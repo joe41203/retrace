@@ -1,0 +1,102 @@
+{
+  "seq": 79,
+  "sha": "a3db3d5c2eea93f1457dd57c0715d7a2a96e36e9",
+  "parents": [
+    "38e518392fa9a48f98a0b8009b07407e0b54fba6"
+  ],
+  "author": {
+    "name": "wangzitian0",
+    "email": "zitwang@linkedin.com",
+    "date": "2017-11-01T19:02:27+08:00"
+  },
+  "message": "improve coverage of users to 90% & add go fmt checking",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 5,
+    "additions": 76,
+    "deletions": 5
+  },
+  "files": [
+    {
+      "path": ".travis.yml",
+      "status": "M",
+      "additions": 2,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "scripts/gofmt.sh",
+      "status": "A",
+      "additions": 7,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "users/models.go",
+      "status": "M",
+      "additions": 2,
+      "deletions": 4,
+      "binary": false
+    },
+    {
+      "path": "users/routers.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "users/unit_test.go",
+      "status": "M",
+      "additions": 64,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/.travis.yml b/.travis.yml\nindex 4dab6fe..4ab698d 100644\n--- a/.travis.yml\n+++ b/.travis.yml\n@@ -15,7 +15,8 @@ install:\n   - go get -u github.com/kardianos/govendor\n   - govendor sync\n script:\n-  - go test -v ./...\n+#  - go test -v ./...\n+  - bash ./scripts/gofmt.sh\n   - bash ./scripts/coverage.sh\n \n after_success:\ndiff --git a/scripts/gofmt.sh b/scripts/gofmt.sh\nnew file mode 100755\nindex 0000000..bb90c4e\n--- /dev/null\n+++ b/scripts/gofmt.sh\n@@ -0,0 +1,7 @@\n+#!/bin/bash\n+\n+if [ -n \"$(go fmt ./...)\" ]; then\n+    echo \"Go code is not formatted:\"\n+    gofmt -d .\n+    exit 1\n+fi\ndiff --git a/users/models.go b/users/models.go\nindex d1c93b7..9aff77a 100644\n--- a/users/models.go\n+++ b/users/models.go\n@@ -56,10 +56,8 @@ func (u *UserModel) setPassword(password string) error {\n \t\treturn errors.New(\"password should not be empty!\")\n \t}\n \tbytePassword := []byte(password)\n-\tpasswordHash, err := bcrypt.GenerateFromPassword(bytePassword, bcrypt.DefaultCost)\n-\tif err != nil {\n-\t\treturn err\n-\t}\n+\t// Make sure the second param `bcrypt generator cost` between [4, 32)\n+\tpasswordHash, _ := bcrypt.GenerateFromPassword(bytePassword, bcrypt.DefaultCost)\n \tu.PasswordHash = string(passwordHash)\n \treturn nil\n }\ndiff --git a/users/routers.go b/users/routers.go\nindex 802ee69..a4da46e 100644\n--- a/users/routers.go\n+++ b/users/routers.go\n@@ -33,6 +33,7 @@ func ProfileRetrieve(c *gin.Context) {\n \tprofileSerializer := ProfileSerializer{c, userModel}\n \tc.JSON(http.StatusOK, gin.H{\"profile\": profileSerializer.Response()})\n }\n+\n func ProfileFollow(c *gin.Context) {\n \tusername := c.Param(\"username\")\n \tuserModel, err := FindOneUser(&UserModel{Username: username})\ndiff --git a/users/unit_test.go b/users/unit_test.go\nindex 199902c..ee9e57f 100644\n--- a/users/unit_test.go\n+++ b/users/unit_test.go\n@@ -226,6 +226,17 @@ var unauthRequestTests = []struct {\n \t\t``,\n \t\t\"request should return 401 without token\",\n \t},\n+\t{\n+\t\tfunc(req *http.Request) {\n+\t\t\treq.Header.Set(\"Authorization\", fmt.Sprintf(\"Tokee %v\", common.GenToken(1)))\n+\t\t},\n+\t\t\"/user/\",\n+\t\t\"GET\",\n+\t\t``,\n+\t\thttp.StatusUnauthorized,\n+\t\t``,\n+\t\t\"wrong token should return 401\",\n+\t},\n \t{\n \t\tfunc(req *http.Request) {\n \t\t\tHeaderTokenMock(req, 1)\n@@ -303,9 +314,62 @@ var unauthRequestTests = []struct {\n \t\t\"request should return correct other's profile\",\n \t},\n \n+\t//---------------------   Testing for user following errors   ---------------------\n+\t{\n+\t\tfunc(req *http.Request) {\n+\t\t\tcommon.TestDBFree(test_db)\n+\t\t\ttest_db = common.TestDBInit()\n+\n+\t\t\ttest_db.AutoMigrate(&UserModel{})\n+\t\t\tuserModelMocker(3)\n+\t\t\tHeaderTokenMock(req, 2)\n+\t\t},\n+\t\t\"/profiles/user1/follow\",\n+\t\t\"POST\",\n+\t\t``,\n+\t\thttp.StatusUnprocessableEntity,\n+\t\t`{\"errors\":{\"database\":\"no such table: follow_models\"}}`,\n+\t\t\"test database error\",\n+\t},\n+\t{\n+\t\tfunc(req *http.Request) {\n+\t\t\tHeaderTokenMock(req, 2)\n+\t\t},\n+\t\t\"/profiles/user1/follow\",\n+\t\t\"DELETE\",\n+\t\t``,\n+\t\thttp.StatusUnprocessableEntity,\n+\t\t`{\"errors\":{\"database\":\"no such table: follow_models\"}}`,\n+\t\t\"test database error\",\n+\t},\n+\t{\n+\t\tfunc(req *http.Request) {\n+\t\t\tresetDBWithMock()\n+\t\t\tHeaderTokenMock(req, 2)\n+\t\t},\n+\t\t\"/profiles/user666/follow\",\n+\t\t\"POST\",\n+\t\t``,\n+\t\thttp.StatusNotFound,\n+\t\t`{\"errors\":{\"profile\":\"Invalid username\"}}`,\n+\t\t\"following wrong user name should return errors\",\n+\t},\n+\t{\n+\t\tfunc(req *http.Request) {\n+\t\t\tHeaderTokenMock(req, 2)\n+\t\t},\n+\t\t\"/profiles/user666/follow\",\n+\t\t\"DELETE\",\n+\t\t``,\n+\t\thttp.StatusNotFound,\n+\t\t`{\"errors\":{\"profile\":\"Invalid username\"}}`,\n+\t\t\"cancel following wrong user name should return errors\",\n+\t},\n+\n \t//---------------------   Testing for user following   ---------------------\n \t{\n \t\tfunc(req *http.Request) {\n+\t\t\tresetDBWithMock()\n \t\t\tHeaderTokenMock(req, 2)\n \t\t},\n \t\t\"/profiles/user1/follow\",\n",
+  "diffTruncated": false,
+  "tree": [
+    ".gitignore",
+    ".travis.yml",
+    "BACKEND_INSTRUCTIONS.md",
+    "FRONTEND_INSTRUCTIONS.md",
+    "MOBILE_INSTRUCTIONS.md",
+    "articles/models.go",
+    "articles/routers.go",
+    "articles/serializers.go",
+    "articles/validators.go",
+    "common/database.go",
+    "common/utils.go",
+    "common/utils_test.go",
+    "hello.go",
+    "logo.png",
+    "readme.md",
+    "scripts/coverage.sh",
+    "scripts/gofmt.sh",
+    "users/doc.go",
+    "users/middlewares.go",
+    "users/models.go",
+    "users/routers.go",
+    "users/serializers.go",
+    "users/unit_test.go",
+    "users/validators.go",
+    "vendor/vendor.json"
+  ],
+  "explanation": {
+    "what": "新規ファイル scripts/gofmt.sh を追加し、`go fmt ./...` の出力が空でなければフォーマット崩れとみなして gofmt -d の差分を表示し exit 1 するチェックスクリプトを実装。.travis.yml の test ステップで `go test -v ./...` をコメントアウトし、代わりに gofmt.sh の実行を追加した。users/models.go の setPassword ではエラーハンドリングを削除して bcrypt.GenerateFromPassword の戻り値エラーを `_` で捨てる形に変更し、コメントでコストパラメータの範囲(4〜32)を明記。users/unit_test.go に不正トークンのテストケースと、フォロー機能まわりのエラーケース(存在しないテーブル、存在しないユーザーへのフォロー/アンフォロー)のテストケースを追加した。",
+    "why": "コミットメッセージ「improve coverage of users to 90% & add go fmt checking」の通り、2つの目的を持つ変更。(1) users パッケージのテストカバレッジを90%まで引き上げるため、これまでカバーされていなかったエラーパス(不正トークン、存在しない follow テーブル、存在しないユーザーのフォロー)のテストケースを追加した。(2) CI に go fmt チェックを追加し、フォーマット崩れのコードがマージされないようにした。setPassword のエラー戻り値を捨てる変更は本来の目的(カバレッジ向上)とは別の副次的な単純化とみられ、コメントで bcrypt のコスト値が固定範囲内であるため事実上エラーが起こらないことを示唆している。",
+    "highlights": [
+      { "file": "scripts/gofmt.sh", "note": "CI にフォーマットチェックを追加。gofmt -d でどこが崩れているか差分表示する" },
+      { "file": "users/unit_test.go", "note": "フォロー機能のエラーケース(存在しないテーブル、存在しないユーザー)をまとめて追加。カバレッジ90%達成の主な追加分" }
+    ],
+    "langNotes": [
+      { "topic": "go fmt / gofmt", "note": "Go はコードフォーマットの唯一の標準(gofmt)を持ち、`go fmt ./...` は対象パッケージのファイルを自動整形する。CI でこの出力が空でないことを検知してフォーマット崩れを弾くのは Go プロジェクトでよく見るチェックパターン。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

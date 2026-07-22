@@ -1,0 +1,80 @@
+{
+  "seq": 86,
+  "sha": "f4c4d25dc3df11117be650ff2d3148c85be2f006",
+  "parents": [
+    "04e874ec707818ee7f3444014df1b0d2baa2e4c5"
+  ],
+  "author": {
+    "name": "wangzitian0",
+    "email": "zitwang@linkedin.com",
+    "date": "2017-11-02T21:48:51+08:00"
+  },
+  "message": "improve the coverage of common to 90%+",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 115,
+    "deletions": 38
+  },
+  "files": [
+    {
+      "path": "common/unit_test.go",
+      "status": "M",
+      "additions": 106,
+      "deletions": 26,
+      "binary": false
+    },
+    {
+      "path": "common/utils.go",
+      "status": "M",
+      "additions": 9,
+      "deletions": 12,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/common/unit_test.go b/common/unit_test.go\nindex e746dc7..15bcaf6 100644\n--- a/common/unit_test.go\n+++ b/common/unit_test.go\n@@ -1,78 +1,158 @@\n package common\n \n import (\n+\t\"bytes\"\n+\t\"errors\"\n \t\"github.com/stretchr/testify/assert\"\n+\t\"gopkg.in/gin-gonic/gin.v1\"\n+\t\"net/http\"\n+\t\"net/http/httptest\"\n \t\"os\"\n \t\"testing\"\n )\n \n func TestConnectingDatabase(t *testing.T) {\n-\tassert := assert.New(t)\n+\tasserts := assert.New(t)\n \tdb := Init()\n \t// Test create & close DB\n \t_, err := os.Stat(\"./../gorm.db\")\n-\tassert.NoError(err, \"Db should exist\")\n-\tassert.NoError(db.DB().Ping(), \"Db should be able to ping\")\n+\tasserts.NoError(err, \"Db should exist\")\n+\tasserts.NoError(db.DB().Ping(), \"Db should be able to ping\")\n \n \t// Test get a connecting from connection pools\n \tconnection := GetDB()\n-\tassert.NoError(connection.DB().Ping(), \"Db should be able to ping\")\n+\tasserts.NoError(connection.DB().Ping(), \"Db should be able to ping\")\n \tdb.Close()\n \n-\n \t// Test DB exceptions\n-\tos.Chmod(\"./../gorm.db\",0000)\n+\tos.Chmod(\"./../gorm.db\", 0000)\n \tdb = Init()\n-\tassert.Error(db.DB().Ping(), \"Db should not be able to ping\")\n+\tasserts.Error(db.DB().Ping(), \"Db should not be able to ping\")\n \tdb.Close()\n-\tos.Chmod(\"./../gorm.db\",0644)\n+\tos.Chmod(\"./../gorm.db\", 0644)\n }\n \n-\n func TestConnectingTestDatabase(t *testing.T) {\n-\tassert := assert.New(t)\n+\tasserts := assert.New(t)\n \t// Test create & close DB\n \tdb := TestDBInit()\n \t_, err := os.Stat(\"./../gorm_test.db\")\n-\tassert.NoError(err, \"Db should exist\")\n-\tassert.NoError(db.DB().Ping(), \"Db should be able to ping\")\n+\tasserts.NoError(err, \"Db should exist\")\n+\tasserts.NoError(db.DB().Ping(), \"Db should be able to ping\")\n \tdb.Close()\n \n \t// Test testDB exceptions\n-\tos.Chmod(\"./../gorm_test.db\",0000)\n+\tos.Chmod(\"./../gorm_test.db\", 0000)\n \tdb = TestDBInit()\n \t_, err = os.Stat(\"./../gorm_test.db\")\n-\tassert.NoError(err, \"Db should exist\")\n-\tassert.Error(db.DB().Ping(), \"Db should not be able to ping\")\n-\tdb.Close()\n-\tos.Chmod(\"./../gorm_test.db\",0644)\n+\tasserts.NoError(err, \"Db should exist\")\n+\tasserts.Error(db.DB().Ping(), \"Db should not be able to ping\")\n+\tos.Chmod(\"./../gorm_test.db\", 0644)\n \n-\t// Test delete DB\n+\t// Test close delete DB\n \tTestDBFree(db)\n \t_, err = os.Stat(\"./../gorm_test.db\")\n \n-\tassert.Error(err, \"Db should not exist\")\n+\tasserts.Error(err, \"Db should not exist\")\n }\n \n func TestRandString(t *testing.T) {\n-\tassert := assert.New(t)\n+\tasserts := assert.New(t)\n \n \tvar letters = []rune(\"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789\")\n \tstr := RandString(0)\n-\tassert.Equal(str, \"\", \"length should be ''\")\n+\tasserts.Equal(str, \"\", \"length should be ''\")\n \n \tstr = RandString(10)\n-\tassert.Equal(len(str), 10, \"length should be 10\")\n+\tasserts.Equal(len(str), 10, \"length should be 10\")\n \tfor _, ch := range str {\n-\t\tassert.Contains(letters, ch, \"char should be a-z|A-Z|0-9\")\n+\t\tasserts.Contains(letters, ch, \"char should be a-z|A-Z|0-9\")\n \t}\n }\n \n func TestGenToken(t *testing.T) {\n-\tassert := assert.New(t)\n+\tasserts := assert.New(t)\n \n \ttoken := GenToken(2)\n \n-\tassert.IsType(token, string(\"token\"), \"token type should be string\")\n-\tassert.Len(token, 115, \"JWT's length should be 115\")\n+\tasserts.IsType(token, string(\"token\"), \"token type should be string\")\n+\tasserts.Len(token, 115, \"JWT's length should be 115\")\n+}\n+\n+func TestNewValidatorError(t *testing.T) {\n+\tasserts := assert.New(t)\n+\n+\ttype Login struct {\n+\t\tUsername string `form:\"username\" json:\"username\" binding:\"exists,alphanum,min=4,max=255\"`\n+\t\tPassword string `form:\"password\" json:\"password\" binding:\"exists,min=8,max=255\"`\n+\t}\n+\n+\tvar requestTests = []struct {\n+\t\tbodyData       string\n+\t\texpectedCode   int\n+\t\tresponseRegexg string\n+\t\tmsg            string\n+\t}{\n+\t\t{\n+\t\t\t`{\"username\": \"wangzitian0\",\"password\": \"0123456789\"}`,\n+\t\t\thttp.StatusOK,\n+\t\t\t`{\"status\":\"you are logged in\"}`,\n+\t\t\t\"valid data and should return StatusCreated\",\n+\t\t},\n+\t\t{\n+\t\t\t`{\"username\": \"wangzitian0\",\"password\": \"01234567866\"}`,\n+\t\t\thttp.StatusUnauthorized,\n+\t\t\t`{\"errors\":{\"user\":\"wrong username or password\"}}`,\n+\t\t\t\"wrong login status should return StatusUnauthorized\",\n+\t\t},\n+\t\t{\n+\t\t\t`{\"username\": \"wangzitian0\",\"password\": \"0122\"}`,\n+\t\t\thttp.StatusUnprocessableEntity,\n+\t\t\t`{\"errors\":{\"Password\":\"{min: 8}\"}}`,\n+\t\t\t\"invalid data and should return StatusUnprocessableEntity\",\n+\t\t},\n+\t}\n+\n+\tr := gin.Default()\n+\n+\tr.POST(\"/login\", func(c *gin.Context) {\n+\t\tvar json Login\n+\t\tif err := Bind(c, &json); err == nil {\n+\t\t\tif json.Username == \"wangzitian0\" && json.Password == \"0123456789\" {\n+\t\t\t\tc.JSON(http.StatusOK, gin.H{\"status\": \"you are logged in\"})\n+\t\t\t} else {\n+\t\t\t\tc.JSON(http.StatusUnauthorized, NewError(\"user\", errors.New(\"wrong username or password\")))\n+\t\t\t}\n+\t\t} else {\n+\t\t\tc.JSON(http.StatusUnprocessableEntity, NewValidatorError(err))\n+\t\t}\n+\t})\n+\n+\tfor _, testData := range requestTests {\n+\t\tbodyData := testData.bodyData\n+\t\treq, err := http.NewRequest(\"POST\", \"/login\", bytes.NewBufferString(bodyData))\n+\t\treq.Header.Set(\"Content-Type\", \"application/json\")\n+\t\tasserts.NoError(err)\n+\n+\t\tw := httptest.NewRecorder()\n+\t\tr.ServeHTTP(w, req)\n+\n+\t\tasserts.Equal(testData.expectedCode, w.Code, \"Response Status - \"+testData.msg)\n+\t\tasserts.Regexp(testData.responseRegexg, w.Body.String(), \"Response Content - \"+testData.msg)\n+\t}\n+}\n+\n+func TestNewError(t *testing.T) {\n+\tassert := assert.New(t)\n+\n+\tdb := TestDBInit()\n+\ttype NotExist struct {\n+\t\theheda string\n+\t}\n+\tdb.AutoMigrate(NotExist{})\n+\n+\tcommenError := NewError(\"database\", db.Find(NotExist{heheda: \"heheda\"}).Error)\n+\tassert.IsType(commenError, commenError, \"commenError should have right type\")\n+\tassert.Equal(map[string]interface{}(map[string]interface{}{\"database\": \"no such table: not_exists\"}),\n+\t\tcommenError.Errors, \"commenError should have right error info\")\n }\ndiff --git a/common/utils.go b/common/utils.go\nindex bb35500..560b06f 100644\n--- a/common/utils.go\n+++ b/common/utils.go\n@@ -6,7 +6,6 @@ import (\n \t\"time\"\n \n \t\"github.com/dgrijalva/jwt-go\"\n-\t_ \"github.com/jinzhu/gorm/dialects/sqlite\"\n \t\"gopkg.in/go-playground/validator.v8\"\n \n \t\"github.com/gin-gonic/gin/binding\"\n@@ -26,6 +25,7 @@ func RandString(n int) string {\n const NBSecretPassword = \"A String Very Very Very Strong!!@##$!@#$\"\n const NBRandomPassword = \"A String Very Very Very Niubilty!!@##$!@#4\"\n \n+// A Util function to generate jwt_token which can be used in the request header\n func GenToken(id uint) string {\n \tjwt_token := jwt.New(jwt.GetSigningMethod(\"HS256\"))\n \t// Set some claims\n@@ -41,21 +41,14 @@ func GenToken(id uint) string {\n \treturn token\n }\n \n-func ErrsToList(err error) []interface{} {\n-\terrs := err.(validator.ValidationErrors)\n-\tvar res []interface{}\n-\tfor _, v := range errs {\n-\t\t// can translate each error one at a time.\n-\t\t//fmt.Println(v.Value)\n-\t\tres = append(res, v.Field)\n-\t}\n-\treturn res\n-}\n-\n+// My own Error type that will help return my customized Error info\n+//  {\"database\": {\"hello\":\"no such table\", error: \"not_exists\"}}\n type CommonError struct {\n \tErrors map[string]interface{} `json:\"errors\"`\n }\n \n+// To handle the error returned by c.Bind in gin framework\n+// https://github.com/go-playground/validator/blob/v9/_examples/translations/main.go\n func NewValidatorError(err error) CommonError {\n \tres := CommonError{}\n \tres.Errors = make(map[string]interface{})\n@@ -73,6 +66,7 @@ func NewValidatorError(err error) CommonError {\n \treturn res\n }\n \n+// Warp the error info in a object\n func NewError(key string, err error) CommonError {\n \tres := CommonError{}\n \tres.Errors = make(map[string]interface{})\n@@ -80,6 +74,9 @@ func NewError(key string, err error) CommonError {\n \treturn res\n }\n \n+// Changed the c.MustBindWith() ->  c.ShouldBindWith().\n+// I don't want to auto return 400 when error happened.\n+// origin function is here: https://github.com/gin-gonic/gin/blob/master/context.go\n func Bind(c *gin.Context, obj interface{}) error {\n \tb := binding.Default(c.Request.Method, c.ContentType())\n \treturn c.ShouldBindWith(obj, b)\n",
+  "diffTruncated": false,
+  "tree": [
+    ".gitignore",
+    ".travis.yml",
+    "BACKEND_INSTRUCTIONS.md",
+    "FRONTEND_INSTRUCTIONS.md",
+    "MOBILE_INSTRUCTIONS.md",
+    "articles/models.go",
+    "articles/routers.go",
+    "articles/serializers.go",
+    "articles/validators.go",
+    "common/database.go",
+    "common/unit_test.go",
+    "common/utils.go",
+    "hello.go",
+    "logo.png",
+    "readme.md",
+    "scripts/coverage.sh",
+    "scripts/gofmt.sh",
+    "users/doc.go",
+    "users/middlewares.go",
+    "users/models.go",
+    "users/routers.go",
+    "users/serializers.go",
+    "users/unit_test.go",
+    "users/validators.go",
+    "vendor/vendor.json"
+  ],
+  "explanation": {
+    "what": "common モジュールのテストカバレッジを90%以上に引き上げた。common/unit_test.go に TestNewValidatorError(バリデーションエラー時のJSONレスポンス検証。gin.Default() でテスト用ルータを組み gin.v1 の httptest でPOSTを模擬)と TestNewError(存在しないテーブルへのクエリでDBエラーを起こしエラー整形を検証)を追加した。common/utils.go では未使用だった ErrsToList 関数を削除し、既存関数にコメントを追加した。",
+    "why": "コミットメッセージが「improve the coverage of common to 90%+」と明言しており、テストカバレッジの数値目標達成が直接の動機。ErrsToList の削除はカバレッジ計測から外れる死んだコードを整理する目的とみられる。",
+    "highlights": [
+      { "file": "common/unit_test.go", "note": "gin.Default() + httptest でHTTPハンドラを直接叩き、バリデーションエラー時のJSON整形(NewValidatorError)を検証している" }
+    ],
+    "langNotes": [
+      { "topic": "net/http/httptest", "note": "実サーバを起動せずにハンドラ関数を直接テストできるGo標準ライブラリ。httptest.NewRecorder() でレスポンスを記録し、gin のルータに ServeHTTP で直接リクエストを流し込んでいる。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

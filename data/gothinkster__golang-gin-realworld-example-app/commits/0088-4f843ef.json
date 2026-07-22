@@ -1,0 +1,85 @@
+{
+  "seq": 88,
+  "sha": "4f843efe51b0db45c571cd5a3363c04a653f969e",
+  "parents": [
+    "4977e94a76e42651ccae47e7e62e941a35df453d"
+  ],
+  "author": {
+    "name": "wangzitian0",
+    "email": "zitwang@linkedin.com",
+    "date": "2017-11-03T18:48:24+08:00"
+  },
+  "message": "improve common's test coverage",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 3,
+    "additions": 12,
+    "deletions": 5
+  },
+  "files": [
+    {
+      "path": "common/unit_test.go",
+      "status": "M",
+      "additions": 7,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "common/utils.go",
+      "status": "M",
+      "additions": 3,
+      "deletions": 4,
+      "binary": false
+    },
+    {
+      "path": "users/serializers.go",
+      "status": "M",
+      "additions": 2,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/common/unit_test.go b/common/unit_test.go\nindex 15bcaf6..71b4997 100644\n--- a/common/unit_test.go\n+++ b/common/unit_test.go\n@@ -109,7 +109,13 @@ func TestNewValidatorError(t *testing.T) {\n \t\t\t`{\"username\": \"wangzitian0\",\"password\": \"0122\"}`,\n \t\t\thttp.StatusUnprocessableEntity,\n \t\t\t`{\"errors\":{\"Password\":\"{min: 8}\"}}`,\n-\t\t\t\"invalid data and should return StatusUnprocessableEntity\",\n+\t\t\t\"invalid password of too short and should return StatusUnprocessableEntity\",\n+\t\t},\n+\t\t{\n+\t\t\t`{\"username\": \"_wangzitian0\",\"password\": \"0123456789\"}`,\n+\t\t\thttp.StatusUnprocessableEntity,\n+\t\t\t`{\"errors\":{\"Username\":\"{key: alphanum}\"}}`,\n+\t\t\t\"invalid username of non alphanum and should return StatusUnprocessableEntity\",\n \t\t},\n \t}\n \ndiff --git a/common/utils.go b/common/utils.go\nindex 560b06f..3cdbcbd 100644\n--- a/common/utils.go\n+++ b/common/utils.go\n@@ -14,6 +14,7 @@ import (\n \n var letters = []rune(\"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789\")\n \n+// A helper function to generate random string\n func RandString(n int) string {\n \tb := make([]rune, n)\n \tfor i := range b {\n@@ -22,6 +23,7 @@ func RandString(n int) string {\n \treturn string(b)\n }\n \n+// Keep this two config private, it should not expose to open source\n const NBSecretPassword = \"A String Very Very Very Strong!!@##$!@#$\"\n const NBRandomPassword = \"A String Very Very Very Niubilty!!@##$!@#4\"\n \n@@ -34,10 +36,7 @@ func GenToken(id uint) string {\n \t\t\"exp\": time.Now().Add(time.Hour * 24).Unix(),\n \t}\n \t// Sign and get the complete encoded token as a string\n-\ttoken, err := jwt_token.SignedString([]byte(NBSecretPassword))\n-\tif err != nil {\n-\t\tpanic(\"jwt generator broken\")\n-\t}\n+\ttoken, _ := jwt_token.SignedString([]byte(NBSecretPassword))\n \treturn token\n }\n \ndiff --git a/users/serializers.go b/users/serializers.go\nindex 8029bd8..c7e23cd 100644\n--- a/users/serializers.go\n+++ b/users/serializers.go\n@@ -11,6 +11,7 @@ type ProfileSerializer struct {\n \tUserModel\n }\n \n+// Declare your response schema here\n type ProfileResponse struct {\n \tID        uint    `json:\"-\"`\n \tUsername  string  `json:\"username\"`\n@@ -19,6 +20,7 @@ type ProfileResponse struct {\n \tFollowing bool    `json:\"following\"`\n }\n \n+// Put your response logic including wrap the userModel here.\n func (self *ProfileSerializer) Response() ProfileResponse {\n \tmyUserModel := self.C.MustGet(\"my_user_model\").(UserModel)\n \tprofile := ProfileResponse{\n",
+  "diffTruncated": false,
+  "tree": [
+    ".gitignore",
+    ".travis.yml",
+    "BACKEND_INSTRUCTIONS.md",
+    "FRONTEND_INSTRUCTIONS.md",
+    "MOBILE_INSTRUCTIONS.md",
+    "articles/models.go",
+    "articles/routers.go",
+    "articles/serializers.go",
+    "articles/validators.go",
+    "common/database.go",
+    "common/unit_test.go",
+    "common/utils.go",
+    "hello.go",
+    "logo.png",
+    "readme.md",
+    "scripts/coverage.sh",
+    "scripts/gofmt.sh",
+    "users/doc.go",
+    "users/middlewares.go",
+    "users/models.go",
+    "users/routers.go",
+    "users/serializers.go",
+    "users/unit_test.go",
+    "users/validators.go",
+    "vendor/vendor.json"
+  ],
+  "explanation": {
+    "what": "common/unit_test.go の TestNewValidatorError に、ユーザー名が英数字以外(non alphanum)を含む場合のバリデーションエラーケースを追加した。common/utils.go の GenToken では jwt_token.SignedString のエラーを無視する形(戻り値を _ で捨てる)に変え、panicを除去した。users/serializers.go の ProfileResponse にもコメントを追加した。",
+    "why": "コミットメッセージ「improve common's test coverage」が示す通り、テストケースの追加によるカバレッジ改善が主目的。GenToken のpanic除去は、HS256署名のSignedStringが実質的にエラーを返さない(署名に失敗する状況がほぼ無い)ことを踏まえ、到達しない分岐を消してテスト・カバレッジ計測をシンプルにする意図とみられる。",
+    "highlights": [
+      { "file": "common/utils.go", "note": "GenToken のエラーハンドリングを `token, err := ...; if err != nil { panic(...) }` から `token, _ := ...` に簡略化" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

@@ -1,0 +1,90 @@
+{
+  "seq": 107,
+  "sha": "1c19b709f3fcfab6db04d057c4eeb15f32a47f7c",
+  "parents": [
+    "e5c6928df98f6c6c73ebc1de14a541a018d79edb"
+  ],
+  "author": {
+    "name": "wangzitian0",
+    "email": "wangzitian0@gmail.com",
+    "date": "2026-01-04T05:06:19+08:00"
+  },
+  "message": "fix: sort article tags alphabetically for API spec compliance (#48)\n\nSort tagList in alphabetical order to match RealWorld API test expectations.\nThis ensures consistent tag ordering across all article responses.",
+  "pr": {
+    "number": 48,
+    "title": "fix: sort article tags alphabetically for API spec compliance",
+    "body": "## Summary\n\nSort tagList in alphabetical order to match RealWorld API test expectations.\n\n## Changes\n\n- Added `sort.Strings(response.Tags)` in `ArticleSerializer.Response()` to ensure consistent alphabetical ordering of tags\n\n## Test Results\n\n**RealWorld API Tests (Postman Collection):**\n- Total assertions: 311\n- Passing: **311** ✅\n- Failing: **0**\n\nAll unit tests pass.",
+    "url": "https://github.com/gothinkster/golang-gin-realworld-example-app/pull/48"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 3,
+    "deletions": 0
+  },
+  "files": [
+    {
+      "path": "articles/serializers.go",
+      "status": "M",
+      "additions": 3,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/articles/serializers.go b/articles/serializers.go\nindex 0e60f8d..8691f86 100644\n--- a/articles/serializers.go\n+++ b/articles/serializers.go\n@@ -1,6 +1,8 @@\n package articles\n \n import (\n+\t\"sort\"\n+\n \t\"github.com/gin-gonic/gin\"\n \t\"github.com/gosimple/slug\"\n \t\"github.com/gothinkster/golang-gin-realworld-example-app/users\"\n@@ -84,6 +86,7 @@ func (s *ArticleSerializer) Response() ArticleResponse {\n \t\tserializer := TagSerializer{s.C, tag}\n \t\tresponse.Tags = append(response.Tags, serializer.Response())\n \t}\n+\tsort.Strings(response.Tags)\n \treturn response\n }\n \n",
+  "diffTruncated": false,
+  "tree": [
+    ".env.example",
+    ".github/SETUP.md",
+    ".github/workflows/ci.yml",
+    ".gitignore",
+    ".golangci.yml",
+    ".travis.yml",
+    "AGENTS.md",
+    "BACKEND_INSTRUCTIONS.md",
+    "FRONTEND_INSTRUCTIONS.md",
+    "LICENSE",
+    "MOBILE_INSTRUCTIONS.md",
+    "articles/doc.go",
+    "articles/models.go",
+    "articles/routers.go",
+    "articles/serializers.go",
+    "articles/unit_test.go",
+    "articles/validators.go",
+    "common/database.go",
+    "common/unit_test.go",
+    "common/utils.go",
+    "data/.gitkeep",
+    "doc.go",
+    "go.mod",
+    "go.mod-generated_by_mod_init",
+    "go.sum",
+    "hello.go",
+    "logo.png",
+    "readme.md",
+    "scripts/coverage.sh",
+    "scripts/gofmt.sh",
+    "users/doc.go",
+    "users/middlewares.go",
+    "users/models.go",
+    "users/routers.go",
+    "users/serializers.go",
+    "users/unit_test.go",
+    "users/validators.go"
+  ],
+  "explanation": {
+    "what": "articles/serializers.go の ArticleSerializer.Response() で、tagList を組み立てた直後に sort.Strings(response.Tags) を追加し、記事レスポンス内のタグをアルファベット順に並べるようにした。",
+    "why": "PR body によれば、RealWorld API の Postman テスト(全311アサーション)がタグの並び順に依存しており、順序が不定だとテストが失敗していた。sort.Strings を1行加えるだけで全アサーションが通過するようになったとPRに記載されている。",
+    "highlights": [
+      { "file": "articles/serializers.go", "note": "sort.Strings(response.Tags) の1行追加のみ。tagList のシリアライズ順序をアルファベット順に固定する" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [
+      { "type": "pr", "number": 48, "url": "https://github.com/gothinkster/golang-gin-realworld-example-app/pull/48" }
+    ],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

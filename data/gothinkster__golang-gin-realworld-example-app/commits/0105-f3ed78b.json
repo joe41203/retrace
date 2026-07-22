@@ -1,0 +1,149 @@
+{
+  "seq": 105,
+  "sha": "f3ed78bee296ddc27f88425690ab3a3729c6d27e",
+  "parents": [
+    "6ccdfbe5d25b34b33c9cfeea0b1fab4564d09042"
+  ],
+  "author": {
+    "name": "wangzitian0",
+    "email": "wangzitian0@gmail.com",
+    "date": "2026-01-04T04:15:54+08:00"
+  },
+  "message": "fix: resolve articles API test failures and add environment config (#46)\n\n* fix: resolve articles API test failures and add environment config\n\n## Changes\n\n### Environment Configuration\n- Add comprehensive .env.example with PORT, DB_PATH, and other settings\n- Update common/database.go to use environment variables for DB path\n- Update hello.go to use PORT environment variable\n- Create data/ directory for SQLite database files\n\n### API Routing Fix (Main Fix)\n- Disable RedirectTrailingSlash in Gin to prevent POST body loss\n- Register routes both with and without trailing slashes\n- This fixes 307 redirects that were causing POST requests to fail\n\n### Test Results\n- Before: 63.2% pass rate (153/242 assertions)\n- After: 99.4% pass rate (309/311 assertions)\n- Remaining 2 failures are tag ordering edge cases in test suite\n\n### Files Modified\n- .env.example: Complete environment configuration template\n- .gitignore: Proper handling of .env and database files\n- hello.go: Environment variable support and routing fix\n- common/database.go: Dynamic DB path from environment\n- common/unit_test.go: Updated test paths\n- users/routers.go: Dual route registration\n- articles/routers.go: Dual route registration\n- readme.md: Updated getting started guide\n\n* fix: address code review feedback\n\n- Fix directory permissions: use 0750 instead of 0755\n- Handle r.Run() error in hello.go\n- Export GetDBPath() and GetTestDBPath() to avoid duplication in tests\n- Simplify .env.example to only include actually used variables\n- Update readme.md to clarify env vars are set directly (not via .env file loader)\n- Remove duplicated path logic in unit tests\n\n* Update readme.md\n\nCo-authored-by: Copilot <175728472+Copilot@users.noreply.github.com>\n\n* Update articles/routers.go\n\nCo-authored-by: Copilot <175728472+Copilot@users.noreply.github.com>\n\n---------\n\nCo-authored-by: Copilot <175728472+Copilot@users.noreply.github.com>",
+  "pr": {
+    "number": 46,
+    "title": "fix: resolve articles API test failures and add environment config",
+    "body": "## Summary\n\nThis PR fixes the Articles module API test failures and adds comprehensive environment configuration support.\n\n## Problem\n\nThe API tests were failing with a **63.2% pass rate** (153/242 assertions). All 89 failures were in the Articles module:\n- Create Article: 15/15 failed\n- Single Article by slug: 15/15 failed  \n- Update Article: 15/15 failed\n- Favorite/Unfavorite: 33/33 failed\n- Comments: 10/10 failed\n\n## Root Cause\n\nGin's `RedirectTrailingSlash` feature was causing **307 redirects** for POST/PUT requests to endpoints without trailing slashes (e.g., `POST /api/users` → `POST /api/users/`). This redirect caused the request body to be lost, resulting in empty responses and validation errors.\n\n## Solution\n\n1. **Disabled RedirectTrailingSlash** in Gin router configuration\n2. **Registered routes both with and without trailing slashes** to support all client behaviors\n3. **Added environment variable configuration** for PORT, DB_PATH, etc.\n\n## Test Results\n\n| Metric | Before | After |\n|--------|--------|-------|\n| Pass Rate | 63.2% | **99.4%** |\n| Passed | 153/242 | 309/311 |\n| Failed | 89 | 2 |\n\nThe remaining 2 failures are tag ordering edge cases in the test suite (expects alphabetical order, we preserve user input order).\n\n## Changes\n\n### Environment Configuration\n- `.env.example`: Complete configuration template\n- `common/database.go`: Dynamic DB path from environment variables\n- `hello.go`: PORT environment variable support\n- `data/` directory for SQLite database files\n\n### API Routing Fix\n- `hello.go`: Disable `RedirectTrailingSlash`\n- `users/routers.go`: Dual route registration\n- `articles/routers.go`: Dual route registration\n\n### Documentation\n- `readme.md`: Updated getting started guide with env config\n\n## Testing\n\n```bash\n# Run Go unit tests\ngo test ./...\n\n# Run RealWorld API tests\nPORT=3333 go run hello.go &\nnewman run api/Conduit.postman_collection.json \\\n  --global-var \"APIURL=http://localhost:3333/api\" \\\n  --global-var \"USERNAME=testuser\" \\\n  --global-var \"EMAIL=test@test.com\" \\\n  --global-var \"PASSWORD=password123\"\n```",
+    "url": "https://github.com/gothinkster/golang-gin-realworld-example-app/pull/46"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 9,
+    "additions": 127,
+    "deletions": 17
+  },
+  "files": [
+    {
+      "path": ".env.example",
+      "status": "M",
+      "additions": 9,
+      "deletions": 4,
+      "binary": false
+    },
+    {
+      "path": ".gitignore",
+      "status": "M",
+      "additions": 11,
+      "deletions": 2,
+      "binary": false
+    },
+    {
+      "path": "articles/routers.go",
+      "status": "M",
+      "additions": 4,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "common/database.go",
+      "status": "M",
+      "additions": 48,
+      "deletions": 4,
+      "binary": false
+    },
+    {
+      "path": "common/unit_test.go",
+      "status": "M",
+      "additions": 7,
+      "deletions": 5,
+      "binary": false
+    },
+    {
+      "path": "data/.gitkeep",
+      "status": "A",
+      "additions": 1,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "hello.go",
+      "status": "M",
+      "additions": 13,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "readme.md",
+      "status": "M",
+      "additions": 31,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "users/routers.go",
+      "status": "M",
+      "additions": 3,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/.env.example b/.env.example\nindex 7e96a82..b13f1b0 100644\n--- a/.env.example\n+++ b/.env.example\n@@ -1,4 +1,9 @@\n-# Golang 环境\n-export PATH=\"/opt/homebrew/opt/go@1.22/bin:$PATH\"\n-export GOPATH=$HOME/go\n-export PATH=$PATH:$GOPATH/bin\n+# Server Configuration\n+PORT=8080\n+GIN_MODE=debug\n+\n+# Database Configuration (SQLite)\n+DB_PATH=./data/gorm.db\n+\n+# Test Database Path (optional, for running tests)\n+# TEST_DB_PATH=./data/gorm_test.db\ndiff --git a/.gitignore b/.gitignore\nindex a3db3ac..f35878b 100644\n--- a/.gitignore\n+++ b/.gitignore\n@@ -11,7 +11,6 @@\n *.launch\n .settings/\n \n-\n #System Files\n .DS_Store\n Thumbs.db\n@@ -20,12 +19,22 @@ vendor/*\n !vendor/vendor.json\n \n tmp/*\n+\n+# Database files\n+*.db\n+data/*.db\n gorm.db\n gorm_test.db\n-*.db\n+\n+# Test output\n coverage.txt\n coverage.out\n profile.out\n results.sarif\n \n+# Environment files (keep .env.example)\n+.env\n+.env.local\n+.env.*.local\n+\n bak.*\ndiff --git a/articles/routers.go b/articles/routers.go\nindex 386d364..b91cefc 100644\n--- a/articles/routers.go\n+++ b/articles/routers.go\n@@ -11,8 +11,10 @@ import (\n \n func ArticlesRegister(router *gin.RouterGroup) {\n \trouter.GET(\"/feed\", ArticleFeed)\n+\trouter.POST(\"\", ArticleCreate)\n \trouter.POST(\"/\", ArticleCreate)\n \trouter.PUT(\"/:slug\", ArticleUpdate)\n+\trouter.PUT(\"/:slug/\", ArticleUpdate)\n \trouter.DELETE(\"/:slug\", ArticleDelete)\n \trouter.POST(\"/:slug/favorite\", ArticleFavorite)\n \trouter.DELETE(\"/:slug/favorite\", ArticleUnfavorite)\n@@ -21,12 +23,14 @@ func ArticlesRegister(router *gin.RouterGroup) {\n }\n \n func ArticlesAnonymousRegister(router *gin.RouterGroup) {\n+\trouter.GET(\"\", ArticleList)\n \trouter.GET(\"/\", ArticleList)\n \trouter.GET(\"/:slug\", ArticleRetrieve)\n \trouter.GET(\"/:slug/comments\", ArticleCommentList)\n }\n \n func TagsAnonymousRegister(router *gin.RouterGroup) {\n+\trouter.GET(\"\", TagList)\n \trouter.GET(\"/\", TagList)\n }\n \ndiff --git a/common/database.go b/common/database.go\nindex bce85c7..e560926 100644\n--- a/common/database.go\n+++ b/common/database.go\n@@ -3,6 +3,7 @@ package common\n import (\n \t\"fmt\"\n \t\"os\"\n+\t\"path/filepath\"\n \n \t\"gorm.io/driver/sqlite\"\n \t\"gorm.io/gorm\"\n@@ -15,9 +16,45 @@ type Database struct {\n \n var DB *gorm.DB\n \n+// GetDBPath returns the database path from environment or default.\n+// Exported for use in tests.\n+func GetDBPath() string {\n+\tdbPath := os.Getenv(\"DB_PATH\")\n+\tif dbPath == \"\" {\n+\t\tdbPath = \"./data/gorm.db\"\n+\t}\n+\treturn dbPath\n+}\n+\n+// GetTestDBPath returns the test database path from environment or default.\n+// Exported for use in tests.\n+func GetTestDBPath() string {\n+\ttestDBPath := os.Getenv(\"TEST_DB_PATH\")\n+\tif testDBPath == \"\" {\n+\t\ttestDBPath = \"./data/gorm_test.db\"\n+\t}\n+\treturn testDBPath\n+}\n+\n+// ensureDir creates the directory for the database file if it doesn't exist\n+func ensureDir(filePath string) error {\n+\tdir := filepath.Dir(filePath)\n+\tif dir != \"\" && dir != \".\" {\n+\t\treturn os.MkdirAll(dir, 0750)\n+\t}\n+\treturn nil\n+}\n+\n // Opening a database and save the reference to `Database` struct.\n func Init() *gorm.DB {\n-\tdb, err := gorm.Open(sqlite.Open(\"./../gorm.db\"), &gorm.Config{})\n+\tdbPath := GetDBPath()\n+\n+\t// Ensure the directory exists\n+\tif err := ensureDir(dbPath); err != nil {\n+\t\tfmt.Println(\"db err: (Init - create dir) \", err)\n+\t}\n+\n+\tdb, err := gorm.Open(sqlite.Open(dbPath), &gorm.Config{})\n \tif err != nil {\n \t\tfmt.Println(\"db err: (Init) \", err)\n \t}\n@@ -27,14 +64,20 @@ func Init() *gorm.DB {\n \t} else {\n \t\tsqlDB.SetMaxIdleConns(10)\n \t}\n-\t//db.LogMode(true)\n \tDB = db\n \treturn DB\n }\n \n // This function will create a temporarily database for running testing cases\n func TestDBInit() *gorm.DB {\n-\ttest_db, err := gorm.Open(sqlite.Open(\"./../gorm_test.db\"), &gorm.Config{\n+\ttestDBPath := GetTestDBPath()\n+\n+\t// Ensure the directory exists\n+\tif err := ensureDir(testDBPath); err != nil {\n+\t\tfmt.Println(\"db err: (TestDBInit - create dir) \", err)\n+\t}\n+\n+\ttest_db, err := gorm.Open(sqlite.Open(testDBPath), &gorm.Config{\n \t\tLogger: logger.Default.LogMode(logger.Info),\n \t})\n \tif err != nil {\n@@ -59,7 +102,8 @@ func TestDBFree(test_db *gorm.DB) error {\n \tif err := sqlDB.Close(); err != nil {\n \t\treturn err\n \t}\n-\terr = os.Remove(\"./../gorm_test.db\")\n+\ttestDBPath := GetTestDBPath()\n+\terr = os.Remove(testDBPath)\n \treturn err\n }\n \ndiff --git a/common/unit_test.go b/common/unit_test.go\nindex b435119..b75e6fa 100644\n--- a/common/unit_test.go\n+++ b/common/unit_test.go\n@@ -15,8 +15,9 @@ import (\n func TestConnectingDatabase(t *testing.T) {\n \tasserts := assert.New(t)\n \tdb := Init()\n+\tdbPath := GetDBPath()\n \t// Test create & close DB\n-\t_, err := os.Stat(\"./../gorm.db\")\n+\t_, err := os.Stat(dbPath)\n \tasserts.NoError(err, \"Db should exist\")\n \tsqlDB, _ := db.DB()\n \tasserts.NoError(sqlDB.Ping(), \"Db should be able to ping\")\n@@ -28,19 +29,20 @@ func TestConnectingDatabase(t *testing.T) {\n \tsqlDB.Close()\n \n \t// Test DB exceptions\n-\tos.Chmod(\"./../gorm.db\", 0000)\n+\tos.Chmod(dbPath, 0000)\n \tdb = Init()\n \tsqlDB, _ = db.DB()\n \tasserts.Error(sqlDB.Ping(), \"Db should not be able to ping\")\n \tsqlDB.Close()\n-\tos.Chmod(\"./../gorm.db\", 0644)\n+\tos.Chmod(dbPath, 0644)\n }\n \n func TestConnectingTestDatabase(t *testing.T) {\n \tasserts := assert.New(t)\n \t// Test create & close DB\n \tdb := TestDBInit()\n-\t_, err := os.Stat(\"./../gorm_test.db\")\n+\ttestDBPath := GetTestDBPath()\n+\t_, err := os.Stat(testDBPath)\n \tasserts.NoError(err, \"Db should exist\")\n \tsqlDB, _ := db.DB()\n \tasserts.NoError(sqlDB.Ping(), \"Db should be able to ping\")\n@@ -49,7 +51,7 @@ func TestConnectingTestDatabase(t *testing.T) {\n \t// Test close delete DB\n \tdb = TestDBInit()\n \tTestDBFree(db)\n-\t_, err = os.Stat(\"./../gorm_test.db\")\n+\t_, err = os.Stat(testDBPath)\n \n \tasserts.Error(err, \"Db should not exist\")\n }\ndiff --git a/data/.gitkeep b/data/.gitkeep\nnew file mode 100644\nindex 0000000..8896f00\n--- /dev/null\n+++ b/data/.gitkeep\n@@ -0,0 +1 @@\n+# Database files are stored here and ignored by git\ndiff --git a/hello.go b/hello.go\nindex 79710ce..4ff36d3 100644\n--- a/hello.go\n+++ b/hello.go\n@@ -2,6 +2,7 @@ package main\n \n import (\n \t\"log\"\n+\t\"os\"\n \n \t\"github.com/gin-gonic/gin\"\n \n@@ -33,6 +34,10 @@ func main() {\n \n \tr := gin.Default()\n \n+\t// Disable automatic redirect for trailing slashes\n+\t// This prevents POST body from being lost during redirects\n+\tr.RedirectTrailingSlash = false\n+\n \tv1 := r.Group(\"/api\")\n \tusers.UsersRegister(v1.Group(\"/users\"))\n \tv1.Use(users.AuthMiddleware(false))\n@@ -54,5 +59,12 @@ func main() {\n \t\t})\n \t})\n \n-\tr.Run() // listen and serve on 0.0.0.0:8080\n+\t// Get port from environment variable or use default\n+\tport := os.Getenv(\"PORT\")\n+\tif port == \"\" {\n+\t\tport = \"8080\"\n+\t}\n+\tif err := r.Run(\":\" + port); err != nil {\n+\t\tlog.Fatal(\"failed to start server:\", err)\n+\t}\n }\ndiff --git a/readme.md b/readme.md\nindex 8d8111d..3b8e480 100644\n--- a/readme.md\n+++ b/readme.md\n@@ -67,7 +67,28 @@ https://golang.org/doc/install\n \n ## Environment Config\n \n-Set-up the standard Go environment variables according to latest guidance (see https://golang.org/doc/install#install).\n+Environment variables can be set directly in your shell or via a `.env` file (requires a tool like `source` or `direnv`).\n+\n+Available environment variables:\n+```bash\n+PORT=8080                     # Server port (default: 8080)\n+GIN_MODE=debug               # Gin mode: debug or release\n+DB_PATH=./data/gorm.db       # SQLite database path (default: ./data/gorm.db)\n+TEST_DB_PATH=./data/test.db  # Optional: SQLite database path used for tests\n+```\n+\n+Example usage:\n+```bash\n+# Option 1: Set environment variables directly\n+export PORT=3000\n+export DB_PATH=./data/myapp.db\n+go run hello.go\n+\n+# Option 2: Inline with command\n+PORT=3000 go run hello.go\n+```\n+\n+See `.env.example` for a complete template.\n \n \n ## Install Dependencies\n@@ -78,6 +99,15 @@ go test ./...\n go mod tidy\n ```\n \n+## Run the Server\n+```bash\n+# Using default port 8080\n+go run hello.go\n+\n+# Using custom port\n+PORT=3000 go run hello.go\n+```\n+\n ## Testing\n From the project root, run:\n ```\ndiff --git a/users/routers.go b/users/routers.go\nindex 330d978..4a1410d 100644\n--- a/users/routers.go\n+++ b/users/routers.go\n@@ -8,12 +8,15 @@ import (\n )\n \n func UsersRegister(router *gin.RouterGroup) {\n+\trouter.POST(\"\", UsersRegistration)\n \trouter.POST(\"/\", UsersRegistration)\n \trouter.POST(\"/login\", UsersLogin)\n }\n \n func UserRegister(router *gin.RouterGroup) {\n+\trouter.GET(\"\", UserRetrieve)\n \trouter.GET(\"/\", UserRetrieve)\n+\trouter.PUT(\"\", UserUpdate)\n \trouter.PUT(\"/\", UserUpdate)\n }\n \n",
+  "diffTruncated": false,
+  "tree": [
+    ".env.example",
+    ".github/SETUP.md",
+    ".github/workflows/ci.yml",
+    ".gitignore",
+    ".golangci.yml",
+    ".travis.yml",
+    "AGENTS.md",
+    "BACKEND_INSTRUCTIONS.md",
+    "FRONTEND_INSTRUCTIONS.md",
+    "LICENSE",
+    "MOBILE_INSTRUCTIONS.md",
+    "articles/doc.go",
+    "articles/models.go",
+    "articles/routers.go",
+    "articles/serializers.go",
+    "articles/unit_test.go",
+    "articles/validators.go",
+    "common/database.go",
+    "common/unit_test.go",
+    "common/utils.go",
+    "data/.gitkeep",
+    "doc.go",
+    "go.mod",
+    "go.mod-generated_by_mod_init",
+    "go.sum",
+    "hello.go",
+    "logo.png",
+    "readme.md",
+    "scripts/coverage.sh",
+    "scripts/gofmt.sh",
+    "users/doc.go",
+    "users/middlewares.go",
+    "users/models.go",
+    "users/routers.go",
+    "users/serializers.go",
+    "users/unit_test.go",
+    "users/validators.go"
+  ],
+  "explanation": {
+    "what": "hello.go で gin の r.RedirectTrailingSlash を false に設定し、users/routers.go・articles/routers.go にトレイリングスラッシュ有無の両方のルートを登録した。あわせて common/database.go に GetDBPath()/GetTestDBPath() を追加して DB_PATH・TEST_DB_PATH・PORT を環境変数から読めるようにし、.env.example・data/.gitkeep・readme.md を整備した。",
+    "why": "PR body の Root Cause 記載が根拠。gin のデフォルト機能 RedirectTrailingSlash が POST /api/users のようなトレイリングスラッシュなしのリクエストを307リダイレクトしており、この際にリクエストボディが失われて Articles モジュールのテストが軒並み失敗していた(通過率63.2%)。原因のリダイレクト機能自体を無効化し、両方の形のパスを明示登録することで解決し、結果としてテスト通過率が99.4%まで改善したとPRに記載されている。",
+    "highlights": [
+      { "file": "hello.go", "note": "r.RedirectTrailingSlash = false が今回の主修正。307リダイレクトによる POST ボディ消失を止める" },
+      { "file": "common/database.go", "note": "DB パスをハードコードから環境変数(GetDBPath/GetTestDBPath)経由に変更し、テスト用DBパスの重複ロジックも解消" }
+    ],
+    "langNotes": [
+      { "topic": "gin の RedirectTrailingSlash", "note": "gin はデフォルトで末尾スラッシュの有無が違うパスへのリクエストを307リダイレクトする機能を持つ。HTTPの307リダイレクトはクライアントに再リクエストを促すため、POSTのボディが正しく引き継がれない実装だと本文が失われることがあり、今回はこの挙動自体をオフにして対処している。" }
+    ],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [
+      { "type": "pr", "number": 46, "url": "https://github.com/gothinkster/golang-gin-realworld-example-app/pull/46" }
+    ],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

@@ -1,0 +1,72 @@
+{
+  "seq": 76,
+  "sha": "f12e3beaedfe51dc1408dd38e02bc8199c691df0",
+  "parents": [
+    "c316a9a00092e90ccab2b6cdeb07aba1e6fb2a73"
+  ],
+  "author": {
+    "name": "wangzitian0",
+    "email": "zitwang@linkedin.com",
+    "date": "2017-11-01T16:03:48+08:00"
+  },
+  "message": "add codecov",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 6,
+    "deletions": 8
+  },
+  "files": [
+    {
+      "path": ".travis.yml",
+      "status": "M",
+      "additions": 6,
+      "deletions": 8,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/.travis.yml b/.travis.yml\nindex 29b7377..1201936 100644\n--- a/.travis.yml\n+++ b/.travis.yml\n@@ -1,10 +1,9 @@\n language: go\n \n go:\n-#  - 1.x\n-#  - 1.7\n+  - 1.7\n   - 1.8.x\n-#  - master\n+  - master\n \n go_import_path: github.com/wangzitian0/golang-gin-starter-kit\n \n@@ -15,10 +14,9 @@ install:\n   - go get -u github.com/wangzitian0/golang-gin-starter-kit\n   - go get -u github.com/kardianos/govendor\n   - govendor sync\n-#  - echo $GOPATH\n-#  - ls\n-#  - pwd\n-#  - ls $GOPATH/src\n-#  - ls $GOPATH/src\n script:\n   - go test -v ./...\n+  - go test -race -coverprofile=coverage.txt -covermode=atomic\n+\n+after_success:\n+  - bash <(curl -s https://codecov.io/bash)\n",
+  "diffTruncated": false,
+  "tree": [
+    ".gitignore",
+    ".travis.yml",
+    "BACKEND_INSTRUCTIONS.md",
+    "FRONTEND_INSTRUCTIONS.md",
+    "MOBILE_INSTRUCTIONS.md",
+    "articles/models.go",
+    "articles/routers.go",
+    "articles/serializers.go",
+    "articles/validators.go",
+    "common/database.go",
+    "common/utils.go",
+    "common/utils_test.go",
+    "hello.go",
+    "logo.png",
+    "readme.md",
+    "users/doc.go",
+    "users/middlewares.go",
+    "users/models.go",
+    "users/routers.go",
+    "users/serializers.go",
+    "users/unit_test.go",
+    "users/validators.go",
+    "vendor/vendor.json"
+  ],
+  "explanation": {
+    "what": ".travis.yml の go バージョン行(1.7, master)を有効化し、GOPATH 確認用のコメントアウト行を削除。テストステップに `go test -race -coverprofile=coverage.txt -covermode=atomic` を追加し、after_success で codecov.io のアップロードスクリプト(`bash <(curl -s https://codecov.io/bash)`)を実行するようにした。",
+    "why": "コミットメッセージ「add codecov」の通り、codecov.io によるカバレッジ計測・可視化を CI パイプラインに導入する変更。-race フラグ付きでテストを実行しカバレッジプロファイルを生成し、そのファイルを codecov のアップロードスクリプトに渡す構成にしている。",
+    "highlights": [
+      { "file": ".travis.yml", "note": "coverprofile 生成と codecov アップロードの2ステップが今回のカバレッジ計測導入の核" }
+    ],
+    "langNotes": [
+      { "topic": "go test -coverprofile / -covermode=atomic", "note": "`-coverprofile` は Go 標準のカバレッジ計測機能で、実行結果を coverage.txt のようなプロファイルファイルに出力する。`-covermode=atomic` は `-race`(データ競合検出)と併用する際に必須のカバレッジ計測モードで、goroutine 間の競合を検出しながら正確なカバレッジも取れるようにする。" },
+      { "topic": "codecov", "note": "codecov.io は生成されたカバレッジプロファイルをアップロードし、Web 上でカバレッジ率やdiffごとの増減を可視化するサービス。GitHub の PR に自動でコメントを付ける連携もよく使われる。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

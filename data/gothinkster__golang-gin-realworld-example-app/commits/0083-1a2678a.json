@@ -1,0 +1,73 @@
+{
+  "seq": 83,
+  "sha": "1a2678ab71ae4c4fdfc994db4e0883bbcaefcf60",
+  "parents": [
+    "8589bf396cc340247cfdee3e850c8bdebe06dbc8"
+  ],
+  "author": {
+    "name": "wangzitian0",
+    "email": "zitwang@linkedin.com",
+    "date": "2017-11-01T20:21:32+08:00"
+  },
+  "message": "add code go fmt 4",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 1,
+    "deletions": 1
+  },
+  "files": [
+    {
+      "path": "scripts/gofmt.sh",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/scripts/gofmt.sh b/scripts/gofmt.sh\nindex 5a7acdd..efdcbcf 100755\n--- a/scripts/gofmt.sh\n+++ b/scripts/gofmt.sh\n@@ -1,6 +1,6 @@\n #!/bin/bash\n \n-gofmt=$(go fmt ./...)\n+gofmt=$(govendor fmt +l)\n echo $gofmt\n \n if [ ${#gofmt} != 0 ]; then\n",
+  "diffTruncated": false,
+  "tree": [
+    ".gitignore",
+    ".travis.yml",
+    "BACKEND_INSTRUCTIONS.md",
+    "FRONTEND_INSTRUCTIONS.md",
+    "MOBILE_INSTRUCTIONS.md",
+    "articles/models.go",
+    "articles/routers.go",
+    "articles/serializers.go",
+    "articles/validators.go",
+    "common/database.go",
+    "common/utils.go",
+    "common/utils_test.go",
+    "hello.go",
+    "logo.png",
+    "readme.md",
+    "scripts/coverage.sh",
+    "scripts/gofmt.sh",
+    "users/doc.go",
+    "users/middlewares.go",
+    "users/models.go",
+    "users/routers.go",
+    "users/serializers.go",
+    "users/unit_test.go",
+    "users/validators.go",
+    "vendor/vendor.json"
+  ],
+  "explanation": {
+    "what": "scripts/gofmt.sh のフォーマットチェックコマンドを `go fmt ./...` から `govendor fmt +l` に変更した。",
+    "why": "このリポジトリは vendor/vendor.json で依存を管理しており(govendorツールを使用)、おそらく `go fmt ./...` だと vendor 配下のベンダリング済み依存コードまでフォーマット対象に含めてしまうため、govendor の `+l`(自プロジェクトのコードのみ対象にするステータス指定)を使う形に切り替えたものと考えられる。",
+    "highlights": [
+      { "file": "scripts/gofmt.sh", "note": "`go fmt ./...` → `govendor fmt +l` への置き換え" }
+    ],
+    "langNotes": [
+      { "topic": "govendor / vendor.json", "note": "Go Modules 以前の時代によく使われていた依存管理ツール。依存パッケージを vendor/ ディレクトリにコピーして vendor.json にメタ情報を記録する方式で、`+l`(local)のようなステータス指定で「vendor化された依存」と「自分のコード」を区別してコマンドを適用できる。" }
+    ],
+    "diagram": null,
+    "evidence": "inferred",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

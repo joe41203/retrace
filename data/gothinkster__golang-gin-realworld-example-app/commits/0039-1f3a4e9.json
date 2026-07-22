@@ -1,0 +1,111 @@
+{
+  "seq": 39,
+  "sha": "1f3a4e909da15e22d383310bb0d2025340ab0203",
+  "parents": [
+    "c6c816622bab1341cdcd44861c999a3bdded7c66"
+  ],
+  "author": {
+    "name": "wangzitian0",
+    "email": "zitwang@linkedin.com",
+    "date": "2017-07-16T23:27:26+08:00"
+  },
+  "message": "add auth middlewares",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 7,
+    "additions": 117,
+    "deletions": 41
+  },
+  "files": [
+    {
+      "path": "common/utils.go",
+      "status": "A",
+      "additions": 43,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "hello.go",
+      "status": "M",
+      "additions": 15,
+      "deletions": 4,
+      "binary": false
+    },
+    {
+      "path": "middlewares/auth-jwt.go",
+      "status": "A",
+      "additions": 21,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "middlewares/database.go",
+      "status": "A",
+      "additions": 13,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "storage/database.go",
+      "status": "D",
+      "additions": 0,
+      "deletions": 22,
+      "binary": false
+    },
+    {
+      "path": "users/models.go",
+      "status": "M",
+      "additions": 23,
+      "deletions": 14,
+      "binary": false
+    },
+    {
+      "path": "users/routers.go",
+      "status": "M",
+      "additions": 2,
+      "deletions": 1,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/common/utils.go b/common/utils.go\nnew file mode 100644\nindex 0000000..610ea75\n--- /dev/null\n+++ b/common/utils.go\n@@ -0,0 +1,43 @@\n+package common\n+\n+import (\n+    \"math/rand\"\n+    \"time\"\n+    \"github.com/jinzhu/gorm\"\n+    \"fmt\"\n+    \n+    \"github.com/dgrijalva/jwt-go\"\n+\n+)\n+\n+func DatabaseConnection() *gorm.DB {\n+    db, err := gorm.Open(\"sqlite3\", \"gorm.db\")\n+    if err != nil {\n+        fmt.Println(\"db err: \",err)\n+    }\n+    return db\n+}\n+\n+\n+var letters = []rune(\"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789\")\n+\n+func RandString(n int) string {\n+    b := make([]rune, n)\n+    for i := range b {\n+        b[i] = letters[rand.Intn(len(letters))]\n+    }\n+    return string(b)\n+}\n+\n+const NBSecretPassword = \"heheda\";\n+\n+func GenToken(id uint) (string, error){\n+    token := jwt.New(jwt.GetSigningMethod(\"HS256\"))\n+    // Set some claims\n+    token.Claims = jwt.MapClaims{\n+        \"Id\":  id,\n+        \"exp\": time.Now().Add(time.Hour * 24).Unix(),\n+    }\n+    // Sign and get the complete encoded token as a string\n+    return token.SignedString([]byte(NBSecretPassword))\n+}\n\\ No newline at end of file\ndiff --git a/hello.go b/hello.go\nindex e69ba7e..2f24309 100644\n--- a/hello.go\n+++ b/hello.go\n@@ -4,23 +4,34 @@ import (\n \t\"gopkg.in/gin-gonic/gin.v1\"\n \t_ \"github.com/jinzhu/gorm/dialects/sqlite\"\n \n-    \"golang-gin-starter-kit/storage\"\n+    \"golang-gin-starter-kit/common\"\n+    \"golang-gin-starter-kit/middlewares\"\n     \"golang-gin-starter-kit/users\"\n )\n \n \n func main() {\n \n-\tdb := storage.DatabaseConnection()\n+\tdb := common.DatabaseConnection()\n \tdefer db.Close()\n \n     db.AutoMigrate(&users.UserModel{})\n \n \n     r := gin.Default()\n-\tr.Use(storage.ApiMiddleware(db))\n+\tr.Use(middlewares.DatabaseMiddleware(db))\n \n-    users.Register(r.Group(\"/api/v1/users\"))\n+    usersGroup := r.Group(\"/api/v1/users\")\n+    users.Register(usersGroup)\n+\n+    testAuth := r.Group(\"/api/v1/ping\")\n+    testAuth.Use(middlewares.Auth(common.NBSecretPassword))\n+\n+    testAuth.GET(\"/\", func(c *gin.Context) {\n+        c.JSON(200, gin.H{\n+            \"message\": \"pong\",\n+        })\n+    })\n \n \tr.Run() // listen and serve on 0.0.0.0:8080\n }\n\\ No newline at end of file\ndiff --git a/middlewares/auth-jwt.go b/middlewares/auth-jwt.go\nnew file mode 100644\nindex 0000000..ac00fd6\n--- /dev/null\n+++ b/middlewares/auth-jwt.go\n@@ -0,0 +1,21 @@\n+package middlewares\n+\n+\n+import (\n+    \"gopkg.in/gin-gonic/gin.v1\"\n+    \"github.com/dgrijalva/jwt-go\"\n+    \"github.com/dgrijalva/jwt-go/request\"\n+)\n+\n+func Auth(secret string) gin.HandlerFunc {\n+    return func(c *gin.Context) {\n+        _, err := request.ParseFromRequest(c.Request, request.OAuth2Extractor, func(token *jwt.Token) (interface{}, error) {\n+            b := ([]byte(secret))\n+            return b, nil\n+        })\n+\n+        if err != nil {\n+            c.AbortWithError(401, err)\n+        }\n+    }\n+}\ndiff --git a/middlewares/database.go b/middlewares/database.go\nnew file mode 100644\nindex 0000000..6f7ad92\n--- /dev/null\n+++ b/middlewares/database.go\n@@ -0,0 +1,13 @@\n+package middlewares\n+\n+import (\n+    \"github.com/jinzhu/gorm\"\n+    \"gopkg.in/gin-gonic/gin.v1\"\n+)\n+\n+func DatabaseMiddleware(db *gorm.DB) gin.HandlerFunc {\n+    return func(c *gin.Context) {\n+        c.Set(\"DB\", db)\n+        c.Next()\n+    }\n+}\ndiff --git a/storage/database.go b/storage/database.go\ndeleted file mode 100644\nindex a9d64b4..0000000\n--- a/storage/database.go\n+++ /dev/null\n@@ -1,22 +0,0 @@\n-package storage\n-\n-import (\n-    \"gopkg.in/gin-gonic/gin.v1\"\n-    \"github.com/jinzhu/gorm\"\n-    \"fmt\"\n-)\n-\n-func DatabaseConnection() *gorm.DB {\n-    db, err := gorm.Open(\"sqlite3\", \"gorm.db\")\n-    if err != nil {\n-        fmt.Println(\"db err: \",err)\n-    }\n-    return db\n-}\n-\n-func ApiMiddleware(db *gorm.DB) gin.HandlerFunc {\n-    return func(c *gin.Context) {\n-        c.Set(\"DB\", db)\n-        c.Next()\n-    }\n-}\ndiff --git a/users/models.go b/users/models.go\nindex ba4e2c3..a36e36b 100644\n--- a/users/models.go\n+++ b/users/models.go\n@@ -1,24 +1,33 @@\n package users\n \n-import \"github.com/jinzhu/gorm\"\n-\n+import (\n+    \"golang.org/x/crypto/bcrypt\"\n+    \"golang-gin-starter-kit/common\"\n+)\n \n type UserModel struct {\n-    gorm.Model\n-    Username      string      `gorm:\"column:username\"`\n-    Email         string      `gorm:\"column:email\"`\n-    Bio           string      `gorm:\"column:bio\"`\n-    Image         string      `gorm:\"column:image\"`\n-    Salt          string      `gorm:\"column:salt\"`\n-    PasswordHash  string      `gorm:\"column:password\"`\n+    ID            uint        `json:\"id\" gorm:\"primary_key\"`\n+    Username      string      `json:\"username\" gorm:\"column:username\"`\n+    Email         string      `json:\"email\" gorm:\"column:email;unique_index\"`\n+    Bio           string      `json:\"bio\" gorm:\"column:bio\"`\n+    Image         *string     `json:\"image\" gorm:\"column:image\"`\n+    PasswordHash  string      `json:\"-\" gorm:\"column:password\"`\n+    JWT           string      `json:\"jwt\" gorm:\"column:-\"`\n }\n \n func (u *UserModel) setPassword(password string){\n-    passwordHash := password + \"salt\"\n-    u.PasswordHash = passwordHash\n+    bytePassword := []byte(password)\n+    passwordHash, _ := bcrypt.GenerateFromPassword(bytePassword, bcrypt.DefaultCost)\n+    u.PasswordHash = string(passwordHash)\n }\n \n-func (u *UserModel) checkPassword(password string) bool{\n-    passwordHash := password + \"salt\"\n-    return passwordHash == u.PasswordHash\n+func (u *UserModel) checkPassword(password string) error{\n+    bytePassword := []byte(password)\n+    byteHashedPassword := []byte(u.PasswordHash)\n+    token, err := common.GenToken(u.ID)\n+    if err!=nil {\n+        return err\n+    }\n+    u.JWT = token\n+    return bcrypt.CompareHashAndPassword(byteHashedPassword, bytePassword)\n }\n\\ No newline at end of file\ndiff --git a/users/routers.go b/users/routers.go\nindex 277dfbe..f982f3f 100644\n--- a/users/routers.go\n+++ b/users/routers.go\n@@ -50,7 +50,8 @@ func (r *Router) Login(c *gin.Context) {\n     }\n     fmt.Println(\"user from DB: \", userModel)\n \n-    if valid := userModel.checkPassword(form.User.Password); !valid {\n+    err := userModel.checkPassword(form.User.Password)\n+    if err != nil {\n         c.JSON(http.StatusForbidden, gin.H{\"Error\" : \"password error!\"})\n         return\n     }\n",
+  "diffTruncated": false,
+  "tree": [
+    ".gitignore",
+    "BACKEND_INSTRUCTIONS.md",
+    "FRONTEND_INSTRUCTIONS.md",
+    "MOBILE_INSTRUCTIONS.md",
+    "common/utils.go",
+    "hello.go",
+    "logo.png",
+    "middlewares/auth-jwt.go",
+    "middlewares/database.go",
+    "readme.md",
+    "users/models.go",
+    "users/routers.go",
+    "users/validators.go"
+  ],
+  "explanation": {
+    "what": "認証・共通処理を独立パッケージへ切り出す再構成コミット。新設した `common/utils.go` に DB接続・ランダム文字列生成・JWT発行(GenToken)を集約し、`storage/database.go` を削除して `middlewares/database.go`(DatabaseMiddleware)と `middlewares/auth-jwt.go`(Auth)の2ファイルに再編した。`hello.go` では `/api/v1/ping` に Auth ミドルウェアを適用した動作確認用ルートを追加している。UserModel の setPassword/checkPassword は bcrypt(golang.org/x/crypto/bcrypt)を使うようになり、また PasswordHash フィールドに `json:\"-\"` タグを付けてレスポンスに含めないようにした。",
+    "why": "コミットメッセージ「add auth middlewares」の通り、JWT ベースの認証ミドルウェアを追加する回。前コミットの storage パッケージ名は DB接続専用としては役割が曖昧だったため、common(汎用処理)と middlewares(gin ミドルウェア)に分割し、以降のルートで再利用しやすい構造に整理したと考えられる。パスワードも単純な文字列連結から bcrypt ハッシュへ切り替わっており、セキュリティ上の改善も兼ねている。",
+    "highlights": [
+      { "file": "middlewares/auth-jwt.go", "note": "request.ParseFromRequest + OAuth2Extractor で Authorization ヘッダの Bearer トークンを検証する Auth ミドルウェアの初出" },
+      { "file": "common/utils.go", "note": "jwt.New(jwt.GetSigningMethod(\"HS256\")) でトークンを発行する GenToken。有効期限は24時間" },
+      { "file": "users/models.go", "note": "setPassword/checkPassword が bcrypt.GenerateFromPassword / CompareHashAndPassword に置き換わった" }
+    ],
+    "langNotes": [
+      { "topic": "gin ミドルウェアの Group().Use() での限定適用", "note": "r.Group(\"/api/v1/ping\") で作った RouterGroup にだけ testAuth.Use(middlewares.Auth(...)) を呼ぶことで、特定のルート群にのみ認証を要求できる。ルート全体には掛けず、必要な箇所だけ絞って適用するのが gin の典型パターン。" },
+      { "topic": "dgrijalva/jwt-go による JWT の発行・検証", "note": "jwt.New(...).Claims にクレーム(Id, exp など)を詰めて SignedString(秘密鍵)で署名済みトークン文字列を得る。検証側は jwt-go/request の ParseFromRequest と OAuth2Extractor を使い、HTTPリクエストから Authorization ヘッダのトークンを取り出して同じ秘密鍵で検証する。" },
+      { "topic": "bcrypt によるパスワードハッシュ", "note": "golang.org/x/crypto/bcrypt の GenerateFromPassword/CompareHashAndPassword は、ソルトを内部で自動生成・保持するハッシュ関数。前コミットの password+\"salt\" という自前連結の簡易実装から、業界標準のハッシュ方式へ置き換わった。" },
+      { "topic": "json:\"-\" タグでのフィールド除外", "note": "encoding/json は struct タグが `-` のフィールドをシリアライズ時に無視する。PasswordHash に付けることで、UserModel を c.JSON() でそのまま返してもパスワードハッシュが漏れない。" }
+    ],
+    "diagram": {
+      "mermaid": "flowchart LR\n  Req[\"HTTPリクエスト\"] --> DBMW[\"middlewares.DatabaseMiddleware\"]\n  DBMW --> AuthMW[\"middlewares.Auth(secret)\"]\n  AuthMW -- \"トークン検証OK\" --> Handler[\"ルートハンドラ\"]\n  AuthMW -- \"検証NG\" --> Abort[\"401 AbortWithError\"]\n  Handler --> DB[(\"gorm.DB\")]",
+      "caption": "DatabaseMiddleware で DB をコンテキストに積んだ後、Auth ミドルウェアが JWT を検証してからハンドラに到達する経路"
+    },
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

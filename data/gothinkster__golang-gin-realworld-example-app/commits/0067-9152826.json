@@ -1,0 +1,69 @@
+{
+  "seq": 67,
+  "sha": "91528263bb6e327b385c29649e1f06ab714f581c",
+  "parents": [
+    "19476cd6682bb4b237e99648768aebea03efebc2"
+  ],
+  "author": {
+    "name": "wangzitian0",
+    "email": "zitwang@linkedin.com",
+    "date": "2017-10-31T20:05:49+08:00"
+  },
+  "message": "add travis ci yml",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 5,
+    "deletions": 4
+  },
+  "files": [
+    {
+      "path": ".travis.yml",
+      "status": "M",
+      "additions": 5,
+      "deletions": 4,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/.travis.yml b/.travis.yml\nindex 8ecb6cb..6b5b86e 100644\n--- a/.travis.yml\n+++ b/.travis.yml\n@@ -1,17 +1,18 @@\n language: go\n \n go:\n-  - 1.x\n-  - 1.7\n+#  - 1.x\n+#  - 1.7\n   - 1.8.x\n-  - master\n+#  - master\n \n install:\n   - echo $GOPATH\n   - ls\n   - pwd\n-  - ls $GOPATH/src\n+  - cd $GOPATH/src\n   - go get -u github.com/kardianos/govendor\n   - govendor sync\n+  - ls $GOPATH/src\n script:\n   - go test ./...\n",
+  "diffTruncated": false,
+  "tree": [
+    ".gitignore",
+    ".travis.yml",
+    "BACKEND_INSTRUCTIONS.md",
+    "FRONTEND_INSTRUCTIONS.md",
+    "MOBILE_INSTRUCTIONS.md",
+    "articles/models.go",
+    "articles/routers.go",
+    "articles/serializers.go",
+    "articles/validators.go",
+    "common/database.go",
+    "common/utils.go",
+    "common/utils_test.go",
+    "hello.go",
+    "logo.png",
+    "readme.md",
+    "users/doc.go",
+    "users/middlewares.go",
+    "users/models.go",
+    "users/routers.go",
+    "users/serializers.go",
+    "users/unit_test.go",
+    "users/validators.go",
+    "vendor/vendor.json"
+  ],
+  "explanation": {
+    "what": "go: のバージョンマトリクスから 1.x・1.7・master をコメントアウトし、1.8.x のみを有効なテスト対象として残した。install ステップでは echo/ls/pwd の直後に cd $GOPATH/src を追加し、govendor sync の後に ls $GOPATH/src を移動して実行順序を入れ替えた。",
+    "why": "おそらく複数バージョンでのマトリクスビルドがノイズになって原因切り分けを妨げていたため、まず1.8.x一本に絞ってビルド自体を安定させ、cd $GOPATH/src の追加や ls の位置変更で GOPATH 配下の状態確認を継続していたと考えられる。",
+    "highlights": [
+      { "file": ".travis.yml", "note": "go: マトリクスを 1.8.x のみに縮小(他はコメントアウト)。デバッグを単純化する狙いが読み取れる" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "inferred",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

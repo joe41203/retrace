@@ -1,0 +1,88 @@
+{
+  "seq": 43,
+  "sha": "4bbbe29620d756fe1d5cd6b0274b6a7e2becd74b",
+  "parents": [
+    "9bc7f8be282c8a1952bf87e6c7a2b337fe4292cf"
+  ],
+  "author": {
+    "name": "wangzitian0",
+    "email": "zitwang@linkedin.com",
+    "date": "2017-07-23T22:30:00+08:00"
+  },
+  "message": "modify tests to list",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 4,
+    "additions": 107,
+    "deletions": 27
+  },
+  "files": [
+    {
+      "path": "common/utils.go",
+      "status": "M",
+      "additions": 35,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "hello.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "users/routers.go",
+      "status": "M",
+      "additions": 11,
+      "deletions": 9,
+      "binary": false
+    },
+    {
+      "path": "users/unit_test.go",
+      "status": "M",
+      "additions": 60,
+      "deletions": 17,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/common/utils.go b/common/utils.go\nindex 4fe4654..06c83eb 100644\n--- a/common/utils.go\n+++ b/common/utils.go\n@@ -10,6 +10,8 @@ import (\n     \"gopkg.in/go-playground/validator.v8\"\n     _ \"github.com/jinzhu/gorm/dialects/sqlite\"\n \n+    \"github.com/gin-gonic/gin/binding\"\n+    \"gopkg.in/gin-gonic/gin.v1\"\n )\n \n func DatabaseConnection() *gorm.DB {\n@@ -53,4 +55,37 @@ func ErrsToList(err error) ([]interface{}){\n         res = append(res, v.Field)\n     }\n     return res\n+}\n+\n+type CommonError struct {\n+    Errors map[string]interface{} `json:\"errors\"`\n+}\n+\n+func NewValidatorError(err error) CommonError{\n+    res := CommonError{}\n+    res.Errors = make(map[string]interface{})\n+    errs := err.(validator.ValidationErrors)\n+    for _, v := range errs {\n+        // can translate each error one at a time.\n+        //fmt.Println(\"gg\",v.NameNamespace)\n+        if v.Param !=\"\"{\n+            res.Errors[v.Field]= fmt.Sprintf(\"{%v: %v}\",v.Tag,v.Param)\n+        }else {\n+            res.Errors[v.Field]= fmt.Sprintf(\"{key: %v}\",v.Tag)\n+        }\n+\n+    }\n+    return res\n+}\n+\n+func NewError(key string,err error) CommonError{\n+    res := CommonError{}\n+    res.Errors = make(map[string]interface{})\n+    res.Errors[key] = err.Error()\n+    return res\n+}\n+\n+func Bind(c *gin.Context, obj interface{}) error {\n+    b := binding.Default(c.Request.Method, c.ContentType())\n+    return c.ShouldBindWith(obj, b)\n }\n\\ No newline at end of file\ndiff --git a/hello.go b/hello.go\nindex b6f786d..45a2c8a 100644\n--- a/hello.go\n+++ b/hello.go\n@@ -24,8 +24,8 @@ func main() {\n     usersGroup := r.Group(\"/api/v1/users\")\n     users.Register(usersGroup)\n \n+    r.Use(middlewares.Auth(common.NBSecretPassword))\n     testAuth := r.Group(\"/api/v1/ping\")\n-    testAuth.Use(middlewares.Auth(common.NBSecretPassword))\n \n     testAuth.GET(\"/\", func(c *gin.Context) {\n         c.JSON(200, gin.H{\ndiff --git a/users/routers.go b/users/routers.go\nindex 56bfaad..9c6b3ae 100644\n--- a/users/routers.go\n+++ b/users/routers.go\n@@ -6,6 +6,7 @@ import (\n \t\"golang-gin-starter-kit/common\"\n \t\"gopkg.in/gin-gonic/gin.v1\"\n \t\"net/http\"\n+    \"errors\"\n )\n \n type Router struct {\n@@ -20,11 +21,12 @@ func Register(router *gin.RouterGroup) Router{\n \treturn r\n }\n \n-func (r *Router) Registration(c *gin.Context) {\n+func (r Router) Registration(c *gin.Context) {\n \tdb := c.MustGet(\"DB\").(*gorm.DB)\n+\n \tvar validator RegistrationValidator\n-\tif err := c.Bind(&validator); err != nil {\n-\t\tc.JSON(http.StatusBadRequest, gin.H{\"Data binding error\": common.ErrsToList(err)})\n+\tif err := common.Bind(c, &validator); err != nil {\n+\t\tc.JSON(http.StatusUnprocessableEntity, common.NewValidatorError(err))\n \t\treturn\n \t}\n \tvar userModel UserModel\n@@ -32,30 +34,30 @@ func (r *Router) Registration(c *gin.Context) {\n \tuserModel.Email = validator.User.Email\n \tuserModel.setPassword(validator.User.Password)\n \tif err := db.Save(&userModel).Error; err != nil {\n-\t\tc.JSON(http.StatusBadRequest, gin.H{\"Database error\": err})\n+\t\tc.JSON(http.StatusUnprocessableEntity, common.NewError(\"database\",err))\n \t\treturn\n \t}\n \tc.JSON(http.StatusCreated, gin.H{\"user\": userModel})\n }\n \n-func (r *Router) Login(c *gin.Context) {\n+func (r Router) Login(c *gin.Context) {\n \tdb := c.MustGet(\"DB\").(*gorm.DB)\n \tvar validator LoginValidator\n-\tif err := c.Bind(&validator); err != nil {\n-\t\tc.JSON(http.StatusBadRequest, gin.H{\"Data binding error\": common.ErrsToList(err)})\n+\tif err := common.Bind(c, &validator); err != nil {\n+        c.JSON(http.StatusUnprocessableEntity, common.NewValidatorError(err))\n \t\treturn\n \t}\n \tvar userModel UserModel\n \n \tif err := db.Where(&UserModel{Email: validator.User.Email}).First(&userModel).Error; err != nil {\n-\t\tc.JSON(http.StatusForbidden, gin.H{\"Database error\": err})\n+        c.JSON(http.StatusForbidden, common.NewError(\"login\",errors.New(\"Not Registered email or invalid password\")))\n \t\treturn\n \t}\n \tfmt.Println(\"user from DB: \", userModel)\n \n \terr := userModel.checkPassword(validator.User.Password)\n \tif err != nil {\n-\t\tc.JSON(http.StatusForbidden, gin.H{\"Error\": \"password error!\"})\n+        c.JSON(http.StatusForbidden, common.NewError(\"login\",errors.New(\"Not Registered email or invalid password\")))\n \t\treturn\n \t}\n \tc.JSON(http.StatusOK, gin.H{\"user\": userModel})\ndiff --git a/users/unit_test.go b/users/unit_test.go\nindex 5ae4d27..4af01bb 100644\n--- a/users/unit_test.go\n+++ b/users/unit_test.go\n@@ -12,7 +12,8 @@ import (\n     \"github.com/jinzhu/gorm\"\n     \"os\"\n     \"golang-gin-starter-kit/middlewares\"\n-    \"regexp\"\n+    _ \"regexp\"\n+    _ \"fmt\"\n )\n \n var image_url =\"https://golang.org/doc/gopher/frontpage.png\"\n@@ -85,33 +86,75 @@ func TestRegister(t *testing.T) {\n     assert.Equal(path,router.BasePath,\"Base path should be set\")\n }\n \n+var test_db *gorm.DB\n+\n+\n+var routerRegistrationTests = []struct {\n+    bodyData        string\n+    expectedCode    int\n+    responseRegexg  string\n+    msg             string\n+}{\n+    {\n+        `{\"user\":{\"username\": \"wangzitian0\",\"email\": \"wzt@gg.cn\",\"password\": \"jakejxke\"}}`,\n+        http.StatusCreated,\n+        `{\"user\":{\"id\":1,\"username\":\"wangzitian0\",\"email\":\"wzt@gg.cn\",\"bio\":\"\",\"image\":null,\"jwt\":\"([a-zA-Z0-9-_.]{115})\"}}`,\n+        \"valid data and should return 200\",\n+    },\n+    {\n+        `{\"user\":{\"username\": \"u\",\"email\": \"wzt@gg.cn\",\"password\": \"jakejxke\"}}`,\n+        http.StatusUnprocessableEntity,\n+        `{\"errors\":{\"Username\":\"{min: 8}\"}}`,\n+        \"short username should return error\",\n+    },\n+    {\n+        `{\"user\":{\"username\": \"wangzitian0\",\"email\": \"wzt@gg.cn\",\"password\": \"j\"}}`,\n+        http.StatusUnprocessableEntity,\n+        `{\"errors\":{\"Password\":\"{min: 8}\"}}`,\n+        \"short password should return error\",\n+    },\n+    {\n+        `{\"user\":{\"username\": \"wangzitian0\",\"email\": \"wztgg.cn\",\"password\": \"jakejxke\"}}`,\n+        http.StatusUnprocessableEntity,\n+        `{\"errors\":{\"Email\":\"{key: email}\"}}`,\n+        \"email invalid should return error\",\n+    },\n+}\n+\n+\n func TestRouter_Registration(t *testing.T) {\n     assert := assert.New(t)\n \n-    test_db, _ := gorm.Open(\"sqlite3\", \"./../gorm_test.db\")\n-    test_db.AutoMigrate(&UserModel{})\n-    defer os.Remove(\"./../gorm_test.db\")\n \n     r := gin.New()\n     usersGroup := r.Group(\"/p\")\n     usersGroup.Use(middlewares.DatabaseMiddleware(test_db))\n     Register(usersGroup)\n-    var bodyData string= `{\"user\":{\"username\": \"Jacxxxxxx\",\"email\": \"wztx@gg.cn\",\"password\": \"jakejxke\"}}`\n-    //pat := regexp.MustCompile(`\\{\\\"user\\\":\\{\\\"id\\\":(\\d+),\\\"username\\\":\\\"Jacxxxxxx\\\",\\\"email\\\":\\\"wztx@gg.cn\\\",\\\"bio\\\":\\\"\\\",\\\"image\\\":null,\\\"jwt\\\":\\\"(^\\\"+)\\\"\\}\\}`)\n+    for _, testData := range routerRegistrationTests{\n+        bodyData := testData.bodyData\n+        req, err := http.NewRequest(\"POST\", \"/p/\", bytes.NewBufferString(bodyData))\n+        req.Header.Set(\"Content-Type\", \"application/json\")\n \n-    req, err := http.NewRequest(\"POST\", \"/p/\", bytes.NewBufferString(bodyData))\n-    req.Header.Set(\"Content-Type\", \"application/json\")\n+        assert.NoError(err)\n+        w := httptest.NewRecorder()\n+        r.ServeHTTP(w, req)\n \n-    assert.NoError(err)\n-    w := httptest.NewRecorder()\n-    r.ServeHTTP(w, req)\n-    assert.Equal(http.StatusCreated, w.Code,\"response status should be 200\")\n+        assert.Equal(testData.expectedCode, w.Code, \"code - \" + testData.msg)\n+        assert.Regexp(testData.responseRegexg, w.Body.String(),\"regexp - %v\\n \" + testData.msg)\n+    }\n \n \n-    pat := regexp.MustCompile(`\\{\\\"user\\\":\\{\\\"id\\\":1,\\\"username\\\":\\\"Jacxxxxxx\\\",\\\"email\\\":\\\"wztx@gg.cn\\\",\\\"bio\\\":\\\"\\\",\\\"image\\\":null,\\\"jwt\\\":\\\"([^\\\"]+)\\\"\\}\\}`)\n+}\n \n-    match := pat.FindStringSubmatch(w.Body.String())\n-    assert.True(len(match)!=0)\n-    assert.Len(match[1],115,\"JWT's length should be 115\")\n+func TestMain(m *testing.M) {\n \n-}\n+    test_db, _ = gorm.Open(\"sqlite3\", \"./../gorm_test.db\")\n+    test_db.AutoMigrate(&UserModel{})\n+    //fmt.Println(\"before\")\n+    exitVal := m.Run()\n+    //fmt.Println(\"after\")\n+    test_db.Close()\n+    os.Remove(\"./../gorm_test.db\")\n+\n+    os.Exit(exitVal)\n+}\n\\ No newline at end of file\n",
+  "diffTruncated": false,
+  "tree": [
+    ".gitignore",
+    "BACKEND_INSTRUCTIONS.md",
+    "FRONTEND_INSTRUCTIONS.md",
+    "MOBILE_INSTRUCTIONS.md",
+    "common/utils.go",
+    "common/utils_test.go",
+    "hello.go",
+    "logo.png",
+    "middlewares/auth-jwt.go",
+    "middlewares/auth-jwt_test.go",
+    "middlewares/database.go",
+    "middlewares/database_test.go",
+    "readme.md",
+    "users/models.go",
+    "users/routers.go",
+    "users/unit_test.go",
+    "users/validators.go"
+  ],
+  "explanation": {
+    "what": "common/utils.go に CommonError 型・NewValidatorError・NewError・Bind ヘルパーを追加し、users/routers.go の Registration/Login がこの共通エラー形式(`{\"errors\": {...}}`)と 422 Unprocessable Entity を返すように変更した。users/unit_test.go は個別アサーションの羅列から、テストケースをテーブル(struct のスライス `routerRegistrationTests`)にまとめてループで回す形に書き換え、TestMain で共有の test_db を1回だけセットアップ・クリーンアップするようにした。",
+    "why": "コミットメッセージ「modify tests to list」が示す通り、テストケースが増えるにつれ個別関数で書くと冗長になるためテーブル駆動テストへ移行したのが主眼。エラーレスポンスの共通化(CommonError/Bind)は、テストで複数の異常系(ユーザー名短すぎ・パスワード短すぎ・メール不正)を検証するために、レスポンス形式を一貫させる必要があったためと考えられる。",
+    "highlights": [
+      { "file": "users/unit_test.go", "note": "routerRegistrationTests に正常系・異常系3パターンをまとめ、for ループで検証するテーブル駆動テストへの書き換え" },
+      { "file": "common/utils.go", "note": "バリデーションエラーを `{\"errors\": {field: reason}}` 形式に変換する NewValidatorError" }
+    ],
+    "langNotes": [
+      { "topic": "テーブル駆動テスト(table-driven test)", "note": "Go のテストでよく使われる書き方で、テストケースを struct のスライスとして定義し、1つの `for` ループで全ケースを回す。本コミットの `routerRegistrationTests` が典型例で、入力・期待コード・期待レスポンスをまとめて持つ。" },
+      { "topic": "TestMain", "note": "`func TestMain(m *testing.M)` を定義すると、そのパッケージの全テスト実行前後に共通のセットアップ・後片付け(ここでは test_db の作成と削除)を挟める。個々のテスト関数ごとにDBを作り直さずに済む。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

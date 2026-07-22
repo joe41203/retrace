@@ -1,0 +1,78 @@
+{
+  "seq": 72,
+  "sha": "e2598feb1321a8623d9f6c3f4d2b3ce81324fe1e",
+  "parents": [
+    "872e0e8ea76b0e8d0898f03d8d915f282310bca8"
+  ],
+  "author": {
+    "name": "wangzitian0",
+    "email": "zitwang@linkedin.com",
+    "date": "2017-10-31T21:44:58+08:00"
+  },
+  "message": "change module name to github",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 46,
+    "deletions": 46
+  },
+  "files": [
+    {
+      "path": "articles/serializers.go",
+      "status": "M",
+      "additions": 34,
+      "deletions": 34,
+      "binary": false
+    },
+    {
+      "path": "articles/validators.go",
+      "status": "M",
+      "additions": 12,
+      "deletions": 12,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/articles/serializers.go b/articles/serializers.go\nindex 9173410..0a0d4c4 100644\n--- a/articles/serializers.go\n+++ b/articles/serializers.go\n@@ -16,14 +16,14 @@ type TagsSerializer struct {\n \tTags []TagModel\n }\n \n-func (self *TagSerializer) Response() string {\n-\treturn self.TagModel.Tag\n+func (s *TagSerializer) Response() string {\n+\treturn s.TagModel.Tag\n }\n \n-func (self *TagsSerializer) Response() []string {\n+func (s *TagsSerializer) Response() []string {\n \tresponse := []string{}\n-\tfor _, tag := range self.Tags {\n-\t\tserializer := TagSerializer{self.C, tag}\n+\tfor _, tag := range s.Tags {\n+\t\tserializer := TagSerializer{s.C, tag}\n \t\tresponse = append(response, serializer.Response())\n \t}\n \treturn response\n@@ -34,8 +34,8 @@ type ArticleUserSerializer struct {\n \tArticleUserModel\n }\n \n-func (self *ArticleUserSerializer) Response() users.ProfileResponse {\n-\tresponse := users.ProfileSerializer{self.C, self.ArticleUserModel.UserModel}\n+func (s *ArticleUserSerializer) Response() users.ProfileResponse {\n+\tresponse := users.ProfileSerializer{s.C, s.ArticleUserModel.UserModel}\n \treturn response.Response()\n }\n \n@@ -63,34 +63,34 @@ type ArticlesSerializer struct {\n \tArticles []ArticleModel\n }\n \n-func (self *ArticleSerializer) Response() ArticleResponse {\n-\tmyUserModel := self.C.MustGet(\"my_user_model\").(users.UserModel)\n-\tauthorSerializer := ArticleUserSerializer{self.C, self.Author}\n+func (s *ArticleSerializer) Response() ArticleResponse {\n+\tmyUserModel := s.C.MustGet(\"my_user_model\").(users.UserModel)\n+\tauthorSerializer := ArticleUserSerializer{s.C, s.Author}\n \tresponse := ArticleResponse{\n-\t\tID:          self.ID,\n-\t\tSlug:        slug.Make(self.Title),\n-\t\tTitle:       self.Title,\n-\t\tDescription: self.Description,\n-\t\tBody:        self.Body,\n-\t\tCreatedAt:   self.CreatedAt.UTC().Format(\"2006-01-02T15:04:05.999Z\"),\n-\t\t//UpdatedAt:      self.UpdatedAt.UTC().Format(time.RFC3339Nano),\n-\t\tUpdatedAt:      self.UpdatedAt.UTC().Format(\"2006-01-02T15:04:05.999Z\"),\n+\t\tID:          s.ID,\n+\t\tSlug:        slug.Make(s.Title),\n+\t\tTitle:       s.Title,\n+\t\tDescription: s.Description,\n+\t\tBody:        s.Body,\n+\t\tCreatedAt:   s.CreatedAt.UTC().Format(\"2006-01-02T15:04:05.999Z\"),\n+\t\t//UpdatedAt:      s.UpdatedAt.UTC().Format(time.RFC3339Nano),\n+\t\tUpdatedAt:      s.UpdatedAt.UTC().Format(\"2006-01-02T15:04:05.999Z\"),\n \t\tAuthor:         authorSerializer.Response(),\n-\t\tFavorite:       self.isFavoriteBy(GetArticleUserModel(myUserModel)),\n-\t\tFavoritesCount: self.favoritesCount(),\n+\t\tFavorite:       s.isFavoriteBy(GetArticleUserModel(myUserModel)),\n+\t\tFavoritesCount: s.favoritesCount(),\n \t}\n \tresponse.Tags = make([]string, 0)\n-\tfor _, tag := range self.Tags {\n-\t\tserializer := TagSerializer{self.C, tag}\n+\tfor _, tag := range s.Tags {\n+\t\tserializer := TagSerializer{s.C, tag}\n \t\tresponse.Tags = append(response.Tags, serializer.Response())\n \t}\n \treturn response\n }\n \n-func (self *ArticlesSerializer) Response() []ArticleResponse {\n+func (s *ArticlesSerializer) Response() []ArticleResponse {\n \tresponse := []ArticleResponse{}\n-\tfor _, article := range self.Articles {\n-\t\tserializer := ArticleSerializer{self.C, article}\n+\tfor _, article := range s.Articles {\n+\t\tserializer := ArticleSerializer{s.C, article}\n \t\tresponse = append(response, serializer.Response())\n \t}\n \treturn response\n@@ -114,22 +114,22 @@ type CommentResponse struct {\n \tAuthor    users.ProfileResponse `json:\"author\"`\n }\n \n-func (self *CommentSerializer) Response() CommentResponse {\n-\tauthorSerializer := ArticleUserSerializer{self.C, self.Author}\n+func (s *CommentSerializer) Response() CommentResponse {\n+\tauthorSerializer := ArticleUserSerializer{s.C, s.Author}\n \tresponse := CommentResponse{\n-\t\tID:        self.ID,\n-\t\tBody:      self.Body,\n-\t\tCreatedAt: self.CreatedAt.UTC().Format(\"2006-01-02T15:04:05.999Z\"),\n-\t\tUpdatedAt: self.UpdatedAt.UTC().Format(\"2006-01-02T15:04:05.999Z\"),\n+\t\tID:        s.ID,\n+\t\tBody:      s.Body,\n+\t\tCreatedAt: s.CreatedAt.UTC().Format(\"2006-01-02T15:04:05.999Z\"),\n+\t\tUpdatedAt: s.UpdatedAt.UTC().Format(\"2006-01-02T15:04:05.999Z\"),\n \t\tAuthor:    authorSerializer.Response(),\n \t}\n \treturn response\n }\n \n-func (self *CommentsSerializer) Response() []CommentResponse {\n+func (s *CommentsSerializer) Response() []CommentResponse {\n \tresponse := []CommentResponse{}\n-\tfor _, comment := range self.Comments {\n-\t\tserializer := CommentSerializer{self.C, comment}\n+\tfor _, comment := range s.Comments {\n+\t\tserializer := CommentSerializer{s.C, comment}\n \t\tresponse = append(response, serializer.Response())\n \t}\n \treturn response\ndiff --git a/articles/validators.go b/articles/validators.go\nindex 0a20626..33082c5 100644\n--- a/articles/validators.go\n+++ b/articles/validators.go\n@@ -32,19 +32,19 @@ func NewArticleModelValidatorFillWith(articleModel ArticleModel) ArticleModelVal\n \treturn articleModelValidator\n }\n \n-func (self *ArticleModelValidator) Bind(c *gin.Context) error {\n+func (s *ArticleModelValidator) Bind(c *gin.Context) error {\n \tmyUserModel := c.MustGet(\"my_user_model\").(users.UserModel)\n \n-\terr := common.Bind(c, self)\n+\terr := common.Bind(c, s)\n \tif err != nil {\n \t\treturn err\n \t}\n-\tself.articleModel.Slug = slug.Make(self.Article.Title)\n-\tself.articleModel.Title = self.Article.Title\n-\tself.articleModel.Description = self.Article.Description\n-\tself.articleModel.Body = self.Article.Body\n-\tself.articleModel.Author = GetArticleUserModel(myUserModel)\n-\tself.articleModel.setTags(self.Article.Tags)\n+\ts.articleModel.Slug = slug.Make(s.Article.Title)\n+\ts.articleModel.Title = s.Article.Title\n+\ts.articleModel.Description = s.Article.Description\n+\ts.articleModel.Body = s.Article.Body\n+\ts.articleModel.Author = GetArticleUserModel(myUserModel)\n+\ts.articleModel.setTags(s.Article.Tags)\n \treturn nil\n }\n \n@@ -59,14 +59,14 @@ func NewCommentModelValidator() CommentModelValidator {\n \treturn CommentModelValidator{}\n }\n \n-func (self *CommentModelValidator) Bind(c *gin.Context) error {\n+func (s *CommentModelValidator) Bind(c *gin.Context) error {\n \tmyUserModel := c.MustGet(\"my_user_model\").(users.UserModel)\n \n-\terr := common.Bind(c, self)\n+\terr := common.Bind(c, s)\n \tif err != nil {\n \t\treturn err\n \t}\n-\tself.commentModel.Body = self.Comment.Body\n-\tself.commentModel.Author = GetArticleUserModel(myUserModel)\n+\ts.commentModel.Body = s.Comment.Body\n+\ts.commentModel.Author = GetArticleUserModel(myUserModel)\n \treturn nil\n }\n",
+  "diffTruncated": false,
+  "tree": [
+    ".gitignore",
+    ".travis.yml",
+    "BACKEND_INSTRUCTIONS.md",
+    "FRONTEND_INSTRUCTIONS.md",
+    "MOBILE_INSTRUCTIONS.md",
+    "articles/models.go",
+    "articles/routers.go",
+    "articles/serializers.go",
+    "articles/validators.go",
+    "common/database.go",
+    "common/utils.go",
+    "common/utils_test.go",
+    "hello.go",
+    "logo.png",
+    "readme.md",
+    "users/doc.go",
+    "users/middlewares.go",
+    "users/models.go",
+    "users/routers.go",
+    "users/serializers.go",
+    "users/unit_test.go",
+    "users/validators.go",
+    "vendor/vendor.json"
+  ],
+  "explanation": {
+    "what": "articles/serializers.go と articles/validators.go にある各 Serializer / Validator 型のメソッドで、レシーバ変数名を `self` から `s` に一括改名した。TagSerializer、TagsSerializer、ArticleUserSerializer、ArticleSerializer、ArticlesSerializer、CommentSerializer、CommentsSerializer、ArticleModelValidator、CommentModelValidator の Response()/Bind() メソッドが対象。",
+    "why": "コミットメッセージは前コミットと同じ「change module name to github」だが、実際の変更内容はレシーバ名のリネームのみで import パスの変更は含まれていない。`self` は Python 由来の命名で、Go の慣習ではレシーバ名は型名の頭文字などの短い識別子(ここでは Serializer の s)にするのが一般的なため、おそらく Go らしいレシーバ命名へ揃える整形を行ったと考えられる。",
+    "highlights": [
+      { "file": "articles/serializers.go", "note": "self→s のリネームがファイル内の全メソッドに及んでいる。Response() の実装ロジック自体は変わっていない" }
+    ],
+    "langNotes": [
+      { "topic": "レシーバ名の慣習", "note": "Go のメソッドレシーバ(func (s *T) Method())には `this` や `self` のような固定語は使わず、型名の頭文字などの短い1〜2文字が好まれる。gofmt/golint もこの慣習を前提にしており、他言語出身者が book/blog を読んでも自己流の self を使いがちな箇所。" }
+    ],
+    "diagram": null,
+    "evidence": "inferred",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

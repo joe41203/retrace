@@ -1,0 +1,87 @@
+{
+  "seq": 85,
+  "sha": "04e874ec707818ee7f3444014df1b0d2baa2e4c5",
+  "parents": [
+    "75c7b337db03ee2ade84c0687cd3cf737ed5e4ec"
+  ],
+  "author": {
+    "name": "wangzitian0",
+    "email": "zitwang@linkedin.com",
+    "date": "2017-11-02T20:18:49+08:00"
+  },
+  "message": "change test of common module",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 3,
+    "additions": 82,
+    "deletions": 47
+  },
+  "files": [
+    {
+      "path": "common/database.go",
+      "status": "M",
+      "additions": 4,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "common/unit_test.go",
+      "status": "A",
+      "additions": 78,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "common/utils_test.go",
+      "status": "D",
+      "additions": 0,
+      "deletions": 47,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/common/database.go b/common/database.go\nindex f22699f..57aa3af 100644\n--- a/common/database.go\n+++ b/common/database.go\n@@ -13,6 +13,7 @@ type Database struct {\n \n var DB *gorm.DB\n \n+// Opening a database and save the reference to `Database` struct.\n func Init() *gorm.DB {\n \tdb, err := gorm.Open(\"sqlite3\", \"./../gorm.db\")\n \tif err != nil {\n@@ -24,6 +25,7 @@ func Init() *gorm.DB {\n \treturn DB\n }\n \n+// This function will create a temporarily database for running testing cases\n func TestDBInit() *gorm.DB {\n \ttest_db, err := gorm.Open(\"sqlite3\", \"./../gorm_test.db\")\n \tif err != nil {\n@@ -35,12 +37,14 @@ func TestDBInit() *gorm.DB {\n \treturn DB\n }\n \n+// Delete the database after running testing cases.\n func TestDBFree(test_db *gorm.DB) error {\n \ttest_db.Close()\n \terr := os.Remove(\"./../gorm_test.db\")\n \treturn err\n }\n \n+// Using this function to get a connection, you can create your connection pool here.\n func GetDB() *gorm.DB {\n \treturn DB\n }\ndiff --git a/common/unit_test.go b/common/unit_test.go\nnew file mode 100644\nindex 0000000..e746dc7\n--- /dev/null\n+++ b/common/unit_test.go\n@@ -0,0 +1,78 @@\n+package common\n+\n+import (\n+\t\"github.com/stretchr/testify/assert\"\n+\t\"os\"\n+\t\"testing\"\n+)\n+\n+func TestConnectingDatabase(t *testing.T) {\n+\tassert := assert.New(t)\n+\tdb := Init()\n+\t// Test create & close DB\n+\t_, err := os.Stat(\"./../gorm.db\")\n+\tassert.NoError(err, \"Db should exist\")\n+\tassert.NoError(db.DB().Ping(), \"Db should be able to ping\")\n+\n+\t// Test get a connecting from connection pools\n+\tconnection := GetDB()\n+\tassert.NoError(connection.DB().Ping(), \"Db should be able to ping\")\n+\tdb.Close()\n+\n+\n+\t// Test DB exceptions\n+\tos.Chmod(\"./../gorm.db\",0000)\n+\tdb = Init()\n+\tassert.Error(db.DB().Ping(), \"Db should not be able to ping\")\n+\tdb.Close()\n+\tos.Chmod(\"./../gorm.db\",0644)\n+}\n+\n+\n+func TestConnectingTestDatabase(t *testing.T) {\n+\tassert := assert.New(t)\n+\t// Test create & close DB\n+\tdb := TestDBInit()\n+\t_, err := os.Stat(\"./../gorm_test.db\")\n+\tassert.NoError(err, \"Db should exist\")\n+\tassert.NoError(db.DB().Ping(), \"Db should be able to ping\")\n+\tdb.Close()\n+\n+\t// Test testDB exceptions\n+\tos.Chmod(\"./../gorm_test.db\",0000)\n+\tdb = TestDBInit()\n+\t_, err = os.Stat(\"./../gorm_test.db\")\n+\tassert.NoError(err, \"Db should exist\")\n+\tassert.Error(db.DB().Ping(), \"Db should not be able to ping\")\n+\tdb.Close()\n+\tos.Chmod(\"./../gorm_test.db\",0644)\n+\n+\t// Test delete DB\n+\tTestDBFree(db)\n+\t_, err = os.Stat(\"./../gorm_test.db\")\n+\n+\tassert.Error(err, \"Db should not exist\")\n+}\n+\n+func TestRandString(t *testing.T) {\n+\tassert := assert.New(t)\n+\n+\tvar letters = []rune(\"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789\")\n+\tstr := RandString(0)\n+\tassert.Equal(str, \"\", \"length should be ''\")\n+\n+\tstr = RandString(10)\n+\tassert.Equal(len(str), 10, \"length should be 10\")\n+\tfor _, ch := range str {\n+\t\tassert.Contains(letters, ch, \"char should be a-z|A-Z|0-9\")\n+\t}\n+}\n+\n+func TestGenToken(t *testing.T) {\n+\tassert := assert.New(t)\n+\n+\ttoken := GenToken(2)\n+\n+\tassert.IsType(token, string(\"token\"), \"token type should be string\")\n+\tassert.Len(token, 115, \"JWT's length should be 115\")\n+}\ndiff --git a/common/utils_test.go b/common/utils_test.go\ndeleted file mode 100644\nindex 693213e..0000000\n--- a/common/utils_test.go\n+++ /dev/null\n@@ -1,47 +0,0 @@\n-package common\n-\n-import (\n-\t\"github.com/jinzhu/gorm\"\n-\t_ \"github.com/jinzhu/gorm/dialects/sqlite\"\n-\t\"github.com/stretchr/testify/assert\"\n-\t\"os\"\n-\t\"testing\"\n-)\n-\n-func TestDatabaseConnection(t *testing.T) {\n-\tassert := assert.New(t)\n-\tdb := Init()\n-\tdefer db.Close()\n-\n-\ttest_db, _ := gorm.Open(\"sqlite3\", \"./../gorm_test.db\")\n-\tdefer test_db.Close()\n-\tassert.IsType(test_db, db, \"Db'type should be gorm.DB\")\n-\tassert.NoError(db.DB().Ping(), \"Db should be able to ping\")\n-\tassert.NoError(test_db.DB().Ping(), \"Test Db should be able to ping\")\n-\n-\tvar err = os.Remove(\"./../gorm_test.db\")\n-\tassert.NoError(err, \"Db should be deleted\")\n-}\n-\n-func TestRandString(t *testing.T) {\n-\tassert := assert.New(t)\n-\n-\tvar letters = []rune(\"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789\")\n-\tstr := RandString(0)\n-\tassert.Equal(str, \"\", \"length should be ''\")\n-\n-\tstr = RandString(10)\n-\tassert.Equal(len(str), 10, \"length should be 10\")\n-\tfor _, ch := range str {\n-\t\tassert.Contains(letters, ch, \"char should be a-z|A-Z|0-9\")\n-\t}\n-}\n-\n-func TestGenToken(t *testing.T) {\n-\tassert := assert.New(t)\n-\n-\ttoken := GenToken(2)\n-\n-\tassert.IsType(token, string(\"token\"), \"token type should be string\")\n-\tassert.Len(token, 115, \"JWT's length should be 115\")\n-}\n",
+  "diffTruncated": false,
+  "tree": [
+    ".gitignore",
+    ".travis.yml",
+    "BACKEND_INSTRUCTIONS.md",
+    "FRONTEND_INSTRUCTIONS.md",
+    "MOBILE_INSTRUCTIONS.md",
+    "articles/models.go",
+    "articles/routers.go",
+    "articles/serializers.go",
+    "articles/validators.go",
+    "common/database.go",
+    "common/unit_test.go",
+    "common/utils.go",
+    "hello.go",
+    "logo.png",
+    "readme.md",
+    "scripts/coverage.sh",
+    "scripts/gofmt.sh",
+    "users/doc.go",
+    "users/middlewares.go",
+    "users/models.go",
+    "users/routers.go",
+    "users/serializers.go",
+    "users/unit_test.go",
+    "users/validators.go",
+    "vendor/vendor.json"
+  ],
+  "explanation": {
+    "what": "common モジュールのテストファイルを utils_test.go から unit_test.go にリネームしつつ内容を作り直した。TestDatabaseConnection を TestConnectingDatabase と TestConnectingTestDatabase の2つに分割し、DB接続失敗時(os.Chmod でパーミッションを0000にしてPingを失敗させる)のケースを追加した。common/database.go の各関数にはコメントを追加している。",
+    "why": "コミットメッセージは「change test of common module」とだけあり具体的な数値目標は語られていないが、次のコミット(seq86)で「improve the coverage of common to 90%+」と続くことから、おそらくこのコミットはその準備として、DB接続の正常系・異常系を分けて検証できるようにテスト構造を整理したものと考えられる。",
+    "highlights": [
+      { "file": "common/unit_test.go", "note": "TestConnectingDatabase / TestConnectingTestDatabase として、os.Chmod で意図的に権限エラーを起こすDB接続失敗系のテストを新設" }
+    ],
+    "langNotes": [
+      { "topic": "common パッケージの位置づけ", "note": "このプロジェクトでは common がDB初期化・JWT生成・共通エラー型など、users/articles など各機能モジュールが共通で使う下位レイヤーの役割を担っている。RealWorldの他言語実装で言う「utils」「shared」層に近い。" }
+    ],
+    "diagram": null,
+    "evidence": "inferred",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

@@ -1,0 +1,79 @@
+{
+  "seq": 77,
+  "sha": "dcc1734b7bc4b0fb54df54a8795dbb3b9ae60762",
+  "parents": [
+    "f12e3beaedfe51dc1408dd38e02bc8199c691df0"
+  ],
+  "author": {
+    "name": "wangzitian0",
+    "email": "zitwang@linkedin.com",
+    "date": "2017-11-01T17:10:00+08:00"
+  },
+  "message": "add codecov script",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 20,
+    "deletions": 1
+  },
+  "files": [
+    {
+      "path": ".travis.yml",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "scripts/coverage.sh",
+      "status": "A",
+      "additions": 19,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/.travis.yml b/.travis.yml\nindex 1201936..4dab6fe 100644\n--- a/.travis.yml\n+++ b/.travis.yml\n@@ -16,7 +16,7 @@ install:\n   - govendor sync\n script:\n   - go test -v ./...\n-  - go test -race -coverprofile=coverage.txt -covermode=atomic\n+  - bash ./scripts/coverage.sh\n \n after_success:\n   - bash <(curl -s https://codecov.io/bash)\ndiff --git a/scripts/coverage.sh b/scripts/coverage.sh\nnew file mode 100755\nindex 0000000..d753e4a\n--- /dev/null\n+++ b/scripts/coverage.sh\n@@ -0,0 +1,19 @@\n+#!/usr/bin/env bash\n+\n+set -e\n+\n+# http://stackoverflow.com/a/21142256/2055281\n+\n+echo \"mode: atomic\" > coverage.txt\n+\n+for d in $(find ./* -maxdepth 10 -type d); do\n+    if ls $d/*.go &> /dev/null; then\n+        go test  -coverprofile=profile.out -covermode=atomic $d\n+        if [ -f profile.out ]; then\n+            echo \"$(pwd)\"\n+            cat profile.out | grep -v \"mode: \" >> coverage.txt\n+            rm profile.out\n+        fi\n+    fi\n+done\n+\n",
+  "diffTruncated": false,
+  "tree": [
+    ".gitignore",
+    ".travis.yml",
+    "BACKEND_INSTRUCTIONS.md",
+    "FRONTEND_INSTRUCTIONS.md",
+    "MOBILE_INSTRUCTIONS.md",
+    "articles/models.go",
+    "articles/routers.go",
+    "articles/serializers.go",
+    "articles/validators.go",
+    "common/database.go",
+    "common/utils.go",
+    "common/utils_test.go",
+    "hello.go",
+    "logo.png",
+    "readme.md",
+    "scripts/coverage.sh",
+    "users/doc.go",
+    "users/middlewares.go",
+    "users/models.go",
+    "users/routers.go",
+    "users/serializers.go",
+    "users/unit_test.go",
+    "users/validators.go",
+    "vendor/vendor.json"
+  ],
+  "explanation": {
+    "what": "新規ファイル scripts/coverage.sh を追加し、リポジトリ内の各ディレクトリを再帰的に走査して `go test -coverprofile` をパッケージごとに実行、結果を1つの coverage.txt にマージするスクリプトを実装した。.travis.yml のテストステップを直接の `go test -race -coverprofile=...` 呼び出しから `bash ./scripts/coverage.sh` の呼び出しに置き換えた。",
+    "why": "コミットメッセージ「add codecov script」の通り。前コミットの `go test -coverprofile=coverage.txt` は単一パッケージ(カレントディレクトリ)しか計測できないため、articles/common/users のような複数パッケージ全体のカバレッジを1つのレポートに集約するために、ディレクトリを走査してパッケージごとに計測しマージするシェルスクリプトへ切り出したとみられる。",
+    "highlights": [
+      { "file": "scripts/coverage.sh", "note": "find で全ディレクトリを列挙し、*.go があるディレクトリだけ go test -coverprofile を実行、profile.out を coverage.txt に追記していく。StackOverflow の回答を参照している旨のコメントが残っている" }
+    ],
+    "langNotes": [
+      { "topic": "パッケージ単位のカバレッジ集約", "note": "Go の `go test -coverprofile` は基本的に1回の実行につき1パッケージ分のカバレッジしか出力しないため、複数パッケージ(モノレポ的な構成)をまとめて計測したい場合はディレクトリごとに実行してプロファイルを手動でマージするのが GOPATH 時代のよくあるパターンだった。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

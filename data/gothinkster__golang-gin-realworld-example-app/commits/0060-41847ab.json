@@ -1,0 +1,100 @@
+{
+  "seq": 60,
+  "sha": "41847ab299b0ddd15b045f2a61f17a862569e529",
+  "parents": [
+    "9fa668e1b944755bf40add4fed628c24d7935586"
+  ],
+  "author": {
+    "name": "wangzitian0",
+    "email": "zitwang@linkedin.com",
+    "date": "2017-10-30T21:08:21+08:00"
+  },
+  "message": "change test of users",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 5,
+    "additions": 124,
+    "deletions": 52
+  },
+  "files": [
+    {
+      "path": "common/database.go",
+      "status": "M",
+      "additions": 19,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "hello.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 2,
+      "binary": false
+    },
+    {
+      "path": "users/models.go",
+      "status": "M",
+      "additions": 9,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "users/routers.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "users/unit_test.go",
+      "status": "M",
+      "additions": 94,
+      "deletions": 47,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/common/database.go b/common/database.go\nindex b35830d..f22699f 100644\n--- a/common/database.go\n+++ b/common/database.go\n@@ -4,6 +4,7 @@ import (\n \t\"fmt\"\n \t\"github.com/jinzhu/gorm\"\n \t_ \"github.com/jinzhu/gorm/dialects/sqlite\"\n+\t\"os\"\n )\n \n type Database struct {\n@@ -18,11 +19,28 @@ func Init() *gorm.DB {\n \t\tfmt.Println(\"db err: \", err)\n \t}\n \tdb.DB().SetMaxIdleConns(10)\n-\tdb.LogMode(true)\n+\t//db.LogMode(true)\n \tDB = db\n \treturn DB\n }\n \n+func TestDBInit() *gorm.DB {\n+\ttest_db, err := gorm.Open(\"sqlite3\", \"./../gorm_test.db\")\n+\tif err != nil {\n+\t\tfmt.Println(\"db err: \", err)\n+\t}\n+\ttest_db.DB().SetMaxIdleConns(3)\n+\ttest_db.LogMode(true)\n+\tDB = test_db\n+\treturn DB\n+}\n+\n+func TestDBFree(test_db *gorm.DB) error {\n+\ttest_db.Close()\n+\terr := os.Remove(\"./../gorm_test.db\")\n+\treturn err\n+}\n+\n func GetDB() *gorm.DB {\n \treturn DB\n }\ndiff --git a/hello.go b/hello.go\nindex aa0bf63..5c1b72a 100644\n--- a/hello.go\n+++ b/hello.go\n@@ -13,8 +13,7 @@ import (\n )\n \n func Migrate(db *gorm.DB) {\n-\tdb.AutoMigrate(&users.UserModel{})\n-\tdb.AutoMigrate(&users.FollowModel{})\n+\tusers.AutoMigrate()\n \tdb.AutoMigrate(&articles.ArticleModel{})\n \tdb.AutoMigrate(&articles.TagModel{})\n \tdb.AutoMigrate(&articles.FavoriteModel{})\ndiff --git a/users/models.go b/users/models.go\nindex 595ab3e..6f37b53 100644\n--- a/users/models.go\n+++ b/users/models.go\n@@ -39,6 +39,14 @@ type FollowModel struct {\n \tFollowedByID uint\n }\n \n+// Migrate the schema of database if needed\n+func AutoMigrate() {\n+\tdb := common.GetDB()\n+\n+\tdb.AutoMigrate(&UserModel{})\n+\tdb.AutoMigrate(&FollowModel{})\n+}\n+\n // What's bcrypt? https://en.wikipedia.org/wiki/Bcrypt\n // Golang bcrypt doc: https://godoc.org/golang.org/x/crypto/bcrypt\n // You can change the value in bcrypt.DefaultCost to adjust the security index.\n@@ -71,7 +79,7 @@ func FindOneUser(condition interface{}) (UserModel, error) {\n \tvar model UserModel\n \terr := db.Where(condition).First(&model).Error\n \treturn model, err\n-};\n+}\n \n // You could input an UserModel which will be saved in database returning with error info\n // \tif err := SaveOne(&userModel); err != nil { ... }\ndiff --git a/users/routers.go b/users/routers.go\nindex 7be859b..a86d22a 100644\n--- a/users/routers.go\n+++ b/users/routers.go\n@@ -103,7 +103,7 @@ func UsersLogin(c *gin.Context) {\n \t}\n \tc.Set(\"my_user_model\", userModel)\n \tuserSerializer := UserSerializer{c}\n-\tc.JSON(http.StatusCreated, gin.H{\"user\": userSerializer.Response()})\n+\tc.JSON(http.StatusOK, gin.H{\"user\": userSerializer.Response()})\n }\n \n func UserRetrieve(c *gin.Context) {\ndiff --git a/users/unit_test.go b/users/unit_test.go\nindex 64562ad..c0c8449 100644\n--- a/users/unit_test.go\n+++ b/users/unit_test.go\n@@ -5,9 +5,9 @@ import (\n \t\"testing\"\n \n \t\"bytes\"\n-\t\"encoding/json\"\n-\t_ \"fmt\"\n+\t\"fmt\"\n \t\"github.com/jinzhu/gorm\"\n+\t\"golang-gin-starter-kit/common\"\n \t\"gopkg.in/gin-gonic/gin.v1\"\n \t\"net/http\"\n \t\"net/http/httptest\"\n@@ -16,6 +16,7 @@ import (\n )\n \n var image_url = \"https://golang.org/doc/gopher/frontpage.png\"\n+var test_db *gorm.DB\n \n func newUserModel() UserModel {\n \treturn UserModel{\n@@ -27,110 +28,156 @@ func newUserModel() UserModel {\n \t\tPasswordHash: \"\",\n \t}\n }\n-func assertUserModel(t *testing.T, userModel UserModel) {\n-\tassert.EqualValues(t, userModel.ID, 2, \"Marshal field should be equal\")\n-\tassert.Equal(t, *userModel.Image, image_url, \"Marshal field should be equal\")\n-\tassert.Equal(t, userModel.Username, \"asd123!@#ASD\", \"Marshal field should be equal\")\n-\tassert.Equal(t, userModel.Email, \"wzt@g.cn\", \"Marshal field should be equal\")\n-\tassert.Equal(t, userModel.Bio, \"heheda\", \"Marshal field should be equal\")\n+\n+func userModelMocker(n int) []UserModel {\n+\tvar ret []UserModel\n+\tfor i := 0; i < n; i++ {\n+\t\timage := fmt.Sprintf(\"image%v\", i)\n+\t\tuserModel := UserModel{\n+\t\t\tUsername: fmt.Sprintf(\"user%v\", i),\n+\t\t\tEmail:    fmt.Sprintf(\"user%v@linkedin.com\", i),\n+\t\t\tBio:      fmt.Sprintf(\"bio%v\", i),\n+\t\t\tImage:    &image,\n+\t\t}\n+\t\tuserModel.setPassword(\"password123\")\n+\t\ttest_db.Create(&userModel)\n+\t\tret = append(ret, userModel)\n+\t}\n+\treturn ret\n }\n \n-func TestUsermodel(t *testing.T) {\n-\tassert := assert.New(t)\n+func TestUserModel(t *testing.T) {\n+\tasserts := assert.New(t)\n \n+\t//Testing UserModel's password feature\n \tuserModel := newUserModel()\n \terr := userModel.checkPassword(\"\")\n-\tassert.Error(err, \"empty password should return err\")\n+\tasserts.Error(err, \"empty password should return err\")\n \n \tuserModel = newUserModel()\n \terr = userModel.setPassword(\"\")\n-\tassert.Error(err, \"empty password can not be set null\")\n+\tasserts.Error(err, \"empty password can not be set null\")\n \n \tuserModel = newUserModel()\n \terr = userModel.setPassword(\"asd123!@#ASD\")\n-\tassert.NoError(err, \"password should be set successful\")\n-\tassert.Len(userModel.PasswordHash, 60, \"password hash length should be 60\")\n+\tasserts.NoError(err, \"password should be set successful\")\n+\tasserts.Len(userModel.PasswordHash, 60, \"password hash length should be 60\")\n \n \terr = userModel.checkPassword(\"sd123!@#ASD\")\n-\tassert.Error(err, \"password should be checked and not validated\")\n+\tasserts.Error(err, \"password should be checked and not validated\")\n \n \terr = userModel.checkPassword(\"asd123!@#ASD\")\n-\tassert.NoError(err, \"password should be checked and validated\")\n-\n-\tuserModel.Token = \"_token\"\n-\tmarshalModel := []byte(`{\"id\":2,\"username\":\"asd123!@#ASD\",\"email\":\"wzt@g.cn\",\"bio\":\"heheda\",\"image\":\"https://golang.org/doc/gopher/frontpage.png\",\"token\":\"_token\"}`)\n-\tmodelJSON, _ := json.Marshal(userModel)\n-\t//fmt.Println(\"%s\",string(modelJSON))\n-\tassert.Equal(marshalModel, modelJSON, \"Marshal should be equal\")\n-\n-\tjson.Unmarshal(marshalModel, userModel)\n-\tassertUserModel(t, userModel)\n+\tasserts.NoError(err, \"password should be checked and validated\")\n+\n+\t//Testing the following relationship between users\n+\tusers := userModelMocker(3)\n+\ta := users[0]\n+\tb := users[1]\n+\tc := users[2]\n+\tasserts.Equal(0, len(a.GetFollowings()), \"GetFollowings should be right before following\")\n+\tasserts.Equal(false, a.isFollowing(b), \"isFollowing relationship should be right at init\")\n+\ta.following(b)\n+\tasserts.Equal(1, len(a.GetFollowings()), \"GetFollowings should be right after a following b\")\n+\tasserts.Equal(true, a.isFollowing(b), \"isFollowing should be right after a following b\")\n+\ta.following(c)\n+\tasserts.Equal(2, len(a.GetFollowings()), \"GetFollowings be right after a following c\")\n+\tasserts.EqualValues(b, a.GetFollowings()[0], \"GetFollowings should be right\")\n+\tasserts.EqualValues(c, a.GetFollowings()[1], \"GetFollowings should be right\")\n+\ta.unFollowing(b)\n+\tasserts.Equal(1, len(a.GetFollowings()), \"GetFollowings should be right after a unFollowing b\")\n+\tasserts.EqualValues(c, a.GetFollowings()[0], \"GetFollowings should be right after a unFollowing b\")\n+\tasserts.Equal(false, a.isFollowing(b), \"isFollowing should be right after a unFollowing b\")\n }\n \n-var test_db *gorm.DB\n-\n var routerRegistrationTests = []struct {\n+\turl            string\n \tbodyData       string\n \texpectedCode   int\n \tresponseRegexg string\n \tmsg            string\n }{\n \t{\n+\t\t\"/users/\",\n \t\t`{\"user\":{\"username\": \"wangzitian0\",\"email\": \"wzt@gg.cn\",\"password\": \"jakejxke\"}}`,\n \t\thttp.StatusCreated,\n-\t\t`{\"user\":{\"id\":1,\"username\":\"wangzitian0\",\"email\":\"wzt@gg.cn\",\"bio\":\"\",\"image\":null,\"token\":\"([a-zA-Z0-9-_.]{115})\"}}`,\n-\t\t\"valid data and should return 200\",\n+\t\t`{\"user\":{\"username\":\"wangzitian0\",\"email\":\"wzt@gg.cn\",\"bio\":\"\",\"image\":null,\"token\":\"([a-zA-Z0-9-_.]{115})\"}}`,\n+\t\t\"valid data and should return StatusCreated\",\n \t},\n \t{\n+\t\t\"/users/\",\n \t\t`{\"user\":{\"username\": \"u\",\"email\": \"wzt@gg.cn\",\"password\": \"jakejxke\"}}`,\n \t\thttp.StatusUnprocessableEntity,\n-\t\t`{\"errors\":{\"Username\":\"{min: 8}\"}}`,\n+\t\t`{\"errors\":{\"Username\":\"{min: 4}\"}}`,\n \t\t\"short username should return error\",\n \t},\n \t{\n+\t\t\"/users/\",\n \t\t`{\"user\":{\"username\": \"wangzitian0\",\"email\": \"wzt@gg.cn\",\"password\": \"j\"}}`,\n \t\thttp.StatusUnprocessableEntity,\n \t\t`{\"errors\":{\"Password\":\"{min: 8}\"}}`,\n \t\t\"short password should return error\",\n \t},\n \t{\n+\t\t\"/users/\",\n \t\t`{\"user\":{\"username\": \"wangzitian0\",\"email\": \"wztgg.cn\",\"password\": \"jakejxke\"}}`,\n \t\thttp.StatusUnprocessableEntity,\n \t\t`{\"errors\":{\"Email\":\"{key: email}\"}}`,\n \t\t\"email invalid should return error\",\n \t},\n+\t{\n+\t\t\"/users/login\",\n+\t\t`{\"user\":{\"email\": \"user1@linkedin.com\",\"password\": \"password123\"}}`,\n+\t\thttp.StatusOK,\n+\t\t`{\"user\":{\"username\":\"user1\",\"email\":\"user1@linkedin.com\",\"bio\":\"bio1\",\"image\":\"image1\",\"token\":\"([a-zA-Z0-9-_.]{115})\"}}`,\n+\t\t\"email login should return user\",\n+\t},\n+\t{\n+\t\t\"/users/login\",\n+\t\t`{\"user\":{\"email\": \"user112312312@linkedin.com\",\"password\": \"password123\"}}`,\n+\t\thttp.StatusForbidden,\n+\t\t`{\"errors\":{\"login\":\"Not Registered email or invalid password\"}}`,\n+\t\t\"email not exist should return error info\",\n+\t},\n+\t{\n+\t\t\"/users/login\",\n+\t\t`{\"user\":{\"email\": \"user1@linkedin.com\",\"password\": \"password126\"}}`,\n+\t\thttp.StatusForbidden,\n+\t\t`{\"errors\":{\"login\":\"Not Registered email or invalid password\"}}`,\n+\t\t\"password error should return error info\",\n+\t},\n+\t{\n+\t\t\"/users/login\",\n+\t\t`{\"user\":{\"email\": \"user1@linkedin.com\",\"password\": \"passw\"}}`,\n+\t\thttp.StatusUnprocessableEntity,\n+\t\t`{\"errors\":{\"Password\":\"{min: 8}\"}}`,\n+\t\t\"password too short should return error info\",\n+\t},\n }\n \n-func TestRouter_Registration(t *testing.T) {\n-\tassert := assert.New(t)\n+func TestWithoutAuth(t *testing.T) {\n+\tasserts := assert.New(t)\n \n \tr := gin.New()\n-\tusersGroup := r.Group(\"/p\")\n-\tUsersRegister(usersGroup)\n+\tUsersRegister(r.Group(\"/users\"))\n \tfor _, testData := range routerRegistrationTests {\n \t\tbodyData := testData.bodyData\n-\t\treq, err := http.NewRequest(\"POST\", \"/p/\", bytes.NewBufferString(bodyData))\n+\t\treq, err := http.NewRequest(\"POST\", testData.url, bytes.NewBufferString(bodyData))\n \t\treq.Header.Set(\"Content-Type\", \"application/json\")\n \n-\t\tassert.NoError(err)\n+\t\tasserts.NoError(err)\n \t\tw := httptest.NewRecorder()\n \t\tr.ServeHTTP(w, req)\n \n-\t\tassert.Equal(testData.expectedCode, w.Code, \"code - \"+testData.msg)\n-\t\tassert.Regexp(testData.responseRegexg, w.Body.String(), \"regexp - %v\\n \"+testData.msg)\n+\t\tasserts.Equal(testData.expectedCode, w.Code, \"Response Status - \"+testData.msg)\n+\t\tasserts.Regexp(testData.responseRegexg, w.Body.String(), \"Response Content - \"+testData.msg)\n \t}\n-\n }\n \n+//This is a hack way to add test database for each case\n func TestMain(m *testing.M) {\n-\n-\ttest_db, _ = gorm.Open(\"sqlite3\", \"./../gorm_test.db\")\n-\ttest_db.AutoMigrate(&UserModel{})\n-\t//fmt.Println(\"before\")\n+\ttest_db = common.TestDBInit()\n+\tAutoMigrate()\n \texitVal := m.Run()\n-\t//fmt.Println(\"after\")\n-\ttest_db.Close()\n-\tos.Remove(\"./../gorm_test.db\")\n-\n+\tcommon.TestDBFree(test_db)\n \tos.Exit(exitVal)\n }\n",
+  "diffTruncated": false,
+  "tree": [
+    ".gitignore",
+    "BACKEND_INSTRUCTIONS.md",
+    "FRONTEND_INSTRUCTIONS.md",
+    "MOBILE_INSTRUCTIONS.md",
+    "articles/models.go",
+    "articles/routers.go",
+    "articles/serializers.go",
+    "articles/validators.go",
+    "common/database.go",
+    "common/utils.go",
+    "common/utils_test.go",
+    "hello.go",
+    "logo.png",
+    "middlewares/auth-jwt.go",
+    "middlewares/auth-jwt_test.go",
+    "readme.md",
+    "users/doc.go",
+    "users/models.go",
+    "users/routers.go",
+    "users/serializers.go",
+    "users/unit_test.go",
+    "users/validators.go",
+    "vendor/vendor.json"
+  ],
+  "explanation": {
+    "what": "common/database.go に TestDBInit()/TestDBFree() を追加し、テスト専用の sqlite ファイル(gorm_test.db)の初期化・後始末を共通化した。users/models.go に AutoMigrate() を新設して hello.go の Migrate() から呼び出すようにし、users/unit_test.go を全面的に書き直して userModelMocker によるテストデータ生成、フォロー関係(GetFollowings/isFollowing/following/unFollowing)の検証、ログイン(/users/login)の成功・失敗パターンのテストを追加した。UsersLogin のレスポンスコードも StatusCreated から StatusOK に修正した。",
+    "why": "コミットメッセージ「change test of users」の通り、users パッケージのテストを作り直す作業。テスト用DBのセットアップ/後片付けを共通関数に切り出すことで、他のパッケージ(articles など)でも同じ仕組みを再利用できるようにしたと見られる。",
+    "highlights": [
+      { "file": "common/database.go", "note": "TestDBInit/TestDBFree でテスト用DBの生成・破棄を共通化。テストごとに sqlite ファイルを作り直す方式" },
+      { "file": "users/unit_test.go", "note": "TestMain で common.TestDBInit()+AutoMigrate() を使うよう置き換え、フォロー関係やログインの表テスト(テーブル駆動テスト)が追加された" }
+    ],
+    "langNotes": [
+      { "topic": "TestMain とテーブル駆動テスト", "note": "Go のテストファイルは `func TestMain(m *testing.M)` を定義すると、テスト実行前後に共通のセットアップ/後片付けを差し込める。routerRegistrationTests のような構造体スライスに入力と期待値を並べて for ループで回す書き方は Go で頻出の「テーブル駆動テスト」パターン。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

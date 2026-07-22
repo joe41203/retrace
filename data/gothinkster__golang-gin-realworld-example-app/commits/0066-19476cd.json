@@ -1,0 +1,69 @@
+{
+  "seq": 66,
+  "sha": "19476cd6682bb4b237e99648768aebea03efebc2",
+  "parents": [
+    "d5dc3eeed26cfbe13ac05efb875fca96f62a7b0a"
+  ],
+  "author": {
+    "name": "wangzitian0",
+    "email": "zitwang@linkedin.com",
+    "date": "2017-10-31T19:55:25+08:00"
+  },
+  "message": "add travis ci yml",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 2,
+    "deletions": 2
+  },
+  "files": [
+    {
+      "path": ".travis.yml",
+      "status": "M",
+      "additions": 2,
+      "deletions": 2,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/.travis.yml b/.travis.yml\nindex 9444621..8ecb6cb 100644\n--- a/.travis.yml\n+++ b/.travis.yml\n@@ -7,11 +7,11 @@ go:\n   - master\n \n install:\n-  - go get -u github.com/kardianos/govendor\n   - echo $GOPATH\n   - ls\n   - pwd\n-  - cd $GOPATH/src/github.com/wangzitian0/golang-gin-starter-kit/\n+  - ls $GOPATH/src\n+  - go get -u github.com/kardianos/govendor\n   - govendor sync\n script:\n   - go test ./...\n",
+  "diffTruncated": false,
+  "tree": [
+    ".gitignore",
+    ".travis.yml",
+    "BACKEND_INSTRUCTIONS.md",
+    "FRONTEND_INSTRUCTIONS.md",
+    "MOBILE_INSTRUCTIONS.md",
+    "articles/models.go",
+    "articles/routers.go",
+    "articles/serializers.go",
+    "articles/validators.go",
+    "common/database.go",
+    "common/utils.go",
+    "common/utils_test.go",
+    "hello.go",
+    "logo.png",
+    "readme.md",
+    "users/doc.go",
+    "users/middlewares.go",
+    "users/models.go",
+    "users/routers.go",
+    "users/serializers.go",
+    "users/unit_test.go",
+    "users/validators.go",
+    "vendor/vendor.json"
+  ],
+  "explanation": {
+    "what": "install ステップから govendor 取得用の go get -u github.com/kardianos/govendor と、直前に追加していた cd $GOPATH/src/github.com/wangzitian0/golang-gin-starter-kit/ を削除し、代わりに ls $GOPATH/src を echo $GOPATH の直後に追加した。govendor の go get 自体は govendor sync の直前に移動する形で残っている(順序: echo/ls/pwd/ls $GOPATH/src → go get govendor → govendor sync)。",
+    "why": "おそらく GOPATH/src 配下に実際にどんなディレクトリが存在しているかを ls $GOPATH/src で確認し、Travis が想定通りの場所にリポジトリを配置しているかを調べようとした調査目的の変更と考えられる。cd を消したのは、その cd がなくても govendor sync が動く(あるいは動かなかった)ことを試している途中とみられる。",
+    "highlights": [
+      { "file": ".travis.yml", "note": "ls $GOPATH/src の追加と cd の削除。GOPATH 配下の実際の配置を確認しながら試行錯誤している跡が読み取れる" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "inferred",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

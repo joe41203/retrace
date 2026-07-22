@@ -1,0 +1,73 @@
+{
+  "seq": 62,
+  "sha": "7aa81c0654e95f6eb84e6f53ac027e47adf779d7",
+  "parents": [
+    "5b097e6ff1ce3e12b4af83159dc86dc36a2f391e"
+  ],
+  "author": {
+    "name": "wangzitian0",
+    "email": "zitwang@linkedin.com",
+    "date": "2017-10-31T18:47:23+08:00"
+  },
+  "message": "add travis ci yml",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 14,
+    "deletions": 0
+  },
+  "files": [
+    {
+      "path": ".travis.yml",
+      "status": "A",
+      "additions": 14,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/.travis.yml b/.travis.yml\nnew file mode 100644\nindex 0000000..ae300d5\n--- /dev/null\n+++ b/.travis.yml\n@@ -0,0 +1,14 @@\n+language: go\n+\n+go:\n+  - 1.x\n+  - 1.7\n+  - 1.8.x\n+  - master\n+\n+go_import_path: github.com/wangzitian0/golang-gin-starter-kit\n+\n+\n+before_install:\n+\n+script: go get -u github.com/kardianos/govendor && govendor sync && go test ./...\n",
+  "diffTruncated": false,
+  "tree": [
+    ".gitignore",
+    ".travis.yml",
+    "BACKEND_INSTRUCTIONS.md",
+    "FRONTEND_INSTRUCTIONS.md",
+    "MOBILE_INSTRUCTIONS.md",
+    "articles/models.go",
+    "articles/routers.go",
+    "articles/serializers.go",
+    "articles/validators.go",
+    "common/database.go",
+    "common/utils.go",
+    "common/utils_test.go",
+    "hello.go",
+    "logo.png",
+    "readme.md",
+    "users/doc.go",
+    "users/middlewares.go",
+    "users/models.go",
+    "users/routers.go",
+    "users/serializers.go",
+    "users/unit_test.go",
+    "users/validators.go",
+    "vendor/vendor.json"
+  ],
+  "explanation": {
+    "what": "リポジトリに .travis.yml を新規追加し、Travis CI での自動テストを初めて設定した。language: go を指定し、Go のバージョンマトリクスとして 1.x・1.7・1.8.x・master の4系列を並べている。go_import_path で GOPATH 上のインポートパスを github.com/wangzitian0/golang-gin-starter-kit に固定し、script ステップで govendor による依存同期(govendor sync)後に go test ./... を実行する構成にした。",
+    "why": "直前のコミット(seq 61)で users パッケージのテストカバレッジを90%まで引き上げたばかりであり、その成果をプッシュのたびに自動検証する体制を整えるため、この時点で初めて CI 設定を導入したと考えられる。",
+    "highlights": [
+      { "file": ".travis.yml", "note": "この時点の構成: 複数 Go バージョンでのマトリクステスト + govendor sync + go test ./... という最小構成" }
+    ],
+    "langNotes": [
+      { "topic": ".travis.yml と Travis CI", "note": "Travis CI はリポジトリ直下の .travis.yml を読んでビルド・テストを自動実行する CI サービス。language: go を指定すると Go 用のビルド環境が使われ、go: のリストで複数バージョンに対するマトリクスビルド(同じジョブをバージョンごとに並行実行)が組める。" },
+      { "topic": "go_import_path と GOPATH ベースの Go", "note": "この時代(Go 1.x〜1.8、モジュール導入=Go 1.11以前)の Go は go.mod を持たず、GOPATH/src 配下の決まった位置にリポジトリを置くことでパッケージの import パスを決定していた。go_import_path は Travis 側にそのパスでリポジトリを配置させるための設定。" },
+      { "topic": "govendor", "note": "Go 1.11 未満の GOPATH 時代に使われていたベンダリングツールの一つ。vendor/vendor.json に依存関係を記録し、govendor sync でその内容を vendor/ ディレクトリに復元する。現在の go.mod + go mod download に相当する役割。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

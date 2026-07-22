@@ -1,0 +1,107 @@
+{
+  "seq": 106,
+  "sha": "e5c6928df98f6c6c73ebc1de14a541a018d79edb",
+  "parents": [
+    "f3ed78bee296ddc27f88425690ab3a3729c6d27e"
+  ],
+  "author": {
+    "name": "wangzitian0",
+    "email": "wangzitian0@gmail.com",
+    "date": "2026-01-04T04:19:55+08:00"
+  },
+  "message": "fix: add Preload for article tags query and improve test coverage (#47)\n\n* fix: add Preload for article tags query and improve test coverage\n\n- Fix FindManyArticle to preload Tags and Author for tag/author queries\n- Add comprehensive router tests for articles package\n- Add SetPassword public method for cross-package testing\n- Improve articles package test coverage from 26.8% to 87.7%\n\nAPI test results: 309/311 passing (2 failures are tag order expectations)\n\n* fix: address CR feedback - resolve N+1 query and remove public SetPassword\n\n- Replace N+1 query loop with batch query using 'WHERE id IN (?)'\n- Remove SetPassword public wrapper, use bcrypt directly in test helper\n- Maintain same functionality with better performance\n\n* fix: address additional CR feedback\n\n- Handle bcrypt error in test helper with panic on failure\n- Fix feed test expectation to match actual behavior (empty array)\n- Add ORDER BY updated_at desc to maintain consistent pagination order",
+  "pr": {
+    "number": 47,
+    "title": "fix: add Preload for article tags query and improve test coverage",
+    "body": "## Summary\n\nThis PR fixes the article tags query issue and significantly improves test coverage for the articles package.\n\n## Changes\n\n### Bug Fix\n- **Fixed `FindManyArticle` function**: Added Preload for Tags and Author when querying articles by tag or author. Previously, these queries returned articles with empty `tagList` arrays.\n\n### Test Coverage Improvements\n- Added comprehensive router tests for the articles package\n- Added `SetPassword` public method in users package for cross-package testing\n- **Articles package coverage improved from 26.8% to 87.7%**\n\n### Test Results\n\n| Package | Coverage |\n|---------|----------|\n| articles | 87.7% |\n| users | 96.7% |\n| common | 86.0% |\n\n### API Test Results (RealWorld Postman Collection)\n- **Total assertions**: 311\n- **Passing**: 309\n- **Failing**: 2 (tag order expectation mismatch in Postman tests - not a code issue)\n\n## Files Changed\n- `articles/models.go`: Added Preload for tag/author queries\n- `articles/unit_test.go`: Added comprehensive router tests\n- `users/models.go`: Added `SetPassword` public method\n- `.gitignore`: Added tmp/ directory",
+    "url": "https://github.com/gothinkster/golang-gin-realworld-example-app/pull/47"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 3,
+    "additions": 412,
+    "deletions": 2
+  },
+  "files": [
+    {
+      "path": ".gitignore",
+      "status": "M",
+      "additions": 1,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "articles/models.go",
+      "status": "M",
+      "additions": 22,
+      "deletions": 2,
+      "binary": false
+    },
+    {
+      "path": "articles/unit_test.go",
+      "status": "M",
+      "additions": 389,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/.gitignore b/.gitignore\nindex f35878b..216cc12 100644\n--- a/.gitignore\n+++ b/.gitignore\n@@ -38,3 +38,4 @@ results.sarif\n .env.*.local\n \n bak.*\n+tmp/\ndiff --git a/articles/models.go b/articles/models.go\nindex 732fc24..1a70b07 100644\n--- a/articles/models.go\n+++ b/articles/models.go\n@@ -148,11 +148,21 @@ func FindManyArticle(tag, author, limit, offset, favorited string) ([]ArticleMod\n \t\tvar tagModel TagModel\n \t\ttx.Where(TagModel{Tag: tag}).First(&tagModel)\n \t\tif tagModel.ID != 0 {\n-\t\t\tif err := tx.Model(&tagModel).Offset(offset_int).Limit(limit_int).Association(\"ArticleModels\").Find(&models); err != nil {\n+\t\t\t// Get article IDs via association\n+\t\t\tvar tempModels []ArticleModel\n+\t\t\tif err := tx.Model(&tagModel).Offset(offset_int).Limit(limit_int).Association(\"ArticleModels\").Find(&tempModels); err != nil {\n \t\t\t\ttx.Rollback()\n \t\t\t\treturn models, count, err\n \t\t\t}\n \t\t\tcount = int(tx.Model(&tagModel).Association(\"ArticleModels\").Count())\n+\t\t\t// Fetch articles with preloaded associations in single query, ordered by updated_at desc\n+\t\t\tif len(tempModels) > 0 {\n+\t\t\t\tvar ids []uint\n+\t\t\t\tfor _, m := range tempModels {\n+\t\t\t\t\tids = append(ids, m.ID)\n+\t\t\t\t}\n+\t\t\t\ttx.Preload(\"Author.UserModel\").Preload(\"Tags\").Where(\"id IN ?\", ids).Order(\"updated_at desc\").Find(&models)\n+\t\t\t}\n \t\t}\n \t} else if author != \"\" {\n \t\tvar userModel users.UserModel\n@@ -161,10 +171,20 @@ func FindManyArticle(tag, author, limit, offset, favorited string) ([]ArticleMod\n \n \t\tif articleUserModel.ID != 0 {\n \t\t\tcount = int(tx.Model(&articleUserModel).Association(\"ArticleModels\").Count())\n-\t\t\tif err := tx.Model(&articleUserModel).Offset(offset_int).Limit(limit_int).Association(\"ArticleModels\").Find(&models); err != nil {\n+\t\t\t// Get article IDs via association\n+\t\t\tvar tempModels []ArticleModel\n+\t\t\tif err := tx.Model(&articleUserModel).Offset(offset_int).Limit(limit_int).Association(\"ArticleModels\").Find(&tempModels); err != nil {\n \t\t\t\ttx.Rollback()\n \t\t\t\treturn models, count, err\n \t\t\t}\n+\t\t\t// Fetch articles with preloaded associations in single query, ordered by updated_at desc\n+\t\t\tif len(tempModels) > 0 {\n+\t\t\t\tvar ids []uint\n+\t\t\t\tfor _, m := range tempModels {\n+\t\t\t\t\tids = append(ids, m.ID)\n+\t\t\t\t}\n+\t\t\t\ttx.Preload(\"Author.UserModel\").Preload(\"Tags\").Where(\"id IN ?\", ids).Order(\"updated_at desc\").Find(&models)\n+\t\t\t}\n \t\t}\n \t} else if favorited != \"\" {\n \t\tvar userModel users.UserModel\ndiff --git a/articles/unit_test.go b/articles/unit_test.go\nindex 9120897..503d0e4 100644\n--- a/articles/unit_test.go\n+++ b/articles/unit_test.go\n@@ -1,12 +1,18 @@\n package articles\n \n import (\n+\t\"bytes\"\n+\t\"fmt\"\n+\t\"net/http\"\n+\t\"net/http/httptest\"\n \t\"os\"\n \t\"testing\"\n \n+\t\"github.com/gin-gonic/gin\"\n \t\"github.com/gothinkster/golang-gin-realworld-example-app/common\"\n \t\"github.com/gothinkster/golang-gin-realworld-example-app/users\"\n \t\"github.com/stretchr/testify/assert\"\n+\t\"golang.org/x/crypto/bcrypt\"\n \t\"gorm.io/gorm\"\n )\n \n@@ -200,6 +206,389 @@ func TestSetTags(t *testing.T) {\n \tasserts.Equal(3, len(article.Tags), \"Should have 3 tags\")\n }\n \n+// Helper functions for router tests\n+func HeaderTokenMock(req *http.Request, u uint) {\n+\treq.Header.Set(\"Authorization\", fmt.Sprintf(\"Token %v\", common.GenToken(u)))\n+}\n+\n+func userModelMocker(n int) []users.UserModel {\n+\tvar offset int64\n+\ttest_db.Model(&users.UserModel{}).Count(&offset)\n+\tvar ret []users.UserModel\n+\tfor i := int(offset) + 1; i <= int(offset)+n; i++ {\n+\t\timage := fmt.Sprintf(\"http://image/%v.jpg\", i)\n+\t\t// Generate password hash directly using bcrypt\n+\t\tpasswordHash, err := bcrypt.GenerateFromPassword([]byte(\"password123\"), bcrypt.DefaultCost)\n+\t\tif err != nil {\n+\t\t\tpanic(fmt.Sprintf(\"failed to generate password hash: %v\", err))\n+\t\t}\n+\t\tuserModel := users.UserModel{\n+\t\t\tUsername:     fmt.Sprintf(\"articleuser%v\", i),\n+\t\t\tEmail:        fmt.Sprintf(\"articleuser%v@test.com\", i),\n+\t\t\tBio:          fmt.Sprintf(\"bio%v\", i),\n+\t\t\tImage:        &image,\n+\t\t\tPasswordHash: string(passwordHash),\n+\t\t}\n+\t\ttest_db.Create(&userModel)\n+\t\tret = append(ret, userModel)\n+\t}\n+\treturn ret\n+}\n+\n+func resetDBWithMock() {\n+\tcommon.TestDBFree(test_db)\n+\ttest_db = common.TestDBInit()\n+\tusers.AutoMigrate()\n+\ttest_db.AutoMigrate(&ArticleModel{})\n+\ttest_db.AutoMigrate(&TagModel{})\n+\ttest_db.AutoMigrate(&FavoriteModel{})\n+\ttest_db.AutoMigrate(&ArticleUserModel{})\n+\ttest_db.AutoMigrate(&CommentModel{})\n+\tuserModelMocker(3)\n+}\n+\n+// Router tests\n+var articleRequestTests = []struct {\n+\tinit           func(*http.Request)\n+\turl            string\n+\tmethod         string\n+\tbodyData       string\n+\texpectedCode   int\n+\tresponseRegexp string\n+\tmsg            string\n+}{\n+\t// Test article list\n+\t{\n+\t\tfunc(req *http.Request) {\n+\t\t\tresetDBWithMock()\n+\t\t},\n+\t\t\"/api/articles/\",\n+\t\t\"GET\",\n+\t\t``,\n+\t\thttp.StatusOK,\n+\t\t`{\"articles\":\\[\\],\"articlesCount\":0}`,\n+\t\t\"empty article list should return empty array\",\n+\t},\n+\t// Test tags list\n+\t{\n+\t\tfunc(req *http.Request) {},\n+\t\t\"/api/tags/\",\n+\t\t\"GET\",\n+\t\t``,\n+\t\thttp.StatusOK,\n+\t\t`{\"tags\":\\[\\]}`,\n+\t\t\"empty tags list should return empty array\",\n+\t},\n+\t// Test create article\n+\t{\n+\t\tfunc(req *http.Request) {\n+\t\t\tHeaderTokenMock(req, 1)\n+\t\t},\n+\t\t\"/api/articles/\",\n+\t\t\"POST\",\n+\t\t`{\"article\":{\"title\":\"Test Article\",\"description\":\"Test Description\",\"body\":\"Test Body\",\"tagList\":[\"test\",\"golang\"]}}`,\n+\t\thttp.StatusCreated,\n+\t\t`\"title\":\"Test Article\"`,\n+\t\t\"create article should succeed with auth\",\n+\t},\n+\t// Test get single article\n+\t{\n+\t\tfunc(req *http.Request) {},\n+\t\t\"/api/articles/test-article\",\n+\t\t\"GET\",\n+\t\t``,\n+\t\thttp.StatusOK,\n+\t\t`\"slug\":\"test-article\"`,\n+\t\t\"get single article should succeed\",\n+\t},\n+\t// Test article list with articles\n+\t{\n+\t\tfunc(req *http.Request) {},\n+\t\t\"/api/articles/\",\n+\t\t\"GET\",\n+\t\t``,\n+\t\thttp.StatusOK,\n+\t\t`\"articlesCount\":1`,\n+\t\t\"article list should contain created article\",\n+\t},\n+\t// Test articles by tag\n+\t{\n+\t\tfunc(req *http.Request) {},\n+\t\t\"/api/articles/?tag=golang\",\n+\t\t\"GET\",\n+\t\t``,\n+\t\thttp.StatusOK,\n+\t\t`\"articles\":\\[`,\n+\t\t\"articles by tag should work\",\n+\t},\n+\t// Test articles by author\n+\t{\n+\t\tfunc(req *http.Request) {},\n+\t\t\"/api/articles/?author=articleuser1\",\n+\t\t\"GET\",\n+\t\t``,\n+\t\thttp.StatusOK,\n+\t\t`\"articles\":\\[`,\n+\t\t\"articles by author should work\",\n+\t},\n+\t// Test update article\n+\t{\n+\t\tfunc(req *http.Request) {\n+\t\t\tHeaderTokenMock(req, 1)\n+\t\t},\n+\t\t\"/api/articles/test-article\",\n+\t\t\"PUT\",\n+\t\t`{\"article\":{\"title\":\"Updated Title\"}}`,\n+\t\thttp.StatusOK,\n+\t\t`\"title\":\"Updated Title\"`,\n+\t\t\"update article should succeed\",\n+\t},\n+\t// Test favorite article\n+\t{\n+\t\tfunc(req *http.Request) {\n+\t\t\tHeaderTokenMock(req, 1)\n+\t\t},\n+\t\t\"/api/articles/updated-title/favorite\",\n+\t\t\"POST\",\n+\t\t``,\n+\t\thttp.StatusOK,\n+\t\t`\"favorited\":true`,\n+\t\t\"favorite article should succeed\",\n+\t},\n+\t// Test favorites count\n+\t{\n+\t\tfunc(req *http.Request) {},\n+\t\t\"/api/articles/updated-title\",\n+\t\t\"GET\",\n+\t\t``,\n+\t\thttp.StatusOK,\n+\t\t`\"favoritesCount\":1`,\n+\t\t\"favorites count should be 1\",\n+\t},\n+\t// Test articles favorited by user\n+\t{\n+\t\tfunc(req *http.Request) {},\n+\t\t\"/api/articles/?favorited=articleuser1\",\n+\t\t\"GET\",\n+\t\t``,\n+\t\thttp.StatusOK,\n+\t\t`\"articlesCount\":1`,\n+\t\t\"articles favorited by user should work\",\n+\t},\n+\t// Test unfavorite article\n+\t{\n+\t\tfunc(req *http.Request) {\n+\t\t\tHeaderTokenMock(req, 1)\n+\t\t},\n+\t\t\"/api/articles/updated-title/favorite\",\n+\t\t\"DELETE\",\n+\t\t``,\n+\t\thttp.StatusOK,\n+\t\t`\"favorited\":false`,\n+\t\t\"unfavorite article should succeed\",\n+\t},\n+\t// Test favorites count after unfavorite\n+\t{\n+\t\tfunc(req *http.Request) {},\n+\t\t\"/api/articles/updated-title\",\n+\t\t\"GET\",\n+\t\t``,\n+\t\thttp.StatusOK,\n+\t\t`\"favoritesCount\":0`,\n+\t\t\"favorites count should be 0 after unfavorite\",\n+\t},\n+\t// Test create comment\n+\t{\n+\t\tfunc(req *http.Request) {\n+\t\t\tHeaderTokenMock(req, 1)\n+\t\t},\n+\t\t\"/api/articles/updated-title/comments\",\n+\t\t\"POST\",\n+\t\t`{\"comment\":{\"body\":\"Test comment body\"}}`,\n+\t\thttp.StatusCreated,\n+\t\t`\"body\":\"Test comment body\"`,\n+\t\t\"create comment should succeed\",\n+\t},\n+\t// Test get comments\n+\t{\n+\t\tfunc(req *http.Request) {},\n+\t\t\"/api/articles/updated-title/comments\",\n+\t\t\"GET\",\n+\t\t``,\n+\t\thttp.StatusOK,\n+\t\t`\"comments\":\\[`,\n+\t\t\"get comments should succeed\",\n+\t},\n+\t// Test delete comment\n+\t{\n+\t\tfunc(req *http.Request) {\n+\t\t\tHeaderTokenMock(req, 1)\n+\t\t},\n+\t\t\"/api/articles/updated-title/comments/1\",\n+\t\t\"DELETE\",\n+\t\t``,\n+\t\thttp.StatusOK,\n+\t\t``,\n+\t\t\"delete comment should succeed\",\n+\t},\n+\t// Test feed (requires auth) - returns empty array since no follow relationship set up\n+\t{\n+\t\tfunc(req *http.Request) {\n+\t\t\tHeaderTokenMock(req, 2)\n+\t\t},\n+\t\t\"/api/articles/feed\",\n+\t\t\"GET\",\n+\t\t``,\n+\t\thttp.StatusOK,\n+\t\t`\"articles\":\\[\\]`,\n+\t\t\"feed should return empty array when user follows no one\",\n+\t},\n+\t// Test delete article\n+\t{\n+\t\tfunc(req *http.Request) {\n+\t\t\tHeaderTokenMock(req, 1)\n+\t\t},\n+\t\t\"/api/articles/updated-title\",\n+\t\t\"DELETE\",\n+\t\t``,\n+\t\thttp.StatusOK,\n+\t\t``,\n+\t\t\"delete article should succeed\",\n+\t},\n+\t// Test 404 for deleted article\n+\t{\n+\t\tfunc(req *http.Request) {},\n+\t\t\"/api/articles/updated-title\",\n+\t\t\"GET\",\n+\t\t``,\n+\t\thttp.StatusNotFound,\n+\t\t`\"articles\":\"Invalid slug\"`,\n+\t\t\"deleted article should return 404\",\n+\t},\n+\t// Test favorite non-existent article\n+\t{\n+\t\tfunc(req *http.Request) {\n+\t\t\tHeaderTokenMock(req, 1)\n+\t\t},\n+\t\t\"/api/articles/non-existent/favorite\",\n+\t\t\"POST\",\n+\t\t``,\n+\t\thttp.StatusNotFound,\n+\t\t`\"articles\":\"Invalid slug\"`,\n+\t\t\"favorite non-existent article should return 404\",\n+\t},\n+\t// Test unfavorite non-existent article\n+\t{\n+\t\tfunc(req *http.Request) {\n+\t\t\tHeaderTokenMock(req, 1)\n+\t\t},\n+\t\t\"/api/articles/non-existent/favorite\",\n+\t\t\"DELETE\",\n+\t\t``,\n+\t\thttp.StatusNotFound,\n+\t\t`\"articles\":\"Invalid slug\"`,\n+\t\t\"unfavorite non-existent article should return 404\",\n+\t},\n+\t// Test create article with invalid data\n+\t{\n+\t\tfunc(req *http.Request) {\n+\t\t\tHeaderTokenMock(req, 1)\n+\t\t},\n+\t\t\"/api/articles/\",\n+\t\t\"POST\",\n+\t\t`{\"article\":{\"title\":\"ab\",\"description\":\"Test\",\"body\":\"Test\"}}`,\n+\t\thttp.StatusUnprocessableEntity,\n+\t\t`\"errors\"`,\n+\t\t\"create article with short title should fail\",\n+\t},\n+\t// Test create comment on non-existent article\n+\t{\n+\t\tfunc(req *http.Request) {\n+\t\t\tHeaderTokenMock(req, 1)\n+\t\t},\n+\t\t\"/api/articles/non-existent/comments\",\n+\t\t\"POST\",\n+\t\t`{\"comment\":{\"body\":\"Test\"}}`,\n+\t\thttp.StatusNotFound,\n+\t\t`\"comment\":\"Invalid slug\"`,\n+\t\t\"create comment on non-existent article should return 404\",\n+\t},\n+\t// Test get comments on non-existent article\n+\t{\n+\t\tfunc(req *http.Request) {},\n+\t\t\"/api/articles/non-existent/comments\",\n+\t\t\"GET\",\n+\t\t``,\n+\t\thttp.StatusNotFound,\n+\t\t`\"comments\":\"Invalid slug\"`,\n+\t\t\"get comments on non-existent article should return 404\",\n+\t},\n+\t// Test update non-existent article\n+\t{\n+\t\tfunc(req *http.Request) {\n+\t\t\tHeaderTokenMock(req, 1)\n+\t\t},\n+\t\t\"/api/articles/non-existent\",\n+\t\t\"PUT\",\n+\t\t`{\"article\":{\"title\":\"Test\"}}`,\n+\t\thttp.StatusNotFound,\n+\t\t`\"articles\":\"Invalid slug\"`,\n+\t\t\"update non-existent article should return 404\",\n+\t},\n+\t// Test delete non-existent article (GORM delete returns OK even if not found)\n+\t{\n+\t\tfunc(req *http.Request) {\n+\t\t\tHeaderTokenMock(req, 1)\n+\t\t},\n+\t\t\"/api/articles/non-existent\",\n+\t\t\"DELETE\",\n+\t\t``,\n+\t\thttp.StatusOK,\n+\t\t``,\n+\t\t\"delete non-existent article returns OK (soft delete behavior)\",\n+\t},\n+\t// Test delete comment with invalid id\n+\t{\n+\t\tfunc(req *http.Request) {\n+\t\t\tHeaderTokenMock(req, 1)\n+\t\t},\n+\t\t\"/api/articles/test/comments/invalid\",\n+\t\t\"DELETE\",\n+\t\t``,\n+\t\thttp.StatusNotFound,\n+\t\t`\"comment\":\"Invalid id\"`,\n+\t\t\"delete comment with invalid id should return 404\",\n+\t},\n+}\n+\n+func TestArticleRouters(t *testing.T) {\n+\tasserts := assert.New(t)\n+\n+\tr := gin.New()\n+\tr.Use(users.AuthMiddleware(false))\n+\tArticlesAnonymousRegister(r.Group(\"/api/articles\"))\n+\tTagsAnonymousRegister(r.Group(\"/api/tags\"))\n+\tr.Use(users.AuthMiddleware(true))\n+\tArticlesRegister(r.Group(\"/api/articles\"))\n+\n+\tfor _, testData := range articleRequestTests {\n+\t\tbodyData := testData.bodyData\n+\t\treq, err := http.NewRequest(testData.method, testData.url, bytes.NewBufferString(bodyData))\n+\t\treq.Header.Set(\"Content-Type\", \"application/json\")\n+\t\tasserts.NoError(err)\n+\n+\t\ttestData.init(req)\n+\n+\t\tw := httptest.NewRecorder()\n+\t\tr.ServeHTTP(w, req)\n+\n+\t\tasserts.Equal(testData.expectedCode, w.Code, \"Response Status - \"+testData.msg)\n+\t\tif testData.responseRegexp != \"\" {\n+\t\t\tasserts.Regexp(testData.responseRegexp, w.Body.String(), \"Response Content - \"+testData.msg)\n+\t\t}\n+\t}\n+}\n+\n // This is a hack way to add test database for each case\n func TestMain(m *testing.M) {\n \ttest_db = common.TestDBInit()\n",
+  "diffTruncated": false,
+  "tree": [
+    ".env.example",
+    ".github/SETUP.md",
+    ".github/workflows/ci.yml",
+    ".gitignore",
+    ".golangci.yml",
+    ".travis.yml",
+    "AGENTS.md",
+    "BACKEND_INSTRUCTIONS.md",
+    "FRONTEND_INSTRUCTIONS.md",
+    "LICENSE",
+    "MOBILE_INSTRUCTIONS.md",
+    "articles/doc.go",
+    "articles/models.go",
+    "articles/routers.go",
+    "articles/serializers.go",
+    "articles/unit_test.go",
+    "articles/validators.go",
+    "common/database.go",
+    "common/unit_test.go",
+    "common/utils.go",
+    "data/.gitkeep",
+    "doc.go",
+    "go.mod",
+    "go.mod-generated_by_mod_init",
+    "go.sum",
+    "hello.go",
+    "logo.png",
+    "readme.md",
+    "scripts/coverage.sh",
+    "scripts/gofmt.sh",
+    "users/doc.go",
+    "users/middlewares.go",
+    "users/models.go",
+    "users/routers.go",
+    "users/serializers.go",
+    "users/unit_test.go",
+    "users/validators.go"
+  ],
+  "explanation": {
+    "what": "articles/models.go の FindManyArticle 内、タグ・著者による記事検索で、関連記事の ID を先に取得したうえで Preload(\"Author.UserModel\").Preload(\"Tags\").Where(\"id IN ?\", ids) を使い1クエリで Author と Tags を読み込むように変更した。articles/unit_test.go に TestArticleRouters と articleRequestTests を追加し、articles パッケージのルーター経路を一通りテストするようにした。",
+    "why": "PR body によれば、以前は FindManyArticle がタグ・著者で記事を絞り込む際 Tags を読み込んでおらず、レスポンスの tagList が常に空配列になるバグがあった。この修正で Preload を使って関連データをまとめて取得するようにし、あわせて articles パッケージのカバレッジを26.8%から87.7%に引き上げるためルーターテストを追加した。コミットメッセージにあるとおり、レビュー指摘を受けてN+1になっていたループクエリを WHERE id IN (?) によるバッチクエリに置き換えている。",
+    "highlights": [
+      { "file": "articles/models.go", "note": "Association().Find() で記事IDだけ取得し、Preload+WHERE id IN でまとめて本体を取得する2段階クエリに変更。次コミット(#49)のN+1解消の先駆け" },
+      { "file": "articles/unit_test.go", "note": "TestArticleRouters が gin.New() でルーターを組み立て、記事のCRUD・favorite・comment・feedまで一通りHTTPレベルで検証する" }
+    ],
+    "langNotes": [
+      { "topic": "GORM の Preload と N+1問題", "note": "Preload はGORMで関連レコード(この場合は記事の Author や Tags)をまとめて事前読み込みする機能で、1件ごとに追加クエリを発行するN+1問題を避けるための代表的な手段。今回は Association().Find() で対象IDを絞ってから Preload 付きの Where(\"id IN ?\", ids) で本体をまとめて取得する形にしている。" }
+    ],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [
+      { "type": "pr", "number": 47, "url": "https://github.com/gothinkster/golang-gin-realworld-example-app/pull/47" }
+    ],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

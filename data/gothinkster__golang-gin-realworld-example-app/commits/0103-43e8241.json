@@ -1,0 +1,111 @@
+{
+  "seq": 103,
+  "sha": "43e82416c4752e564a60b05fb1ae5c1c5f24dd95",
+  "parents": [
+    "6d29314c99f7649a197602d3e06a90fd334b1d89"
+  ],
+  "author": {
+    "name": "wangzitian0",
+    "email": "wangzitian0@gmail.com",
+    "date": "2026-01-04T03:20:30+08:00"
+  },
+  "message": "fix: Fix Coveralls 0% coverage and improve API compatibility (#44)\n\n* fix: remove continue-on-error to properly fail CI when tests fail\n\nThis ensures test failures are visible and coverage is not uploaded\nwhen tests are broken.\n\n* fix: improve API compatibility and remove test artifacts\n\n- Remove continue-on-error from CI to properly fail on test failures\n- Remove test user creation code from hello.go that caused DB conflicts\n- Relax username validation (remove alphanum) to support RealWorld API spec\n  (usernames like 'celeb_username' are now allowed)\n- Add .env.example for Go environment configuration",
+  "pr": {
+    "number": 44,
+    "title": "fix: Fix Coveralls 0% coverage and improve API compatibility",
+    "body": "## Summary\n\nThis PR fixes the Coveralls 0% coverage issue and improves API compatibility with the RealWorld spec.\n\n## Changes\n\n### CI Fixes\n- **Remove `continue-on-error: true`** from test step - CI now properly fails when tests fail, preventing upload of empty/zero coverage data\n\n### Code Fixes\n- **Remove test user creation code from hello.go** - This code was creating a fixed test user on startup, causing database conflicts during tests\n- **Relax username validation** - Remove `alphanum` constraint to allow underscores and other characters (e.g., `celeb_username`), aligning with RealWorld API spec\n- **Add .env.example** - Go environment configuration template\n\n## Test Coverage After Fix\n\n| Package | Coverage |\n|---------|----------|\n| articles | 27.0% |\n| common | 86.0% |\n| users | 97.2% |\n\n## Verification\n\nAll unit tests pass:\n```\nok  github.com/gothinkster/golang-gin-realworld-example-app/articles\nok  github.com/gothinkster/golang-gin-realworld-example-app/common\nok  github.com/gothinkster/golang-gin-realworld-example-app/users\n```\n",
+    "url": "https://github.com/gothinkster/golang-gin-realworld-example-app/pull/44"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 4,
+    "additions": 7,
+    "deletions": 25
+  },
+  "files": [
+    {
+      "path": ".env.example",
+      "status": "A",
+      "additions": 4,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": ".github/workflows/ci.yml",
+      "status": "M",
+      "additions": 0,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "hello.go",
+      "status": "M",
+      "additions": 2,
+      "deletions": 23,
+      "binary": false
+    },
+    {
+      "path": "users/validators.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/.env.example b/.env.example\nnew file mode 100644\nindex 0000000..7e96a82\n--- /dev/null\n+++ b/.env.example\n@@ -0,0 +1,4 @@\n+# Golang 环境\n+export PATH=\"/opt/homebrew/opt/go@1.22/bin:$PATH\"\n+export GOPATH=$HOME/go\n+export PATH=$PATH:$GOPATH/bin\ndiff --git a/.github/workflows/ci.yml b/.github/workflows/ci.yml\nindex f8da5b2..dcdc3ec 100644\n--- a/.github/workflows/ci.yml\n+++ b/.github/workflows/ci.yml\n@@ -38,7 +38,6 @@ jobs:\n       run: bash ./scripts/gofmt.sh\n     \n     - name: Run tests with coverage\n-      continue-on-error: true\n       run: bash ./scripts/coverage.sh\n     \n     - name: Upload coverage to Coveralls\ndiff --git a/hello.go b/hello.go\nindex 8ddf8e0..79710ce 100644\n--- a/hello.go\n+++ b/hello.go\n@@ -1,7 +1,7 @@\n package main\n \n import (\n-\t\"fmt\"\n+\t\"log\"\n \n \t\"github.com/gin-gonic/gin\"\n \n@@ -26,7 +26,7 @@ func main() {\n \tMigrate(db)\n \tsqlDB, err := db.DB()\n \tif err != nil {\n-\t\tfmt.Println(\"failed to get sql.DB:\", err)\n+\t\tlog.Println(\"failed to get sql.DB:\", err)\n \t} else {\n \t\tdefer sqlDB.Close()\n \t}\n@@ -54,26 +54,5 @@ func main() {\n \t\t})\n \t})\n \n-\t// test 1 to 1\n-\ttx1 := db.Begin()\n-\tuserA := users.UserModel{\n-\t\tUsername: \"AAAAAAAAAAAAAAAA\",\n-\t\tEmail:    \"aaaa@g.cn\",\n-\t\tBio:      \"hehddeda\",\n-\t\tImage:    nil,\n-\t}\n-\ttx1.Save(&userA)\n-\ttx1.Commit()\n-\tfmt.Println(userA)\n-\n-\t//db.Save(&ArticleUserModel{\n-\t//    UserModelID:userA.ID,\n-\t//})\n-\t//var userAA ArticleUserModel\n-\t//db.Where(&ArticleUserModel{\n-\t//    UserModelID:userA.ID,\n-\t//}).First(&userAA)\n-\t//fmt.Println(userAA)\n-\n \tr.Run() // listen and serve on 0.0.0.0:8080\n }\ndiff --git a/users/validators.go b/users/validators.go\nindex 5c5bc2a..0754b7c 100644\n--- a/users/validators.go\n+++ b/users/validators.go\n@@ -11,7 +11,7 @@ import (\n // Then, you can just call model.save() after the data is ready in DataModel.\n type UserModelValidator struct {\n \tUser struct {\n-\t\tUsername string `form:\"username\" json:\"username\" binding:\"required,alphanum,min=4,max=255\"`\n+\t\tUsername string `form:\"username\" json:\"username\" binding:\"required,min=4,max=255\"`\n \t\tEmail    string `form:\"email\" json:\"email\" binding:\"required,email\"`\n \t\tPassword string `form:\"password\" json:\"password\" binding:\"required,min=8,max=255\"`\n \t\tBio      string `form:\"bio\" json:\"bio\" binding:\"max=1024\"`\n",
+  "diffTruncated": false,
+  "tree": [
+    ".env.example",
+    ".github/SETUP.md",
+    ".github/workflows/ci.yml",
+    ".gitignore",
+    ".golangci.yml",
+    ".travis.yml",
+    "AGENTS.md",
+    "BACKEND_INSTRUCTIONS.md",
+    "FRONTEND_INSTRUCTIONS.md",
+    "LICENSE",
+    "MOBILE_INSTRUCTIONS.md",
+    "articles/doc.go",
+    "articles/models.go",
+    "articles/routers.go",
+    "articles/serializers.go",
+    "articles/unit_test.go",
+    "articles/validators.go",
+    "common/database.go",
+    "common/unit_test.go",
+    "common/utils.go",
+    "doc.go",
+    "go.mod",
+    "go.mod-generated_by_mod_init",
+    "go.sum",
+    "hello.go",
+    "logo.png",
+    "readme.md",
+    "scripts/coverage.sh",
+    "scripts/gofmt.sh",
+    "users/doc.go",
+    "users/middlewares.go",
+    "users/models.go",
+    "users/routers.go",
+    "users/serializers.go",
+    "users/unit_test.go",
+    "users/validators.go"
+  ],
+  "explanation": {
+    "what": "CI ワークフロー(.github/workflows/ci.yml)からテストステップの continue-on-error: true を削除し、hello.go の main() 内にあった固定ユーザー(username: AAAAAAAAAAAAAAAA)を作成するデバッグ用コードを削除、users/validators.go のユーザー名バリデーションから alphanum 制約を外し、Go 環境変数設定のテンプレート .env.example を追加した。",
+    "why": "PR body によれば、CI が continue-on-error: true でテスト失敗を握りつぶしていたため、テストが壊れていても coverage が(実質空のデータとして)アップロードされ Coveralls の coverage が 0% と表示される問題があった。hello.go の固定ユーザー作成コードは起動のたびに DB に同じユーザーを insert しようとして競合を起こしていたため削除。ユーザー名の alphanum 制約は RealWorld API spec が celeb_username のようなアンダースコア入りの名前を許容するため緩和した。",
+    "highlights": [
+      { "file": ".github/workflows/ci.yml", "note": "continue-on-error: true の削除。テスト失敗時に CI が正しく赤くなるようにする1行の修正" },
+      { "file": "hello.go", "note": "起動時に固定テストユーザーを DB へ書き込んでいたデバッグコードを削除し、DB 競合の原因を除去" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [
+      { "type": "pr", "number": 44, "url": "https://github.com/gothinkster/golang-gin-realworld-example-app/pull/44" }
+    ],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

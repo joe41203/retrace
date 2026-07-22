@@ -1,0 +1,113 @@
+{
+  "seq": 51,
+  "sha": "418c1f5f9576c63c300053f5b41970568a939b5f",
+  "parents": [
+    "2e1d4d3d92f74c41a34d9dbcf308b8841c0149ef"
+  ],
+  "author": {
+    "name": "wangzitian0",
+    "email": "zitwang@linkedin.com",
+    "date": "2017-08-04T11:21:30+08:00"
+  },
+  "message": "tmp save for test model function",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 7,
+    "additions": 293,
+    "deletions": 48
+  },
+  "files": [
+    {
+      "path": "articles/models.go",
+      "status": "M",
+      "additions": 114,
+      "deletions": 7,
+      "binary": false
+    },
+    {
+      "path": "articles/routers.go",
+      "status": "M",
+      "additions": 89,
+      "deletions": 2,
+      "binary": false
+    },
+    {
+      "path": "articles/serializers.go",
+      "status": "M",
+      "additions": 40,
+      "deletions": 21,
+      "binary": false
+    },
+    {
+      "path": "articles/validators.go",
+      "status": "M",
+      "additions": 14,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "hello.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "users/models.go",
+      "status": "M",
+      "additions": 29,
+      "deletions": 10,
+      "binary": false
+    },
+    {
+      "path": "users/routers.go",
+      "status": "M",
+      "additions": 6,
+      "deletions": 8,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/articles/models.go b/articles/models.go\nindex 7dcc18d..28e97bd 100644\n--- a/articles/models.go\n+++ b/articles/models.go\n@@ -4,20 +4,71 @@ import (\n     \"github.com/jinzhu/gorm\"\n     \"golang-gin-starter-kit/common\"\n     \"golang-gin-starter-kit/users\"\n+    \"fmt\"\n+    \"strconv\"\n )\n \n type ArticleModel struct {\n     gorm.Model\n-    Title       string      `gorm:\"unique_index\"`\n-    Description string      `gorm:\"size:2048\"`\n-    Body        string      `gorm:\"size:2048\"`\n-    Author      users.UserModel\n-    Tags        []TagModel    `many2many:article_tags;`\n+    Slug            string              `gorm:\"unique_index\"`\n+    Title           string\n+    Description     string              `gorm:\"size:2048\"`\n+    Body            string              `gorm:\"size:2048\"`\n+    Author          users.UserModel\n+    AuthorID        uint\n+    Tags            []TagModel          `gorm:\"many2many:article_tags;\"`\n+}\n+\n+type FavoriteModel struct {\n+    gorm.Model\n+    Favorite     ArticleModel\n+    FavoriteID   uint\n+    FavoriteBy   users.UserModel\n+    FavoriteByID uint\n }\n \n type TagModel struct {\n     gorm.Model\n-    Tag string      `gorm:\"unique_index\"`\n+    Tag             string          `gorm:\"unique_index\"`\n+    ArticleModels   []ArticleModel  `gorm:\"many2many:article_tags;\"`\n+}\n+\n+func (article ArticleModel) favoritesCount() uint {\n+    db := common.GetDB()\n+    var count uint\n+    db.Model(&FavoriteModel{}).Where(FavoriteModel{\n+        FavoriteID:   article.ID,\n+    }).Count(&count)\n+    return count\n+}\n+\n+func (article ArticleModel) isFavoriteBy(user users.UserModel) bool {\n+    db := common.GetDB()\n+    var favorite FavoriteModel\n+    db.Where(FavoriteModel{\n+        FavoriteID:   article.ID,\n+        FavoriteByID: user.ID,\n+    }).First(&favorite)\n+    return favorite.ID != 0\n+}\n+\n+func (article ArticleModel) favoriteBy(user users.UserModel) error {\n+    db := common.GetDB()\n+    var favorite FavoriteModel\n+    err := db.FirstOrCreate(&favorite, &FavoriteModel{\n+        FavoriteID:   article.ID,\n+        FavoriteByID: user.ID,\n+    }).Error\n+    return err\n+}\n+\n+func (article ArticleModel) unFavoriteBy(user users.UserModel) error {\n+    db := common.GetDB()\n+    err := db.Where(FavoriteModel{\n+        FavoriteID:   article.ID,\n+        FavoriteByID: user.ID,\n+    }).Delete(FavoriteModel{}).Error\n+    return err\n }\n \n func SaveOne(data interface{}) error {\n@@ -29,10 +80,66 @@ func SaveOne(data interface{}) error {\n func FindOneArticle(condition interface{}) (ArticleModel, error) {\n     db := common.GetDB()\n     var model ArticleModel\n-    err := db.Where(condition).First(&model).Error\n+    tx := db.Begin()\n+    tx.Where(condition).First(&model)\n+    tx.Model(&model).Related(&model.Author,\"Author\")\n+    tx.Model(&model).Related(&model.Tags,\"Tags\")\n+    err := tx.Commit().Error\n     return model, err\n }\n \n+func FindManyArticle(tag, author, limit, offset, favorited string) ([]ArticleModel,int, error) {\n+    db := common.GetDB()\n+    var models []ArticleModel\n+    var count int\n+    tx := db.Begin()\n+    if tag!=\"\" {\n+        var tagModel TagModel\n+        tx.Where(TagModel{Tag:tag}).First(&tagModel)\n+        tx.Model(&tagModel).Related(&models,\"ArticleModels\")\n+    }else if author!=\"\" {\n+        var models_tmp []ArticleModel\n+        var userModel users.UserModel\n+        tx.Model(&users.UserModel{Username:author}).First(&userModel)\n+        tx.Where(&ArticleModel{Author:userModel}).Find(models_tmp)\n+        models = models_tmp\n+    }\n+    fmt.Println(\"1gggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggg\")\n+    fmt.Println(models)\n+\n+    if favorited!=\"\" {\n+        var favoriteModels []FavoriteModel\n+        var userModel users.UserModel\n+        tx.Model(&users.UserModel{Username:author}).First(&userModel)\n+        db.Where(FavoriteModel{\n+            FavoriteByID:  userModel.ID,\n+        }).Find(&favoriteModels)\n+\n+        fmt.Println(\"0gggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggg\")\n+        fmt.Println(favoriteModels)\n+    }\n+    fmt.Println(\"2gggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggg\")\n+    fmt.Println(models)\n+    tx.Model(&models).Count(&count)\n+    offset_int, err := strconv.Atoi(offset)\n+    if err!=nil{\n+        offset_int = 0\n+    }\n+\n+    limit_int, err := strconv.Atoi(limit)\n+    if err!=nil{\n+        limit_int = 20\n+    }\n+\n+    tx.Model(&models).Offset(offset_int).Limit(limit_int).Find(&models)\n+    for i, _ := range models{\n+        tx.Model(&models[i]).Related(&models[i].Author,\"Author\")\n+        tx.Model(&models[i]).Related(&models[i].Tags,\"Tags\")\n+    }\n+    err = tx.Commit().Error\n+    return models, count, err\n+}\n+\n func (model *ArticleModel) setTags(tags []string) error {\n     db := common.GetDB()\n     var tagList []TagModel\ndiff --git a/articles/routers.go b/articles/routers.go\nindex 58b2df0..51aa206 100644\n--- a/articles/routers.go\n+++ b/articles/routers.go\n@@ -4,11 +4,18 @@ import (\n     \"golang-gin-starter-kit/common\"\n     \"gopkg.in/gin-gonic/gin.v1\"\n     \"net/http\"\n+    \"errors\"\n+    \"golang-gin-starter-kit/users\"\n )\n \n func ArticlesRegister(router *gin.RouterGroup) {\n+    router.GET(\"/\", ArticleList)\n     router.POST(\"/\", ArticleCreate)\n+    router.GET(\"/:slug\", ArticleRetrieve)\n     router.PUT(\"/:slug\", ArticleUpdate)\n+    router.DELETE(\"/:slug\", ArticleDelete)\n+    router.POST(\"/:slug/favorite\", ArticleFavorite)\n+    router.DELETE(\"/:slug/favorite\", ArticleUnfavorite)\n }\n \n func ArticleCreate(c *gin.Context) {\n@@ -22,10 +29,90 @@ func ArticleCreate(c *gin.Context) {\n         c.JSON(http.StatusUnprocessableEntity, common.NewError(\"database\", err))\n         return\n     }\n-    articleSerializer := ArticleSerializer{c,articleModelValidator.articleModel}\n-    c.JSON(http.StatusCreated, gin.H{\"article\": articleSerializer.Response()})\n+    serializer := ArticleSerializer{c, articleModelValidator.articleModel}\n+    c.JSON(http.StatusCreated, gin.H{\"article\": serializer.Response()})\n }\n \n+func ArticleList(c *gin.Context) {\n+    //condition := ArticleModel{}\n+    tag := c.Query(\"tag\")\n+    author := c.Query(\"author\")\n+    favorited := c.Query(\"favorited\")\n+    limit := c.Query(\"limit\")\n+    offset := c.Query(\"offset\")\n+    articleModels, modelCount, err := FindManyArticle(tag,author,limit,offset,favorited)\n+    if err != nil {\n+        c.JSON(http.StatusNotFound, common.NewError(\"articles\", errors.New(\"Invalid param\")))\n+        return\n+    }\n+    serializer := ArticlesSerializer{c, articleModels}\n+    c.JSON(http.StatusOK, gin.H{\"articles\": serializer.Response(), \"articlesCount\":modelCount})\n+}\n+\n+func ArticleRetrieve(c *gin.Context) {\n+    slug := c.Param(\"slug\")\n+    articleModel, err := FindOneArticle(&ArticleModel{Slug: slug})\n+    if err != nil {\n+        c.JSON(http.StatusNotFound, common.NewError(\"articles\", errors.New(\"Invalid slug\")))\n+        return\n+    }\n+    serializer := ArticleSerializer{c, articleModel}\n+    c.JSON(http.StatusOK, gin.H{\"article\": serializer.Response()})\n+}\n \n func ArticleUpdate(c *gin.Context) {\n+    slug := c.Param(\"slug\")\n+    articleModel, err := FindOneArticle(&ArticleModel{Slug: slug})\n+    if err != nil {\n+        c.JSON(http.StatusNotFound, common.NewError(\"articles\", errors.New(\"Invalid slug\")))\n+        return\n+    }\n+    articleModelValidator := NewArticleModelValidatorFillWith(articleModel)\n+    if err := articleModelValidator.Bind(c); err != nil {\n+        c.JSON(http.StatusUnprocessableEntity, common.NewValidatorError(err))\n+        return\n+    }\n+\n+    if err := articleModel.Update(articleModelValidator.articleModel); err != nil {\n+        c.JSON(http.StatusUnprocessableEntity, common.NewError(\"database\", err))\n+        return\n+    }\n+    serializer := ArticleSerializer{c, articleModel}\n+    c.JSON(http.StatusOK, gin.H{\"article\": serializer.Response()})\n+}\n+\n+func ArticleDelete(c *gin.Context) {\n+    slug := c.Param(\"slug\")\n+    err := DeleteArticleModel(&ArticleModel{Slug: slug})\n+    if err != nil {\n+        c.JSON(http.StatusNotFound, common.NewError(\"articles\", errors.New(\"Invalid slug\")))\n+        return\n+    }\n+    c.JSON(http.StatusOK, gin.H{\"article\": \"Delete success\"})\n+}\n+\n+func ArticleFavorite(c *gin.Context) {\n+    slug := c.Param(\"slug\")\n+    articleModel, err := FindOneArticle(&ArticleModel{Slug: slug})\n+    if err != nil {\n+        c.JSON(http.StatusNotFound, common.NewError(\"articles\", errors.New(\"Invalid slug\")))\n+        return\n+    }\n+    myUserModel := c.MustGet(\"my_user_model\").(users.UserModel)\n+    err = articleModel.favoriteBy(myUserModel)\n+    serializer := ArticleSerializer{c, articleModel}\n+    c.JSON(http.StatusOK, gin.H{\"article\": serializer.Response()})\n+}\n+\n+func ArticleUnfavorite(c *gin.Context) {\n+    slug := c.Param(\"slug\")\n+    articleModel, err := FindOneArticle(&ArticleModel{Slug: slug})\n+    if err != nil {\n+        c.JSON(http.StatusNotFound, common.NewError(\"articles\", errors.New(\"Invalid slug\")))\n+        return\n+    }\n+    myUserModel := c.MustGet(\"my_user_model\").(users.UserModel)\n+    err = articleModel.unFavoriteBy(myUserModel)\n+    serializer := ArticleSerializer{c, articleModel}\n+    c.JSON(http.StatusOK, gin.H{\"article\": serializer.Response()})\n }\ndiff --git a/articles/serializers.go b/articles/serializers.go\nindex 10d69b9..e8440b1 100644\n--- a/articles/serializers.go\n+++ b/articles/serializers.go\n@@ -11,7 +11,6 @@ type ArticleSerializer struct {\n     ArticleModel\n }\n \n-\n type TagSerializer struct {\n     TagModel\n }\n@@ -21,34 +20,54 @@ func (self *TagSerializer) Response() string {\n }\n \n type ArticleResponse struct {\n-    ID              uint        `json:\"-\"`\n-    Title           string      `json:\"title\"`\n-    Slug            string      `json:\"slug\"`\n-    Description     string      `json:\"description\"`\n-    Body            string      `json:\"body\"`\n-    CreatedAt       string      `json:\"createdAt\"`\n-    UpdatedAt       string      `json:\"updatedAt\"`\n-    Author          users.ProfileResponse `json:\"author\"`\n-    Tags            []string    `json:\"tagList\"`\n+    ID             uint        `json:\"-\"`\n+    Title          string      `json:\"title\"`\n+    Slug           string      `json:\"slug\"`\n+    Description    string      `json:\"description\"`\n+    Body           string      `json:\"body\"`\n+    CreatedAt      string      `json:\"createdAt\"`\n+    UpdatedAt      string      `json:\"updatedAt\"`\n+    Author         users.ProfileResponse `json:\"author\"`\n+    Tags           []string    `json:\"tagList\"`\n+    Favorite       bool        `json:\"favorited\"`\n+    FavoritesCount uint        `json:\"favoritesCount\"`\n+}\n+\n+type ArticlesSerializer struct {\n+    C        *gin.Context\n+    Articles []ArticleModel\n }\n \n+\n func (self *ArticleSerializer) Response() ArticleResponse {\n-    authorSerializer := users.ProfileSerializer{self.C,self.Author}\n-    article := ArticleResponse{\n-        ID:             self.ID,\n-        Slug:           slug.Make(self.Title),\n-        Title:          self.Title,\n-        Description:    self.Description,\n-        Body:           self.Body,\n-        CreatedAt:      self.CreatedAt.UTC().Format(\"2006-01-02T15:04:05.999Z\"),\n+    myUserModel := self.C.MustGet(\"my_user_model\").(users.UserModel)\n+    authorSerializer := users.ProfileSerializer{self.C, self.Author}\n+    response := ArticleResponse{\n+        ID:          self.ID,\n+        Slug:        slug.Make(self.Title),\n+        Title:       self.Title,\n+        Description: self.Description,\n+        Body:        self.Body,\n+        CreatedAt:   self.CreatedAt.UTC().Format(\"2006-01-02T15:04:05.999Z\"),\n         //UpdatedAt:      self.UpdatedAt.UTC().Format(time.RFC3339Nano),\n         UpdatedAt:      self.UpdatedAt.UTC().Format(\"2006-01-02T15:04:05.999Z\"),\n         Author:         authorSerializer.Response(),\n+        Favorite:       self.isFavoriteBy(myUserModel),\n+        FavoritesCount: self.favoritesCount(),\n     }\n+    response.Tags = make([]string, 0)\n     for _, tag := range self.Tags {\n-        tagSerializer := TagSerializer{tag}\n-        article.Tags = append(article.Tags, tagSerializer.Response())\n+        serializer := TagSerializer{tag}\n+        response.Tags = append(response.Tags, serializer.Response())\n     }\n-    return article\n+    return response\n }\n \n+func (self *ArticlesSerializer) Response() []ArticleResponse {\n+    response := []ArticleResponse{}\n+    for _, article := range self.Articles {\n+        serializer := ArticleSerializer{self.C, article}\n+        response = append(response, serializer.Response())\n+    }\n+    return response\n+}\ndiff --git a/articles/validators.go b/articles/validators.go\nindex 4c326de..8aaa583 100644\n--- a/articles/validators.go\n+++ b/articles/validators.go\n@@ -4,6 +4,7 @@ import (\n     \"golang-gin-starter-kit/common\"\n     \"gopkg.in/gin-gonic/gin.v1\"\n     \"golang-gin-starter-kit/users\"\n+    \"github.com/gosimple/slug\"\n )\n \n type ArticleModelValidator struct {\n@@ -20,6 +21,18 @@ func NewArticleModelValidator() ArticleModelValidator {\n     return ArticleModelValidator{};\n }\n \n+\n+func NewArticleModelValidatorFillWith(articleModel ArticleModel) ArticleModelValidator{\n+    articleModelValidator := NewArticleModelValidator()\n+    articleModelValidator.Article.Title = articleModel.Title\n+    articleModelValidator.Article.Description = articleModel.Description\n+    articleModelValidator.Article.Body = articleModel.Body\n+    for _, tagModel := range articleModel.Tags{\n+        articleModelValidator.Article.Tags = append(articleModelValidator.Article.Tags, tagModel.Tag)\n+    }\n+    return articleModelValidator\n+}\n+\n func (self *ArticleModelValidator) Bind(c *gin.Context) error {\n     myUserModel := c.MustGet(\"my_user_model\").(users.UserModel)\n \n@@ -27,6 +40,7 @@ func (self *ArticleModelValidator) Bind(c *gin.Context) error {\n     if err != nil {\n         return err\n     }\n+    self.articleModel.Slug = slug.Make(self.Article.Title)\n     self.articleModel.Title = self.Article.Title\n     self.articleModel.Description = self.Article.Description\n     self.articleModel.Body = self.Article.Body\ndiff --git a/hello.go b/hello.go\nindex 5249b76..ff17c0c 100644\n--- a/hello.go\n+++ b/hello.go\n@@ -17,6 +17,7 @@ func Migrate(db *gorm.DB)  {\n     db.AutoMigrate(&users.FollowModel{})\n     db.AutoMigrate(&articles.ArticleModel{})\n     db.AutoMigrate(&articles.TagModel{})\n+    db.AutoMigrate(&articles.FavoriteModel{})\n }\n \n \ndiff --git a/users/models.go b/users/models.go\nindex 8eea1a4..cb01ba9 100644\n--- a/users/models.go\n+++ b/users/models.go\n@@ -43,16 +43,6 @@ func (u *UserModel) checkPassword(password string) error {\n     return bcrypt.CompareHashAndPassword(byteHashedPassword, bytePassword)\n }\n \n-func (u UserModel) isFollowing(v UserModel) bool {\n-    db := common.GetDB()\n-    var follow FollowModel\n-    db.Where(FollowModel{\n-        FollowingID:  u.ID,\n-        FollowedByID: v.ID,\n-    }).First(&follow)\n-    return follow.ID != 0\n-}\n-\n func FindOneUser(condition interface{}) (UserModel, error) {\n     db := common.GetDB()\n     var model UserModel\n@@ -77,3 +67,32 @@ func DeleteFollowModel(condition interface{}) error {\n     err := db.Where(condition).Delete(FollowModel{}).Error\n     return err\n }\n+\n+func (u UserModel) following(v UserModel) error {\n+    db := common.GetDB()\n+    var follow FollowModel\n+    err := db.FirstOrCreate(&follow, &FollowModel{\n+        FollowingID:  u.ID,\n+        FollowedByID: v.ID,\n+    }).Error\n+    return err\n+}\n+\n+func (u UserModel) isFollowing(v UserModel) bool {\n+    db := common.GetDB()\n+    var follow FollowModel\n+    db.Where(FollowModel{\n+        FollowingID:  u.ID,\n+        FollowedByID: v.ID,\n+    }).First(&follow)\n+    return follow.ID != 0\n+}\n+\n+func (u UserModel) unFollowing(v UserModel) error {\n+    db := common.GetDB()\n+    err := db.Where(FollowModel{\n+        FollowingID:  u.ID,\n+        FollowedByID: v.ID,\n+    }).Delete(FollowModel{}).Error\n+    return err\n+}\ndiff --git a/users/routers.go b/users/routers.go\nindex bb0fbbb..18ecfb0 100644\n--- a/users/routers.go\n+++ b/users/routers.go\n@@ -41,10 +41,7 @@ func ProfileFollow(c *gin.Context) {\n         return\n     }\n     myUserModel := c.MustGet(\"my_user_model\").(UserModel)\n-    err = SaveOne(&FollowModel{\n-        Following:  myUserModel,\n-        FollowedBy: userModel,\n-    })\n+    err = myUserModel.following(userModel)\n     if err != nil {\n         c.JSON(http.StatusUnprocessableEntity, common.NewError(\"database\", err))\n         return\n@@ -62,10 +59,11 @@ func ProfileUnfollow(c *gin.Context) {\n     }\n     myUserModel := c.MustGet(\"my_user_model\").(UserModel)\n \n-    DeleteFollowModel(FollowModel{\n-        FollowingID:  myUserModel.ID,\n-        FollowedByID: userModel.ID,\n-    })\n+    err = myUserModel.unFollowing(userModel)\n+    if err != nil {\n+        c.JSON(http.StatusUnprocessableEntity, common.NewError(\"database\", err))\n+        return\n+    }\n     profileSerializer := ProfileSerializer{c, userModel}\n     c.JSON(http.StatusOK, gin.H{\"profile\": profileSerializer.Response()})\n }\n",
+  "diffTruncated": false,
+  "tree": [
+    ".gitignore",
+    "BACKEND_INSTRUCTIONS.md",
+    "FRONTEND_INSTRUCTIONS.md",
+    "MOBILE_INSTRUCTIONS.md",
+    "articles/models.go",
+    "articles/routers.go",
+    "articles/serializers.go",
+    "articles/validators.go",
+    "common/database.go",
+    "common/utils.go",
+    "common/utils_test.go",
+    "hello.go",
+    "logo.png",
+    "middlewares/auth-jwt.go",
+    "middlewares/auth-jwt_test.go",
+    "readme.md",
+    "users/models.go",
+    "users/routers.go",
+    "users/serializers.go",
+    "users/unit_test.go",
+    "users/validators.go"
+  ],
+  "explanation": {
+    "what": "articles/models.go に FavoriteModel(お気に入り)と favoritesCount/isFavoriteBy/favoriteBy/unFavoriteBy を追加し、articles/routers.go に ArticleList/ArticleRetrieve/ArticleUpdate/ArticleDelete/ArticleFavorite/ArticleUnfavorite のハンドラとルーティングを実装した。articles/serializers.go はレスポンスに Favorite/FavoritesCount を含む ArticlesSerializer(複数記事用)を追加し、users/models.go では following 系の関数を UserModel のメソッドとして再配置した。",
+    "why": "コミットメッセージ「tmp save for test model function」から、テスト用の関数を書くために一旦動く状態で保存した作業だとわかる。FindManyArticle 内に \"1ggggg...\" のようなデバッグ用 fmt.Println が複数残っており(次コミット52で削除される)、実装途中のスナップショットをそのままコミットしたものと見られる。",
+    "highlights": [
+      { "file": "articles/models.go", "note": "FindManyArticle にデバッグ用の fmt.Println(\"1gggg...\")が複数残る。未完成な調査コードであることが分かる" },
+      { "file": "articles/routers.go", "note": "ArticleList/ArticleFavorite など RealWorld API の主要エンドポイントが一気に追加された" }
+    ],
+    "langNotes": [
+      { "topic": "gorm many2many / Related", "note": "gorm(Go の ORM)の `Related` は外部キーで結びついた関連レコードを取得するヘルパー。`many2many:article_tags;` タグは中間テーブルを介した多対多関係を表す。" },
+      { "topic": "strconv.Atoi", "note": "クエリパラメータは文字列で届くため、limit/offset を数値に変換するのに strconv.Atoi を使う。変換失敗時はデフォルト値にフォールバックしている。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

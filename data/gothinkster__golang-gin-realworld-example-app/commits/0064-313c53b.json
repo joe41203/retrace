@@ -1,0 +1,69 @@
+{
+  "seq": 64,
+  "sha": "313c53ba6528b68cc8c73f4ccf6cf740d4dec457",
+  "parents": [
+    "47c8c3827999c0c534a4a6860c127beaaec8820a"
+  ],
+  "author": {
+    "name": "wangzitian0",
+    "email": "zitwang@linkedin.com",
+    "date": "2017-10-31T19:26:24+08:00"
+  },
+  "message": "add travis ci yml",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 10,
+    "deletions": 1
+  },
+  "files": [
+    {
+      "path": ".travis.yml",
+      "status": "M",
+      "additions": 10,
+      "deletions": 1,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/.travis.yml b/.travis.yml\nindex 0139795..6b21371 100644\n--- a/.travis.yml\n+++ b/.travis.yml\n@@ -6,4 +6,13 @@ go:\n   - 1.8.x\n   - master\n \n-script: go get -u github.com/kardianos/govendor && govendor sync && go test ./...\n+install:\n+  - go get -u github.com/kardianos/govendor\n+  - go get -u github.com/wangzitian0/golang-gin-starter-kit\n+  - echo $GOPATH\n+  - ls\n+  - pwd\n+  - govendor sync\n+  - cd $GOPATH/src/github.com/wangzitian0/how-to-add-badge-in-github-readme\n+script:\n+  - go test ./...\n",
+  "diffTruncated": false,
+  "tree": [
+    ".gitignore",
+    ".travis.yml",
+    "BACKEND_INSTRUCTIONS.md",
+    "FRONTEND_INSTRUCTIONS.md",
+    "MOBILE_INSTRUCTIONS.md",
+    "articles/models.go",
+    "articles/routers.go",
+    "articles/serializers.go",
+    "articles/validators.go",
+    "common/database.go",
+    "common/utils.go",
+    "common/utils_test.go",
+    "hello.go",
+    "logo.png",
+    "readme.md",
+    "users/doc.go",
+    "users/middlewares.go",
+    "users/models.go",
+    "users/routers.go",
+    "users/serializers.go",
+    "users/unit_test.go",
+    "users/validators.go",
+    "vendor/vendor.json"
+  ],
+  "explanation": {
+    "what": "script: の一行構成を install: と script: の2段階に分割した。install ステップでは govendor の取得(go get -u github.com/kardianos/govendor)、リポジトリ自体の取得(go get -u .../golang-gin-starter-kit)、GOPATH の値・ディレクトリ内容・カレントディレクトリを確認する echo $GOPATH / ls / pwd、govendor sync、最後に cd $GOPATH/src/github.com/wangzitian0/how-to-add-badge-in-github-readme という別プロジェクト名のディレクトリへの移動を追加している。script は go test ./... のみに簡略化された。",
+    "why": "おそらく前コミットで go_import_path を削除した結果、CI 上でカレントディレクトリが期待した GOPATH 配下のパスになっていないなど、ビルド環境の状態を掴めていなかったため、echo/ls/pwd といったデバッグ用コマンドを差し込んで手探りで原因を調べようとしたと考えられる。末尾の cd 先のディレクトリ名(how-to-add-badge-in-github-readme)は本プロジェクトと無関係で、コピペ由来の誤りとみられる。",
+    "highlights": [
+      { "file": ".travis.yml", "note": "install/script の2段階化。echo $GOPATH・ls・pwd という調査目的の行と、誤ったプロジェクト名への cd が混在している" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "inferred",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

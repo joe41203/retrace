@@ -1,0 +1,91 @@
+{
+  "seq": 50,
+  "sha": "2e1d4d3d92f74c41a34d9dbcf308b8841c0149ef",
+  "parents": [
+    "cdaeae244f328e83aad28427bf55ef4a604c95af"
+  ],
+  "author": {
+    "name": "wangzitian0",
+    "email": "zitwang@linkedin.com",
+    "date": "2017-07-31T21:35:32+08:00"
+  },
+  "message": "article tags is ok",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 4,
+    "additions": 47,
+    "deletions": 13
+  },
+  "files": [
+    {
+      "path": "articles/models.go",
+      "status": "M",
+      "additions": 27,
+      "deletions": 8,
+      "binary": false
+    },
+    {
+      "path": "articles/serializers.go",
+      "status": "M",
+      "additions": 17,
+      "deletions": 3,
+      "binary": false
+    },
+    {
+      "path": "articles/validators.go",
+      "status": "M",
+      "additions": 2,
+      "deletions": 2,
+      "binary": false
+    },
+    {
+      "path": "hello.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/articles/models.go b/articles/models.go\nindex d5256df..7dcc18d 100644\n--- a/articles/models.go\n+++ b/articles/models.go\n@@ -8,12 +8,23 @@ import (\n \n type ArticleModel struct {\n     gorm.Model\n-    Title           string      `gorm:\"unique_index\"`\n-    Description     string      `gorm:\"size:2048\"`\n-    Body            string      `gorm:\"size:2048\"`\n-    Author          users.UserModel\n+    Title       string      `gorm:\"unique_index\"`\n+    Description string      `gorm:\"size:2048\"`\n+    Body        string      `gorm:\"size:2048\"`\n+    Author      users.UserModel\n+    Tags        []TagModel    `many2many:article_tags;`\n }\n \n+type TagModel struct {\n+    gorm.Model\n+    Tag string      `gorm:\"unique_index\"`\n+}\n+\n+func SaveOne(data interface{}) error {\n+    db := common.GetDB()\n+    err := db.Save(data).Error\n+    return err\n+}\n \n func FindOneArticle(condition interface{}) (ArticleModel, error) {\n     db := common.GetDB()\n@@ -22,10 +33,19 @@ func FindOneArticle(condition interface{}) (ArticleModel, error) {\n     return model, err\n }\n \n-func SaveOne(data interface{}) error {\n+func (model *ArticleModel) setTags(tags []string) error {\n     db := common.GetDB()\n-    err := db.Save(data).Error\n-    return err\n+    var tagList []TagModel\n+    for _, tag := range tags {\n+        var tagModel TagModel\n+        err := db.FirstOrCreate(&tagModel, TagModel{Tag: tag}).Error\n+        if err != nil {\n+            return err\n+        }\n+        tagList = append(tagList, tagModel)\n+    }\n+    model.Tags = tagList\n+    return nil\n }\n \n func (model *ArticleModel) Update(data interface{}) error {\n@@ -34,7 +54,6 @@ func (model *ArticleModel) Update(data interface{}) error {\n     return err\n }\n \n-\n func DeleteArticleModel(condition interface{}) error {\n     db := common.GetDB()\n     err := db.Where(condition).Delete(ArticleModel{}).Error\ndiff --git a/articles/serializers.go b/articles/serializers.go\nindex 6a8b5d2..10d69b9 100644\n--- a/articles/serializers.go\n+++ b/articles/serializers.go\n@@ -11,6 +11,15 @@ type ArticleSerializer struct {\n     ArticleModel\n }\n \n+\n+type TagSerializer struct {\n+    TagModel\n+}\n+\n+func (self *TagSerializer) Response() string {\n+    return self.TagModel.Tag\n+}\n+\n type ArticleResponse struct {\n     ID              uint        `json:\"-\"`\n     Title           string      `json:\"title\"`\n@@ -20,10 +29,11 @@ type ArticleResponse struct {\n     CreatedAt       string      `json:\"createdAt\"`\n     UpdatedAt       string      `json:\"updatedAt\"`\n     Author          users.ProfileResponse `json:\"author\"`\n+    Tags            []string    `json:\"tagList\"`\n }\n \n func (self *ArticleSerializer) Response() ArticleResponse {\n-    author := users.ProfileSerializer{self.C,self.Author}\n+    authorSerializer := users.ProfileSerializer{self.C,self.Author}\n     article := ArticleResponse{\n         ID:             self.ID,\n         Slug:           slug.Make(self.Title),\n@@ -31,9 +41,13 @@ func (self *ArticleSerializer) Response() ArticleResponse {\n         Description:    self.Description,\n         Body:           self.Body,\n         CreatedAt:      self.CreatedAt.UTC().Format(\"2006-01-02T15:04:05.999Z\"),\n-        UpdatedAt:      self.UpdatedAt.UTC().Format(\"2006-01-02T15:04:05.999Z\"),\n-        Author:         author.Response(),\n         //UpdatedAt:      self.UpdatedAt.UTC().Format(time.RFC3339Nano),\n+        UpdatedAt:      self.UpdatedAt.UTC().Format(\"2006-01-02T15:04:05.999Z\"),\n+        Author:         authorSerializer.Response(),\n+    }\n+    for _, tag := range self.Tags {\n+        tagSerializer := TagSerializer{tag}\n+        article.Tags = append(article.Tags, tagSerializer.Response())\n     }\n     return article\n }\ndiff --git a/articles/validators.go b/articles/validators.go\nindex f073c9c..4c326de 100644\n--- a/articles/validators.go\n+++ b/articles/validators.go\n@@ -11,6 +11,7 @@ type ArticleModelValidator struct {\n         Title       string      `form:\"title\" json:\"title\" binding:\"exists,min=4\"`\n         Description string      `form:\"description\" json:\"description\" binding:\"max=2048\"`\n         Body        string      `form:\"body\" json:\"body\" binding:\"max=2048\"`\n+        Tags        []string    `form:\"tagList\" json:\"tagList\"`\n     } `json:\"article\"`\n     articleModel ArticleModel   `json:\"-\"`\n }\n@@ -30,7 +31,6 @@ func (self *ArticleModelValidator) Bind(c *gin.Context) error {\n     self.articleModel.Description = self.Article.Description\n     self.articleModel.Body = self.Article.Body\n     self.articleModel.Author = myUserModel\n-\n-\n+    self.articleModel.setTags(self.Article.Tags)\n     return nil\n }\ndiff --git a/hello.go b/hello.go\nindex e31f0c8..5249b76 100644\n--- a/hello.go\n+++ b/hello.go\n@@ -16,6 +16,7 @@ func Migrate(db *gorm.DB)  {\n     db.AutoMigrate(&users.UserModel{})\n     db.AutoMigrate(&users.FollowModel{})\n     db.AutoMigrate(&articles.ArticleModel{})\n+    db.AutoMigrate(&articles.TagModel{})\n }\n \n \n",
+  "diffTruncated": false,
+  "tree": [
+    ".gitignore",
+    "BACKEND_INSTRUCTIONS.md",
+    "FRONTEND_INSTRUCTIONS.md",
+    "MOBILE_INSTRUCTIONS.md",
+    "articles/models.go",
+    "articles/routers.go",
+    "articles/serializers.go",
+    "articles/validators.go",
+    "common/database.go",
+    "common/utils.go",
+    "common/utils_test.go",
+    "hello.go",
+    "logo.png",
+    "middlewares/auth-jwt.go",
+    "middlewares/auth-jwt_test.go",
+    "readme.md",
+    "users/models.go",
+    "users/routers.go",
+    "users/serializers.go",
+    "users/unit_test.go",
+    "users/validators.go"
+  ],
+  "explanation": {
+    "what": "articles/models.go に TagModel(gorm.Model 埋め込み、Tag は unique_index)を追加し、ArticleModel に many2many:article_tags のタグ関連を持たせた。setTags メソッドで渡されたタグ文字列群を FirstOrCreate により取得または新規作成し、記事に紐付ける。ArticleModelValidator.Bind から setTags を呼び出すようにし、ArticleSerializer.Response は Tags を文字列スライスとして tagList キーでレスポンスに含めるようにした。hello.go に TagModel のマイグレーションを追加している。",
+    "why": "コミットメッセージ「article tags is ok」の通り、RealWorld仕様が要求する記事へのタグ付け機能を完成させたことを報告する内容。GORMのmany2many関連とFirstOrCreateによる重複防止の組み合わせで、同じタグ文字列が複数回登録されないようにしている。",
+    "highlights": [
+      { "file": "articles/models.go", "note": "many2many:article_tags によるArticleModelとTagModelの多対多関連、setTagsでのFirstOrCreate利用" },
+      { "file": "articles/serializers.go", "note": "TagModelのスライスをtagListとしてレスポンスに変換するTagSerializer" }
+    ],
+    "langNotes": [
+      { "topic": "GORM の many2many タグと FirstOrCreate", "note": "構造体タグ `many2many:article_tags;` を付けたスライスフィールドは、GORMに中間テーブル(ここではarticle_tags)を介した多対多関連であることを伝える。`FirstOrCreate` は条件に一致するレコードがあれば取得し、無ければ新規作成するGORMのメソッドで、同じタグ名を重複登録せずに再利用するために使われている。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

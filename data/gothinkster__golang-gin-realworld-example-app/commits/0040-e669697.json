@@ -1,0 +1,84 @@
+{
+  "seq": 40,
+  "sha": "e6696979a4b4d4db63bf226882d5f6f2f9505e83",
+  "parents": [
+    "1f3a4e909da15e22d383310bb0d2025340ab0203"
+  ],
+  "author": {
+    "name": "wangzitian0",
+    "email": "zitwang@linkedin.com",
+    "date": "2017-07-17T21:53:14+08:00"
+  },
+  "message": "modify user.models added validators & fix a jwt bug",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 4,
+    "additions": 43,
+    "deletions": 20
+  },
+  "files": [
+    {
+      "path": "common/utils.go",
+      "status": "M",
+      "additions": 12,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "users/models.go",
+      "status": "M",
+      "additions": 14,
+      "deletions": 4,
+      "binary": false
+    },
+    {
+      "path": "users/routers.go",
+      "status": "M",
+      "additions": 12,
+      "deletions": 11,
+      "binary": false
+    },
+    {
+      "path": "users/validators.go",
+      "status": "M",
+      "additions": 5,
+      "deletions": 5,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/common/utils.go b/common/utils.go\nindex 610ea75..9a74750 100644\n--- a/common/utils.go\n+++ b/common/utils.go\n@@ -7,6 +7,7 @@ import (\n     \"fmt\"\n     \n     \"github.com/dgrijalva/jwt-go\"\n+    \"gopkg.in/go-playground/validator.v8\"\n \n )\n \n@@ -40,4 +41,15 @@ func GenToken(id uint) (string, error){\n     }\n     // Sign and get the complete encoded token as a string\n     return token.SignedString([]byte(NBSecretPassword))\n+}\n+\n+func ErrsToList(err error) ([]interface{}){\n+    errs := err.(validator.ValidationErrors)\n+    var res []interface{}\n+    for _, v := range errs {\n+        // can translate each error one at a time.\n+        fmt.Println(v.Value)\n+        res = append(res, v.Field)\n+    }\n+    return res\n }\n\\ No newline at end of file\ndiff --git a/users/models.go b/users/models.go\nindex a36e36b..e8fdb7a 100644\n--- a/users/models.go\n+++ b/users/models.go\n@@ -15,19 +15,29 @@ type UserModel struct {\n     JWT           string      `json:\"jwt\" gorm:\"column:-\"`\n }\n \n-func (u *UserModel) setPassword(password string){\n+func (u *UserModel) setJWT()error{\n+    token, err := common.GenToken(u.ID)\n+    u.JWT = token\n+    return err\n+}\n+\n+func (u *UserModel) setPassword(password string) error{\n     bytePassword := []byte(password)\n-    passwordHash, _ := bcrypt.GenerateFromPassword(bytePassword, bcrypt.DefaultCost)\n+    passwordHash, err := bcrypt.GenerateFromPassword(bytePassword, bcrypt.DefaultCost)\n+    if err!=nil {\n+        return err\n+    }\n     u.PasswordHash = string(passwordHash)\n+    err = u.setJWT()\n+    return err\n }\n \n func (u *UserModel) checkPassword(password string) error{\n     bytePassword := []byte(password)\n     byteHashedPassword := []byte(u.PasswordHash)\n-    token, err := common.GenToken(u.ID)\n+    err := u.setJWT()\n     if err!=nil {\n         return err\n     }\n-    u.JWT = token\n     return bcrypt.CompareHashAndPassword(byteHashedPassword, bytePassword)\n }\n\\ No newline at end of file\ndiff --git a/users/routers.go b/users/routers.go\nindex f982f3f..6751e9c 100644\n--- a/users/routers.go\n+++ b/users/routers.go\n@@ -5,6 +5,7 @@ import (\n     \"github.com/jinzhu/gorm\"\n     \"net/http\"\n     \"fmt\"\n+    \"golang-gin-starter-kit/common\"\n )\n \n type Router struct {\n@@ -19,15 +20,15 @@ func Register(router *gin.RouterGroup){\n \n func (r *Router) Registration(c *gin.Context) {\n     db := c.MustGet(\"DB\").(*gorm.DB)\n-    var form RegistrationValidator\n-    if err := c.Bind(&form); err != nil {\n-        c.JSON(http.StatusBadRequest, gin.H{\"Data binding error\" : err})\n+    var validator RegistrationValidator\n+    if err := c.Bind(&validator); err != nil {\n+        c.JSON(http.StatusBadRequest, gin.H{\"Data binding error\" : common.ErrsToList(err)})\n         return\n     }\n     var userModel UserModel\n-    userModel.Username = form.User.Username\n-    userModel.Email = form.User.Email\n-    userModel.setPassword(form.User.Password)\n+    userModel.Username = validator.User.Username\n+    userModel.Email = validator.User.Email\n+    userModel.setPassword(validator.User.Password)\n     if err := db.Save(&userModel).Error; err != nil {\n         c.JSON(http.StatusBadRequest, gin.H{\"Database error\" : err})\n         return\n@@ -37,20 +38,20 @@ func (r *Router) Registration(c *gin.Context) {\n \n func (r *Router) Login(c *gin.Context) {\n     db := c.MustGet(\"DB\").(*gorm.DB)\n-    var form LoginValidator\n-    if err := c.Bind(&form); err != nil {\n-        c.JSON(http.StatusBadRequest, gin.H{\"Data binding error\" : err})\n+    var validator LoginValidator\n+    if err := c.Bind(&validator); err != nil {\n+        c.JSON(http.StatusBadRequest, gin.H{\"Data binding error\" : common.ErrsToList(err)})\n         return\n     }\n     var userModel UserModel\n \n-    if err := db.Where(&UserModel{ Email: form.User.Email}).First(&userModel).Error; err != nil {\n+    if err := db.Where(&UserModel{ Email: validator.User.Email}).First(&userModel).Error; err != nil {\n         c.JSON(http.StatusForbidden, gin.H{\"Database error\" : err})\n         return\n     }\n     fmt.Println(\"user from DB: \", userModel)\n \n-    err := userModel.checkPassword(form.User.Password)\n+    err := userModel.checkPassword(validator.User.Password)\n     if err != nil {\n         c.JSON(http.StatusForbidden, gin.H{\"Error\" : \"password error!\"})\n         return\ndiff --git a/users/validators.go b/users/validators.go\nindex 1a3401f..a9cec79 100644\n--- a/users/validators.go\n+++ b/users/validators.go\n@@ -2,15 +2,15 @@ package users\n \n type RegistrationValidator struct {\n     User struct {\n-        Username      string      `json:\"username\"`\n-        Email         string      `json:\"email\"`\n-        Password      string      `json:\"password\"`\n+        Username      string      `form:\"username\" json:\"username\" binding:\"exists,alphanum,min=8,max=255\"`\n+        Email         string      `form:\"email\" json:\"email\" binding:\"exists,email\"`\n+        Password      string      `form:\"password\" json:\"password\" binding:\"exists,min=8,max=255\"`\n     } `json:\"user\"`\n }\n \n type LoginValidator struct {\n     User struct {\n-        Email         string      `json:\"email\"`\n-        Password      string      `json:\"password\"`\n+        Email         string      `form:\"email\" json:\"email\" binding:\"exists,email\"`\n+        Password      string      `form:\"password\"json:\"password\" binding:\"exists,min=8,max=255\"`\n     } `json:\"user\"`\n }\n",
+  "diffTruncated": false,
+  "tree": [
+    ".gitignore",
+    "BACKEND_INSTRUCTIONS.md",
+    "FRONTEND_INSTRUCTIONS.md",
+    "MOBILE_INSTRUCTIONS.md",
+    "common/utils.go",
+    "hello.go",
+    "logo.png",
+    "middlewares/auth-jwt.go",
+    "middlewares/database.go",
+    "readme.md",
+    "users/models.go",
+    "users/routers.go",
+    "users/validators.go"
+  ],
+  "explanation": {
+    "what": "users/validators.go の各フィールドに `binding:\"exists,alphanum,min=8,max=255\"` のような検証ルールタグを追加し、`common/utils.go` に validator.v8 のエラーを `[]interface{}` へ変換する ErrsToList を追加した。また users/models.go の UserModel に setJWT() メソッドを新設し、checkPassword 内で直接 common.GenToken を呼んでいた処理を setJWT() 呼び出しに置き換えた。routers.go では変数名を form から validator に統一し、バインドエラー時のレスポンスに ErrsToList(err) を使うよう変更した。",
+    "why": "コミットメッセージ「modify user.models added validators & fix a jwt bug」の通り、2つの目的を持つコミット。1つはリクエストの各フィールドに具体的なバリデーションルール(必須・英数字・文字数)を付けてエラーを構造化して返せるようにしたこと。もう1つは checkPassword 内でパスワード一致を確認する前に無条件で JWT を発行していたバグを setJWT() に切り出して修正したこと。",
+    "highlights": [
+      { "file": "users/validators.go", "note": "binding:\"exists,alphanum,min=8,max=255\" 等のバリデーションタグの初出" },
+      { "file": "users/models.go", "note": "setJWT() を独立させ、checkPassword から共通化して呼び出す形に整理" },
+      { "file": "common/utils.go", "note": "ErrsToList が validator.ValidationErrors を []interface{} に変換し、フィールド名一覧としてクライアントに返す" }
+    ],
+    "langNotes": [
+      { "topic": "gin の binding タグによるバリデーション", "note": "go-playground/validator と連携する gin では、struct フィールドに `binding:\"exists,email,min=8\"` のようなタグを書くと c.Bind() 時に自動でルールを検証してくれる。違反時のエラーは validator.ValidationErrors 型で返る。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

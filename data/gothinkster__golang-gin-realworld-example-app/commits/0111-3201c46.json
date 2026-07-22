@@ -1,0 +1,144 @@
+{
+  "seq": 111,
+  "sha": "3201c46c383a44411fa7be9914037bfb24ca09a7",
+  "parents": [
+    "72d5215ba01b29a34bc87c2c66e6ad85a7ad537d"
+  ],
+  "author": {
+    "name": "wangzitian0",
+    "email": "wangzitian0@gmail.com",
+    "date": "2026-01-04T07:04:04+08:00"
+  },
+  "message": "fix: comprehensive security, compliance and coverage updates (#53)\n\n- Replace math/rand with crypto/rand for security (fix/use-crypto-rand)\n- Use stored article slug for API compliance (fix/api-spec-compliance-issues)\n- Fix ArticleDelete idempotency and GORM query issues (PR reviews)\n- Optimize authorization checks using preloaded IDs (avoid N+1)\n- Improve type safety for FindOneComment\n- Improve test coverage to >93% (common package improvements)\n- Resolve build errors and merge conflicts\n- Cleanup legacy configuration",
+  "pr": {
+    "number": 53,
+    "title": "fix: enhance security and api compliance",
+    "body": "This PR consolidates fixes from recent reviews:\n- Replaces math/rand with crypto/rand for secure random generation.\n- Uses stored article slugs instead of regenerating them to fix potential API inconsistencies.\n- Resolves build errors and merge conflicts from previous cherry-picks.\n- Includes all test coverage improvements.",
+    "url": "https://github.com/gothinkster/golang-gin-realworld-example-app/pull/53"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 8,
+    "additions": 40,
+    "deletions": 13
+  },
+  "files": [
+    {
+      "path": "api/run-api-tests.sh",
+      "status": "M",
+      "additions": 0,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "articles/models.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "articles/routers.go",
+      "status": "M",
+      "additions": 3,
+      "deletions": 3,
+      "binary": false
+    },
+    {
+      "path": "articles/serializers.go",
+      "status": "M",
+      "additions": 2,
+      "deletions": 3,
+      "binary": false
+    },
+    {
+      "path": "articles/unit_test.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "common/test_helpers.go",
+      "status": "M",
+      "additions": 6,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "common/unit_test.go",
+      "status": "M",
+      "additions": 15,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "common/utils.go",
+      "status": "M",
+      "additions": 12,
+      "deletions": 3,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/api/run-api-tests.sh b/api/run-api-tests.sh\nindex ab41444..160d562 100755\n--- a/api/run-api-tests.sh\n+++ b/api/run-api-tests.sh\n@@ -1,5 +1,4 @@\n #!/usr/bin/env bash\n-set -x\n \n SCRIPTDIR=\"$( cd \"$( dirname \"${BASH_SOURCE[0]}\" )\" >/dev/null && pwd )\"\n \ndiff --git a/articles/models.go b/articles/models.go\nindex b2c0df6..c70cb48 100644\n--- a/articles/models.go\n+++ b/articles/models.go\n@@ -154,7 +154,7 @@ func FindOneArticle(condition interface{}) (ArticleModel, error) {\n \treturn model, err\n }\n \n-func FindOneComment(condition interface{}) (CommentModel, error) {\n+func FindOneComment(condition *CommentModel) (CommentModel, error) {\n \tdb := common.GetDB()\n \tvar model CommentModel\n \terr := db.Preload(\"Author.UserModel\").Preload(\"Article\").Where(condition).First(&model).Error\ndiff --git a/articles/routers.go b/articles/routers.go\nindex fd18697..4afc126 100644\n--- a/articles/routers.go\n+++ b/articles/routers.go\n@@ -103,7 +103,7 @@ func ArticleUpdate(c *gin.Context) {\n \t\treturn\n \t}\n \tmyUserModel := c.MustGet(\"my_user_model\").(users.UserModel)\n-\tif articleModel.AuthorID != GetArticleUserModel(myUserModel).ID {\n+\tif articleModel.Author.UserModelID != myUserModel.ID {\n \t\tc.JSON(http.StatusForbidden, common.NewError(\"articles\", errors.New(\"You are not the author of this article\")))\n \t\treturn\n \t}\n@@ -130,7 +130,7 @@ func ArticleDelete(c *gin.Context) {\n \t\treturn\n \t}\n \tmyUserModel := c.MustGet(\"my_user_model\").(users.UserModel)\n-\tif articleModel.AuthorID != GetArticleUserModel(myUserModel).ID {\n+\tif articleModel.Author.UserModelID != myUserModel.ID {\n \t\tc.JSON(http.StatusForbidden, common.NewError(\"articles\", errors.New(\"You are not the author of this article\")))\n \t\treturn\n \t}\n@@ -211,7 +211,7 @@ func ArticleCommentDelete(c *gin.Context) {\n \t\treturn\n \t}\n \tmyUserModel := c.MustGet(\"my_user_model\").(users.UserModel)\n-\tif commentModel.AuthorID != GetArticleUserModel(myUserModel).ID {\n+\tif commentModel.Author.UserModelID != myUserModel.ID {\n \t\tc.JSON(http.StatusForbidden, common.NewError(\"comment\", errors.New(\"You are not the author of this comment\")))\n \t\treturn\n \t}\ndiff --git a/articles/serializers.go b/articles/serializers.go\nindex 1c136cc..a9ff9f7 100644\n--- a/articles/serializers.go\n+++ b/articles/serializers.go\n@@ -4,7 +4,6 @@ import (\n \t\"sort\"\n \n \t\"github.com/gin-gonic/gin\"\n-\t\"github.com/gosimple/slug\"\n \t\"github.com/gothinkster/golang-gin-realworld-example-app/users\"\n )\n \n@@ -70,7 +69,7 @@ func (s *ArticleSerializer) Response() ArticleResponse {\n \tauthorSerializer := ArticleUserSerializer{C: s.C, ArticleUserModel: s.Author}\n \tresponse := ArticleResponse{\n \t\tID:          s.ID,\n-\t\tSlug:        slug.Make(s.Title),\n+\t\tSlug:        s.Slug,\n \t\tTitle:       s.Title,\n \t\tDescription: s.Description,\n \t\tBody:        s.Body,\n@@ -95,7 +94,7 @@ func (s *ArticleSerializer) ResponseWithPreloaded(favorited bool, favoritesCount\n \tauthorSerializer := ArticleUserSerializer{C: s.C, ArticleUserModel: s.Author}\n \tresponse := ArticleResponse{\n \t\tID:             s.ID,\n-\t\tSlug:           slug.Make(s.Title),\n+\t\tSlug:           s.Slug,\n \t\tTitle:          s.Title,\n \t\tDescription:    s.Description,\n \t\tBody:           s.Body,\ndiff --git a/articles/unit_test.go b/articles/unit_test.go\nindex eede1be..c1944e2 100644\n--- a/articles/unit_test.go\n+++ b/articles/unit_test.go\n@@ -1585,7 +1585,7 @@ func TestCommentDeleteAuthorizationForbidden(t *testing.T) {\n \tasserts.Equal(http.StatusForbidden, w.Code, \"Delete comment by non-author should return 403\")\n \n \t// Verify comment still exists\n-\tfoundComment, err := FindOneComment(comment.ID)\n+\tfoundComment, err := FindOneComment(&CommentModel{Model: gorm.Model{ID: comment.ID}})\n \tasserts.NoError(err, \"Comment should still exist\")\n \tasserts.Equal(comment.ID, foundComment.ID, \"Comment ID should match\")\n }\ndiff --git a/common/test_helpers.go b/common/test_helpers.go\nindex 043db10..a9c87fa 100644\n--- a/common/test_helpers.go\n+++ b/common/test_helpers.go\n@@ -31,5 +31,10 @@ func VerifyTokenClaims(tokenString string) (jwt.MapClaims, error) {\n \t\treturn nil, err\n \t}\n \n-\treturn token.Claims.(jwt.MapClaims), nil\n+\tclaims, ok := token.Claims.(jwt.MapClaims)\n+\tif !ok {\n+\t\treturn nil, fmt.Errorf(\"unexpected claims type: %T\", token.Claims)\n+\t}\n+\n+\treturn claims, nil\n }\ndiff --git a/common/unit_test.go b/common/unit_test.go\nindex 8c9b077..66c1f89 100644\n--- a/common/unit_test.go\n+++ b/common/unit_test.go\n@@ -170,6 +170,21 @@ func TestExtractTokenFromHeader(t *testing.T) {\n \tasserts.Empty(extracted, \"Should return empty for short header\")\n }\n \n+func TestVerifyTokenClaims(t *testing.T) {\n+\tasserts := assert.New(t)\n+\n+\t// Test valid token\n+\tuserID := uint(123)\n+\ttoken := GenToken(userID)\n+\tclaims, err := VerifyTokenClaims(token)\n+\tasserts.NoError(err, \"VerifyTokenClaims should not error for valid token\")\n+\tasserts.Equal(float64(userID), claims[\"id\"], \"Claims should contain correct user ID\")\n+\n+\t// Test invalid token\n+\t_, err = VerifyTokenClaims(\"invalid.token.string\")\n+\tasserts.Error(err, \"VerifyTokenClaims should error for invalid token\")\n+}\n+\n func TestNewValidatorError(t *testing.T) {\n \tasserts := assert.New(t)\n \ndiff --git a/common/utils.go b/common/utils.go\nindex 9c4e5bd..4bd193e 100644\n--- a/common/utils.go\n+++ b/common/utils.go\n@@ -2,8 +2,9 @@\n package common\n \n import (\n+\t\"crypto/rand\"\n \t\"fmt\"\n-\t\"math/rand\"\n+\t\"math/big\"\n \t\"time\"\n \n \t\"github.com/gin-gonic/gin\"\n@@ -18,14 +19,22 @@ var letters = []rune(\"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ012345\n func RandString(n int) string {\n \tb := make([]rune, n)\n \tfor i := range b {\n-\t\tb[i] = letters[rand.Intn(len(letters))]\n+\t\trandIdx, err := rand.Int(rand.Reader, big.NewInt(int64(len(letters))))\n+\t\tif err != nil {\n+\t\t\tpanic(err)\n+\t\t}\n+\t\tb[i] = letters[randIdx.Int64()]\n \t}\n \treturn string(b)\n }\n \n // A helper function to generate random int\n func RandInt() int {\n-\treturn rand.Intn(1000000)\n+\trandNum, err := rand.Int(rand.Reader, big.NewInt(1000000))\n+\tif err != nil {\n+\t\tpanic(err)\n+\t}\n+\treturn int(randNum.Int64())\n }\n \n // Keep this two config private, it should not expose to open source\n",
+  "diffTruncated": false,
+  "tree": [
+    ".env.example",
+    ".github/SETUP.md",
+    ".github/workflows/ci.yml",
+    ".gitignore",
+    ".golangci.yml",
+    "AGENTS.md",
+    "BACKEND_INSTRUCTIONS.md",
+    "FRONTEND_INSTRUCTIONS.md",
+    "LICENSE",
+    "MOBILE_INSTRUCTIONS.md",
+    "api/Conduit.postman_collection.json",
+    "api/run-api-tests.sh",
+    "articles/doc.go",
+    "articles/models.go",
+    "articles/routers.go",
+    "articles/serializers.go",
+    "articles/unit_test.go",
+    "articles/validators.go",
+    "common/database.go",
+    "common/test_helpers.go",
+    "common/unit_test.go",
+    "common/utils.go",
+    "data/.gitkeep",
+    "doc.go",
+    "go.mod",
+    "go.sum",
+    "hello.go",
+    "logo.png",
+    "readme.md",
+    "scripts/coverage.sh",
+    "scripts/gofmt.sh",
+    "users/doc.go",
+    "users/middlewares.go",
+    "users/models.go",
+    "users/routers.go",
+    "users/serializers.go",
+    "users/unit_test.go",
+    "users/validators.go"
+  ],
+  "explanation": {
+    "what": "common/utils.go の RandString/RandInt を math/rand から crypto/rand + math/big ベースの実装に置き換え、articles/routers.go の著者チェックを GetArticleUserModel(myUserModel).ID との比較(追加クエリを伴う)から Preload 済みの articleModel.Author.UserModelID との直接比較に変更した。articles/serializers.go では slug.Make(s.Title) による slug 再生成をやめ、保存済みの s.Slug をそのまま使うようにし、FindOneComment の引数を interface{} から *CommentModel に変更して型安全性を高めた。",
+    "why": "コミットメッセージと PR body によれば、math/rand は暗号論的に安全な乱数生成器ではなく、セキュリティ関連の用途(トークンやテストデータ生成)には crypto/rand が推奨されるための置き換え。著者チェックの最適化は、Preload 済みの Author.UserModelID を直接比較することで GetArticleUserModel() 呼び出しによる追加クエリを避ける狙いがある。slug 再生成の廃止は、記事タイトル編集時に slug.Make(s.Title) で毎回スラッグを作り直すとタイトル変更のたびにURLが変わってしまう API 不整合(fix/api-spec-compliance-issues)を修正するもの。",
+    "highlights": [
+      { "file": "common/utils.go", "note": "math/rand → crypto/rand + math/big.NewInt への置換。RandInt/RandString の実装が変わる" },
+      { "file": "articles/routers.go", "note": "ArticleUpdate/ArticleDelete/ArticleCommentDelete の認可チェックが GetArticleUserModel(myUserModel).ID から articleModel.Author.UserModelID の直接比較に変更され、追加クエリを避けている" },
+      { "file": "articles/serializers.go", "note": "slug.Make(s.Title) の再生成をやめ、保存済み s.Slug を使うことで記事更新後もURLが変わらないようにした" }
+    ],
+    "langNotes": [
+      { "topic": "crypto/rand と math/rand の違い", "note": "math/rand は再現可能な擬似乱数を高速に生成するための一般用途の乱数生成器で、シードが分かれば予測できてしまう。crypto/rand はOSの乱数源を使い予測困難な乱数を生成するパッケージで、トークンやパスワードなどセキュリティに関わる値の生成では crypto/rand + math/big(範囲指定に rand.Int(rand.Reader, big.NewInt(n)) を使う)が定石とされる。" }
+    ],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [
+      { "type": "pr", "number": 53, "url": "https://github.com/gothinkster/golang-gin-realworld-example-app/pull/53" }
+    ],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

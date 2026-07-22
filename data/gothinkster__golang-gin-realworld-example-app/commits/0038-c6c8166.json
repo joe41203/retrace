@@ -1,0 +1,99 @@
+{
+  "seq": 38,
+  "sha": "c6c816622bab1341cdcd44861c999a3bdded7c66",
+  "parents": [
+    "a8935136cc4fc9ccce6e838892c716bf391c668e"
+  ],
+  "author": {
+    "name": "wangzitian0",
+    "email": "zitwang@linkedin.com",
+    "date": "2017-07-16T14:12:54+08:00"
+  },
+  "message": "basic users",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 6,
+    "additions": 155,
+    "deletions": 0
+  },
+  "files": [
+    {
+      "path": ".gitignore",
+      "status": "M",
+      "additions": 8,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "hello.go",
+      "status": "A",
+      "additions": 26,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "storage/database.go",
+      "status": "A",
+      "additions": 22,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "users/models.go",
+      "status": "A",
+      "additions": 24,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "users/routers.go",
+      "status": "A",
+      "additions": 59,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "users/validators.go",
+      "status": "A",
+      "additions": 16,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/.gitignore b/.gitignore\nindex 2725c8d..9e5d450 100644\n--- a/.gitignore\n+++ b/.gitignore\n@@ -15,3 +15,11 @@\n #System Files\n .DS_Store\n Thumbs.db\n+\n+vendor/\n+!vendor/vendor.json\n+\n+tmp/*\n+gorm.db\n+\n+bak.*\ndiff --git a/hello.go b/hello.go\nnew file mode 100644\nindex 0000000..e69ba7e\n--- /dev/null\n+++ b/hello.go\n@@ -0,0 +1,26 @@\n+package main\n+\n+import (\n+\t\"gopkg.in/gin-gonic/gin.v1\"\n+\t_ \"github.com/jinzhu/gorm/dialects/sqlite\"\n+\n+    \"golang-gin-starter-kit/storage\"\n+    \"golang-gin-starter-kit/users\"\n+)\n+\n+\n+func main() {\n+\n+\tdb := storage.DatabaseConnection()\n+\tdefer db.Close()\n+\n+    db.AutoMigrate(&users.UserModel{})\n+\n+\n+    r := gin.Default()\n+\tr.Use(storage.ApiMiddleware(db))\n+\n+    users.Register(r.Group(\"/api/v1/users\"))\n+\n+\tr.Run() // listen and serve on 0.0.0.0:8080\n+}\n\\ No newline at end of file\ndiff --git a/storage/database.go b/storage/database.go\nnew file mode 100644\nindex 0000000..a9d64b4\n--- /dev/null\n+++ b/storage/database.go\n@@ -0,0 +1,22 @@\n+package storage\n+\n+import (\n+    \"gopkg.in/gin-gonic/gin.v1\"\n+    \"github.com/jinzhu/gorm\"\n+    \"fmt\"\n+)\n+\n+func DatabaseConnection() *gorm.DB {\n+    db, err := gorm.Open(\"sqlite3\", \"gorm.db\")\n+    if err != nil {\n+        fmt.Println(\"db err: \",err)\n+    }\n+    return db\n+}\n+\n+func ApiMiddleware(db *gorm.DB) gin.HandlerFunc {\n+    return func(c *gin.Context) {\n+        c.Set(\"DB\", db)\n+        c.Next()\n+    }\n+}\ndiff --git a/users/models.go b/users/models.go\nnew file mode 100644\nindex 0000000..ba4e2c3\n--- /dev/null\n+++ b/users/models.go\n@@ -0,0 +1,24 @@\n+package users\n+\n+import \"github.com/jinzhu/gorm\"\n+\n+\n+type UserModel struct {\n+    gorm.Model\n+    Username      string      `gorm:\"column:username\"`\n+    Email         string      `gorm:\"column:email\"`\n+    Bio           string      `gorm:\"column:bio\"`\n+    Image         string      `gorm:\"column:image\"`\n+    Salt          string      `gorm:\"column:salt\"`\n+    PasswordHash  string      `gorm:\"column:password\"`\n+}\n+\n+func (u *UserModel) setPassword(password string){\n+    passwordHash := password + \"salt\"\n+    u.PasswordHash = passwordHash\n+}\n+\n+func (u *UserModel) checkPassword(password string) bool{\n+    passwordHash := password + \"salt\"\n+    return passwordHash == u.PasswordHash\n+}\n\\ No newline at end of file\ndiff --git a/users/routers.go b/users/routers.go\nnew file mode 100644\nindex 0000000..277dfbe\n--- /dev/null\n+++ b/users/routers.go\n@@ -0,0 +1,59 @@\n+package users\n+\n+import (\n+    \"gopkg.in/gin-gonic/gin.v1\"\n+    \"github.com/jinzhu/gorm\"\n+    \"net/http\"\n+    \"fmt\"\n+)\n+\n+type Router struct {\n+\n+}\n+\n+func Register(router *gin.RouterGroup){\n+    r :=  Router{}\n+    router.POST(\"/\", r.Registration)\n+    router.POST(\"/login\", r.Login)\n+}\n+\n+func (r *Router) Registration(c *gin.Context) {\n+    db := c.MustGet(\"DB\").(*gorm.DB)\n+    var form RegistrationValidator\n+    if err := c.Bind(&form); err != nil {\n+        c.JSON(http.StatusBadRequest, gin.H{\"Data binding error\" : err})\n+        return\n+    }\n+    var userModel UserModel\n+    userModel.Username = form.User.Username\n+    userModel.Email = form.User.Email\n+    userModel.setPassword(form.User.Password)\n+    if err := db.Save(&userModel).Error; err != nil {\n+        c.JSON(http.StatusBadRequest, gin.H{\"Database error\" : err})\n+        return\n+    }\n+    c.JSON(http.StatusCreated, gin.H{\"user\":userModel})\n+}\n+\n+func (r *Router) Login(c *gin.Context) {\n+    db := c.MustGet(\"DB\").(*gorm.DB)\n+    var form LoginValidator\n+    if err := c.Bind(&form); err != nil {\n+        c.JSON(http.StatusBadRequest, gin.H{\"Data binding error\" : err})\n+        return\n+    }\n+    var userModel UserModel\n+\n+    if err := db.Where(&UserModel{ Email: form.User.Email}).First(&userModel).Error; err != nil {\n+        c.JSON(http.StatusForbidden, gin.H{\"Database error\" : err})\n+        return\n+    }\n+    fmt.Println(\"user from DB: \", userModel)\n+\n+    if valid := userModel.checkPassword(form.User.Password); !valid {\n+        c.JSON(http.StatusForbidden, gin.H{\"Error\" : \"password error!\"})\n+        return\n+    }\n+    c.JSON(http.StatusOK, gin.H{\"user\":userModel})\n+}\n+\ndiff --git a/users/validators.go b/users/validators.go\nnew file mode 100644\nindex 0000000..1a3401f\n--- /dev/null\n+++ b/users/validators.go\n@@ -0,0 +1,16 @@\n+package users\n+\n+type RegistrationValidator struct {\n+    User struct {\n+        Username      string      `json:\"username\"`\n+        Email         string      `json:\"email\"`\n+        Password      string      `json:\"password\"`\n+    } `json:\"user\"`\n+}\n+\n+type LoginValidator struct {\n+    User struct {\n+        Email         string      `json:\"email\"`\n+        Password      string      `json:\"password\"`\n+    } `json:\"user\"`\n+}\n",
+  "diffTruncated": false,
+  "tree": [
+    ".gitignore",
+    "BACKEND_INSTRUCTIONS.md",
+    "FRONTEND_INSTRUCTIONS.md",
+    "MOBILE_INSTRUCTIONS.md",
+    "hello.go",
+    "logo.png",
+    "readme.md",
+    "storage/database.go",
+    "users/models.go",
+    "users/routers.go",
+    "users/validators.go"
+  ],
+  "explanation": {
+    "what": "この Go + gin バックエンドで初めて実コードを追加するコミット。エントリポイント `hello.go`、DB接続とミドルウェアを持つ `storage/database.go`、ユーザーモデル `users/models.go`、registration/login の2ルートを持つ `users/routers.go`、リクエストボディの構造体 `users/validators.go` の5ファイルを新規作成し、`.gitignore` に vendor/ や sqlite の DB ファイルなどを追記した。gorm.Model を埋め込んだ UserModel を SQLite(gorm/dialects/sqlite)へ AutoMigrate し、gin の RouterGroup 経由で `/api/v1/users/` と `/api/v1/users/login` を登録している。パスワードは `password + \"salt\"` という固定文字列を連結してハッシュ相当の文字列を作る簡易実装。",
+    "why": "おそらく readme.md やドキュメント整備が一段落した後、RealWorld API 仕様のうち最初のドメインである users(登録・ログイン)から実装に着手したコミットと考えられる。ファイル構成が `storage/`(DB接続)・`users/`(モデル・ルーター・バリデータ)と関心ごとに分かれており、この後 `middlewares/` パッケージへ発展していく設計の出発点になっている。",
+    "highlights": [
+      { "file": "users/models.go", "note": "gorm.Model を埋め込んだ UserModel。setPassword/checkPassword は文字列連結のみで bcrypt 等は未使用" },
+      { "file": "users/routers.go", "note": "Router 構造体のメソッドとして Registration/Login を実装し、Register 関数で RouterGroup にバインドする gin の典型パターン" },
+      { "file": "storage/database.go", "note": "ApiMiddleware で db を gin.Context に Set し、各ハンドラで MustGet して取り出す仕組みの初出" }
+    ],
+    "langNotes": [
+      { "topic": "gin.RouterGroup / gin.HandlerFunc", "note": "gin はルートを RouterGroup 単位でグループ化でき、Register(router *gin.RouterGroup) のように渡してプレフィックス付きのサブルートをまとめて登録する。ミドルウェアは func(*gin.Context) 型の gin.HandlerFunc として実装し、Use() で登録する。" },
+      { "topic": "gin.Context 経由の値受け渡し(Set/MustGet)", "note": "gin.Context.Set(key, value) と MustGet(key).(型アサーション) を使うと、ミドルウェアで用意したリソース(ここでは *gorm.DB)を後続のハンドラに安全に橋渡しできる。MustGet は見つからないと panic する。" },
+      { "topic": "struct タグと gorm.Model の struct embedding", "note": "フィールド後ろの `gorm:\"column:username\"` や `json:\"username\"` はタグと呼ばれるメタデータで、GORM や encoding/json がリフレクションで読み取りDBカラム名やJSONキーへのマッピングを決める。また UserModel は gorm.Model を無名フィールドとして埋め込む(struct embedding)ことで ID/CreatedAt/UpdatedAt/DeletedAt を継承相当で取り込む。いずれも Go の継承の代替=コンポジションの典型。" },
+      { "topic": "c.Bind によるリクエストボディのバインド", "note": "gin の c.Bind(&form) は Content-Type に応じて JSON などのボディを Go の構造体にデコードする。RegistrationValidator/LoginValidator のようにネストした無名構造体で `{\"user\": {...}}` 形式のペイロードを受ける。" }
+    ],
+    "diagram": null,
+    "evidence": "inferred",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

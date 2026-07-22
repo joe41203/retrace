@@ -1,0 +1,71 @@
+{
+  "seq": 68,
+  "sha": "62dd7261b8a97fa77664590949fc38eb6c2b04f0",
+  "parents": [
+    "91528263bb6e327b385c29649e1f06ab714f581c"
+  ],
+  "author": {
+    "name": "wangzitian0",
+    "email": "zitwang@linkedin.com",
+    "date": "2017-10-31T20:23:16+08:00"
+  },
+  "message": "add travis ci yml",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 5,
+    "deletions": 3
+  },
+  "files": [
+    {
+      "path": ".travis.yml",
+      "status": "M",
+      "additions": 5,
+      "deletions": 3,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/.travis.yml b/.travis.yml\nindex 6b5b86e..2967b57 100644\n--- a/.travis.yml\n+++ b/.travis.yml\n@@ -6,13 +6,15 @@ go:\n   - 1.8.x\n #  - master\n \n+go_import_path: github.com/wangzitian0/golang-gin-starter-kit\n+\n install:\n   - echo $GOPATH\n   - ls\n   - pwd\n-  - cd $GOPATH/src\n+  - ls $GOPATH/src\n   - go get -u github.com/kardianos/govendor\n-  - govendor sync\n   - ls $GOPATH/src\n+  - govendor sync\n script:\n-  - go test ./...\n+  - go test -v ./...\n",
+  "diffTruncated": false,
+  "tree": [
+    ".gitignore",
+    ".travis.yml",
+    "BACKEND_INSTRUCTIONS.md",
+    "FRONTEND_INSTRUCTIONS.md",
+    "MOBILE_INSTRUCTIONS.md",
+    "articles/models.go",
+    "articles/routers.go",
+    "articles/serializers.go",
+    "articles/validators.go",
+    "common/database.go",
+    "common/utils.go",
+    "common/utils_test.go",
+    "hello.go",
+    "logo.png",
+    "readme.md",
+    "users/doc.go",
+    "users/middlewares.go",
+    "users/models.go",
+    "users/routers.go",
+    "users/serializers.go",
+    "users/unit_test.go",
+    "users/validators.go",
+    "vendor/vendor.json"
+  ],
+  "explanation": {
+    "what": "go_import_path: github.com/wangzitian0/golang-gin-starter-kit を再び追加し、install ステップの cd $GOPATH/src を ls $GOPATH/src に置き換えた上で govendor sync の前後にあった ls の順序も入れ替えた。script は go test ./... から go test -v ./... に変更し、テスト実行時の詳細出力(verbose)を有効にした。",
+    "why": "おそらく go_import_path を消していたことがビルド不安定の一因だった、あるいは正しいパス配置のために必要だったと判断し復活させたと考えられる。go test -v への変更は、CI ログにテスト名や結果を1件ずつ出力させることで、これまでの試行錯誤で掴めなかった失敗の詳細を可視化する狙いとみられる。",
+    "highlights": [
+      { "file": ".travis.yml", "note": "go_import_path の復活と go test -v ./... 化。ログの詳細度を上げてデバッグしやすくしている" }
+    ],
+    "langNotes": [
+      { "topic": "go test -v", "note": "-v フラグを付けると各テスト関数の PASS/FAIL と実行時間がログに逐一出力される。CI 上で原因不明の失敗を切り分ける際によく使われる。" }
+    ],
+    "diagram": null,
+    "evidence": "inferred",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

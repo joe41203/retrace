@@ -1,0 +1,115 @@
+{
+  "seq": 44,
+  "sha": "1e588c686978cbdd05b039608742f30bd9bcb81a",
+  "parents": [
+    "4bbbe29620d756fe1d5cd6b0274b6a7e2becd74b"
+  ],
+  "author": {
+    "name": "wangzitian0",
+    "email": "zitwang@linkedin.com",
+    "date": "2017-07-24T00:50:59+08:00"
+  },
+  "message": "modify tests & and router '/user'",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 8,
+    "additions": 108,
+    "deletions": 33
+  },
+  "files": [
+    {
+      "path": "common/utils.go",
+      "status": "M",
+      "additions": 2,
+      "deletions": 2,
+      "binary": false
+    },
+    {
+      "path": "hello.go",
+      "status": "M",
+      "additions": 7,
+      "deletions": 3,
+      "binary": false
+    },
+    {
+      "path": "middlewares/auth-jwt.go",
+      "status": "M",
+      "additions": 12,
+      "deletions": 4,
+      "binary": false
+    },
+    {
+      "path": "middlewares/auth-jwt_test.go",
+      "status": "M",
+      "additions": 25,
+      "deletions": 6,
+      "binary": false
+    },
+    {
+      "path": "users/models.go",
+      "status": "M",
+      "additions": 3,
+      "deletions": 9,
+      "binary": false
+    },
+    {
+      "path": "users/routers.go",
+      "status": "M",
+      "additions": 54,
+      "deletions": 2,
+      "binary": false
+    },
+    {
+      "path": "users/unit_test.go",
+      "status": "M",
+      "additions": 2,
+      "deletions": 6,
+      "binary": false
+    },
+    {
+      "path": "users/validators.go",
+      "status": "M",
+      "additions": 3,
+      "deletions": 1,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/common/utils.go b/common/utils.go\nindex 06c83eb..b8cbb3e 100644\n--- a/common/utils.go\n+++ b/common/utils.go\n@@ -35,11 +35,11 @@ func RandString(n int) string {\n \n const NBSecretPassword = \"heheda\";\n \n-func GenToken(id uint) (string, error){\n+func GenToken(id uint64) (string, error){\n     token := jwt.New(jwt.GetSigningMethod(\"HS256\"))\n     // Set some claims\n     token.Claims = jwt.MapClaims{\n-        \"Id\":  id,\n+        \"id\":  id,\n         \"exp\": time.Now().Add(time.Hour * 24).Unix(),\n     }\n     // Sign and get the complete encoded token as a string\ndiff --git a/hello.go b/hello.go\nindex 45a2c8a..c8af5b6 100644\n--- a/hello.go\n+++ b/hello.go\n@@ -19,12 +19,16 @@ func main() {\n \n \n     r := gin.Default()\n+\n \tr.Use(middlewares.DatabaseMiddleware(db))\n \n-    usersGroup := r.Group(\"/api/v1/users\")\n-    users.Register(usersGroup)\n+    v1 := r.Group(\"/api/v1\")\n+    users.UsersRegister(v1.Group(\"/users\"))\n+\n+    v1.Use(middlewares.Auth())\n+    users.UserRegister(v1.Group(\"/user\"))\n+\n \n-    r.Use(middlewares.Auth(common.NBSecretPassword))\n     testAuth := r.Group(\"/api/v1/ping\")\n \n     testAuth.GET(\"/\", func(c *gin.Context) {\ndiff --git a/middlewares/auth-jwt.go b/middlewares/auth-jwt.go\nindex c63c0b0..2baf5af 100644\n--- a/middlewares/auth-jwt.go\n+++ b/middlewares/auth-jwt.go\n@@ -6,17 +6,25 @@ import (\n     \"gopkg.in/gin-gonic/gin.v1\"\n     \"github.com/dgrijalva/jwt-go\"\n     \"github.com/dgrijalva/jwt-go/request\"\n+    \"golang-gin-starter-kit/common\"\n )\n \n-func Auth(secret string) gin.HandlerFunc {\n+func Auth() gin.HandlerFunc {\n     return func(c *gin.Context) {\n-        _, err := request.ParseFromRequest(c.Request, request.OAuth2Extractor, func(token *jwt.Token) (interface{}, error) {\n-            b := ([]byte(secret))\n+        token, err := request.ParseFromRequest(c.Request, request.OAuth2Extractor, func(token *jwt.Token) (interface{}, error) {\n+            b := ([]byte(common.NBSecretPassword))\n             return b, nil\n         })\n-\n         if err != nil {\n             c.AbortWithError(http.StatusUnauthorized, err)\n+            return\n+        }\n+        if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {\n+            my_user_id := uint64(claims[\"id\"].(float64))\n+            //fmt.Println(my_user_id,claims[\"id\"])\n+            c.Set(\"my_user_id\", my_user_id)\n+        } else {\n+            c.Set(\"my_user_id\", uint64(0))\n         }\n     }\n }\ndiff --git a/middlewares/auth-jwt_test.go b/middlewares/auth-jwt_test.go\nindex dcf5814..c1320d5 100644\n--- a/middlewares/auth-jwt_test.go\n+++ b/middlewares/auth-jwt_test.go\n@@ -6,8 +6,9 @@ import (\n     \"net/http\"\n     \"gopkg.in/gin-gonic/gin.v1\"\n     \"github.com/stretchr/testify/assert\"\n-    \"golang-gin-starter-kit/common\"\n+    _ \"golang-gin-starter-kit/common\"\n     \"net/http/httptest\"\n+    \"golang-gin-starter-kit/common\"\n )\n \n func TestAuth(t *testing.T) {\n@@ -16,9 +17,12 @@ func TestAuth(t *testing.T) {\n     r := gin.New()\n     v1 := r.Group(\"/v1\")\n     const pong string = \"pong\"\n-    v1.Use(Auth(common.NBSecretPassword))\n+    v1.Use(Auth())\n     {\n         v1.GET(\"/ping\", func(c *gin.Context) {\n+            my_user_id,ok := c.Get(\"my_user_id\")\n+            assert.True(ok,\"anonymous should work correct\")\n+            assert.Equal(uint64(0),my_user_id,\"anonymous should return user id 0\")\n             c.String(http.StatusOK, pong)\n         })\n     }\n@@ -29,15 +33,30 @@ func TestAuth(t *testing.T) {\n     r.ServeHTTP(w, req)\n     assert.Equal(\"\", w.Body.String(), \"response content should be nil\")\n     assert.Equal(http.StatusUnauthorized,w.Code,\"response status should be 401\")\n+}\n \n+func TestUnAuth(t *testing.T) {\n+    assert := assert.New(t)\n \n+    r := gin.New()\n+    v1 := r.Group(\"/v1\")\n+    const pong string = \"pong\"\n+    v1.Use(Auth())\n+    {\n+        v1.GET(\"/ping\", func(c *gin.Context) {\n+            my_user_id,ok := c.Get(\"my_user_id\")\n+            assert.True(ok,\"login user should work correct\")\n+            assert.Equal(uint64(2),my_user_id,\"login user should return user id 2\")\n+            c.String(http.StatusOK, pong)\n+        })\n+    }\n \n-    token, err := common.GenToken(2)\n-    req, err = http.NewRequest(\"GET\", \"/v1/ping\", nil)\n+    token, err := common.GenToken(uint64(2))\n+    req, err := http.NewRequest(\"GET\", \"/v1/ping\", nil)\n     assert.NoError(err)\n     req.Header.Set(\"Authorization\", \"Bearer \"+token)\n-    w = httptest.NewRecorder()\n+    w := httptest.NewRecorder()\n     r.ServeHTTP(w, req)\n     assert.Equal(pong, w.Body.String(), \"response content should be 'pong'\")\n     assert.Equal(http.StatusOK, w.Code,\"response status should be 200\")\n-}\n+}\n\\ No newline at end of file\ndiff --git a/users/models.go b/users/models.go\nindex 09eba8c..a6d15cb 100644\n--- a/users/models.go\n+++ b/users/models.go\n@@ -7,7 +7,7 @@ import (\n )\n \n type UserModel struct {\n-    ID            uint        `json:\"id\" gorm:\"primary_key\"`\n+    ID            uint64      `json:\"id\" gorm:\"primary_key\"`\n     Username      string      `json:\"username\" gorm:\"column:username\"`\n     Email         string      `json:\"email\" gorm:\"column:email;unique_index\"`\n     Bio           string      `json:\"bio\" gorm:\"column:bio\"`\n@@ -32,17 +32,11 @@ func (u *UserModel) setPassword(password string) error{\n         return err\n     }\n     u.PasswordHash = string(passwordHash)\n-    err = u.setJWT()\n-    return err\n+    return nil\n }\n \n func (u *UserModel) checkPassword(password string) error{\n     bytePassword := []byte(password)\n     byteHashedPassword := []byte(u.PasswordHash)\n-    err := bcrypt.CompareHashAndPassword(byteHashedPassword, bytePassword)\n-    if err!=nil {\n-        return err\n-    }\n-    err = u.setJWT()\n-    return err\n+    return bcrypt.CompareHashAndPassword(byteHashedPassword, bytePassword)\n }\n\\ No newline at end of file\ndiff --git a/users/routers.go b/users/routers.go\nindex 9c6b3ae..0db0a52 100644\n--- a/users/routers.go\n+++ b/users/routers.go\n@@ -13,7 +13,7 @@ type Router struct {\n \tBasePath string\n }\n \n-func Register(router *gin.RouterGroup) Router{\n+func UsersRegister(router *gin.RouterGroup) Router{\n \tr := Router{}\n \tr.BasePath = router.BasePath()\n \trouter.POST(\"/\", r.Registration)\n@@ -21,10 +21,19 @@ func Register(router *gin.RouterGroup) Router{\n \treturn r\n }\n \n+func UserRegister(router *gin.RouterGroup) Router{\n+    r := Router{}\n+    r.BasePath = router.BasePath()\n+    router.GET(\"/\", r.Retrieve)\n+    router.PUT(\"/\", r.Update)\n+    return r\n+}\n+\n+\n func (r Router) Registration(c *gin.Context) {\n \tdb := c.MustGet(\"DB\").(*gorm.DB)\n \n-\tvar validator RegistrationValidator\n+\tvar validator UserModelValidator\n \tif err := common.Bind(c, &validator); err != nil {\n \t\tc.JSON(http.StatusUnprocessableEntity, common.NewValidatorError(err))\n \t\treturn\n@@ -37,6 +46,7 @@ func (r Router) Registration(c *gin.Context) {\n \t\tc.JSON(http.StatusUnprocessableEntity, common.NewError(\"database\",err))\n \t\treturn\n \t}\n+    userModel.setJWT()\n \tc.JSON(http.StatusCreated, gin.H{\"user\": userModel})\n }\n \n@@ -60,5 +70,47 @@ func (r Router) Login(c *gin.Context) {\n         c.JSON(http.StatusForbidden, common.NewError(\"login\",errors.New(\"Not Registered email or invalid password\")))\n \t\treturn\n \t}\n+    userModel.setJWT()\n \tc.JSON(http.StatusOK, gin.H{\"user\": userModel})\n }\n+\n+func (r Router) Retrieve(c *gin.Context) {\n+    db := c.MustGet(\"DB\").(*gorm.DB)\n+    my_user_id := c.MustGet(\"my_user_id\")\n+\n+    var userModel UserModel\n+    if err := db.First(&userModel,my_user_id).Error; err != nil {\n+        c.JSON(http.StatusUnprocessableEntity, common.NewError(\"database\",err))\n+        return\n+    }\n+    userModel.setJWT()\n+    c.JSON(http.StatusCreated, gin.H{\"user\": userModel})\n+}\n+\n+func (r Router) Update(c *gin.Context) {\n+    db := c.MustGet(\"DB\").(*gorm.DB)\n+    my_user_id := c.MustGet(\"my_user_id\")\n+\n+    var validator UserModelValidator\n+    if err := common.Bind(c, &validator); err != nil {\n+        c.JSON(http.StatusUnprocessableEntity, common.NewValidatorError(err))\n+        return\n+    }\n+    var userModel UserModel\n+    if err := db.First(&userModel,my_user_id).Error; err != nil {\n+        c.JSON(http.StatusUnprocessableEntity, common.NewError(\"database\",err))\n+        return\n+    }\n+    userModel.Username = validator.User.Username\n+    userModel.Email = validator.User.Email\n+    userModel.Bio = validator.User.Bio\n+    userModel.Image = &validator.User.Image\n+    userModel.setPassword(validator.User.Password)\n+\n+    if err := db.Save(&userModel).Error; err != nil {\n+        c.JSON(http.StatusUnprocessableEntity, common.NewError(\"database\",err))\n+        return\n+    }\n+    userModel.setJWT()\n+    c.JSON(http.StatusCreated, gin.H{\"user\": userModel})\n+}\ndiff --git a/users/unit_test.go b/users/unit_test.go\nindex 4af01bb..c19e795 100644\n--- a/users/unit_test.go\n+++ b/users/unit_test.go\n@@ -44,25 +44,21 @@ func TestUsermodel(t *testing.T) {\n     userModel := newUserModel()\n     err := userModel.checkPassword(\"\")\n     assert.Error(err,\"empty password should return err\")\n-    assert.Equal(userModel.JWT, \"\",\"JWT's should be null\")\n \n     userModel = newUserModel()\n     err = userModel.setPassword(\"\")\n     assert.Error(err,\"empty password can not be set null\")\n-    assert.Equal(userModel.JWT, \"\",\"JWT's should be null\")\n \n     userModel = newUserModel()\n     err = userModel.setPassword(\"asd123!@#ASD\")\n     assert.NoError(err,\"password should be set successful\")\n     assert.Len(userModel.PasswordHash, 60,\"password hash length should be 60\")\n-    assert.Len(userModel.JWT, 115,\"JWT's length should be 115\")\n \n     err = userModel.checkPassword(\"sd123!@#ASD\")\n     assert.Error(err,\"password should be checked and not validated\")\n \n     err = userModel.checkPassword(\"asd123!@#ASD\")\n     assert.NoError(err,\"password should be checked and validated\")\n-    assert.Len(userModel.JWT, 115,\"JWT's length should be 115\")\n \n \n     userModel.JWT = \"_jwt_jwt\"\n@@ -82,7 +78,7 @@ func TestRegister(t *testing.T) {\n     const path string = \"/api/v1/users\"\n \n     usersGroup := r.Group(path)\n-    router := Register(usersGroup)\n+    router := UsersRegister(usersGroup)\n     assert.Equal(path,router.BasePath,\"Base path should be set\")\n }\n \n@@ -129,7 +125,7 @@ func TestRouter_Registration(t *testing.T) {\n     r := gin.New()\n     usersGroup := r.Group(\"/p\")\n     usersGroup.Use(middlewares.DatabaseMiddleware(test_db))\n-    Register(usersGroup)\n+    UsersRegister(usersGroup)\n     for _, testData := range routerRegistrationTests{\n         bodyData := testData.bodyData\n         req, err := http.NewRequest(\"POST\", \"/p/\", bytes.NewBufferString(bodyData))\ndiff --git a/users/validators.go b/users/validators.go\nindex a9cec79..fb7adfb 100644\n--- a/users/validators.go\n+++ b/users/validators.go\n@@ -1,10 +1,12 @@\n package users\n \n-type RegistrationValidator struct {\n+type UserModelValidator struct {\n     User struct {\n         Username      string      `form:\"username\" json:\"username\" binding:\"exists,alphanum,min=8,max=255\"`\n         Email         string      `form:\"email\" json:\"email\" binding:\"exists,email\"`\n         Password      string      `form:\"password\" json:\"password\" binding:\"exists,min=8,max=255\"`\n+        Bio           string      `form:\"bio\" json:\"bio\" binding:\"max=1024\"`\n+        Image         string      `form:\"image\" json:\"image\" binding:\"omitempty,url\"`\n     } `json:\"user\"`\n }\n \n",
+  "diffTruncated": false,
+  "tree": [
+    ".gitignore",
+    "BACKEND_INSTRUCTIONS.md",
+    "FRONTEND_INSTRUCTIONS.md",
+    "MOBILE_INSTRUCTIONS.md",
+    "common/utils.go",
+    "common/utils_test.go",
+    "hello.go",
+    "logo.png",
+    "middlewares/auth-jwt.go",
+    "middlewares/auth-jwt_test.go",
+    "middlewares/database.go",
+    "middlewares/database_test.go",
+    "readme.md",
+    "users/models.go",
+    "users/routers.go",
+    "users/unit_test.go",
+    "users/validators.go"
+  ],
+  "explanation": {
+    "what": "users/routers.go に UsersRegister(登録・ログイン)とは別の UserRegister(GET/PUT `/user`)を追加し、ログイン中ユーザー自身の取得・更新エンドポイントを新設した。middlewares/auth-jwt.go の Auth はトークンを検証するだけでなく、JWTのクレームから user id を取り出して `c.Set(\"my_user_id\", ...)` にセットするようになった。GenToken の引数型を uint から uint64 に変更し、JWTクレームのキーも \"Id\" から \"id\"(小文字)に統一している。",
+    "why": "コミットメッセージ「modify tests & and router '/user'」が示す通り、users と user の2つのルートグループを分離し、認証済みユーザー自身の情報を扱う `/user` エンドポイントを実装するのが主目的。認証ミドルウェアでユーザーIDをコンテキストに埋め込む変更は、この新しい Retrieve/Update ハンドラがログイン中ユーザーを特定するために必要になったための対応と見られる。",
+    "highlights": [
+      { "file": "middlewares/auth-jwt.go", "note": "トークンの claims から my_user_id を取り出して gin.Context にセットする変更" },
+      { "file": "users/routers.go", "note": "新設された Retrieve/Update ハンドラ(GET/PUT /user)" }
+    ],
+    "langNotes": [
+      { "topic": "gin.Context の Set/MustGet", "note": "gin ではリクエストスコープの値を `c.Set(key, value)` で保存し、後続のハンドラで `c.MustGet(key)` により型アサーション付きで取り出せる。本コミットでは認証ミドルウェアがセットした my_user_id を後段のハンドラが読む、という一連の流れが初めて成立する。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

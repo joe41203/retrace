@@ -1,0 +1,95 @@
+{
+  "seq": 84,
+  "sha": "75c7b337db03ee2ade84c0687cd3cf737ed5e4ec",
+  "parents": [
+    "1a2678ab71ae4c4fdfc994db4e0883bbcaefcf60"
+  ],
+  "author": {
+    "name": "wangzitian0",
+    "email": "zitwang@linkedin.com",
+    "date": "2017-11-01T22:19:28+08:00"
+  },
+  "message": "improve the coverage of users to 100%",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 4,
+    "additions": 63,
+    "deletions": 26
+  },
+  "files": [
+    {
+      "path": "users/middlewares.go",
+      "status": "M",
+      "additions": 4,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "users/models.go",
+      "status": "M",
+      "additions": 0,
+      "deletions": 6,
+      "binary": false
+    },
+    {
+      "path": "users/routers.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "users/unit_test.go",
+      "status": "M",
+      "additions": 58,
+      "deletions": 19,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/users/middlewares.go b/users/middlewares.go\nindex 07c1e30..ffeda29 100644\n--- a/users/middlewares.go\n+++ b/users/middlewares.go\n@@ -18,7 +18,7 @@ func stripBearerPrefixFromTokenString(tok string) (string, error) {\n \treturn tok, nil\n }\n \n-// Extract bearer token from Authorization header\n+// Extract  token from Authorization header\n // Uses PostExtractionFilter to strip \"TOKEN \" prefix from header\n var AuthorizationHeaderExtractor = &request.PostExtractionFilter{\n \trequest.HeaderExtractor{\"Authorization\"},\n@@ -32,6 +32,7 @@ var MyAuth2Extractor = &request.MultiExtractor{\n \trequest.ArgumentExtractor{\"access_token\"},\n }\n \n+// A helper to write user_id and user_model to the context\n func UpdateContextUserModel(c *gin.Context, my_user_id uint) {\n \tvar myUserModel UserModel\n \tif my_user_id != 0 {\n@@ -42,6 +43,8 @@ func UpdateContextUserModel(c *gin.Context, my_user_id uint) {\n \tc.Set(\"my_user_model\", myUserModel)\n }\n \n+// You can custom middlewares yourself as the doc: https://github.com/gin-gonic/gin#custom-middleware\n+//  r.Use(AuthMiddleware(true))\n func AuthMiddleware(auto401 bool) gin.HandlerFunc {\n \treturn func(c *gin.Context) {\n \t\tUpdateContextUserModel(c, 0)\ndiff --git a/users/models.go b/users/models.go\nindex 9aff77a..f2406fb 100644\n--- a/users/models.go\n+++ b/users/models.go\n@@ -95,12 +95,6 @@ func (model *UserModel) Update(data interface{}) error {\n \treturn err\n }\n \n-func DeleteFollowModel(condition interface{}) error {\n-\tdb := common.GetDB()\n-\terr := db.Where(condition).Delete(FollowModel{}).Error\n-\treturn err\n-}\n-\n // You could add a following relationship as userModel1 following userModel2\n // \terr = userModel1.following(userModel2)\n func (u UserModel) following(v UserModel) error {\ndiff --git a/users/routers.go b/users/routers.go\nindex a4da46e..aa661c7 100644\n--- a/users/routers.go\n+++ b/users/routers.go\n@@ -120,6 +120,7 @@ func UserUpdate(c *gin.Context) {\n \t\treturn\n \t}\n \n+\tuserModelValidator.userModel.ID = myUserModel.ID\n \tif err := myUserModel.Update(userModelValidator.userModel); err != nil {\n \t\tc.JSON(http.StatusUnprocessableEntity, common.NewError(\"database\", err))\n \t\treturn\ndiff --git a/users/unit_test.go b/users/unit_test.go\nindex ee9e57f..32f9d12 100644\n--- a/users/unit_test.go\n+++ b/users/unit_test.go\n@@ -214,7 +214,7 @@ var unauthRequestTests = []struct {\n \t\t\"password too short should return error info\",\n \t},\n \n-\t//---------------------   Testing for user profile CRUD   ---------------------\n+\t//---------------------   Testing for self info get & auth module  ---------------------\n \t{\n \t\tfunc(req *http.Request) {\n \t\t\tresetDBWithMock()\n@@ -248,8 +248,36 @@ var unauthRequestTests = []struct {\n \t\t`{\"user\":{\"username\":\"user1\",\"email\":\"user1@linkedin.com\",\"bio\":\"bio1\",\"image\":\"http://image/1.jpg\",\"token\":\"([a-zA-Z0-9-_.]{115})\"}}`,\n \t\t\"request should return current user with token\",\n \t},\n+\n+\t//---------------------   Testing for users' profile get   ---------------------\n+\t{\n+\t\tfunc(req *http.Request) {\n+\t\t\tresetDBWithMock()\n+\t\t\tHeaderTokenMock(req, 1)\n+\t\t},\n+\t\t\"/profiles/user1\",\n+\t\t\"GET\",\n+\t\t``,\n+\t\thttp.StatusOK,\n+\t\t`{\"profile\":{\"username\":\"user1\",\"bio\":\"bio1\",\"image\":\"http://image/1.jpg\",\"following\":false}}`,\n+\t\t\"request should return self profile\",\n+\t},\n+\t{\n+\t\tfunc(req *http.Request) {\n+\t\t\tHeaderTokenMock(req, 2)\n+\t\t},\n+\t\t\"/profiles/user1\",\n+\t\t\"GET\",\n+\t\t``,\n+\t\thttp.StatusOK,\n+\t\t`{\"profile\":{\"username\":\"user1\",\"bio\":\"bio1\",\"image\":\"http://image/1.jpg\",\"following\":false}}`,\n+\t\t\"request should return correct other's profile\",\n+\t},\n+\n+\t//---------------------   Testing for users' profile update   ---------------------\n \t{\n \t\tfunc(req *http.Request) {\n+\t\t\tresetDBWithMock()\n \t\t\tHeaderTokenMock(req, 1)\n \t\t},\n \t\t\"/profiles/user123\",\n@@ -290,31 +318,42 @@ var unauthRequestTests = []struct {\n \t\t`{\"user\":{\"username\":\"user123\",\"email\":\"user123@linkedin.com\",\"bio\":\"bio123\",\"image\":\"http://hehe/123.jpg\",\"token\":\"([a-zA-Z0-9-_.]{115})\"}}`,\n \t\t\"user should login using new password after changed\",\n \t},\n+\t{\n+\t\tfunc(req *http.Request) {\n+\t\t\tHeaderTokenMock(req, 2)\n+\t\t},\n+\t\t\"/user/\",\n+\t\t\"PUT\",\n+\t\t`{\"user\":{\"password\": \"pas\"}}`,\n+\t\thttp.StatusUnprocessableEntity,\n+\t\t`{\"errors\":{\"Password\":\"{min: 8}\"}}`,\n+\t\t\"current user profile should not be changed with error user info\",\n+\t},\n+\n+\t//---------------------   Testing for db errors   ---------------------\n \t{\n \t\tfunc(req *http.Request) {\n \t\t\tresetDBWithMock()\n-\t\t\tHeaderTokenMock(req, 1)\n+\t\t\tHeaderTokenMock(req, 4)\n \t\t},\n-\t\t\"/profiles/user1\",\n-\t\t\"GET\",\n-\t\t``,\n-\t\thttp.StatusOK,\n-\t\t`{\"profile\":{\"username\":\"user1\",\"bio\":\"bio1\",\"image\":\"http://image/1.jpg\",\"following\":false}}`,\n-\t\t\"request should return self profile\",\n+\t\t\"/user/\",\n+\t\t\"PUT\",\n+\t\t`{\"password\": \"password321\"}}`,\n+\t\thttp.StatusUnprocessableEntity,\n+\t\t`{\"errors\":{\"Email\":\"{key: email}\",\"Username\":\"{key: alphanum}\"}}`,\n+\t\t\"test database pk error for user update\",\n \t},\n \t{\n \t\tfunc(req *http.Request) {\n-\t\t\tHeaderTokenMock(req, 2)\n+\t\t\tHeaderTokenMock(req, 0)\n \t\t},\n-\t\t\"/profiles/user1\",\n-\t\t\"GET\",\n-\t\t``,\n-\t\thttp.StatusOK,\n-\t\t`{\"profile\":{\"username\":\"user1\",\"bio\":\"bio1\",\"image\":\"http://image/1.jpg\",\"following\":false}}`,\n-\t\t\"request should return correct other's profile\",\n+\t\t\"/user/\",\n+\t\t\"PUT\",\n+\t\t`{\"user\":{\"username\": \"wangzitian0\",\"email\": \"wzt@gg.cn\",\"password\": \"jakejxke\"}}`,\n+\t\thttp.StatusUnprocessableEntity,\n+\t\t`{\"errors\":{\"database\":\"UNIQUE constraint failed: user_models.email\"}}`,\n+\t\t\"cheat validator and test database connecting error for user update\",\n \t},\n-\n-\t//---------------------   Testing for user following errors   ---------------------\n \t{\n \t\tfunc(req *http.Request) {\n \t\t\tcommon.TestDBFree(test_db)\n@@ -329,7 +368,7 @@ var unauthRequestTests = []struct {\n \t\t``,\n \t\thttp.StatusUnprocessableEntity,\n \t\t`{\"errors\":{\"database\":\"no such table: follow_models\"}}`,\n-\t\t\"test database error\",\n+\t\t\"test database error for following\",\n \t},\n \t{\n \t\tfunc(req *http.Request) {\n@@ -340,7 +379,7 @@ var unauthRequestTests = []struct {\n \t\t``,\n \t\thttp.StatusUnprocessableEntity,\n \t\t`{\"errors\":{\"database\":\"no such table: follow_models\"}}`,\n-\t\t\"test database error\",\n+\t\t\"test database error for canceling following\",\n \t},\n \t{\n \t\tfunc(req *http.Request) {\n",
+  "diffTruncated": false,
+  "tree": [
+    ".gitignore",
+    ".travis.yml",
+    "BACKEND_INSTRUCTIONS.md",
+    "FRONTEND_INSTRUCTIONS.md",
+    "MOBILE_INSTRUCTIONS.md",
+    "articles/models.go",
+    "articles/routers.go",
+    "articles/serializers.go",
+    "articles/validators.go",
+    "common/database.go",
+    "common/utils.go",
+    "common/utils_test.go",
+    "hello.go",
+    "logo.png",
+    "readme.md",
+    "scripts/coverage.sh",
+    "scripts/gofmt.sh",
+    "users/doc.go",
+    "users/middlewares.go",
+    "users/models.go",
+    "users/routers.go",
+    "users/serializers.go",
+    "users/unit_test.go",
+    "users/validators.go",
+    "vendor/vendor.json"
+  ],
+  "explanation": {
+    "what": "users モジュールのテストカバレッジを100%にした。users/unit_test.go に「他人のプロフィール取得」「不正なパスワードでの更新拒否」「DB主キー衝突」「メールのUNIQUE制約違反」などのテストケースを追加し、既存テストの説明文言(msgフィールド)もより具体的に書き直した。あわせて未使用だった DeleteFollowModel 関数(users/models.go)を削除し、UserUpdate ハンドラ(users/routers.go)では更新前に userModelValidator.userModel.ID を明示的にセットする1行を追加した。",
+    "why": "コミットメッセージが「improve the coverage of users to 100%」と明言しており、テストの網羅性を100%まで高めることが直接の目的。未使用関数の削除はカバレッジ計測上「呼ばれないコード」を減らすための整理と考えられ、userModel.ID のセットはテスト追加の過程で見つかった更新処理の不備を合わせて直したものと見られる。",
+    "highlights": [
+      { "file": "users/unit_test.go", "note": "プロフィール取得・更新・DBエラー系のテストケースを追加してカバレッジの穴を埋めている" },
+      { "file": "users/routers.go", "note": "userModelValidator.userModel.ID = myUserModel.ID の1行追加。更新時にIDが引き継がれていなかった不備の修正とみられる" }
+    ],
+    "langNotes": [
+      { "topic": "テストカバレッジ100%という設計目標", "note": "Go には `go test -cover` で関数・分岐単位のカバレッジ計測が標準搭載されている。小規模なライブラリ的コード(このusersパッケージのような薄いCRUD層)では100%到達を明確な達成目標に据えることがよくあり、このコミットもその節目にあたる。"}
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

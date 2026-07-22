@@ -1,0 +1,117 @@
+{
+  "seq": 102,
+  "sha": "6d29314c99f7649a197602d3e06a90fd334b1d89",
+  "parents": [
+    "804a0138e848be72d4481908e5af8ec7c03850a8"
+  ],
+  "author": {
+    "name": "wangzitian0",
+    "email": "wangzitian0@gmail.com",
+    "date": "2026-01-04T03:09:30+08:00"
+  },
+  "message": "fix: align API with RealWorld spec (#43)\n\n* fix: align API with RealWorld spec\n\n- GET /profiles/:username now supports optional auth (anonymous access)\n- Login failure returns 401 Unauthorized instead of 403 Forbidden\n- Updated tests to match new behavior\n\n* fix: improve /articles/feed routing and empty delete responses\n\n- Register /articles/feed as dedicated route instead of hack in ArticleRetrieve\n- Delete article returns empty response (200 with no body) per spec\n- Delete comment returns empty response (200 with no body) per spec\n\n* test: add anonymous profile retrieval test case\n\n- Add test case verifying anonymous users can retrieve profiles\n- Verify following field returns false for unauthenticated requests\n- Update README with 2026 RealWorld API spec compliance notes",
+  "pr": {
+    "number": 43,
+    "title": "fix: align API with RealWorld spec",
+    "body": "## Changes\n\nThis PR aligns the API implementation with the [RealWorld OpenAPI spec](https://github.com/gothinkster/realworld/blob/main/api/openapi.yml).\n\n### 1. GET /profiles/:username supports optional auth\n- **Before**: Route was registered under authenticated routes only\n- **After**: GET request can be accessed anonymously (auth is optional per spec)\n- Split `ProfileRegister` into `ProfileRetrieveRegister` (anonymous) and `ProfileRegister` (authenticated for follow/unfollow)\n\n### 2. Login failure returns 401 Unauthorized\n- **Before**: `POST /users/login` returned 403 Forbidden on failure\n- **After**: Returns 401 Unauthorized per RealWorld spec\n\n### Tests\n- Updated test expectations to match new 401 status code\n- Added proper route registration for anonymous profile access in tests\n\nAll tests pass.",
+    "url": "https://github.com/gothinkster/golang-gin-realworld-example-app/pull/43"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 5,
+    "additions": 30,
+    "deletions": 11
+  },
+  "files": [
+    {
+      "path": "articles/routers.go",
+      "status": "M",
+      "additions": 3,
+      "deletions": 6,
+      "binary": false
+    },
+    {
+      "path": "hello.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "readme.md",
+      "status": "M",
+      "additions": 5,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "users/routers.go",
+      "status": "M",
+      "additions": 6,
+      "deletions": 3,
+      "binary": false
+    },
+    {
+      "path": "users/unit_test.go",
+      "status": "M",
+      "additions": 15,
+      "deletions": 2,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/articles/routers.go b/articles/routers.go\nindex 6b05680..386d364 100644\n--- a/articles/routers.go\n+++ b/articles/routers.go\n@@ -10,6 +10,7 @@ import (\n )\n \n func ArticlesRegister(router *gin.RouterGroup) {\n+\trouter.GET(\"/feed\", ArticleFeed)\n \trouter.POST(\"/\", ArticleCreate)\n \trouter.PUT(\"/:slug\", ArticleUpdate)\n \trouter.DELETE(\"/:slug\", ArticleDelete)\n@@ -81,10 +82,6 @@ func ArticleFeed(c *gin.Context) {\n \n func ArticleRetrieve(c *gin.Context) {\n \tslug := c.Param(\"slug\")\n-\tif slug == \"feed\" {\n-\t\tArticleFeed(c)\n-\t\treturn\n-\t}\n \tarticleModel, err := FindOneArticle(&ArticleModel{Slug: slug})\n \tif err != nil {\n \t\tc.JSON(http.StatusNotFound, common.NewError(\"articles\", errors.New(\"Invalid slug\")))\n@@ -123,7 +120,7 @@ func ArticleDelete(c *gin.Context) {\n \t\tc.JSON(http.StatusNotFound, common.NewError(\"articles\", errors.New(\"Invalid slug\")))\n \t\treturn\n \t}\n-\tc.JSON(http.StatusOK, gin.H{\"article\": \"Delete success\"})\n+\tc.Status(http.StatusOK)\n }\n \n func ArticleFavorite(c *gin.Context) {\n@@ -192,7 +189,7 @@ func ArticleCommentDelete(c *gin.Context) {\n \t\tc.JSON(http.StatusNotFound, common.NewError(\"comment\", errors.New(\"Invalid id\")))\n \t\treturn\n \t}\n-\tc.JSON(http.StatusOK, gin.H{\"comment\": \"Delete success\"})\n+\tc.Status(http.StatusOK)\n }\n \n func ArticleCommentList(c *gin.Context) {\ndiff --git a/hello.go b/hello.go\nindex b2e344a..8ddf8e0 100644\n--- a/hello.go\n+++ b/hello.go\n@@ -38,6 +38,7 @@ func main() {\n \tv1.Use(users.AuthMiddleware(false))\n \tarticles.ArticlesAnonymousRegister(v1.Group(\"/articles\"))\n \tarticles.TagsAnonymousRegister(v1.Group(\"/tags\"))\n+\tusers.ProfileRetrieveRegister(v1.Group(\"/profiles\"))\n \n \tv1.Use(users.AuthMiddleware(true))\n \tusers.UserRegister(v1.Group(\"/user\"))\ndiff --git a/readme.md b/readme.md\nindex e85746a..df4f1c2 100644\n--- a/readme.md\n+++ b/readme.md\n@@ -19,6 +19,11 @@ This project has been modernized with the following updates:\n - **JWT v5**: Updated from deprecated dgrijalva/jwt-go to golang-jwt/jwt/v5 (fixes CVE-2020-26160)\n - **Validator v10**: Updated validator tags and package to match gin v1.10.0\n - **Latest Dependencies**: All dependencies updated to their latest stable versions\n+- **RealWorld API Spec Compliance (2026)**:\n+  - `GET /profiles/:username` now supports optional authentication (anonymous access allowed)\n+  - `POST /users/login` returns 401 Unauthorized on failure (previously 403)\n+  - `GET /articles/feed` registered as dedicated authenticated route\n+  - `DELETE /articles/:slug` and `DELETE /articles/:slug/comments/:id` return empty response body\n \n \n # Directory structure\ndiff --git a/users/routers.go b/users/routers.go\nindex 9193617..330d978 100644\n--- a/users/routers.go\n+++ b/users/routers.go\n@@ -17,8 +17,11 @@ func UserRegister(router *gin.RouterGroup) {\n \trouter.PUT(\"/\", UserUpdate)\n }\n \n-func ProfileRegister(router *gin.RouterGroup) {\n+func ProfileRetrieveRegister(router *gin.RouterGroup) {\n \trouter.GET(\"/:username\", ProfileRetrieve)\n+}\n+\n+func ProfileRegister(router *gin.RouterGroup) {\n \trouter.POST(\"/:username/follow\", ProfileFollow)\n \trouter.DELETE(\"/:username/follow\", ProfileUnfollow)\n }\n@@ -94,12 +97,12 @@ func UsersLogin(c *gin.Context) {\n \tuserModel, err := FindOneUser(&UserModel{Email: loginValidator.userModel.Email})\n \n \tif err != nil {\n-\t\tc.JSON(http.StatusForbidden, common.NewError(\"login\", errors.New(\"Not Registered email or invalid password\")))\n+\t\tc.JSON(http.StatusUnauthorized, common.NewError(\"login\", errors.New(\"Not Registered email or invalid password\")))\n \t\treturn\n \t}\n \n \tif userModel.checkPassword(loginValidator.User.Password) != nil {\n-\t\tc.JSON(http.StatusForbidden, common.NewError(\"login\", errors.New(\"Not Registered email or invalid password\")))\n+\t\tc.JSON(http.StatusUnauthorized, common.NewError(\"login\", errors.New(\"Not Registered email or invalid password\")))\n \t\treturn\n \t}\n \tUpdateContextUserModel(c, userModel.ID)\ndiff --git a/users/unit_test.go b/users/unit_test.go\nindex 11532e3..6e77619 100644\n--- a/users/unit_test.go\n+++ b/users/unit_test.go\n@@ -181,7 +181,7 @@ var unauthRequestTests = []struct {\n \t\t\"/users/login\",\n \t\t\"POST\",\n \t\t`{\"user\":{\"email\": \"user112312312@linkedin.com\",\"password\": \"password123\"}}`,\n-\t\thttp.StatusForbidden,\n+\t\thttp.StatusUnauthorized,\n \t\t`{\"errors\":{\"login\":\"Not Registered email or invalid password\"}}`,\n \t\t\"email not exist should return error info\",\n \t},\n@@ -190,7 +190,7 @@ var unauthRequestTests = []struct {\n \t\t\"/users/login\",\n \t\t\"POST\",\n \t\t`{\"user\":{\"email\": \"user1@linkedin.com\",\"password\": \"password126\"}}`,\n-\t\thttp.StatusForbidden,\n+\t\thttp.StatusUnauthorized,\n \t\t`{\"errors\":{\"login\":\"Not Registered email or invalid password\"}}`,\n \t\t\"password error should return error info\",\n \t},\n@@ -249,6 +249,17 @@ var unauthRequestTests = []struct {\n \t},\n \n \t//---------------------   Testing for users' profile get   ---------------------\n+\t{\n+\t\tfunc(req *http.Request) {\n+\t\t\tresetDBWithMock()\n+\t\t},\n+\t\t\"/profiles/user1\",\n+\t\t\"GET\",\n+\t\t``,\n+\t\thttp.StatusOK,\n+\t\t`{\"profile\":{\"username\":\"user1\",\"bio\":\"bio1\",\"image\":\"http://image/1.jpg\",\"following\":false}}`,\n+\t\t\"anonymous request should return profile with following=false\",\n+\t},\n \t{\n \t\tfunc(req *http.Request) {\n \t\t\tresetDBWithMock()\n@@ -459,6 +470,8 @@ func TestWithoutAuth(t *testing.T) {\n \n \tr := gin.New()\n \tUsersRegister(r.Group(\"/users\"))\n+\tr.Use(AuthMiddleware(false))\n+\tProfileRetrieveRegister(r.Group(\"/profiles\"))\n \tr.Use(AuthMiddleware(true))\n \tUserRegister(r.Group(\"/user\"))\n \tProfileRegister(r.Group(\"/profiles\"))\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/SETUP.md",
+    ".github/workflows/ci.yml",
+    ".gitignore",
+    ".golangci.yml",
+    ".travis.yml",
+    "AGENTS.md",
+    "BACKEND_INSTRUCTIONS.md",
+    "FRONTEND_INSTRUCTIONS.md",
+    "LICENSE",
+    "MOBILE_INSTRUCTIONS.md",
+    "articles/doc.go",
+    "articles/models.go",
+    "articles/routers.go",
+    "articles/serializers.go",
+    "articles/unit_test.go",
+    "articles/validators.go",
+    "common/database.go",
+    "common/unit_test.go",
+    "common/utils.go",
+    "doc.go",
+    "go.mod",
+    "go.mod-generated_by_mod_init",
+    "go.sum",
+    "hello.go",
+    "logo.png",
+    "readme.md",
+    "scripts/coverage.sh",
+    "scripts/gofmt.sh",
+    "users/doc.go",
+    "users/middlewares.go",
+    "users/models.go",
+    "users/routers.go",
+    "users/serializers.go",
+    "users/unit_test.go",
+    "users/validators.go"
+  ],
+  "explanation": {
+    "what": "GET /profiles/:username を認証不要のルートに分離し(ProfileRegister を ProfileRetrieveRegister と ProfileRegister に分割)、ログイン失敗時のレスポンスを 403 Forbidden から 401 Unauthorized に変更した。あわせて /articles/feed を専用ルートとして登録し直し、article/comment の削除レスポンスを本文なしの 200 に変更、匿名プロフィール取得のテストケースを追加した。",
+    "why": "PR body が明記する通り、RealWorld OpenAPI spec との整合を取るための修正。spec では GET /profiles/:username は認証任意(匿名アクセス可)だが、従来は認証必須ルート配下に登録されていたためアクセスできなかった。ログイン失敗時のステータスコードも spec 準拠の 401 に修正し、/articles/feed も ArticleRetrieve 内のハック(slug が \"feed\" かどうかの分岐)から専用ルート登録に置き換えて実装を素直にしている。",
+    "highlights": [
+      { "file": "users/routers.go", "note": "ProfileRegister を認証不要の ProfileRetrieveRegister と認証必須の ProfileRegister(follow/unfollow)に分割" },
+      { "file": "articles/routers.go", "note": "/articles/feed を router.GET(\"/feed\", ArticleFeed) として明示登録し、ArticleRetrieve 内の slug==\"feed\" 分岐ハックを削除" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [
+      { "type": "pr", "number": 43, "url": "https://github.com/gothinkster/golang-gin-realworld-example-app/pull/43" }
+    ],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

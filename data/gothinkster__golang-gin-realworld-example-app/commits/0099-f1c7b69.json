@@ -1,0 +1,99 @@
+{
+  "seq": 99,
+  "sha": "f1c7b697f9fa806ee7930a676ecf58461a1473d8",
+  "parents": [
+    "2a83e7308fc63852e996e01e479b4ebc30a0e3bc"
+  ],
+  "author": {
+    "name": "wangzitian0",
+    "email": "wangzitian0@gmail.com",
+    "date": "2026-01-04T01:22:15+08:00"
+  },
+  "message": "Fix Codecov badge URL (#42)\n\n* Fix Codecov badge URL to point to gothinkster org and main branch\n\n* fix: update License badge URL from master to main",
+  "pr": {
+    "number": 42,
+    "title": "Fix Codecov badge URL",
+    "body": "The Codecov badge was pointing to the wrong repository (`wangzitian0/golang-gin-realworld-example-app`) and wrong branch (`master`).\n\nThis PR fixes it to point to:\n- Organization: `gothinkster`\n- Branch: `main`\n\n**Note:** For the badge to work properly, you also need to:\n1. Set up the `CODECOV_TOKEN` secret in the repository settings (see `.github/SETUP.md` for instructions)\n2. Ensure coverage reports are being uploaded successfully",
+    "url": "https://github.com/gothinkster/golang-gin-realworld-example-app/pull/42"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 3,
+    "additions": 6,
+    "deletions": 5
+  },
+  "files": [
+    {
+      "path": ".travis.yml",
+      "status": "M",
+      "additions": 2,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "readme.md",
+      "status": "M",
+      "additions": 2,
+      "deletions": 2,
+      "binary": false
+    },
+    {
+      "path": "scripts/coverage.sh",
+      "status": "M",
+      "additions": 2,
+      "deletions": 2,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/.travis.yml b/.travis.yml\nindex dfd0ce5..8f135c9 100644\n--- a/.travis.yml\n+++ b/.travis.yml\n@@ -20,4 +20,5 @@ script:\n   - bash ./scripts/coverage.sh\n \n after_success:\n-  - bash <(curl -s https://codecov.io/bash)\n+  - go install github.com/mattn/goveralls@latest\n+  - goveralls -coverprofile=coverage.out -service=travis-ci\ndiff --git a/readme.md b/readme.md\nindex 9fa735d..5958337 100644\n--- a/readme.md\n+++ b/readme.md\n@@ -2,8 +2,8 @@\n \n \n [![CI](https://github.com/gothinkster/golang-gin-realworld-example-app/actions/workflows/ci.yml/badge.svg)](https://github.com/gothinkster/golang-gin-realworld-example-app/actions/workflows/ci.yml)\n-[![codecov](https://codecov.io/gh/wangzitian0/golang-gin-realworld-example-app/branch/master/graph/badge.svg)](https://codecov.io/gh/wangzitian0/golang-gin-realworld-example-app)\n-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/gothinkster/golang-gin-realworld-example-app/blob/master/LICENSE)\n+[![Coverage Status](https://coveralls.io/repos/github/gothinkster/golang-gin-realworld-example-app/badge.svg?branch=main)](https://coveralls.io/github/gothinkster/golang-gin-realworld-example-app?branch=main)\n+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/gothinkster/golang-gin-realworld-example-app/blob/main/LICENSE)\n [![GoDoc](https://godoc.org/github.com/gothinkster/golang-gin-realworld-example-app?status.svg)](https://godoc.org/github.com/gothinkster/golang-gin-realworld-example-app)\n \n > ### Golang/Gin codebase containing real world examples (CRUD, auth, advanced patterns, etc) that adheres to the [RealWorld](https://github.com/gothinkster/realworld) spec and API.\ndiff --git a/scripts/coverage.sh b/scripts/coverage.sh\nindex d753e4a..1a02391 100755\n--- a/scripts/coverage.sh\n+++ b/scripts/coverage.sh\n@@ -4,14 +4,14 @@ set -e\n \n # http://stackoverflow.com/a/21142256/2055281\n \n-echo \"mode: atomic\" > coverage.txt\n+echo \"mode: atomic\" > coverage.out\n \n for d in $(find ./* -maxdepth 10 -type d); do\n     if ls $d/*.go &> /dev/null; then\n         go test  -coverprofile=profile.out -covermode=atomic $d\n         if [ -f profile.out ]; then\n             echo \"$(pwd)\"\n-            cat profile.out | grep -v \"mode: \" >> coverage.txt\n+            cat profile.out | grep -v \"mode: \" >> coverage.out\n             rm profile.out\n         fi\n     fi\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/SETUP.md",
+    ".github/workflows/ci.yml",
+    ".gitignore",
+    ".golangci.yml",
+    ".travis.yml",
+    "BACKEND_INSTRUCTIONS.md",
+    "FRONTEND_INSTRUCTIONS.md",
+    "LICENSE",
+    "MOBILE_INSTRUCTIONS.md",
+    "articles/doc.go",
+    "articles/models.go",
+    "articles/routers.go",
+    "articles/serializers.go",
+    "articles/validators.go",
+    "common/database.go",
+    "common/unit_test.go",
+    "common/utils.go",
+    "doc.go",
+    "go.mod",
+    "go.mod-generated_by_mod_init",
+    "go.sum",
+    "hello.go",
+    "logo.png",
+    "readme.md",
+    "scripts/coverage.sh",
+    "scripts/gofmt.sh",
+    "users/doc.go",
+    "users/middlewares.go",
+    "users/models.go",
+    "users/routers.go",
+    "users/serializers.go",
+    "users/unit_test.go",
+    "users/validators.go"
+  ],
+  "explanation": {
+    "what": "readme.md の Codecov バッジを Coveralls バッジに置き換え、License バッジのリンク先ブランチを master から main に修正した。あわせて .travis.yml の after_success を `codecov.io/bash` の実行から `goveralls` によるCoverallsアップロードに変更し、scripts/coverage.sh の出力先ファイル名を coverage.txt から coverage.out に変更した。",
+    "why": "PRタイトルは「Codecov バッジURLの修正」だが、PR本文によれば元々のバッジは誤って `wangzitian0/golang-gin-realworld-example-app`(誤ったorg)・masterブランチ(存在しないブランチ)を指しており、正しくは `gothinkster` org・`main` ブランチを指すべきだった。コミット本体の変更はそれに留まらず、カバレッジサービス自体をCodecovからCoverallsに切り替えている。CODECOV_TOKENの設定が必要な運用上の負担を避け、goveralls(Travis CI向けのシンプルな認証)に乗り換えたものと考えられるが、その判断の直接的な記述はPR本文中には無い。",
+    "highlights": [
+      { "file": "readme.md", "note": "Codecovバッジ→Coverallsバッジへの置き換え" },
+      { "file": ".travis.yml", "note": "after_success を codecov.io/bash から goveralls に変更" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [{ "type": "pr", "number": 42, "url": "https://github.com/gothinkster/golang-gin-realworld-example-app/pull/42" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

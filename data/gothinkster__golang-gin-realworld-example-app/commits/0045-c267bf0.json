@@ -1,0 +1,99 @@
+{
+  "seq": 45,
+  "sha": "c267bf00a0e897472052cd46bc77756c0772ab1c",
+  "parents": [
+    "1e588c686978cbdd05b039608742f30bd9bcb81a"
+  ],
+  "author": {
+    "name": "wangzitian0",
+    "email": "zitwang@linkedin.com",
+    "date": "2017-07-24T02:32:33+08:00"
+  },
+  "message": "/user & /users was ok",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 6,
+    "additions": 60,
+    "deletions": 22
+  },
+  "files": [
+    {
+      "path": "hello.go",
+      "status": "M",
+      "additions": 2,
+      "deletions": 2,
+      "binary": false
+    },
+    {
+      "path": "middlewares/auth-jwt.go",
+      "status": "M",
+      "additions": 26,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "middlewares/auth-jwt_test.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "users/models.go",
+      "status": "M",
+      "additions": 3,
+      "deletions": 3,
+      "binary": false
+    },
+    {
+      "path": "users/routers.go",
+      "status": "M",
+      "additions": 23,
+      "deletions": 10,
+      "binary": false
+    },
+    {
+      "path": "users/unit_test.go",
+      "status": "M",
+      "additions": 5,
+      "deletions": 5,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/hello.go b/hello.go\nindex c8af5b6..ce9ee75 100644\n--- a/hello.go\n+++ b/hello.go\n@@ -22,14 +22,14 @@ func main() {\n \n \tr.Use(middlewares.DatabaseMiddleware(db))\n \n-    v1 := r.Group(\"/api/v1\")\n+    v1 := r.Group(\"/api\")\n     users.UsersRegister(v1.Group(\"/users\"))\n \n     v1.Use(middlewares.Auth())\n     users.UserRegister(v1.Group(\"/user\"))\n \n \n-    testAuth := r.Group(\"/api/v1/ping\")\n+    testAuth := r.Group(\"/api/ping\")\n \n     testAuth.GET(\"/\", func(c *gin.Context) {\n         c.JSON(200, gin.H{\ndiff --git a/middlewares/auth-jwt.go b/middlewares/auth-jwt.go\nindex 2baf5af..6bae134 100644\n--- a/middlewares/auth-jwt.go\n+++ b/middlewares/auth-jwt.go\n@@ -7,11 +7,36 @@ import (\n     \"github.com/dgrijalva/jwt-go\"\n     \"github.com/dgrijalva/jwt-go/request\"\n     \"golang-gin-starter-kit/common\"\n+    \"strings\"\n )\n+// Strips 'Bearer ' prefix from bearer token string\n+func stripBearerPrefixFromTokenString(tok string) (string, error) {\n+    // Should be a bearer token\n+    if len(tok) > 5 && strings.ToUpper(tok[0:6]) == \"TOKEN \" {\n+        return tok[6:], nil\n+    }\n+    return tok, nil\n+}\n+\n+// Extract bearer token from Authorization header\n+// Uses PostExtractionFilter to strip \"Bearer \" prefix from header\n+var AuthorizationHeaderExtractor = &request.PostExtractionFilter{\n+    request.HeaderExtractor{\"Authorization\"},\n+    stripBearerPrefixFromTokenString,\n+}\n+\n+// Extractor for OAuth2 access tokens.  Looks in 'Authorization'\n+// header then 'access_token' argument for a token.\n+var MyAuth2Extractor = &request.MultiExtractor{\n+    AuthorizationHeaderExtractor,\n+    request.ArgumentExtractor{\"access_token\"},\n+}\n+\n+\n \n func Auth() gin.HandlerFunc {\n     return func(c *gin.Context) {\n-        token, err := request.ParseFromRequest(c.Request, request.OAuth2Extractor, func(token *jwt.Token) (interface{}, error) {\n+        token, err := request.ParseFromRequest(c.Request, MyAuth2Extractor, func(token *jwt.Token) (interface{}, error) {\n             b := ([]byte(common.NBSecretPassword))\n             return b, nil\n         })\ndiff --git a/middlewares/auth-jwt_test.go b/middlewares/auth-jwt_test.go\nindex c1320d5..b37f50d 100644\n--- a/middlewares/auth-jwt_test.go\n+++ b/middlewares/auth-jwt_test.go\n@@ -54,7 +54,7 @@ func TestUnAuth(t *testing.T) {\n     token, err := common.GenToken(uint64(2))\n     req, err := http.NewRequest(\"GET\", \"/v1/ping\", nil)\n     assert.NoError(err)\n-    req.Header.Set(\"Authorization\", \"Bearer \"+token)\n+    req.Header.Set(\"Authorization\", \"Token \"+token)\n     w := httptest.NewRecorder()\n     r.ServeHTTP(w, req)\n     assert.Equal(pong, w.Body.String(), \"response content should be 'pong'\")\ndiff --git a/users/models.go b/users/models.go\nindex a6d15cb..18e6caa 100644\n--- a/users/models.go\n+++ b/users/models.go\n@@ -13,12 +13,12 @@ type UserModel struct {\n     Bio           string      `json:\"bio\" gorm:\"column:bio\"`\n     Image         *string     `json:\"image\" gorm:\"column:image\"`\n     PasswordHash  string      `json:\"-\" gorm:\"column:password;not null\"`\n-    JWT           string      `json:\"jwt\" gorm:\"column:-\"`\n+    Token         string      `json:\"token\" gorm:\"column:-\"`\n }\n \n-func (u *UserModel) setJWT()error{\n+func (u *UserModel) setToken()error{\n     token, err := common.GenToken(u.ID)\n-    u.JWT = token\n+    u.Token = token\n     return err\n }\n \ndiff --git a/users/routers.go b/users/routers.go\nindex 0db0a52..0683aa4 100644\n--- a/users/routers.go\n+++ b/users/routers.go\n@@ -46,7 +46,7 @@ func (r Router) Registration(c *gin.Context) {\n \t\tc.JSON(http.StatusUnprocessableEntity, common.NewError(\"database\",err))\n \t\treturn\n \t}\n-    userModel.setJWT()\n+    userModel.setToken()\n \tc.JSON(http.StatusCreated, gin.H{\"user\": userModel})\n }\n \n@@ -70,7 +70,7 @@ func (r Router) Login(c *gin.Context) {\n         c.JSON(http.StatusForbidden, common.NewError(\"login\",errors.New(\"Not Registered email or invalid password\")))\n \t\treturn\n \t}\n-    userModel.setJWT()\n+    userModel.setToken()\n \tc.JSON(http.StatusOK, gin.H{\"user\": userModel})\n }\n \n@@ -83,7 +83,7 @@ func (r Router) Retrieve(c *gin.Context) {\n         c.JSON(http.StatusUnprocessableEntity, common.NewError(\"database\",err))\n         return\n     }\n-    userModel.setJWT()\n+    userModel.setToken()\n     c.JSON(http.StatusCreated, gin.H{\"user\": userModel})\n }\n \n@@ -91,26 +91,39 @@ func (r Router) Update(c *gin.Context) {\n     db := c.MustGet(\"DB\").(*gorm.DB)\n     my_user_id := c.MustGet(\"my_user_id\")\n \n-    var validator UserModelValidator\n-    if err := common.Bind(c, &validator); err != nil {\n-        c.JSON(http.StatusUnprocessableEntity, common.NewValidatorError(err))\n-        return\n-    }\n     var userModel UserModel\n     if err := db.First(&userModel,my_user_id).Error; err != nil {\n         c.JSON(http.StatusUnprocessableEntity, common.NewError(\"database\",err))\n         return\n     }\n+    var validator UserModelValidator\n+    validator.User.Username = userModel.Username\n+    validator.User.Email = userModel.Email\n+    validator.User.Password = userModel.PasswordHash\n+    validator.User.Bio = userModel.Bio\n+    if userModel.Image!=nil{\n+        validator.User.Image = *userModel.Image\n+    }\n+    if err := common.Bind(c, &validator); err != nil {\n+        c.JSON(http.StatusUnprocessableEntity, common.NewValidatorError(err))\n+        return\n+    }\n     userModel.Username = validator.User.Username\n     userModel.Email = validator.User.Email\n     userModel.Bio = validator.User.Bio\n     userModel.Image = &validator.User.Image\n-    userModel.setPassword(validator.User.Password)\n+\n+    if validator.User.Image==\"\"{\n+        userModel.Image = nil\n+    }\n+    if validator.User.Password!=userModel.PasswordHash{\n+        userModel.setPassword(validator.User.Password)\n+    }\n \n     if err := db.Save(&userModel).Error; err != nil {\n         c.JSON(http.StatusUnprocessableEntity, common.NewError(\"database\",err))\n         return\n     }\n-    userModel.setJWT()\n+    userModel.setToken()\n     c.JSON(http.StatusCreated, gin.H{\"user\": userModel})\n }\ndiff --git a/users/unit_test.go b/users/unit_test.go\nindex c19e795..c740275 100644\n--- a/users/unit_test.go\n+++ b/users/unit_test.go\n@@ -25,7 +25,7 @@ func newUserModel() UserModel{\n         Email:\"wzt@g.cn\",\n         Bio:\"heheda\",\n         Image: &image_url,\n-        JWT:\"\",\n+        Token:\"\",\n         PasswordHash:\"\",\n     }\n }\n@@ -61,8 +61,8 @@ func TestUsermodel(t *testing.T) {\n     assert.NoError(err,\"password should be checked and validated\")\n \n \n-    userModel.JWT = \"_jwt_jwt\"\n-    marshalModel:=[]byte(`{\"id\":2,\"username\":\"asd123!@#ASD\",\"email\":\"wzt@g.cn\",\"bio\":\"heheda\",\"image\":\"https://golang.org/doc/gopher/frontpage.png\",\"jwt\":\"_jwt_jwt\"}`)\n+    userModel.Token = \"_token\"\n+    marshalModel:=[]byte(`{\"id\":2,\"username\":\"asd123!@#ASD\",\"email\":\"wzt@g.cn\",\"bio\":\"heheda\",\"image\":\"https://golang.org/doc/gopher/frontpage.png\",\"token\":\"_token\"}`)\n     modelJSON, _ := json.Marshal(userModel)\n     //fmt.Println(\"%s\",string(modelJSON))\n     assert.Equal(marshalModel, modelJSON,\"Marshal should be equal\")\n@@ -75,7 +75,7 @@ func TestRegister(t *testing.T) {\n     assert := assert.New(t)\n \n     r := gin.New()\n-    const path string = \"/api/v1/users\"\n+    const path string = \"/api/users\"\n \n     usersGroup := r.Group(path)\n     router := UsersRegister(usersGroup)\n@@ -94,7 +94,7 @@ var routerRegistrationTests = []struct {\n     {\n         `{\"user\":{\"username\": \"wangzitian0\",\"email\": \"wzt@gg.cn\",\"password\": \"jakejxke\"}}`,\n         http.StatusCreated,\n-        `{\"user\":{\"id\":1,\"username\":\"wangzitian0\",\"email\":\"wzt@gg.cn\",\"bio\":\"\",\"image\":null,\"jwt\":\"([a-zA-Z0-9-_.]{115})\"}}`,\n+        `{\"user\":{\"id\":1,\"username\":\"wangzitian0\",\"email\":\"wzt@gg.cn\",\"bio\":\"\",\"image\":null,\"token\":\"([a-zA-Z0-9-_.]{115})\"}}`,\n         \"valid data and should return 200\",\n     },\n     {\n",
+  "diffTruncated": false,
+  "tree": [
+    ".gitignore",
+    "BACKEND_INSTRUCTIONS.md",
+    "FRONTEND_INSTRUCTIONS.md",
+    "MOBILE_INSTRUCTIONS.md",
+    "common/utils.go",
+    "common/utils_test.go",
+    "hello.go",
+    "logo.png",
+    "middlewares/auth-jwt.go",
+    "middlewares/auth-jwt_test.go",
+    "middlewares/database.go",
+    "middlewares/database_test.go",
+    "readme.md",
+    "users/models.go",
+    "users/routers.go",
+    "users/unit_test.go",
+    "users/validators.go"
+  ],
+  "explanation": {
+    "what": "APIのベースパスを `/api/v1` から `/api` に変更(RealWorld仕様準拠と見られる)。middlewares/auth-jwt.go に \"Token \" プレフィックスを剥がす stripBearerPrefixFromTokenString と MyAuth2Extractor を追加し、Authorization ヘッダの形式を \"Bearer \" から \"Token \" に変更した。users/models.go の JWT フィールドを Token に改名し、users/routers.go の Update ハンドラは既存ユーザー値でバリデータを事前に埋めてから bind することで、パスワード等の未指定フィールドを空で上書きしないよう修正した。",
+    "why": "コミットメッセージ「/user & /users was ok」は両エンドポイントが動作した到達点であることを示すのみで、個々の変更理由は明言されていない。おそらく Authorizationヘッダのプレフィックスを \"Token\" に変えたのはRealWorld API仕様(Token方式の認証ヘッダ)への合わせ込みだが、断定はできない。",
+    "highlights": [
+      { "file": "middlewares/auth-jwt.go", "note": "\"Token \" プレフィックスを剥がす独自の MyAuth2Extractor" },
+      { "file": "users/routers.go", "note": "Update で既存値をバリデータに詰めてから Bind し、未入力フィールドの意図しない上書きを防ぐ変更" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "inferred",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

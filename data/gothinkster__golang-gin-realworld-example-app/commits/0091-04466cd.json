@@ -1,0 +1,82 @@
+{
+  "seq": 91,
+  "sha": "04466cd4c8f1fab1a04772741e5a05959393efc9",
+  "parents": [
+    "9423bbefbc22d77939a18069037a3f08fd4f5592",
+    "066098a8d664bf8badfa4363da410c6d6d445e72"
+  ],
+  "author": {
+    "name": "wangzitian0",
+    "email": "wangzitian0@gmail.com",
+    "date": "2018-01-10T16:24:26+08:00"
+  },
+  "message": "Merge pull request #3 from shola/master\n\nFix issue with linking external dependencies properly",
+  "pr": {
+    "number": 3,
+    "title": "Fix issue with linking external dependencies properly",
+    "body": "Without linking the external dependencies, `fresh` cannot properly build this repo.",
+    "url": "https://github.com/gothinkster/golang-gin-realworld-example-app/pull/3"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 1,
+    "deletions": 0
+  },
+  "files": [
+    {
+      "path": "readme.md",
+      "status": "M",
+      "additions": 1,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/readme.md b/readme.md\nindex cb78c76..46c8901 100644\n--- a/readme.md\n+++ b/readme.md\n@@ -57,6 +57,7 @@ go get -u github.com/pilu/fresh\n ## Start\n ```\n ➜  govendor sync\n+➜  govendor add +external\n ➜  fresh\n ```\n \n",
+  "diffTruncated": false,
+  "tree": [
+    ".gitignore",
+    ".travis.yml",
+    "BACKEND_INSTRUCTIONS.md",
+    "FRONTEND_INSTRUCTIONS.md",
+    "LICENSE",
+    "MOBILE_INSTRUCTIONS.md",
+    "articles/doc.go",
+    "articles/models.go",
+    "articles/routers.go",
+    "articles/serializers.go",
+    "articles/validators.go",
+    "common/database.go",
+    "common/unit_test.go",
+    "common/utils.go",
+    "doc.go",
+    "hello.go",
+    "logo.png",
+    "readme.md",
+    "scripts/coverage.sh",
+    "scripts/gofmt.sh",
+    "users/doc.go",
+    "users/middlewares.go",
+    "users/models.go",
+    "users/routers.go",
+    "users/serializers.go",
+    "users/unit_test.go",
+    "users/validators.go",
+    "vendor/vendor.json"
+  ],
+  "explanation": {
+    "what": "readme.md の govendor 手順に `govendor add +external` の1行を追記した。govendor sync の後に外部依存を vendor へ取り込むコマンドが不足していたための修正。",
+    "why": "PR本文によれば、この行を追加しないと `fresh`(ホットリロードツール)がリポジトリを正しくビルドできなかった。govendor は依存を GOPATH から検出して vendor 配下にコピーするツールだが、sync だけでは外部パッケージを取り込みきれないケースがあり、+external オプションで明示的に取り込む必要があった。",
+    "highlights": [
+      { "file": "readme.md", "note": "govendor sync の直後に `govendor add +external` を追加した1行" }
+    ],
+    "langNotes": [
+      { "topic": "govendor", "note": "GOPATH時代のGoで使われていた依存管理ツール。vendor/ディレクトリに依存パッケージのソースをコピーして固定する仕組みで、後のGo modules(go.mod)以前の主流だった。`add +external` はGOPATHから未取り込みの外部パッケージをvendorに追加するサブコマンド。" }
+    ],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [{ "type": "pr", "number": 3, "url": "https://github.com/gothinkster/golang-gin-realworld-example-app/pull/3" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

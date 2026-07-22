@@ -1,0 +1,86 @@
+{
+  "seq": 58,
+  "sha": "39fb4a3f3120366d28f2146a15170ce8cf0ba02f",
+  "parents": [
+    "d5a704aa0041f18a742619127411a0a2174dfaab"
+  ],
+  "author": {
+    "name": "wangzitian0",
+    "email": "zitwang@linkedin.com",
+    "date": "2017-10-26T21:22:42+08:00"
+  },
+  "message": "add doc of users/models",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 3,
+    "additions": 48,
+    "deletions": 5
+  },
+  "files": [
+    {
+      "path": "common/utils_test.go",
+      "status": "M",
+      "additions": 3,
+      "deletions": 4,
+      "binary": false
+    },
+    {
+      "path": "users/doc.go",
+      "status": "A",
+      "additions": 9,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "users/models.go",
+      "status": "M",
+      "additions": 36,
+      "deletions": 1,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/common/utils_test.go b/common/utils_test.go\nindex 9ab46d3..693213e 100644\n--- a/common/utils_test.go\n+++ b/common/utils_test.go\n@@ -10,7 +10,7 @@ import (\n \n func TestDatabaseConnection(t *testing.T) {\n \tassert := assert.New(t)\n-\tdb := DatabaseConnection()\n+\tdb := Init()\n \tdefer db.Close()\n \n \ttest_db, _ := gorm.Open(\"sqlite3\", \"./../gorm_test.db\")\n@@ -28,7 +28,7 @@ func TestRandString(t *testing.T) {\n \n \tvar letters = []rune(\"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789\")\n \tstr := RandString(0)\n-\tassert.Equal(len(str), 0, \"length should be 0\")\n+\tassert.Equal(str, \"\", \"length should be ''\")\n \n \tstr = RandString(10)\n \tassert.Equal(len(str), 10, \"length should be 10\")\n@@ -40,8 +40,7 @@ func TestRandString(t *testing.T) {\n func TestGenToken(t *testing.T) {\n \tassert := assert.New(t)\n \n-\ttoken, err := GenToken(2)\n-\tassert.NoError(err, \"Db should be able to ping\")\n+\ttoken := GenToken(2)\n \n \tassert.IsType(token, string(\"token\"), \"token type should be string\")\n \tassert.Len(token, 115, \"JWT's length should be 115\")\ndiff --git a/users/doc.go b/users/doc.go\nnew file mode 100644\nindex 0000000..99f7bc3\n--- /dev/null\n+++ b/users/doc.go\n@@ -0,0 +1,9 @@\n+/*\n+The user module containing the user CRU operation.\n+\n+model.go: definition of orm based data model\n+routers.go: router binding and core logic\n+serializers.go: definition the schema of return data\n+validators.go: definition the validator of form data\n+*/\n+package users\ndiff --git a/users/models.go b/users/models.go\nindex d8533cd..595ab3e 100644\n--- a/users/models.go\n+++ b/users/models.go\n@@ -7,6 +7,11 @@ import (\n \t\"golang.org/x/crypto/bcrypt\"\n )\n \n+// Models should only be concerned with database schema, more strict checking should be put in validator.\n+//\n+// More detail you can find here: http://jinzhu.me/gorm/models.html#model-definition\n+//\n+// HINT: If you want to split null and \"\", you should use *string instead of string.\n type UserModel struct {\n \tID           uint    `gorm:\"primary_key\"`\n \tUsername     string  `gorm:\"column:username\"`\n@@ -16,6 +21,16 @@ type UserModel struct {\n \tPasswordHash string  `gorm:\"column:password;not null\"`\n }\n \n+// A hack way to save ManyToMany relationship,\n+// gorm will build the alias as FollowingBy <-> FollowingByID <-> \"following_by_id\".\n+//\n+// DB schema looks like: id, created_at, updated_at, deleted_at, following_id, followed_by_id.\n+//\n+// Retrieve them by:\n+// \tdb.Where(FollowModel{ FollowingID:  v.ID, FollowedByID: u.ID, }).First(&follow)\n+// \tdb.Where(FollowModel{ FollowedByID: u.ID, }).Find(&follows)\n+//\n+// More details about gorm.Model: http://jinzhu.me/gorm/models.html#conventions\n type FollowModel struct {\n \tgorm.Model\n \tFollowing    UserModel\n@@ -24,6 +39,10 @@ type FollowModel struct {\n \tFollowedByID uint\n }\n \n+// What's bcrypt? https://en.wikipedia.org/wiki/Bcrypt\n+// Golang bcrypt doc: https://godoc.org/golang.org/x/crypto/bcrypt\n+// You can change the value in bcrypt.DefaultCost to adjust the security index.\n+// \terr := userModel.setPassword(\"password0\")\n func (u *UserModel) setPassword(password string) error {\n \tif len(password) == 0 {\n \t\treturn errors.New(\"password should not be empty!\")\n@@ -37,25 +56,33 @@ func (u *UserModel) setPassword(password string) error {\n \treturn nil\n }\n \n+// Database will only save the hashed string, you should check it by util function.\n+// \tif err := serModel.checkPassword(\"password0\"); err != nil { password error }\n func (u *UserModel) checkPassword(password string) error {\n \tbytePassword := []byte(password)\n \tbyteHashedPassword := []byte(u.PasswordHash)\n \treturn bcrypt.CompareHashAndPassword(byteHashedPassword, bytePassword)\n }\n \n+// You could input the conditions and it will return an UserModel in database with error info.\n+// \tuserModel, err := FindOneUser(&UserModel{Username: \"username0\"})\n func FindOneUser(condition interface{}) (UserModel, error) {\n \tdb := common.GetDB()\n \tvar model UserModel\n \terr := db.Where(condition).First(&model).Error\n \treturn model, err\n-}\n+};\n \n+// You could input an UserModel which will be saved in database returning with error info\n+// \tif err := SaveOne(&userModel); err != nil { ... }\n func SaveOne(data interface{}) error {\n \tdb := common.GetDB()\n \terr := db.Save(data).Error\n \treturn err\n }\n \n+// You could update properties of an UserModel to database returning with error info.\n+//  err := db.Model(userModel).Update(UserModel{Username: \"wangzitian0\"}).Error\n func (model *UserModel) Update(data interface{}) error {\n \tdb := common.GetDB()\n \terr := db.Model(model).Update(data).Error\n@@ -68,6 +95,8 @@ func DeleteFollowModel(condition interface{}) error {\n \treturn err\n }\n \n+// You could add a following relationship as userModel1 following userModel2\n+// \terr = userModel1.following(userModel2)\n func (u UserModel) following(v UserModel) error {\n \tdb := common.GetDB()\n \tvar follow FollowModel\n@@ -78,6 +107,8 @@ func (u UserModel) following(v UserModel) error {\n \treturn err\n }\n \n+// You could check whether  userModel1 following userModel2\n+// \tfollowingBool = myUserModel.isFollowing(self.UserModel)\n func (u UserModel) isFollowing(v UserModel) bool {\n \tdb := common.GetDB()\n \tvar follow FollowModel\n@@ -88,6 +119,8 @@ func (u UserModel) isFollowing(v UserModel) bool {\n \treturn follow.ID != 0\n }\n \n+// You could delete a following relationship as userModel1 following userModel2\n+// \terr = userModel1.unFollowing(userModel2)\n func (u UserModel) unFollowing(v UserModel) error {\n \tdb := common.GetDB()\n \terr := db.Where(FollowModel{\n@@ -97,6 +130,8 @@ func (u UserModel) unFollowing(v UserModel) error {\n \treturn err\n }\n \n+// You could get a following list of userModel\n+// \tfollowings := userModel.GetFollowings()\n func (u UserModel) GetFollowings() []UserModel {\n \tdb := common.GetDB()\n \ttx := db.Begin()\n",
+  "diffTruncated": false,
+  "tree": [
+    ".gitignore",
+    "BACKEND_INSTRUCTIONS.md",
+    "FRONTEND_INSTRUCTIONS.md",
+    "MOBILE_INSTRUCTIONS.md",
+    "articles/models.go",
+    "articles/routers.go",
+    "articles/serializers.go",
+    "articles/validators.go",
+    "common/database.go",
+    "common/utils.go",
+    "common/utils_test.go",
+    "hello.go",
+    "logo.png",
+    "middlewares/auth-jwt.go",
+    "middlewares/auth-jwt_test.go",
+    "readme.md",
+    "users/doc.go",
+    "users/models.go",
+    "users/routers.go",
+    "users/serializers.go",
+    "users/unit_test.go",
+    "users/validators.go",
+    "vendor/vendor.json"
+  ],
+  "explanation": {
+    "what": "users/doc.go を新設し、users パッケージ内の各ファイル(models.go/routers.go/serializers.go/validators.go)の役割を package コメントとして記述した。users/models.go の UserModel・FollowModel・各関数(FindOneUser・SaveOne・following・isFollowing・unFollowing・GetFollowings)にも使い方付きのコメントを追加した。あわせて common/utils_test.go を common.DatabaseConnection() から common.Init() 呼び出しに、GenToken の戻り値をエラー無しの単一値に合わせて修正した。",
+    "why": "コミットメッセージ「add doc of users/models」の通り、users パッケージのドキュメンテーションコメントを充実させる作業。gofmt(57)でコードスタイルを揃えた直後に、今度は可読性・保守性を高めるためコメントを整備する流れと見られる。",
+    "highlights": [
+      { "file": "users/doc.go", "note": "パッケージ全体の役割を package コメントとしてまとめた新規ファイル。GoDoc で表示される先頭コメントの書き方の例になっている" },
+      { "file": "users/models.go", "note": "FollowModel のコメントに gorm の many2many のフィールド命名規則(FollowingID/FollowedByID)の解説が書かれている" }
+    ],
+    "langNotes": [
+      { "topic": "GoDoc コメント規約", "note": "Go では関数・型の直前に書いたコメント(// で始まる)が godoc に抽出され公式ドキュメントになる。doc.go はパッケージ全体の説明だけを書く慣習的なファイル名。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

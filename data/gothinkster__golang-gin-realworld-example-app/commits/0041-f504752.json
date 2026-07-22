@@ -1,0 +1,123 @@
+{
+  "seq": 41,
+  "sha": "f504752b041861f7abd7960db788314107e6ef4e",
+  "parents": [
+    "e6696979a4b4d4db63bf226882d5f6f2f9505e83"
+  ],
+  "author": {
+    "name": "wangzitian0",
+    "email": "zitwang@linkedin.com",
+    "date": "2017-07-19T22:37:51+08:00"
+  },
+  "message": "add many tests",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 9,
+    "additions": 242,
+    "deletions": 53
+  },
+  "files": [
+    {
+      "path": "common/utils.go",
+      "status": "M",
+      "additions": 3,
+      "deletions": 2,
+      "binary": false
+    },
+    {
+      "path": "common/utils_test.go",
+      "status": "A",
+      "additions": 50,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "hello.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "middlewares/auth-jwt.go",
+      "status": "M",
+      "additions": 2,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "middlewares/auth-jwt_test.go",
+      "status": "A",
+      "additions": 43,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "middlewares/database_test.go",
+      "status": "A",
+      "additions": 41,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "users/models.go",
+      "status": "M",
+      "additions": 8,
+      "deletions": 3,
+      "binary": false
+    },
+    {
+      "path": "users/routers.go",
+      "status": "M",
+      "additions": 44,
+      "deletions": 46,
+      "binary": false
+    },
+    {
+      "path": "users/unit_test.go",
+      "status": "A",
+      "additions": 50,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/common/utils.go b/common/utils.go\nindex 9a74750..4fe4654 100644\n--- a/common/utils.go\n+++ b/common/utils.go\n@@ -8,11 +8,12 @@ import (\n     \n     \"github.com/dgrijalva/jwt-go\"\n     \"gopkg.in/go-playground/validator.v8\"\n+    _ \"github.com/jinzhu/gorm/dialects/sqlite\"\n \n )\n \n func DatabaseConnection() *gorm.DB {\n-    db, err := gorm.Open(\"sqlite3\", \"gorm.db\")\n+    db, err := gorm.Open(\"sqlite3\", \"./../gorm.db\")\n     if err != nil {\n         fmt.Println(\"db err: \",err)\n     }\n@@ -48,7 +49,7 @@ func ErrsToList(err error) ([]interface{}){\n     var res []interface{}\n     for _, v := range errs {\n         // can translate each error one at a time.\n-        fmt.Println(v.Value)\n+        //fmt.Println(v.Value)\n         res = append(res, v.Field)\n     }\n     return res\ndiff --git a/common/utils_test.go b/common/utils_test.go\nnew file mode 100644\nindex 0000000..931650a\n--- /dev/null\n+++ b/common/utils_test.go\n@@ -0,0 +1,50 @@\n+package common\n+\n+import (\n+    \"testing\"\n+    \"github.com/jinzhu/gorm\"\n+    \"github.com/stretchr/testify/assert\"\n+    _ \"github.com/jinzhu/gorm/dialects/sqlite\"\n+    \"os\"\n+)\n+\n+\n+func TestDatabaseConnection(t *testing.T) {\n+    assert := assert.New(t)\n+    db := DatabaseConnection()\n+    defer db.Close()\n+\n+    test_db, _ := gorm.Open(\"sqlite3\", \"./../gorm_test.db\")\n+    defer test_db.Close()\n+    assert.IsType(test_db,db,\"Db'type should be gorm.DB\")\n+    assert.NoError(db.DB().Ping(),\"Db should be able to ping\")\n+    assert.NoError(test_db.DB().Ping(),\"Test Db should be able to ping\")\n+\n+\n+    var err = os.Remove(\"./../gorm_test.db\")\n+    assert.NoError(err,\"Db should be deleted\")\n+}\n+\n+func TestRandString(t *testing.T) {\n+    assert := assert.New(t)\n+\n+    var letters = []rune(\"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789\")\n+    str := RandString(0)\n+    assert.Equal(len(str),0,\"length should be 0\")\n+\n+    str = RandString(10)\n+    assert.Equal(len(str),10, \"length should be 10\")\n+    for _, ch :=range str{\n+        assert.Contains(letters, ch, \"char should be a-z|A-Z|0-9\")\n+    }\n+}\n+\n+func TestGenToken(t *testing.T) {\n+    assert := assert.New(t)\n+\n+    token, err := GenToken(2)\n+    assert.NoError(err,\"Db should be able to ping\")\n+\n+    assert.IsType(token,string(\"token\"),\"token type should be string\")\n+    assert.Len(token, 115,\"JWT's length should be 115\")\n+}\n\\ No newline at end of file\ndiff --git a/hello.go b/hello.go\nindex 2f24309..b6f786d 100644\n--- a/hello.go\n+++ b/hello.go\n@@ -2,7 +2,6 @@ package main\n \n import (\n \t\"gopkg.in/gin-gonic/gin.v1\"\n-\t_ \"github.com/jinzhu/gorm/dialects/sqlite\"\n \n     \"golang-gin-starter-kit/common\"\n     \"golang-gin-starter-kit/middlewares\"\n@@ -15,6 +14,7 @@ func main() {\n \tdb := common.DatabaseConnection()\n \tdefer db.Close()\n \n+    db.DB().SetMaxIdleConns(10)\n     db.AutoMigrate(&users.UserModel{})\n \n \ndiff --git a/middlewares/auth-jwt.go b/middlewares/auth-jwt.go\nindex ac00fd6..c63c0b0 100644\n--- a/middlewares/auth-jwt.go\n+++ b/middlewares/auth-jwt.go\n@@ -2,6 +2,7 @@ package middlewares\n \n \n import (\n+    \"net/http\"\n     \"gopkg.in/gin-gonic/gin.v1\"\n     \"github.com/dgrijalva/jwt-go\"\n     \"github.com/dgrijalva/jwt-go/request\"\n@@ -15,7 +16,7 @@ func Auth(secret string) gin.HandlerFunc {\n         })\n \n         if err != nil {\n-            c.AbortWithError(401, err)\n+            c.AbortWithError(http.StatusUnauthorized, err)\n         }\n     }\n }\ndiff --git a/middlewares/auth-jwt_test.go b/middlewares/auth-jwt_test.go\nnew file mode 100644\nindex 0000000..dcf5814\n--- /dev/null\n+++ b/middlewares/auth-jwt_test.go\n@@ -0,0 +1,43 @@\n+package middlewares\n+\n+\n+import (\n+    \"testing\"\n+    \"net/http\"\n+    \"gopkg.in/gin-gonic/gin.v1\"\n+    \"github.com/stretchr/testify/assert\"\n+    \"golang-gin-starter-kit/common\"\n+    \"net/http/httptest\"\n+)\n+\n+func TestAuth(t *testing.T) {\n+    assert := assert.New(t)\n+\n+    r := gin.New()\n+    v1 := r.Group(\"/v1\")\n+    const pong string = \"pong\"\n+    v1.Use(Auth(common.NBSecretPassword))\n+    {\n+        v1.GET(\"/ping\", func(c *gin.Context) {\n+            c.String(http.StatusOK, pong)\n+        })\n+    }\n+\n+    req, err := http.NewRequest(\"GET\", \"/v1/ping\", nil)\n+    assert.NoError(err)\n+    w := httptest.NewRecorder()\n+    r.ServeHTTP(w, req)\n+    assert.Equal(\"\", w.Body.String(), \"response content should be nil\")\n+    assert.Equal(http.StatusUnauthorized,w.Code,\"response status should be 401\")\n+\n+\n+\n+    token, err := common.GenToken(2)\n+    req, err = http.NewRequest(\"GET\", \"/v1/ping\", nil)\n+    assert.NoError(err)\n+    req.Header.Set(\"Authorization\", \"Bearer \"+token)\n+    w = httptest.NewRecorder()\n+    r.ServeHTTP(w, req)\n+    assert.Equal(pong, w.Body.String(), \"response content should be 'pong'\")\n+    assert.Equal(http.StatusOK, w.Code,\"response status should be 200\")\n+}\ndiff --git a/middlewares/database_test.go b/middlewares/database_test.go\nnew file mode 100644\nindex 0000000..a0778ef\n--- /dev/null\n+++ b/middlewares/database_test.go\n@@ -0,0 +1,41 @@\n+package middlewares\n+\n+import (\n+    \"testing\"\n+    \"github.com/jinzhu/gorm\"\n+    \"gopkg.in/gin-gonic/gin.v1\"\n+    \"github.com/stretchr/testify/assert\"\n+    \"golang-gin-starter-kit/common\"\n+    \"net/http\"\n+    \"net/http/httptest\"\n+)\n+\n+func TestDatabaseMiddleware(t *testing.T) {\n+    assert := assert.New(t)\n+\n+    dbConnection := common.DatabaseConnection()\n+    dbConnection2 := common.DatabaseConnection()\n+    defer dbConnection.Close()\n+    defer dbConnection2.Close()\n+    r := gin.New()\n+    v1 := r.Group(\"/v1\")\n+    const pong string = \"pong\"\n+    v1.Use(DatabaseMiddleware(dbConnection))\n+    {\n+        v1.GET(\"/ping\", func(c *gin.Context) {\n+            db := c.MustGet(\"DB\").(*gorm.DB)\n+            assert.Equal(dbConnection, db,\"db in middleware should be same with outer one\")\n+            assert.NotEqual(dbConnection2, db,\"db in middleware should not be same as another\")\n+\n+            assert.NoError(db.DB().Ping(),\"Db should be able to ping\")\n+            c.String(http.StatusOK, pong)\n+        })\n+    }\n+\n+    req, err := http.NewRequest(\"GET\", \"/v1/ping\", nil)\n+    assert.NoError(err)\n+    w := httptest.NewRecorder()\n+    r.ServeHTTP(w, req)\n+    assert.Equal(pong, w.Body.String(), \"response content should be 'pong'\")\n+    assert.Equal(http.StatusOK, w.Code,\"response status should be 200\")\n+}\ndiff --git a/users/models.go b/users/models.go\nindex e8fdb7a..09eba8c 100644\n--- a/users/models.go\n+++ b/users/models.go\n@@ -3,6 +3,7 @@ package users\n import (\n     \"golang.org/x/crypto/bcrypt\"\n     \"golang-gin-starter-kit/common\"\n+    \"errors\"\n )\n \n type UserModel struct {\n@@ -11,7 +12,7 @@ type UserModel struct {\n     Email         string      `json:\"email\" gorm:\"column:email;unique_index\"`\n     Bio           string      `json:\"bio\" gorm:\"column:bio\"`\n     Image         *string     `json:\"image\" gorm:\"column:image\"`\n-    PasswordHash  string      `json:\"-\" gorm:\"column:password\"`\n+    PasswordHash  string      `json:\"-\" gorm:\"column:password;not null\"`\n     JWT           string      `json:\"jwt\" gorm:\"column:-\"`\n }\n \n@@ -22,6 +23,9 @@ func (u *UserModel) setJWT()error{\n }\n \n func (u *UserModel) setPassword(password string) error{\n+    if len(password)==0{\n+        return errors.New(\"password should not be empty!\")\n+    }\n     bytePassword := []byte(password)\n     passwordHash, err := bcrypt.GenerateFromPassword(bytePassword, bcrypt.DefaultCost)\n     if err!=nil {\n@@ -35,9 +39,10 @@ func (u *UserModel) setPassword(password string) error{\n func (u *UserModel) checkPassword(password string) error{\n     bytePassword := []byte(password)\n     byteHashedPassword := []byte(u.PasswordHash)\n-    err := u.setJWT()\n+    err := bcrypt.CompareHashAndPassword(byteHashedPassword, bytePassword)\n     if err!=nil {\n         return err\n     }\n-    return bcrypt.CompareHashAndPassword(byteHashedPassword, bytePassword)\n+    err = u.setJWT()\n+    return err\n }\n\\ No newline at end of file\ndiff --git a/users/routers.go b/users/routers.go\nindex 6751e9c..c736c68 100644\n--- a/users/routers.go\n+++ b/users/routers.go\n@@ -1,61 +1,59 @@\n package users\n \n import (\n-    \"gopkg.in/gin-gonic/gin.v1\"\n-    \"github.com/jinzhu/gorm\"\n-    \"net/http\"\n-    \"fmt\"\n-    \"golang-gin-starter-kit/common\"\n+\t\"fmt\"\n+\t\"github.com/jinzhu/gorm\"\n+\t\"golang-gin-starter-kit/common\"\n+\t\"gopkg.in/gin-gonic/gin.v1\"\n+\t\"net/http\"\n )\n \n type Router struct {\n-\n }\n \n-func Register(router *gin.RouterGroup){\n-    r :=  Router{}\n-    router.POST(\"/\", r.Registration)\n-    router.POST(\"/login\", r.Login)\n+func Register(router *gin.RouterGroup) {\n+\tr := Router{}\n+\trouter.POST(\"/\", r.Registration)\n+\trouter.POST(\"/login\", r.Login)\n }\n \n func (r *Router) Registration(c *gin.Context) {\n-    db := c.MustGet(\"DB\").(*gorm.DB)\n-    var validator RegistrationValidator\n-    if err := c.Bind(&validator); err != nil {\n-        c.JSON(http.StatusBadRequest, gin.H{\"Data binding error\" : common.ErrsToList(err)})\n-        return\n-    }\n-    var userModel UserModel\n-    userModel.Username = validator.User.Username\n-    userModel.Email = validator.User.Email\n-    userModel.setPassword(validator.User.Password)\n-    if err := db.Save(&userModel).Error; err != nil {\n-        c.JSON(http.StatusBadRequest, gin.H{\"Database error\" : err})\n-        return\n-    }\n-    c.JSON(http.StatusCreated, gin.H{\"user\":userModel})\n+\tdb := c.MustGet(\"DB\").(*gorm.DB)\n+\tvar validator RegistrationValidator\n+\tif err := c.Bind(&validator); err != nil {\n+\t\tc.JSON(http.StatusBadRequest, gin.H{\"Data binding error\": common.ErrsToList(err)})\n+\t\treturn\n+\t}\n+\tvar userModel UserModel\n+\tuserModel.Username = validator.User.Username\n+\tuserModel.Email = validator.User.Email\n+\tuserModel.setPassword(validator.User.Password)\n+\tif err := db.Save(&userModel).Error; err != nil {\n+\t\tc.JSON(http.StatusBadRequest, gin.H{\"Database error\": err})\n+\t\treturn\n+\t}\n+\tc.JSON(http.StatusCreated, gin.H{\"user\": userModel})\n }\n \n func (r *Router) Login(c *gin.Context) {\n-    db := c.MustGet(\"DB\").(*gorm.DB)\n-    var validator LoginValidator\n-    if err := c.Bind(&validator); err != nil {\n-        c.JSON(http.StatusBadRequest, gin.H{\"Data binding error\" : common.ErrsToList(err)})\n-        return\n-    }\n-    var userModel UserModel\n-\n-    if err := db.Where(&UserModel{ Email: validator.User.Email}).First(&userModel).Error; err != nil {\n-        c.JSON(http.StatusForbidden, gin.H{\"Database error\" : err})\n-        return\n-    }\n-    fmt.Println(\"user from DB: \", userModel)\n-\n-    err := userModel.checkPassword(validator.User.Password)\n-    if err != nil {\n-        c.JSON(http.StatusForbidden, gin.H{\"Error\" : \"password error!\"})\n-        return\n-    }\n-    c.JSON(http.StatusOK, gin.H{\"user\":userModel})\n+\tdb := c.MustGet(\"DB\").(*gorm.DB)\n+\tvar validator LoginValidator\n+\tif err := c.Bind(&validator); err != nil {\n+\t\tc.JSON(http.StatusBadRequest, gin.H{\"Data binding error\": common.ErrsToList(err)})\n+\t\treturn\n+\t}\n+\tvar userModel UserModel\n+\n+\tif err := db.Where(&UserModel{Email: validator.User.Email}).First(&userModel).Error; err != nil {\n+\t\tc.JSON(http.StatusForbidden, gin.H{\"Database error\": err})\n+\t\treturn\n+\t}\n+\tfmt.Println(\"user from DB: \", userModel)\n+\n+\terr := userModel.checkPassword(validator.User.Password)\n+\tif err != nil {\n+\t\tc.JSON(http.StatusForbidden, gin.H{\"Error\": \"password error!\"})\n+\t\treturn\n+\t}\n+\tc.JSON(http.StatusOK, gin.H{\"user\": userModel})\n }\n-\ndiff --git a/users/unit_test.go b/users/unit_test.go\nnew file mode 100644\nindex 0000000..5884816\n--- /dev/null\n+++ b/users/unit_test.go\n@@ -0,0 +1,50 @@\n+package users\n+\n+import (\n+    \"testing\"\n+    \"github.com/stretchr/testify/assert\"\n+    \"encoding/json\"\n+)\n+\n+func TestUsermodel(t *testing.T) {\n+    assert := assert.New(t)\n+    image := \"https://golang.org/doc/gopher/frontpage.png\"\n+    userModel := UserModel{\n+        ID: 2,\n+        Username:\"asd123!@#ASD\",\n+        Email:\"wzt@g.cn\",\n+        Bio:\"heheda\",\n+        Image: &image,\n+    }\n+    userModel.JWT = \"\"\n+    err := userModel.checkPassword(\"\")\n+    assert.Error(err,\"empty password should return err\")\n+    assert.Equal(userModel.JWT, \"\",\"JWT's should be null\")\n+\n+    userModel.JWT = \"\"\n+    err = userModel.setPassword(\"\")\n+    assert.Error(err,\"empty password can not be set null\")\n+    assert.Equal(userModel.JWT, \"\",\"JWT's should be null\")\n+\n+    userModel.JWT = \"\"\n+    err = userModel.setPassword(\"asd123!@#ASD\")\n+    assert.NoError(err,\"password should be set successful\")\n+    assert.Len(userModel.PasswordHash, 60,\"password hash length should be 60\")\n+    assert.Len(userModel.JWT, 115,\"JWT's length should be 115\")\n+\n+    userModel.JWT = \"\"\n+    err = userModel.checkPassword(\"asd123!@#ASD\")\n+    assert.NoError(err,\"password should be checked and validated\")\n+    assert.Len(userModel.JWT, 115,\"JWT's length should be 115\")\n+\n+    userModel.JWT = \"\"\n+    err = userModel.checkPassword(\"sd123!@#ASD\")\n+    assert.Error(err,\"password should be checked and not validated\")\n+    assert.Equal(\"\", userModel.JWT,\"JWT's should be null\")\n+\n+\n+    userModel.JWT = \"_jwt_jwt\"\n+    modelJSON, _ := json.Marshal(userModel)\n+    assert.Equal(\"{\\\"id\\\":2,\\\"username\\\":\\\"asd123!@#ASD\\\",\\\"email\\\":\\\"wzt@g.cn\\\",\\\"bio\\\":\\\"heheda\\\",\\\"image\\\":\\\"https://golang.org/doc/gopher/frontpage.png\\\",\\\"jwt\\\":\\\"_jwt_jwt\\\"}\",\n+        string(modelJSON),\"Marshal should be equal\")\n+}\n",
+  "diffTruncated": false,
+  "tree": [
+    ".gitignore",
+    "BACKEND_INSTRUCTIONS.md",
+    "FRONTEND_INSTRUCTIONS.md",
+    "MOBILE_INSTRUCTIONS.md",
+    "common/utils.go",
+    "common/utils_test.go",
+    "hello.go",
+    "logo.png",
+    "middlewares/auth-jwt.go",
+    "middlewares/auth-jwt_test.go",
+    "middlewares/database.go",
+    "middlewares/database_test.go",
+    "readme.md",
+    "users/models.go",
+    "users/routers.go",
+    "users/unit_test.go",
+    "users/validators.go"
+  ],
+  "explanation": {
+    "what": "common/utils_test.go・middlewares/auth-jwt_test.go・middlewares/database_test.go・users/unit_test.go を新規追加し、DB接続・JWT生成・認証ミドルウェア・パスワードハッシュ化の単体テストを一括で整備した。合わせて users/models.go の checkPassword が誤って setJWT を呼びパスワード比較自体を省いていたバグを修正し、setPassword に空文字ガードを追加した。users/routers.go は gofmt でインデントをタブ揃えに整形している。",
+    "why": "テストを書く過程で checkPassword の実装バグ(bcrypt.CompareHashAndPassword を呼ばずに setJWT を呼んでいた)に気付いて併せて直したと見られる。コミットメッセージ自体は「add many tests」とだけ述べており、修正の意図までは説明していない。",
+    "highlights": [
+      { "file": "users/models.go", "note": "checkPassword が setJWT を呼ぶだけでパスワード検証をしていなかったバグの修正箇所" },
+      { "file": "users/unit_test.go", "note": "UserModel の password/JWT/JSON marshal を検証する新規テストファイル" }
+    ],
+    "langNotes": [
+      { "topic": "*_test.go と testing パッケージ", "note": "Go では `_test.go` サフィックスのファイルが `go test` の対象になり、`func TestXxx(t *testing.T)` の形の関数がテストケースとして実行される。本コミットで utils_test.go・auth-jwt_test.go・unit_test.go が一斉に追加され、この規約に沿って各パッケージ内にテストが同居している。" },
+      { "topic": "httptest", "note": "`net/http/httptest` はHTTPサーバーを実プロセスとして起動せずにハンドラーへリクエストを流し込みレスポンスを検証できるパッケージ。auth-jwt_test.go や unit_test.go の TestAuth 等で gin のルーターに対する疑似リクエスト送信に使われている。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}
