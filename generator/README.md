@@ -2,7 +2,7 @@
 
 OSS リポジトリの mainline コミット履歴を機械抽出し、`data/<owner>__<repo>/` に JSON として焼くスクリプト群。**LLM は使わない**(章立て・解説の付与は `.claude/skills/retrace-generate/` の役割)。
 
-依存は **Node 26 標準モジュール + `git` + `gh` CLI のみ**。npm パッケージは使わない。
+依存は **Node 20+ 標準モジュール(動作確認は v26)+ `git` + `gh` CLI のみ**。npm パッケージは使わない。
 
 ## 前提
 

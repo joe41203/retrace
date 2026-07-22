@@ -125,7 +125,7 @@ flowchart LR
   5. スキーマ通りに JSON 出力。`datasets.json` を更新
   6. **再開可能**: 出力済み `commits/*.json` はスキップ(`--force` で上書き)
 - `validate.mjs --repo <owner>/<repo>`: スキーマ検証と統計出力
-- 依存: Node 18+ 標準モジュール + git + gh CLI のみ(npm 依存なし)
+- 依存: Node 20+ 標準モジュール(動作確認は v26)+ git + gh CLI のみ(npm 依存なし)
 
 ## 生成スキル仕様(.claude/skills/retrace-generate/)
 
