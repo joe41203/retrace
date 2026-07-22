@@ -1,0 +1,62 @@
+{
+  "seq": 80,
+  "sha": "c142d160525494deb52b636f489088a578d3a9b6",
+  "parents": [
+    "4e2d182c9aa51f1b7ac376be4bcb42a9ace80ea7"
+  ],
+  "author": {
+    "name": "John Barton",
+    "email": "jb@johnbarton.co",
+    "date": "2020-11-11T15:30:39+11:00"
+  },
+  "message": "Try a different github action",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 7,
+    "deletions": 17
+  },
+  "files": [
+    {
+      "path": ".github/workflows/release.yml",
+      "status": "M",
+      "additions": 7,
+      "deletions": 17,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/.github/workflows/release.yml b/.github/workflows/release.yml\nindex 0e2d1fe..17e626d 100644\n--- a/.github/workflows/release.yml\n+++ b/.github/workflows/release.yml\n@@ -20,23 +20,13 @@ jobs:\n             name: 'godotenv'\n             compress: 'true'\n             dest: 'dist'\n-      - name: Create Release\n-        id: create_release\n-        uses: actions/create-release@v1\n-        env:\n-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}\n+      - name: Publish Binaries\n+        uses: svenstaro/upload-release-action@v2\n         with:\n-          tag_name: ${{ github.ref }}\n-          release_name: Release ${{ github.ref }}\n-          draft: false\n-          prerelease: ${{ contains(github.ref, 'pre') }}\n-      - name: Upload Release Assets\n-        id: upload-release-asset \n-        uses: actions/upload-release-asset@v1\n-        env:\n-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}\n-        with:\n-          upload_url: ${{ steps.create_release.outputs.upload_url }}\n+          repo_token: ${{ secrets.GITHUB_TOKEN }}\n+          name: Release ${{ github.ref }}\n+          tag: ${{ github.ref }}\n           file: dist/*\n+          file_glob: true\n           overwrite: true\n-          file_glob: true\n\\ No newline at end of file\n+          \n\\ No newline at end of file\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/ci.yml",
+    ".github/workflows/release.yml",
+    ".gitignore",
+    "LICENCE",
+    "README.md",
+    "autoload/autoload.go",
+    "cmd/godotenv/cmd.go",
+    "fixtures/equals.env",
+    "fixtures/exported.env",
+    "fixtures/invalid1.env",
+    "fixtures/plain.env",
+    "fixtures/quoted.env",
+    "fixtures/substitutions.env",
+    "go.mod",
+    "godotenv.go",
+    "godotenv_test.go"
+  ],
+  "explanation": {
+    "what": "release.yml のリリース作成・アップロード手順を actions/create-release + actions/upload-release-asset の2ステップから、svenstaro/upload-release-action 1本による Publish Binaries ステップに置き換えた。",
+    "why": "コミットメッセージは \"Try a different github action\" とだけ述べており、直前のコミットで導入したactionの組み合わせから別のactionへ試験的に切り替えたことがうかがえるが、切り替えの具体的な理由(前者が動作しなかった、設定が煩雑だった等)は記録されておらず、おそらく前段のリリースaction構成がうまく機能しなかったための試行錯誤と考えられる。",
+    "highlights": [
+      { "file": ".github/workflows/release.yml", "note": "create_release ステップの出力(upload_url)を参照する構成から、svenstaro/upload-release-action の単一ステップ構成に置き換わっている" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

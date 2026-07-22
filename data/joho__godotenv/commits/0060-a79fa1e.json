@@ -1,0 +1,65 @@
+{
+  "seq": 60,
+  "sha": "a79fa1e548e2c689c241d10173efd51e5d689d5b",
+  "parents": [
+    "144189c1ed2bf69438627841c6d580cb4c074ffa",
+    "e6264cf869ef4f2cef27197a96ffbc7f0ad24700"
+  ],
+  "author": {
+    "name": "John Barton",
+    "email": "jrbarton@gmail.com",
+    "date": "2017-09-18T16:32:59+10:00"
+  },
+  "message": "Merge pull request #41 from alexquick/document-write-dotenv\n\nDocument Marshal, Unmarshal, and Write",
+  "pr": {
+    "number": 41,
+    "title": "Document Marshal, Unmarshal, and Write",
+    "body": "I forgot the most important part of #35 !\r\n\r\nHow do you feel about bumping the version?\r\n",
+    "url": "https://github.com/joho/godotenv/pull/41"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 23,
+    "deletions": 0
+  },
+  "files": [
+    {
+      "path": "README.md",
+      "status": "M",
+      "additions": 23,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/README.md b/README.md\nindex 7a13bf5..1a20c78 100644\n--- a/README.md\n+++ b/README.md\n@@ -103,6 +103,13 @@ reader := getRemoteFile()\n myEnv, err := godotenv.Parse(reader)\n ```\n \n+... or from a `string` if you so desire\n+\n+```go\n+content := getRemoteFileContent()\n+myEnv, err := godotenv.Unmarshal(content)\n+```\n+\n ### Command Mode\n \n Assuming you've installed the command as above and you've got `$GOPATH/bin` in your `$PATH`\n@@ -113,6 +120,22 @@ godotenv -f /some/path/to/.env some_command with some args\n \n If you don't specify `-f` it will fall back on the default of loading `.env` in `PWD`\n \n+### Writing Env Files\n+\n+Godotenv can also write a map representing the environment to a correctly-formatted and escaped file\n+\n+```go\n+env, err := godotenv.Unmarshal(\"KEY=value\")\n+err := godotenv.Write(env, \"./.env\")\n+```\n+\n+... or to a string\n+\n+```go\n+env, err := godotenv.Unmarshal(\"KEY=value\")\n+content, err := godotenv.Marshal(env)\n+```\n+\n ## Contributing\n \n Contributions are most welcome! The parser itself is pretty stupidly naive and I wouldn't be surprised if it breaks with edge cases.\n",
+  "diffTruncated": false,
+  "tree": [
+    ".gitignore",
+    ".travis.yml",
+    "LICENCE",
+    "README.md",
+    "autoload/autoload.go",
+    "cmd/godotenv/cmd.go",
+    "fixtures/equals.env",
+    "fixtures/exported.env",
+    "fixtures/invalid1.env",
+    "fixtures/plain.env",
+    "fixtures/quoted.env",
+    "godotenv.go",
+    "godotenv_test.go"
+  ],
+  "explanation": {
+    "what": "README.md に Marshal/Unmarshal/Write の使用例を追記した。文字列からのパース(`godotenv.Unmarshal`)、ファイルへの書き出し(`godotenv.Write`)、文字列への書き出し(`godotenv.Marshal`)それぞれの短いコード例を「Writing Env Files」節として追加している。",
+    "why": "PR body で投稿者自身が『#35(Write機能追加PR)で一番大事なこと=ドキュメントを書き忘れていた』と述べており、その埋め合わせとして本PRを送っている。コードの追加ではなく、既存機能の説明漏れを後追いで補うドキュメントPR。",
+    "highlights": [
+      { "file": "README.md", "note": "Marshal/Unmarshal/Write の使用例を追加した Writing Env Files 節" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [{ "type": "pr", "number": 41, "url": "https://github.com/joho/godotenv/pull/41" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

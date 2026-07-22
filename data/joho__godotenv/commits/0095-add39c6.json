@@ -1,0 +1,64 @@
+{
+  "seq": 95,
+  "sha": "add39c6f94ba6aedc178b80b33eb9f2d6ae8f2ec",
+  "parents": [
+    "1b6c7eb7cc42ec229a2839949353101b0e2938e3"
+  ],
+  "author": {
+    "name": "John Barton",
+    "email": "jb@johnbarton.co",
+    "date": "2022-06-12T15:47:52+12:00"
+  },
+  "message": "Remove power8 again as it wasn't fixed",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 0,
+    "deletions": 43
+  },
+  "files": [
+    {
+      "path": ".github/workflows/ci.yml",
+      "status": "M",
+      "additions": 0,
+      "deletions": 43,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/.github/workflows/ci.yml b/.github/workflows/ci.yml\nindex 3eb00b4..c740ad0 100644\n--- a/.github/workflows/ci.yml\n+++ b/.github/workflows/ci.yml\n@@ -18,46 +18,3 @@ jobs:\n         with:\n           go-version: ${{ matrix.go }}\n       - run: go test\n-\n-  test-non-amd64:\n-    strategy:\n-      fail-fast: false\n-      matrix:\n-        arch:\n-          # For some reasons this is segfaulting on go env\n-          # - name: IBM Z and LinuxONE\n-          #   architecture: \"s390x\"\n-          - name: POWER8\n-            architecture: \"ppc64le\"\n-\n-    runs-on: ubuntu-latest\n-    name: Test on ${{ matrix.arch.name }}\n-    steps:\n-      - uses: actions/checkout@v2\n-      - uses: uraimo/run-on-arch-action@master\n-        with:\n-          arch: ${{ matrix.arch.architecture }}\n-          distro: ubuntu20.04\n-          env: | # YAML pipe\n-            GOARCH: ${{ matrix.arch.architecture }}\n-            CGO_ENABLED: 0\n-            GOPRIVATE: github.com/joho/godotenv\n-          run: |\n-            apt-get update\n-            apt-get install -q -y curl wget git\n-            latestGo=$(curl \"https://go.dev/VERSION?m=text\")\n-            wget \"https://dl.google.com/go/${latestGo}.linux-${GOARCH}.tar.gz\"\n-            rm -f $(which go)\n-            rm -rf /usr/local/go\n-            tar -C /usr/local -xzf \"${latestGo}.linux-${GOARCH}.tar.gz\"\n-            export PATH=/usr/local/go/bin:$PATH\n-            printf \"Using go at: $(which go)\\n\"\n-            printf \"Go version: $(go version)\\n\"\n-            printf \"\\n\\nGo environment:\\n\\n\"\n-            go env\n-            printf \"\\n\\nSystem environment:\\n\\n\"\n-            env\n-            go get -v -t -d ./...\n-            go test ./...\n-            cd ./cmd/godotenv\n-            go build -trimpath -ldflags=\"-w -s\" -v\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/dependabot.yml",
+    ".github/workflows/ci.yml",
+    ".github/workflows/codeql-analysis.yml",
+    ".github/workflows/release.yml",
+    ".gitignore",
+    "LICENCE",
+    "README.md",
+    "autoload/autoload.go",
+    "cmd/godotenv/cmd.go",
+    "fixtures/equals.env",
+    "fixtures/exported.env",
+    "fixtures/invalid1.env",
+    "fixtures/plain.env",
+    "fixtures/quoted.env",
+    "fixtures/substitutions.env",
+    "go.mod",
+    "godotenv.go",
+    "godotenv_test.go"
+  ],
+  "explanation": {
+    "what": "ci.yml から test-non-amd64(POWER8/ppc64le)ジョブを再び削除した。直前の seq93 で復活してしまっていたジョブを取り除く形。",
+    "why": "コミットメッセージ「Remove power8 again as it wasn't fixed」のとおり、以前(seq86)にも同じ理由で削除したはずのジョブが直っておらず、再発したため再度削除した。",
+    "highlights": [
+      { "file": ".github/workflows/ci.yml", "note": "test-non-amd64 ジョブの丸ごと削除" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

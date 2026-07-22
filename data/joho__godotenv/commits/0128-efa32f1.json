@@ -1,0 +1,81 @@
+{
+  "seq": 128,
+  "sha": "efa32f116f3f9e8d56b9dde19f758fefca4dcbd7",
+  "parents": [
+    "32bfb2c280907b51c64fbf00c49245cdc52ea0bb",
+    "139cdfde14c082c05f07c71152b74e2dfb7e9352"
+  ],
+  "author": {
+    "name": "John Barton",
+    "email": "jb@johnbarton.co",
+    "date": "2026-05-25T10:33:10+10:00"
+  },
+  "message": "Merge pull request #264 from joho/fix/allow-hyphens-in-keys\n\nDefinitively commit to allowing hyphens (again)",
+  "pr": {
+    "number": 264,
+    "title": "Definitively commit to allowing hyphens (again)",
+    "body": "Capturing this background so I don't hopefully forget _again_ what the project policy on hyphens in key names are.\r\n\r\nAllowed characters in key names per named upstream inspiration libraries:\r\n  - Ruby dotenv: [\\w.]+ — letters, digits, underscore, dot. No hyphen.\r\n  - Node dotenv: [\\w.-]+ — letters, digits, underscore, dot, hyphen allowed.\r\n\r\nGenerally I prefer to follow the ruby implementation, but also not to break backwards compatibility\r\n\r\nContext from the repo history:\r\n\r\n  - v1.4.0 happened to allow hyphens (accidentally committing to the node character set; a later refactor accidentally broke that.\r\n  - PR #228 added TestParserErrors/Invalid char in March 2024 codifying the hyphen being disallowed (but sat unmerged)\r\n  - PR #245 (commit 82194f2, March 2025) deliberately restored hyphen support, citing the v1.4.0 backwards-compat regression.\r\n  - Commit 65e5809 added TestKeyNameCharsetRejectsDisallowed which locks in [A-Za-z0-9_.-] and explicitly says \"If you widen this further, delete the relevant case here on purpose\" — i.e. it codifies hyphen-as-allowed.\r\n  - fixtures/hyphen.env + TestLoadHyphenEnv (godotenv_test.go:175ish) also depend on hyphens being valid.\r\n  - Merging #228 in a dumb way via a cleanup branch on c92e518 brought the failing test into main\r\n \r\nSo that was a bit dumb by me trying to rush through some release cleanup. Will do a new-new pre-release.\r\n\r\nHave also updated the readme to capture this to avoid future messups.",
+    "url": "https://github.com/joho/godotenv/pull/264"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 4,
+    "deletions": 4
+  },
+  "files": [
+    {
+      "path": "README.md",
+      "status": "M",
+      "additions": 4,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "godotenv_test.go",
+      "status": "M",
+      "additions": 0,
+      "deletions": 4,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/README.md b/README.md\nindex f8bd09b..6f93bff 100644\n--- a/README.md\n+++ b/README.md\n@@ -119,6 +119,10 @@ content := getRemoteFileContent()\n myEnv, err := godotenv.Unmarshal(content)\n ```\n \n+### Variable name compatibility\n+\n+Ruby's dotenv only allows `[A-Za-z0-9_.]` in key names, while Node's dotenv also permits `-`. godotenv has matched the Node charset since v1.4.0, so keys like `MY-VAR` parse cleanly here and in Node but will error under Ruby's dotenv.\n+\n ### Precedence & Conventions\n \n Existing envs take precedence of envs that are loaded later.\ndiff --git a/godotenv_test.go b/godotenv_test.go\nindex 970938f..5a18db5 100644\n--- a/godotenv_test.go\n+++ b/godotenv_test.go\n@@ -710,10 +710,6 @@ func TestParserErrors(t *testing.T) {\n \t\tinput string\n \t\terr   error\n \t}{\n-\t\t\"Invalid char\": {\n-\t\t\tinput: \"foo-1=bar\",\n-\t\t\terr:   ErrUnexpectedChar,\n-\t\t},\n \t\t\"UnterminatedQuote\": {\n \t\t\tinput: \"foo=\\\"bar\",\n \t\t\terr:   ErrUnterminatedQuote,\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/dependabot.yml",
+    ".github/workflows/ci.yml",
+    ".github/workflows/codeql-analysis.yml",
+    ".github/workflows/release.yml",
+    ".gitignore",
+    "LICENCE",
+    "README.md",
+    "autoload/autoload.go",
+    "cmd/godotenv/cmd.go",
+    "fixtures/comments.env",
+    "fixtures/equals.env",
+    "fixtures/exported.env",
+    "fixtures/hyphen.env",
+    "fixtures/invalid1.env",
+    "fixtures/plain.env",
+    "fixtures/quoted.env",
+    "fixtures/substitutions.env",
+    "go.mod",
+    "godotenv.go",
+    "godotenv_test.go",
+    "parser.go"
+  ],
+  "explanation": {
+    "what": "godotenv_test.go から TestParserErrors 内の \"Invalid char\"(foo-1=bar を ErrUnexpectedChar として拒否する)ケースを削除し、README にキー名の互換性についての節を追加して、godotenv が Node dotenv 互換の `[A-Za-z0-9_.-]`(ハイフン許可)を採用していることを明記した。",
+    "why": "PR本文に詳しい経緯が書かれている。v1.4.0 の時点で godotenv は(意図せず)Node dotenv 系の文字集合を許可しており、後の PR #245 でも後方互換性維持のためハイフン許可を明示的に復活させていた。ところが PR #228 由来のテスト(ハイフンを拒否する TestParserErrors/Invalid char)が seq125 のクリーンアップ作業を経て main に紛れ込み、ハイフンを禁止する方向に逆戻りしてしまっていた。このコミットはその矛盾を解消し、「ハイフンは許可する」という項目方針を再度確定してドキュメント化するもの。",
+    "highlights": [
+      { "file": "godotenv_test.go", "note": "ハイフンを不正文字として拒否するテストケースを削除。仕様の巻き戻りを修正" },
+      { "file": "README.md", "note": "Ruby dotenv([A-Za-z0-9_.])と Node dotenv([A-Za-z0-9_.-])の文字集合の違いを明記" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [{ "type": "pr", "number": 264, "url": "https://github.com/joho/godotenv/pull/264" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

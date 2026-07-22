@@ -1,0 +1,78 @@
+{
+  "seq": 67,
+  "sha": "c0b86d615e06d6fa5f869364d68f774ba49a86e3",
+  "parents": [
+    "23d116af351c84513e1946b527c88823e476be13",
+    "3896766f7d5260451da300cbf555e087a3b77740"
+  ],
+  "author": {
+    "name": "John Barton",
+    "email": "jb@johnbarton.co",
+    "date": "2018-09-27T15:32:03+10:00"
+  },
+  "message": "Merge pull request #60 from coolaj86/precedence\n\nexplicitly state env precedence and convention",
+  "pr": {
+    "number": 60,
+    "title": "explicitly state env precedence and convention",
+    "body": "Supplement #59",
+    "url": "https://github.com/joho/godotenv/pull/60"
+  },
+  "linkedIssues": [
+    {
+      "number": 59,
+      "title": "Which takes precedence, the local .env or the actual environment variables?",
+      "body": "Just curious, for edge cases.",
+      "url": "https://github.com/joho/godotenv/issues/59"
+    }
+  ],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 25,
+    "deletions": 0
+  },
+  "files": [
+    {
+      "path": "README.md",
+      "status": "M",
+      "additions": 25,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/README.md b/README.md\nindex 4e8fcf2..d5370ec 100644\n--- a/README.md\n+++ b/README.md\n@@ -110,6 +110,31 @@ content := getRemoteFileContent()\n myEnv, err := godotenv.Unmarshal(content)\n ```\n \n+### Precendence & Conventions\n+\n+Existing envs take precendence of envs that are loaded later.\n+\n+The [convention](https://github.com/bkeepers/dotenv#what-other-env-files-can-i-use)\n+for managing multiple environments (i.e. development, test, production)\n+is to create an env named `{YOURAPP}_ENV` and load envs in this order:\n+\n+```go\n+env := os.Getenv(\"FOO_ENV\")\n+if \"\" == env {\n+  env = \"development\"\n+}\n+\n+godotenv.Load(\".env.\" + env + \".local\")\n+if \"test\" != env {\n+  godotenv.Load(\".env.local\")\n+}\n+godotenv.Load(\".env.\" + env)\n+godotenv.Load() // The Original .env\n+```\n+\n+If you need to, you can also use `godotenv.Overload()` to defy this convention\n+and overwrite existing envs instead of only supplanting them. Use with caution.\n+\n ### Command Mode\n \n Assuming you've installed the command as above and you've got `$GOPATH/bin` in your `$PATH`\n",
+  "diffTruncated": false,
+  "tree": [
+    ".gitignore",
+    ".travis.yml",
+    "LICENCE",
+    "README.md",
+    "autoload/autoload.go",
+    "cmd/godotenv/cmd.go",
+    "fixtures/equals.env",
+    "fixtures/exported.env",
+    "fixtures/invalid1.env",
+    "fixtures/plain.env",
+    "fixtures/quoted.env",
+    "fixtures/substitutions.env",
+    "godotenv.go",
+    "godotenv_test.go"
+  ],
+  "explanation": {
+    "what": "README.md に「Precendence & Conventions」の節を追加し、既存の環境変数が後から読み込む `.env` より優先される(=上書きしない)ことを明記した。あわせて `{YOURAPP}_ENV` という慣習的な環境変数名で `.env.{env}.local` / `.env.local` / `.env.{env}` / `.env` の順に読み込むサンプルコードと、優先順位を無視して上書きしたい場合の `godotenv.Overload()` の案内を追加した。",
+    "why": "issue #59 で「ローカルの .env と実際の環境変数のどちらが優先されるのか」という質問が寄せられており、PR はその補足(Supplement #59)として動作を文書化したもの。コード自体の変更は無く、既存の優先順位の挙動をドキュメント化しただけ。",
+    "highlights": [
+      { "file": "README.md", "note": "`.env.{env}.local` → `.env.local` → `.env.{env}` → `.env` という多段階ロードの慣習と `Overload()` の使い分けを説明する節。" }
+    ],
+    "langNotes": [
+      { "topic": "precedence(環境変数の優先順位)", "note": "godotenv の Load は既存の環境変数を上書きしない(先勝ち)。複数の .env ファイルを順に Load すると、最初に設定された値が優先され、後続のファイルの同名キーは無視される。この挙動を意図的に反転させたい場合は Overload() を使う。" }
+    ],
+    "diagram": null,
+    "evidence": "issue",
+    "refs": [
+      { "type": "pr", "number": 60, "url": "https://github.com/joho/godotenv/pull/60" },
+      { "type": "issue", "number": 59, "url": "https://github.com/joho/godotenv/issues/59" }
+    ],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

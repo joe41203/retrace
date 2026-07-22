@@ -1,0 +1,67 @@
+{
+  "seq": 48,
+  "sha": "4ed13390c0acd2ff4e371e64d8b97c8954138243",
+  "parents": [
+    "443e926da0d793d3b3f32118b1e4ba52ada26503",
+    "008304c688b69df82210e3ab01099dabfa7f424b"
+  ],
+  "author": {
+    "name": "John Barton",
+    "email": "jrbarton@gmail.com",
+    "date": "2015-09-07T11:02:28+10:00"
+  },
+  "message": "Merge pull request #13 from jmervine/master\n\nAdd Overload methods.",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 81,
+    "deletions": 9
+  },
+  "files": [
+    {
+      "path": "godotenv.go",
+      "status": "M",
+      "additions": 26,
+      "deletions": 3,
+      "binary": false
+    },
+    {
+      "path": "godotenv_test.go",
+      "status": "M",
+      "additions": 55,
+      "deletions": 6,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/godotenv.go b/godotenv.go\nindex 277bde2..94b2676 100644\n--- a/godotenv.go\n+++ b/godotenv.go\n@@ -36,7 +36,30 @@ func Load(filenames ...string) (err error) {\n \tfilenames = filenamesOrDefault(filenames)\n \n \tfor _, filename := range filenames {\n-\t\terr = loadFile(filename)\n+\t\terr = loadFile(filename, false)\n+\t\tif err != nil {\n+\t\t\treturn // return early on a spazout\n+\t\t}\n+\t}\n+\treturn\n+}\n+\n+// Overload will read your env file(s) and load them into ENV for this process.\n+//\n+// Call this function as close as possible to the start of your program (ideally in main)\n+//\n+// If you call Overload without any args it will default to loading .env in the current path\n+//\n+// You can otherwise tell it which files to load (there can be more than one) like\n+//\n+//\t\tgodotenv.Overload(\"fileone\", \"filetwo\")\n+//\n+// It's important to note this WILL OVERRIDE an env variable that already exists - consider the .env file to forcefilly set all vars.\n+func Overload(filenames ...string) (err error) {\n+\tfilenames = filenamesOrDefault(filenames)\n+\n+\tfor _, filename := range filenames {\n+\t\terr = loadFile(filename, true)\n \t\tif err != nil {\n \t\t\treturn // return early on a spazout\n \t\t}\n@@ -90,14 +113,14 @@ func filenamesOrDefault(filenames []string) []string {\n \treturn filenames\n }\n \n-func loadFile(filename string) error {\n+func loadFile(filename string, overload bool) error {\n \tenvMap, err := readFile(filename)\n \tif err != nil {\n \t\treturn err\n \t}\n \n \tfor key, value := range envMap {\n-\t\tif os.Getenv(key) == \"\" {\n+\t\tif os.Getenv(key) == \"\" || overload {\n \t\t\tos.Setenv(key, value)\n \t\t}\n \t}\ndiff --git a/godotenv_test.go b/godotenv_test.go\nindex 85b012f..e93539e 100644\n--- a/godotenv_test.go\n+++ b/godotenv_test.go\n@@ -5,6 +5,8 @@ import (\n \t\"testing\"\n )\n \n+var noopPresets = make(map[string]string)\n+\n func parseAndCompare(t *testing.T, rawEnvLine string, expectedKey string, expectedValue string) {\n \tkey, value, _ := parseLine(rawEnvLine)\n \tif key != expectedKey || value != expectedValue {\n@@ -12,11 +14,15 @@ func parseAndCompare(t *testing.T, rawEnvLine string, expectedKey string, expect\n \t}\n }\n \n-func loadEnvAndCompareValues(t *testing.T, envFileName string, expectedValues map[string]string) {\n+func loadEnvAndCompareValues(t *testing.T, loader func(files ...string) error, envFileName string, expectedValues map[string]string, presets map[string]string) {\n \t// first up, clear the env\n \tos.Clearenv()\n \n-\terr := Load(envFileName)\n+\tfor k, v := range presets {\n+\t\tos.Setenv(k, v)\n+\t}\n+\n+\terr := loader(envFileName)\n \tif err != nil {\n \t\tt.Fatalf(\"Error loading %v\", envFileName)\n \t}\n@@ -38,6 +44,14 @@ func TestLoadWithNoArgsLoadsDotEnv(t *testing.T) {\n \t}\n }\n \n+func TestOverloadWithNoArgsOverloadsDotEnv(t *testing.T) {\n+\terr := Overload()\n+\tpathError := err.(*os.PathError)\n+\tif pathError == nil || pathError.Op != \"open\" || pathError.Path != \".env\" {\n+\t\tt.Errorf(\"Didn't try and open .env by default\")\n+\t}\n+}\n+\n func TestLoadFileNotFound(t *testing.T) {\n \terr := Load(\"somefilethatwillneverexistever.env\")\n \tif err == nil {\n@@ -45,6 +59,13 @@ func TestLoadFileNotFound(t *testing.T) {\n \t}\n }\n \n+func TestOverloadFileNotFound(t *testing.T) {\n+\terr := Overload(\"somefilethatwillneverexistever.env\")\n+\tif err == nil {\n+\t\tt.Error(\"File wasn't found but Overload didn't return an error\")\n+\t}\n+}\n+\n func TestReadPlainEnv(t *testing.T) {\n \tenvFileName := \"fixtures/plain.env\"\n \texpectedValues := map[string]string{\n@@ -71,6 +92,34 @@ func TestReadPlainEnv(t *testing.T) {\n \t}\n }\n \n+func TestLoadDoesNotOverride(t *testing.T) {\n+\tenvFileName := \"fixtures/plain.env\"\n+\n+\t// ensure NO overload\n+\tpresets := map[string]string{\n+\t\t\"OPTION_A\": \"do_not_override\",\n+\t}\n+\n+\texpectedValues := map[string]string{\n+\t\t\"OPTION_A\": \"do_not_override\",\n+\t}\n+\tloadEnvAndCompareValues(t, Load, envFileName, expectedValues, presets)\n+}\n+\n+func TestOveroadDoesOverride(t *testing.T) {\n+\tenvFileName := \"fixtures/plain.env\"\n+\n+\t// ensure NO overload\n+\tpresets := map[string]string{\n+\t\t\"OPTION_A\": \"do_not_override\",\n+\t}\n+\n+\texpectedValues := map[string]string{\n+\t\t\"OPTION_A\": \"1\",\n+\t}\n+\tloadEnvAndCompareValues(t, Overload, envFileName, expectedValues, presets)\n+}\n+\n func TestLoadPlainEnv(t *testing.T) {\n \tenvFileName := \"fixtures/plain.env\"\n \texpectedValues := map[string]string{\n@@ -81,7 +130,7 @@ func TestLoadPlainEnv(t *testing.T) {\n \t\t\"OPTION_E\": \"5\",\n \t}\n \n-\tloadEnvAndCompareValues(t, envFileName, expectedValues)\n+\tloadEnvAndCompareValues(t, Load, envFileName, expectedValues, noopPresets)\n }\n \n func TestLoadExportedEnv(t *testing.T) {\n@@ -91,7 +140,7 @@ func TestLoadExportedEnv(t *testing.T) {\n \t\t\"OPTION_B\": \"\\n\",\n \t}\n \n-\tloadEnvAndCompareValues(t, envFileName, expectedValues)\n+\tloadEnvAndCompareValues(t, Load, envFileName, expectedValues, noopPresets)\n }\n \n func TestLoadEqualsEnv(t *testing.T) {\n@@ -100,7 +149,7 @@ func TestLoadEqualsEnv(t *testing.T) {\n \t\t\"OPTION_A\": \"postgres://localhost:5432/database?sslmode=disable\",\n \t}\n \n-\tloadEnvAndCompareValues(t, envFileName, expectedValues)\n+\tloadEnvAndCompareValues(t, Load, envFileName, expectedValues, noopPresets)\n }\n \n func TestLoadQuotedEnv(t *testing.T) {\n@@ -116,7 +165,7 @@ func TestLoadQuotedEnv(t *testing.T) {\n \t\t\"OPTION_H\": \"\\n\",\n \t}\n \n-\tloadEnvAndCompareValues(t, envFileName, expectedValues)\n+\tloadEnvAndCompareValues(t, Load, envFileName, expectedValues, noopPresets)\n }\n \n func TestActualEnvVarsAreLeftAlone(t *testing.T) {\n",
+  "diffTruncated": false,
+  "tree": [
+    ".gitignore",
+    "LICENCE",
+    "README.md",
+    "autoload/autoload.go",
+    "cmd/godotenv/cmd.go",
+    "fixtures/equals.env",
+    "fixtures/exported.env",
+    "fixtures/plain.env",
+    "fixtures/quoted.env",
+    "godotenv.go",
+    "godotenv_test.go",
+    "wercker.yml"
+  ],
+  "explanation": {
+    "what": "既存の環境変数を絶対に上書きしない Load() とは別に、常に上書きする Overload() を追加した。内部の loadFile に overload bool 引数を足し、`os.Getenv(key) == \"\" || overload` の条件で os.Setenv するよう分岐させている。テスト側は loadEnvAndCompareValues ヘルパーに loader 関数と事前セット用の presets map を渡せるよう拡張し、Load が上書きしないこと・Overload が上書きすることをそれぞれ検証するテスト(TestLoadDoesNotOverride, TestOveroadDoesOverride)を追加した。",
+    "why": "マージコミットの本文に「Add Overload methods.」とある通り、既存の Load() は既存の環境変数を尊重して上書きしない設計だったが、.env の値で強制的に上書きしたいユースケース(テスト環境の固定値投入など)に応えるため新しい公開 API を追加した。",
+    "highlights": [
+      { "file": "godotenv.go", "note": "Overload は Load とほぼ同じ実装だが loadFile に overload=true を渡すだけの違い。公開 API を増やす際の最小差分の付け方が見える" },
+      { "file": "godotenv_test.go", "note": "loadEnvAndCompareValues に loader 関数を引数として渡す設計変更で、Load/Overload 双方のテストを1つのヘルパーで共有している" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

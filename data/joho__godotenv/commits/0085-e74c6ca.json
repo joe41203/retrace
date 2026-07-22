@@ -1,0 +1,85 @@
+{
+  "seq": 85,
+  "sha": "e74c6cadd5d7f26640f54278dc2ac083d639c505",
+  "parents": [
+    "c40e9c6392b05ba58e6fea50091ce35a1ef020e7"
+  ],
+  "author": {
+    "name": "Oleksandr Redko",
+    "email": "oleksandr.red+github@gmail.com",
+    "date": "2022-04-25T07:35:55+03:00"
+  },
+  "message": "Fix typos in comments and extend README (#177)",
+  "pr": {
+    "number": 177,
+    "title": "Fix typos in comments and extend README",
+    "body": "This PR:\r\n- fixes typos and grammar issues;\r\n- extends README with the link to Ruby's dotenv;\r\n- fixes typo in test's name.",
+    "url": "https://github.com/joho/godotenv/pull/177"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 3,
+    "additions": 8,
+    "deletions": 8
+  },
+  "files": [
+    {
+      "path": "README.md",
+      "status": "M",
+      "additions": 3,
+      "deletions": 3,
+      "binary": false
+    },
+    {
+      "path": "godotenv.go",
+      "status": "M",
+      "additions": 2,
+      "deletions": 2,
+      "binary": false
+    },
+    {
+      "path": "godotenv_test.go",
+      "status": "M",
+      "additions": 3,
+      "deletions": 3,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/README.md b/README.md\nindex 1ec45b2..01bc695 100644\n--- a/README.md\n+++ b/README.md\n@@ -1,6 +1,6 @@\n # GoDotEnv ![CI](https://github.com/joho/godotenv/workflows/CI/badge.svg) [![Go Report Card](https://goreportcard.com/badge/github.com/joho/godotenv)](https://goreportcard.com/report/github.com/joho/godotenv)\n \n-A Go (golang) port of the Ruby dotenv project (which loads env vars from a .env file)\n+A Go (golang) port of the Ruby [dotenv](https://github.com/bkeepers/dotenv) project (which loads env vars from a .env file).\n \n From the original Library:\n \n@@ -8,9 +8,9 @@ From the original Library:\n >\n > But it is not always practical to set environment variables on development machines or continuous integration servers where multiple projects are run. Dotenv load variables from a .env file into ENV when the environment is bootstrapped.\n \n-It can be used as a library (for loading in env for your own daemons etc) or as a bin command.\n+It can be used as a library (for loading in env for your own daemons etc.) or as a bin command.\n \n-There is test coverage and CI for both linuxish and windows environments, but I make no guarantees about the bin version working on windows.\n+There is test coverage and CI for both linuxish and Windows environments, but I make no guarantees about the bin version working on Windows.\n \n ## Installation\n \ndiff --git a/godotenv.go b/godotenv.go\nindex 466f2eb..975d7bc 100644\n--- a/godotenv.go\n+++ b/godotenv.go\n@@ -1,6 +1,6 @@\n // Package godotenv is a go port of the ruby dotenv library (https://github.com/bkeepers/dotenv)\n //\n-// Examples/readme can be found on the github page at https://github.com/joho/godotenv\n+// Examples/readme can be found on the GitHub page at https://github.com/joho/godotenv\n //\n // The TL;DR is that you make a .env file that looks something like\n //\n@@ -61,7 +61,7 @@ func Load(filenames ...string) (err error) {\n //\n //\t\tgodotenv.Overload(\"fileone\", \"filetwo\")\n //\n-// It's important to note this WILL OVERRIDE an env variable that already exists - consider the .env file to forcefilly set all vars.\n+// It's important to note this WILL OVERRIDE an env variable that already exists - consider the .env file to forcefully set all vars.\n func Overload(filenames ...string) (err error) {\n \tfilenames = filenamesOrDefault(filenames)\n \ndiff --git a/godotenv_test.go b/godotenv_test.go\nindex 7274c14..49f6fe0 100644\n--- a/godotenv_test.go\n+++ b/godotenv_test.go\n@@ -131,7 +131,7 @@ func TestLoadDoesNotOverride(t *testing.T) {\n \tloadEnvAndCompareValues(t, Load, envFileName, expectedValues, presets)\n }\n \n-func TestOveroadDoesOverride(t *testing.T) {\n+func TestOverloadDoesOverride(t *testing.T) {\n \tenvFileName := \"fixtures/plain.env\"\n \n \t// ensure NO overload\n@@ -325,11 +325,11 @@ func TestParsing(t *testing.T) {\n \t// expect(env('FOO=\"bar\\nbaz\"')).to eql('FOO' => \"bar\\nbaz\")\n \tparseAndCompare(t, `FOO=\"bar\\nbaz\"`, \"FOO\", \"bar\\nbaz\")\n \n-\t// it 'parses varibales with \".\" in the name' do\n+\t// it 'parses variables with \".\" in the name' do\n \t// expect(env('FOO.BAR=foobar')).to eql('FOO.BAR' => 'foobar')\n \tparseAndCompare(t, \"FOO.BAR=foobar\", \"FOO.BAR\", \"foobar\")\n \n-\t// it 'parses varibales with several \"=\" in the value' do\n+\t// it 'parses variables with several \"=\" in the value' do\n \t// expect(env('FOO=foobar=')).to eql('FOO' => 'foobar=')\n \tparseAndCompare(t, \"FOO=foobar=\", \"FOO\", \"foobar=\")\n \n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/ci.yml",
+    ".github/workflows/release.yml",
+    ".gitignore",
+    "LICENCE",
+    "README.md",
+    "autoload/autoload.go",
+    "cmd/godotenv/cmd.go",
+    "fixtures/equals.env",
+    "fixtures/exported.env",
+    "fixtures/invalid1.env",
+    "fixtures/plain.env",
+    "fixtures/quoted.env",
+    "fixtures/substitutions.env",
+    "go.mod",
+    "godotenv.go",
+    "godotenv_test.go",
+    "renovate.json"
+  ],
+  "explanation": {
+    "what": "README.md・godotenv.go・godotenv_test.go にまたがる typo とグラマーの修正。README には Ruby dotenv 本家へのリンク追加、テスト関数名 TestOveroadDoesOverride を TestOverloadDoesOverride に修正。",
+    "why": "PR本文の通り、typo/文法の修正と README への本家リンク追加、テスト名の誤字修正をまとめて行ったもの。",
+    "highlights": [
+      { "file": "godotenv_test.go", "note": "TestOveroadDoesOverride → TestOverloadDoesOverride のテスト関数名修正" },
+      { "file": "README.md", "note": "本家 Ruby dotenv (bkeepers/dotenv) へのリンクを追加" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [
+      { "type": "pr", "number": 177, "url": "https://github.com/joho/godotenv/pull/177" }
+    ],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

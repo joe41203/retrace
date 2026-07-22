@@ -1,0 +1,56 @@
+{
+  "seq": 29,
+  "sha": "d00d0f7ef4cc24256c71dc2ff7671457aeb72648",
+  "parents": [
+    "5896be1361bf9f3d2471f58028e2157ee2075222"
+  ],
+  "author": {
+    "name": "John Barton (joho)",
+    "email": "jrbarton@gmail.com",
+    "date": "2013-08-02T13:40:38+10:00"
+  },
+  "message": "Turns out there was an easier way to read the env file.",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 3,
+    "deletions": 23
+  },
+  "files": [
+    {
+      "path": "godotenv.go",
+      "status": "M",
+      "additions": 3,
+      "deletions": 23,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/godotenv.go b/godotenv.go\nindex 73f82ab..f89ec30 100644\n--- a/godotenv.go\n+++ b/godotenv.go\n@@ -16,9 +16,8 @@ and all the env vars declared in .env will be avaiable through os.Getenv(\"SOME_E\n package godotenv\n \n import (\n-\t\"bufio\"\n \t\"errors\"\n-\t\"io\"\n+\t\"io/ioutil\"\n \t\"os\"\n \t\"strings\"\n )\n@@ -49,12 +48,12 @@ func Load(filenames ...string) (err error) {\n }\n \n func loadFile(filename string) (err error) {\n-\tfile, err := os.Open(filename)\n+\tcontent, err := ioutil.ReadFile(filename)\n \tif err != nil {\n \t\treturn\n \t}\n \n-\tlines := readRawLines(file)\n+\tlines := strings.Split(string(content), \"\\n\")\n \n \tfor _, fullLine := range lines {\n \t\tif !isIgnoredLine(fullLine) {\n@@ -69,25 +68,6 @@ func loadFile(filename string) (err error) {\n \treturn\n }\n \n-func readRawLines(file io.Reader) (lines []string) {\n-\tlineReader := bufio.NewReader(file)\n-\tfor line, isPrefix, e := lineReader.ReadLine(); e == nil; line, isPrefix, e = lineReader.ReadLine() {\n-\t\tfullLine := string(line)\n-\t\tif isPrefix {\n-\t\t\tfor {\n-\t\t\t\tline, isPrefix, _ = lineReader.ReadLine()\n-\t\t\t\tfullLine += string(line)\n-\t\t\t\tif !isPrefix {\n-\t\t\t\t\tbreak\n-\t\t\t\t}\n-\t\t\t}\n-\t\t}\n-\t\t// add a line to the game/parse\n-\t\tlines = append(lines, string(line))\n-\t}\n-\treturn\n-}\n-\n func parseLine(line string) (key string, value string, err error) {\n \tif len(line) == 0 {\n \t\terr = errors.New(\"zero length string\")\n",
+  "diffTruncated": false,
+  "tree": [
+    ".gitignore",
+    "LICENCE",
+    "README.md",
+    "autoload/autoload.go",
+    "fixtures/exported.env",
+    "fixtures/plain.env",
+    "fixtures/quoted.env",
+    "godotenv.go",
+    "godotenv_test.go",
+    "wercker.yml"
+  ],
+  "explanation": {
+    "what": "loadFile内の独自実装だったreadRawLines関数(bufio.Readerで1行ずつ読み進める処理、約20行)を丸ごと削除し、代わりにioutil.ReadFileでファイル全体を読み込んでからstrings.Splitで改行区切りにする3行程度の実装に置き換えた。",
+    "why": "コミットメッセージ「Turns out there was an easier way to read the env file.」の通り、当初はbufio.Readerで行の途中切れ(isPrefix)を考慮した自作の行読み込みロジックを書いていたが、.envのような小さな設定ファイルであればファイル全体を一度に読んでから分割するだけで十分だと気づき、大幅に簡潔なコードへ置き換えた。",
+    "highlights": [
+      { "file": "godotenv.go", "note": "readRawLines関数の削除。ioutil.ReadFile+strings.Splitへの簡素化" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

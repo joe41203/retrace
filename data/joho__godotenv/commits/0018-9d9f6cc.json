@@ -1,0 +1,61 @@
+{
+  "seq": 18,
+  "sha": "9d9f6ccb5796291af08ad30fda3b44508ae073e2",
+  "parents": [
+    "ac58adf673316c5696b6de97397f9d886629422b"
+  ],
+  "author": {
+    "name": "John Barton (joho)",
+    "email": "jrbarton@gmail.com",
+    "date": "2013-07-31T13:51:59+10:00"
+  },
+  "message": "Make Load() without args open .env by default",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 11,
+    "deletions": 0
+  },
+  "files": [
+    {
+      "path": "godotenv.go",
+      "status": "M",
+      "additions": 4,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "godotenv_test.go",
+      "status": "M",
+      "additions": 7,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/godotenv.go b/godotenv.go\nindex 301d0ae..a210f4e 100644\n--- a/godotenv.go\n+++ b/godotenv.go\n@@ -9,6 +9,10 @@ import (\n )\n \n func Load(filenames ...string) (err error) {\n+\tif len(filenames) == 0 {\n+\t\tfilenames = []string{\".env\"}\n+\t}\n+\n \tfor _, filename := range filenames {\n \t\terr = loadFile(filename)\n \t\tif err != nil {\ndiff --git a/godotenv_test.go b/godotenv_test.go\nindex d31dfe8..2f096e7 100644\n--- a/godotenv_test.go\n+++ b/godotenv_test.go\n@@ -30,6 +30,13 @@ func loadEnvAndCompareValues(t *testing.T, envFileName string, expectedValues ma\n \t}\n }\n \n+func TestLoadWithNoArgsLoadsDotEnv(t *testing.T) {\n+\terr := Load()\n+\tif err.Error() != \"open .env: no such file or directory\" {\n+\t\tt.Errorf(\"Didn't try and open .env by default\")\n+\t}\n+}\n+\n func TestLoadFileNotFound(t *testing.T) {\n \terr := Load(\"somefilethatwillneverexistever.env\")\n \tif err == nil {\n",
+  "diffTruncated": false,
+  "tree": [
+    ".gitignore",
+    "fixtures/exported.env",
+    "fixtures/plain.env",
+    "fixtures/quoted.env",
+    "godotenv.go",
+    "godotenv_test.go"
+  ],
+  "explanation": {
+    "what": "Load(filenames ...string)の冒頭でlen(filenames) == 0のときにfilenamesを[]string{\".env\"}で初期化するようにした。TestLoadWithNoArgsLoadsDotEnvを追加し、引数なしでLoad()を呼んだ際に\".env\"を開こうとしてエラーメッセージ\"open .env: no such file or directory\"が返ることを確認している。",
+    "why": "コミットメッセージ\"Make Load() without args open .env by default\"の通り、Ruby版dotenvのRequire('dotenv')相当の「引数なしなら.envを読む」という利用者にとって自然なデフォルト挙動をGo版にも持たせるための変更。",
+    "highlights": [
+      { "file": "godotenv.go", "note": "Loadの可変長引数filenamesが空のときに\".env\"で埋め直す3行" }
+    ],
+    "langNotes": [
+      { "topic": "可変長引数(variadic) ...string", "note": "Go の `func Load(filenames ...string)` は呼び出し側が `Load()` / `Load(\"a.env\")` / `Load(\"a.env\", \"b.env\")` のいずれでも呼べる可変長引数。関数内ではfilenamesは`[]string`として扱われ、このコミットのように空スライスかどうかをlen()で判定してデフォルト値を補うのが典型的なイディオム。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

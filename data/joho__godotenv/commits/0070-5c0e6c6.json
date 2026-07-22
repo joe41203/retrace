@@ -1,0 +1,78 @@
+{
+  "seq": 70,
+  "sha": "5c0e6c6ab1a0a9ef0a8822cba3a05d62f7dad941",
+  "parents": [
+    "823f94bb9ab6dd992519bae0746e7df7b0875fb3",
+    "61baafa6272c539fad5af1ef505fe8feadba868c"
+  ],
+  "author": {
+    "name": "John Barton",
+    "email": "jb@johnbarton.co",
+    "date": "2019-02-04T15:41:09+11:00"
+  },
+  "message": "Merge pull request #69 from hairyhenderson/ignore-leading-whitespace\n\nFixing a couple whitespace bugs: ignoring leading whitespace, and supporting more kinds of empty lines",
+  "pr": {
+    "number": 69,
+    "title": "Fixing a couple whitespace bugs: ignoring leading whitespace, and supporting more kinds of empty lines",
+    "body": "I noticed that parsing a line like `\\tFOO=bar` ended up with a key equal to `\\tFOO` which isn't _quite_ what I expected 😉 - this fixes that by using `strings.TrimSpace` in place of `strings.Trim(..., \" \")`.\r\n\r\nI also noticed that only certain types of whitespace are ignored for \"empty\" lines - I've expanded that to use `strings.TrimSpace` as well.\r\n\r\nSigned-off-by: Dave Henderson <dhenderson@gmail.com>",
+    "url": "https://github.com/joho/godotenv/pull/69"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 17,
+    "deletions": 2
+  },
+  "files": [
+    {
+      "path": "godotenv.go",
+      "status": "M",
+      "additions": 8,
+      "deletions": 2,
+      "binary": false
+    },
+    {
+      "path": "godotenv_test.go",
+      "status": "M",
+      "additions": 9,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/godotenv.go b/godotenv.go\nindex 1716fee..beaa146 100644\n--- a/godotenv.go\n+++ b/godotenv.go\n@@ -252,7 +252,13 @@ func parseLine(line string, envMap map[string]string) (key string, value string,\n \t}\n \n \t// Parse the key\n-\tre := regexp.MustCompile(`^\\s*(?:export\\s+)?(.*?)\\s*$`)\n+\tkey = splitString[0]\n+\tif strings.HasPrefix(key, \"export\") {\n+\t\tkey = strings.TrimPrefix(key, \"export\")\n+\t}\n+\tkey = strings.TrimSpace(key)\n+\n+  re := regexp.MustCompile(`^\\s*(?:export\\s+)?(.*?)\\s*$`)\n \tkey = re.ReplaceAllString(splitString[0], \"$1\")\n \n \t// Parse the value\n@@ -324,7 +330,7 @@ func expandVariables(v string, m map[string]string) string {\n }\n \n func isIgnoredLine(line string) bool {\n-\ttrimmedLine := strings.Trim(line, \" \\n\\t\")\n+\ttrimmedLine := strings.TrimSpace(line)\n \treturn len(trimmedLine) == 0 || strings.HasPrefix(trimmedLine, \"#\")\n }\n \ndiff --git a/godotenv_test.go b/godotenv_test.go\nindex 1290f65..d1f73cb 100644\n--- a/godotenv_test.go\n+++ b/godotenv_test.go\n@@ -362,6 +362,11 @@ func TestParsing(t *testing.T) {\n \tparseAndCompare(t, `KEY=\"`, \"KEY\", \"\\\"\")\n \tparseAndCompare(t, `KEY=\"value`, \"KEY\", \"\\\"value\")\n \n+\t// leading whitespace should be ignored\n+\tparseAndCompare(t, \" KEY =value\", \"KEY\", \"value\")\n+\tparseAndCompare(t, \"   KEY=value\", \"KEY\", \"value\")\n+\tparseAndCompare(t, \"\\tKEY=value\", \"KEY\", \"value\")\n+\n \t// it 'throws an error if line format is incorrect' do\n \t// expect{env('lol$wut')}.to raise_error(Dotenv::FormatError)\n \tbadlyFormattedLine := \"lol$wut\"\n@@ -378,6 +383,10 @@ func TestLinesToIgnore(t *testing.T) {\n \t\tt.Error(\"Line with nothing but line break wasn't ignored\")\n \t}\n \n+\tif !isIgnoredLine(\"\\r\\n\") {\n+\t\tt.Error(\"Line with nothing but windows-style line break wasn't ignored\")\n+\t}\n+\n \tif !isIgnoredLine(\"\\t\\t \") {\n \t\tt.Error(\"Line full of whitespace wasn't ignored\")\n \t}\n",
+  "diffTruncated": false,
+  "tree": [
+    ".gitignore",
+    ".travis.yml",
+    "LICENCE",
+    "README.md",
+    "autoload/autoload.go",
+    "cmd/godotenv/cmd.go",
+    "fixtures/equals.env",
+    "fixtures/exported.env",
+    "fixtures/invalid1.env",
+    "fixtures/plain.env",
+    "fixtures/quoted.env",
+    "fixtures/substitutions.env",
+    "godotenv.go",
+    "godotenv_test.go"
+  ],
+  "explanation": {
+    "what": "キーのトリム処理を `strings.Trim(line, \" \")` 相当から `strings.TrimSpace` に変更し、タブや改行を含む先頭・末尾の空白文字も除去されるようにした。isIgnoredLine の空行判定も同様に `strings.Trim(line, \" \\n\\t\")` から `strings.TrimSpace(line)` に変更し、Windows 形式の改行(`\\r\\n`)のみの行も空行として無視されるようにした。なお diff には export プレフィックス除去のロジックが一部重複して残っており(前コミットの正規表現版と旧来の HasPrefix 版が両方存在)、マージ時の統合の痕跡が見える。",
+    "why": "PR body に具体例がある。`\\tFOO=bar` のようにタブで始まる行をパースすると、半角スペースしかトリムしない実装ではキーが `\\tFOO` のままになってしまう不具合があり、`strings.TrimSpace` を使うことで空白文字全般(スペース・タブ・改行)を確実に除去できるようにした。あわせて「空行」の判定も同じ理由で強化されている。",
+    "highlights": [
+      { "file": "godotenv.go", "note": "`strings.Trim(key, \" \")` → `strings.TrimSpace(key)`、`isIgnoredLine` も同様の変更。" },
+      { "file": "godotenv_test.go", "note": "` KEY =value` や `\\tKEY=value` など先頭空白付きの行、`\\r\\n` のみの行を無視する回帰テストを追加。" }
+    ],
+    "langNotes": [
+      { "topic": "先頭空白の無視(strings.TrimSpace)", "note": "Go の `strings.Trim(s, cutset)` は指定した文字集合しか取り除かないため、スペースだけを指定するとタブや改行が残ってしまう。`strings.TrimSpace` はUnicodeの空白文字全般(スペース・タブ・改行・復帰など)をまとめて取り除く関数で、`.env` の行頭インデントを安全に無視するのに使われている。" }
+    ],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [
+      { "type": "pr", "number": 69, "url": "https://github.com/joho/godotenv/pull/69" }
+    ],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

@@ -1,0 +1,84 @@
+{
+  "seq": 76,
+  "sha": "23296b91aa473eb89d3ef2227622297b786cfad5",
+  "parents": [
+    "0da8ce72f0e200bb10ab4e0ff7f73cd9420c23fa",
+    "e57c08db278472e34dfb9093fc464f977aaa1125"
+  ],
+  "author": {
+    "name": "John Barton",
+    "email": "jb@johnbarton.co",
+    "date": "2020-11-11T11:33:11+11:00"
+  },
+  "message": "Merge pull request #121 from joho/github-actions\n\nSetup GitHub actions for CI",
+  "pr": {
+    "number": 121,
+    "title": "Setup GitHub actions for CI",
+    "body": "Right now CI is spread over travis & appveyor.\r\n\r\nAlso there have been requests to publish binaries with releases.\r\n\r\nLet's see how easy it all is on GH",
+    "url": "https://github.com/joho/godotenv/pull/121"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 3,
+    "additions": 20,
+    "deletions": 12
+  },
+  "files": [
+    {
+      "path": ".github/workflows/ci.yml",
+      "status": "A",
+      "additions": 19,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": ".travis.yml",
+      "status": "D",
+      "additions": 0,
+      "deletions": 11,
+      "binary": false
+    },
+    {
+      "path": "README.md",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/.github/workflows/ci.yml b/.github/workflows/ci.yml\nnew file mode 100644\nindex 0000000..b31cdbf\n--- /dev/null\n+++ b/.github/workflows/ci.yml\n@@ -0,0 +1,19 @@\n+name: CI\n+\n+on: [push]\n+\n+jobs:\n+  build:\n+    runs-on: ${{ matrix.os }}\n+    strategy:\n+      matrix:\n+        go: [ '1.15', '1.14' ]\n+        os: [ ubuntu-latest, macOS-latest, windows-latest ]\n+    name: ${{ matrix.os }} Go ${{ matrix.go }} Tests\n+    steps:\n+      - uses: actions/checkout@v2\n+      - name: Setup go\n+        uses: actions/setup-go@v2\n+        with:\n+          go-version: ${{ matrix.go }}\n+      - run: go test\n\\ No newline at end of file\ndiff --git a/.travis.yml b/.travis.yml\ndeleted file mode 100644\nindex ac89140..0000000\n--- a/.travis.yml\n+++ /dev/null\n@@ -1,11 +0,0 @@\n-arch: \n-  - amd64\n-  - ppc64le\n-language: go\n-\n-go:\n-  - 1.x\n-\n-os:\n-  - linux\n-  - osx\ndiff --git a/README.md b/README.md\nindex 8212be7..1ec45b2 100644\n--- a/README.md\n+++ b/README.md\n@@ -1,4 +1,4 @@\n-# GoDotEnv [![Build Status](https://travis-ci.org/joho/godotenv.svg?branch=master)](https://travis-ci.org/joho/godotenv) [![Build status](https://ci.appveyor.com/api/projects/status/9v40vnfvvgde64u4?svg=true)](https://ci.appveyor.com/project/joho/godotenv) [![Go Report Card](https://goreportcard.com/badge/github.com/joho/godotenv)](https://goreportcard.com/report/github.com/joho/godotenv)\n+# GoDotEnv ![CI](https://github.com/joho/godotenv/workflows/CI/badge.svg) [![Go Report Card](https://goreportcard.com/badge/github.com/joho/godotenv)](https://goreportcard.com/report/github.com/joho/godotenv)\n \n A Go (golang) port of the Ruby dotenv project (which loads env vars from a .env file)\n \n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/ci.yml",
+    ".gitignore",
+    "LICENCE",
+    "README.md",
+    "autoload/autoload.go",
+    "cmd/godotenv/cmd.go",
+    "fixtures/equals.env",
+    "fixtures/exported.env",
+    "fixtures/invalid1.env",
+    "fixtures/plain.env",
+    "fixtures/quoted.env",
+    "fixtures/substitutions.env",
+    "godotenv.go",
+    "godotenv_test.go"
+  ],
+  "explanation": {
+    "what": ".github/workflows/ci.yml を新設して GitHub Actions 上に Go 1.14/1.15 × ubuntu/macOS/windows のマトリクスビルドを構築し、旧来の .travis.yml を削除、README のビルドバッジも Travis CI + AppVeyor のものから GitHub Actions の CI バッジに差し替えた。",
+    "why": "PRのbodyによれば、それまでCIがTravis CIとAppVeyorに分散していたことに加え、リリースバイナリを公開してほしいという要望もあったため、GitHub Actions一本化がどの程度容易か試す目的で移行した。",
+    "highlights": [
+      { "file": ".github/workflows/ci.yml", "note": "matrix.go と matrix.os の組み合わせで複数OS・複数Goバージョンを1ワークフローでテストしている" }
+    ],
+    "langNotes": [
+      { "topic": "GitHub Actions のワークフロー", "note": ".github/workflows/ 配下の YAML がイベント(on)をトリガーにジョブ(jobs)を実行する仕組み。strategy.matrix で go や os を列挙すると、組み合わせの数だけ並列にジョブが走る。actions/checkout や actions/setup-go は再利用可能な公式アクション。" }
+    ],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [
+      { "type": "pr", "number": 121, "url": "https://github.com/joho/godotenv/pull/121" }
+    ],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

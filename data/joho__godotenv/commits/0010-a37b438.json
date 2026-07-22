@@ -1,0 +1,59 @@
+{
+  "seq": 10,
+  "sha": "a37b438d549d3ff88f30f66eaff32b2ea3d0eea1",
+  "parents": [
+    "b3b488372f7426811b635990a3b44f636ab1c359"
+  ],
+  "author": {
+    "name": "John Barton (joho)",
+    "email": "jrbarton@gmail.com",
+    "date": "2013-07-31T11:48:10+10:00"
+  },
+  "message": "Start trying to do comments/quoting properly.",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 43,
+    "deletions": 35
+  },
+  "files": [
+    {
+      "path": "godotenv.go",
+      "status": "M",
+      "additions": 19,
+      "deletions": 2,
+      "binary": false
+    },
+    {
+      "path": "godotenv_test.go",
+      "status": "M",
+      "additions": 24,
+      "deletions": 33,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/godotenv.go b/godotenv.go\nindex dd1b4ca..9193694 100644\n--- a/godotenv.go\n+++ b/godotenv.go\n@@ -76,8 +76,25 @@ func parseLine(line string) (key string, value string, err error) {\n \t}\n \tkey = strings.Trim(key, \" \")\n \n-\tvalue = strings.Trim(splitString[1], \" \\\"'\")\n-\tvalue = strings.Replace(value, \"\\\\\\\"\", \"\\\"\", -1)\n+\tvalue = splitString[1]\n+\n+\t// ditch the comments\n+\tif strings.Contains(value, \"#\") {\n+\t\tvalue = strings.Trim(strings.Split(value, \"#\")[0], \" \")\n+\t}\n+\n+\t// check if we've got quoted values\n+\tif strings.Count(value, \"\\\"\") == 2 || strings.Count(value, \"'\") == 2 {\n+\t\t// pull the quotes off the edge\n+\t\tvalue = strings.Trim(value, \"\\\"'\")\n+\n+\t\t// expand quotes\n+\t\tvalue = strings.Replace(value, \"\\\\\\\"\", \"\\\"\", -1)\n+\t\t// expand newlines\n+\t\tvalue = strings.Replace(value, \"\\\\n\", \"\\n\", -1)\n+\t}\n+\t// trim\n+\tvalue = strings.Trim(value, \" \")\n \n \treturn\n }\ndiff --git a/godotenv_test.go b/godotenv_test.go\nindex bb31049..d748538 100644\n--- a/godotenv_test.go\n+++ b/godotenv_test.go\n@@ -70,45 +70,36 @@ func TestParsing(t *testing.T) {\n \t// parses export keyword\n \tparseAndCompare(t, \"export OPTION_A=2\", \"OPTION_A\", \"2\")\n \n-\t/*\n-\t\t\tThe rest of my TODO list\n+\t// it 'expands newlines in quoted strings' do\n+\t// expect(env('FOO=\"bar\\nbaz\"')).to eql('FOO' => \"bar\\nbaz\")\n+\tparseAndCompare(t, \"FOO=\\\"bar\\\\nbaz\\\"\", \"FOO\", \"bar\\nbaz\")\n \n-\t\t\tit 'expands newlines in quoted strings' do\n-\t\t    expect(env('FOO=\"bar\\nbaz\"')).to eql('FOO' => \"bar\\nbaz\")\n-\t\t  end\n+\t// it 'parses varibales with \".\" in the name' do\n+\t// expect(env('FOO.BAR=foobar')).to eql('FOO.BAR' => 'foobar')\n+\tparseAndCompare(t, \"FOO.BAR=foobar\", \"FOO.BAR\", \"foobar\")\n \n-\t\t  it 'parses varibales with \".\" in the name' do\n-\t\t    expect(env('FOO.BAR=foobar')).to eql('FOO.BAR' => 'foobar')\n-\t\t  end\n+\t// it 'strips unquoted values' do\n+\t// expect(env('foo=bar ')).to eql('foo' => 'bar') # not 'bar '\n+\tparseAndCompare(t, \"FOO=bar \", \"FOO\", \"bar\")\n \n-\t\t  it 'strips unquoted values' do\n-\t\t    expect(env('foo=bar ')).to eql('foo' => 'bar') # not 'bar '\n-\t\t  end\n+\t// it 'ignores inline comments' do\n+\t// expect(env(\"foo=bar # this is foo\")).to eql('foo' => 'bar')\n+\tparseAndCompare(t, \"FOO=bar # this is foo\", \"FOO\", \"bar\")\n \n-\t\t  it 'throws an error if line format is incorrect' do\n-\t\t    expect{env('lol$wut')}.to raise_error(Dotenv::FormatError)\n-\t\t  end\n+\t// it 'allows # in quoted value' do\n+\t// expect(env('foo=\"bar#baz\" # comment')).to eql('foo' => 'bar#baz')\n+\tparseAndCompare(t, \"FOO=\\\"bar#baz\\\" # comment\", \"FOO\", \"bar#baz\")\n \n-\t\t  it 'ignores empty lines' do\n-\t\t    expect(env(\"\\n \\t  \\nfoo=bar\\n \\nfizz=buzz\")).to eql('foo' => 'bar', 'fizz' => 'buzz')\n-\t\t  end\n+\t// it 'ignores comment lines' do\n+\t// expect(env(\"\\n\\n\\n # HERE GOES FOO \\nfoo=bar\")).to eql('foo' => 'bar')\n \n-\t\t  it 'ignores inline comments' do\n-\t\t    expect(env(\"foo=bar # this is foo\")).to eql('foo' => 'bar')\n-\t\t  end\n+\t// it 'parses # in quoted values' do\n+\t// expect(env('foo=\"ba#r\"')).to eql('foo' => 'ba#r')\n+\t// expect(env(\"foo='ba#r'\")).to eql('foo' => 'ba#r')\n \n-\t\t  it 'allows # in quoted value' do\n-\t\t    expect(env('foo=\"bar#baz\" # comment')).to eql('foo' => 'bar#baz')\n-\t\t  end\n+\t// it 'throws an error if line format is incorrect' do\n+\t// expect{env('lol$wut')}.to raise_error(Dotenv::FormatError)\n \n-\t\t  it 'ignores comment lines' do\n-\t\t    expect(env(\"\\n\\n\\n # HERE GOES FOO \\nfoo=bar\")).to eql('foo' => 'bar')\n-\t\t  end\n-\n-\t\t  it 'parses # in quoted values' do\n-\t\t    expect(env('foo=\"ba#r\"')).to eql('foo' => 'ba#r')\n-\t\t    expect(env(\"foo='ba#r'\")).to eql('foo' => 'ba#r')\n-\t\t  end\n-\n-\t*/\n+\t// it 'ignores empty lines' do\n+\t// expect(env(\"\\n \\t  \\nfoo=bar\\n \\nfizz=buzz\")).to eql('foo' => 'bar', 'fizz' => 'buzz')\n }\n",
+  "diffTruncated": false,
+  "tree": [
+    ".gitignore",
+    "fixtures/exported.env",
+    "fixtures/plain.env",
+    "fixtures/quoted.env",
+    "godotenv.go",
+    "godotenv_test.go"
+  ],
+  "explanation": {
+    "what": "parseLine の value 処理を書き直した。value 中に \"#\" があればそれ以前を切り出してインラインコメントを除去し、value 全体がダブルクォートまたはシングルクォートでちょうど2個ずつ囲まれている場合のみクォートを剥がし、エスケープされた \\\" を \" に、\\n を実改行にそれぞれ展開するようにした。最後に前後の空白を trim する。前コミットでコメントアウトしていた TODO のうち、newline 展開・ドット入り変数名・末尾空白除去・インラインコメント・クォート内の # を扱うテストケースを parseAndCompare として実装した。",
+    "why": "件名の \"Start trying to do comments/quoting properly.\" が示す通り、それまでの単純な文字トリムによるクォート処理(コミット6)を、コメントの除去とクォートの有無判定を組み合わせた、より正確な処理に置き換える試みである。おそらく前コミットで洗い出した TODO リストの一部から着手し、クォートの外にある # のみをコメントとして扱い、クォート内の値やエスケープシーケンスは保持するという、Ruby 版 dotenv に近い挙動を目指したと考えられる。",
+    "highlights": [
+      {"file": "godotenv.go", "note": "strings.Count(value, \"\\\"\") == 2 でクォートに \"ちょうど囲まれている\" かを判定し、それだけを剥がしてエスケープ展開する分岐"}
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "inferred",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

@@ -1,0 +1,82 @@
+{
+  "seq": 62,
+  "sha": "6d367c18edf6ca7fd004efd6863e4c5728fa858e",
+  "parents": [
+    "0f92a24bb0cd655270e0a559fbda13f92629510b",
+    "05be8ccbf7d00838dce28ccee1a950c038740e73"
+  ],
+  "author": {
+    "name": "John Barton",
+    "email": "jrbarton@gmail.com",
+    "date": "2017-11-10T12:03:15+11:00"
+  },
+  "message": "Merge pull request #46 from joho/fix_quoting_parser_bug\n\nWIP Parsing bug with nested quotes",
+  "pr": {
+    "number": 46,
+    "title": "WIP Parsing bug with nested quotes",
+    "body": "#45 reports that a line of format `TEST = \"echo 'foo'\"` incorrectly returns `echo 'asd` with the trailing single quote missing.\r\n\r\nThis PR will fix that bug, if I can replicate it, which I can't yet on my machine.\r\n\r\n```\r\n ~/Projects/go/src/github.com/joho/godotenv   fix_quoting_parser_bug ●  go test ./...\r\nok  \tgithub.com/joho/godotenv\t0.009s\r\n?   \tgithub.com/joho/godotenv/autoload\t[no test files]\r\n?   \tgithub.com/joho/godotenv/cmd/godotenv\t[no test files]\r\n```",
+    "url": "https://github.com/joho/godotenv/pull/46"
+  },
+  "linkedIssues": [
+    {
+      "number": 45,
+      "title": "Quotes dropped at the end of a value",
+      "body": "When having a value which includes quotes, godotenv seems to drop them automatically:\r\n```\r\nTEST = \"echo 'asd'\"\r\n```\r\nresults in\r\n```\r\necho 'asd\r\n```\r\nShort term solution by adding a space after it works for our usecase, however I doubt that this is the case in general\r\nexample that works:\r\n\r\n```\r\nTEST = \"echo 'asd' \"\r\n```\r\nresults in\r\n```\r\necho 'asd'\r\n```\r\n\r\nIn hindsight after reading\r\n> The parser itself is pretty stupidly naive and I wouldn’t be surprised if it breaks with edge cases.\r\n\r\nit is not particularly surprising.\r\nMaybe this can be used as an example to make it a bit smarter?",
+      "url": "https://github.com/joho/godotenv/issues/45"
+    }
+  ],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 2,
+    "deletions": 0
+  },
+  "files": [
+    {
+      "path": "fixtures/quoted.env",
+      "status": "M",
+      "additions": 1,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "godotenv_test.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/fixtures/quoted.env b/fixtures/quoted.env\nindex a03ce24..cc6376a 100644\n--- a/fixtures/quoted.env\n+++ b/fixtures/quoted.env\n@@ -6,3 +6,4 @@ OPTION_E=\"1\"\n OPTION_F=\"2\"\n OPTION_G=\"\"\n OPTION_H=\"\\n\"\n+OPTION_I = \"echo 'asd'\"\ndiff --git a/godotenv_test.go b/godotenv_test.go\nindex 91f4363..fc4f7f0 100644\n--- a/godotenv_test.go\n+++ b/godotenv_test.go\n@@ -187,6 +187,7 @@ func TestLoadQuotedEnv(t *testing.T) {\n \t\t\"OPTION_F\": \"2\",\n \t\t\"OPTION_G\": \"\",\n \t\t\"OPTION_H\": \"\\n\",\n+\t\t\"OPTION_I\": \"echo 'asd'\",\n \t}\n \n \tloadEnvAndCompareValues(t, Load, envFileName, expectedValues, noopPresets)\n",
+  "diffTruncated": false,
+  "tree": [
+    ".gitignore",
+    ".travis.yml",
+    "LICENCE",
+    "README.md",
+    "autoload/autoload.go",
+    "cmd/godotenv/cmd.go",
+    "fixtures/equals.env",
+    "fixtures/exported.env",
+    "fixtures/invalid1.env",
+    "fixtures/plain.env",
+    "fixtures/quoted.env",
+    "godotenv.go",
+    "godotenv_test.go"
+  ],
+  "explanation": {
+    "what": "fixtures/quoted.env に `OPTION_I = \"echo 'asd'\"` という、ダブルクォートで囲んだ値の中に一重引用符を含むケースを追加し、godotenv_test.go の期待値に対応するテストケースを1件追加した。パーサ本体(godotenv.go)への変更はこのコミットには含まれない。",
+    "why": "issue #45 で `TEST = \"echo 'asd'\"` のような、ダブルクォート値の中にシングルクォートが混在する行を parse すると末尾のクォートが欠落する不具合が報告されていた。PR #46 はこの不具合の再現・修正を目的としていたが、PR body の時点では作者自身も再現できておらず「まだ再現できていない」と書いている。この merge コミットの差分はテストケースの追加のみで、実際のクォート処理ロジックの修正はここでは行われていない。",
+    "highlights": [
+      { "file": "fixtures/quoted.env", "note": "`OPTION_I = \"echo 'asd'\"` — ダブルクォート内にシングルクォートを含む、issue #45 の再現ケース。" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "issue",
+    "refs": [
+      { "type": "pr", "number": 46, "url": "https://github.com/joho/godotenv/pull/46" },
+      { "type": "issue", "number": 45, "url": "https://github.com/joho/godotenv/issues/45" }
+    ],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

@@ -1,0 +1,70 @@
+{
+  "seq": 65,
+  "sha": "1709ab122c988931ad53508747b3c061400c2984",
+  "parents": [
+    "6bb08516677f8c8274c557fc801bee9ab564ab2c",
+    "8ad714e304a10f3deda29e2268b8041ff535dcfd"
+  ],
+  "author": {
+    "name": "John Barton",
+    "email": "jb@johnbarton.co",
+    "date": "2018-04-05T15:36:34+10:00"
+  },
+  "message": "Merge pull request #54 from egorse/master\n\nThe value expand fallback to actual ENV values",
+  "pr": {
+    "number": 54,
+    "title": "The value expand fallback to actual ENV values",
+    "body": "This pr fixing reference from .env file to value in ENV. i.e. \r\nENV has PWD='/home/egorse'\r\n.env has VAR='${PWD}/.config'.\r\nResult value will be '/home/egorse/.config'",
+    "url": "https://github.com/joho/godotenv/pull/54"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 3,
+    "deletions": 0
+  },
+  "files": [
+    {
+      "path": "godotenv.go",
+      "status": "M",
+      "additions": 3,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/godotenv.go b/godotenv.go\nindex 19751d7..e606481 100644\n--- a/godotenv.go\n+++ b/godotenv.go\n@@ -296,6 +296,9 @@ func parseValue(value string, envMap map[string]string) string {\n \t\tif val, ok := envMap[key]; ok {\n \t\t\treturn val\n \t\t}\n+\t\tif val, ok := os.LookupEnv(key); ok {\n+\t\t\treturn val\n+\t\t}\n \t\treturn \"\"\n \t})\n \treturn value\n",
+  "diffTruncated": false,
+  "tree": [
+    ".gitignore",
+    ".travis.yml",
+    "LICENCE",
+    "README.md",
+    "autoload/autoload.go",
+    "cmd/godotenv/cmd.go",
+    "fixtures/equals.env",
+    "fixtures/exported.env",
+    "fixtures/invalid1.env",
+    "fixtures/plain.env",
+    "fixtures/quoted.env",
+    "fixtures/substitutions.env",
+    "godotenv.go",
+    "godotenv_test.go"
+  ],
+  "explanation": {
+    "what": "parseValue の変数展開コールバック内に、envMap(このファイル内で既にパースされたキー)に見つからなかった場合のフォールバックとして `os.LookupEnv(key)` を追加した。これにより `.env` ファイル外の実際の環境変数も `${VAR}` 展開の参照先になる。",
+    "why": "PR body に具体例が示されている。実行環境の ENV に `PWD=/home/egorse` があり、`.env` 側で `VAR='${PWD}/.config'` と書いた場合、それまでは envMap 内にしか無い値しか参照できず空文字列になっていたが、実際の環境変数にもフォールバックすることで `/home/egorse/.config` のように解決できるようにする変更。",
+    "highlights": [
+      { "file": "godotenv.go", "note": "envMap で見つからない場合に `os.LookupEnv(key)` を試す1段のフォールバックを追加。" }
+    ],
+    "langNotes": [
+      { "topic": "os.LookupEnv", "note": "`os.Getenv` と異なり、環境変数が「未設定」か「空文字列が設定されている」かを bool の第2戻り値で区別できる Go 標準ライブラリの関数。ここでは envMap に無いキーが実際の OS 環境変数として存在するかを判定するのに使われている。" }
+    ],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [
+      { "type": "pr", "number": 54, "url": "https://github.com/joho/godotenv/pull/54" }
+    ],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

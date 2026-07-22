@@ -1,0 +1,71 @@
+{
+  "seq": 107,
+  "sha": "383d64cb7ee0cbb880fc28a2bd91bcdbdf84d0a1",
+  "parents": [
+    "e3b6eee84d15b0fa274078565ca46591f5e08876"
+  ],
+  "author": {
+    "name": "Vintage",
+    "email": "btadamz@gmail.com",
+    "date": "2024-01-06T08:10:56+01:00"
+  },
+  "message": "Update cmd.go (#221)\n\nRenuewed Update",
+  "pr": {
+    "number": 221,
+    "title": "Update cmd.go",
+    "body": "Renuewed Update",
+    "url": "https://github.com/joho/godotenv/pull/221"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 2,
+    "deletions": 2
+  },
+  "files": [
+    {
+      "path": "cmd/godotenv/cmd.go",
+      "status": "M",
+      "additions": 2,
+      "deletions": 2,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/cmd/godotenv/cmd.go b/cmd/godotenv/cmd.go\nindex 2a7b2d8..aa97a05 100644\n--- a/cmd/godotenv/cmd.go\n+++ b/cmd/godotenv/cmd.go\n@@ -21,7 +21,7 @@ func main() {\n \tflag.Parse()\n \n \tusage := `\n-Run a process with an env setup from a .env file\n+Run a process with an env setup from a .env fil\n \n godotenv [-o] [-f ENV_FILE_PATHS] COMMAND_ARGS\n \n@@ -35,7 +35,7 @@ example\n \t// print usage and return\n \targs := flag.Args()\n \tif showHelp || len(args) == 0 {\n-\t\tfmt.Println(usage)\n+\t\tfmt.log(usage)\n \t\treturn\n \t}\n \n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/dependabot.yml",
+    ".github/workflows/ci.yml",
+    ".github/workflows/codeql-analysis.yml",
+    ".github/workflows/release.yml",
+    ".gitignore",
+    "LICENCE",
+    "README.md",
+    "autoload/autoload.go",
+    "cmd/godotenv/cmd.go",
+    "fixtures/comments.env",
+    "fixtures/equals.env",
+    "fixtures/exported.env",
+    "fixtures/invalid1.env",
+    "fixtures/plain.env",
+    "fixtures/quoted.env",
+    "fixtures/substitutions.env",
+    "go.mod",
+    "godotenv.go",
+    "godotenv_test.go",
+    "parser.go"
+  ],
+  "explanation": {
+    "what": "cmd/godotenv/cmd.go のusage文字列から \"file\" の末尾の \"e\" を削って \"fil\" にし、さらに fmt.Println(usage) を fmt.log(usage) という存在しない呼び出しに書き換えた。fmt パッケージに log という関数は無いため、この変更はビルドを壊す。",
+    "why": "PR自体は「Update cmd.go」「Renuewed Update」とだけ書かれており具体的な意図は読み取れない。diffの内容から見て、おそらくtypoを直すつもりが誤って別のtypoを追加し、かつ存在しないfmt.logを書いてしまった変更だと推測される。実際に次のコミット(#223)でこの fmt.log がビルドエラーを起こしていたと明記され、すぐさま修正されている。",
+    "highlights": [
+      { "file": "cmd/godotenv/cmd.go", "note": "fmt.Println(usage) が fmt.log(usage) に変わっており、fmtパッケージには存在しない関数を呼んでいるためコンパイルが通らなくなる" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "inferred",
+    "refs": [{ "type": "pr", "number": 221, "url": "https://github.com/joho/godotenv/pull/221" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

@@ -1,0 +1,52 @@
+{
+  "seq": 5,
+  "sha": "919c16194535565aefd874e2e64307d87b9a9f1d",
+  "parents": [
+    "d8dfdb69b3f6ebd22f2197facb601cbb7632ad64"
+  ],
+  "author": {
+    "name": "John Barton (joho)",
+    "email": "jrbarton@gmail.com",
+    "date": "2013-07-30T18:15:58+10:00"
+  },
+  "message": "Start porting over parser tests.",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 12,
+    "deletions": 0
+  },
+  "files": [
+    {
+      "path": "godotenv_test.go",
+      "status": "M",
+      "additions": 12,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/godotenv_test.go b/godotenv_test.go\nindex d51b382..454a54a 100644\n--- a/godotenv_test.go\n+++ b/godotenv_test.go\n@@ -5,6 +5,13 @@ import (\n \t\"testing\"\n )\n \n+func parseAndCompare(t *testing.T, rawEnvLine string, expectedKey string, expectedValue string) {\n+\tkey, value, _ := parseLine(rawEnvLine)\n+\tif key != expectedKey || value != expectedValue {\n+\t\tt.Errorf(\"Expected '%v' to parse as '%v' => '%v', got '%v' => '%v' instead\", rawEnvLine, expectedKey, expectedValue, key, value)\n+\t}\n+}\n+\n func loadEnvAndCompareValues(t *testing.T, envFileName string, expectedValues map[string]string) {\n \terr := Load(envFileName)\n \tif err != nil {\n@@ -39,3 +46,8 @@ func TestLoadPlainEnv(t *testing.T) {\n \n \tloadEnvAndCompareValues(t, envFileName, plainValues)\n }\n+\n+func TestParsing(t *testing.T) {\n+\t// unquoted values\n+\tparseAndCompare(t, \"FOO=bar\", \"FOO\", \"bar\")\n+}\n",
+  "diffTruncated": false,
+  "tree": [
+    ".gitignore",
+    "fixtures/exported.env",
+    "fixtures/plain.env",
+    "fixtures/quoted.env",
+    "godotenv.go",
+    "godotenv_test.go"
+  ],
+  "explanation": {
+    "what": "parseLine 単体をテストするための parseAndCompare ヘルパーと TestParsing 関数を追加した。最初のケースとして \"FOO=bar\" が \"FOO\" => \"bar\" にパースされることだけを検証する。godotenv.go の実装は変更していない。",
+    "why": "おそらく件名の通り、Ruby 版 dotenv のパーサ仕様のテストを Go 側に移植し始めた段階と考えられる。ファイル単位の統合テスト(TestLoadPlainEnv)とは別に、parseLine という関数単体を狙い撃ちでテストする経路を新設し、以降のコミットでクォートや export などのケースを1つずつ足していく土台にしていると考えられる。",
+    "highlights": [
+      {"file": "godotenv_test.go", "note": "parseLine を直接呼ぶ parseAndCompare の追加により、以後のコミットでパーサの細かい仕様をケースごとに足していける"}
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "inferred",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

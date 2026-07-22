@@ -1,0 +1,61 @@
+{
+  "seq": 15,
+  "sha": "9001b882504d2b1f4a46940cca3cad15190a6cea",
+  "parents": [
+    "48ca995c3b153da4e059302fa49b4c0b193f1ed9"
+  ],
+  "author": {
+    "name": "John Barton (joho)",
+    "email": "jrbarton@gmail.com",
+    "date": "2013-07-31T12:37:08+10:00"
+  },
+  "message": "Ignore comment lines and lines full o' whitespace.",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 30,
+    "deletions": 6
+  },
+  "files": [
+    {
+      "path": "godotenv.go",
+      "status": "M",
+      "additions": 10,
+      "deletions": 3,
+      "binary": false
+    },
+    {
+      "path": "godotenv_test.go",
+      "status": "M",
+      "additions": 20,
+      "deletions": 3,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/godotenv.go b/godotenv.go\nindex bd7fcda..2a3c4fc 100644\n--- a/godotenv.go\n+++ b/godotenv.go\n@@ -42,10 +42,12 @@ func loadFile(filename string) (err error) {\n \t}\n \n \tfor _, fullLine := range lines {\n-\t\tkey, value, err := parseLine(fullLine)\n+\t\tif !isIgnoredLine(fullLine) {\n+\t\t\tkey, value, err := parseLine(fullLine)\n \n-\t\tif err == nil {\n-\t\t\tos.Setenv(key, value)\n+\t\t\tif err == nil {\n+\t\t\t\tos.Setenv(key, value)\n+\t\t\t}\n \t\t}\n \t}\n \n@@ -116,3 +118,8 @@ func parseLine(line string) (key string, value string, err error) {\n \n \treturn\n }\n+\n+func isIgnoredLine(line string) bool {\n+\ttrimmedLine := strings.Trim(line, \" \\n\\t\")\n+\treturn len(trimmedLine) == 0 || strings.HasPrefix(trimmedLine, \"#\")\n+}\ndiff --git a/godotenv_test.go b/godotenv_test.go\nindex 47acbc2..933595c 100644\n--- a/godotenv_test.go\n+++ b/godotenv_test.go\n@@ -92,9 +92,6 @@ func TestParsing(t *testing.T) {\n \tparseAndCompare(t, \"FOO='bar#baz' # comment\", \"FOO\", \"bar#baz\")\n \tparseAndCompare(t, \"FOO=\\\"bar#baz#bang\\\" # comment\", \"FOO\", \"bar#baz#bang\")\n \n-\t// it 'ignores comment lines' do\n-\t// expect(env(\"\\n\\n\\n # HERE GOES FOO \\nfoo=bar\")).to eql('foo' => 'bar')\n-\n \t// it 'parses # in quoted values' do\n \t// expect(env('foo=\"ba#r\"')).to eql('foo' => 'ba#r')\n \t// expect(env(\"foo='ba#r'\")).to eql('foo' => 'ba#r')\n@@ -108,7 +105,27 @@ func TestParsing(t *testing.T) {\n \tif err == nil {\n \t\tt.Errorf(\"Expected \\\"%v\\\" to return error, but it didn't\", badlyFormattedLine)\n \t}\n+}\n \n+func TestLinesToIgnore(t *testing.T) {\n \t// it 'ignores empty lines' do\n \t// expect(env(\"\\n \\t  \\nfoo=bar\\n \\nfizz=buzz\")).to eql('foo' => 'bar', 'fizz' => 'buzz')\n+\tif !isIgnoredLine(\"\\n\") {\n+\t\tt.Error(\"Line with nothing but line break wasn't ignored\")\n+\t}\n+\n+\tif !isIgnoredLine(\"\\t\\t \") {\n+\t\tt.Error(\"Line full of whitespace wasn't ignored\")\n+\t}\n+\n+\t// it 'ignores comment lines' do\n+\t// expect(env(\"\\n\\n\\n # HERE GOES FOO \\nfoo=bar\")).to eql('foo' => 'bar')\n+\tif !isIgnoredLine(\"# comment\") {\n+\t\tt.Error(\"Comment wasn't ignored\")\n+\t}\n+\n+\tif !isIgnoredLine(\"\\t#comment\") {\n+\t\tt.Error(\"Indented comment wasn't ignored\")\n+\t}\n+\n }\n",
+  "diffTruncated": false,
+  "tree": [
+    ".gitignore",
+    "fixtures/exported.env",
+    "fixtures/plain.env",
+    "fixtures/quoted.env",
+    "godotenv.go",
+    "godotenv_test.go"
+  ],
+  "explanation": {
+    "what": "isIgnoredLine関数を新設し、trimした行が空か\"#\"で始まる場合はコメント行・空白行としてparseLineに渡さずスキップするようにloadFileを変更した。TestLinesToIgnoreを新設し、改行のみの行・インデント付き空白行・行頭コメント・インデント付きコメントの4パターンで検証している。",
+    "why": "コミットメッセージ\"Ignore comment lines and lines full o' whitespace.\"の通り、それまでparseLineは全ての行を=区切りとして解釈しようとしており、コメント行や空行が渡されるとエラー(あるいは意図しないパース)になっていた。dotenvファイルの実運用ではコメント・空行が普通に含まれるため、パース前にフィルタする層を分離した。",
+    "highlights": [
+      { "file": "godotenv.go", "note": "isIgnoredLineはstrings.Trim(line, \" \\n\\t\")してから長さ0判定・#プレフィックス判定するだけの小さな純関数" }
+    ],
+    "langNotes": [
+      { "topic": "コメント行・空白行のスキップ", "note": "dotenvファイルでは`# comment`のような行や空白のみの行が許容される。isIgnoredLineはstrings.Trimでスペースやタブや改行を削った上でlen==0か#プレフィックスかを見る、Goでよく使うシンプルな文字列前処理パターン。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

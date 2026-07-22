@@ -1,0 +1,62 @@
+{
+  "seq": 3,
+  "sha": "973cf53008332ef58d44121143d3ef29758c3352",
+  "parents": [
+    "78ba83b776f06f652fb3f1ee7d1044199d3c5f86"
+  ],
+  "author": {
+    "name": "John Barton (joho)",
+    "email": "jrbarton@gmail.com",
+    "date": "2013-07-30T17:44:28+10:00"
+  },
+  "message": "Get the basic tests green.",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 69,
+    "deletions": 0
+  },
+  "files": [
+    {
+      "path": "godotenv.go",
+      "status": "M",
+      "additions": 62,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "godotenv_test.go",
+      "status": "M",
+      "additions": 7,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/godotenv.go b/godotenv.go\nindex d667e7f..69e8b44 100644\n--- a/godotenv.go\n+++ b/godotenv.go\n@@ -1,5 +1,67 @@\n package godotenv\n \n+import (\n+\t\"bufio\"\n+\t\"errors\"\n+\t\"os\"\n+\t\"strings\"\n+)\n+\n func Load(filenames ...string) (err error) {\n+\tfor _, filename := range filenames {\n+\t\terr = loadFile(filename)\n+\t\tif err != nil {\n+\t\t\treturn // return early on a spazout\n+\t\t}\n+\t}\n+\treturn\n+}\n+\n+func loadFile(filename string) (err error) {\n+\tfile, err := os.Open(filename)\n+\tif err != nil {\n+\t\treturn\n+\t}\n+\n+\tbufferSize := 20\n+\tlines := make([]string, bufferSize)\n+\tlineReader := bufio.NewReaderSize(file, bufferSize)\n+\tfor line, isPrefix, e := lineReader.ReadLine(); e == nil; line, isPrefix, e = lineReader.ReadLine() {\n+\t\tfullLine := string(line)\n+\t\tif isPrefix {\n+\t\t\tfor {\n+\t\t\t\tline, isPrefix, _ = lineReader.ReadLine()\n+\t\t\t\tfullLine += string(line)\n+\t\t\t\tif !isPrefix {\n+\t\t\t\t\tbreak\n+\t\t\t\t}\n+\t\t\t}\n+\t\t}\n+\t\t// add a line to the game/parse\n+\t\tlines = append(lines, string(line))\n+\t}\n+\n+\tfor _, fullLine := range lines {\n+\t\tkey, value, err := parseLine(fullLine)\n+\n+\t\tif err == nil {\n+\t\t\tos.Setenv(key, value)\n+\t\t}\n+\t}\n+\n+\treturn\n+}\n+\n+func parseLine(line string) (key string, value string, err error) {\n+\tif len(line) == 0 {\n+\t\terr = errors.New(\"zero length string\")\n+\t\treturn\n+\t}\n+\n+\tsplitString := strings.Split(line, \"=\")\n+\n+\tkey = strings.Trim(splitString[0], \" \")\n+\tvalue = strings.Trim(splitString[1], \" \")\n+\n \treturn\n }\ndiff --git a/godotenv_test.go b/godotenv_test.go\nindex d698b9a..72f2b28 100644\n--- a/godotenv_test.go\n+++ b/godotenv_test.go\n@@ -5,6 +5,13 @@ import (\n \t\"testing\"\n )\n \n+func TestLoadFileNotFound(t *testing.T) {\n+\terr := Load(\"somefilethatwillneverexistever.env\")\n+\tif err == nil {\n+\t\tt.Error(\"File wasn't found but Load didn't return an error\")\n+\t}\n+}\n+\n func TestLoadPlainEnv(t *testing.T) {\n \tenvFileName := \"fixtures/plain.env\"\n \terr := Load(envFileName)\n",
+  "diffTruncated": false,
+  "tree": [
+    ".gitignore",
+    "fixtures/exported.env",
+    "fixtures/plain.env",
+    "fixtures/quoted.env",
+    "godotenv.go",
+    "godotenv_test.go"
+  ],
+  "explanation": {
+    "what": "Load を実装した。指定ファイルごとに loadFile を呼び、bufio.Reader で行を読み、各行を parseLine で key/value に分割して os.Setenv する。parseLine は \"=\" で1回 Split し、両辺を strings.Trim(\" \") するだけの最小実装。あわせて存在しないファイルを渡す TestLoadFileNotFound を追加した。",
+    "why": "前コミットで書いた TestLoadPlainEnv を green にするための実装。件名の \"Get the basic tests green.\" が示す通り、おそらくまずはクォートやコメントを考慮しない最も単純な KEY=VALUE 分割で fixtures/plain.env のケースだけを通すことを目標にしていると考えられる。",
+    "highlights": [
+      {"file": "godotenv.go", "note": "parseLine は splitString[1] を決め打ちで参照しており、\"=\" を含まない行やクォート付き値はまだ扱えない素朴な実装"}
+    ],
+    "langNotes": [
+      {"topic": "bufio.NewReaderSize / ReadLine", "note": "Go の bufio パッケージでバッファ付きに1行ずつ読む書き方。ReadLine はバッファサイズを超える長い行を isPrefix フラグで分割して返すため、ループで結合する必要がある。"},
+      {"topic": "名前付き戻り値と bare return", "note": "func loadFile(filename string) (err error) のように戻り値に名前を付けておくと、途中の return だけで err の値を返せる(bare return)。Go 特有の書き方で、このコードでは早期リターンの簡潔化に使われている。"}
+    ],
+    "diagram": null,
+    "evidence": "inferred",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

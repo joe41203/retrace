@@ -1,0 +1,61 @@
+{
+  "seq": 44,
+  "sha": "19b5c2bf30561c9d0f6788e95bdf3a0722462f0b",
+  "parents": [
+    "e1c92610d7a1cf1df69dae47a509f5e20fffa058"
+  ],
+  "author": {
+    "name": "John Barton (joho)",
+    "email": "jrbarton@gmail.com",
+    "date": "2015-03-23T12:15:01+11:00"
+  },
+  "message": "Some golint feedback from http://goreportcard.com/report/joho/godotenv",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 38,
+    "deletions": 43
+  },
+  "files": [
+    {
+      "path": "godotenv.go",
+      "status": "M",
+      "additions": 38,
+      "deletions": 43,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/godotenv.go b/godotenv.go\nindex 33bf84d..b3f61c3 100644\n--- a/godotenv.go\n+++ b/godotenv.go\n@@ -1,18 +1,17 @@\n-/*\n-A go port of the ruby dotenv library (https://github.com/bkeepers/dotenv)\n-\n-Examples/readme can be found on the github page at https://github.com/joho/godotenv\n-\n-The TL;DR is that you make a .env file that looks something like\n-\n-\t\tSOME_ENV_VAR=somevalue\n-\n-and then in your go code you can call\n-\n-\t\tgodotenv.Load()\n-\n-and all the env vars declared in .env will be avaiable through os.Getenv(\"SOME_ENV_VAR\")\n-*/\n+// Package godotenv\n+// A go port of the ruby dotenv library (https://github.com/bkeepers/dotenv)\n+//\n+// Examples/readme can be found on the github page at https://github.com/joho/godotenv\n+//\n+// The TL;DR is that you make a .env file that looks something like\n+//\n+// \t\tSOME_ENV_VAR=somevalue\n+//\n+// and then in your go code you can call\n+//\n+// \t\tgodotenv.Load()\n+//\n+// and all the env vars declared in .env will be avaiable through os.Getenv(\"SOME_ENV_VAR\")\n package godotenv\n \n import (\n@@ -23,17 +22,17 @@ import (\n \t\"strings\"\n )\n \n-/*\n-\tCall this function as close as possible to the start of your program (ideally in main)\n-\n-\tIf you call Load without any args it will default to loading .env in the current path\n-\n-\tYou can otherwise tell it which files to load (there can be more than one) like\n-\n-\t\tgodotenv.Load(\"fileone\", \"filetwo\")\n-\n-\tIt's important to note that it WILL NOT OVERRIDE an env variable that already exists - consider the .env file to set dev vars or sensible defaults\n-*/\n+// Load will read your env file(s) and load them into ENV for this process.\n+//\n+// Call this function as close as possible to the start of your program (ideally in main)\n+//\n+// If you call Load without any args it will default to loading .env in the current path\n+//\n+// You can otherwise tell it which files to load (there can be more than one) like\n+//\n+//\t\tgodotenv.Load(\"fileone\", \"filetwo\")\n+//\n+// It's important to note that it WILL NOT OVERRIDE an env variable that already exists - consider the .env file to set dev vars or sensible defaults\n func Load(filenames ...string) (err error) {\n \tfilenames = filenamesOrDefault(filenames)\n \n@@ -46,10 +45,8 @@ func Load(filenames ...string) (err error) {\n \treturn\n }\n \n-/*\n-  Read all env (with same file loading semantics as Load) but return values as\n-  a map rather than automatically writing values into env\n-*/\n+// Read all env (with same file loading semantics as Load) but return values as\n+// a map rather than automatically writing values into env\n func Read(filenames ...string) (envMap map[string]string, err error) {\n \tfilenames = filenamesOrDefault(filenames)\n \tenvMap = make(map[string]string)\n@@ -70,15 +67,13 @@ func Read(filenames ...string) (envMap map[string]string, err error) {\n \treturn\n }\n \n-/*\n-  Loads env vars from the specified filenames (empty map falls back to default)\n-  then executes the cmd specified.\n-\n-  Simply hooks up os.Stdin/err/out to the command and calls Run()\n-\n-  If you want more fine grained control over your command it's recommended\n-  that you use `Load()` or `Read()` and the `os/exec` package yourself.\n-*/\n+// Exec loads env vars from the specified filenames (empty map falls back to default)\n+// then executes the cmd specified.\n+//\n+// Simply hooks up os.Stdin/err/out to the command and calls Run()\n+//\n+// If you want more fine grained control over your command it's recommended\n+// that you use `Load()` or `Read()` and the `os/exec` package yourself.\n func Exec(filenames []string, cmd string, cmdArgs []string) error {\n \tLoad(filenames...)\n \n@@ -97,10 +92,10 @@ func filenamesOrDefault(filenames []string) []string {\n \t}\n }\n \n-func loadFile(filename string) (err error) {\n+func loadFile(filename string) error {\n \tenvMap, err := readFile(filename)\n \tif err != nil {\n-\t\treturn\n+\t\treturn err\n \t}\n \n \tfor key, value := range envMap {\n@@ -109,7 +104,7 @@ func loadFile(filename string) (err error) {\n \t\t}\n \t}\n \n-\treturn\n+\treturn nil\n }\n \n func readFile(filename string) (envMap map[string]string, err error) {\n@@ -149,7 +144,7 @@ func parseLine(line string) (key string, value string, err error) {\n \tif strings.Contains(line, \"#\") {\n \t\tsegmentsBetweenHashes := strings.Split(line, \"#\")\n \t\tquotesAreOpen := false\n-\t\tsegmentsToKeep := make([]string, 0)\n+\t\tvar segmentsToKeep []string\n \t\tfor _, segment := range segmentsBetweenHashes {\n \t\t\tif strings.Count(segment, \"\\\"\") == 1 || strings.Count(segment, \"'\") == 1 {\n \t\t\t\tif quotesAreOpen {\n",
+  "diffTruncated": false,
+  "tree": [
+    ".gitignore",
+    "LICENCE",
+    "README.md",
+    "autoload/autoload.go",
+    "cmd/godotenv/cmd.go",
+    "fixtures/equals.env",
+    "fixtures/exported.env",
+    "fixtures/plain.env",
+    "fixtures/quoted.env",
+    "godotenv.go",
+    "godotenv_test.go",
+    "wercker.yml"
+  ],
+  "explanation": {
+    "what": "godotenv.go の godoc コメントを golint が推奨する形式に書き直した。パッケージコメントとブロックコメント(`/* ... */`)を `//` の行コメントに変換し、各エクスポート関数(Load, Read, Exec)のコメントを「関数名から始まる文」の形式に揃えた。あわせて `loadFile` の戻り値を名前付き戻り値(err error)から明示的な `error` 型に変え、`return`/`return err`/`return nil` を明示的に書くようにし、`make([]string, 0)` を `var segmentsToKeep []string` に置き換えた。",
+    "why": "コミットメッセージが goreportcard.com の golint 指摘への対応であることを明示している。golint はエクスポートされた識別子の doc コメントが「識別子名で始まる文であること」を要求するため、それに合わせて既存コメントを書き直した。",
+    "highlights": [
+      { "file": "godotenv.go", "note": "Load/Read/Exec の doc コメントが「関数名で始まる文」に統一され、golint の exported-name-doc-comment ルールに沿う形になった" }
+    ],
+    "langNotes": [
+      { "topic": "golint", "note": "golint は Go コードのスタイル線形チェッカーで、代表的な指摘の一つが「エクスポートされた識別子の doc コメントはその識別子名で始めるべき」というもの。このコミットは goreportcard.com のレポートを受けて複数関数のコメントを一括修正している。" },
+      { "topic": "named return values", "note": "Go では `func f() (err error)` のように戻り値に名前を付けられ、`return` だけで暗黙的にその変数を返せる。このコミットは可読性のため loadFile を明示的な `return err` / `return nil` に書き換えている。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

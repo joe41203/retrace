@@ -1,0 +1,101 @@
+{
+  "seq": 123,
+  "sha": "8680ef74f43cd5be7536ac29c4e33b24f275be0e",
+  "parents": [
+    "eea6c4a3a0a4b93298567758b1de11a004be0c6f",
+    "f5c700691439ef5e943dd8e18552eb7c2a399230"
+  ],
+  "author": {
+    "name": "John Barton",
+    "email": "jb@johnbarton.co",
+    "date": "2026-05-20T14:11:22+10:00"
+  },
+  "message": "Merge pull request #263 from joho/ci-and-versioning-updates-may-26\n\nCI and Versioning updates",
+  "pr": {
+    "number": 263,
+    "title": "CI and Versioning updates",
+    "body": "Bit of hygiene while doing release prep\r\n\r\n* Latest 5 go versions for testing\r\n* Updated actions",
+    "url": "https://github.com/joho/godotenv/pull/263"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 5,
+    "additions": 10,
+    "deletions": 9
+  },
+  "files": [
+    {
+      "path": ".github/workflows/ci.yml",
+      "status": "M",
+      "additions": 3,
+      "deletions": 3,
+      "binary": false
+    },
+    {
+      "path": ".github/workflows/codeql-analysis.yml",
+      "status": "M",
+      "additions": 4,
+      "deletions": 4,
+      "binary": false
+    },
+    {
+      "path": ".github/workflows/release.yml",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": ".gitignore",
+      "status": "M",
+      "additions": 2,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "README.md",
+      "status": "M",
+      "additions": 0,
+      "deletions": 1,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/.github/workflows/ci.yml b/.github/workflows/ci.yml\nindex 03b0a99..3724f60 100644\n--- a/.github/workflows/ci.yml\n+++ b/.github/workflows/ci.yml\n@@ -8,13 +8,13 @@ jobs:\n     strategy:\n       fail-fast: false\n       matrix:\n-        go: [ '1.20', '1.19', '1.18', '1.17', '1.16' ]\n+        go: [ '1.26', '1.25', '1.24', '1.23', '1.22' ]\n         os: [ ubuntu-latest, macOS-latest, windows-latest ]\n     name: ${{ matrix.os }} Go ${{ matrix.go }} Tests\n     steps:\n-      - uses: actions/checkout@v4\n+      - uses: actions/checkout@v6\n       - name: Setup go\n-        uses: actions/setup-go@v4\n+        uses: actions/setup-go@v6\n         with:\n           go-version: ${{ matrix.go }}\n       - run: go test\ndiff --git a/.github/workflows/codeql-analysis.yml b/.github/workflows/codeql-analysis.yml\nindex b5bab63..0fed7f4 100644\n--- a/.github/workflows/codeql-analysis.yml\n+++ b/.github/workflows/codeql-analysis.yml\n@@ -38,11 +38,11 @@ jobs:\n \n     steps:\n     - name: Checkout repository\n-      uses: actions/checkout@v4\n+      uses: actions/checkout@v6\n \n     # Initializes the CodeQL tools for scanning.\n     - name: Initialize CodeQL\n-      uses: github/codeql-action/init@v2\n+      uses: github/codeql-action/init@v4\n       with:\n         languages: ${{ matrix.language }}\n         # If you wish to specify custom queries, you can do so here or in a config file.\n@@ -56,7 +56,7 @@ jobs:\n     # Autobuild attempts to build any compiled languages  (C/C++, C#, or Java).\n     # If this step fails, then you should remove it and run the build manually (see below)\n     - name: Autobuild\n-      uses: github/codeql-action/autobuild@v2\n+      uses: github/codeql-action/autobuild@v4\n \n     # ℹ️ Command-line programs to run using the OS shell.\n     # 📚 See https://docs.github.com/en/actions/using-workflows/workflow-syntax-for-github-actions#jobsjob_idstepsrun\n@@ -69,4 +69,4 @@ jobs:\n     #   ./location_of_script_within_repo/buildscript.sh\n \n     - name: Perform CodeQL Analysis\n-      uses: github/codeql-action/analyze@v2\n+      uses: github/codeql-action/analyze@v4\ndiff --git a/.github/workflows/release.yml b/.github/workflows/release.yml\nindex 15bf3f5..3318636 100644\n--- a/.github/workflows/release.yml\n+++ b/.github/workflows/release.yml\n@@ -11,7 +11,7 @@ jobs:\n     runs-on: ubuntu-latest\n     steps:\n       - name: Checkout code\n-        uses: actions/checkout@v4\n+        uses: actions/checkout@v6\n       - name: Generate build files\n         uses: thatisuday/go-cross-build@v1.0.2\n         with:\ndiff --git a/.gitignore b/.gitignore\nindex e43b0f9..999f85c 100644\n--- a/.gitignore\n+++ b/.gitignore\n@@ -1 +1,3 @@\n .DS_Store\n+CLAUDE.md\n+.claude\ndiff --git a/README.md b/README.md\nindex 5f7e27a..dc446ee 100644\n--- a/README.md\n+++ b/README.md\n@@ -22,7 +22,6 @@ go get github.com/joho/godotenv\n \n or if you want to use it as a bin command\n \n-go >= 1.17\n ```shell\n go install github.com/joho/godotenv/cmd/godotenv@latest\n ```\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/dependabot.yml",
+    ".github/workflows/ci.yml",
+    ".github/workflows/codeql-analysis.yml",
+    ".github/workflows/release.yml",
+    ".gitignore",
+    "LICENCE",
+    "README.md",
+    "autoload/autoload.go",
+    "cmd/godotenv/cmd.go",
+    "fixtures/comments.env",
+    "fixtures/equals.env",
+    "fixtures/exported.env",
+    "fixtures/hyphen.env",
+    "fixtures/invalid1.env",
+    "fixtures/plain.env",
+    "fixtures/quoted.env",
+    "fixtures/substitutions.env",
+    "go.mod",
+    "godotenv.go",
+    "godotenv_test.go",
+    "parser.go"
+  ],
+  "explanation": {
+    "what": "CI・リリース周りの棚卸し。ci.yml のテスト対象 Go バージョンを 1.16〜1.20 から 1.22〜1.26 に引き上げ、actions/checkout・setup-go・codeql-action を新しいメジャーバージョンに更新し、.gitignore に CLAUDE.md / .claude を追加、README から古い \"go >= 1.17\" の注記を削除した。",
+    "why": "PR本文にある通り、リリース準備の一環としての整理(\"Bit of hygiene while doing release prep\")。テスト対象 Go バージョンを最新5世代に揃え、依存アクションのメジャーバージョンも合わせて更新している。",
+    "highlights": [
+      { "file": ".github/workflows/ci.yml", "note": "テスト対象 Go バージョンを 1.16-1.20 から 1.22-1.26 へ" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [{ "type": "pr", "number": 263, "url": "https://github.com/joho/godotenv/pull/263" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

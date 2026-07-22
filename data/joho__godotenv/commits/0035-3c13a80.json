@@ -1,0 +1,65 @@
+{
+  "seq": 35,
+  "sha": "3c13a80fe13f26da8d7cf5b257bdfe54975b8043",
+  "parents": [
+    "3505098f907089729105e928aebea45f0a643f20",
+    "7e3e1e2c6ce31914ef27b4a6336cbe7fa188ef71"
+  ],
+  "author": {
+    "name": "John Barton",
+    "email": "jrbarton@gmail.com",
+    "date": "2014-03-10T14:25:32+11:00"
+  },
+  "message": "Merge pull request #3 from ys/feature/accept-equals-in-values\n\nUse SplitN instead of split",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 11,
+    "deletions": 0
+  },
+  "files": [
+    {
+      "path": "fixtures/equals.env",
+      "status": "A",
+      "additions": 2,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "godotenv_test.go",
+      "status": "M",
+      "additions": 9,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/fixtures/equals.env b/fixtures/equals.env\nnew file mode 100644\nindex 0000000..594c532\n--- /dev/null\n+++ b/fixtures/equals.env\n@@ -0,0 +1,2 @@\n+export OPTION_A='postgres://localhost:5432/database?sslmode=disable'\n+\ndiff --git a/godotenv_test.go b/godotenv_test.go\nindex e1ac87f..c6d9f2d 100644\n--- a/godotenv_test.go\n+++ b/godotenv_test.go\n@@ -93,6 +93,15 @@ func TestLoadExportedEnv(t *testing.T) {\n \tloadEnvAndCompareValues(t, envFileName, expectedValues)\n }\n \n+func TestLoadEqualsEnv(t *testing.T) {\n+\tenvFileName := \"fixtures/equals.env\"\n+\texpectedValues := map[string]string{\n+\t\t\"OPTION_A\": \"postgres://localhost:5432/database?sslmode=disable\",\n+\t}\n+\n+\tloadEnvAndCompareValues(t, envFileName, expectedValues)\n+}\n+\n func TestLoadQuotedEnv(t *testing.T) {\n \tenvFileName := \"fixtures/quoted.env\"\n \texpectedValues := map[string]string{\n",
+  "diffTruncated": false,
+  "tree": [
+    ".gitignore",
+    "LICENCE",
+    "README.md",
+    "autoload/autoload.go",
+    "fixtures/equals.env",
+    "fixtures/exported.env",
+    "fixtures/plain.env",
+    "fixtures/quoted.env",
+    "godotenv.go",
+    "godotenv_test.go",
+    "wercker.yml"
+  ],
+  "explanation": {
+    "what": "外部コントリビューター ys からの PR をマージ。値に `=` を含む URL 形式(`postgres://localhost:5432/database?sslmode=disable`)を検証する fixture ファイル fixtures/equals.env と、対応するテスト TestLoadEqualsEnv を追加した。",
+    "why": "コミットメッセージ「Use SplitN instead of split」が示す通り、直前の seq34 で導入された SplitN による区切り文字対応を、より実運用に近い形(DB接続文字列のようにクエリパラメータで `=` を含む値)で回帰しないよう固定化するテストの追加と考えられる。",
+    "highlights": [
+      { "file": "fixtures/equals.env", "note": "`=` を含む値の代表例として DB 接続文字列(sslmode=disable)を使った fixture。" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

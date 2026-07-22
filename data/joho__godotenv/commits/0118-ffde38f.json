@@ -1,0 +1,75 @@
+{
+  "seq": 118,
+  "sha": "ffde38feff4a02be3e00f0e5b90f369c3f1d6471",
+  "parents": [
+    "d1658129f903364e7db887a1cd3075212b746ec0",
+    "310d3f598cfe04d2634b807443285bdc45b5b32f"
+  ],
+  "author": {
+    "name": "John Barton",
+    "email": "jb@johnbarton.co",
+    "date": "2026-05-19T21:54:18+10:00"
+  },
+  "message": "Merge pull request #198 from ghaninia/bugfix/ParseErrorOnReadme\n\nThe `env` variable is already defined but has been declared again",
+  "pr": {
+    "number": 198,
+    "title": "The `env` variable is already defined but has been declared again",
+    "body": "",
+    "url": "https://github.com/joho/godotenv/pull/198"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 1,
+    "deletions": 1
+  },
+  "files": [
+    {
+      "path": "README.md",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/README.md b/README.md\nindex bfbe66a..65cdc66 100644\n--- a/README.md\n+++ b/README.md\n@@ -99,7 +99,7 @@ as a final aside, if you don't want godotenv munging your env you can just get a\n \n ```go\n var myEnv map[string]string\n-myEnv, err := godotenv.Read()\n+myEnv, err = godotenv.Read()\n \n s3Bucket := myEnv[\"S3_BUCKET\"]\n ```\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/dependabot.yml",
+    ".github/workflows/ci.yml",
+    ".github/workflows/codeql-analysis.yml",
+    ".github/workflows/release.yml",
+    ".gitignore",
+    "LICENCE",
+    "README.md",
+    "autoload/autoload.go",
+    "cmd/godotenv/cmd.go",
+    "fixtures/comments.env",
+    "fixtures/equals.env",
+    "fixtures/exported.env",
+    "fixtures/hyphen.env",
+    "fixtures/invalid1.env",
+    "fixtures/plain.env",
+    "fixtures/quoted.env",
+    "fixtures/substitutions.env",
+    "go.mod",
+    "godotenv.go",
+    "godotenv_test.go",
+    "parser.go"
+  ],
+  "explanation": {
+    "what": "README.md の使用例で `myEnv, err := godotenv.Read()` となっていた箇所を `myEnv, err = godotenv.Read()` に修正した。直前に `var myEnv map[string]string` で myEnv を宣言済みのため、`:=` のままだと変数の再宣言になりコンパイルエラーになる。",
+    "why": "PRタイトルの通り、既に宣言済みの変数を `:=` で再度宣言してしまっているというドキュメント上のミスの修正。",
+    "highlights": [
+      { "file": "README.md", "note": "`:=` を `=` に修正した1行" }
+    ],
+    "langNotes": [
+      { "topic": ":= と = の使い分け", "note": "Go の `:=` は短縮変数宣言で、左辺の変数を新規に宣言する。既に `var` などで宣言済みの変数に代入するだけなら `=` を使う必要があり、`:=` のままだと(スコープ内に少なくとも1つ新しい変数がない限り)コンパイルエラーになる。" }
+    ],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [{ "type": "pr", "number": 198, "url": "https://github.com/joho/godotenv/pull/198" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

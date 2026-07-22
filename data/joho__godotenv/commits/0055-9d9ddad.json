@@ -1,0 +1,82 @@
+{
+  "seq": 55,
+  "sha": "9d9ddadf44b4c17c42bafdc530ddeee1927c067d",
+  "parents": [
+    "3ddb2792f3923947290c4932990136e17852a078",
+    "390de3704e4db84cfb4bde24238ec0693ce462ed"
+  ],
+  "author": {
+    "name": "John Barton",
+    "email": "jrbarton@gmail.com",
+    "date": "2017-08-06T18:28:30+10:00"
+  },
+  "message": "Merge pull request #36 from pda/parse-from-reader\n\nParse(reader) as alternative to Read(filenames)",
+  "pr": {
+    "number": 36,
+    "title": "Parse(reader) as alternative to Read(filenames)",
+    "body": "Adds `func Parse(r io.Reader)` to the public API, which returns a `map[string]string` just like the existing `func Read(filenames ...string)` but reads from an `io.Reader` rather than a list of filenames.\r\n\r\nThis avoids needing to create a temporary file in tools like https://github.com/cultureamp/s3dotenv which load a dotenv file from a non-filesystem source.",
+    "url": "https://github.com/joho/godotenv/pull/36"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 3,
+    "additions": 55,
+    "deletions": 24
+  },
+  "files": [
+    {
+      "path": "README.md",
+      "status": "M",
+      "additions": 7,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "godotenv.go",
+      "status": "M",
+      "additions": 30,
+      "deletions": 24,
+      "binary": false
+    },
+    {
+      "path": "godotenv_test.go",
+      "status": "M",
+      "additions": 18,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/README.md b/README.md\nindex a6fb495..f45458b 100644\n--- a/README.md\n+++ b/README.md\n@@ -96,6 +96,13 @@ myEnv, err := godotenv.Read()\n s3Bucket := myEnv[\"S3_BUCKET\"]\n ```\n \n+... or from an `io.Reader` instead of a local file\n+\n+```go\n+reader := getRemoteFile()\n+myEnv, err := godotenv.Parse(reader)\n+```\n+\n ### Command Mode\n \n Assuming you've installed the command as above and you've got `$GOPATH/bin` in your `$PATH`\ndiff --git a/godotenv.go b/godotenv.go\nindex 0d9066c..f44a58d 100644\n--- a/godotenv.go\n+++ b/godotenv.go\n@@ -16,6 +16,7 @@ package godotenv\n import (\n \t\"bufio\"\n \t\"errors\"\n+\t\"io\"\n \t\"os\"\n \t\"os/exec\"\n \t\"strings\"\n@@ -89,6 +90,34 @@ func Read(filenames ...string) (envMap map[string]string, err error) {\n \treturn\n }\n \n+// Parse reads an env file from io.Reader, returning a map of keys and values.\n+func Parse(r io.Reader) (envMap map[string]string, err error) {\n+\tenvMap = make(map[string]string)\n+\n+\tvar lines []string\n+\tscanner := bufio.NewScanner(r)\n+\tfor scanner.Scan() {\n+\t\tlines = append(lines, scanner.Text())\n+\t}\n+\n+\tif err = scanner.Err(); err != nil {\n+\t\treturn\n+\t}\n+\n+\tfor _, fullLine := range lines {\n+\t\tif !isIgnoredLine(fullLine) {\n+\t\t\tvar key, value string\n+\t\t\tkey, value, err = parseLine(fullLine)\n+\n+\t\t\tif err != nil {\n+\t\t\t\treturn\n+\t\t\t}\n+\t\t\tenvMap[key] = value\n+\t\t}\n+\t}\n+\treturn\n+}\n+\n // Exec loads env vars from the specified filenames (empty map falls back to default)\n // then executes the cmd specified.\n //\n@@ -142,30 +171,7 @@ func readFile(filename string) (envMap map[string]string, err error) {\n \t}\n \tdefer file.Close()\n \n-\tenvMap = make(map[string]string)\n-\n-\tvar lines []string\n-\tscanner := bufio.NewScanner(file)\n-\tfor scanner.Scan() {\n-\t\tlines = append(lines, scanner.Text())\n-\t}\n-\n-\tif err = scanner.Err(); err != nil {\n-\t\treturn\n-\t}\n-\n-\tfor _, fullLine := range lines {\n-\t\tif !isIgnoredLine(fullLine) {\n-\t\t\tvar key, value string\n-\t\t\tkey, value, err = parseLine(fullLine)\n-\n-\t\t\tif err != nil {\n-\t\t\t\treturn\n-\t\t\t}\n-\t\t\tenvMap[key] = value\n-\t\t}\n-\t}\n-\treturn\n+\treturn Parse(file)\n }\n \n func parseLine(line string) (key string, value string, err error) {\ndiff --git a/godotenv_test.go b/godotenv_test.go\nindex a62bf87..2d46b19 100644\n--- a/godotenv_test.go\n+++ b/godotenv_test.go\n@@ -1,6 +1,7 @@\n package godotenv\n \n import (\n+\t\"bytes\"\n \t\"os\"\n \t\"testing\"\n )\n@@ -94,6 +95,23 @@ func TestReadPlainEnv(t *testing.T) {\n \t}\n }\n \n+func TestParse(t *testing.T) {\n+\tenvMap, err := Parse(bytes.NewReader([]byte(\"ONE=1\\nTWO='2'\\nTHREE = \\\"3\\\"\")))\n+\texpectedValues := map[string]string{\n+\t\t\"ONE\":   \"1\",\n+\t\t\"TWO\":   \"2\",\n+\t\t\"THREE\": \"3\",\n+\t}\n+\tif err != nil {\n+\t\tt.Fatalf(\"error parsing env: %v\", err)\n+\t}\n+\tfor key, value := range expectedValues {\n+\t\tif envMap[key] != value {\n+\t\t\tt.Errorf(\"expected %s to be %s, got %s\", key, value, envMap[key])\n+\t\t}\n+\t}\n+}\n+\n func TestLoadDoesNotOverride(t *testing.T) {\n \tenvFileName := \"fixtures/plain.env\"\n \n",
+  "diffTruncated": false,
+  "tree": [
+    ".gitignore",
+    ".travis.yml",
+    "LICENCE",
+    "README.md",
+    "autoload/autoload.go",
+    "cmd/godotenv/cmd.go",
+    "fixtures/equals.env",
+    "fixtures/exported.env",
+    "fixtures/invalid1.env",
+    "fixtures/plain.env",
+    "fixtures/quoted.env",
+    "godotenv.go",
+    "godotenv_test.go"
+  ],
+  "explanation": {
+    "what": "公開 API に `func Parse(r io.Reader) (envMap map[string]string, err error)` を追加した。従来 readFile 内にべた書きされていた「bufio.Scanner で行を読み、isIgnoredLine と parseLine で処理する」ロジックを Parse に切り出し、readFile はファイルを開いたあと `return Parse(file)` を呼ぶだけに簡素化した。README にも io.Reader からの利用例を追記している。",
+    "why": "PR body によれば、S3 など「ファイルシステム上に存在しない場所から .env 形式のデータを読み込みたい」ツール(例に挙がる s3dotenv)では、従来の Read(filenames) だけだと一時ファイルを作ってからパースする必要があった。io.Reader を直接受け取れる Parse を公開することで、そうした一時ファイル経由の手間を避けられるようにした。",
+    "highlights": [
+      { "file": "godotenv.go", "note": "新設された Parse(io.Reader) と、readFile からのロジック切り出し" }
+    ],
+    "langNotes": [
+      { "topic": "io.Reader からのパース", "note": "os.File も bytes.Reader も strings.Reader も io.Reader インタフェースを満たすため、パース処理を io.Reader 引数で書いておけば呼び出し元はファイル・メモリ上のバイト列・文字列のどれからでも同じ関数を呼べる。本コミットはファイル専用だった読み込みロジックをこの形に一般化した例。" },
+      { "topic": "bufio.Scanner", "note": "bufio.NewScanner(r) は io.Reader を1行ずつ読み出すための標準的な手段。Scan() を呼ぶたびに次の行に進み、Text() で現在行の文字列を取得する。読み込み中のエラーは戻り値ではなく Scanner.Err() で読み終わったあとにまとめて確認する点に注意。" }
+    ],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [{ "type": "pr", "number": 36, "url": "https://github.com/joho/godotenv/pull/36" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

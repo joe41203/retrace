@@ -1,0 +1,78 @@
+{
+  "seq": 71,
+  "sha": "b09de681dcaff3eaeafcc62ee1f9f622a0c32b8b",
+  "parents": [
+    "5c0e6c6ab1a0a9ef0a8822cba3a05d62f7dad941",
+    "992ab0ec47650589f676287dfc39e2edaddca0d7"
+  ],
+  "author": {
+    "name": "John Barton",
+    "email": "jb@johnbarton.co",
+    "date": "2019-10-21T07:25:22+11:00"
+  },
+  "message": "Merge pull request #90 from djherbis/master\n\n#89 move regexp.MustCompile to globals",
+  "pr": {
+    "number": 90,
+    "title": "#89 move regexp.MustCompile to globals",
+    "body": "This should fix the performance issue I observed in #89 where the regexp is being compiled many times over.",
+    "url": "https://github.com/joho/godotenv/pull/90"
+  },
+  "linkedIssues": [
+    {
+      "number": 89,
+      "title": "Poor performance: not reusing regexp.MustCompile",
+      "body": "You should def. only use regexp.MustCompile once for each static regexp you're creating (just throw them in global vars, they are concurrent safe) see https://golang.org/pkg/regexp/#MustCompile.\r\n\r\nCompiling every time like it is now uses up a lot of CPU.",
+      "url": "https://github.com/joho/godotenv/issues/89"
+    }
+  ],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 17,
+    "deletions": 13
+  },
+  "files": [
+    {
+      "path": "godotenv.go",
+      "status": "M",
+      "additions": 17,
+      "deletions": 13,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/godotenv.go b/godotenv.go\nindex beaa146..330f1c2 100644\n--- a/godotenv.go\n+++ b/godotenv.go\n@@ -209,6 +209,8 @@ func readFile(filename string) (envMap map[string]string, err error) {\n \treturn Parse(file)\n }\n \n+var exportRegex = regexp.MustCompile(`^\\s*(?:export\\s+)?(.*?)\\s*$`)\n+\n func parseLine(line string, envMap map[string]string) (key string, value string, err error) {\n \tif len(line) == 0 {\n \t\terr = errors.New(\"zero length string\")\n@@ -258,14 +260,20 @@ func parseLine(line string, envMap map[string]string) (key string, value string,\n \t}\n \tkey = strings.TrimSpace(key)\n \n-  re := regexp.MustCompile(`^\\s*(?:export\\s+)?(.*?)\\s*$`)\n-\tkey = re.ReplaceAllString(splitString[0], \"$1\")\n+\tkey = exportRegex.ReplaceAllString(splitString[0], \"$1\")\n \n \t// Parse the value\n \tvalue = parseValue(splitString[1], envMap)\n \treturn\n }\n \n+var (\n+\tsingleQuotesRegex  = regexp.MustCompile(`\\A'(.*)'\\z`)\n+\tdoubleQuotesRegex  = regexp.MustCompile(`\\A\"(.*)\"\\z`)\n+\tescapeRegex        = regexp.MustCompile(`\\\\.`)\n+\tunescapeCharsRegex = regexp.MustCompile(`\\\\([^$])`)\n+)\n+\n func parseValue(value string, envMap map[string]string) string {\n \n \t// trim\n@@ -273,11 +281,9 @@ func parseValue(value string, envMap map[string]string) string {\n \n \t// check if we've got quoted values or possible escapes\n \tif len(value) > 1 {\n-\t\trs := regexp.MustCompile(`\\A'(.*)'\\z`)\n-\t\tsingleQuotes := rs.FindStringSubmatch(value)\n+\t\tsingleQuotes := singleQuotesRegex.FindStringSubmatch(value)\n \n-\t\trd := regexp.MustCompile(`\\A\"(.*)\"\\z`)\n-\t\tdoubleQuotes := rd.FindStringSubmatch(value)\n+\t\tdoubleQuotes := doubleQuotesRegex.FindStringSubmatch(value)\n \n \t\tif singleQuotes != nil || doubleQuotes != nil {\n \t\t\t// pull the quotes off the edges\n@@ -286,7 +292,6 @@ func parseValue(value string, envMap map[string]string) string {\n \n \t\tif doubleQuotes != nil {\n \t\t\t// expand newlines\n-\t\t\tescapeRegex := regexp.MustCompile(`\\\\.`)\n \t\t\tvalue = escapeRegex.ReplaceAllStringFunc(value, func(match string) string {\n \t\t\t\tc := strings.TrimPrefix(match, `\\`)\n \t\t\t\tswitch c {\n@@ -299,8 +304,7 @@ func parseValue(value string, envMap map[string]string) string {\n \t\t\t\t}\n \t\t\t})\n \t\t\t// unescape characters\n-\t\t\te := regexp.MustCompile(`\\\\([^$])`)\n-\t\t\tvalue = e.ReplaceAllString(value, \"$1\")\n+\t\t\tvalue = unescapeCharsRegex.ReplaceAllString(value, \"$1\")\n \t\t}\n \n \t\tif singleQuotes == nil {\n@@ -311,11 +315,11 @@ func parseValue(value string, envMap map[string]string) string {\n \treturn value\n }\n \n-func expandVariables(v string, m map[string]string) string {\n-\tr := regexp.MustCompile(`(\\\\)?(\\$)(\\()?\\{?([A-Z0-9_]+)?\\}?`)\n+var expandVarRegex = regexp.MustCompile(`(\\\\)?(\\$)(\\()?\\{?([A-Z0-9_]+)?\\}?`)\n \n-\treturn r.ReplaceAllStringFunc(v, func(s string) string {\n-\t\tsubmatch := r.FindStringSubmatch(s)\n+func expandVariables(v string, m map[string]string) string {\n+\treturn expandVarRegex.ReplaceAllStringFunc(v, func(s string) string {\n+\t\tsubmatch := expandVarRegex.FindStringSubmatch(s)\n \n \t\tif submatch == nil {\n \t\t\treturn s\n",
+  "diffTruncated": false,
+  "tree": [
+    ".gitignore",
+    ".travis.yml",
+    "LICENCE",
+    "README.md",
+    "autoload/autoload.go",
+    "cmd/godotenv/cmd.go",
+    "fixtures/equals.env",
+    "fixtures/exported.env",
+    "fixtures/invalid1.env",
+    "fixtures/plain.env",
+    "fixtures/quoted.env",
+    "fixtures/substitutions.env",
+    "godotenv.go",
+    "godotenv_test.go"
+  ],
+  "explanation": {
+    "what": "parseLine と parseValue、expandVariables の中で毎回呼んでいた regexp.MustCompile 呼び出しを、パッケージレベルの var 宣言(exportRegex, singleQuotesRegex, doubleQuotesRegex, escapeRegex, unescapeCharsRegex, expandVarRegex)に切り出した。関数の外に出しただけで正規表現パターン自体は変更していない。",
+    "why": "issue #89 で「regexp.MustCompile は静的な正規表現なら一度だけコンパイルしてグローバル変数に置くべきで、行ごとに毎回コンパイルするとCPUを浪費する」と指摘されており、PRはその性能問題を修正するためのもの。",
+    "highlights": [
+      { "file": "godotenv.go", "note": "parseLine/parseValue/expandVariables 内の regexp.MustCompile 呼び出しがすべてパッケージスコープの var に移動している" }
+    ],
+    "langNotes": [
+      { "topic": "regexp.MustCompile とグローバル変数", "note": "Go の regexp.MustCompile はパターンをコンパイルするたびにコストがかかるが、コンパイル済みの *regexp.Regexp はゴルーチン間で安全に共有できる。そのため定数的な正規表現はパッケージレベルの var にキャッシュしておくのが定石。" }
+    ],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [
+      { "type": "pr", "number": 90, "url": "https://github.com/joho/godotenv/pull/90" },
+      { "type": "issue", "number": 89, "url": "https://github.com/joho/godotenv/issues/89" }
+    ],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

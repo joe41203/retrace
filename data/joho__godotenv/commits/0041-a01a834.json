@@ -1,0 +1,58 @@
+{
+  "seq": 41,
+  "sha": "a01a834e1654b4c9ca5b3ad05159445cc9c7ad08",
+  "parents": [
+    "d2ce5befea71fea6922c5ced068e261661717176"
+  ],
+  "author": {
+    "name": "John Barton (joho)",
+    "email": "jrbarton@gmail.com",
+    "date": "2014-10-12T10:38:08+11:00"
+  },
+  "message": "Update docs for the bin command.",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 20,
+    "deletions": 1
+  },
+  "files": [
+    {
+      "path": "README.md",
+      "status": "M",
+      "additions": 20,
+      "deletions": 1,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/README.md b/README.md\nindex cc3843b..05c47e6 100644\n--- a/README.md\n+++ b/README.md\n@@ -8,12 +8,23 @@ From the original Library:\n >\n > But it is not always practical to set environment variables on development machines or continuous integration servers where multiple projects are run. Dotenv load variables from a .env file into ENV when the environment is bootstrapped.\n \n+It can be used as a library (for loading in env for your own daemons etc) or as a bin command.\n+\n+There is test coverage and CI for both linuxish and windows environments, but I make no guarantees about the bin version working on windows.\n+\n ## Installation\n \n+As a library\n+\n ```shell\n go get github.com/joho/godotenv\n ```\n \n+or if you want to use it as a bin command\n+```shell\n+go get github.com/joho/godotenv/cmd/godotenv\n+```\n+\n ## Usage\n \n Add your application configuration to your `.env` file in the root of your project:\n@@ -85,7 +96,15 @@ myEnv, err := godotenv.Read()\n s3Bucket := myEnv[\"S3_BUCKET\"]\n ```\n \n-end\n+### Command Mode\n+\n+Assuming you've installed the command as above and you've got `$GOPATH/bin` in your `$PATH`\n+\n+```\n+godotenv -f /some/path/to/.env some_command with some args\n+```\n+\n+If you don't specify `-f` it will fall back on the default of loading `.env` in `PWD`\n \n ## Contributing\n \n",
+  "diffTruncated": false,
+  "tree": [
+    ".gitignore",
+    "LICENCE",
+    "README.md",
+    "autoload/autoload.go",
+    "cmd/godotenv/cmd.go",
+    "fixtures/equals.env",
+    "fixtures/exported.env",
+    "fixtures/plain.env",
+    "fixtures/quoted.env",
+    "godotenv.go",
+    "godotenv_test.go",
+    "wercker.yml"
+  ],
+  "explanation": {
+    "what": "README.md に bin コマンドとしての使い方を追記した。ライブラリとして go get する手順とは別に `go get github.com/joho/godotenv/cmd/godotenv` でコマンドを導入する手順、`godotenv -f /path/to/.env some_command with some args` という実行例、`-f` を省略した場合は PWD の `.env` を使う旨を説明する「Command Mode」セクションを追加している。あわせて linuxish/windows 双方の CI がある旨も書き加えた。",
+    "why": "直前の2コミット(seq39 の PR #6 マージで bin コマンドを追加、seq40 でパッケージパスを `cmd/godotenv` に整理)によってライブラリとコマンドの2通りの使い方が生まれたため、README にコマンドの導入・使用方法を追記して利用者に説明する必要が生じた。",
+    "highlights": [
+      { "file": "README.md", "note": "「Command Mode」セクションが新設され、-f フラグの意味とデフォルト挙動が説明されている" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

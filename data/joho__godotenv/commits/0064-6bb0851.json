@@ -1,0 +1,96 @@
+{
+  "seq": 64,
+  "sha": "6bb08516677f8c8274c557fc801bee9ab564ab2c",
+  "parents": [
+    "06e67b5ef3bef2e1a8696e1c04b94b44cbc5d9a5",
+    "2707e9ff66c3758b5e7342e3ee72dd183aba7aef"
+  ],
+  "author": {
+    "name": "John Barton",
+    "email": "jrbarton@gmail.com",
+    "date": "2018-01-15T13:49:21+11:00"
+  },
+  "message": "Merge pull request #47 from sachaos/feature-expand-variables-on-value\n\nSupport variable substitution in dotenv files",
+  "pr": {
+    "number": 47,
+    "title": "Support variable substitution in dotenv files",
+    "body": "One of #38 .",
+    "url": "https://github.com/joho/godotenv/pull/47"
+  },
+  "linkedIssues": [
+    {
+      "number": 38,
+      "title": "Support for variable/command substitution in dotenv files",
+      "body": "The ruby dotenv has support for command substitution and basic variable substitution (but not yet expansion)\r\n\r\nAt the very least, variable substitution would be a nice to have in godotenv",
+      "url": "https://github.com/joho/godotenv/issues/38"
+    }
+  ],
+  "stats": {
+    "filesChanged": 3,
+    "additions": 32,
+    "deletions": 7
+  },
+  "files": [
+    {
+      "path": "fixtures/substitutions.env",
+      "status": "A",
+      "additions": 5,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "godotenv.go",
+      "status": "M",
+      "additions": 11,
+      "deletions": 4,
+      "binary": false
+    },
+    {
+      "path": "godotenv_test.go",
+      "status": "M",
+      "additions": 16,
+      "deletions": 3,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/fixtures/substitutions.env b/fixtures/substitutions.env\nnew file mode 100644\nindex 0000000..44337a9\n--- /dev/null\n+++ b/fixtures/substitutions.env\n@@ -0,0 +1,5 @@\n+OPTION_A=1\n+OPTION_B=${OPTION_A}\n+OPTION_C=$OPTION_B\n+OPTION_D=${OPTION_A}${OPTION_B}\n+OPTION_E=${OPTION_NOT_DEFINED}\ndiff --git a/godotenv.go b/godotenv.go\nindex 48ae78c..19751d7 100644\n--- a/godotenv.go\n+++ b/godotenv.go\n@@ -112,7 +112,7 @@ func Parse(r io.Reader) (envMap map[string]string, err error) {\n \tfor _, fullLine := range lines {\n \t\tif !isIgnoredLine(fullLine) {\n \t\t\tvar key, value string\n-\t\t\tkey, value, err = parseLine(fullLine)\n+\t\t\tkey, value, err = parseLine(fullLine, envMap)\n \n \t\t\tif err != nil {\n \t\t\t\treturn\n@@ -209,7 +209,7 @@ func readFile(filename string) (envMap map[string]string, err error) {\n \treturn Parse(file)\n }\n \n-func parseLine(line string) (key string, value string, err error) {\n+func parseLine(line string, envMap map[string]string) (key string, value string, err error) {\n \tif len(line) == 0 {\n \t\terr = errors.New(\"zero length string\")\n \t\treturn\n@@ -259,11 +259,11 @@ func parseLine(line string) (key string, value string, err error) {\n \tkey = strings.Trim(key, \" \")\n \n \t// Parse the value\n-\tvalue = parseValue(splitString[1])\n+\tvalue = parseValue(splitString[1], envMap)\n \treturn\n }\n \n-func parseValue(value string) string {\n+func parseValue(value string, envMap map[string]string) string {\n \n \t// trim\n \tvalue = strings.Trim(value, \" \")\n@@ -291,6 +291,13 @@ func parseValue(value string) string {\n \t\t}\n \t}\n \n+\t// expand variables\n+\tvalue = os.Expand(value, func(key string) string {\n+\t\tif val, ok := envMap[key]; ok {\n+\t\t\treturn val\n+\t\t}\n+\t\treturn \"\"\n+\t})\n \treturn value\n }\n \ndiff --git a/godotenv_test.go b/godotenv_test.go\nindex fc4f7f0..bbbd658 100644\n--- a/godotenv_test.go\n+++ b/godotenv_test.go\n@@ -11,7 +11,7 @@ import (\n var noopPresets = make(map[string]string)\n \n func parseAndCompare(t *testing.T, rawEnvLine string, expectedKey string, expectedValue string) {\n-\tkey, value, _ := parseLine(rawEnvLine)\n+\tkey, value, _ := parseLine(rawEnvLine, noopPresets)\n \tif key != expectedKey || value != expectedValue {\n \t\tt.Errorf(\"Expected '%v' to parse as '%v' => '%v', got '%v' => '%v' instead\", rawEnvLine, expectedKey, expectedValue, key, value)\n \t}\n@@ -193,6 +193,19 @@ func TestLoadQuotedEnv(t *testing.T) {\n \tloadEnvAndCompareValues(t, Load, envFileName, expectedValues, noopPresets)\n }\n \n+func TestSubstituitions(t *testing.T) {\n+\tenvFileName := \"fixtures/substitutions.env\"\n+\texpectedValues := map[string]string{\n+\t\t\"OPTION_A\": \"1\",\n+\t\t\"OPTION_B\": \"1\",\n+\t\t\"OPTION_C\": \"1\",\n+\t\t\"OPTION_D\": \"11\",\n+\t\t\"OPTION_E\": \"\",\n+\t}\n+\n+\tloadEnvAndCompareValues(t, Load, envFileName, expectedValues, noopPresets)\n+}\n+\n func TestActualEnvVarsAreLeftAlone(t *testing.T) {\n \tos.Clearenv()\n \tos.Setenv(\"OPTION_A\", \"actualenv\")\n@@ -280,7 +293,7 @@ func TestParsing(t *testing.T) {\n \t// it 'throws an error if line format is incorrect' do\n \t// expect{env('lol$wut')}.to raise_error(Dotenv::FormatError)\n \tbadlyFormattedLine := \"lol$wut\"\n-\t_, _, err := parseLine(badlyFormattedLine)\n+\t_, _, err := parseLine(badlyFormattedLine, noopPresets)\n \tif err == nil {\n \t\tt.Errorf(\"Expected \\\"%v\\\" to return error, but it didn't\", badlyFormattedLine)\n \t}\n@@ -348,7 +361,7 @@ func TestWrite(t *testing.T) {\n \t//but single quotes are left alone\n \twriteAndCompare(`key=va'lu'e`, `key=\"va'lu'e\"`)\n \t// newlines, backslashes, and some other special chars are escaped\n-\twriteAndCompare(`foo=\"$ba\\n\\r\\\\r!\"`, `foo=\"\\$ba\\n\\r\\\\r\\!\"`)\n+\twriteAndCompare(`foo=\"\\n\\r\\\\r!\"`, `foo=\"\\n\\r\\\\r\\!\"`)\n \t// lines should be sorted\n \twriteAndCompare(\"foo=bar\\nbaz=buzz\", \"baz=\\\"buzz\\\"\\nfoo=\\\"bar\\\"\")\n \n",
+  "diffTruncated": false,
+  "tree": [
+    ".gitignore",
+    ".travis.yml",
+    "LICENCE",
+    "README.md",
+    "autoload/autoload.go",
+    "cmd/godotenv/cmd.go",
+    "fixtures/equals.env",
+    "fixtures/exported.env",
+    "fixtures/invalid1.env",
+    "fixtures/plain.env",
+    "fixtures/quoted.env",
+    "fixtures/substitutions.env",
+    "godotenv.go",
+    "godotenv_test.go"
+  ],
+  "explanation": {
+    "what": "値の中に `$VAR` や `${VAR}` の形式で他のキーを参照できる変数展開を実装した。parseLine と parseValue にそれまで解析済みの envMap を引数として渡すよう変更し、parseValue の最後で `os.Expand` を使って `${key}` 形式のプレースホルダを envMap 内の値に置換する。新しい fixtures/substitutions.env と TestSubstituitions を追加し、未定義変数は空文字列に展開されることも確認している。",
+    "why": "issue #38 で「Ruby 版の dotenv には変数・コマンド置換の機能があるが godotenv には無い」という要望が出ており、その一部(変数展開)を実装するPR。まず同一ファイル内で既にパースされた値だけを参照できる形で実装され、実際の環境変数(os.LookupEnv)へのフォールバックは含まれない。",
+    "highlights": [
+      { "file": "godotenv.go", "note": "parseValue の末尾に `os.Expand(value, func(key string) string {...})` を追加。envMap 内にキーがあれば値を返し、無ければ空文字列を返すコールバック。" },
+      { "file": "fixtures/substitutions.env", "note": "`OPTION_B=${OPTION_A}` `OPTION_C=$OPTION_B` など、波括弧あり/なしと未定義変数のケースを網羅した新規フィクスチャ。" }
+    ],
+    "langNotes": [
+      { "topic": "os.Expand と $VAR / ${VAR} 展開", "note": "Go 標準ライブラリの `os.Expand(s, mapping)` は文字列内の `$name` や `${name}` を mapping 関数の戻り値に置換するユーティリティ。ここでは mapping にファイル内で既にパース済みの envMap を参照するクロージャを渡すことで、シェルの変数展開に似た機能を再現している。" }
+    ],
+    "diagram": {
+      "mermaid": "flowchart TD\n  A[\"Parse() が行ごとに parseLine を呼ぶ\"] --> B[\"parseLine が key/value を分離\"]\n  B --> C[\"parseValue(value, envMap) を呼ぶ\"]\n  C --> D[\"os.Expand で $VAR / ${VAR} を検出\"]\n  D --> E{\"envMap にキーが存在?\"}\n  E -->|\"Yes\"| F[\"envMap の値に置換\"]\n  E -->|\"No\"| G[\"空文字列に置換\"]\n  F --> H[\"展開後の value を envMap に格納\"]\n  G --> H",
+      "caption": "値中の $VAR / ${VAR} を os.Expand で envMap 参照に展開するフロー"
+    },
+    "evidence": "issue",
+    "refs": [
+      { "type": "pr", "number": 47, "url": "https://github.com/joho/godotenv/pull/47" },
+      { "type": "issue", "number": 38, "url": "https://github.com/joho/godotenv/issues/38" }
+    ],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

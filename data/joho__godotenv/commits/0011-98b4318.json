@@ -1,0 +1,52 @@
+{
+  "seq": 11,
+  "sha": "98b43188a1624cc1e0e6863adc21ed83192c5873",
+  "parents": [
+    "a37b438d549d3ff88f30f66eaff32b2ea3d0eea1"
+  ],
+  "author": {
+    "name": "John Barton (joho)",
+    "email": "jrbarton@gmail.com",
+    "date": "2013-07-31T12:08:58+10:00"
+  },
+  "message": "World's most naive comment parser...\n\nReally pushing this red/green/refactor thing a little bit too far.",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 8,
+    "deletions": 3
+  },
+  "files": [
+    {
+      "path": "godotenv.go",
+      "status": "M",
+      "additions": 8,
+      "deletions": 3,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/godotenv.go b/godotenv.go\nindex 9193694..62ab57d 100644\n--- a/godotenv.go\n+++ b/godotenv.go\n@@ -80,13 +80,18 @@ func parseLine(line string) (key string, value string, err error) {\n \n \t// ditch the comments\n \tif strings.Contains(value, \"#\") {\n-\t\tvalue = strings.Trim(strings.Split(value, \"#\")[0], \" \")\n+\t\tsegmentsBetweenHashes := strings.Split(value, \"#\")\n+\t\tvalue = segmentsBetweenHashes[0]\n+\t\t// open quote in leftmost segment\n+\t\tif strings.Count(value, \"\\\"\") == 1 {\n+\t\t\tvalue = value + \"#\" + segmentsBetweenHashes[1]\n+\t\t}\n \t}\n \n \t// check if we've got quoted values\n \tif strings.Count(value, \"\\\"\") == 2 || strings.Count(value, \"'\") == 2 {\n-\t\t// pull the quotes off the edge\n-\t\tvalue = strings.Trim(value, \"\\\"'\")\n+\t\t// pull the quotes off the edges\n+\t\tvalue = strings.Trim(value, \"\\\"' \")\n \n \t\t// expand quotes\n \t\tvalue = strings.Replace(value, \"\\\\\\\"\", \"\\\"\", -1)\n",
+  "diffTruncated": false,
+  "tree": [
+    ".gitignore",
+    "fixtures/exported.env",
+    "fixtures/plain.env",
+    "fixtures/quoted.env",
+    "godotenv.go",
+    "godotenv_test.go"
+  ],
+  "explanation": {
+    "what": "parseLine内のコメント除去処理を拡張し、値の中に開きクォート(\"または')が1つだけ含まれる場合はハッシュ(#)以降を切り捨てずに繋ぎ戻すようにした。また、クォートを剥がすstrings.Trimの対象文字にスペースを加えた。",
+    "why": "コミットメッセージの\"World's most naive comment parser...\"が示す通り、直前のseq10で始めたコメント/クォート処理をTDDのred/greenサイクルで一歩ずつ進めている。`FOO=\"bar#baz\"`のようにクォート内に#がある値を、単純な最初の#で区切るとクォートが閉じないまま切り詰めてしまう問題に対処するための、まだ粗い(naiveな)応急処置。",
+    "highlights": [
+      { "file": "godotenv.go", "note": "strings.Countでクォート文字が奇数個(=1個)残っているかを見て、開きっぱなしなら#以降を戻す場当たり的なロジック" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

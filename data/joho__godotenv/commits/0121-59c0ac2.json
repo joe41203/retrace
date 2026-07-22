@@ -1,0 +1,83 @@
+{
+  "seq": 121,
+  "sha": "59c0ac271a104e9ffcf62c1181c602dc72496894",
+  "parents": [
+    "045f59bfe5f302b78e29bd2e1a7597c542bfabc2",
+    "44124b6598ef47344500a3fb5def06ae227b0b48"
+  ],
+  "author": {
+    "name": "John Barton",
+    "email": "jb@johnbarton.co",
+    "date": "2026-05-19T21:55:59+10:00"
+  },
+  "message": "Merge pull request #252 from lotusirous/main\n\nsimplify Replace(..,-1) by ReplaceAll for strings and bytes",
+  "pr": {
+    "number": 252,
+    "title": "simplify Replace(..,-1) by ReplaceAll for strings and bytes",
+    "body": "",
+    "url": "https://github.com/joho/godotenv/pull/252"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 2,
+    "deletions": 2
+  },
+  "files": [
+    {
+      "path": "godotenv.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "parser.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/godotenv.go b/godotenv.go\nindex 8e9fe3f..9cc3688 100644\n--- a/godotenv.go\n+++ b/godotenv.go\n@@ -241,7 +241,7 @@ func doubleQuoteEscape(line string) string {\n \t\tif c == '\\r' {\n \t\t\ttoReplace = `\\r`\n \t\t}\n-\t\tline = strings.Replace(line, string(c), toReplace, -1)\n+\t\tline = strings.ReplaceAll(line, string(c), toReplace)\n \t}\n \treturn line\n }\ndiff --git a/parser.go b/parser.go\nindex 81c7788..f9fa9a4 100644\n--- a/parser.go\n+++ b/parser.go\n@@ -19,7 +19,7 @@ const (\n )\n \n func parseBytes(src []byte, out map[string]string) error {\n-\tsrc = bytes.Replace(src, []byte(\"\\r\\n\"), []byte(\"\\n\"), -1)\n+\tsrc = bytes.ReplaceAll(src, []byte(\"\\r\\n\"), []byte(\"\\n\"))\n \tcutset := src\n \tfor {\n \t\tcutset = getStatementStart(cutset)\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/dependabot.yml",
+    ".github/workflows/ci.yml",
+    ".github/workflows/codeql-analysis.yml",
+    ".github/workflows/release.yml",
+    ".gitignore",
+    "LICENCE",
+    "README.md",
+    "autoload/autoload.go",
+    "cmd/godotenv/cmd.go",
+    "fixtures/comments.env",
+    "fixtures/equals.env",
+    "fixtures/exported.env",
+    "fixtures/hyphen.env",
+    "fixtures/invalid1.env",
+    "fixtures/plain.env",
+    "fixtures/quoted.env",
+    "fixtures/substitutions.env",
+    "go.mod",
+    "godotenv.go",
+    "godotenv_test.go",
+    "parser.go"
+  ],
+  "explanation": {
+    "what": "godotenv.go の doubleQuoteEscape と parser.go の parseBytes で使っていた strings.Replace(..., -1) / bytes.Replace(..., -1) を、それぞれ strings.ReplaceAll / bytes.ReplaceAll に置き換えた。前者はダブルクォート内のエスケープ処理、後者は CRLF を LF に正規化する処理で使われている。",
+    "why": "第4引数に -1 を渡す Replace 呼び出しは「全置換」を意味するが、Go 1.12 で追加された ReplaceAll はその意図をそのまま関数名で表現できる。PR タイトルの通り、挙動を変えずに可読性を上げるための簡素化。",
+    "highlights": [
+      { "file": "parser.go", "note": "bytes.ReplaceAll で CRLF→LF 正規化。パーサの前処理として重要な一行" },
+      { "file": "godotenv.go", "note": "doubleQuoteEscape 内、strings.Replace(...,-1) から書き換え" }
+    ],
+    "langNotes": [
+      { "topic": "strings.ReplaceAll / bytes.ReplaceAll", "note": "Go 1.12 で追加された関数。`strings.Replace(s, old, new, -1)` と等価だが、-1 という「マジックナンバー」を書かずに済む。既存コードに Replace(...,-1) を見かけたら ReplaceAll への置換候補と考えてよい。" }
+    ],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [{ "type": "pr", "number": 252, "url": "https://github.com/joho/godotenv/pull/252" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

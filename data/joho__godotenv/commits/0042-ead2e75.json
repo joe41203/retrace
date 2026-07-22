@@ -1,0 +1,59 @@
+{
+  "seq": 42,
+  "sha": "ead2e75027bf1a3f6457e28d9eb3c2fa05109d2b",
+  "parents": [
+    "a01a834e1654b4c9ca5b3ad05159445cc9c7ad08",
+    "dc9cc93c4e85bf0e83c21f201a2d07d8804df25f"
+  ],
+  "author": {
+    "name": "John Barton",
+    "email": "jrbarton@gmail.com",
+    "date": "2015-01-02T15:46:44+11:00"
+  },
+  "message": "Merge pull request #8 from calavera/add_values_to_envmap\n\nFix issue reading file.",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 4,
+    "deletions": 2
+  },
+  "files": [
+    {
+      "path": "godotenv.go",
+      "status": "M",
+      "additions": 4,
+      "deletions": 2,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/godotenv.go b/godotenv.go\nindex 816e759..33bf84d 100644\n--- a/godotenv.go\n+++ b/godotenv.go\n@@ -104,7 +104,9 @@ func loadFile(filename string) (err error) {\n \t}\n \n \tfor key, value := range envMap {\n-\t\tos.Setenv(key, value)\n+\t\tif os.Getenv(key) == \"\" {\n+\t\t\tos.Setenv(key, value)\n+\t\t}\n \t}\n \n \treturn\n@@ -129,7 +131,7 @@ func readFile(filename string) (envMap map[string]string, err error) {\n \t\tif !isIgnoredLine(fullLine) {\n \t\t\tkey, value, err := parseLine(fullLine)\n \n-\t\t\tif err == nil && os.Getenv(key) == \"\" {\n+\t\t\tif err == nil {\n \t\t\t\tenvMap[key] = value\n \t\t\t}\n \t\t}\n",
+  "diffTruncated": false,
+  "tree": [
+    ".gitignore",
+    "LICENCE",
+    "README.md",
+    "autoload/autoload.go",
+    "cmd/godotenv/cmd.go",
+    "fixtures/equals.env",
+    "fixtures/exported.env",
+    "fixtures/plain.env",
+    "fixtures/quoted.env",
+    "godotenv.go",
+    "godotenv_test.go",
+    "wercker.yml"
+  ],
+  "explanation": {
+    "what": "godotenv.go の loadFile と readFile の間で重複していた「既存の環境変数を上書きしない」判定を loadFile 側だけに一本化した。loadFile では `os.Getenv(key) == \"\"` のときだけ os.Setenv するよう変更し、readFile 側では逆に既存環境変数のチェックを外して常に envMap に値を詰めるようにした。",
+    "why": "PR タイトルが「Fix issue reading file.」であり、readFile が既存の環境変数を見て値をスキップしてしまうと、Read() で取得する envMap に本来含まれるべきキーが欠落する不具合があったためと考えられる(PRのbodyが空のため詳細は読み取れない)。",
+    "highlights": [
+      { "file": "godotenv.go", "note": "上書き抑制のロジックが readFile→loadFile に移動し、Read() は素直に全キーを返すようになった" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

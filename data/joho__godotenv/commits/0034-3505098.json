@@ -1,0 +1,66 @@
+{
+  "seq": 34,
+  "sha": "3505098f907089729105e928aebea45f0a643f20",
+  "parents": [
+    "6e333bd70814b1dff26872504f510b40a5317a11",
+    "c0dce90b3cda5af0354b940f9439599eb279a6c1"
+  ],
+  "author": {
+    "name": "John Barton",
+    "email": "jrbarton@gmail.com",
+    "date": "2013-11-18T01:49:12-08:00"
+  },
+  "message": "Merge pull request #2 from mattn/seveal_equals\n\nFOO=BAR= should be \"FOO\" = \"BAR=\"",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 6,
+    "deletions": 2
+  },
+  "files": [
+    {
+      "path": "godotenv.go",
+      "status": "M",
+      "additions": 2,
+      "deletions": 2,
+      "binary": false
+    },
+    {
+      "path": "godotenv_test.go",
+      "status": "M",
+      "additions": 4,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/godotenv.go b/godotenv.go\nindex a421053..84e2ff9 100644\n--- a/godotenv.go\n+++ b/godotenv.go\n@@ -138,11 +138,11 @@ func parseLine(line string) (key string, value string, err error) {\n \t}\n \n \t// now split key from value\n-\tsplitString := strings.Split(line, \"=\")\n+\tsplitString := strings.SplitN(line, \"=\", 2)\n \n \tif len(splitString) != 2 {\n \t\t// try yaml mode!\n-\t\tsplitString = strings.Split(line, \":\")\n+\t\tsplitString = strings.SplitN(line, \":\", 2)\n \t}\n \n \tif len(splitString) != 2 {\ndiff --git a/godotenv_test.go b/godotenv_test.go\nindex 381be3e..e1ac87f 100644\n--- a/godotenv_test.go\n+++ b/godotenv_test.go\n@@ -151,6 +151,10 @@ func TestParsing(t *testing.T) {\n \t// expect(env('FOO.BAR=foobar')).to eql('FOO.BAR' => 'foobar')\n \tparseAndCompare(t, \"FOO.BAR=foobar\", \"FOO.BAR\", \"foobar\")\n \n+\t// it 'parses varibales with several \"=\" in the value' do\n+\t// expect(env('FOO=foobar=')).to eql('FOO' => 'foobar=')\n+\tparseAndCompare(t, \"FOO=foobar=\", \"FOO\", \"foobar=\")\n+\n \t// it 'strips unquoted values' do\n \t// expect(env('foo=bar ')).to eql('foo' => 'bar') # not 'bar '\n \tparseAndCompare(t, \"FOO=bar \", \"FOO\", \"bar\")\n",
+  "diffTruncated": false,
+  "tree": [
+    ".gitignore",
+    "LICENCE",
+    "README.md",
+    "autoload/autoload.go",
+    "fixtures/exported.env",
+    "fixtures/plain.env",
+    "fixtures/quoted.env",
+    "godotenv.go",
+    "godotenv_test.go",
+    "wercker.yml"
+  ],
+  "explanation": {
+    "what": "外部コントリビューター mattn からの PR をマージ。parseLine 内の区切り文字分割を strings.Split から strings.SplitN(line, sep, 2) に変更し、値の中に `=` や `:` が複数含まれる行を正しく1回だけ分割するようにした。テストケース `FOO=foobar=` → key=\"FOO\", value=\"foobar=\" を追加。",
+    "why": "コミットメッセージにある通り `FOO=BAR=` は key=\"FOO\", value=\"BAR=\" と解釈されるべきだが、無制限の strings.Split では `=` の個数分に分割されてしまい値が壊れていた。SplitN で分割回数を2に制限することで、最初の区切り文字以降はすべて値の一部として扱うよう修正した。",
+    "highlights": [
+      { "file": "godotenv.go", "note": "strings.Split → strings.SplitN(line, sep, 2)。値の中に区切り文字が含まれるケースへの対応。" }
+    ],
+    "langNotes": [
+      { "topic": "strings.SplitN", "note": "標準ライブラリ strings.Split は区切り文字の出現回数だけ無制限に分割するが、SplitN は第3引数で分割後の要素数上限を指定できる。`SplitN(s, sep, 2)` は最初の区切り文字だけで2つに分け、以降の同じ文字は分割せず後半の要素にそのまま残す。"}
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

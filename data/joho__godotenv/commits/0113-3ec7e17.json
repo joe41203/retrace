@@ -1,0 +1,83 @@
+{
+  "seq": 113,
+  "sha": "3ec7e17a8db025f18ae066e6f220354b9de09754",
+  "parents": [
+    "a2be92d182fc04da33b365bf47c17fe0f4808aea"
+  ],
+  "author": {
+    "name": "Yanhu007",
+    "email": "huangfuyang900204@gmail.com",
+    "date": "2026-04-14T14:39:45+08:00"
+  },
+  "message": "refactor: replace recursion with loop in getStatementStart\n\nConvert the recursive getStatementStart function to an iterative\nloop. This prevents potential stack overflow on files with a very\nlarge number of consecutive comment lines.\n\nRef #232",
+  "pr": {
+    "number": 261,
+    "title": "refactor: replace recursion with loop in getStatementStart",
+    "body": "Ref #232\n\nConverts the recursive `getStatementStart` function to an iterative loop. The behavior is identical, but the iterative version:\n\n- Prevents potential stack overflow on files with many consecutive comment lines\n- Is slightly more idiomatic Go\n- Is marginally more efficient (no recursive call overhead)\n\nAll existing tests pass.",
+    "url": "https://github.com/joho/godotenv/pull/261"
+  },
+  "linkedIssues": [
+    {
+      "number": 232,
+      "title": "Recursion in getStatementStart could be a loop",
+      "body": "Hey, I just noticed that the recursion here could be a simple loop, I think? (I'm new to Go, not new to programming.)\r\n\r\nhttps://github.com/joho/godotenv/blob/3fc4292b58a67b78e1dbb6e47b4879a6cc602ec4/parser.go#L50-L68\r\n\r\nCould be something like this:\r\n```Go\r\nfunc getStatementStart(src []byte) []byte {\r\n\tfor {\r\n\t\tpos := indexOfNonSpaceChar(src)\r\n\t\tif pos == -1 {\r\n\t\t\treturn nil\r\n\t\t}\r\n\r\n\t\tsrc = src[pos:]\r\n\t\tif src[0] != charComment {\r\n\t\t\treturn src\r\n\t\t}\r\n\r\n\t\t// skip comment section\r\n\t\tpos = bytes.IndexFunc(src, isCharFunc('\\n'))\r\n\t\tif pos == -1 {\r\n\t\t\treturn nil\r\n\t\t}\r\n\r\n\t\tsrc = src[pos:]\r\n\t}\r\n}\r\n```\r\n\r\nThis is not a bug, just something I noticed while reading the source in order to understand exactly what syntax this tool is accepting. 😄\r\nSorry for the noise.",
+      "url": "https://github.com/joho/godotenv/issues/232"
+    }
+  ],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 16,
+    "deletions": 14
+  },
+  "files": [
+    {
+      "path": "parser.go",
+      "status": "M",
+      "additions": 16,
+      "deletions": 14,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/parser.go b/parser.go\nindex 6655318..49fc292 100644\n--- a/parser.go\n+++ b/parser.go\n@@ -49,23 +49,25 @@ func parseBytes(src []byte, out map[string]string) error {\n //\n // It skips any comment line or non-whitespace character.\n func getStatementStart(src []byte) []byte {\n-\tpos := indexOfNonSpaceChar(src)\n-\tif pos == -1 {\n-\t\treturn nil\n-\t}\n+\tfor {\n+\t\tpos := indexOfNonSpaceChar(src)\n+\t\tif pos == -1 {\n+\t\t\treturn nil\n+\t\t}\n \n-\tsrc = src[pos:]\n-\tif src[0] != charComment {\n-\t\treturn src\n-\t}\n+\t\tsrc = src[pos:]\n+\t\tif src[0] != charComment {\n+\t\t\treturn src\n+\t\t}\n \n-\t// skip comment section\n-\tpos = bytes.IndexFunc(src, isCharFunc('\\n'))\n-\tif pos == -1 {\n-\t\treturn nil\n-\t}\n+\t\t// skip comment section\n+\t\tpos = bytes.IndexFunc(src, isCharFunc('\\n'))\n+\t\tif pos == -1 {\n+\t\t\treturn nil\n+\t\t}\n \n-\treturn getStatementStart(src[pos:])\n+\t\tsrc = src[pos:]\n+\t}\n }\n \n // locateKeyName locates and parses key name and returns rest of slice\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/dependabot.yml",
+    ".github/workflows/ci.yml",
+    ".github/workflows/codeql-analysis.yml",
+    ".github/workflows/release.yml",
+    ".gitignore",
+    "LICENCE",
+    "README.md",
+    "autoload/autoload.go",
+    "cmd/godotenv/cmd.go",
+    "fixtures/comments.env",
+    "fixtures/equals.env",
+    "fixtures/exported.env",
+    "fixtures/invalid1.env",
+    "fixtures/plain.env",
+    "fixtures/quoted.env",
+    "fixtures/substitutions.env",
+    "go.mod",
+    "godotenv.go",
+    "godotenv_test.go",
+    "parser.go"
+  ],
+  "explanation": {
+    "what": "getStatementStart 関数を、末尾で自分自身を呼び出す再帰(return getStatementStart(src[pos:]))から、for による反復ループへ書き換えた。コメント行やホワイトスペースだけの行を読み飛ばすロジック自体は変わっていない。",
+    "why": "linkedIssue #232 で、この再帰は末尾呼び出しにすぎずループに置き換えられる、と Go 初心者の第三者から指摘されていた。PR本文の通り、連続するコメント行が非常に多いファイルを読んだ際の潜在的なスタックオーバーフローを避けられ、また再帰呼び出しのオーバーヘッドがなくなりわずかに効率的になる、という理由でループ化された。",
+    "highlights": [
+      { "file": "parser.go", "note": "getStatementStart 本体。再帰呼び出しが for ループの1周に置き換わった" }
+    ],
+    "langNotes": [
+      { "topic": "tail recursion to loop", "note": "Go コンパイラは末尾呼び出し最適化(tail-call optimization)を保証しない。再帰の深さがコールスタックを消費するため、入力サイズに比例して再帰するコードは大きな入力でスタックオーバーフローの懸念がある。同じ処理を for ループで書き直せば、呼び出し1回分のスタックだけで済む。"}
+    ],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [
+      { "type": "pr", "number": 261, "url": "https://github.com/joho/godotenv/pull/261" },
+      { "type": "issue", "number": 232, "url": "https://github.com/joho/godotenv/issues/232" }
+    ],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

@@ -1,0 +1,91 @@
+{
+  "seq": 52,
+  "sha": "eaf676fc033919bc7814b970310973dcfe6197e1",
+  "parents": [
+    "b01826f9569125401f5a25c97d62820184893c32",
+    "a42a65518cade4f35102bd3378112edc859e8729"
+  ],
+  "author": {
+    "name": "John Barton",
+    "email": "jrbarton@gmail.com",
+    "date": "2017-03-23T07:07:31+11:00"
+  },
+  "message": "Merge pull request #27 from goenning/empty_var\n\nallow usage of empty var on .env",
+  "pr": {
+    "number": 27,
+    "title": "allow usage of empty var on .env",
+    "body": "This PR should fix #26.",
+    "url": "https://github.com/joho/godotenv/pull/27"
+  },
+  "linkedIssues": [
+    {
+      "number": 26,
+      "title": "Empty env var are not allowed anymore",
+      "body": "Before PR #25 it was possible to have empty variables like \r\n\r\n```\r\nMYVAR=somevalue\r\nMYOTHERVAR=\r\n```\r\n\r\nAs of current version I'm receiving a panic with `panic: runtime error: slice bounds out of range`. Is this by design? I like to leave empty variables as placeholders and to let others know which variables can be used.\r\n\r\nI can send the PR if necessary.\r\n\r\nThanks!",
+      "url": "https://github.com/joho/godotenv/issues/26"
+    }
+  ],
+  "stats": {
+    "filesChanged": 3,
+    "additions": 17,
+    "deletions": 10
+  },
+  "files": [
+    {
+      "path": "fixtures/plain.env",
+      "status": "M",
+      "additions": 2,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "godotenv.go",
+      "status": "M",
+      "additions": 13,
+      "deletions": 10,
+      "binary": false
+    },
+    {
+      "path": "godotenv_test.go",
+      "status": "M",
+      "additions": 2,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/fixtures/plain.env b/fixtures/plain.env\nindex c983b06..43f7e44 100644\n--- a/fixtures/plain.env\n+++ b/fixtures/plain.env\n@@ -3,3 +3,5 @@ OPTION_B=2\n OPTION_C= 3\n OPTION_D =4\n OPTION_E = 5\n+OPTION_F = \n+OPTION_G=\n\\ No newline at end of file\ndiff --git a/godotenv.go b/godotenv.go\nindex 2551048..016acc1 100644\n--- a/godotenv.go\n+++ b/godotenv.go\n@@ -212,20 +212,23 @@ func parseLine(line string) (key string, value string, err error) {\n \n \t// Parse the value\n \tvalue = splitString[1]\n+\n \t// trim\n \tvalue = strings.Trim(value, \" \")\n \n \t// check if we've got quoted values\n-\tfirst := string(value[0:1])\n-\tlast := string(value[len(value)-1:])\n-\tif first == last && strings.ContainsAny(first, `\"'`) {\n-\t\t// pull the quotes off the edges\n-\t\tvalue = strings.Trim(value, `\"'`)\n-\n-\t\t// expand quotes\n-\t\tvalue = strings.Replace(value, `\\\"`, `\"`, -1)\n-\t\t// expand newlines\n-\t\tvalue = strings.Replace(value, `\\n`, \"\\n\", -1)\n+\tif value != \"\" {\n+\t\tfirst := string(value[0:1])\n+\t\tlast := string(value[len(value)-1:])\n+\t\tif first == last && strings.ContainsAny(first, `\"'`) {\n+\t\t\t// pull the quotes off the edges\n+\t\t\tvalue = strings.Trim(value, `\"'`)\n+\n+\t\t\t// expand quotes\n+\t\t\tvalue = strings.Replace(value, `\\\"`, `\"`, -1)\n+\t\t\t// expand newlines\n+\t\t\tvalue = strings.Replace(value, `\\n`, \"\\n\", -1)\n+\t\t}\n \t}\n \n \treturn\ndiff --git a/godotenv_test.go b/godotenv_test.go\nindex ea22da3..0a1aff6 100644\n--- a/godotenv_test.go\n+++ b/godotenv_test.go\n@@ -74,6 +74,8 @@ func TestReadPlainEnv(t *testing.T) {\n \t\t\"OPTION_C\": \"3\",\n \t\t\"OPTION_D\": \"4\",\n \t\t\"OPTION_E\": \"5\",\n+\t\t\"OPTION_F\": \"\",\n+\t\t\"OPTION_G\": \"\",\n \t}\n \n \tenvMap, err := Read(envFileName)\n",
+  "diffTruncated": false,
+  "tree": [
+    ".gitignore",
+    ".travis.yml",
+    "LICENCE",
+    "README.md",
+    "autoload/autoload.go",
+    "cmd/godotenv/cmd.go",
+    "fixtures/equals.env",
+    "fixtures/exported.env",
+    "fixtures/invalid1.env",
+    "fixtures/plain.env",
+    "fixtures/quoted.env",
+    "godotenv.go",
+    "godotenv_test.go"
+  ],
+  "explanation": {
+    "what": "parseLine の値パース処理で、value が空文字列の場合はクォート判定のために `value[0:1]` や `value[len(value)-1:]` へ添字アクセスしないよう `if value != \"\"` で分岐を追加した。fixtures/plain.env に空値のケース(`OPTION_F = `, `OPTION_G=`、末尾改行なし)を追加し、Read() のテストに対応する期待値も加えている。",
+    "why": "直前のコミット(#25, seq51)でクォート判定を先頭・末尾1文字を見る方式に変更したことで、値が空文字列の行(例: `MYOTHERVAR=`)を渡すと `value[0:1]` が範囲外アクセスとなり `panic: runtime error: slice bounds out of range` を起こすようになっていた。issue #26 でこの回帰が報告され、本PRは空文字列のガードを入れて .env で空の値を持つ変数(プレースホルダとしての利用)を安全に扱えるようにした。",
+    "highlights": [
+      { "file": "godotenv.go", "note": "value が空文字列のときクォート判定処理をスキップするガード" },
+      { "file": "fixtures/plain.env", "note": "空値・末尾スペースあり/なしのケースを追加した fixture" }
+    ],
+    "langNotes": [
+      { "topic": "スライスの範囲外アクセス", "note": "Go の文字列は内部的にバイト列で、`value[0:1]` のようなスライス操作は value が空文字列だと範囲外となり実行時 panic(slice bounds out of range)になる。長さチェックなしのインデックス・スライスアクセスは空入力に弱いという典型例。" }
+    ],
+    "diagram": null,
+    "evidence": "issue",
+    "refs": [
+      { "type": "pr", "number": 27, "url": "https://github.com/joho/godotenv/pull/27" }
+    ],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

@@ -1,0 +1,85 @@
+{
+  "seq": 58,
+  "sha": "9739509beaf969082c261d8c9a996f18852bc116",
+  "parents": [
+    "c9360df4d16dc0e391ea2f28da2d31a9ede2e26f",
+    "b1bb9d9fc33d39f78baf8c246d09832eedb34119"
+  ],
+  "author": {
+    "name": "John Barton",
+    "email": "jrbarton@gmail.com",
+    "date": "2017-09-13T22:32:30-07:00"
+  },
+  "message": "Merge pull request #35 from alexquick/feature-write-dotenv\n\nsupport for writing envs out in dotenv format",
+  "pr": {
+    "number": 35,
+    "title": "support for writing envs out in dotenv format",
+    "body": "implements: #31 (give writing out dotenv files a shot)\r\nrequires: https://github.com/joho/godotenv/pull/34 (fixes for parsing escapes -- `\\\\` in particular)\r\n\r\nA few months ago you said I could give roundtripping dotenv files a whirl. Here's the whirl :)\r\n\r\nIt's is useful for systems that create environments for other processes or change their own environments. That way everyone involved can use the same package. It also came in handy for exercising the parser more heavily. The output values are double-quoted and backslash escaped.\r\n\r\ngodotenv gets the following new members:\r\n\r\n```go\r\n// Write serializes the given environment and writes it to a file\r\nfunc Write(envMap map[string]string, filename string) error {}\r\n\r\n// Marshal outputs the given environment as a dotenv-formatted environment file.\r\n// Each line is in the format: KEY=\"VALUE\" where VALUE is backslash-escaped.\r\nfunc Marshal(envMap map[string]string) (string, error) {}\r\n\r\n//Unmarshal reads an env file from a string, returning a map of keys and values.\r\nfunc Unmarshal(str string) (envMap map[string]string, err error) {}\r\n```",
+    "url": "https://github.com/joho/godotenv/pull/35"
+  },
+  "linkedIssues": [
+    {
+      "number": 31,
+      "title": ".env file output",
+      "body": "Hi, I've got a use case where it would be beneficial to be able to output `.env` files as well as read them. Is that something you'd be interested in a PR for or is it out of scope for this project?",
+      "url": "https://github.com/joho/godotenv/issues/31"
+    }
+  ],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 92,
+    "deletions": 0
+  },
+  "files": [
+    {
+      "path": "godotenv.go",
+      "status": "M",
+      "additions": 46,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "godotenv_test.go",
+      "status": "M",
+      "additions": 46,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/godotenv.go b/godotenv.go\nindex 269d7c7..2710572 100644\n--- a/godotenv.go\n+++ b/godotenv.go\n@@ -16,6 +16,7 @@ package godotenv\n import (\n \t\"bufio\"\n \t\"errors\"\n+\t\"fmt\"\n \t\"io\"\n \t\"os\"\n \t\"os/exec\"\n@@ -23,6 +24,8 @@ import (\n \t\"strings\"\n )\n \n+const doubleQuoteSpecialChars = \"\\\\\\n\\r\\\"!$`\"\n+\n // Load will read your env file(s) and load them into ENV for this process.\n //\n // Call this function as close as possible to the start of your program (ideally in main)\n@@ -119,6 +122,11 @@ func Parse(r io.Reader) (envMap map[string]string, err error) {\n \treturn\n }\n \n+//Unmarshal reads an env file from a string, returning a map of keys and values.\n+func Unmarshal(str string) (envMap map[string]string, err error) {\n+\treturn Parse(strings.NewReader(str))\n+}\n+\n // Exec loads env vars from the specified filenames (empty map falls back to default)\n // then executes the cmd specified.\n //\n@@ -136,6 +144,30 @@ func Exec(filenames []string, cmd string, cmdArgs []string) error {\n \treturn command.Run()\n }\n \n+// Write serializes the given environment and writes it to a file\n+func Write(envMap map[string]string, filename string) error {\n+\tcontent, error := Marshal(envMap)\n+\tif error != nil {\n+\t\treturn error\n+\t}\n+\tfile, error := os.Create(filename)\n+\tif error != nil {\n+\t\treturn error\n+\t}\n+\t_, err := file.WriteString(content)\n+\treturn err\n+}\n+\n+// Marshal outputs the given environment as a dotenv-formatted environment file.\n+// Each line is in the format: KEY=\"VALUE\" where VALUE is backslash-escaped.\n+func Marshal(envMap map[string]string) (string, error) {\n+\tlines := make([]string, 0, len(envMap))\n+\tfor k, v := range envMap {\n+\t\tlines = append(lines, fmt.Sprintf(`%s=\"%s\"`, k, doubleQuoteEscape(v)))\n+\t}\n+\treturn strings.Join(lines, \"\\n\"), nil\n+}\n+\n func filenamesOrDefault(filenames []string) []string {\n \tif len(filenames) == 0 {\n \t\treturn []string{\".env\"}\n@@ -264,3 +296,17 @@ func isIgnoredLine(line string) bool {\n \ttrimmedLine := strings.Trim(line, \" \\n\\t\")\n \treturn len(trimmedLine) == 0 || strings.HasPrefix(trimmedLine, \"#\")\n }\n+\n+func doubleQuoteEscape(line string) string {\n+\tfor _, c := range doubleQuoteSpecialChars {\n+\t\ttoReplace := \"\\\\\" + string(c)\n+\t\tif c == '\\n' {\n+\t\t\ttoReplace = `\\n`\n+\t\t}\n+\t\tif c == '\\r' {\n+\t\t\ttoReplace = `\\r`\n+\t\t}\n+\t\tline = strings.Replace(line, string(c), toReplace, -1)\n+\t}\n+\treturn line\n+}\ndiff --git a/godotenv_test.go b/godotenv_test.go\nindex 0bb5229..47b0c35 100644\n--- a/godotenv_test.go\n+++ b/godotenv_test.go\n@@ -2,7 +2,9 @@ package godotenv\n \n import (\n \t\"bytes\"\n+\t\"fmt\"\n \t\"os\"\n+\t\"reflect\"\n \t\"testing\"\n )\n \n@@ -326,3 +328,47 @@ func TestErrorParsing(t *testing.T) {\n \t\tt.Errorf(\"Expected error, got %v\", envMap)\n \t}\n }\n+\n+func TestWrite(t *testing.T) {\n+\twriteAndCompare := func(env string, expected string) {\n+\t\tenvMap, _ := Unmarshal(env)\n+\t\tactual, _ := Marshal(envMap)\n+\t\tif expected != actual {\n+\t\t\tt.Errorf(\"Expected '%v' (%v) to write as '%v', got '%v' instead.\", env, envMap, expected, actual)\n+\t\t}\n+\t}\n+\t//just test some single lines to show the general idea\n+\t//TestRoundtrip makes most of the good assertions\n+\n+\t//values are always double-quoted\n+\twriteAndCompare(`key=value`, `key=\"value\"`)\n+\t//double-quotes are escaped\n+\twriteAndCompare(`key=va\"lu\"e`, `key=\"va\\\"lu\\\"e\"`)\n+\t//but single quotes are left alone\n+\twriteAndCompare(`key=va'lu'e`, `key=\"va'lu'e\"`)\n+\t// newlines, backslashes, and some other special chars are escaped\n+\twriteAndCompare(`foo=\"$ba\\n\\r\\\\r!\"`, `foo=\"\\$ba\\n\\r\\\\r\\!\"`)\n+}\n+\n+func TestRoundtrip(t *testing.T) {\n+\tfixtures := []string{\"equals.env\", \"exported.env\", \"invalid1.env\", \"plain.env\", \"quoted.env\"}\n+\tfor _, fixture := range fixtures {\n+\t\tfixtureFilename := fmt.Sprintf(\"fixtures/%s\", fixture)\n+\t\tenv, err := readFile(fixtureFilename)\n+\t\tif err != nil {\n+\t\t\tcontinue\n+\t\t}\n+\t\trep, err := Marshal(env)\n+\t\tif err != nil {\n+\t\t\tcontinue\n+\t\t}\n+\t\troundtripped, err := Unmarshal(rep)\n+\t\tif err != nil {\n+\t\t\tcontinue\n+\t\t}\n+\t\tif !reflect.DeepEqual(env, roundtripped) {\n+\t\t\tt.Errorf(\"Expected '%s' to roundtrip as '%v', got '%v' instead\", fixtureFilename, env, roundtripped)\n+\t\t}\n+\n+\t}\n+}\n",
+  "diffTruncated": false,
+  "tree": [
+    ".gitignore",
+    ".travis.yml",
+    "LICENCE",
+    "README.md",
+    "autoload/autoload.go",
+    "cmd/godotenv/cmd.go",
+    "fixtures/equals.env",
+    "fixtures/exported.env",
+    "fixtures/invalid1.env",
+    "fixtures/plain.env",
+    "fixtures/quoted.env",
+    "godotenv.go",
+    "godotenv_test.go"
+  ],
+  "explanation": {
+    "what": "godotenv に「書き出し」機能を追加した。`Unmarshal(str string)` は文字列を Parse に渡すラッパー、`Marshal(envMap map[string]string) (string, error)` は map を `KEY=\"VALUE\"` 形式の行に変換して結合し(値は doubleQuoteEscape でバックスラッシュ・改行・CR・ダブルクォート・`!`・`$`・バッククォートをエスケープ)、`Write(envMap, filename)` は Marshal した内容をファイルに書き出す。ラウンドトリップ(読み込み→書き出し→読み込みで元と一致するか)を検証するテストも追加された。",
+    "why": "issue #31 で「読み込みだけでなく .env ファイルの書き出しもサポートしてほしい」という要望が出ており、本PRはそれに応える形で実装された。PR body によれば、環境を作り出したり自身の環境を変更したりするシステムが godotenv の読み書き双方を同じパッケージで扱えるようにすることが動機で、あわせてパーサをより広く(ラウンドトリップという形で)鍛える効果もあった。なお本PRは直前の #34(パース修正PR)のマージを前提としている旨が明記されている。",
+    "highlights": [
+      { "file": "godotenv.go", "note": "Write/Marshal/Unmarshal の新設と doubleQuoteEscape によるエスケープ処理" },
+      { "file": "godotenv_test.go", "note": "TestRoundtrip: 既存 fixtures を読み込み→Marshal→Unmarshal して元の map と一致するか検証" }
+    ],
+    "langNotes": [
+      { "topic": "Write で .env に書き出す", "note": "godotenv はこのコミットで読み込み専用(Load/Read/Parse)から読み書き両対応になった。Marshal は map を文字列化するだけの純粋な変換、Write はその文字列を os.Create したファイルに書き出す薄いラッパーという役割分担になっている。" }
+    ],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [
+      { "type": "pr", "number": 35, "url": "https://github.com/joho/godotenv/pull/35" },
+      { "type": "issue", "number": 31, "url": "https://github.com/joho/godotenv/issues/31" }
+    ],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

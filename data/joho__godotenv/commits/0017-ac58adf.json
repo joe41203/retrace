@@ -1,0 +1,59 @@
+{
+  "seq": 17,
+  "sha": "ac58adf673316c5696b6de97397f9d886629422b",
+  "parents": [
+    "9b4bbb98c319c668cbbeb4df8b27f4c301ad714c"
+  ],
+  "author": {
+    "name": "John Barton (joho)",
+    "email": "jrbarton@gmail.com",
+    "date": "2013-07-31T13:39:59+10:00"
+  },
+  "message": "Get the code running against all fixtures.",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 52,
+    "deletions": 43
+  },
+  "files": [
+    {
+      "path": "godotenv.go",
+      "status": "M",
+      "additions": 47,
+      "deletions": 42,
+      "binary": false
+    },
+    {
+      "path": "godotenv_test.go",
+      "status": "M",
+      "additions": 5,
+      "deletions": 1,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/godotenv.go b/godotenv.go\nindex 18430cc..301d0ae 100644\n--- a/godotenv.go\n+++ b/godotenv.go\n@@ -3,6 +3,7 @@ package godotenv\n import (\n \t\"bufio\"\n \t\"errors\"\n+\t\"io\"\n \t\"os\"\n \t\"strings\"\n )\n@@ -23,9 +24,23 @@ func loadFile(filename string) (err error) {\n \t\treturn\n \t}\n \n-\tbufferSize := 20\n-\tlines := make([]string, bufferSize)\n-\tlineReader := bufio.NewReaderSize(file, bufferSize)\n+\tlines := readRawLines(file)\n+\n+\tfor _, fullLine := range lines {\n+\t\tif !isIgnoredLine(fullLine) {\n+\t\t\tkey, value, err := parseLine(fullLine)\n+\n+\t\t\tif err == nil {\n+\t\t\t\tos.Setenv(key, value)\n+\t\t\t}\n+\t\t}\n+\t}\n+\n+\treturn\n+}\n+\n+func readRawLines(file io.Reader) (lines []string) {\n+\tlineReader := bufio.NewReader(file)\n \tfor line, isPrefix, e := lineReader.ReadLine(); e == nil; line, isPrefix, e = lineReader.ReadLine() {\n \t\tfullLine := string(line)\n \t\tif isPrefix {\n@@ -40,19 +55,6 @@ func loadFile(filename string) (err error) {\n \t\t// add a line to the game/parse\n \t\tlines = append(lines, string(line))\n \t}\n-\n-\tfor _, fullLine := range lines {\n-\t\t// fmt.Printf(\"Line: %v\\n\", fullLine)\n-\t\tif !isIgnoredLine(fullLine) {\n-\t\t\tkey, value, err := parseLine(fullLine)\n-\t\t\t// fmt.Printf(\"Key: %v Value: %v\\n\", key, value)\n-\n-\t\t\tif err == nil {\n-\t\t\t\tos.Setenv(key, value)\n-\t\t\t}\n-\t\t}\n-\t}\n-\n \treturn\n }\n \n@@ -62,29 +64,9 @@ func parseLine(line string) (key string, value string, err error) {\n \t\treturn\n \t}\n \n-\tsplitString := strings.Split(line, \"=\")\n-\n-\tif len(splitString) != 2 {\n-\t\t// try yaml mode!\n-\t\tsplitString = strings.Split(line, \":\")\n-\t}\n-\n-\tif len(splitString) != 2 {\n-\t\terr = errors.New(\"Can't separate key from value\")\n-\t\treturn\n-\t}\n-\n-\tkey = splitString[0]\n-\tif strings.HasPrefix(key, \"export\") {\n-\t\tkey = strings.TrimPrefix(key, \"export\")\n-\t}\n-\tkey = strings.Trim(key, \" \")\n-\n-\tvalue = splitString[1]\n-\n \t// ditch the comments (but keep quoted hashes)\n-\tif strings.Contains(value, \"#\") {\n-\t\tsegmentsBetweenHashes := strings.Split(value, \"#\")\n+\tif strings.Contains(line, \"#\") {\n+\t\tsegmentsBetweenHashes := strings.Split(line, \"#\")\n \t\tquotesAreOpen := false\n \t\tsegmentsToKeep := make([]string, 0)\n \t\tfor _, segment := range segmentsBetweenHashes {\n@@ -102,21 +84,44 @@ func parseLine(line string) (key string, value string, err error) {\n \t\t\t}\n \t\t}\n \n-\t\tvalue = strings.Join(segmentsToKeep, \"#\")\n+\t\tline = strings.Join(segmentsToKeep, \"#\")\n+\t}\n+\n+\t// now split key from value\n+\tsplitString := strings.Split(line, \"=\")\n+\n+\tif len(splitString) != 2 {\n+\t\t// try yaml mode!\n+\t\tsplitString = strings.Split(line, \":\")\n+\t}\n+\n+\tif len(splitString) != 2 {\n+\t\terr = errors.New(\"Can't separate key from value\")\n+\t\treturn\n \t}\n \n+\t// Parse the key\n+\tkey = splitString[0]\n+\tif strings.HasPrefix(key, \"export\") {\n+\t\tkey = strings.TrimPrefix(key, \"export\")\n+\t}\n+\tkey = strings.Trim(key, \" \")\n+\n+\t// Parse the value\n+\tvalue = splitString[1]\n+\t// trim\n+\tvalue = strings.Trim(value, \" \")\n+\n \t// check if we've got quoted values\n \tif strings.Count(value, \"\\\"\") == 2 || strings.Count(value, \"'\") == 2 {\n \t\t// pull the quotes off the edges\n-\t\tvalue = strings.Trim(value, \"\\\"' \")\n+\t\tvalue = strings.Trim(value, \"\\\"'\")\n \n \t\t// expand quotes\n \t\tvalue = strings.Replace(value, \"\\\\\\\"\", \"\\\"\", -1)\n \t\t// expand newlines\n \t\tvalue = strings.Replace(value, \"\\\\n\", \"\\n\", -1)\n \t}\n-\t// trim\n-\tvalue = strings.Trim(value, \" \")\n \n \treturn\n }\ndiff --git a/godotenv_test.go b/godotenv_test.go\nindex 5d3d328..d31dfe8 100644\n--- a/godotenv_test.go\n+++ b/godotenv_test.go\n@@ -98,7 +98,7 @@ func TestParsing(t *testing.T) {\n \n \t// parses export keyword\n \tparseAndCompare(t, \"export OPTION_A=2\", \"OPTION_A\", \"2\")\n-\tparseAndCompare(t, \"export OPTION_B='\\n'\", \"OPTION_B\", \"\\n\")\n+\tparseAndCompare(t, \"export OPTION_B='\\\\n'\", \"OPTION_B\", \"\\n\")\n \n \t// it 'expands newlines in quoted strings' do\n \t// expect(env('FOO=\"bar\\nbaz\"')).to eql('FOO' => \"bar\\nbaz\")\n@@ -158,4 +158,8 @@ func TestLinesToIgnore(t *testing.T) {\n \t\tt.Error(\"Indented comment wasn't ignored\")\n \t}\n \n+\t// make sure we're not getting false positives\n+\tif isIgnoredLine(\"export OPTION_B='\\\\n'\") {\n+\t\tt.Error(\"ignoring a perfectly valid line to parse\")\n+\t}\n }\n",
+  "diffTruncated": false,
+  "tree": [
+    ".gitignore",
+    "fixtures/exported.env",
+    "fixtures/plain.env",
+    "fixtures/quoted.env",
+    "godotenv.go",
+    "godotenv_test.go"
+  ],
+  "explanation": {
+    "what": "行読み込みロジックをreadRawLines(io.Readerを受け取る)として分離し、bufio.NewReaderSizeの固定バッファサイズ指定をやめてbufio.NewReaderに変更した。さらにparseLineの処理順を変更し、従来はkey=valueに分割してからvalue側でコメント除去していたのを、行全体に対して先にコメント除去(#のクォート追跡)を行い、その後で=分割・export剥がし・クォート処理を行う順に組み替えた。合わせて既存の全fixtureファイル(plain/exported/quoted)を通してテストが通ることを確認する回。",
+    "why": "コミットメッセージ\"Get the code running against all fixtures.\"の通り、これまで個別ケースのテストでは通っていたパーサを、実際のfixtureファイル全体に対して動かして粗を洗い出す回。value側だけでなく行全体で#除去した方が、key部分に#が来ないケースを前提にできて処理順序が素直になるための組み替えと読める。readRawLinesの分離はloadFileの責務を「行に分ける」と「行をパースする」に分けるための整理。",
+    "highlights": [
+      { "file": "godotenv.go", "note": "parseLine内で「コメント除去 → key/value分割 → クォート処理」の順に処理を並べ替えた点。行全体に対して#走査するよう変わっている" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

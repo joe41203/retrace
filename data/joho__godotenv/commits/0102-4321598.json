@@ -1,0 +1,88 @@
+{
+  "seq": 102,
+  "sha": "4321598b05f72577f12b0a727d75b003df595ef7",
+  "parents": [
+    "32a3b9b960f8e8da7cc208e114a1a65862777322"
+  ],
+  "author": {
+    "name": "2tef",
+    "email": "21069422+2tef@users.noreply.github.com",
+    "date": "2023-02-03T21:00:21-03:00"
+  },
+  "message": "add overload flag (#200)\n\n* add -o flag\r\n\r\nincreases compatibility with the ruby command\r\n\r\n* update README",
+  "pr": {
+    "number": 200,
+    "title": "add overload flag",
+    "body": "implements ruby's -o option (https://github.com/bkeepers/dotenv#why-is-it-not-overriding-existing-env-variables).\r\n\\---\r\nexample\r\n```shell\r\n% cat a.env\r\nVAR=a\r\n% cat b.env\r\nVAR=b\r\n% godotenv -f a.env,b.env printenv VAR\r\na\r\n% godotenv -o -f a.env,b.env printenv VAR\r\nb\r\n```",
+    "url": "https://github.com/joho/godotenv/pull/200"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 3,
+    "additions": 13,
+    "deletions": 5
+  },
+  "files": [
+    {
+      "path": "README.md",
+      "status": "M",
+      "additions": 2,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "cmd/godotenv/cmd.go",
+      "status": "M",
+      "additions": 4,
+      "deletions": 2,
+      "binary": false
+    },
+    {
+      "path": "godotenv.go",
+      "status": "M",
+      "additions": 7,
+      "deletions": 3,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/README.md b/README.md\nindex 76a90d1..bfbe66a 100644\n--- a/README.md\n+++ b/README.md\n@@ -153,6 +153,8 @@ godotenv -f /some/path/to/.env some_command with some args\n \n If you don't specify `-f` it will fall back on the default of loading `.env` in `PWD`\n \n+By default, it won't override existing environment variables; you can do that with the `-o` flag.\n+\n ### Writing Env Files\n \n Godotenv can also write a map representing the environment to a correctly-formatted and escaped file\ndiff --git a/cmd/godotenv/cmd.go b/cmd/godotenv/cmd.go\nindex 8dce420..2a7b2d8 100644\n--- a/cmd/godotenv/cmd.go\n+++ b/cmd/godotenv/cmd.go\n@@ -15,13 +15,15 @@ func main() {\n \tflag.BoolVar(&showHelp, \"h\", false, \"show help\")\n \tvar rawEnvFilenames string\n \tflag.StringVar(&rawEnvFilenames, \"f\", \"\", \"comma separated paths to .env files\")\n+\tvar overload bool\n+\tflag.BoolVar(&overload, \"o\", false, \"override existing .env variables\")\n \n \tflag.Parse()\n \n \tusage := `\n Run a process with an env setup from a .env file\n \n-godotenv [-f ENV_FILE_PATHS] COMMAND_ARGS\n+godotenv [-o] [-f ENV_FILE_PATHS] COMMAND_ARGS\n \n ENV_FILE_PATHS: comma separated paths to .env files\n COMMAND_ARGS: command and args you want to run\n@@ -47,7 +49,7 @@ example\n \tcmd := args[0]\n \tcmdArgs := args[1:]\n \n-\terr := godotenv.Exec(envFilenames, cmd, cmdArgs)\n+\terr := godotenv.Exec(envFilenames, cmd, cmdArgs, overload)\n \tif err != nil {\n \t\tlog.Fatal(err)\n \t}\ndiff --git a/godotenv.go b/godotenv.go\nindex 715e87d..7762b5b 100644\n--- a/godotenv.go\n+++ b/godotenv.go\n@@ -125,9 +125,13 @@ func UnmarshalBytes(src []byte) (map[string]string, error) {\n // Simply hooks up os.Stdin/err/out to the command and calls Run().\n //\n // If you want more fine grained control over your command it's recommended\n-// that you use `Load()` or `Read()` and the `os/exec` package yourself.\n-func Exec(filenames []string, cmd string, cmdArgs []string) error {\n-\tif err := Load(filenames...); err != nil {\n+// that you use `Load()`, `Overload()` or `Read()` and the `os/exec` package yourself.\n+func Exec(filenames []string, cmd string, cmdArgs []string, overload bool) error {\n+\top := Load\n+\tif overload {\n+\t\top = Overload\n+\t}\n+\tif err := op(filenames...); err != nil {\n \t\treturn err\n \t}\n \n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/dependabot.yml",
+    ".github/workflows/ci.yml",
+    ".github/workflows/codeql-analysis.yml",
+    ".github/workflows/release.yml",
+    ".gitignore",
+    "LICENCE",
+    "README.md",
+    "autoload/autoload.go",
+    "cmd/godotenv/cmd.go",
+    "fixtures/comments.env",
+    "fixtures/equals.env",
+    "fixtures/exported.env",
+    "fixtures/invalid1.env",
+    "fixtures/plain.env",
+    "fixtures/quoted.env",
+    "fixtures/substitutions.env",
+    "go.mod",
+    "godotenv.go",
+    "godotenv_test.go",
+    "parser.go"
+  ],
+  "explanation": {
+    "what": "CLIコマンド(cmd/godotenv/cmd.go)に `-o` フラグを追加し、godotenv.go の Exec 関数にも overload bool 引数を追加した。overload が true のとき Load の代わりに Overload を呼ぶよう分岐する。README にも `-o` フラグの説明を追記している。",
+    "why": "PR本文で、Ruby版dotenvの `-o` オプション(既存のENV変数を上書きするかどうかを切り替える機能)との互換性を高めるためと説明されている。CLIの実行例も添えられており、既存の Load/Overload の使い分けをコマンドラインからも選べるようにした。",
+    "highlights": [
+      { "file": "godotenv.go", "note": "op := Load; if overload { op = Overload } という関数値の切り替えでExec内の分岐を実装している" }
+    ],
+    "langNotes": [
+      { "topic": "overload フラグと Load/Overload の使い分け", "note": "godotenv には元々「既存のENV変数を上書きしないLoad」と「上書きするOverload」の2つの公開関数があった。この overload フラグはCLIからその2つを切り替えるためのもので、Rubyのdotenv gemが持つ `-o` オプションに合わせている。" },
+      { "topic": "関数を値として変数に代入する", "note": "Go では関数もファーストクラスの値なので、op := Load のように関数自体を変数に代入し、条件によって op = Overload と差し替えてから op(filenames...) のように呼び出せる。if/elseで呼び出しを重複させずに済む書き方。" }
+    ],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [{ "type": "pr", "number": 200, "url": "https://github.com/joho/godotenv/pull/200" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

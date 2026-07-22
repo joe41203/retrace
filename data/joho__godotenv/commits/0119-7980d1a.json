@@ -1,0 +1,73 @@
+{
+  "seq": 119,
+  "sha": "7980d1a6eef17757b437f6e30a3c4a12c136034a",
+  "parents": [
+    "ffde38feff4a02be3e00f0e5b90f369c3f1d6471",
+    "e1f87cdb6c8ef9d13e7dfec645e1c25657015a23"
+  ],
+  "author": {
+    "name": "John Barton",
+    "email": "jb@johnbarton.co",
+    "date": "2026-05-19T21:54:49+10:00"
+  },
+  "message": "Merge pull request #243 from kvokka/patch-1\n\nFix Precedence & Conventions in README.md",
+  "pr": {
+    "number": 243,
+    "title": "Fix Precedence & Conventions in README.md",
+    "body": "Following the [docs](https://github.com/bkeepers/dotenv?tab=readme-ov-file#customizing-rails) in the original ruby repo, the loading order should be the opposite. The existing example in the readme is confusing, but this PR fix that",
+    "url": "https://github.com/joho/godotenv/pull/243"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 3,
+    "deletions": 3
+  },
+  "files": [
+    {
+      "path": "README.md",
+      "status": "M",
+      "additions": 3,
+      "deletions": 3,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/README.md b/README.md\nindex 65cdc66..f6c67fd 100644\n--- a/README.md\n+++ b/README.md\n@@ -132,12 +132,12 @@ if \"\" == env {\n   env = \"development\"\n }\n \n-godotenv.Load(\".env.\" + env + \".local\")\n+godotenv.Load() // The Original .env\n+godotenv.Load(\".env.\" + env)\n if \"test\" != env {\n   godotenv.Load(\".env.local\")\n }\n-godotenv.Load(\".env.\" + env)\n-godotenv.Load() // The Original .env\n+godotenv.Load(\".env.\" + env + \".local\")\n ```\n \n If you need to, you can also use `godotenv.Overload()` to defy this convention\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/dependabot.yml",
+    ".github/workflows/ci.yml",
+    ".github/workflows/codeql-analysis.yml",
+    ".github/workflows/release.yml",
+    ".gitignore",
+    "LICENCE",
+    "README.md",
+    "autoload/autoload.go",
+    "cmd/godotenv/cmd.go",
+    "fixtures/comments.env",
+    "fixtures/equals.env",
+    "fixtures/exported.env",
+    "fixtures/hyphen.env",
+    "fixtures/invalid1.env",
+    "fixtures/plain.env",
+    "fixtures/quoted.env",
+    "fixtures/substitutions.env",
+    "go.mod",
+    "godotenv.go",
+    "godotenv_test.go",
+    "parser.go"
+  ],
+  "explanation": {
+    "what": "README.md の \"Precedence and Conventions\" のサンプルコードで、`godotenv.Load()` 呼び出しの記述順を入れ替えた。従来は `.env.<env>.local` → `.env.local` → `.env.<env>` → `.env` の順だったが、`.env` → `.env.<env>` → `.env.local` → `.env.<env>.local` の順に書き直している。",
+    "why": "PR本文によれば、Rails 版の元祖 dotenv(bkeepers/dotenv)のドキュメントに従うと読み込み順は逆であるべきで、既存の README の例は分かりにくかったため、この PR で修正したとされる。README のサンプルコードの記述順を直すだけの変更で、実装(godotenv.go)には手を入れていない。",
+    "highlights": [
+      { "file": "README.md", "note": "4つの Load 呼び出しの記述順が入れ替わっている" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [{ "type": "pr", "number": 243, "url": "https://github.com/joho/godotenv/pull/243" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

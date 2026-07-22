@@ -1,0 +1,58 @@
+{
+  "seq": 28,
+  "sha": "5896be1361bf9f3d2471f58028e2157ee2075222",
+  "parents": [
+    "42920bbe5dc477fc7a5f7f11b928d8a5fdbb6f54"
+  ],
+  "author": {
+    "name": "John Barton (joho)",
+    "email": "jrbarton@gmail.com",
+    "date": "2013-07-31T19:46:42+10:00"
+  },
+  "message": "Add the ability to autoload the env file when you import.",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 15,
+    "deletions": 0
+  },
+  "files": [
+    {
+      "path": "autoload/autoload.go",
+      "status": "A",
+      "additions": 15,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/autoload/autoload.go b/autoload/autoload.go\nnew file mode 100644\nindex 0000000..5cfcea8\n--- /dev/null\n+++ b/autoload/autoload.go\n@@ -0,0 +1,15 @@\n+package \"autoload\"\n+\n+/*\n+\tYou can just read the .env file on import just by doing\n+\n+\t\timport _ \"github.com/joho/godotenv/autoload\"\n+\n+\tAnd bob's your mother's brother\n+*/\n+\n+import \"github.com/joho/godotenv\"\n+\n+func init() {\n+\t_ = godotenv.Load()\n+}\n",
+  "diffTruncated": false,
+  "tree": [
+    ".gitignore",
+    "LICENCE",
+    "README.md",
+    "autoload/autoload.go",
+    "fixtures/exported.env",
+    "fixtures/plain.env",
+    "fixtures/quoted.env",
+    "godotenv.go",
+    "godotenv_test.go",
+    "wercker.yml"
+  ],
+  "explanation": {
+    "what": "新しいサブパッケージautoload/autoload.goを追加した。init()関数の中でgodotenv.Load()を呼び出すだけの内容で、コメントには`import _ \"github.com/joho/godotenv/autoload\"`と書くだけで.envが読み込まれると説明している。",
+    "why": "コミットメッセージ「Add the ability to autoload the env file when you import.」の通り、Load()を明示的に呼ぶコードを書かなくても、パッケージをブランクインポートするだけで.envの読み込みが自動的に行われる、より手軽な導入手段を提供するため。",
+    "highlights": [
+      { "file": "autoload/autoload.go", "note": "init()内でgodotenv.Load()を呼ぶだけの薄いパッケージ。ブランクインポート専用の設計" }
+    ],
+    "langNotes": [
+      { "topic": "ブランクインポートとinit()", "note": "Goでは`import _ \"path\"`と書くとパッケージの識別子を使わずにインポートでき、そのパッケージのinit()関数だけが副作用として実行される。設定ファイルの自動読み込みのように「読み込むだけで良い」処理をパッケージ化する際によく使われるイディオム。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

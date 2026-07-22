@@ -1,0 +1,61 @@
+{
+  "seq": 8,
+  "sha": "37c8b8e487d129c3d0f05366a345a3604c239ed9",
+  "parents": [
+    "4a2748eb3c53d0eec35964f820a4f5122b1bdf8c"
+  ],
+  "author": {
+    "name": "John Barton (joho)",
+    "email": "jrbarton@gmail.com",
+    "date": "2013-07-30T18:38:10+10:00"
+  },
+  "message": "export keyword parsing",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 8,
+    "deletions": 1
+  },
+  "files": [
+    {
+      "path": "godotenv.go",
+      "status": "M",
+      "additions": 5,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "godotenv_test.go",
+      "status": "M",
+      "additions": 3,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/godotenv.go b/godotenv.go\nindex 7b215ea..dd1b4ca 100644\n--- a/godotenv.go\n+++ b/godotenv.go\n@@ -70,7 +70,11 @@ func parseLine(line string) (key string, value string, err error) {\n \t\treturn\n \t}\n \n-\tkey = strings.Trim(splitString[0], \" \")\n+\tkey = splitString[0]\n+\tif strings.HasPrefix(key, \"export\") {\n+\t\tkey = strings.TrimPrefix(key, \"export\")\n+\t}\n+\tkey = strings.Trim(key, \" \")\n \n \tvalue = strings.Trim(splitString[1], \" \\\"'\")\n \tvalue = strings.Replace(value, \"\\\\\\\"\", \"\\\"\", -1)\ndiff --git a/godotenv_test.go b/godotenv_test.go\nindex eaf0bf3..66ab7b4 100644\n--- a/godotenv_test.go\n+++ b/godotenv_test.go\n@@ -67,4 +67,7 @@ func TestParsing(t *testing.T) {\n \t// parses yaml style options\n \tparseAndCompare(t, \"OPTION_A: 1\", \"OPTION_A\", \"1\")\n \n+\t// parses export keyword\n+\tparseAndCompare(t, \"export OPTION_A=2\", \"OPTION_A\", \"2\")\n+\n }\n",
+  "diffTruncated": false,
+  "tree": [
+    ".gitignore",
+    "fixtures/exported.env",
+    "fixtures/plain.env",
+    "fixtures/quoted.env",
+    "godotenv.go",
+    "godotenv_test.go"
+  ],
+  "explanation": {
+    "what": "parseLine のキー部分の処理を変更し、strings.HasPrefix(key, \"export\") が真なら strings.TrimPrefix(key, \"export\") で \"export\" を取り除いてからトリムするようにした。TestParsing に \"export OPTION_A=2\" が \"OPTION_A\" => \"2\" にパースされるケースを追加した。",
+    "why": "件名の \"export keyword parsing\" が示す通り、Bash などで `export FOO=bar` と書かれた行(fixtures/exported.env に既に存在する形式)を godotenv でも扱えるようにする対応である。おそらくシェルスクリプトの .env ファイルをそのまま source できる書式にも対応させたい意図があったと考えられる。",
+    "highlights": [
+      {"file": "godotenv.go", "note": "export 接頭辞を文字列の前方一致(HasPrefix/TrimPrefix)で取り除くだけの単純な対応"}
+    ],
+    "langNotes": [
+      {"topic": "export キーワードのパース", "note": "シェルスクリプトでは export FOO=bar と書くと環境変数として子プロセスに引き継がれる。.env ファイルを直接 `source` することもできるようにするため、godotenv のパーサも先頭の export を無視してキーだけを取り出す。"}
+    ],
+    "diagram": null,
+    "evidence": "inferred",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

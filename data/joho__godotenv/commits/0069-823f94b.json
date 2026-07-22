@@ -1,0 +1,86 @@
+{
+  "seq": 69,
+  "sha": "823f94bb9ab6dd992519bae0746e7df7b0875fb3",
+  "parents": [
+    "69ed1d913aa885da390dd6de9febf063d101b097",
+    "263a1dda9d3b147821e171361b2e7c3b3d91006e"
+  ],
+  "author": {
+    "name": "John Barton",
+    "email": "jb@johnbarton.co",
+    "date": "2019-02-04T15:26:24+11:00"
+  },
+  "message": "Merge pull request #70 from hairyhenderson/support-keys-beginning-with-export-66\n\nSupport key names beginning with 'export'",
+  "pr": {
+    "number": 70,
+    "title": "Support key names beginning with 'export'",
+    "body": "Fixes #66 \r\n\r\nSigned-off-by: Dave Henderson <dhenderson@gmail.com>",
+    "url": "https://github.com/joho/godotenv/pull/70"
+  },
+  "linkedIssues": [
+    {
+      "number": 66,
+      "title": "Any key starting lowercase `export` fails to return value.",
+      "body": "Any key starting lowercase `export` fails to return value.\r\n\r\nAll the following will fail to return value:\r\n\r\n`export\r\nexport_\r\nexport_x\r\nexport_xx\r\nexport_xxx\r\nexport_zzzz\r\nexport_env\r\nexport-env\r\nexport_envx\r\nexportabc\r\nexport_env\r\nEXPORT_ENV\r\nexport_env_settings\r\nexport_env_\r\n`\r\n\r\n`expor` or `EXPORT` are fine. \r\n\r\nI note `export BAR=BAZ` is valid usage. \r\n\r\nChanging the if to check 'export ' rather than 'export' and testing specifically for key of export in godotenv.go line 256 gives the expected behaviour for me. \r\n\r\n```\r\n// Parse the key\r\n\tkey = splitString[0]\r\n\tif strings.HasPrefix(key, \"export\") {\r\n\t\tkey = strings.TrimPrefix(key, \"export\")\r\n\t}\r\n\tkey = strings.Trim(key, \" \")\r\n```\r\n\r\nchange to \r\n\r\n```\r\n// Parse the key\r\n\tkey = splitString[0]\r\n\tif strings.HasPrefix(key, \"export \") && string.Trim(key, \" \") != \"export\" {\r\n\t\tkey = strings.TrimPrefix(key, \"export\")\r\n\t}\r\n\tkey = strings.Trim(key, \" \")\r\n```\r\n",
+      "url": "https://github.com/joho/godotenv/issues/66"
+    }
+  ],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 10,
+    "deletions": 6
+  },
+  "files": [
+    {
+      "path": "godotenv.go",
+      "status": "M",
+      "additions": 2,
+      "deletions": 5,
+      "binary": false
+    },
+    {
+      "path": "godotenv_test.go",
+      "status": "M",
+      "additions": 8,
+      "deletions": 1,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/godotenv.go b/godotenv.go\nindex 29b436c..1716fee 100644\n--- a/godotenv.go\n+++ b/godotenv.go\n@@ -252,11 +252,8 @@ func parseLine(line string, envMap map[string]string) (key string, value string,\n \t}\n \n \t// Parse the key\n-\tkey = splitString[0]\n-\tif strings.HasPrefix(key, \"export\") {\n-\t\tkey = strings.TrimPrefix(key, \"export\")\n-\t}\n-\tkey = strings.Trim(key, \" \")\n+\tre := regexp.MustCompile(`^\\s*(?:export\\s+)?(.*?)\\s*$`)\n+\tkey = re.ReplaceAllString(splitString[0], \"$1\")\n \n \t// Parse the value\n \tvalue = parseValue(splitString[1], envMap)\ndiff --git a/godotenv_test.go b/godotenv_test.go\nindex acc2131..1290f65 100644\n--- a/godotenv_test.go\n+++ b/godotenv_test.go\n@@ -5,8 +5,8 @@ import (\n \t\"fmt\"\n \t\"os\"\n \t\"reflect\"\n-\t\"testing\"\n \t\"strings\"\n+\t\"testing\"\n )\n \n var noopPresets = make(map[string]string)\n@@ -313,6 +313,13 @@ func TestParsing(t *testing.T) {\n \t// parses export keyword\n \tparseAndCompare(t, \"export OPTION_A=2\", \"OPTION_A\", \"2\")\n \tparseAndCompare(t, `export OPTION_B='\\n'`, \"OPTION_B\", \"\\\\n\")\n+\tparseAndCompare(t, \"export exportFoo=2\", \"exportFoo\", \"2\")\n+\tparseAndCompare(t, \"exportFOO=2\", \"exportFOO\", \"2\")\n+\tparseAndCompare(t, \"export_FOO =2\", \"export_FOO\", \"2\")\n+\tparseAndCompare(t, \"export.FOO= 2\", \"export.FOO\", \"2\")\n+\tparseAndCompare(t, \"export\\tOPTION_A=2\", \"OPTION_A\", \"2\")\n+\tparseAndCompare(t, \"  export OPTION_A=2\", \"OPTION_A\", \"2\")\n+\tparseAndCompare(t, \"\\texport OPTION_A=2\", \"OPTION_A\", \"2\")\n \n \t// it 'expands newlines in quoted strings' do\n \t// expect(env('FOO=\"bar\\nbaz\"')).to eql('FOO' => \"bar\\nbaz\")\n",
+  "diffTruncated": false,
+  "tree": [
+    ".gitignore",
+    ".travis.yml",
+    "LICENCE",
+    "README.md",
+    "autoload/autoload.go",
+    "cmd/godotenv/cmd.go",
+    "fixtures/equals.env",
+    "fixtures/exported.env",
+    "fixtures/invalid1.env",
+    "fixtures/plain.env",
+    "fixtures/quoted.env",
+    "fixtures/substitutions.env",
+    "godotenv.go",
+    "godotenv_test.go"
+  ],
+  "explanation": {
+    "what": "キー名のパース処理を、`strings.HasPrefix(key, \"export\")` による単純な前方一致チェックから正規表現 `^\\s*(?:export\\s+)?(.*?)\\s*$` を使った実装に置き換えた。これにより `export ` の後に空白を必須とするマッチになり、`exportFOO=2` のように `export` で始まるがキーワードそのものではないキー名が誤って `FOO` に切り詰められる不具合を修正した。",
+    "why": "issue #66 で、`export` という文字列で始まる任意のキー(`export_env` や `exportFoo` など)が `export` プレフィックスとして誤って剥がされてしまい、正しい値を返せない不具合が報告されていた。issue には具体的な修正案(`export ` へのスペース込みの前方一致 + トリム後の完全一致除外)も添えられており、実際の修正はこれを正規表現ベースでより厳密に実装したもの。",
+    "highlights": [
+      { "file": "godotenv.go", "note": "`regexp.MustCompile(`^\\s*(?:export\\s+)?(.*?)\\s*$`)` で `export` の後に空白が続く場合のみキーワードとして除去する。" },
+      { "file": "godotenv_test.go", "note": "`exportFOO=2` や `export_FOO =2` など、`export` で始まるが `export` キーワードではないキーの回帰テストを追加。" }
+    ],
+    "langNotes": [
+      { "topic": "export で始まるキーの許可", "note": "シェルの `export VAR=value` 構文をパースするために、godotenv は行頭の `export` を無視してからキーを取り出す。しかし単純な前方一致だと `exportFoo` のような `export` を含むだけのキー名まで誤って `export` を剥がしてしまうため、`export` の後に空白があるときだけキーワードとして扱う必要がある。" }
+    ],
+    "diagram": null,
+    "evidence": "issue",
+    "refs": [
+      { "type": "pr", "number": 70, "url": "https://github.com/joho/godotenv/pull/70" },
+      { "type": "issue", "number": 66, "url": "https://github.com/joho/godotenv/issues/66" }
+    ],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

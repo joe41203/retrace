@@ -1,0 +1,86 @@
+{
+  "seq": 111,
+  "sha": "3a7a19020151b45a29896c9142723efe5b11a061",
+  "parents": [
+    "a7f6c4c5837ac4174f7ff176a2f2754859c30014"
+  ],
+  "author": {
+    "name": "柚子uccs",
+    "email": "1500846601@qq.com",
+    "date": "2024-12-16T12:14:19+08:00"
+  },
+  "message": "fix: if a line contains multiple # characters, there will be issues w… (#238)\n\n* fix: if a line contains multiple # characters, there will be issues when traversing from back to front\r\n\r\n* fix: typo",
+  "pr": {
+    "number": 238,
+    "title": "fix: if a line contains multiple # characters, there will be issues w…",
+    "body": "When traversing from back to front, an error occurs if a line contains multiple # characters, such as bar=foo # baz # other. I changed it to traverse from front to back instead.",
+    "url": "https://github.com/joho/godotenv/pull/238"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 3,
+    "additions": 20,
+    "deletions": 14
+  },
+  "files": [
+    {
+      "path": "fixtures/comments.env",
+      "status": "M",
+      "additions": 3,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "godotenv_test.go",
+      "status": "M",
+      "additions": 14,
+      "deletions": 11,
+      "binary": false
+    },
+    {
+      "path": "parser.go",
+      "status": "M",
+      "additions": 3,
+      "deletions": 3,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/fixtures/comments.env b/fixtures/comments.env\nindex af9781f..4dd5959 100644\n--- a/fixtures/comments.env\n+++ b/fixtures/comments.env\n@@ -1,4 +1,7 @@\n # Full line comment\n+qux=thud # fred # other\n+thud=fred#qux # other\n+fred=qux#baz # other # more\n foo=bar # baz\n bar=foo#baz\n baz=\"foo\"#bar\ndiff --git a/godotenv_test.go b/godotenv_test.go\nindex c6b5725..c07e6f3 100644\n--- a/godotenv_test.go\n+++ b/godotenv_test.go\n@@ -477,9 +477,12 @@ func TestErrorParsing(t *testing.T) {\n func TestComments(t *testing.T) {\n \tenvFileName := \"fixtures/comments.env\"\n \texpectedValues := map[string]string{\n-\t\t\"foo\": \"bar\",\n-\t\t\"bar\": \"foo#baz\",\n-\t\t\"baz\": \"foo\",\n+\t\t\"qux\":  \"thud\",\n+\t\t\"thud\": \"fred#qux\",\n+\t\t\"fred\": \"qux#baz\",\n+\t\t\"foo\":  \"bar\",\n+\t\t\"bar\":  \"foo#baz\",\n+\t\t\"baz\":  \"foo\",\n \t}\n \n \tloadEnvAndCompareValues(t, Load, envFileName, expectedValues, noopPresets)\n@@ -588,42 +591,42 @@ func TestWhitespace(t *testing.T) {\n \t}{\n \t\t\"Leading whitespace\": {\n \t\t\tinput: \" A=a\\n\",\n-\t\t\tkey: \"A\",\n+\t\t\tkey:   \"A\",\n \t\t\tvalue: \"a\",\n \t\t},\n \t\t\"Leading tab\": {\n \t\t\tinput: \"\\tA=a\\n\",\n-\t\t\tkey: \"A\",\n+\t\t\tkey:   \"A\",\n \t\t\tvalue: \"a\",\n \t\t},\n \t\t\"Leading mixed whitespace\": {\n \t\t\tinput: \" \\t \\t\\n\\t \\t A=a\\n\",\n-\t\t\tkey: \"A\",\n+\t\t\tkey:   \"A\",\n \t\t\tvalue: \"a\",\n \t\t},\n \t\t\"Leading whitespace before export\": {\n \t\t\tinput: \" \\t\\t export    A=a\\n\",\n-\t\t\tkey: \"A\",\n+\t\t\tkey:   \"A\",\n \t\t\tvalue: \"a\",\n \t\t},\n \t\t\"Trailing whitespace\": {\n \t\t\tinput: \"A=a \\t \\t\\n\",\n-\t\t\tkey: \"A\",\n+\t\t\tkey:   \"A\",\n \t\t\tvalue: \"a\",\n \t\t},\n \t\t\"Trailing whitespace with export\": {\n \t\t\tinput: \"export A=a\\t \\t \\n\",\n-\t\t\tkey: \"A\",\n+\t\t\tkey:   \"A\",\n \t\t\tvalue: \"a\",\n \t\t},\n \t\t\"No EOL\": {\n \t\t\tinput: \"A=a\",\n-\t\t\tkey: \"A\",\n+\t\t\tkey:   \"A\",\n \t\t\tvalue: \"a\",\n \t\t},\n \t\t\"Trailing whitespace with no EOL\": {\n \t\t\tinput: \"A=a \",\n-\t\t\tkey: \"A\",\n+\t\t\tkey:   \"A\",\n \t\t\tvalue: \"a\",\n \t\t},\n \t}\ndiff --git a/parser.go b/parser.go\nindex 098f05d..a180d7d 100644\n--- a/parser.go\n+++ b/parser.go\n@@ -143,9 +143,9 @@ func extractVarValue(src []byte, vars map[string]string) (value string, rest []b\n \t\t}\n \n \t\t// Work backwards to check if the line ends in whitespace then\n-\t\t// a comment (ie asdasd # some comment)\n-\t\tfor i := endOfVar - 1; i >= 0; i-- {\n-\t\t\tif line[i] == charComment && i > 0 {\n+\t\t// a comment, ie: foo=bar # baz # other\n+\t\tfor i := 0; i < endOfVar; i++ {\n+\t\t\tif line[i] == charComment && i < endOfVar {\n \t\t\t\tif isSpace(line[i-1]) {\n \t\t\t\t\tendOfVar = i\n \t\t\t\t\tbreak\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/dependabot.yml",
+    ".github/workflows/ci.yml",
+    ".github/workflows/codeql-analysis.yml",
+    ".github/workflows/release.yml",
+    ".gitignore",
+    "LICENCE",
+    "README.md",
+    "autoload/autoload.go",
+    "cmd/godotenv/cmd.go",
+    "fixtures/comments.env",
+    "fixtures/equals.env",
+    "fixtures/exported.env",
+    "fixtures/invalid1.env",
+    "fixtures/plain.env",
+    "fixtures/quoted.env",
+    "fixtures/substitutions.env",
+    "go.mod",
+    "godotenv.go",
+    "godotenv_test.go",
+    "parser.go"
+  ],
+  "explanation": {
+    "what": "extractVarValue 内でコメント開始位置を探すループの走査方向を末尾からの逆走査(for i := endOfVar - 1; i >= 0; i--)から先頭からの順走査(for i := 0; i < endOfVar; i++)に変更した。あわせて fixtures/comments.env に `#` を複数含む行(例: `thud=fred#qux # other`)を追加し、godotenv_test.go の期待値も拡張している。",
+    "why": "PR本文によれば、値の中に `#` が複数回登場する行(例: `bar=foo # baz # other`)を末尾から走査すると、どの `#` が実際のコメント開始かを誤って判定してしまう問題があった。先頭から順に走査して最初にスペースの後に現れる `#` をコメント開始とすることで、複数 `#` を含む行でも意図通りに値とコメントを分離できるようにした。",
+    "highlights": [
+      { "file": "parser.go", "note": "走査方向を逆転させた1行(for ループの向き)がバグ修正の核心" },
+      { "file": "fixtures/comments.env", "note": "複数 # を含む新しい回帰テスト用の行" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [{ "type": "pr", "number": 238, "url": "https://github.com/joho/godotenv/pull/238" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

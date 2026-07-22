@@ -1,0 +1,86 @@
+{
+  "seq": 72,
+  "sha": "d6ee6871f21dd95e76563a90f522ce9fe75443f8",
+  "parents": [
+    "b09de681dcaff3eaeafcc62ee1f9f622a0c32b8b",
+    "dbcf4b53b84c52d7c18976e25d85b31f01f266aa"
+  ],
+  "author": {
+    "name": "John Barton",
+    "email": "jb@johnbarton.co",
+    "date": "2020-03-02T07:46:15+11:00"
+  },
+  "message": "Merge pull request #95 from orxobo/Write-adjustment\n\nFixed Write bugs",
+  "pr": {
+    "number": 95,
+    "title": "Fixed Write bugs",
+    "body": "This should address a fix #93 and #94\r\nThis has not been addressed in any tests.",
+    "url": "https://github.com/joho/godotenv/pull/95"
+  },
+  "linkedIssues": [
+    {
+      "number": 93,
+      "title": "BUG: Write assigns error to \"error\" type rather than a variable",
+      "body": "Function \"Write\" assigns the returned errors to the \"error\" type rather than a variable like err.",
+      "url": "https://github.com/joho/godotenv/issues/93"
+    },
+    {
+      "number": 94,
+      "title": "BUG: Write does not close or sync the opened file",
+      "body": "Function Write should defer a close on the open file and preferably sync the file that has been written by flushing the os write buffer through file.Sync() function.",
+      "url": "https://github.com/joho/godotenv/issues/94"
+    }
+  ],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 12,
+    "deletions": 7
+  },
+  "files": [
+    {
+      "path": "godotenv.go",
+      "status": "M",
+      "additions": 12,
+      "deletions": 7,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/godotenv.go b/godotenv.go\nindex 330f1c2..69e816c 100644\n--- a/godotenv.go\n+++ b/godotenv.go\n@@ -147,15 +147,20 @@ func Exec(filenames []string, cmd string, cmdArgs []string) error {\n \n // Write serializes the given environment and writes it to a file\n func Write(envMap map[string]string, filename string) error {\n-\tcontent, error := Marshal(envMap)\n-\tif error != nil {\n-\t\treturn error\n+\tcontent, err := Marshal(envMap)\n+\tif err != nil {\n+\t\treturn err\n+\t}\n+\tfile, err := os.Create(filename)\n+\tif err != nil {\n+\t\treturn err\n \t}\n-\tfile, error := os.Create(filename)\n-\tif error != nil {\n-\t\treturn error\n+\tdefer file.Close()\n+\t_, err = file.WriteString(content)\n+\tif err != nil {\n+\t\treturn err\n \t}\n-\t_, err := file.WriteString(content)\n+\tfile.Sync()\n \treturn err\n }\n \n",
+  "diffTruncated": false,
+  "tree": [
+    ".gitignore",
+    ".travis.yml",
+    "LICENCE",
+    "README.md",
+    "autoload/autoload.go",
+    "cmd/godotenv/cmd.go",
+    "fixtures/equals.env",
+    "fixtures/exported.env",
+    "fixtures/invalid1.env",
+    "fixtures/plain.env",
+    "fixtures/quoted.env",
+    "fixtures/substitutions.env",
+    "godotenv.go",
+    "godotenv_test.go"
+  ],
+  "explanation": {
+    "what": "Write 関数のエラー変数名を組み込み型 error と同名の変数 error から err に変更し、file.Close() を defer で確実に呼ぶようにし、書き込み後に file.Sync() を呼んでから戻り値を返すよう修正した。",
+    "why": "linkedIssues #93 は「Write が返り値を error という名前の変数に代入しており err のような通常の変数名にすべき」、#94 は「Write が開いたファイルを close も sync もしていない」という指摘で、この2つのバグ修正がPRの目的。",
+    "highlights": [
+      { "file": "godotenv.go", "note": "os.Create で開いた file に defer file.Close() を追加し、WriteString 後に file.Sync() でOSの書き込みバッファをフラッシュしている" }
+    ],
+    "langNotes": [
+      { "topic": "組み込み型名を変数名に使う問題", "note": "Go では error は予約語ではなく組み込みの型名なので、変数名として error を使うこと自体は文法的に許されるが、スコープ内で組み込み型を隠してしまい紛らわしいためリンターや慣習では err という変数名が推奨される。" },
+      { "topic": "defer file.Close()", "note": "Go では os.Create などでリソースを開いた直後に defer Close() を書き、関数を抜けるどの経路でも確実に解放されるようにするのが定石のイディオム。" }
+    ],
+    "diagram": null,
+    "evidence": "issue",
+    "refs": [
+      { "type": "pr", "number": 95, "url": "https://github.com/joho/godotenv/pull/95" },
+      { "type": "issue", "number": 93, "url": "https://github.com/joho/godotenv/issues/93" },
+      { "type": "issue", "number": 94, "url": "https://github.com/joho/godotenv/issues/94" }
+    ],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

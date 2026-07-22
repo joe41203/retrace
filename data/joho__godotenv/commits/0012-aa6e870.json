@@ -1,0 +1,59 @@
+{
+  "seq": 12,
+  "sha": "aa6e870b578a4917b28fd5fe6f39ccc359859aca",
+  "parents": [
+    "98b43188a1624cc1e0e6863adc21ed83192c5873"
+  ],
+  "author": {
+    "name": "John Barton (joho)",
+    "email": "jrbarton@gmail.com",
+    "date": "2013-07-31T12:10:31+10:00"
+  },
+  "message": "Red, green, rinse repeat.",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 2,
+    "deletions": 1
+  },
+  "files": [
+    {
+      "path": "godotenv.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "godotenv_test.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/godotenv.go b/godotenv.go\nindex 62ab57d..04c4414 100644\n--- a/godotenv.go\n+++ b/godotenv.go\n@@ -83,7 +83,7 @@ func parseLine(line string) (key string, value string, err error) {\n \t\tsegmentsBetweenHashes := strings.Split(value, \"#\")\n \t\tvalue = segmentsBetweenHashes[0]\n \t\t// open quote in leftmost segment\n-\t\tif strings.Count(value, \"\\\"\") == 1 {\n+\t\tif strings.Count(value, \"\\\"\") == 1 || strings.Count(value, \"'\") == 1 {\n \t\t\tvalue = value + \"#\" + segmentsBetweenHashes[1]\n \t\t}\n \t}\ndiff --git a/godotenv_test.go b/godotenv_test.go\nindex d748538..417a677 100644\n--- a/godotenv_test.go\n+++ b/godotenv_test.go\n@@ -89,6 +89,7 @@ func TestParsing(t *testing.T) {\n \t// it 'allows # in quoted value' do\n \t// expect(env('foo=\"bar#baz\" # comment')).to eql('foo' => 'bar#baz')\n \tparseAndCompare(t, \"FOO=\\\"bar#baz\\\" # comment\", \"FOO\", \"bar#baz\")\n+\tparseAndCompare(t, \"FOO='bar#baz' # comment\", \"FOO\", \"bar#baz\")\n \n \t// it 'ignores comment lines' do\n \t// expect(env(\"\\n\\n\\n # HERE GOES FOO \\nfoo=bar\")).to eql('foo' => 'bar')\n",
+  "diffTruncated": false,
+  "tree": [
+    ".gitignore",
+    "fixtures/exported.env",
+    "fixtures/plain.env",
+    "fixtures/quoted.env",
+    "godotenv.go",
+    "godotenv_test.go"
+  ],
+  "explanation": {
+    "what": "seq11で追加した「開きクォートが1個だけなら#以降を戻す」判定を、ダブルクォート(\")だけでなくシングルクォート(')にも対応させた。対応するテストとして`FOO='bar#baz' # comment`を追加している。",
+    "why": "コミットメッセージ\"Red, green, rinse repeat.\"の通り、TDDのサイクルを一段回した小さな修正。dotenvのシングルクォート記法でも同じ問題(値中の#が誤ってコメント扱いされる)が起きるため、ダブルクォートと同じ扱いに揃えた。",
+    "highlights": [
+      { "file": "godotenv.go", "note": "if文の条件に`strings.Count(value, \"'\") == 1`のORを追加しただけの1行差分" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

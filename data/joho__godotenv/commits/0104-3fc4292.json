@@ -1,0 +1,105 @@
+{
+  "seq": 104,
+  "sha": "3fc4292b58a67b78e1dbb6e47b4879a6cc602ec4",
+  "parents": [
+    "b311b2657d7c3f549674adf6080d032437caa68c"
+  ],
+  "author": {
+    "name": "John Barton",
+    "email": "jb@johnbarton.co",
+    "date": "2023-02-06T08:47:38+11:00"
+  },
+  "message": "Fix bug where internal unquoted whitespace truncates values (#205)\n\n* Add tests to cover the regression reported in #204\r\n\r\n* Add a comment on regex for clarity\r\n\r\n* Remove some old code that wasn't doing anything\r\n\r\n* Push _all_ parse code into the parser and get tests calling live code\r\n\r\n* Add some newline specific tests\r\n\r\n* Add some YAML tests for the newline/space split bug\r\n\r\n* Fix incorrect terminating of lines on whitespace\r\n\r\n* Fix most of the parser regressions\r\n\r\n* Bring back FOO.BAR names\r\n\r\n* remove some commented out code",
+  "pr": {
+    "number": 205,
+    "title": "Fix bug where internal unquoted whitespace truncates values",
+    "body": "Reported in #204\r\n\r\nThe new parser for multiline values incorrectly truncates unquoted lines with internal whitespace.\r\n\r\nThere was no test for this previously so was \"undefined\" behaviour, but given we use https://github.com/bkeepers/dotenv as our \"standard\", it works there so it should work here.\r\n\r\nOnce getting deeper into the fix, I discovered not all tests had been moved over to the new parser and some dead code had been left in the package. I've now fixed all that up and got (almost all) original tests passing.\r\n\r\nI cut two tests (allowing unterminated quoted variables) as they didn't match any rspec in ruby's dotenv.",
+    "url": "https://github.com/joho/godotenv/pull/205"
+  },
+  "linkedIssues": [
+    {
+      "number": 204,
+      "title": "Bugs in parser around unquoted whitespace and newlines in v1.5.0",
+      "body": "Hi there!\r\n\r\nI'd just like to let you know that the following, which worked on v1.4.0, now breaks in v1.5.0:\r\n\r\n```\r\nMY_ENV=foo bar\r\n```\r\n\r\nIt's possible to fix by wrapping into quotes, though:\r\n\r\n```\r\nMY_ENV=\"foo bar\"\r\n```\r\n\r\nAs there isn't any official dotenv specification (AFAIK), I'm not sure if the former is supposed to work in the first place, but it caught my attention and I decided to wait until at least we have a decision if this is going to be addressed or not before upgrading, because it can end up breaking for my users.",
+      "url": "https://github.com/joho/godotenv/issues/204"
+    }
+  ],
+  "stats": {
+    "filesChanged": 4,
+    "additions": 135,
+    "deletions": 143
+  },
+  "files": [
+    {
+      "path": "fixtures/plain.env",
+      "status": "M",
+      "additions": 2,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "godotenv.go",
+      "status": "M",
+      "additions": 0,
+      "deletions": 126,
+      "binary": false
+    },
+    {
+      "path": "godotenv_test.go",
+      "status": "M",
+      "additions": 61,
+      "deletions": 8,
+      "binary": false
+    },
+    {
+      "path": "parser.go",
+      "status": "M",
+      "additions": 72,
+      "deletions": 8,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/fixtures/plain.env b/fixtures/plain.env\nindex 43f7e44..e033366 100644\n--- a/fixtures/plain.env\n+++ b/fixtures/plain.env\n@@ -4,4 +4,5 @@ OPTION_C= 3\n OPTION_D =4\n OPTION_E = 5\n OPTION_F = \n-OPTION_G=\n\\ No newline at end of file\n+OPTION_G=\n+OPTION_H=1 2\n\\ No newline at end of file\ndiff --git a/godotenv.go b/godotenv.go\nindex 3d312f3..61b0ebb 100644\n--- a/godotenv.go\n+++ b/godotenv.go\n@@ -15,12 +15,10 @@ package godotenv\n \n import (\n \t\"bytes\"\n-\t\"errors\"\n \t\"fmt\"\n \t\"io\"\n \t\"os\"\n \t\"os/exec\"\n-\t\"regexp\"\n \t\"sort\"\n \t\"strconv\"\n \t\"strings\"\n@@ -215,130 +213,6 @@ func readFile(filename string) (envMap map[string]string, err error) {\n \treturn Parse(file)\n }\n \n-var exportRegex = regexp.MustCompile(`^\\s*(?:export\\s+)?(.*?)\\s*$`)\n-\n-func parseLine(line string, envMap map[string]string) (key string, value string, err error) {\n-\tif len(line) == 0 {\n-\t\terr = errors.New(\"zero length string\")\n-\t\treturn\n-\t}\n-\n-\t// ditch the comments (but keep quoted hashes)\n-\tif strings.Contains(line, \"#\") {\n-\t\tsegmentsBetweenHashes := strings.Split(line, \"#\")\n-\t\tquotesAreOpen := false\n-\t\tvar segmentsToKeep []string\n-\t\tfor _, segment := range segmentsBetweenHashes {\n-\t\t\tif strings.Count(segment, \"\\\"\") == 1 || strings.Count(segment, \"'\") == 1 {\n-\t\t\t\tif quotesAreOpen {\n-\t\t\t\t\tquotesAreOpen = false\n-\t\t\t\t\tsegmentsToKeep = append(segmentsToKeep, segment)\n-\t\t\t\t} else {\n-\t\t\t\t\tquotesAreOpen = true\n-\t\t\t\t}\n-\t\t\t}\n-\n-\t\t\tif len(segmentsToKeep) == 0 || quotesAreOpen {\n-\t\t\t\tsegmentsToKeep = append(segmentsToKeep, segment)\n-\t\t\t}\n-\t\t}\n-\n-\t\tline = strings.Join(segmentsToKeep, \"#\")\n-\t}\n-\n-\tfirstEquals := strings.Index(line, \"=\")\n-\tfirstColon := strings.Index(line, \":\")\n-\tsplitString := strings.SplitN(line, \"=\", 2)\n-\tif firstColon != -1 && (firstColon < firstEquals || firstEquals == -1) {\n-\t\t//this is a yaml-style line\n-\t\tsplitString = strings.SplitN(line, \":\", 2)\n-\t}\n-\n-\tif len(splitString) != 2 {\n-\t\terr = errors.New(\"can't separate key from value\")\n-\t\treturn\n-\t}\n-\n-\t// Parse the key\n-\tkey = splitString[0]\n-\n-\tkey = strings.TrimPrefix(key, \"export\")\n-\n-\tkey = strings.TrimSpace(key)\n-\n-\tkey = exportRegex.ReplaceAllString(splitString[0], \"$1\")\n-\n-\t// Parse the value\n-\tvalue = parseValue(splitString[1], envMap)\n-\treturn\n-}\n-\n-var (\n-\tsingleQuotesRegex  = regexp.MustCompile(`\\A'(.*)'\\z`)\n-\tdoubleQuotesRegex  = regexp.MustCompile(`\\A\"(.*)\"\\z`)\n-\tescapeRegex        = regexp.MustCompile(`\\\\.`)\n-\tunescapeCharsRegex = regexp.MustCompile(`\\\\([^$])`)\n-)\n-\n-func parseValue(value string, envMap map[string]string) string {\n-\n-\t// trim\n-\tvalue = strings.Trim(value, \" \")\n-\n-\t// check if we've got quoted values or possible escapes\n-\tif len(value) > 1 {\n-\t\tsingleQuotes := singleQuotesRegex.FindStringSubmatch(value)\n-\n-\t\tdoubleQuotes := doubleQuotesRegex.FindStringSubmatch(value)\n-\n-\t\tif singleQuotes != nil || doubleQuotes != nil {\n-\t\t\t// pull the quotes off the edges\n-\t\t\tvalue = value[1 : len(value)-1]\n-\t\t}\n-\n-\t\tif doubleQuotes != nil {\n-\t\t\t// expand newlines\n-\t\t\tvalue = escapeRegex.ReplaceAllStringFunc(value, func(match string) string {\n-\t\t\t\tc := strings.TrimPrefix(match, `\\`)\n-\t\t\t\tswitch c {\n-\t\t\t\tcase \"n\":\n-\t\t\t\t\treturn \"\\n\"\n-\t\t\t\tcase \"r\":\n-\t\t\t\t\treturn \"\\r\"\n-\t\t\t\tdefault:\n-\t\t\t\t\treturn match\n-\t\t\t\t}\n-\t\t\t})\n-\t\t\t// unescape characters\n-\t\t\tvalue = unescapeCharsRegex.ReplaceAllString(value, \"$1\")\n-\t\t}\n-\n-\t\tif singleQuotes == nil {\n-\t\t\tvalue = expandVariables(value, envMap)\n-\t\t}\n-\t}\n-\n-\treturn value\n-}\n-\n-var expandVarRegex = regexp.MustCompile(`(\\\\)?(\\$)(\\()?\\{?([A-Z0-9_]+)?\\}?`)\n-\n-func expandVariables(v string, m map[string]string) string {\n-\treturn expandVarRegex.ReplaceAllStringFunc(v, func(s string) string {\n-\t\tsubmatch := expandVarRegex.FindStringSubmatch(s)\n-\n-\t\tif submatch == nil {\n-\t\t\treturn s\n-\t\t}\n-\t\tif submatch[1] == \"\\\\\" || submatch[2] == \"(\" {\n-\t\t\treturn submatch[0][1:]\n-\t\t} else if submatch[4] != \"\" {\n-\t\t\treturn m[submatch[4]]\n-\t\t}\n-\t\treturn s\n-\t})\n-}\n-\n func doubleQuoteEscape(line string) string {\n \tfor _, c := range doubleQuoteSpecialChars {\n \t\ttoReplace := \"\\\\\" + string(c)\ndiff --git a/godotenv_test.go b/godotenv_test.go\nindex 017d6b6..edb5781 100644\n--- a/godotenv_test.go\n+++ b/godotenv_test.go\n@@ -12,9 +12,14 @@ import (\n var noopPresets = make(map[string]string)\n \n func parseAndCompare(t *testing.T, rawEnvLine string, expectedKey string, expectedValue string) {\n-\tkey, value, _ := parseLine(rawEnvLine, noopPresets)\n-\tif key != expectedKey || value != expectedValue {\n-\t\tt.Errorf(\"Expected '%v' to parse as '%v' => '%v', got '%v' => '%v' instead\", rawEnvLine, expectedKey, expectedValue, key, value)\n+\tresult, err := Unmarshal(rawEnvLine)\n+\n+\tif err != nil {\n+\t\tt.Errorf(\"Expected %q to parse as %q: %q, errored %q\", rawEnvLine, expectedKey, expectedValue, err)\n+\t\treturn\n+\t}\n+\tif result[expectedKey] != expectedValue {\n+\t\tt.Errorf(\"Expected '%v' to parse as '%v' => '%v', got %q instead\", rawEnvLine, expectedKey, expectedValue, result)\n \t}\n }\n \n@@ -80,6 +85,7 @@ func TestReadPlainEnv(t *testing.T) {\n \t\t\"OPTION_E\": \"5\",\n \t\t\"OPTION_F\": \"\",\n \t\t\"OPTION_G\": \"\",\n+\t\t\"OPTION_H\": \"1 2\",\n \t}\n \n \tenvMap, err := Read(envFileName)\n@@ -153,6 +159,7 @@ func TestLoadPlainEnv(t *testing.T) {\n \t\t\"OPTION_C\": \"3\",\n \t\t\"OPTION_D\": \"4\",\n \t\t\"OPTION_E\": \"5\",\n+\t\t\"OPTION_H\": \"1 2\",\n \t}\n \n \tloadEnvAndCompareValues(t, Load, envFileName, expectedValues, noopPresets)\n@@ -272,7 +279,6 @@ func TestExpanding(t *testing.T) {\n \t\t\t}\n \t\t})\n \t}\n-\n }\n \n func TestVariableStringValueSeparator(t *testing.T) {\n@@ -369,6 +375,9 @@ func TestParsing(t *testing.T) {\n \t// expect(env('foo=bar ')).to eql('foo' => 'bar') # not 'bar '\n \tparseAndCompare(t, \"FOO=bar \", \"FOO\", \"bar\")\n \n+\t// unquoted internal whitespace is preserved\n+\tparseAndCompare(t, `KEY=value value`, \"KEY\", \"value value\")\n+\n \t// it 'ignores inline comments' do\n \t// expect(env(\"foo=bar # this is foo\")).to eql('foo' => 'bar')\n \tparseAndCompare(t, \"FOO=bar # this is foo\", \"FOO\", \"bar\")\n@@ -391,10 +400,8 @@ func TestParsing(t *testing.T) {\n \tparseAndCompare(t, `FOO=\"bar\\\\r\\ b\\az\"`, \"FOO\", \"bar\\\\r baz\")\n \n \tparseAndCompare(t, `=\"value\"`, \"\", \"value\")\n-\tparseAndCompare(t, `KEY=\"`, \"KEY\", \"\\\"\")\n-\tparseAndCompare(t, `KEY=\"value`, \"KEY\", \"\\\"value\")\n \n-\t// leading whitespace should be ignored\n+\t// unquoted whitespace around keys should be ignored\n \tparseAndCompare(t, \" KEY =value\", \"KEY\", \"value\")\n \tparseAndCompare(t, \"   KEY=value\", \"KEY\", \"value\")\n \tparseAndCompare(t, \"\\tKEY=value\", \"KEY\", \"value\")\n@@ -402,7 +409,7 @@ func TestParsing(t *testing.T) {\n \t// it 'throws an error if line format is incorrect' do\n \t// expect{env('lol$wut')}.to raise_error(Dotenv::FormatError)\n \tbadlyFormattedLine := \"lol$wut\"\n-\t_, _, err := parseLine(badlyFormattedLine, noopPresets)\n+\t_, err := Unmarshal(badlyFormattedLine)\n \tif err == nil {\n \t\tt.Errorf(\"Expected \\\"%v\\\" to return error, but it didn't\", badlyFormattedLine)\n \t}\n@@ -520,3 +527,49 @@ func TestRoundtrip(t *testing.T) {\n \n \t}\n }\n+\n+func TestTrailingNewlines(t *testing.T) {\n+\tcases := map[string]struct {\n+\t\tinput string\n+\t\tkey   string\n+\t\tvalue string\n+\t}{\n+\t\t\"Simple value without trailing newline\": {\n+\t\t\tinput: \"KEY=value\",\n+\t\t\tkey:   \"KEY\",\n+\t\t\tvalue: \"value\",\n+\t\t},\n+\t\t\"Value with internal whitespace without trailing newline\": {\n+\t\t\tinput: \"KEY=value value\",\n+\t\t\tkey:   \"KEY\",\n+\t\t\tvalue: \"value value\",\n+\t\t},\n+\t\t\"Value with internal whitespace with trailing newline\": {\n+\t\t\tinput: \"KEY=value value\\n\",\n+\t\t\tkey:   \"KEY\",\n+\t\t\tvalue: \"value value\",\n+\t\t},\n+\t\t\"YAML style - value with internal whitespace without trailing newline\": {\n+\t\t\tinput: \"KEY: value value\",\n+\t\t\tkey:   \"KEY\",\n+\t\t\tvalue: \"value value\",\n+\t\t},\n+\t\t\"YAML style - value with internal whitespace with trailing newline\": {\n+\t\t\tinput: \"KEY: value value\\n\",\n+\t\t\tkey:   \"KEY\",\n+\t\t\tvalue: \"value value\",\n+\t\t},\n+\t}\n+\n+\tfor n, c := range cases {\n+\t\tt.Run(n, func(t *testing.T) {\n+\t\t\tresult, err := Unmarshal(c.input)\n+\t\t\tif err != nil {\n+\t\t\t\tt.Errorf(\"Input: %q Unexpected error:\\t%q\", c.input, err)\n+\t\t\t}\n+\t\t\tif result[c.key] != c.value {\n+\t\t\t\tt.Errorf(\"Input %q Expected:\\t %q/%q\\nGot:\\t %q\", c.input, c.key, c.value, result)\n+\t\t\t}\n+\t\t})\n+\t}\n+}\ndiff --git a/parser.go b/parser.go\nindex 196418c..cc709af 100644\n--- a/parser.go\n+++ b/parser.go\n@@ -4,6 +4,7 @@ import (\n \t\"bytes\"\n \t\"errors\"\n \t\"fmt\"\n+\t\"regexp\"\n \t\"strings\"\n \t\"unicode\"\n )\n@@ -69,7 +70,13 @@ func getStatementStart(src []byte) []byte {\n // locateKeyName locates and parses key name and returns rest of slice\n func locateKeyName(src []byte) (key string, cutset []byte, err error) {\n \t// trim \"export\" and space at beginning\n-\tsrc = bytes.TrimLeftFunc(bytes.TrimPrefix(src, []byte(exportPrefix)), isSpace)\n+\tsrc = bytes.TrimLeftFunc(src, isSpace)\n+\tif bytes.HasPrefix(src, []byte(exportPrefix)) {\n+\t\ttrimmed := bytes.TrimPrefix(src, []byte(exportPrefix))\n+\t\tif bytes.IndexFunc(trimmed, isSpace) == 0 {\n+\t\t\tsrc = bytes.TrimLeftFunc(trimmed, isSpace)\n+\t\t}\n+\t}\n \n \t// locate key name end and validate it in single loop\n \toffset := 0\n@@ -88,8 +95,8 @@ loop:\n \t\t\tbreak loop\n \t\tcase '_':\n \t\tdefault:\n-\t\t\t// variable name should match [A-Za-z0-9_]\n-\t\t\tif unicode.IsLetter(rchar) || unicode.IsNumber(rchar) {\n+\t\t\t// variable name should match [A-Za-z0-9_.]\n+\t\t\tif unicode.IsLetter(rchar) || unicode.IsNumber(rchar) || rchar == '.' {\n \t\t\t\tcontinue\n \t\t\t}\n \n@@ -113,13 +120,41 @@ loop:\n func extractVarValue(src []byte, vars map[string]string) (value string, rest []byte, err error) {\n \tquote, hasPrefix := hasQuotePrefix(src)\n \tif !hasPrefix {\n-\t\t// unquoted value - read until whitespace\n-\t\tend := bytes.IndexFunc(src, unicode.IsSpace)\n-\t\tif end == -1 {\n-\t\t\treturn expandVariables(string(src), vars), nil, nil\n+\t\t// unquoted value - read until end of line\n+\t\tendOfLine := bytes.IndexFunc(src, isLineEnd)\n+\n+\t\t// Hit EOF without a trailing newline\n+\t\tif endOfLine == -1 {\n+\t\t\tendOfLine = len(src)\n+\n+\t\t\tif endOfLine == 0 {\n+\t\t\t\treturn \"\", nil, nil\n+\t\t\t}\n \t\t}\n \n-\t\treturn expandVariables(string(src[0:end]), vars), src[end:], nil\n+\t\t// Convert line to rune away to do accurate countback of runes\n+\t\tline := []rune(string(src[0:endOfLine]))\n+\n+\t\t// Assume end of line is end of var\n+\t\tendOfVar := len(line)\n+\t\tif endOfVar == 0 {\n+\t\t\treturn \"\", src[endOfLine:], nil\n+\t\t}\n+\n+\t\t// Work backwards to check if the line ends in whitespace then\n+\t\t// a comment (ie asdasd # some comment)\n+\t\tfor i := endOfVar - 1; i >= 0; i-- {\n+\t\t\tif line[i] == charComment && i > 0 {\n+\t\t\t\tif isSpace(line[i-1]) {\n+\t\t\t\t\tendOfVar = i\n+\t\t\t\t\tbreak\n+\t\t\t\t}\n+\t\t\t}\n+\t\t}\n+\n+\t\ttrimmed := strings.TrimFunc(string(line[0:endOfVar]), isSpace)\n+\n+\t\treturn expandVariables(trimmed, vars), src[endOfLine:], nil\n \t}\n \n \t// lookup quoted string terminator\n@@ -205,3 +240,32 @@ func isSpace(r rune) bool {\n \t}\n \treturn false\n }\n+\n+func isLineEnd(r rune) bool {\n+\tif r == '\\n' || r == '\\r' {\n+\t\treturn true\n+\t}\n+\treturn false\n+}\n+\n+var (\n+\tescapeRegex        = regexp.MustCompile(`\\\\.`)\n+\texpandVarRegex     = regexp.MustCompile(`(\\\\)?(\\$)(\\()?\\{?([A-Z0-9_]+)?\\}?`)\n+\tunescapeCharsRegex = regexp.MustCompile(`\\\\([^$])`)\n+)\n+\n+func expandVariables(v string, m map[string]string) string {\n+\treturn expandVarRegex.ReplaceAllStringFunc(v, func(s string) string {\n+\t\tsubmatch := expandVarRegex.FindStringSubmatch(s)\n+\n+\t\tif submatch == nil {\n+\t\t\treturn s\n+\t\t}\n+\t\tif submatch[1] == \"\\\\\" || submatch[2] == \"(\" {\n+\t\t\treturn submatch[0][1:]\n+\t\t} else if submatch[4] != \"\" {\n+\t\t\treturn m[submatch[4]]\n+\t\t}\n+\t\treturn s\n+\t})\n+}\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/dependabot.yml",
+    ".github/workflows/ci.yml",
+    ".github/workflows/codeql-analysis.yml",
+    ".github/workflows/release.yml",
+    ".gitignore",
+    "LICENCE",
+    "README.md",
+    "autoload/autoload.go",
+    "cmd/godotenv/cmd.go",
+    "fixtures/comments.env",
+    "fixtures/equals.env",
+    "fixtures/exported.env",
+    "fixtures/invalid1.env",
+    "fixtures/plain.env",
+    "fixtures/quoted.env",
+    "fixtures/substitutions.env",
+    "go.mod",
+    "godotenv.go",
+    "godotenv_test.go",
+    "parser.go"
+  ],
+  "explanation": {
+    "what": "godotenv.go に残っていた旧パーサ関数群(parseLine, parseValue, expandVariables など約126行)を丸ごと削除し、parser.go 側の extractVarValue のロジックを書き換えた。unquoted(クォートなし)な値の終端判定を「最初の空白で打ち切る」から「行末まで読み、末尾の空白のみをtrimし、行末が『空白+#』ならその手前をコメント開始とみなす」方式に変更している。fixtures/plain.env に `OPTION_H=1 2` のテストケースを追加し、godotenv_test.go のテストは parseLine ではなく Unmarshal を直接呼ぶ形に統一された。",
+    "why": "linkedIssue #204 で「MY_ENV=foo bar のようなクォートなしの内部空白を含む値がv1.5.0で壊れている」と報告されており、PR本文でも新しいマルチライン対応パーサが unquoted な行の内部空白を誤って値の終端と扱ってしまうバグだったと説明されている。Ruby版dotenvを「標準」として動作を合わせるため、行末まで読んでから空白をtrimする方式に直した。また旧パーサの生き残りコードとテストの一部が新パーサに移行し切れていなかったため、このコミットで全面的に整理している。",
+    "highlights": [
+      { "file": "parser.go", "note": "extractVarValueがendOfLineまで読んでからstrings.TrimFuncで前後の空白を落とす方式に変更。末尾の「空白+#」をインラインコメントとして切り落とすロジックも同居している" },
+      { "file": "godotenv.go", "note": "旧実装のparseLine/parseValue/expandVariablesがまるごと削除され、パース処理はparser.goに一本化された" }
+    ],
+    "langNotes": [
+      { "topic": "未クォート空白による値切り詰めバグ", "note": "修正前は bytes.IndexFunc(src, unicode.IsSpace) で最初の空白を見つけて値を打ち切っていたため、KEY=value value のような未クォートの値が最初のスペースで切れてしまっていた。修正後は行末(改行)まで読んでから前後の空白だけをtrimする方式にして、値中の空白を保持できるようにしている。" }
+    ],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [
+      { "type": "pr", "number": 205, "url": "https://github.com/joho/godotenv/pull/205" },
+      { "type": "issue", "number": 204, "url": "https://github.com/joho/godotenv/issues/204" }
+    ],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

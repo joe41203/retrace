@@ -1,0 +1,79 @@
+{
+  "seq": 79,
+  "sha": "4e2d182c9aa51f1b7ac376be4bcb42a9ace80ea7",
+  "parents": [
+    "65218afbaa9b8e90c3e550b3a30da9b213e27a3b"
+  ],
+  "author": {
+    "name": "John Barton",
+    "email": "jb@johnbarton.co",
+    "date": "2020-11-11T15:15:18+11:00"
+  },
+  "message": "Add action to publish binaries on each release (#125)",
+  "pr": {
+    "number": 125,
+    "title": "Add action to publish binaries on each release",
+    "body": "Solves #116",
+    "url": "https://github.com/joho/godotenv/pull/125"
+  },
+  "linkedIssues": [
+    {
+      "number": 116,
+      "title": "Thoughts on publishing binaries to Github Releases?",
+      "body": "# Update: Published\r\n\r\nSince I didn't hear anything back, I used the library to create my own command line binary and published:\r\n\r\n- Github Releases: [github.com/therootcompany/dotenv/releases](https://github.com/therootcompany/dotenv/releases)\r\n- Webi: [webinstall.dev/dotenv](https://webinstall.dev/dotenv)\r\n\r\n**Mac**, **Linux**:\r\n\r\n```bash\r\ncurl -sS https://webinstall.dev/dotenv | bash\r\n```\r\n\r\n**Windows 10**:\r\n\r\n```bash\r\ncurl -A MS https://webinstall.dev/dotenv | powershell\r\n```\r\n\r\nI'm also flirting with the idea of using dotenv-rs for a smaller binary, but it's just so much easier to do automated cross-platform builds in Go.\r\n\r\n## Original Question\r\n\r\nI've been a fan of godotenv for a while and I'd like to add it to [webinstall.dev](https://webinstall.dev). Would you be willing to publish builds for this (i.e. Mac, Linux, Windows, x64, arm64) to Github Releases?\r\n\r\nIf you are, and you think that this is likely to have new versions in the future, I'd be happy to work with you on getting that to be an automated process.\r\n\r\n+1 if the compiled binary could be called `dotenv` as was suggested in https://github.com/joho/godotenv/issues/113.",
+      "url": "https://github.com/joho/godotenv/issues/116"
+    }
+  ],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 42,
+    "deletions": 0
+  },
+  "files": [
+    {
+      "path": ".github/workflows/release.yml",
+      "status": "A",
+      "additions": 42,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/.github/workflows/release.yml b/.github/workflows/release.yml\nnew file mode 100644\nindex 0000000..0e2d1fe\n--- /dev/null\n+++ b/.github/workflows/release.yml\n@@ -0,0 +1,42 @@\n+on:\n+  push:\n+    tags:\n+    - 'v*' # Push events to matching v*, i.e. v1.0, v20.15.10\n+\n+name: Upload Release Assets\n+\n+jobs:\n+  build:\n+    name: Upload Release Assets\n+    runs-on: ubuntu-latest\n+    steps:\n+      - name: Checkout code\n+        uses: actions/checkout@v2\n+      - name: Generate build files\n+        uses: thatisuday/go-cross-build@v1\n+        with:\n+            platforms: 'linux/amd64, linux/ppc64le, darwin/amd64, windows/amd64'\n+            package: 'cmd/godotenv'\n+            name: 'godotenv'\n+            compress: 'true'\n+            dest: 'dist'\n+      - name: Create Release\n+        id: create_release\n+        uses: actions/create-release@v1\n+        env:\n+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}\n+        with:\n+          tag_name: ${{ github.ref }}\n+          release_name: Release ${{ github.ref }}\n+          draft: false\n+          prerelease: ${{ contains(github.ref, 'pre') }}\n+      - name: Upload Release Assets\n+        id: upload-release-asset \n+        uses: actions/upload-release-asset@v1\n+        env:\n+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}\n+        with:\n+          upload_url: ${{ steps.create_release.outputs.upload_url }}\n+          file: dist/*\n+          overwrite: true\n+          file_glob: true\n\\ No newline at end of file\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/ci.yml",
+    ".github/workflows/release.yml",
+    ".gitignore",
+    "LICENCE",
+    "README.md",
+    "autoload/autoload.go",
+    "cmd/godotenv/cmd.go",
+    "fixtures/equals.env",
+    "fixtures/exported.env",
+    "fixtures/invalid1.env",
+    "fixtures/plain.env",
+    "fixtures/quoted.env",
+    "fixtures/substitutions.env",
+    "go.mod",
+    "godotenv.go",
+    "godotenv_test.go"
+  ],
+  "explanation": {
+    "what": ".github/workflows/release.yml を新規追加した。v* タグのpushをトリガーに thatisuday/go-cross-build で linux/amd64, linux/ppc64le, darwin/amd64, windows/amd64 向けにクロスビルドし、actions/create-release と actions/upload-release-asset でGitHub Releaseにバイナリを添付する。",
+    "why": "linkedIssue #116 で、webinstall.dev のメンテナがgodotenvをコマンドラインツールとして配布したいと述べ、Mac/Linux/Windows向けのビルドをGitHub Releasesに自動公開してほしいと要望しており、このPRはその要望に応えてリリース時のバイナリ公開を自動化するもの。",
+    "highlights": [
+      { "file": ".github/workflows/release.yml", "note": "on.push.tags で v* にマッチしたときだけ発火し、go-cross-build で複数OS/アーキ向けバイナリを一括生成している" }
+    ],
+    "langNotes": [
+      { "topic": "タグトリガーとリリース自動化", "note": "GitHub Actions では on.push.tags にパターン(ここでは v*)を指定すると、そのパターンに一致するタグがpushされたときだけワークフローが走る。クロスビルドしたバイナリをそのままGitHub Releaseのアセットとして添付する構成は、Goのようにクロスコンパイルが容易な言語でよく使われる配布パターン。" }
+    ],
+    "diagram": null,
+    "evidence": "issue",
+    "refs": [
+      { "type": "pr", "number": 125, "url": "https://github.com/joho/godotenv/pull/125" },
+      { "type": "issue", "number": 116, "url": "https://github.com/joho/godotenv/issues/116" }
+    ],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

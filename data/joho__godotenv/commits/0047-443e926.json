@@ -1,0 +1,59 @@
+{
+  "seq": 47,
+  "sha": "443e926da0d793d3b3f32118b1e4ba52ada26503",
+  "parents": [
+    "f6581828bb37238bc1ce8e561d9e4050630a304d",
+    "2ed25fcb281a9102d39c8cdf7b1bd87101ea6cb9"
+  ],
+  "author": {
+    "name": "John Barton",
+    "email": "jrbarton@gmail.com",
+    "date": "2015-06-10T07:30:23+10:00"
+  },
+  "message": "Merge pull request #11 from buddhamagnet/master\n\nRemove unecessary assignment in autoloader",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 1,
+    "deletions": 1
+  },
+  "files": [
+    {
+      "path": "autoload/autoload.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/autoload/autoload.go b/autoload/autoload.go\nindex e11c9fd..fbcd2bd 100644\n--- a/autoload/autoload.go\n+++ b/autoload/autoload.go\n@@ -11,5 +11,5 @@ package autoload\n import \"github.com/joho/godotenv\"\n \n func init() {\n-\t_ = godotenv.Load()\n+\tgodotenv.Load()\n }\n",
+  "diffTruncated": false,
+  "tree": [
+    ".gitignore",
+    "LICENCE",
+    "README.md",
+    "autoload/autoload.go",
+    "cmd/godotenv/cmd.go",
+    "fixtures/equals.env",
+    "fixtures/exported.env",
+    "fixtures/plain.env",
+    "fixtures/quoted.env",
+    "godotenv.go",
+    "godotenv_test.go",
+    "wercker.yml"
+  ],
+  "explanation": {
+    "what": "autoload/autoload.go の init() 内で godotenv.Load() の戻り値を受けていた `_ = godotenv.Load()` を、戻り値を無視する `godotenv.Load()` だけの呼び出しに変えた。マージコミットのため差分自体は1行。",
+    "why": "マージコミットの本文に「Remove unecessary assignment in autoloader」とある通り、Go では戻り値をそもそも使わない関数呼び出しに `_ =` を付ける必要がなく、余計な記述だったため外部コントリビュータが除去した。",
+    "highlights": [],
+    "langNotes": [
+      { "topic": "blank identifier (_)", "note": "Go では関数の戻り値を使わない場合、`_ = f()` のようにブランク識別子で明示的に捨てることがあるが、式文として単に `f()` と書くだけでも戻り値は自然に無視されるため、`_ =` は多くの場面で不要な冗長記述になる。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

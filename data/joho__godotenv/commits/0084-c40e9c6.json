@@ -1,0 +1,70 @@
+{
+  "seq": 84,
+  "sha": "c40e9c6392b05ba58e6fea50091ce35a1ef020e7",
+  "parents": [
+    "ddf83eb33bbb136f62617a409142b74b91dbcff3"
+  ],
+  "author": {
+    "name": "John Barton",
+    "email": "jb@johnbarton.co",
+    "date": "2021-09-24T21:38:50+10:00"
+  },
+  "message": "Fix CI for power8 arch (#157)",
+  "pr": {
+    "number": 157,
+    "title": "Try and fix go get in CI for power8",
+    "body": "In trying to test #118 & #156 I discovered the power8 test was broken, so this PR should fix it.",
+    "url": "https://github.com/joho/godotenv/pull/157"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 2,
+    "deletions": 1
+  },
+  "files": [
+    {
+      "path": ".github/workflows/ci.yml",
+      "status": "M",
+      "additions": 2,
+      "deletions": 1,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/.github/workflows/ci.yml b/.github/workflows/ci.yml\nindex 6f91de3..e96faf7 100644\n--- a/.github/workflows/ci.yml\n+++ b/.github/workflows/ci.yml\n@@ -41,6 +41,7 @@ jobs:\n           env: | # YAML pipe\n             GOARCH: ${{ matrix.arch.architecture }}\n             CGO_ENABLED: 0\n+            GOPRIVATE: github.com/joho/godotenv\n           run: |\n             apt-get update\n             apt-get install -q -y curl wget git\n@@ -56,7 +57,7 @@ jobs:\n             go env\n             printf \"\\n\\nSystem environment:\\n\\n\"\n             env\n-            go get -insecure -v -t -d ./...\n+            go get -v -t -d ./...\n             go test ./...\n             cd ./cmd/godotenv\n             go build -trimpath -ldflags=\"-w -s\" -v\n\\ No newline at end of file\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/ci.yml",
+    ".github/workflows/release.yml",
+    ".gitignore",
+    "LICENCE",
+    "README.md",
+    "autoload/autoload.go",
+    "cmd/godotenv/cmd.go",
+    "fixtures/equals.env",
+    "fixtures/exported.env",
+    "fixtures/invalid1.env",
+    "fixtures/plain.env",
+    "fixtures/quoted.env",
+    "fixtures/substitutions.env",
+    "go.mod",
+    "godotenv.go",
+    "godotenv_test.go",
+    "renovate.json"
+  ],
+  "explanation": {
+    "what": ".github/workflows/ci.yml の power8(ppc64le)向けクロスアーキテクチャテストジョブで、`go get -insecure -v -t -d ./...` から `-insecure` フラグを削除し、代わりに環境変数 `GOPRIVATE: github.com/joho/godotenv` を追加した。",
+    "why": "PR本文の通り、別の PR(#118, #156)を検証していた際に power8 のテストジョブが壊れていることに気づき、その場で修正したもの。`-insecure` フラグは go get から廃止されており、非公開扱いにしたいモジュールパスは GOPRIVATE で指定する現行の作法に合わせた。",
+    "highlights": [
+      { "file": ".github/workflows/ci.yml", "note": "go get -insecure 廃止に伴う GOPRIVATE への置き換え" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [
+      { "type": "pr", "number": 157, "url": "https://github.com/joho/godotenv/pull/157" }
+    ],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

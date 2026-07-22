@@ -1,0 +1,75 @@
+{
+  "seq": 57,
+  "sha": "c9360df4d16dc0e391ea2f28da2d31a9ede2e26f",
+  "parents": [
+    "59f20222da130929f7b89ffec942355a549750ed",
+    "a905e995777b9f09a2234ffd7d5f0bf721cecee2"
+  ],
+  "author": {
+    "name": "John Barton",
+    "email": "jrbarton@gmail.com",
+    "date": "2017-08-22T14:21:26+10:00"
+  },
+  "message": "Merge pull request #34 from alexquick/fix-parsing-issues\n\nFix some small parsing bugs",
+  "pr": {
+    "number": 34,
+    "title": "Fix some small parsing bugs",
+    "body": "Hi, I found/fixed a few small issues:\r\n\r\n- Values with leading/trailing quotes were getting over-trimmed (`KEY=\"'value'\"` => `value` rather than `'value'`)\r\n- YAML-style parsing was not being used correctly if the value contained an equal-sign (ex: `KEY: value=v1`)\r\n- Escapes were a little too limited.\r\n\r\nThere are some more lurking around too, I think. I'd be willing to rewrite the core as a state machine. The benefit of that is that weird edge cases can be taken care of more easily (complications around real nested quotes, escapes, etc). The downside is that it might not be worth the effort to cover those edge cases, and on the whole is less obvious. `strings.SplitN(\"=\", 2)` is generally easier to read than `if c == '='{ state=Value; continue;}` etc.\r\n\r\nIf it's something you're not fully opposed to I can do it and see how it ends up looking.",
+    "url": "https://github.com/joho/godotenv/pull/34"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 45,
+    "deletions": 14
+  },
+  "files": [
+    {
+      "path": "godotenv.go",
+      "status": "M",
+      "additions": 27,
+      "deletions": 14,
+      "binary": false
+    },
+    {
+      "path": "godotenv_test.go",
+      "status": "M",
+      "additions": 18,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/godotenv.go b/godotenv.go\nindex 9e2581c..269d7c7 100644\n--- a/godotenv.go\n+++ b/godotenv.go\n@@ -19,6 +19,7 @@ import (\n \t\"io\"\n \t\"os\"\n \t\"os/exec\"\n+\t\"regexp\"\n \t\"strings\"\n )\n \n@@ -203,11 +204,11 @@ func parseLine(line string) (key string, value string, err error) {\n \t\tline = strings.Join(segmentsToKeep, \"#\")\n \t}\n \n-\t// now split key from value\n+\tfirstEquals := strings.Index(line, \"=\")\n+\tfirstColon := strings.Index(line, \":\")\n \tsplitString := strings.SplitN(line, \"=\", 2)\n-\n-\tif len(splitString) != 2 {\n-\t\t// try yaml mode!\n+\tif firstColon != -1 && (firstColon < firstEquals || firstEquals == -1) {\n+\t\t//this is a yaml-style line\n \t\tsplitString = strings.SplitN(line, \":\", 2)\n \t}\n \n@@ -224,27 +225,39 @@ func parseLine(line string) (key string, value string, err error) {\n \tkey = strings.Trim(key, \" \")\n \n \t// Parse the value\n-\tvalue = splitString[1]\n+\tvalue = parseValue(splitString[1])\n+\treturn\n+}\n+\n+func parseValue(value string) string {\n \n \t// trim\n \tvalue = strings.Trim(value, \" \")\n \n-\t// check if we've got quoted values\n-\tif value != \"\" {\n+\t// check if we've got quoted values or possible escapes\n+\tif len(value) > 1 {\n \t\tfirst := string(value[0:1])\n \t\tlast := string(value[len(value)-1:])\n \t\tif first == last && strings.ContainsAny(first, `\"'`) {\n \t\t\t// pull the quotes off the edges\n-\t\t\tvalue = strings.Trim(value, `\"'`)\n-\n-\t\t\t// expand quotes\n-\t\t\tvalue = strings.Replace(value, `\\\"`, `\"`, -1)\n-\t\t\t// expand newlines\n-\t\t\tvalue = strings.Replace(value, `\\n`, \"\\n\", -1)\n+\t\t\tvalue = value[1 : len(value)-1]\n+\t\t\t// handle escapes\n+\t\t\tescapeRegex := regexp.MustCompile(`\\\\.`)\n+\t\t\tvalue = escapeRegex.ReplaceAllStringFunc(value, func(match string) string {\n+\t\t\t\tc := strings.TrimPrefix(match, `\\`)\n+\t\t\t\tswitch c {\n+\t\t\t\tcase \"n\":\n+\t\t\t\t\treturn \"\\n\"\n+\t\t\t\tcase \"r\":\n+\t\t\t\t\treturn \"\\r\"\n+\t\t\t\tdefault:\n+\t\t\t\t\treturn c\n+\t\t\t\t}\n+\t\t\t})\n \t\t}\n \t}\n \n-\treturn\n+\treturn value\n }\n \n func isIgnoredLine(line string) bool {\ndiff --git a/godotenv_test.go b/godotenv_test.go\nindex 2d46b19..0bb5229 100644\n--- a/godotenv_test.go\n+++ b/godotenv_test.go\n@@ -217,9 +217,18 @@ func TestParsing(t *testing.T) {\n \t// parses escaped double quotes\n \tparseAndCompare(t, `FOO=\"escaped\\\"bar\"`, \"FOO\", `escaped\"bar`)\n \n+\t// parses single quotes inside double quotes\n+\tparseAndCompare(t, `FOO=\"'d'\"`, \"FOO\", `'d'`)\n+\n \t// parses yaml style options\n \tparseAndCompare(t, \"OPTION_A: 1\", \"OPTION_A\", \"1\")\n \n+\t//parses yaml values with equal signs\n+\tparseAndCompare(t, \"OPTION_A: Foo=bar\", \"OPTION_A\", \"Foo=bar\")\n+\n+\t// parses non-yaml options with colons\n+\tparseAndCompare(t, \"OPTION_A=1:B\", \"OPTION_A\", \"1:B\")\n+\n \t// parses export keyword\n \tparseAndCompare(t, \"export OPTION_A=2\", \"OPTION_A\", \"2\")\n \tparseAndCompare(t, `export OPTION_B='\\n'`, \"OPTION_B\", \"\\n\")\n@@ -256,6 +265,15 @@ func TestParsing(t *testing.T) {\n \tparseAndCompare(t, `FOO=\"ba#r\"`, \"FOO\", \"ba#r\")\n \tparseAndCompare(t, \"FOO='ba#r'\", \"FOO\", \"ba#r\")\n \n+\t//newlines and backslashes should be escaped\n+\tparseAndCompare(t, `FOO=\"bar\\n\\ b\\az\"`, \"FOO\", \"bar\\n baz\")\n+\tparseAndCompare(t, `FOO=\"bar\\\\\\n\\ b\\az\"`, \"FOO\", \"bar\\\\\\n baz\")\n+\tparseAndCompare(t, `FOO=\"bar\\\\r\\ b\\az\"`, \"FOO\", \"bar\\\\r baz\")\n+\n+\tparseAndCompare(t, `=\"value\"`, \"\", \"value\")\n+\tparseAndCompare(t, `KEY=\"`, \"KEY\", \"\\\"\")\n+\tparseAndCompare(t, `KEY=\"value`, \"KEY\", \"\\\"value\")\n+\n \t// it 'throws an error if line format is incorrect' do\n \t// expect{env('lol$wut')}.to raise_error(Dotenv::FormatError)\n \tbadlyFormattedLine := \"lol$wut\"\n",
+  "diffTruncated": false,
+  "tree": [
+    ".gitignore",
+    ".travis.yml",
+    "LICENCE",
+    "README.md",
+    "autoload/autoload.go",
+    "cmd/godotenv/cmd.go",
+    "fixtures/equals.env",
+    "fixtures/exported.env",
+    "fixtures/invalid1.env",
+    "fixtures/plain.env",
+    "fixtures/quoted.env",
+    "godotenv.go",
+    "godotenv_test.go"
+  ],
+  "explanation": {
+    "what": "parseLine の値パース部分を parseValue という別関数に切り出し、3つの不具合を修正した。1) YAML風判定を「`=` で split して失敗したら `:` で試す」から「行内で最初に出現するのが `=` か `:` かを比較して先に決める」方式に変更し、値に `=` を含む YAML 風行(`KEY: value=v1`)を誤って `=` 分割してしまう問題を解消。2) クォート除去を `strings.Trim(value, \"\\\"'\")` から `value[1:len(value)-1]` に変え、`KEY=\"'value'\"` のような二重クォートの内側の単一クォートまで削られてしまう「オーバートリム」を修正。3) エスケープ処理を単純な文字列置換から正規表現 `\\\\.`(バックスラッシュ+任意の1文字)によるコールバック置換に変え、`\\n`・`\\r` 以外の任意の文字のバックスラッシュエスケープにも対応した。",
+    "why": "PR body に列挙された3つの既知の不具合(オーバートリム・YAML風行での `=` 誤判定・限定的すぎるエスケープ)を修正するためのPR。投稿者はさらにパーサをステートマシンとして書き直す提案もしているが、可読性とのトレードオフを本人も認めており、本PRの時点ではその大掛かりな書き直しは行っていない。",
+    "highlights": [
+      { "file": "godotenv.go", "note": "parseValue への切り出しと、正規表現によるエスケープ処理への置き換え" },
+      { "file": "godotenv_test.go", "note": "YAML風行の `=` 誤判定・オーバートリム・エスケープ拡張それぞれの回帰テスト" }
+    ],
+    "langNotes": [
+      { "topic": "regexp.MustCompile と ReplaceAllStringFunc", "note": "Go の regexp.MustCompile はコンパイルに失敗するとpanicする(エラーを返さない)ため、パターンがリテラルで固定されている場合によく使われる。ReplaceAllStringFunc は正規表現でマッチした各部分文字列を、渡したコールバック関数の戻り値で置き換える(単純な固定文字列置換だけでは表現できない、マッチ内容に応じた変換を書ける)。" }
+    ],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [{ "type": "pr", "number": 34, "url": "https://github.com/joho/godotenv/pull/34" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

@@ -1,0 +1,77 @@
+{
+  "seq": 33,
+  "sha": "6e333bd70814b1dff26872504f510b40a5317a11",
+  "parents": [
+    "38f18b82488cebbb2ef29510b6a8c94589ebc253"
+  ],
+  "author": {
+    "name": "John Barton (joho)",
+    "email": "jrbarton@gmail.com",
+    "date": "2013-09-04T12:40:17+10:00"
+  },
+  "message": "add godotenv.Read() which returns a map rather than calling os.Setenv",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 3,
+    "additions": 82,
+    "deletions": 5
+  },
+  "files": [
+    {
+      "path": "README.md",
+      "status": "M",
+      "additions": 11,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "godotenv.go",
+      "status": "M",
+      "additions": 45,
+      "deletions": 5,
+      "binary": false
+    },
+    {
+      "path": "godotenv_test.go",
+      "status": "M",
+      "additions": 26,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/README.md b/README.md\nindex f696370..8af9068 100644\n--- a/README.md\n+++ b/README.md\n@@ -76,6 +76,17 @@ FOO: bar\n BAR: baz\n ```\n \n+as a final aside, if you don't want godotenv munging your env you can just get a map back instead\n+\n+```go\n+var myEnv map[string]string\n+myEnv, err := godotenv.Read()\n+\n+s3Bucket := myEnv[\"S3_BUCKET\"]\n+```\n+\n+end\n+\n ## Contributing\n \n Contributions are most welcome! The parser itself is pretty stupidly naive and I wouldn't be surprised if it breaks with edge cases.\ndiff --git a/godotenv.go b/godotenv.go\nindex f89ec30..a421053 100644\n--- a/godotenv.go\n+++ b/godotenv.go\n@@ -34,9 +34,7 @@ import (\n \tIt's important to note that it WILL NOT OVERRIDE an env variable that already exists - consider the .env file to set dev vars or sensible defaults\n */\n func Load(filenames ...string) (err error) {\n-\tif len(filenames) == 0 {\n-\t\tfilenames = []string{\".env\"}\n-\t}\n+\tfilenames = filenamesOrDefault(filenames)\n \n \tfor _, filename := range filenames {\n \t\terr = loadFile(filename)\n@@ -47,12 +45,55 @@ func Load(filenames ...string) (err error) {\n \treturn\n }\n \n+func Read(filenames ...string) (envMap map[string]string, err error) {\n+\tfilenames = filenamesOrDefault(filenames)\n+\tenvMap = make(map[string]string)\n+\n+\tfor _, filename := range filenames {\n+\t\tindividualEnvMap, individualErr := readFile(filename)\n+\n+\t\tif individualErr != nil {\n+\t\t\terr = individualErr\n+\t\t\treturn // return early on a spazout\n+\t\t}\n+\n+\t\tfor key, value := range individualEnvMap {\n+\t\t\tenvMap[key] = value\n+\t\t}\n+\t}\n+\n+\treturn\n+}\n+\n+func filenamesOrDefault(filenames []string) []string {\n+\tif len(filenames) == 0 {\n+\t\treturn []string{\".env\"}\n+\t} else {\n+\t\treturn filenames\n+\t}\n+}\n+\n func loadFile(filename string) (err error) {\n+\tenvMap, err := readFile(filename)\n+\tif err != nil {\n+\t\treturn\n+\t}\n+\n+\tfor key, value := range envMap {\n+\t\tos.Setenv(key, value)\n+\t}\n+\n+\treturn\n+}\n+\n+func readFile(filename string) (envMap map[string]string, err error) {\n \tcontent, err := ioutil.ReadFile(filename)\n \tif err != nil {\n \t\treturn\n \t}\n \n+\tenvMap = make(map[string]string)\n+\n \tlines := strings.Split(string(content), \"\\n\")\n \n \tfor _, fullLine := range lines {\n@@ -60,11 +101,10 @@ func loadFile(filename string) (err error) {\n \t\t\tkey, value, err := parseLine(fullLine)\n \n \t\t\tif err == nil && os.Getenv(key) == \"\" {\n-\t\t\t\tos.Setenv(key, value)\n+\t\t\t\tenvMap[key] = value\n \t\t\t}\n \t\t}\n \t}\n-\n \treturn\n }\n \ndiff --git a/godotenv_test.go b/godotenv_test.go\nindex e6ec8d9..381be3e 100644\n--- a/godotenv_test.go\n+++ b/godotenv_test.go\n@@ -44,6 +44,32 @@ func TestLoadFileNotFound(t *testing.T) {\n \t}\n }\n \n+func TestReadPlainEnv(t *testing.T) {\n+\tenvFileName := \"fixtures/plain.env\"\n+\texpectedValues := map[string]string{\n+\t\t\"OPTION_A\": \"1\",\n+\t\t\"OPTION_B\": \"2\",\n+\t\t\"OPTION_C\": \"3\",\n+\t\t\"OPTION_D\": \"4\",\n+\t\t\"OPTION_E\": \"5\",\n+\t}\n+\n+\tenvMap, err := Read(envFileName)\n+\tif err != nil {\n+\t\tt.Error(\"Error reading file\")\n+\t}\n+\n+\tif len(envMap) != len(expectedValues) {\n+\t\tt.Error(\"Didn't get the right size map back\")\n+\t}\n+\n+\tfor key, value := range expectedValues {\n+\t\tif envMap[key] != value {\n+\t\t\tt.Error(\"Read got one of the keys wrong\")\n+\t\t}\n+\t}\n+}\n+\n func TestLoadPlainEnv(t *testing.T) {\n \tenvFileName := \"fixtures/plain.env\"\n \texpectedValues := map[string]string{\n",
+  "diffTruncated": false,
+  "tree": [
+    ".gitignore",
+    "LICENCE",
+    "README.md",
+    "autoload/autoload.go",
+    "fixtures/exported.env",
+    "fixtures/plain.env",
+    "fixtures/quoted.env",
+    "godotenv.go",
+    "godotenv_test.go",
+    "wercker.yml"
+  ],
+  "explanation": {
+    "what": "新しい公開関数 `Read(filenames ...string) (envMap map[string]string, err error)` を追加した。内部実装は Load 用の loadFile と共通化し、実際にファイルを読んでパースする処理を新設の readFile 関数に切り出した。loadFile は readFile が返した map を os.Setenv でプロセス環境に書き込む薄いラッパーになり、Read はそれを os.Setenv せずそのまま呼び出し元に map として返す。あわせて README にサンプルと TestReadPlainEnv を追加した。",
+    "why": "コミットメッセージの通り、既存の Load() は .env の内容を無条件にプロセスの環境変数(os.Setenv)へ書き込んでしまう。それでは環境を汚したくない・値を一時的に読みたいだけのユースケースに対応できないため、環境を変更せずに中身を map として受け取れる Read() を新設した。readFile への切り出しは、Load 由来の loadFile と Read の両方から同じパース処理を再利用するための実装上の整理。",
+    "highlights": [
+      { "file": "godotenv.go", "note": "readFile が新設され、loadFile(os.Setenvする側)と Read(mapを返す側)がこの共通関数を呼ぶ形に整理された。" },
+      { "file": "godotenv_test.go", "note": "TestReadPlainEnv で Read() が期待通りの map を返すことを検証。" }
+    ],
+    "langNotes": [
+      { "topic": "名前付き戻り値(named return)", "note": "`func Read(filenames ...string) (envMap map[string]string, err error)` のように戻り値に名前を付けておくと、関数内で envMap/err にそのまま代入でき、`return` だけで暗黙的にその値が返る。Go でよく使われるイディオムで、この関数もそれを利用している。" },
+      { "topic": "os.Setenv と map の使い分け", "note": "Load() はパースした値を os.Setenv でプロセスのグローバルな環境変数に書き込むが、Read() は同じパース結果を map[string]string として呼び出し元に返すだけで環境には触らない。グローバル状態を変更する API と、値を返すだけの副作用なし API を分けて提供する設計。" }
+    ],
+    "diagram": {
+      "mermaid": "flowchart TD\n  A[\"Load(filenames...)\"] --> B[\"loadFile(filename)\"]\n  C[\"Read(filenames...)\"] --> D[\"readFile(filename)\"]\n  B --> D\n  D --> E[\"envMap map[string]string\"]\n  B --> F[\"os.Setenv(key, value)\"]\n  C --> E\n",
+      "caption": "Load は readFile の結果を os.Setenv でプロセス環境に書き込むのに対し、Read は同じ readFile の結果を map のまま返す。"
+    },
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

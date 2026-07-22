@@ -1,0 +1,77 @@
+{
+  "seq": 125,
+  "sha": "c92e518f6aca6fede6a41d71c05eb58b454bd846",
+  "parents": [
+    "59ad2adcd30e71e99e73b0eec064ebdd7dd33073"
+  ],
+  "author": {
+    "name": "Rohan Verma",
+    "email": "hello@rohanverma.net",
+    "date": "2024-03-06T23:43:58+05:30"
+  },
+  "message": "tests: add unit tests for parser errors\n\n- Declares errors and wraps them for error checking\nby clients\n- Adds two unit tests for\n  - terminated quote error\n  - unexpected char",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 36,
+    "deletions": 3
+  },
+  "files": [
+    {
+      "path": "godotenv_test.go",
+      "status": "M",
+      "additions": 26,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "parser.go",
+      "status": "M",
+      "additions": 10,
+      "deletions": 3,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/godotenv_test.go b/godotenv_test.go\nindex 21b712f..970938f 100644\n--- a/godotenv_test.go\n+++ b/godotenv_test.go\n@@ -2,6 +2,7 @@ package godotenv\n \n import (\n \t\"bytes\"\n+\t\"errors\"\n \t\"fmt\"\n \t\"os\"\n \t\"reflect\"\n@@ -703,3 +704,28 @@ func TestWhitespace(t *testing.T) {\n \t\t})\n \t}\n }\n+\n+func TestParserErrors(t *testing.T) {\n+\tcases := map[string]struct {\n+\t\tinput string\n+\t\terr   error\n+\t}{\n+\t\t\"Invalid char\": {\n+\t\t\tinput: \"foo-1=bar\",\n+\t\t\terr:   ErrUnexpectedChar,\n+\t\t},\n+\t\t\"UnterminatedQuote\": {\n+\t\t\tinput: \"foo=\\\"bar\",\n+\t\t\terr:   ErrUnterminatedQuote,\n+\t\t},\n+\t}\n+\n+\tfor n, c := range cases {\n+\t\tt.Run(n, func(t *testing.T) {\n+\t\t\tv, err := Unmarshal(c.input)\n+\t\t\tif !errors.Is(err, c.err) {\n+\t\t\t\tt.Errorf(\"Input: %q Expected:\\t %q\\nGot:\\t %q Val: %v\", c.input, c.err, err, v)\n+\t\t\t}\n+\t\t})\n+\t}\n+}\ndiff --git a/parser.go b/parser.go\nindex f9fa9a4..c07b55a 100644\n--- a/parser.go\n+++ b/parser.go\n@@ -18,6 +18,12 @@ const (\n \texportPrefix = \"export\"\n )\n \n+var (\n+\tErrZeroLengthString  = errors.New(\"zero length string\")\n+\tErrUnexpectedChar    = errors.New(\"unexpected character\")\n+\tErrUnterminatedQuote = errors.New(\"unterminated quoted value\")\n+)\n+\n func parseBytes(src []byte, out map[string]string) error {\n \tsrc = bytes.ReplaceAll(src, []byte(\"\\r\\n\"), []byte(\"\\n\"))\n \tcutset := src\n@@ -104,13 +110,14 @@ loop:\n \t\t\t}\n \n \t\t\treturn \"\", nil, fmt.Errorf(\n-\t\t\t\t`unexpected character %q in variable name near %q`,\n+\t\t\t\t`%w %q in variable name near %q`,\n+\t\t\t\tErrUnexpectedChar,\n \t\t\t\tstring(char), string(src))\n \t\t}\n \t}\n \n \tif len(src) == 0 {\n-\t\treturn \"\", nil, errors.New(\"zero length string\")\n+\t\treturn \"\", nil, ErrZeroLengthString\n \t}\n \n \t// trim whitespace\n@@ -193,7 +200,7 @@ func extractVarValue(src []byte, vars map[string]string) (value string, rest []b\n \t\tvalEndIndex = len(src)\n \t}\n \n-\treturn \"\", nil, fmt.Errorf(\"unterminated quoted value %s\", src[:valEndIndex])\n+\treturn \"\", nil, fmt.Errorf(\"%w %s\", ErrUnterminatedQuote, src[:valEndIndex])\n }\n \n func expandEscapes(str string) string {\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/dependabot.yml",
+    ".github/workflows/ci.yml",
+    ".github/workflows/codeql-analysis.yml",
+    ".github/workflows/release.yml",
+    ".gitignore",
+    "LICENCE",
+    "README.md",
+    "autoload/autoload.go",
+    "cmd/godotenv/cmd.go",
+    "fixtures/comments.env",
+    "fixtures/equals.env",
+    "fixtures/exported.env",
+    "fixtures/hyphen.env",
+    "fixtures/invalid1.env",
+    "fixtures/plain.env",
+    "fixtures/quoted.env",
+    "fixtures/substitutions.env",
+    "go.mod",
+    "godotenv.go",
+    "godotenv_test.go",
+    "parser.go"
+  ],
+  "explanation": {
+    "what": "parser.go にセンチネルエラー ErrZeroLengthString / ErrUnexpectedChar / ErrUnterminatedQuote を定義し、既存の fmt.Errorf 呼び出しを `%w` によるラップに変更した。godotenv_test.go には errors.Is で照合する TestParserErrors を追加し、不正文字(\"foo-1=bar\")と閉じられていないクォート(\"foo=\\\"bar\")の2ケースを検証している。",
+    "why": "コミットメッセージにある通り、クライアントがエラー種別を判定できるようにするための変更。文字列比較ではなく errors.Is / errors.As で判定できるようにセンチネルエラーを公開し、その上で単体テストを追加した。",
+    "highlights": [
+      { "file": "parser.go", "note": "ErrZeroLengthString / ErrUnexpectedChar / ErrUnterminatedQuote の定義と %w によるラップ" },
+      { "file": "godotenv_test.go", "note": "TestParserErrors。errors.Is でエラー種別を検証する新設テスト" }
+    ],
+    "langNotes": [
+      { "topic": "%w によるエラーラップと errors.Is", "note": "fmt.Errorf の書式で `%w` を使うと元のエラーを保持したままラップでき、呼び出し側は errors.Is(err, ErrUnexpectedChar) のように文字列比較なしでエラー種別を判定できる。パッケージレベルの `var ErrXxx = errors.New(...)` はセンチネルエラーと呼ばれる Go の一般的な慣習。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

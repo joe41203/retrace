@@ -1,0 +1,59 @@
+{
+  "seq": 13,
+  "sha": "74ec3a085ff1502ce46d462db7c59de74a851639",
+  "parents": [
+    "aa6e870b578a4917b28fd5fe6f39ccc359859aca"
+  ],
+  "author": {
+    "name": "John Barton (joho)",
+    "email": "jrbarton@gmail.com",
+    "date": "2013-07-31T12:24:03+10:00"
+  },
+  "message": "Handle quoted hashes \"properly\"\n\nRead: not prettily or robustly.",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 19,
+    "deletions": 5
+  },
+  "files": [
+    {
+      "path": "godotenv.go",
+      "status": "M",
+      "additions": 18,
+      "deletions": 5,
+      "binary": false
+    },
+    {
+      "path": "godotenv_test.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/godotenv.go b/godotenv.go\nindex 04c4414..bd7fcda 100644\n--- a/godotenv.go\n+++ b/godotenv.go\n@@ -78,14 +78,27 @@ func parseLine(line string) (key string, value string, err error) {\n \n \tvalue = splitString[1]\n \n-\t// ditch the comments\n+\t// ditch the comments (but keep quoted hashes)\n \tif strings.Contains(value, \"#\") {\n \t\tsegmentsBetweenHashes := strings.Split(value, \"#\")\n-\t\tvalue = segmentsBetweenHashes[0]\n-\t\t// open quote in leftmost segment\n-\t\tif strings.Count(value, \"\\\"\") == 1 || strings.Count(value, \"'\") == 1 {\n-\t\t\tvalue = value + \"#\" + segmentsBetweenHashes[1]\n+\t\tquotesAreOpen := false\n+\t\tsegmentsToKeep := make([]string, 0)\n+\t\tfor _, segment := range segmentsBetweenHashes {\n+\t\t\tif strings.Count(segment, \"\\\"\") == 1 || strings.Count(segment, \"'\") == 1 {\n+\t\t\t\tif quotesAreOpen {\n+\t\t\t\t\tquotesAreOpen = false\n+\t\t\t\t\tsegmentsToKeep = append(segmentsToKeep, segment)\n+\t\t\t\t} else {\n+\t\t\t\t\tquotesAreOpen = true\n+\t\t\t\t}\n+\t\t\t}\n+\n+\t\t\tif len(segmentsToKeep) == 0 || quotesAreOpen {\n+\t\t\t\tsegmentsToKeep = append(segmentsToKeep, segment)\n+\t\t\t}\n \t\t}\n+\n+\t\tvalue = strings.Join(segmentsToKeep, \"#\")\n \t}\n \n \t// check if we've got quoted values\ndiff --git a/godotenv_test.go b/godotenv_test.go\nindex 417a677..24f6748 100644\n--- a/godotenv_test.go\n+++ b/godotenv_test.go\n@@ -90,6 +90,7 @@ func TestParsing(t *testing.T) {\n \t// expect(env('foo=\"bar#baz\" # comment')).to eql('foo' => 'bar#baz')\n \tparseAndCompare(t, \"FOO=\\\"bar#baz\\\" # comment\", \"FOO\", \"bar#baz\")\n \tparseAndCompare(t, \"FOO='bar#baz' # comment\", \"FOO\", \"bar#baz\")\n+\tparseAndCompare(t, \"FOO=\\\"bar#baz#bang\\\" # comment\", \"FOO\", \"bar#baz#bang\")\n \n \t// it 'ignores comment lines' do\n \t// expect(env(\"\\n\\n\\n # HERE GOES FOO \\nfoo=bar\")).to eql('foo' => 'bar')\n",
+  "diffTruncated": false,
+  "tree": [
+    ".gitignore",
+    "fixtures/exported.env",
+    "fixtures/plain.env",
+    "fixtures/quoted.env",
+    "godotenv.go",
+    "godotenv_test.go"
+  ],
+  "explanation": {
+    "what": "#によるコメント除去ロジックを書き直し、値を#で分割した各segmentを走査してクォートの開閉状態(quotesAreOpen)を追跡する方式にした。クォートが開いている間の#は値の一部として保持し、閉じた後の#以降だけをコメントとして捨てる。`FOO=\"bar#baz#bang\" # comment`のように#を複数含むクォート値のテストを追加。",
+    "why": "コミットメッセージの\"Handle quoted hashes 'properly' / Read: not prettily or robustly.\"が示す通り、seq11・seq12の「開きクォートが1個ならとりあえず戻す」という場当たり的な対処では#が2個以上あるケースを扱えなかったため、segmentごとにクォート開閉を追うロジックへ一般化した。ただし作者自身が「きれいでも堅牢でもない」と明言しており、まだ暫定実装であることを認めている。",
+    "highlights": [
+      { "file": "godotenv.go", "note": "quotesAreOpenフラグでsegmentBetweenHashesを走査し、閉じたタイミングまでのsegmentだけをsegmentsToKeepに積むループ" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

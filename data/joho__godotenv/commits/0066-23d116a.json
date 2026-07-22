@@ -1,0 +1,83 @@
+{
+  "seq": 66,
+  "sha": "23d116af351c84513e1946b527c88823e476be13",
+  "parents": [
+    "1709ab122c988931ad53508747b3c061400c2984",
+    "2d8b3aab8888d1d7f5f8301d6a93584c673b9b1e"
+  ],
+  "author": {
+    "name": "John Barton",
+    "email": "jb@johnbarton.co",
+    "date": "2018-09-11T18:04:31+10:00"
+  },
+  "message": "Merge pull request #58 from lucastetreault/master\n\nfeat(Expand Variables): Custom variable expansion instead of Go's os.Expand",
+  "pr": {
+    "number": 58,
+    "title": "feat(Expand Variables): Custom variable expansion instead of Go's os.Expand",
+    "body": "Copy over the tests from https://github.com/bkeepers/dotenv/blob/master/spec/dotenv/parser_spec.rb\r\nrelated to expanding variables and implement the required changes. I also realized as part of this\r\nthat this implementation was not handling values in single quotes properly (e.g.: not the same as the ruby package mentioned) so that has been fixed as well along with the related tests.\r\n\r\nFixes: #52 (for real this time hopefully)",
+    "url": "https://github.com/joho/godotenv/pull/58"
+  },
+  "linkedIssues": [
+    {
+      "number": 52,
+      "title": "Won't read from variable when it contains $ character",
+      "body": "`go version go1.9.2 windows/386`\r\n\r\nWhen I am reading from variable in my .env file which has $ in string:\r\n`MAIL_SECRET=xTvDqw$27`\r\n\r\n`os.Getenv(\"MAIL_SECRET\")`\r\ngives xTvDqw7 back, ignoring $2\r\n\r\nwhy is that, have $ sign some special meaning?\r\n\r\n",
+      "url": "https://github.com/joho/godotenv/issues/52"
+    }
+  ],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 104,
+    "deletions": 17
+  },
+  "files": [
+    {
+      "path": "godotenv.go",
+      "status": "M",
+      "additions": 35,
+      "deletions": 13,
+      "binary": false
+    },
+    {
+      "path": "godotenv_test.go",
+      "status": "M",
+      "additions": 69,
+      "deletions": 4,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/godotenv.go b/godotenv.go\nindex e606481..29b436c 100644\n--- a/godotenv.go\n+++ b/godotenv.go\n@@ -270,12 +270,19 @@ func parseValue(value string, envMap map[string]string) string {\n \n \t// check if we've got quoted values or possible escapes\n \tif len(value) > 1 {\n-\t\tfirst := string(value[0:1])\n-\t\tlast := string(value[len(value)-1:])\n-\t\tif first == last && strings.ContainsAny(first, `\"'`) {\n+\t\trs := regexp.MustCompile(`\\A'(.*)'\\z`)\n+\t\tsingleQuotes := rs.FindStringSubmatch(value)\n+\n+\t\trd := regexp.MustCompile(`\\A\"(.*)\"\\z`)\n+\t\tdoubleQuotes := rd.FindStringSubmatch(value)\n+\n+\t\tif singleQuotes != nil || doubleQuotes != nil {\n \t\t\t// pull the quotes off the edges\n \t\t\tvalue = value[1 : len(value)-1]\n-\t\t\t// handle escapes\n+\t\t}\n+\n+\t\tif doubleQuotes != nil {\n+\t\t\t// expand newlines\n \t\t\tescapeRegex := regexp.MustCompile(`\\\\.`)\n \t\t\tvalue = escapeRegex.ReplaceAllStringFunc(value, func(match string) string {\n \t\t\t\tc := strings.TrimPrefix(match, `\\`)\n@@ -285,23 +292,38 @@ func parseValue(value string, envMap map[string]string) string {\n \t\t\t\tcase \"r\":\n \t\t\t\t\treturn \"\\r\"\n \t\t\t\tdefault:\n-\t\t\t\t\treturn c\n+\t\t\t\t\treturn match\n \t\t\t\t}\n \t\t\t})\n+\t\t\t// unescape characters\n+\t\t\te := regexp.MustCompile(`\\\\([^$])`)\n+\t\t\tvalue = e.ReplaceAllString(value, \"$1\")\n+\t\t}\n+\n+\t\tif singleQuotes == nil {\n+\t\t\tvalue = expandVariables(value, envMap)\n \t\t}\n \t}\n \n-\t// expand variables\n-\tvalue = os.Expand(value, func(key string) string {\n-\t\tif val, ok := envMap[key]; ok {\n-\t\t\treturn val\n+\treturn value\n+}\n+\n+func expandVariables(v string, m map[string]string) string {\n+\tr := regexp.MustCompile(`(\\\\)?(\\$)(\\()?\\{?([A-Z0-9_]+)?\\}?`)\n+\n+\treturn r.ReplaceAllStringFunc(v, func(s string) string {\n+\t\tsubmatch := r.FindStringSubmatch(s)\n+\n+\t\tif submatch == nil {\n+\t\t\treturn s\n \t\t}\n-\t\tif val, ok := os.LookupEnv(key); ok {\n-\t\t\treturn val\n+\t\tif submatch[1] == \"\\\\\" || submatch[2] == \"(\" {\n+\t\t\treturn submatch[0][1:]\n+\t\t} else if submatch[4] != \"\" {\n+\t\t\treturn m[submatch[4]]\n \t\t}\n-\t\treturn \"\"\n+\t\treturn s\n \t})\n-\treturn value\n }\n \n func isIgnoredLine(line string) bool {\ndiff --git a/godotenv_test.go b/godotenv_test.go\nindex bbbd658..acc2131 100644\n--- a/godotenv_test.go\n+++ b/godotenv_test.go\n@@ -6,6 +6,7 @@ import (\n \t\"os\"\n \t\"reflect\"\n \t\"testing\"\n+\t\"strings\"\n )\n \n var noopPresets = make(map[string]string)\n@@ -161,7 +162,7 @@ func TestLoadExportedEnv(t *testing.T) {\n \tenvFileName := \"fixtures/exported.env\"\n \texpectedValues := map[string]string{\n \t\t\"OPTION_A\": \"2\",\n-\t\t\"OPTION_B\": \"\\n\",\n+\t\t\"OPTION_B\": \"\\\\n\",\n \t}\n \n \tloadEnvAndCompareValues(t, Load, envFileName, expectedValues, noopPresets)\n@@ -182,7 +183,7 @@ func TestLoadQuotedEnv(t *testing.T) {\n \t\t\"OPTION_A\": \"1\",\n \t\t\"OPTION_B\": \"2\",\n \t\t\"OPTION_C\": \"\",\n-\t\t\"OPTION_D\": \"\\n\",\n+\t\t\"OPTION_D\": \"\\\\n\",\n \t\t\"OPTION_E\": \"1\",\n \t\t\"OPTION_F\": \"2\",\n \t\t\"OPTION_G\": \"\",\n@@ -193,7 +194,7 @@ func TestLoadQuotedEnv(t *testing.T) {\n \tloadEnvAndCompareValues(t, Load, envFileName, expectedValues, noopPresets)\n }\n \n-func TestSubstituitions(t *testing.T) {\n+func TestSubstitutions(t *testing.T) {\n \tenvFileName := \"fixtures/substitutions.env\"\n \texpectedValues := map[string]string{\n \t\t\"OPTION_A\": \"1\",\n@@ -206,6 +207,70 @@ func TestSubstituitions(t *testing.T) {\n \tloadEnvAndCompareValues(t, Load, envFileName, expectedValues, noopPresets)\n }\n \n+func TestExpanding(t *testing.T) {\n+\ttests := []struct {\n+\t\tname     string\n+\t\tinput    string\n+\t\texpected map[string]string\n+\t}{\n+\t\t{\n+\t\t\t\"expands variables found in values\",\n+\t\t\t\"FOO=test\\nBAR=$FOO\",\n+\t\t\tmap[string]string{\"FOO\": \"test\", \"BAR\": \"test\"},\n+\t\t},\n+\t\t{\n+\t\t\t\"parses variables wrapped in brackets\",\n+\t\t\t\"FOO=test\\nBAR=${FOO}bar\",\n+\t\t\tmap[string]string{\"FOO\": \"test\", \"BAR\": \"testbar\"},\n+\t\t},\n+\t\t{\n+\t\t\t\"expands undefined variables to an empty string\",\n+\t\t\t\"BAR=$FOO\",\n+\t\t\tmap[string]string{\"BAR\": \"\"},\n+\t\t},\n+\t\t{\n+\t\t\t\"expands variables in double quoted strings\",\n+\t\t\t\"FOO=test\\nBAR=\\\"quote $FOO\\\"\",\n+\t\t\tmap[string]string{\"FOO\": \"test\", \"BAR\": \"quote test\"},\n+\t\t},\n+\t\t{\n+\t\t\t\"does not expand variables in single quoted strings\",\n+\t\t\t\"BAR='quote $FOO'\",\n+\t\t\tmap[string]string{\"BAR\": \"quote $FOO\"},\n+\t\t},\n+\t\t{\n+\t\t\t\"does not expand escaped variables\",\n+\t\t\t`FOO=\"foo\\$BAR\"`,\n+\t\t\tmap[string]string{\"FOO\": \"foo$BAR\"},\n+\t\t},\n+\t\t{\n+\t\t\t\"does not expand escaped variables\",\n+\t\t\t`FOO=\"foo\\${BAR}\"`,\n+\t\t\tmap[string]string{\"FOO\": \"foo${BAR}\"},\n+\t\t},\n+\t\t{\n+\t\t\t\"does not expand escaped variables\",\n+\t\t\t\"FOO=test\\nBAR=\\\"foo\\\\${FOO} ${FOO}\\\"\",\n+\t\t\tmap[string]string{\"FOO\": \"test\", \"BAR\": \"foo${FOO} test\"},\n+\t\t},\n+\t}\n+\n+\tfor _, tt := range tests {\n+\t\tt.Run(tt.name, func(t *testing.T) {\n+\t\t\tenv, err := Parse(strings.NewReader(tt.input))\n+\t\t\tif err != nil {\n+\t\t\t\tt.Errorf(\"Error: %s\", err.Error())\n+\t\t\t}\n+\t\t\tfor k, v := range tt.expected {\n+\t\t\t\tif strings.Compare(env[k], v) != 0 {\n+\t\t\t\t\tt.Errorf(\"Expected: %s, Actual: %s\", v, env[k])\n+\t\t\t\t}\n+\t\t\t}\n+\t\t})\n+\t}\n+\n+}\n+\n func TestActualEnvVarsAreLeftAlone(t *testing.T) {\n \tos.Clearenv()\n \tos.Setenv(\"OPTION_A\", \"actualenv\")\n@@ -247,7 +312,7 @@ func TestParsing(t *testing.T) {\n \n \t// parses export keyword\n \tparseAndCompare(t, \"export OPTION_A=2\", \"OPTION_A\", \"2\")\n-\tparseAndCompare(t, `export OPTION_B='\\n'`, \"OPTION_B\", \"\\n\")\n+\tparseAndCompare(t, `export OPTION_B='\\n'`, \"OPTION_B\", \"\\\\n\")\n \n \t// it 'expands newlines in quoted strings' do\n \t// expect(env('FOO=\"bar\\nbaz\"')).to eql('FOO' => \"bar\\nbaz\")\n",
+  "diffTruncated": false,
+  "tree": [
+    ".gitignore",
+    ".travis.yml",
+    "LICENCE",
+    "README.md",
+    "autoload/autoload.go",
+    "cmd/godotenv/cmd.go",
+    "fixtures/equals.env",
+    "fixtures/exported.env",
+    "fixtures/invalid1.env",
+    "fixtures/plain.env",
+    "fixtures/quoted.env",
+    "fixtures/substitutions.env",
+    "godotenv.go",
+    "godotenv_test.go"
+  ],
+  "explanation": {
+    "what": "変数展開の実装を `os.Expand` ベースから、独自の正規表現ベースの `expandVariables` 関数に置き換えた。あわせてクォート判定を先頭・末尾文字の単純比較から正規表現 `\\A'(.*)'\\z` / `\\A\"(.*)\"\\z` に変更し、シングルクォート値では変数展開もエスケープ処理も行わないようにした(ダブルクォートのみ展開・エスケープ対象)。`\\$VAR` のようにバックスラッシュでエスケープされた `$` は展開せずリテラルとして残す処理も追加している。",
+    "why": "issue #52 で「値に `$` を含む文字列(例: `MAIL_SECRET=xTvDqw$27`)を読み込むと `$2` 以降が消える」という不具合が報告されていた。PR body によると、Ruby 版 dotenv のパーサ仕様に合わせてテストケースを移植しつつ実装し直したところ、シングルクォート値の扱いが Ruby 版と異なっていた(展開されるべきでないのに展開されていた)ことも判明し、あわせて修正したとある。",
+    "highlights": [
+      { "file": "godotenv.go", "note": "`expandVariables` — `(\\\\)?(\\$)(\\()?\\{?([A-Z0-9_]+)?\\}?` という正規表現でエスケープされた `$` を区別しつつ変数を展開する自前実装。" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "issue",
+    "refs": [
+      { "type": "pr", "number": 58, "url": "https://github.com/joho/godotenv/pull/58" },
+      { "type": "issue", "number": 52, "url": "https://github.com/joho/godotenv/issues/52" }
+    ],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

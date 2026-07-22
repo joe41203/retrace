@@ -1,0 +1,73 @@
+{
+  "seq": 103,
+  "sha": "b311b2657d7c3f549674adf6080d032437caa68c",
+  "parents": [
+    "4321598b05f72577f12b0a727d75b003df595ef7"
+  ],
+  "author": {
+    "name": "Rakibul Yeasin",
+    "email": "ryeasin03@gmail.com",
+    "date": "2023-02-04T06:10:05+06:00"
+  },
+  "message": "Fix: ioutil.ReadAll() is deprecated, so removed it's dependency (#202)",
+  "pr": {
+    "number": 202,
+    "title": "Fix: ioutil.ReadAll() is deprecated, so removed it's dependency",
+    "body": "As `ioutil.ReadAll()` is deprecated, replaced it with buffer.\r\n\r\n```go\r\nvar buf bytes.Buffer\r\n_, err := io.Copy(&buf, r)\r\n```\r\n\r\nChanges\r\n```patch\r\ndiff --git a/godotenv.go b/godotenv.go\r\nindex 368e804..fd48c6a 100644\r\n--- a/godotenv.go\r\n+++ b/godotenv.go\r\n@@ -4,20 +4,20 @@\r\n //\r\n // The TL;DR is that you make a .env file that looks something like\r\n //\r\n-// \t\tSOME_ENV_VAR=somevalue\r\n+//\tSOME_ENV_VAR=somevalue\r\n //\r\n // and then in your go code you can call\r\n //\r\n-// \t\tgodotenv.Load()\r\n+//\tgodotenv.Load()\r\n //\r\n // and all the env vars declared in .env will be available through os.Getenv(\"SOME_ENV_VAR\")\r\n package godotenv\r\n \r\n import (\r\n+\t\"bytes\"\r\n \t\"errors\"\r\n \t\"fmt\"\r\n \t\"io\"\r\n-\t\"io/ioutil\"\r\n \t\"os\"\r\n \t\"os/exec\"\r\n \t\"regexp\"\r\n@@ -30,12 +30,13 @@ const doubleQuoteSpecialChars = \"\\\\\\n\\r\\\"!$`\"\r\n \r\n // Parse reads an env file from io.Reader, returning a map of keys and values.\r\n func Parse(r io.Reader) (map[string]string, error) {\r\n-\tdata, err := ioutil.ReadAll(r)\r\n+\tvar buf bytes.Buffer\r\n+\t_, err := io.Copy(&buf, r)\r\n \tif err != nil {\r\n \t\treturn nil, err\r\n \t}\r\n \r\n-\treturn UnmarshalBytes(data)\r\n+\treturn UnmarshalBytes(buf.Bytes())\r\n }\r\n \r\n // Load will read your env file(s) and load them into ENV for this process.\r\n@@ -46,7 +47,7 @@ func Parse(r io.Reader) (map[string]string, error) {\r\n //\r\n // You can otherwise tell it which files to load (there can be more than one) like:\r\n //\r\n-//\t\tgodotenv.Load(\"fileone\", \"filetwo\")\r\n+//\tgodotenv.Load(\"fileone\", \"filetwo\")\r\n //\r\n // It's important to note that it WILL NOT OVERRIDE an env variable that already exists - consider the .env file to set dev vars or sensible defaults.\r\n func Load(filenames ...string) (err error) {\r\n@@ -69,7 +70,7 @@ func Load(filenames ...string) (err error) {\r\n //\r\n // You can otherwise tell it which files to load (there can be more than one) like:\r\n //\r\n-//\t\tgodotenv.Overload(\"fileone\", \"filetwo\")\r\n+//\tgodotenv.Overload(\"fileone\", \"filetwo\")\r\n //\r\n // It's important to note this WILL OVERRIDE an env variable that already exists - consider the .env file to forcefully set all vars.\r\n func Overload(filenames ...string) (err error) {\r\n```",
+    "url": "https://github.com/joho/godotenv/pull/202"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 4,
+    "deletions": 3
+  },
+  "files": [
+    {
+      "path": "godotenv.go",
+      "status": "M",
+      "additions": 4,
+      "deletions": 3,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/godotenv.go b/godotenv.go\nindex 7762b5b..3d312f3 100644\n--- a/godotenv.go\n+++ b/godotenv.go\n@@ -14,10 +14,10 @@\n package godotenv\n \n import (\n+\t\"bytes\"\n \t\"errors\"\n \t\"fmt\"\n \t\"io\"\n-\t\"io/ioutil\"\n \t\"os\"\n \t\"os/exec\"\n \t\"regexp\"\n@@ -30,12 +30,13 @@ const doubleQuoteSpecialChars = \"\\\\\\n\\r\\\"!$`\"\n \n // Parse reads an env file from io.Reader, returning a map of keys and values.\n func Parse(r io.Reader) (map[string]string, error) {\n-\tdata, err := ioutil.ReadAll(r)\n+\tvar buf bytes.Buffer\n+\t_, err := io.Copy(&buf, r)\n \tif err != nil {\n \t\treturn nil, err\n \t}\n \n-\treturn UnmarshalBytes(data)\n+\treturn UnmarshalBytes(buf.Bytes())\n }\n \n // Load will read your env file(s) and load them into ENV for this process.\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/dependabot.yml",
+    ".github/workflows/ci.yml",
+    ".github/workflows/codeql-analysis.yml",
+    ".github/workflows/release.yml",
+    ".gitignore",
+    "LICENCE",
+    "README.md",
+    "autoload/autoload.go",
+    "cmd/godotenv/cmd.go",
+    "fixtures/comments.env",
+    "fixtures/equals.env",
+    "fixtures/exported.env",
+    "fixtures/invalid1.env",
+    "fixtures/plain.env",
+    "fixtures/quoted.env",
+    "fixtures/substitutions.env",
+    "go.mod",
+    "godotenv.go",
+    "godotenv_test.go",
+    "parser.go"
+  ],
+  "explanation": {
+    "what": "Parse関数内で使っていた ioutil.ReadAll(r) を、bytes.Buffer と io.Copy(&buf, r) の組み合わせに置き換えた。あわせて import から \"io/ioutil\" を削除し \"bytes\" を追加している。",
+    "why": "PR本文で説明されている通り、ioutil.ReadAll が deprecated になったための置き換え。Go 1.16 で io.ReadAll が追加されて以降 io/ioutil パッケージの関数群は非推奨扱いになっており、その依存を切り離す意図。",
+    "highlights": [
+      { "file": "godotenv.go", "note": "var buf bytes.Buffer; io.Copy(&buf, r) でReaderの全内容を読み切り、buf.Bytes() をUnmarshalBytesに渡す形に書き換えている" }
+    ],
+    "langNotes": [
+      { "topic": "ioutil.ReadAll の非推奨化と io.ReadAll", "note": "Go 1.16 で io パッケージに io.ReadAll が追加され、io/ioutil.ReadAll は非推奨(deprecated)コメントが付いた。本来は io.ReadAll に置き換えるのが簡潔だが、このコミットでは bytes.Buffer + io.Copy という一段回りくどい形を採用している。" }
+    ],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [{ "type": "pr", "number": 202, "url": "https://github.com/joho/godotenv/pull/202" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

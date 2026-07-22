@@ -1,0 +1,71 @@
+{
+  "seq": 105,
+  "sha": "193c9aba29da4c48e5496452b6954785e897bfb4",
+  "parents": [
+    "3fc4292b58a67b78e1dbb6e47b4879a6cc602ec4"
+  ],
+  "author": {
+    "name": "Chris Jones",
+    "email": "chris.jones@ironcorelabs.com",
+    "date": "2023-04-19T18:52:14-06:00"
+  },
+  "message": "Add whitespace tests. (#210)",
+  "pr": {
+    "number": 210,
+    "title": "Add whitespace tests.",
+    "body": "I confused myself into thinking that godotenv wasn't handling whitespace properly, so I wrote these tests. It turns out, it was handling whitespace just fine, and the mistake was mine. It seems like this PR isn't necessary, but here it is anyway in case you want more tests.",
+    "url": "https://github.com/joho/godotenv/pull/210"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 61,
+    "deletions": 0
+  },
+  "files": [
+    {
+      "path": "godotenv_test.go",
+      "status": "M",
+      "additions": 61,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/godotenv_test.go b/godotenv_test.go\nindex edb5781..c6d7e54 100644\n--- a/godotenv_test.go\n+++ b/godotenv_test.go\n@@ -573,3 +573,64 @@ func TestTrailingNewlines(t *testing.T) {\n \t\t})\n \t}\n }\n+\n+func TestWhitespace(t *testing.T) {\n+\tcases := map[string]struct {\n+\t\tinput string\n+\t\tkey   string\n+\t\tvalue string\n+\t}{\n+\t\t\"Leading whitespace\": {\n+\t\t\tinput: \" A=a\\n\",\n+\t\t\tkey: \"A\",\n+\t\t\tvalue: \"a\",\n+\t\t},\n+\t\t\"Leading tab\": {\n+\t\t\tinput: \"\\tA=a\\n\",\n+\t\t\tkey: \"A\",\n+\t\t\tvalue: \"a\",\n+\t\t},\n+\t\t\"Leading mixed whitespace\": {\n+\t\t\tinput: \" \\t \\t\\n\\t \\t A=a\\n\",\n+\t\t\tkey: \"A\",\n+\t\t\tvalue: \"a\",\n+\t\t},\n+\t\t\"Leading whitespace before export\": {\n+\t\t\tinput: \" \\t\\t export    A=a\\n\",\n+\t\t\tkey: \"A\",\n+\t\t\tvalue: \"a\",\n+\t\t},\n+\t\t\"Trailing whitespace\": {\n+\t\t\tinput: \"A=a \\t \\t\\n\",\n+\t\t\tkey: \"A\",\n+\t\t\tvalue: \"a\",\n+\t\t},\n+\t\t\"Trailing whitespace with export\": {\n+\t\t\tinput: \"export A=a\\t \\t \\n\",\n+\t\t\tkey: \"A\",\n+\t\t\tvalue: \"a\",\n+\t\t},\n+\t\t\"No EOL\": {\n+\t\t\tinput: \"A=a\",\n+\t\t\tkey: \"A\",\n+\t\t\tvalue: \"a\",\n+\t\t},\n+\t\t\"Trailing whitespace with no EOL\": {\n+\t\t\tinput: \"A=a \",\n+\t\t\tkey: \"A\",\n+\t\t\tvalue: \"a\",\n+\t\t},\n+\t}\n+\n+\tfor n, c := range cases {\n+\t\tt.Run(n, func(t *testing.T) {\n+\t\t\tresult, err := Unmarshal(c.input)\n+\t\t\tif err != nil {\n+\t\t\t\tt.Errorf(\"Input: %q Unexpected error:\\t%q\", c.input, err)\n+\t\t\t}\n+\t\t\tif result[c.key] != c.value {\n+\t\t\t\tt.Errorf(\"Input %q Expected:\\t %q/%q\\nGot:\\t %q\", c.input, c.key, c.value, result)\n+\t\t\t}\n+\t\t})\n+\t}\n+}\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/dependabot.yml",
+    ".github/workflows/ci.yml",
+    ".github/workflows/codeql-analysis.yml",
+    ".github/workflows/release.yml",
+    ".gitignore",
+    "LICENCE",
+    "README.md",
+    "autoload/autoload.go",
+    "cmd/godotenv/cmd.go",
+    "fixtures/comments.env",
+    "fixtures/equals.env",
+    "fixtures/exported.env",
+    "fixtures/invalid1.env",
+    "fixtures/plain.env",
+    "fixtures/quoted.env",
+    "fixtures/substitutions.env",
+    "go.mod",
+    "godotenv.go",
+    "godotenv_test.go",
+    "parser.go"
+  ],
+  "explanation": {
+    "what": "godotenv_test.go に TestWhitespace を追加し、先頭・末尾の空白やタブ、export前後の空白、改行の有無などのバリエーションで KEY=value がどう解釈されるかを網羅的に検証するテストケースを8件追加した。",
+    "why": "PR本文で、投稿者自身が「godotenvが空白を正しく扱えていないと勘違いしてテストを書いたが、実際は正しく動いていて自分の誤解だった」と説明している。既存動作を壊さないことを確認する追加のリグレッションテストとして取り込まれた形で、プロダクションコードの変更は伴わない。",
+    "highlights": [
+      { "file": "godotenv_test.go", "note": "Leading/Trailing whitespaceやexportとの組み合わせ、No EOL(末尾改行なし)など空白周りの境界値を網羅したテーブル駆動テスト" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [{ "type": "pr", "number": 210, "url": "https://github.com/joho/godotenv/pull/210" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

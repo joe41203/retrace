@@ -1,0 +1,59 @@
+{
+  "seq": 6,
+  "sha": "b10c02f9b06dc1edce11a7840a49c113ef545fcf",
+  "parents": [
+    "919c16194535565aefd874e2e64307d87b9a9f1d"
+  ],
+  "author": {
+    "name": "John Barton (joho)",
+    "email": "jrbarton@gmail.com",
+    "date": "2013-07-30T18:23:33+10:00"
+  },
+  "message": "Move the red-green a little way down the existing parser specs.",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 16,
+    "deletions": 1
+  },
+  "files": [
+    {
+      "path": "godotenv.go",
+      "status": "M",
+      "additions": 3,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "godotenv_test.go",
+      "status": "M",
+      "additions": 13,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/godotenv.go b/godotenv.go\nindex 69e8b44..e58a80f 100644\n--- a/godotenv.go\n+++ b/godotenv.go\n@@ -61,7 +61,9 @@ func parseLine(line string) (key string, value string, err error) {\n \tsplitString := strings.Split(line, \"=\")\n \n \tkey = strings.Trim(splitString[0], \" \")\n-\tvalue = strings.Trim(splitString[1], \" \")\n+\n+\tvalue = strings.Trim(splitString[1], \" \\\"'\")\n+\tvalue = strings.Replace(value, \"\\\\\\\"\", \"\\\"\", -1)\n \n \treturn\n }\ndiff --git a/godotenv_test.go b/godotenv_test.go\nindex 454a54a..44ffe58 100644\n--- a/godotenv_test.go\n+++ b/godotenv_test.go\n@@ -50,4 +50,17 @@ func TestLoadPlainEnv(t *testing.T) {\n func TestParsing(t *testing.T) {\n \t// unquoted values\n \tparseAndCompare(t, \"FOO=bar\", \"FOO\", \"bar\")\n+\n+\t// parses values with spaces around equal sign\n+\tparseAndCompare(t, \"FOO =bar\", \"FOO\", \"bar\")\n+\tparseAndCompare(t, \"FOO= bar\", \"FOO\", \"bar\")\n+\n+\t// parses double quoted values\n+\tparseAndCompare(t, \"FOO=\\\"bar\\\"\", \"FOO\", \"bar\")\n+\n+\t// parses single quoted values\n+\tparseAndCompare(t, \"FOO='bar'\", \"FOO\", \"bar\")\n+\n+\t// parses escaped double quotes\n+\tparseAndCompare(t, \"FOO=escaped\\\\\\\"bar\\\"\", \"FOO\", \"escaped\\\"bar\")\n }\n",
+  "diffTruncated": false,
+  "tree": [
+    ".gitignore",
+    "fixtures/exported.env",
+    "fixtures/plain.env",
+    "fixtures/quoted.env",
+    "godotenv.go",
+    "godotenv_test.go"
+  ],
+  "explanation": {
+    "what": "parseLine の value 側のトリム文字にダブルクォート・シングルクォートを加え(strings.Trim(splitString[1], \" \\\"'\"))、さらにエスケープされたダブルクォート(\\\") を \" に戻す strings.Replace を追加した。TestParsing にはスペース混じりの \"FOO =bar\" / \"FOO= bar\"、ダブル/シングルクォート値、エスケープされたダブルクォートを含む値のケースが追加された。",
+    "why": "おそらく件名の \"Move the red-green a little way down\" が示す通り、TDD のサイクルを1歩ずつ進め、クォートで囲まれた値とエスケープされたクォートを parseLine が扱えるようにする段階と考えられる。まだコメント(#)の除去や YAML 形式には未対応で、次のコミット以降で扱われていく。",
+    "highlights": [
+      {"file": "godotenv.go", "note": "Trim の対象文字集合にクォート文字を足すだけの素朴な実装。まだ「クォートで囲まれているか」の判定はしていない"}
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "inferred",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

@@ -1,0 +1,52 @@
+{
+  "seq": 14,
+  "sha": "48ca995c3b153da4e059302fa49b4c0b193f1ed9",
+  "parents": [
+    "74ec3a085ff1502ce46d462db7c59de74a851639"
+  ],
+  "author": {
+    "name": "John Barton (joho)",
+    "email": "jrbarton@gmail.com",
+    "date": "2013-07-31T12:28:41+10:00"
+  },
+  "message": "Add some more tests.",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 7,
+    "deletions": 0
+  },
+  "files": [
+    {
+      "path": "godotenv_test.go",
+      "status": "M",
+      "additions": 7,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/godotenv_test.go b/godotenv_test.go\nindex 24f6748..47acbc2 100644\n--- a/godotenv_test.go\n+++ b/godotenv_test.go\n@@ -98,9 +98,16 @@ func TestParsing(t *testing.T) {\n \t// it 'parses # in quoted values' do\n \t// expect(env('foo=\"ba#r\"')).to eql('foo' => 'ba#r')\n \t// expect(env(\"foo='ba#r'\")).to eql('foo' => 'ba#r')\n+\tparseAndCompare(t, \"FOO=\\\"ba#r\\\"\", \"FOO\", \"ba#r\")\n+\tparseAndCompare(t, \"FOO='ba#r'\", \"FOO\", \"ba#r\")\n \n \t// it 'throws an error if line format is incorrect' do\n \t// expect{env('lol$wut')}.to raise_error(Dotenv::FormatError)\n+\tbadlyFormattedLine := \"lol$wut\"\n+\t_, _, err := parseLine(badlyFormattedLine)\n+\tif err == nil {\n+\t\tt.Errorf(\"Expected \\\"%v\\\" to return error, but it didn't\", badlyFormattedLine)\n+\t}\n \n \t// it 'ignores empty lines' do\n \t// expect(env(\"\\n \\t  \\nfoo=bar\\n \\nfizz=buzz\")).to eql('foo' => 'bar', 'fizz' => 'buzz')\n",
+  "diffTruncated": false,
+  "tree": [
+    ".gitignore",
+    "fixtures/exported.env",
+    "fixtures/plain.env",
+    "fixtures/quoted.env",
+    "godotenv.go",
+    "godotenv_test.go"
+  ],
+  "explanation": {
+    "what": "既存のコメントアウトされたRuby dotenv仕様(コメント行のみ)に対応するGoテストを2つ実装した。`FOO=\"ba#r\"`・`FOO='ba#r'`のようにクォート内の単一の#が保持されることの確認と、`lol$wut`のようにキー=値の形式でない行がparseLineでエラーを返すことの確認。",
+    "why": "コミットメッセージ通り「もっとテストを追加」する回。ファイル内には元のRuby dotenv仕様を写したコメントが多数残っており(TODOリストのように機能している)、それらのうち未実装だった検証を実コードに落とし込んだ。",
+    "highlights": [
+      { "file": "godotenv_test.go", "note": "badlyFormattedLineでparseLineがerr != nilを返すことを確認するテストが今回初出" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

@@ -1,0 +1,69 @@
+{
+  "seq": 36,
+  "sha": "68b1921266b95895e9d787876f4c3506b7a4a39b",
+  "parents": [
+    "3c13a80fe13f26da8d7cf5b257bdfe54975b8043",
+    "bdacd70f4cd4b3be197ccaa6e7e72ee399714a7b"
+  ],
+  "author": {
+    "name": "John Barton",
+    "email": "jrbarton@gmail.com",
+    "date": "2014-07-14T19:35:09+10:00"
+  },
+  "message": "Merge pull request #4 from GoIncremental/4-windows-line-returns\n\nTests failing on Windows",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 12,
+    "deletions": 4
+  },
+  "files": [
+    {
+      "path": "godotenv.go",
+      "status": "M",
+      "additions": 10,
+      "deletions": 3,
+      "binary": false
+    },
+    {
+      "path": "godotenv_test.go",
+      "status": "M",
+      "additions": 2,
+      "deletions": 1,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/godotenv.go b/godotenv.go\nindex 84e2ff9..b811130 100644\n--- a/godotenv.go\n+++ b/godotenv.go\n@@ -16,8 +16,8 @@ and all the env vars declared in .env will be avaiable through os.Getenv(\"SOME_E\n package godotenv\n \n import (\n+\t\"bufio\"\n \t\"errors\"\n-\t\"io/ioutil\"\n \t\"os\"\n \t\"strings\"\n )\n@@ -87,14 +87,21 @@ func loadFile(filename string) (err error) {\n }\n \n func readFile(filename string) (envMap map[string]string, err error) {\n-\tcontent, err := ioutil.ReadFile(filename)\n+\tfile, err := os.Open(filename)\n+\n+\t// content, err := ioutil.ReadFile(filename)\n \tif err != nil {\n \t\treturn\n \t}\n+\tdefer file.Close()\n \n \tenvMap = make(map[string]string)\n \n-\tlines := strings.Split(string(content), \"\\n\")\n+\tvar lines []string\n+\tscanner := bufio.NewScanner(file)\n+\tfor scanner.Scan() {\n+\t\tlines = append(lines, scanner.Text())\n+\t}\n \n \tfor _, fullLine := range lines {\n \t\tif !isIgnoredLine(fullLine) {\ndiff --git a/godotenv_test.go b/godotenv_test.go\nindex c6d9f2d..705855c 100644\n--- a/godotenv_test.go\n+++ b/godotenv_test.go\n@@ -32,7 +32,8 @@ func loadEnvAndCompareValues(t *testing.T, envFileName string, expectedValues ma\n \n func TestLoadWithNoArgsLoadsDotEnv(t *testing.T) {\n \terr := Load()\n-\tif err.Error() != \"open .env: no such file or directory\" {\n+\tpathError := err.(*os.PathError)\n+\tif pathError == nil || pathError.Op != \"open\" || pathError.Path != \".env\"{\n \t\tt.Errorf(\"Didn't try and open .env by default\")\n \t}\n }\n",
+  "diffTruncated": false,
+  "tree": [
+    ".gitignore",
+    "LICENCE",
+    "README.md",
+    "autoload/autoload.go",
+    "fixtures/equals.env",
+    "fixtures/exported.env",
+    "fixtures/plain.env",
+    "fixtures/quoted.env",
+    "godotenv.go",
+    "godotenv_test.go",
+    "wercker.yml"
+  ],
+  "explanation": {
+    "what": "外部コントリビューター(GoIncremental)からの PR をマージ。readFile のファイル読み込みを ioutil.ReadFile + strings.Split(\"\\n\") から os.Open + bufio.Scanner に変更した。また TestLoadWithNoArgsLoadsDotEnv のエラー検証を文字列の完全一致から *os.PathError の型アサーションに変更した。",
+    "why": "コミットメッセージ「Tests failing on Windows」の通り、Windows の改行コード(CRLF)環境ではファイル全体を \"\\n\" で単純分割すると行末に \\r が残ってしまい、テストが失敗していた。bufio.Scanner はデフォルトで改行を行区切りとして正しく扱えるため、この問題を回避できる。あわせてエラーメッセージの文字列一致に依存していたテストも、OS 依存の文言差を避けるため *os.PathError の型で判定するように直された。",
+    "highlights": [
+      { "file": "godotenv.go", "note": "ioutil.ReadFile + strings.Split(\"\\n\") → os.Open + bufio.Scanner。Windows の CRLF 改行問題への対応。" },
+      { "file": "godotenv_test.go", "note": "エラーメッセージの文字列比較から `err.(*os.PathError)` の型アサーションに変更。OS 間でのエラー文言差異を吸収。" }
+    ],
+    "langNotes": [
+      { "topic": "bufio.Scanner", "note": "bufio.Scanner はストリームを行単位などのトークンで読み進めるための標準ライブラリの仕組み。デフォルトの ScanLines 分割関数は \\n だけでなく \\r\\n も1行として扱ってくれるため、OS ごとの改行コード差を意識せずにテキストファイルを読める。" },
+      { "topic": "型アサーション(err.(*os.PathError))", "note": "Go のエラーは interface 型なので、具体的な実装型の情報を取り出すには `err.(*os.PathError)` のような型アサーション構文を使う。ここではエラーメッセージの文字列丸ごと比較の代わりに、構造化されたフィールド(Op, Path)を見て判定するようにしている。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

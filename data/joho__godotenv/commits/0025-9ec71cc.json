@@ -1,0 +1,65 @@
+{
+  "seq": 25,
+  "sha": "9ec71cc6c8895835970179bbc61547dd0db77dbd",
+  "parents": [
+    "3f6d91c4c0f9331ec82f19174655b6babdd7ba7e"
+  ],
+  "author": {
+    "name": "John Barton (joho)",
+    "email": "jrbarton@gmail.com",
+    "date": "2013-07-31T14:25:10+10:00"
+  },
+  "message": "Make sure we don't overwrite existing ENV vars.",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 11,
+    "deletions": 1
+  },
+  "files": [
+    {
+      "path": "godotenv.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "godotenv_test.go",
+      "status": "M",
+      "additions": 10,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/godotenv.go b/godotenv.go\nindex a210f4e..91151fe 100644\n--- a/godotenv.go\n+++ b/godotenv.go\n@@ -34,7 +34,7 @@ func loadFile(filename string) (err error) {\n \t\tif !isIgnoredLine(fullLine) {\n \t\t\tkey, value, err := parseLine(fullLine)\n \n-\t\t\tif err == nil {\n+\t\t\tif err == nil && os.Getenv(key) == \"\" {\n \t\t\t\tos.Setenv(key, value)\n \t\t\t}\n \t\t}\ndiff --git a/godotenv_test.go b/godotenv_test.go\nindex 2f096e7..e6ec8d9 100644\n--- a/godotenv_test.go\n+++ b/godotenv_test.go\n@@ -83,6 +83,16 @@ func TestLoadQuotedEnv(t *testing.T) {\n \tloadEnvAndCompareValues(t, envFileName, expectedValues)\n }\n \n+func TestActualEnvVarsAreLeftAlone(t *testing.T) {\n+\tos.Clearenv()\n+\tos.Setenv(\"OPTION_A\", \"actualenv\")\n+\t_ = Load(\"fixtures/plain.env\")\n+\n+\tif os.Getenv(\"OPTION_A\") != \"actualenv\" {\n+\t\tt.Error(\"An ENV var set earlier was overwritten\")\n+\t}\n+}\n+\n func TestParsing(t *testing.T) {\n \t// unquoted values\n \tparseAndCompare(t, \"FOO=bar\", \"FOO\", \"bar\")\n",
+  "diffTruncated": false,
+  "tree": [
+    ".gitignore",
+    "LICENCE",
+    "README.md",
+    "fixtures/exported.env",
+    "fixtures/plain.env",
+    "fixtures/quoted.env",
+    "godotenv.go",
+    "godotenv_test.go",
+    "wercker.yml"
+  ],
+  "explanation": {
+    "what": "loadFile内でos.Setenvを呼ぶ条件に`os.Getenv(key) == \"\"`を追加し、既にプロセスの環境変数に値が設定されているキーは.envの値で上書きしないようにした。TestActualEnvVarsAreLeftAloneテストで、事前にos.Setenv(\"OPTION_A\", \"actualenv\")しておいた値がLoad()後も変わらないことを検証している。",
+    "why": "コミットメッセージ「Make sure we don't overwrite existing ENV vars.」の通り、本番環境などで既に設定されている実際の環境変数を、開発用の.envファイルの値で誤って上書きしてしまう事故を防ぐための仕様追加。.envは「未設定なら使うデフォルト値」という位置づけであることが明確になった。",
+    "highlights": [
+      { "file": "godotenv.go", "note": "os.Getenv(key) == \"\" の条件追加。既存ENV優先のポリシーがここで決まる" },
+      { "file": "godotenv_test.go", "note": "TestActualEnvVarsAreLeftAlone。os.Clearenv()で環境をリセットしてから検証するTDDらしいテスト" }
+    ],
+    "langNotes": [
+      { "topic": "os.Setenv / os.Getenv", "note": "Goの標準osパッケージでプロセスの環境変数を読み書きする関数。os.Getenvはキーが存在しない場合も空文字列を返すため、このコミットのように「未設定かどうか」の判定に使われる(値が空文字列の場合と区別できない点には注意が必要)。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

@@ -1,0 +1,71 @@
+{
+  "seq": 108,
+  "sha": "7765d9d198cd9c6197452c94201cfd6f411fa542",
+  "parents": [
+    "383d64cb7ee0cbb880fc28a2bd91bcdbdf84d0a1"
+  ],
+  "author": {
+    "name": "Kha Nguyen",
+    "email": "nguyentrongkha92@gmail.com",
+    "date": "2024-01-13T09:49:45+07:00"
+  },
+  "message": "Fix panic because of wrong function (#223)",
+  "pr": {
+    "number": 223,
+    "title": "Fix panic because of wrong function",
+    "body": "Fix the issue caused by the PR https://github.com/joho/godotenv/pull/221, which calls the wrong function in the `fmt` package",
+    "url": "https://github.com/joho/godotenv/pull/223"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 1,
+    "deletions": 2
+  },
+  "files": [
+    {
+      "path": "cmd/godotenv/cmd.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 2,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/cmd/godotenv/cmd.go b/cmd/godotenv/cmd.go\nindex aa97a05..7dc8f8e 100644\n--- a/cmd/godotenv/cmd.go\n+++ b/cmd/godotenv/cmd.go\n@@ -4,7 +4,6 @@ import (\n \t\"flag\"\n \t\"fmt\"\n \t\"log\"\n-\n \t\"strings\"\n \n \t\"github.com/joho/godotenv\"\n@@ -35,7 +34,7 @@ example\n \t// print usage and return\n \targs := flag.Args()\n \tif showHelp || len(args) == 0 {\n-\t\tfmt.log(usage)\n+\t\tfmt.Println(usage)\n \t\treturn\n \t}\n \n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/dependabot.yml",
+    ".github/workflows/ci.yml",
+    ".github/workflows/codeql-analysis.yml",
+    ".github/workflows/release.yml",
+    ".gitignore",
+    "LICENCE",
+    "README.md",
+    "autoload/autoload.go",
+    "cmd/godotenv/cmd.go",
+    "fixtures/comments.env",
+    "fixtures/equals.env",
+    "fixtures/exported.env",
+    "fixtures/invalid1.env",
+    "fixtures/plain.env",
+    "fixtures/quoted.env",
+    "fixtures/substitutions.env",
+    "go.mod",
+    "godotenv.go",
+    "godotenv_test.go",
+    "parser.go"
+  ],
+  "explanation": {
+    "what": "cmd/godotenv/cmd.go の fmt.log(usage) を fmt.Println(usage) に戻し、空行だったimport内の不要な空行も削除した。",
+    "why": "PR本文に明記されている通り、直前のPR #221 が fmt パッケージに存在しない fmt.log を呼び出す変更を混入させておりビルドが壊れていたため、その修正として fmt.Println に戻した。",
+    "highlights": [
+      { "file": "cmd/godotenv/cmd.go", "note": "fmt.log(usage) → fmt.Println(usage) への差し戻しがこのPRの本体" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [{ "type": "pr", "number": 223, "url": "https://github.com/joho/godotenv/pull/223" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

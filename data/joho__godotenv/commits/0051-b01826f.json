@@ -1,0 +1,75 @@
+{
+  "seq": 51,
+  "sha": "b01826f9569125401f5a25c97d62820184893c32",
+  "parents": [
+    "d10b3fbe007de7a25e086524ad17597afa3d238b",
+    "6a1233b2f650ab427ea90f1970eed5d368a0238e"
+  ],
+  "author": {
+    "name": "John Barton",
+    "email": "jrbarton@gmail.com",
+    "date": "2017-03-21T20:56:48+11:00"
+  },
+  "message": "Merge pull request #25 from matiasanaya/master\n\nFix quoted values check",
+  "pr": {
+    "number": 25,
+    "title": "Fix quoted values check",
+    "body": "* Fixes bug in quoted values check\r\n* Uses raw string literal instead of interpreted string literal, to make strings easier to scan",
+    "url": "https://github.com/joho/godotenv/pull/25"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 14,
+    "deletions": 12
+  },
+  "files": [
+    {
+      "path": "godotenv.go",
+      "status": "M",
+      "additions": 6,
+      "deletions": 4,
+      "binary": false
+    },
+    {
+      "path": "godotenv_test.go",
+      "status": "M",
+      "additions": 8,
+      "deletions": 8,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/godotenv.go b/godotenv.go\nindex a098dd2..2551048 100644\n--- a/godotenv.go\n+++ b/godotenv.go\n@@ -216,14 +216,16 @@ func parseLine(line string) (key string, value string, err error) {\n \tvalue = strings.Trim(value, \" \")\n \n \t// check if we've got quoted values\n-\tif strings.Count(value, \"\\\"\") == 2 || strings.Count(value, \"'\") == 2 {\n+\tfirst := string(value[0:1])\n+\tlast := string(value[len(value)-1:])\n+\tif first == last && strings.ContainsAny(first, `\"'`) {\n \t\t// pull the quotes off the edges\n-\t\tvalue = strings.Trim(value, \"\\\"'\")\n+\t\tvalue = strings.Trim(value, `\"'`)\n \n \t\t// expand quotes\n-\t\tvalue = strings.Replace(value, \"\\\\\\\"\", \"\\\"\", -1)\n+\t\tvalue = strings.Replace(value, `\\\"`, `\"`, -1)\n \t\t// expand newlines\n-\t\tvalue = strings.Replace(value, \"\\\\n\", \"\\n\", -1)\n+\t\tvalue = strings.Replace(value, `\\n`, \"\\n\", -1)\n \t}\n \n \treturn\ndiff --git a/godotenv_test.go b/godotenv_test.go\nindex 2d26ee4..ea22da3 100644\n--- a/godotenv_test.go\n+++ b/godotenv_test.go\n@@ -187,24 +187,24 @@ func TestParsing(t *testing.T) {\n \tparseAndCompare(t, \"FOO= bar\", \"FOO\", \"bar\")\n \n \t// parses double quoted values\n-\tparseAndCompare(t, \"FOO=\\\"bar\\\"\", \"FOO\", \"bar\")\n+\tparseAndCompare(t, `FOO=\"bar\"`, \"FOO\", \"bar\")\n \n \t// parses single quoted values\n \tparseAndCompare(t, \"FOO='bar'\", \"FOO\", \"bar\")\n \n \t// parses escaped double quotes\n-\tparseAndCompare(t, \"FOO=escaped\\\\\\\"bar\\\"\", \"FOO\", \"escaped\\\"bar\")\n+\tparseAndCompare(t, `FOO=\"escaped\\\"bar\"`, \"FOO\", `escaped\"bar`)\n \n \t// parses yaml style options\n \tparseAndCompare(t, \"OPTION_A: 1\", \"OPTION_A\", \"1\")\n \n \t// parses export keyword\n \tparseAndCompare(t, \"export OPTION_A=2\", \"OPTION_A\", \"2\")\n-\tparseAndCompare(t, \"export OPTION_B='\\\\n'\", \"OPTION_B\", \"\\n\")\n+\tparseAndCompare(t, `export OPTION_B='\\n'`, \"OPTION_B\", \"\\n\")\n \n \t// it 'expands newlines in quoted strings' do\n \t// expect(env('FOO=\"bar\\nbaz\"')).to eql('FOO' => \"bar\\nbaz\")\n-\tparseAndCompare(t, \"FOO=\\\"bar\\\\nbaz\\\"\", \"FOO\", \"bar\\nbaz\")\n+\tparseAndCompare(t, `FOO=\"bar\\nbaz\"`, \"FOO\", \"bar\\nbaz\")\n \n \t// it 'parses varibales with \".\" in the name' do\n \t// expect(env('FOO.BAR=foobar')).to eql('FOO.BAR' => 'foobar')\n@@ -224,14 +224,14 @@ func TestParsing(t *testing.T) {\n \n \t// it 'allows # in quoted value' do\n \t// expect(env('foo=\"bar#baz\" # comment')).to eql('foo' => 'bar#baz')\n-\tparseAndCompare(t, \"FOO=\\\"bar#baz\\\" # comment\", \"FOO\", \"bar#baz\")\n+\tparseAndCompare(t, `FOO=\"bar#baz\" # comment`, \"FOO\", \"bar#baz\")\n \tparseAndCompare(t, \"FOO='bar#baz' # comment\", \"FOO\", \"bar#baz\")\n-\tparseAndCompare(t, \"FOO=\\\"bar#baz#bang\\\" # comment\", \"FOO\", \"bar#baz#bang\")\n+\tparseAndCompare(t, `FOO=\"bar#baz#bang\" # comment`, \"FOO\", \"bar#baz#bang\")\n \n \t// it 'parses # in quoted values' do\n \t// expect(env('foo=\"ba#r\"')).to eql('foo' => 'ba#r')\n \t// expect(env(\"foo='ba#r'\")).to eql('foo' => 'ba#r')\n-\tparseAndCompare(t, \"FOO=\\\"ba#r\\\"\", \"FOO\", \"ba#r\")\n+\tparseAndCompare(t, `FOO=\"ba#r\"`, \"FOO\", \"ba#r\")\n \tparseAndCompare(t, \"FOO='ba#r'\", \"FOO\", \"ba#r\")\n \n \t// it 'throws an error if line format is incorrect' do\n@@ -265,7 +265,7 @@ func TestLinesToIgnore(t *testing.T) {\n \t}\n \n \t// make sure we're not getting false positives\n-\tif isIgnoredLine(\"export OPTION_B='\\\\n'\") {\n+\tif isIgnoredLine(`export OPTION_B='\\n'`) {\n \t\tt.Error(\"ignoring a perfectly valid line to parse\")\n \t}\n }\n",
+  "diffTruncated": false,
+  "tree": [
+    ".gitignore",
+    ".travis.yml",
+    "LICENCE",
+    "README.md",
+    "autoload/autoload.go",
+    "cmd/godotenv/cmd.go",
+    "fixtures/equals.env",
+    "fixtures/exported.env",
+    "fixtures/invalid1.env",
+    "fixtures/plain.env",
+    "fixtures/quoted.env",
+    "godotenv.go",
+    "godotenv_test.go"
+  ],
+  "explanation": {
+    "what": "parseLine 内の「クォート付き値かどうか」の判定を、`strings.Count(value, \"\\\"\")==2` のような出現回数カウントから、値の先頭1文字と末尾1文字が一致しかつ `\"` か `'` であるかを見る方式(`first == last && strings.ContainsAny(first, \"\\\"'\")`)に変更した。あわせてテスト内のダブルクォート文字列リテラルを Go の raw string literal(バッククォート)に書き換えている。",
+    "why": "従来の実装は値の中に含まれるクォート文字の総数を数えるだけだったため、`escaped\\\"bar\\\"` のように内部にエスケープされた `\"` を含む値で数が2にならず、クォート除去やエスケープ展開が正しく効かないケースがあった。PRは先頭・末尾の文字だけを見る判定に直すことでこのバグを修正し、あわせて `\\\"` のようなエスケープシーケンスが頻出するテストコードを raw string literal に置き換えて可読性を上げている。",
+    "highlights": [
+      { "file": "godotenv.go", "note": "クォート判定が「出現数2」から「先頭・末尾の文字一致」に変わった箇所" },
+      { "file": "godotenv_test.go", "note": "解釈済み文字列リテラルから raw string literal への書き換え例" }
+    ],
+    "langNotes": [
+      { "topic": "raw string literal", "note": "Go はバッククォートで囲むと raw string literal になり、バックスラッシュのエスケープ解釈が一切行われない。`\\\"` のような文字列を多用するテストコードでは、通常の解釈済み文字列(ダブルクォート)より raw string literal の方がそのまま読めて誤りにくい。" }
+    ],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [{ "type": "pr", "number": 25, "url": "https://github.com/joho/godotenv/pull/25" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

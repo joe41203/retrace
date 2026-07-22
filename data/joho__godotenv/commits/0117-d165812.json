@@ -1,0 +1,78 @@
+{
+  "seq": 117,
+  "sha": "d1658129f903364e7db887a1cd3075212b746ec0",
+  "parents": [
+    "03bb54a6e32c8c7d9a64c00b5a8a88d7d0cc1a0b",
+    "fecda3c8d4303d98f6e1cdec8f1db6f0a9d18217"
+  ],
+  "author": {
+    "name": "John Barton",
+    "email": "jb@johnbarton.co",
+    "date": "2026-05-19T21:50:28+10:00"
+  },
+  "message": "Merge branch 'pr-235-merge-prep'",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 50,
+    "deletions": 3
+  },
+  "files": [
+    {
+      "path": "godotenv.go",
+      "status": "M",
+      "additions": 22,
+      "deletions": 3,
+      "binary": false
+    },
+    {
+      "path": "godotenv_test.go",
+      "status": "M",
+      "additions": 28,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/godotenv.go b/godotenv.go\nindex 61b0ebb..8e9fe3f 100644\n--- a/godotenv.go\n+++ b/godotenv.go\n@@ -20,7 +20,6 @@ import (\n \t\"os\"\n \t\"os/exec\"\n \t\"sort\"\n-\t\"strconv\"\n \t\"strings\"\n )\n \n@@ -159,13 +158,33 @@ func Write(envMap map[string]string, filename string) error {\n \treturn file.Sync()\n }\n \n+// isInt checks if the string may be serialized as a number value, leading\n+// \"-\" symbol is allowed for negative numbers, leading \"+\" sign is not. The\n+// length of the value is not limited.\n+func isInt(s string) bool {\n+\ts = strings.TrimPrefix(s, \"-\")\n+\n+\tif len(s) == 0 {\n+\t\treturn false\n+\t}\n+\n+\tfor _, r := range s {\n+\t\tif '0' <= r && r <= '9' {\n+\t\t\tcontinue\n+\t\t}\n+\t\treturn false\n+\t}\n+\n+\treturn true\n+}\n+\n // Marshal outputs the given environment as a dotenv-formatted environment file.\n // Each line is in the format: KEY=\"VALUE\" where VALUE is backslash-escaped.\n func Marshal(envMap map[string]string) (string, error) {\n \tlines := make([]string, 0, len(envMap))\n \tfor k, v := range envMap {\n-\t\tif d, err := strconv.Atoi(v); err == nil {\n-\t\t\tlines = append(lines, fmt.Sprintf(`%s=%d`, k, d))\n+\t\tif isInt(v) {\n+\t\t\tlines = append(lines, fmt.Sprintf(`%s=%s`, k, v))\n \t\t} else {\n \t\t\tlines = append(lines, fmt.Sprintf(`%s=\"%s\"`, k, doubleQuoteEscape(v)))\n \t\t}\ndiff --git a/godotenv_test.go b/godotenv_test.go\nindex fe0e3fb..21b712f 100644\n--- a/godotenv_test.go\n+++ b/godotenv_test.go\n@@ -520,6 +520,30 @@ func TestComments(t *testing.T) {\n \tloadEnvAndCompareValues(t, Load, envFileName, expectedValues, noopPresets)\n }\n \n+func TestIsInt(t *testing.T) {\n+\tcheckAndCompare := func(s string, expected bool) {\n+\t\tif isInt(s) != expected {\n+\t\t\tt.Fail()\n+\t\t}\n+\t}\n+\n+\t// invalid values\n+\tcheckAndCompare(\"\", false)\n+\tcheckAndCompare(\"+123\", false)\n+\tcheckAndCompare(\"+12a3\", false)\n+\tcheckAndCompare(\"12a3\", false)\n+\tcheckAndCompare(\"abc\", false)\n+\tcheckAndCompare(\"12 3\", false)\n+\tcheckAndCompare(\"-\", false)\n+\tcheckAndCompare(\" \", false)\n+\n+\t// valid values\n+\tcheckAndCompare(\"-123\", true)\n+\tcheckAndCompare(\"123\", true)\n+\tcheckAndCompare(\"-922337203685477580868712\", true)\n+\tcheckAndCompare(\"922337203685477580837281\", true)\n+}\n+\n func TestWrite(t *testing.T) {\n \twriteAndCompare := func(env string, expected string) {\n \t\tenvMap, _ := Unmarshal(env)\n@@ -543,6 +567,10 @@ func TestWrite(t *testing.T) {\n \twriteAndCompare(\"foo=bar\\nbaz=buzz\", \"baz=\\\"buzz\\\"\\nfoo=\\\"bar\\\"\")\n \t// integers should not be quoted\n \twriteAndCompare(`key=\"10\"`, `key=10`)\n+\t// leading + is not numeric — must be quoted to preserve the sign\n+\twriteAndCompare(`key=+123`, `key=\"+123\"`)\n+\t// leading zeros must be preserved (not collapsed to a smaller int)\n+\twriteAndCompare(`key=007`, `key=007`)\n \n }\n \n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/dependabot.yml",
+    ".github/workflows/ci.yml",
+    ".github/workflows/codeql-analysis.yml",
+    ".github/workflows/release.yml",
+    ".gitignore",
+    "LICENCE",
+    "README.md",
+    "autoload/autoload.go",
+    "cmd/godotenv/cmd.go",
+    "fixtures/comments.env",
+    "fixtures/equals.env",
+    "fixtures/exported.env",
+    "fixtures/hyphen.env",
+    "fixtures/invalid1.env",
+    "fixtures/plain.env",
+    "fixtures/quoted.env",
+    "fixtures/substitutions.env",
+    "go.mod",
+    "godotenv.go",
+    "godotenv_test.go",
+    "parser.go"
+  ],
+  "explanation": {
+    "what": "Marshal 関数が値を数値として出力するかどうかの判定を、strconv.Atoi(v) の成否から、新設した isInt(v) という独自の文字列走査関数に置き換えた。isInt は先頭の '-' のみを許容し、残りが全て '0'-'9' かどうかを見る。あわせて isInt の単体テストと、Marshal が \"+123\" や \"007\" のような値をクォート付き文字列として出力することを確認するテストを追加している。",
+    "why": "コミットメッセージは 'Merge branch pr-235-merge-prep' のみで背景の記述はない。おそらく diff から読み取れる範囲では、strconv.Atoi は int の範囲を超える大きな数値でエラーになったり、変換後に \"007\" のような先頭ゼロを \"7\" に潰してしまったりする問題があったとみられる。isInt は文字列としての桁数をそのまま保持しつつ整数らしさだけを判定するため、おそらく桁溢れや先頭ゼロの情報を失わずに Marshal でそのまま出力できるようにする狙いだったと考えられる。",
+    "highlights": [
+      { "file": "godotenv.go", "note": "strconv.Atoi によるパース→再フォーマットから、文字列のまま整数らしさを判定する isInt への置き換え" },
+      { "file": "godotenv_test.go", "note": "\"+123\" はクォート必須、\"007\" は先頭ゼロを保持、という2つの回帰テスト" }
+    ],
+    "langNotes": [
+      { "topic": "strconv.Atoi の限界", "note": "strconv.Atoi(s) は文字列を Go の int 型に変換するが、int の範囲(環境によって32/64bit)を超える桁数の数値はエラーになり、変換後に再度文字列化すると \"007\" のような先頭ゼロの情報も失われる。値を数値として扱えるかどうかだけを判定したい場合は、Atoi で変換・復元するのではなく文字として走査する方が元の表記を保てる。" }
+    ],
+    "diagram": null,
+    "evidence": "inferred",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

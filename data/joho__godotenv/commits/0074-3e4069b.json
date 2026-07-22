@@ -1,0 +1,85 @@
+{
+  "seq": 74,
+  "sha": "3e4069b9b20c70e46aa4568c7d32043f2d822b7c",
+  "parents": [
+    "a4d9cf1d6d98b3f745684f5879cd3de920fece83",
+    "6e653f9adfb8c2ae280cb0b3082f6a596e51ec40"
+  ],
+  "author": {
+    "name": "John Barton",
+    "email": "jb@johnbarton.co",
+    "date": "2020-11-08T11:58:27+11:00"
+  },
+  "message": "Merge pull request #109 from mniak/pr\n\nWrite ints without quotes",
+  "pr": {
+    "number": 109,
+    "title": "Write ints without quotes",
+    "body": "Alternate solution for #107 \r\ncloses #107 \r\n\r\nreplacement for #108 ",
+    "url": "https://github.com/joho/godotenv/pull/109"
+  },
+  "linkedIssues": [
+    {
+      "number": 107,
+      "title": "Marshal option that accept non-string values in the map",
+      "body": "I think ints and floats should not be quoted, but since all the values are strings in the `Marshal` method, everything is quoted.\r\nMaybe there could be a method that accepts `map[string]interface{}` and then converts accordingly",
+      "url": "https://github.com/joho/godotenv/issues/107"
+    }
+  ],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 8,
+    "deletions": 1
+  },
+  "files": [
+    {
+      "path": "godotenv.go",
+      "status": "M",
+      "additions": 6,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "godotenv_test.go",
+      "status": "M",
+      "additions": 2,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/godotenv.go b/godotenv.go\nindex 69e816c..8e311f4 100644\n--- a/godotenv.go\n+++ b/godotenv.go\n@@ -22,6 +22,7 @@ import (\n \t\"os/exec\"\n \t\"regexp\"\n \t\"sort\"\n+\t\"strconv\"\n \t\"strings\"\n )\n \n@@ -169,7 +170,11 @@ func Write(envMap map[string]string, filename string) error {\n func Marshal(envMap map[string]string) (string, error) {\n \tlines := make([]string, 0, len(envMap))\n \tfor k, v := range envMap {\n-\t\tlines = append(lines, fmt.Sprintf(`%s=\"%s\"`, k, doubleQuoteEscape(v)))\n+\t\tif d, err := strconv.Atoi(v); err == nil {\n+\t\t\tlines = append(lines, fmt.Sprintf(`%s=%d`, k, d))\n+\t\t} else {\n+\t\t\tlines = append(lines, fmt.Sprintf(`%s=\"%s\"`, k, doubleQuoteEscape(v)))\n+\t\t}\n \t}\n \tsort.Strings(lines)\n \treturn strings.Join(lines, \"\\n\"), nil\ndiff --git a/godotenv_test.go b/godotenv_test.go\nindex d1f73cb..7274c14 100644\n--- a/godotenv_test.go\n+++ b/godotenv_test.go\n@@ -445,6 +445,8 @@ func TestWrite(t *testing.T) {\n \twriteAndCompare(`foo=\"\\n\\r\\\\r!\"`, `foo=\"\\n\\r\\\\r\\!\"`)\n \t// lines should be sorted\n \twriteAndCompare(\"foo=bar\\nbaz=buzz\", \"baz=\\\"buzz\\\"\\nfoo=\\\"bar\\\"\")\n+\t// integers should not be quoted\n+\twriteAndCompare(`key=\"10\"`, `key=10`)\n \n }\n \n",
+  "diffTruncated": false,
+  "tree": [
+    ".gitignore",
+    ".travis.yml",
+    "LICENCE",
+    "README.md",
+    "autoload/autoload.go",
+    "cmd/godotenv/cmd.go",
+    "fixtures/equals.env",
+    "fixtures/exported.env",
+    "fixtures/invalid1.env",
+    "fixtures/plain.env",
+    "fixtures/quoted.env",
+    "fixtures/substitutions.env",
+    "godotenv.go",
+    "godotenv_test.go"
+  ],
+  "explanation": {
+    "what": "Marshal 関数で各値を strconv.Atoi で整数として解釈できるか試し、変換できた場合はダブルクォートなしの %d 形式で、できなければ従来通りダブルクォート付きの %s 形式でシリアライズするよう変更した。テストにも整数値がクォートなしで出力されることを確認するケースを追加している。",
+    "why": "linkedIssue #107 で「Marshal はすべての値を文字列として扱うため int や float もクォートされてしまう。map[string]interface{} を受ける手段があってもよいのでは」という要望が上がっており、このPRはより簡便な代替案として、文字列値が整数として解釈できる場合はクォートを外す方式で応えたもの。",
+    "highlights": [
+      { "file": "godotenv.go", "note": "strconv.Atoi の成否で出力フォーマット(%d か %s)を分岐している" }
+    ],
+    "langNotes": [
+      { "topic": "strconv.Atoi", "note": "Go の標準ライブラリ strconv は文字列と基本型の相互変換を担う。Atoi(ASCII to integer)は文字列を int に変換し、失敗時は値とエラーの2つを返すため if d, err := strconv.Atoi(v); err == nil という書き方で成否分岐するのが定型。" }
+    ],
+    "diagram": null,
+    "evidence": "issue",
+    "refs": [
+      { "type": "pr", "number": 109, "url": "https://github.com/joho/godotenv/pull/109" },
+      { "type": "issue", "number": 107, "url": "https://github.com/joho/godotenv/issues/107" }
+    ],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

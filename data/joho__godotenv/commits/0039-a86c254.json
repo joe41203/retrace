@@ -1,0 +1,71 @@
+{
+  "seq": 39,
+  "sha": "a86c254d7dd88bcd6d60fb78d662c1cad7e5831d",
+  "parents": [
+    "aab3ea4ba68f8fe7492604240b01190d9efc4db4",
+    "1736a884e7dd3984ce70558d0df8b72c9c04aa83"
+  ],
+  "author": {
+    "name": "John Barton",
+    "email": "jrbarton@gmail.com",
+    "date": "2014-10-12T09:58:57+11:00"
+  },
+  "message": "Merge pull request #6 from joho/add_bin_command\n\nAdd a bin command",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 78,
+    "deletions": 0
+  },
+  "files": [
+    {
+      "path": "cmd/cmd.go",
+      "status": "A",
+      "additions": 54,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "godotenv.go",
+      "status": "M",
+      "additions": 24,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/cmd/cmd.go b/cmd/cmd.go\nnew file mode 100644\nindex 0000000..555dc1e\n--- /dev/null\n+++ b/cmd/cmd.go\n@@ -0,0 +1,54 @@\n+package main\n+\n+import (\n+\t\"flag\"\n+\t\"fmt\"\n+\t\"log\"\n+\n+\t\"strings\"\n+\n+\t\"github.com/joho/godotenv\"\n+)\n+\n+func main() {\n+\tvar showHelp bool\n+\tflag.BoolVar(&showHelp, \"h\", false, \"show help\")\n+\tvar rawEnvFilenames string\n+\tflag.StringVar(&rawEnvFilenames, \"f\", \"\", \"comma separated paths to .env files\")\n+\n+\tflag.Parse()\n+\n+\tusage := `\n+Run a process with a env setup from a .env file\n+\n+godotenv [-f ENV_FILE_PATHS] COMMAND_ARGS\n+\n+ENV_FILE_PATHS: comma separated paths to .env files\n+COMMAND_ARGS: command and args you want to run\n+\n+example\n+  godotenv -f /path/to/something/.env,/another/path/.env fortune\n+`\n+\t// if no args or -h flag\n+\t// print usage and return\n+\targs := flag.Args()\n+\tif showHelp || len(args) == 0 {\n+\t\tfmt.Println(usage)\n+\t\treturn\n+\t}\n+\n+\t// load env\n+\tvar envFilenames []string\n+\tif rawEnvFilenames != \"\" {\n+\t\tenvFilenames = strings.Split(rawEnvFilenames, \",\")\n+\t}\n+\n+\t// take rest of args and \"exec\" them\n+\tcmd := args[0]\n+\tcmdArgs := args[1:len(args)]\n+\n+\terr := godotenv.Exec(envFilenames, cmd, cmdArgs)\n+\tif err != nil {\n+\t\tlog.Fatal(err)\n+\t}\n+}\ndiff --git a/godotenv.go b/godotenv.go\nindex 6b643f3..816e759 100644\n--- a/godotenv.go\n+++ b/godotenv.go\n@@ -19,6 +19,7 @@ import (\n \t\"bufio\"\n \t\"errors\"\n \t\"os\"\n+\t\"os/exec\"\n \t\"strings\"\n )\n \n@@ -45,6 +46,10 @@ func Load(filenames ...string) (err error) {\n \treturn\n }\n \n+/*\n+  Read all env (with same file loading semantics as Load) but return values as\n+  a map rather than automatically writing values into env\n+*/\n func Read(filenames ...string) (envMap map[string]string, err error) {\n \tfilenames = filenamesOrDefault(filenames)\n \tenvMap = make(map[string]string)\n@@ -65,6 +70,25 @@ func Read(filenames ...string) (envMap map[string]string, err error) {\n \treturn\n }\n \n+/*\n+  Loads env vars from the specified filenames (empty map falls back to default)\n+  then executes the cmd specified.\n+\n+  Simply hooks up os.Stdin/err/out to the command and calls Run()\n+\n+  If you want more fine grained control over your command it's recommended\n+  that you use `Load()` or `Read()` and the `os/exec` package yourself.\n+*/\n+func Exec(filenames []string, cmd string, cmdArgs []string) error {\n+\tLoad(filenames...)\n+\n+\tcommand := exec.Command(cmd, cmdArgs...)\n+\tcommand.Stdin = os.Stdin\n+\tcommand.Stdout = os.Stdout\n+\tcommand.Stderr = os.Stderr\n+\treturn command.Run()\n+}\n+\n func filenamesOrDefault(filenames []string) []string {\n \tif len(filenames) == 0 {\n \t\treturn []string{\".env\"}\n",
+  "diffTruncated": false,
+  "tree": [
+    ".gitignore",
+    "LICENCE",
+    "README.md",
+    "autoload/autoload.go",
+    "cmd/cmd.go",
+    "fixtures/equals.env",
+    "fixtures/exported.env",
+    "fixtures/plain.env",
+    "fixtures/quoted.env",
+    "godotenv.go",
+    "godotenv_test.go",
+    "wercker.yml"
+  ],
+  "explanation": {
+    "what": "PR #6 をマージ。新しいコマンドラインツールとして cmd/cmd.go(main パッケージ)を追加し、`godotenv [-f ENV_FILE_PATHS] COMMAND_ARGS` の形式で .env を読み込んでから任意のコマンドを子プロセスとして実行できるようにした。ライブラリ側には godotenv.go に新しい公開関数 `Exec(filenames []string, cmd string, cmdArgs []string) error` を追加し、内部で Load を呼んでから os/exec でコマンドを実行し、標準入出力・標準エラーをそのまま接続する。",
+    "why": "コミットメッセージ「Add a bin command」の通り、それまで godotenv は Go コードに import して使うライブラリでしかなかったが、シェルから直接 `.env` を読み込んで任意のプロセスを起動できる CLI があれば、Go を書かない用途(他言語のプロセス起動やシェルスクリプトなど)でも使えるようになる。dotenv 系ツール(Ruby版のforemanなど)でよく見られる「env をセットしてコマンドを実行する」パターンをそのまま Go 版でも提供したものと考えられる。",
+    "highlights": [
+      { "file": "cmd/cmd.go", "note": "flag パッケージで `-f`/`-h` を定義し、残りの引数をサブコマンドとして godotenv.Exec に渡す最小限の CLI 実装。" },
+      { "file": "godotenv.go", "note": "新関数 Exec が Load → os/exec.Command → Stdin/Stdout/Stderr の接続 → Run() という一連の流れをカプセル化している。" }
+    ],
+    "langNotes": [
+      { "topic": "cmd/ ディレクトリ配置", "note": "Go のプロジェクトでは、ライブラリ本体(ここでは godotenv パッケージ)と実行可能バイナリを分けるために `cmd/<バイナリ名>/main.go` という配置が広く使われる。このコミット時点ではまだ `cmd/cmd.go` という暫定的な置き場所になっている。" },
+      { "topic": "flag パッケージ", "note": "標準ライブラリ flag はコマンドライン引数を解析するための最小限の仕組み。`flag.BoolVar`/`flag.StringVar` でオプション変数を宣言し、`flag.Parse()` 後に `flag.Args()` でオプション以外の残り引数を取得する、という定型的な使い方をしている。" },
+      { "topic": "os/exec", "note": "os/exec パッケージの Command は子プロセスを起動するための標準的な API。Stdin/Stdout/Stderr フィールドに os.Stdin などを代入してから Run() を呼ぶと、子プロセスの入出力を親プロセスにそのまま繋げられる。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

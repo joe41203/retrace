@@ -1,0 +1,52 @@
+{
+  "seq": 4,
+  "sha": "d8dfdb69b3f6ebd22f2197facb601cbb7632ad64",
+  "parents": [
+    "973cf53008332ef58d44121143d3ef29758c3352"
+  ],
+  "author": {
+    "name": "John Barton (joho)",
+    "email": "jrbarton@gmail.com",
+    "date": "2013-07-30T17:48:37+10:00"
+  },
+  "message": "Extract a test helper",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 16,
+    "deletions": 12
+  },
+  "files": [
+    {
+      "path": "godotenv_test.go",
+      "status": "M",
+      "additions": 16,
+      "deletions": 12,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/godotenv_test.go b/godotenv_test.go\nindex 72f2b28..d51b382 100644\n--- a/godotenv_test.go\n+++ b/godotenv_test.go\n@@ -5,6 +5,21 @@ import (\n \t\"testing\"\n )\n \n+func loadEnvAndCompareValues(t *testing.T, envFileName string, expectedValues map[string]string) {\n+\terr := Load(envFileName)\n+\tif err != nil {\n+\t\tt.Fatalf(\"Error loading %v\", envFileName)\n+\t}\n+\n+\tfor k := range expectedValues {\n+\t\tenvValue := os.Getenv(k)\n+\t\tv := expectedValues[k]\n+\t\tif envValue != v {\n+\t\t\tt.Errorf(\"Mismatch for key '%v': expected '%v' got '%v'\", k, v, envValue)\n+\t\t}\n+\t}\n+}\n+\n func TestLoadFileNotFound(t *testing.T) {\n \terr := Load(\"somefilethatwillneverexistever.env\")\n \tif err == nil {\n@@ -14,11 +29,6 @@ func TestLoadFileNotFound(t *testing.T) {\n \n func TestLoadPlainEnv(t *testing.T) {\n \tenvFileName := \"fixtures/plain.env\"\n-\terr := Load(envFileName)\n-\tif err != nil {\n-\t\tt.Fatalf(\"Error loading %v\", envFileName)\n-\t}\n-\n \tplainValues := map[string]string{\n \t\t\"OPTION_A\": \"1\",\n \t\t\"OPTION_B\": \"2\",\n@@ -27,11 +37,5 @@ func TestLoadPlainEnv(t *testing.T) {\n \t\t\"OPTION_E\": \"5\",\n \t}\n \n-\tfor k := range plainValues {\n-\t\tenvValue := os.Getenv(k)\n-\t\tv := plainValues[k]\n-\t\tif envValue != v {\n-\t\t\tt.Errorf(\"Mismatch for key '%v': expected '%v' got '%v'\", k, v, envValue)\n-\t\t}\n-\t}\n+\tloadEnvAndCompareValues(t, envFileName, plainValues)\n }\n",
+  "diffTruncated": false,
+  "tree": [
+    ".gitignore",
+    "fixtures/exported.env",
+    "fixtures/plain.env",
+    "fixtures/quoted.env",
+    "godotenv.go",
+    "godotenv_test.go"
+  ],
+  "explanation": {
+    "what": "TestLoadPlainEnv 内にインライン展開されていた Load 呼び出しと値検証のロジックを loadEnvAndCompareValues というテストヘルパー関数に抽出した。TestLoadPlainEnv 自体は expectedValues マップを作って loadEnvAndCompareValues を呼ぶだけの短い形になった。godotenv.go 側の変更はない。",
+    "why": "おそらく、このあと quoted.env や exported.env 向けのテストケースを追加していく前に、Load 実行と値比較という繰り返しになる部分を先に共通化しておく整理と考えられる。テストのみの変更で実装(godotenv.go)は変わっていないため、振る舞いに影響しないリファクタリングである。",
+    "highlights": [
+      {"file": "godotenv_test.go", "note": "loadEnvAndCompareValues への抽出で、今後のテストケース追加が1行のマップ定義だけで済むようになった"}
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "inferred",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

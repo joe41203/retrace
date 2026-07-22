@@ -1,0 +1,75 @@
+{
+  "seq": 59,
+  "sha": "144189c1ed2bf69438627841c6d580cb4c074ffa",
+  "parents": [
+    "9739509beaf969082c261d8c9a996f18852bc116",
+    "3dd2dbe832c5bf3f32b969aa3e3e3ebbc9dcc40d"
+  ],
+  "author": {
+    "name": "John Barton",
+    "email": "jrbarton@gmail.com",
+    "date": "2017-09-18T16:32:10+10:00"
+  },
+  "message": "Merge pull request #42 from alexquick/feature-sorted-output\n\nSort output of Marshal/Write",
+  "pr": {
+    "number": 42,
+    "title": "Sort output of Marshal/Write",
+    "body": "The order of lines in `Marshal`'d godotenv files is randomized by `Map` iteration. That's not ideal for callers who may be committing the results or relying on them to be consistent.\r\n\r\nWhat do you think of sorting the lines so that they have a predictable order?\r\n",
+    "url": "https://github.com/joho/godotenv/pull/42"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 9,
+    "deletions": 4
+  },
+  "files": [
+    {
+      "path": "godotenv.go",
+      "status": "M",
+      "additions": 2,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "godotenv_test.go",
+      "status": "M",
+      "additions": 7,
+      "deletions": 4,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/godotenv.go b/godotenv.go\nindex 2710572..48ae78c 100644\n--- a/godotenv.go\n+++ b/godotenv.go\n@@ -21,6 +21,7 @@ import (\n \t\"os\"\n \t\"os/exec\"\n \t\"regexp\"\n+\t\"sort\"\n \t\"strings\"\n )\n \n@@ -165,6 +166,7 @@ func Marshal(envMap map[string]string) (string, error) {\n \tfor k, v := range envMap {\n \t\tlines = append(lines, fmt.Sprintf(`%s=\"%s\"`, k, doubleQuoteEscape(v)))\n \t}\n+\tsort.Strings(lines)\n \treturn strings.Join(lines, \"\\n\"), nil\n }\n \ndiff --git a/godotenv_test.go b/godotenv_test.go\nindex 47b0c35..91f4363 100644\n--- a/godotenv_test.go\n+++ b/godotenv_test.go\n@@ -348,23 +348,26 @@ func TestWrite(t *testing.T) {\n \twriteAndCompare(`key=va'lu'e`, `key=\"va'lu'e\"`)\n \t// newlines, backslashes, and some other special chars are escaped\n \twriteAndCompare(`foo=\"$ba\\n\\r\\\\r!\"`, `foo=\"\\$ba\\n\\r\\\\r\\!\"`)\n+\t// lines should be sorted\n+\twriteAndCompare(\"foo=bar\\nbaz=buzz\", \"baz=\\\"buzz\\\"\\nfoo=\\\"bar\\\"\")\n+\n }\n \n func TestRoundtrip(t *testing.T) {\n-\tfixtures := []string{\"equals.env\", \"exported.env\", \"invalid1.env\", \"plain.env\", \"quoted.env\"}\n+\tfixtures := []string{\"equals.env\", \"exported.env\", \"plain.env\", \"quoted.env\"}\n \tfor _, fixture := range fixtures {\n \t\tfixtureFilename := fmt.Sprintf(\"fixtures/%s\", fixture)\n \t\tenv, err := readFile(fixtureFilename)\n \t\tif err != nil {\n-\t\t\tcontinue\n+\t\t\tt.Errorf(\"Expected '%s' to read without error (%v)\", fixtureFilename, err)\n \t\t}\n \t\trep, err := Marshal(env)\n \t\tif err != nil {\n-\t\t\tcontinue\n+\t\t\tt.Errorf(\"Expected '%s' to Marshal (%v)\", fixtureFilename, err)\n \t\t}\n \t\troundtripped, err := Unmarshal(rep)\n \t\tif err != nil {\n-\t\t\tcontinue\n+\t\t\tt.Errorf(\"Expected '%s' to Mashal and Unmarshal (%v)\", fixtureFilename, err)\n \t\t}\n \t\tif !reflect.DeepEqual(env, roundtripped) {\n \t\t\tt.Errorf(\"Expected '%s' to roundtrip as '%v', got '%v' instead\", fixtureFilename, env, roundtripped)\n",
+  "diffTruncated": false,
+  "tree": [
+    ".gitignore",
+    ".travis.yml",
+    "LICENCE",
+    "README.md",
+    "autoload/autoload.go",
+    "cmd/godotenv/cmd.go",
+    "fixtures/equals.env",
+    "fixtures/exported.env",
+    "fixtures/invalid1.env",
+    "fixtures/plain.env",
+    "fixtures/quoted.env",
+    "godotenv.go",
+    "godotenv_test.go"
+  ],
+  "explanation": {
+    "what": "Marshal 内で `KEY=\"VALUE\"` の行を組み立てたあと、`strings.Join` する前に `sort.Strings(lines)` を挟んでアルファベット順にソートするようにした。TestWrite にソート順を検証するケースを追加し、TestRoundtrip では以前 fixture の読み込みエラーを握りつぶしていた `continue` を `t.Errorf` に変更してテストを厳格化している(あわせて invalid1.env を対象から除外)。",
+    "why": "PR body の通り、Go の map のイテレーション順序は毎回ランダムであるため、Marshal が出力する行の順序も呼び出すたびに変わってしまう。書き出した .env ファイルを git にコミットしたり他の処理が結果に依存したりする利用者にとって、出力が非決定的なのは扱いにくいため、ソートして順序を安定させた。",
+    "highlights": [
+      { "file": "godotenv.go", "note": "sort.Strings(lines) の1行追加でMarshalの出力順を安定化" },
+      { "file": "godotenv_test.go", "note": "ソート順の検証テストと、エラーを握りつぶしていたcontinueをt.Errorfに変更した箇所" }
+    ],
+    "langNotes": [
+      { "topic": "map のイテレーション順序とソート出力", "note": "Go の map 型は for-range で回すたびに要素の順序が保証されない(意図的にランダム化されている)。決定的な出力が必要な場合は、本コミットのように一度 slice に集めてから sort パッケージで明示的にソートするのが定石。" }
+    ],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [{ "type": "pr", "number": 42, "url": "https://github.com/joho/godotenv/pull/42" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

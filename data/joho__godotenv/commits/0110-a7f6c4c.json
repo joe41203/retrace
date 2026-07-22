@@ -1,0 +1,104 @@
+{
+  "seq": 110,
+  "sha": "a7f6c4c5837ac4174f7ff176a2f2754859c30014",
+  "parents": [
+    "32e64fa834a9f5fcfe7506c2c603d6535da7eb83"
+  ],
+  "author": {
+    "name": "Andrey Novikov",
+    "email": "envek@envek.name",
+    "date": "2024-11-01T07:24:06+09:00"
+  },
+  "message": "Re-add global env variable substitution (#227)\n\nCo-authored-by: Stanislau Arsoba <sarsoba@klika-tech.com>",
+  "pr": {
+    "number": 227,
+    "title": "Re-add global env variable substitution",
+    "body": "Re-add behavior that was first introduced in #54 and then removed in #58.\r\n\r\nThis behavior is present in Ruby dotenv (see [spec/dotenv/parser_spec.rb#L66-L69](https://github.com/bkeepers/dotenv/blob/c9ecfa4e5598593dbadcf6c610cf5d8a9ed0bec1/spec/dotenv/parser_spec.rb#L66-L69))\r\n\r\nThis pull request is basically a rebase of #72 on top of current main branch (with parser rewritten).\r\n\r\nSee #74 for discussion.\r\n\r\nCloses #72\r\nCloses #74\r\nCloses #88\r\nCloses #102\r\nCloses #103 \r\nCloses #135\r\nCloses #149\r\n\r\n",
+    "url": "https://github.com/joho/godotenv/pull/227"
+  },
+  "linkedIssues": [
+    {
+      "number": 74,
+      "title": "Variable substitution using real environment variable fallbacks",
+      "body": "https://github.com/joho/godotenv/pull/54 introduced a change that meant substitution of variables from the real environment (i.e. not that derived from `.env` itself) was possible.\r\n\r\nIt looks like https://github.com/joho/godotenv/pull/58 removed this behaviour, in particular the deletion of `os.LookupEnv` - https://github.com/joho/godotenv/pull/58/files#diff-224f281bd0a4cfe0e7dcb394e8c7a585L299. Unfortunately it isn't clear from the PR if that was intended. Any chance someone can clarify?",
+      "url": "https://github.com/joho/godotenv/issues/74"
+    },
+    {
+      "number": 102,
+      "title": "Variables expansion only using values from the file, not os.Getenv",
+      "body": "Is there a particular reason for NOT falling back to os.Getenv, when a variable to be expanded within another variable in the file DO NOT exist in that file?\r\n\r\nI saw the history on issues and the PR implementing the current expansion logic, and I guess this should be following the Ruby lib behaviour - which I am not familiar with.\r\n\r\nSo I would like to know if that makes any sense, and we could think about adding such feature to use pre-existing environment variables, or not.\r\n\r\nBTW: thanks for the package, very helpful!",
+      "url": "https://github.com/joho/godotenv/issues/102"
+    }
+  ],
+  "stats": {
+    "filesChanged": 3,
+    "additions": 15,
+    "deletions": 1
+  },
+  "files": [
+    {
+      "path": "fixtures/substitutions.env",
+      "status": "M",
+      "additions": 1,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "godotenv_test.go",
+      "status": "M",
+      "additions": 7,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "parser.go",
+      "status": "M",
+      "additions": 7,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/fixtures/substitutions.env b/fixtures/substitutions.env\nindex 44337a9..c677214 100644\n--- a/fixtures/substitutions.env\n+++ b/fixtures/substitutions.env\n@@ -3,3 +3,4 @@ OPTION_B=${OPTION_A}\n OPTION_C=$OPTION_B\n OPTION_D=${OPTION_A}${OPTION_B}\n OPTION_E=${OPTION_NOT_DEFINED}\n+OPTION_F=${GLOBAL_OPTION}\ndiff --git a/godotenv_test.go b/godotenv_test.go\nindex c6d7e54..c6b5725 100644\n--- a/godotenv_test.go\n+++ b/godotenv_test.go\n@@ -207,15 +207,21 @@ func TestLoadQuotedEnv(t *testing.T) {\n \n func TestSubstitutions(t *testing.T) {\n \tenvFileName := \"fixtures/substitutions.env\"\n+\n+\tpresets := map[string]string{\n+\t\t\"GLOBAL_OPTION\": \"global\",\n+\t}\n+\n \texpectedValues := map[string]string{\n \t\t\"OPTION_A\": \"1\",\n \t\t\"OPTION_B\": \"1\",\n \t\t\"OPTION_C\": \"1\",\n \t\t\"OPTION_D\": \"11\",\n \t\t\"OPTION_E\": \"\",\n+\t\t\"OPTION_F\": \"global\",\n \t}\n \n-\tloadEnvAndCompareValues(t, Load, envFileName, expectedValues, noopPresets)\n+\tloadEnvAndCompareValues(t, Load, envFileName, expectedValues, presets)\n }\n \n func TestExpanding(t *testing.T) {\ndiff --git a/parser.go b/parser.go\nindex cc709af..098f05d 100644\n--- a/parser.go\n+++ b/parser.go\n@@ -4,6 +4,7 @@ import (\n \t\"bytes\"\n \t\"errors\"\n \t\"fmt\"\n+\t\"os\"\n \t\"regexp\"\n \t\"strings\"\n \t\"unicode\"\n@@ -264,6 +265,12 @@ func expandVariables(v string, m map[string]string) string {\n \t\tif submatch[1] == \"\\\\\" || submatch[2] == \"(\" {\n \t\t\treturn submatch[0][1:]\n \t\t} else if submatch[4] != \"\" {\n+\t\t\tif val, ok := m[submatch[4]]; ok {\n+\t\t\t\treturn val\n+\t\t\t}\n+\t\t\tif val, ok := os.LookupEnv(submatch[4]); ok {\n+\t\t\t\treturn val\n+\t\t\t}\n \t\t\treturn m[submatch[4]]\n \t\t}\n \t\treturn s\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/dependabot.yml",
+    ".github/workflows/ci.yml",
+    ".github/workflows/codeql-analysis.yml",
+    ".github/workflows/release.yml",
+    ".gitignore",
+    "LICENCE",
+    "README.md",
+    "autoload/autoload.go",
+    "cmd/godotenv/cmd.go",
+    "fixtures/comments.env",
+    "fixtures/equals.env",
+    "fixtures/exported.env",
+    "fixtures/invalid1.env",
+    "fixtures/plain.env",
+    "fixtures/quoted.env",
+    "fixtures/substitutions.env",
+    "go.mod",
+    "godotenv.go",
+    "godotenv_test.go",
+    "parser.go"
+  ],
+  "explanation": {
+    "what": "parser.go の expandVariables 内で、変数展開時にまず .env ファイル内のマップ m を見て、見つからない場合は os.LookupEnv でOS側の実環境変数にフォールバックするようにした。fixtures/substitutions.env に `OPTION_F=${GLOBAL_OPTION}` というOS環境変数を参照するケースを追加し、テストでは GLOBAL_OPTION をpresetsとして与えて展開結果を検証している。",
+    "why": "PR本文とlinkedIssue #74 によれば、この「.envに無ければ実環境変数にフォールバックする」動作はもともとPR #54で導入されたが、その後PR #58で(意図が明確でないまま)削除されてしまっていた。Ruby版dotenvにも存在する挙動であり、複数のissue(#74, #102ほか)からの要望を受けて再度実装し直したのがこのコミット。",
+    "highlights": [
+      { "file": "parser.go", "note": "m[submatch[4]] だけで探していたのを、まず m を見てから os.LookupEnv にフォールバックする2段構えに変更している" }
+    ],
+    "langNotes": [
+      { "topic": "グローバル変数展開(os.LookupEnv へのフォールバック)", "note": "${VAR} 形式の展開で、.envファイル内で定義されたVARが優先されるが、そこに無い場合はos.LookupEnvでプロセスの実際の環境変数を参照する。os.LookupEnvはos.Getenvと違い、変数が「存在するが空文字列」なのか「存在しない」のかを2つ目の戻り値(bool)で区別できる。" }
+    ],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [
+      { "type": "pr", "number": 227, "url": "https://github.com/joho/godotenv/pull/227" },
+      { "type": "issue", "number": 74, "url": "https://github.com/joho/godotenv/issues/74" },
+      { "type": "issue", "number": 102, "url": "https://github.com/joho/godotenv/issues/102" }
+    ],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

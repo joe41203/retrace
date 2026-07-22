@@ -1,0 +1,57 @@
+{
+  "seq": 27,
+  "sha": "42920bbe5dc477fc7a5f7f11b928d8a5fdbb6f54",
+  "parents": [
+    "85e631994ebf9271cd968727787c3482772f037f"
+  ],
+  "author": {
+    "name": "John Barton (joho)",
+    "email": "jrbarton@gmail.com",
+    "date": "2013-07-31T14:54:21+10:00"
+  },
+  "message": "Write up something for \"go doc\"",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 26,
+    "deletions": 0
+  },
+  "files": [
+    {
+      "path": "godotenv.go",
+      "status": "M",
+      "additions": 26,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/godotenv.go b/godotenv.go\nindex 91151fe..73f82ab 100644\n--- a/godotenv.go\n+++ b/godotenv.go\n@@ -1,3 +1,18 @@\n+/*\n+A go port of the ruby dotenv library (https://github.com/bkeepers/dotenv)\n+\n+Examples/readme can be found on the github page at https://github.com/joho/godotenv\n+\n+The TL;DR is that you make a .env file that looks something like\n+\n+\t\tSOME_ENV_VAR=somevalue\n+\n+and then in your go code you can call\n+\n+\t\tgodotenv.Load()\n+\n+and all the env vars declared in .env will be avaiable through os.Getenv(\"SOME_ENV_VAR\")\n+*/\n package godotenv\n \n import (\n@@ -8,6 +23,17 @@ import (\n \t\"strings\"\n )\n \n+/*\n+\tCall this function as close as possible to the start of your program (ideally in main)\n+\n+\tIf you call Load without any args it will default to loading .env in the current path\n+\n+\tYou can otherwise tell it which files to load (there can be more than one) like\n+\n+\t\tgodotenv.Load(\"fileone\", \"filetwo\")\n+\n+\tIt's important to note that it WILL NOT OVERRIDE an env variable that already exists - consider the .env file to set dev vars or sensible defaults\n+*/\n func Load(filenames ...string) (err error) {\n \tif len(filenames) == 0 {\n \t\tfilenames = []string{\".env\"}\n",
+  "diffTruncated": false,
+  "tree": [
+    ".gitignore",
+    "LICENCE",
+    "README.md",
+    "fixtures/exported.env",
+    "fixtures/plain.env",
+    "fixtures/quoted.env",
+    "godotenv.go",
+    "godotenv_test.go",
+    "wercker.yml"
+  ],
+  "explanation": {
+    "what": "godotenv.goの`package godotenv`宣言の直前にパッケージ全体の説明コメントを、Load関数の直前に使い方を説明する関数コメントを追加した。内容はREADMEとほぼ同じで、.envファイルの書き方とLoad()呼び出しの例、複数ファイル指定の方法、既存ENVを上書きしない旨を記している。",
+    "why": "コミットメッセージ「Write up something for \"go doc\"」の通り、Goの`go doc`コマンド(godoc)でパッケージや関数の説明が表示されるように、コード中にドキュメンテーションコメントを整備する目的。README側の説明だけでなく、コードから直接読めるドキュメントを用意する狙い。",
+    "highlights": [
+      { "file": "godotenv.go", "note": "package宣言直前のパッケージコメントとLoad関数直前の関数コメント。godocに表示される部分" }
+    ],
+    "langNotes": [
+      { "topic": "godoc / go doc コメント慣習", "note": "Goでは`package`宣言の直前に書いたコメントがパッケージ全体の説明として、関数・型の直前に書いたコメントがその要素の説明として`go doc`コマンドやpkg.go.devに表示される。特別なタグは不要で、単なる`//`や`/* */`コメントの位置だけで規約が成立するのがGoの特徴。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

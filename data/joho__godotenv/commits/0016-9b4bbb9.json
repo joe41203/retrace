@@ -1,0 +1,61 @@
+{
+  "seq": 16,
+  "sha": "9b4bbb98c319c668cbbeb4df8b27f4c301ad714c",
+  "parents": [
+    "9001b882504d2b1f4a46940cca3cad15190a6cea"
+  ],
+  "author": {
+    "name": "John Barton (joho)",
+    "email": "jrbarton@gmail.com",
+    "date": "2013-07-31T12:57:44+10:00"
+  },
+  "message": "Clear the env at the start of each integration test.",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 34,
+    "deletions": 2
+  },
+  "files": [
+    {
+      "path": "godotenv.go",
+      "status": "M",
+      "additions": 2,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "godotenv_test.go",
+      "status": "M",
+      "additions": 32,
+      "deletions": 2,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/godotenv.go b/godotenv.go\nindex 2a3c4fc..18430cc 100644\n--- a/godotenv.go\n+++ b/godotenv.go\n@@ -42,8 +42,10 @@ func loadFile(filename string) (err error) {\n \t}\n \n \tfor _, fullLine := range lines {\n+\t\t// fmt.Printf(\"Line: %v\\n\", fullLine)\n \t\tif !isIgnoredLine(fullLine) {\n \t\t\tkey, value, err := parseLine(fullLine)\n+\t\t\t// fmt.Printf(\"Key: %v Value: %v\\n\", key, value)\n \n \t\t\tif err == nil {\n \t\t\t\tos.Setenv(key, value)\ndiff --git a/godotenv_test.go b/godotenv_test.go\nindex 933595c..5d3d328 100644\n--- a/godotenv_test.go\n+++ b/godotenv_test.go\n@@ -13,6 +13,9 @@ func parseAndCompare(t *testing.T, rawEnvLine string, expectedKey string, expect\n }\n \n func loadEnvAndCompareValues(t *testing.T, envFileName string, expectedValues map[string]string) {\n+\t// first up, clear the env\n+\tos.Clearenv()\n+\n \terr := Load(envFileName)\n \tif err != nil {\n \t\tt.Fatalf(\"Error loading %v\", envFileName)\n@@ -36,7 +39,7 @@ func TestLoadFileNotFound(t *testing.T) {\n \n func TestLoadPlainEnv(t *testing.T) {\n \tenvFileName := \"fixtures/plain.env\"\n-\tplainValues := map[string]string{\n+\texpectedValues := map[string]string{\n \t\t\"OPTION_A\": \"1\",\n \t\t\"OPTION_B\": \"2\",\n \t\t\"OPTION_C\": \"3\",\n@@ -44,7 +47,33 @@ func TestLoadPlainEnv(t *testing.T) {\n \t\t\"OPTION_E\": \"5\",\n \t}\n \n-\tloadEnvAndCompareValues(t, envFileName, plainValues)\n+\tloadEnvAndCompareValues(t, envFileName, expectedValues)\n+}\n+\n+func TestLoadExportedEnv(t *testing.T) {\n+\tenvFileName := \"fixtures/exported.env\"\n+\texpectedValues := map[string]string{\n+\t\t\"OPTION_A\": \"2\",\n+\t\t\"OPTION_B\": \"\\n\",\n+\t}\n+\n+\tloadEnvAndCompareValues(t, envFileName, expectedValues)\n+}\n+\n+func TestLoadQuotedEnv(t *testing.T) {\n+\tenvFileName := \"fixtures/quoted.env\"\n+\texpectedValues := map[string]string{\n+\t\t\"OPTION_A\": \"1\",\n+\t\t\"OPTION_B\": \"2\",\n+\t\t\"OPTION_C\": \"\",\n+\t\t\"OPTION_D\": \"\\n\",\n+\t\t\"OPTION_E\": \"1\",\n+\t\t\"OPTION_F\": \"2\",\n+\t\t\"OPTION_G\": \"\",\n+\t\t\"OPTION_H\": \"\\n\",\n+\t}\n+\n+\tloadEnvAndCompareValues(t, envFileName, expectedValues)\n }\n \n func TestParsing(t *testing.T) {\n@@ -69,6 +98,7 @@ func TestParsing(t *testing.T) {\n \n \t// parses export keyword\n \tparseAndCompare(t, \"export OPTION_A=2\", \"OPTION_A\", \"2\")\n+\tparseAndCompare(t, \"export OPTION_B='\\n'\", \"OPTION_B\", \"\\n\")\n \n \t// it 'expands newlines in quoted strings' do\n \t// expect(env('FOO=\"bar\\nbaz\"')).to eql('FOO' => \"bar\\nbaz\")\n",
+  "diffTruncated": false,
+  "tree": [
+    ".gitignore",
+    "fixtures/exported.env",
+    "fixtures/plain.env",
+    "fixtures/quoted.env",
+    "godotenv.go",
+    "godotenv_test.go"
+  ],
+  "explanation": {
+    "what": "loadEnvAndCompareValuesヘルパーの冒頭でos.Clearenv()を呼び、統合テスト同士が環境変数を汚染し合わないようにした。合わせてTestLoadExportedEnvとTestLoadQuotedEnvを新設し、fixtures/exported.envとfixtures/quoted.envをLoad()で読み込んだ結果を期待値マップと突き合わせている。godotenv.go側にはデバッグ用のfmt.Printfがコメントアウトで残された。",
+    "why": "コミットメッセージ\"Clear the env at the start of each integration test.\"の通り、Load()はos.Setenvで実プロセスの環境変数を書き換えるため、テスト実行順によっては前のテストの値が残って別テストの期待値と食い違う恐れがある。そのためテスト間の独立性を確保する目的でクリア処理を先頭に入れたと読める。",
+    "highlights": [
+      { "file": "godotenv_test.go", "note": "TestLoadQuotedEnvはfixtures/quoted.envを使い、クォート・改行・空値など複数パターンを一度に検証する" }
+    ],
+    "langNotes": [
+      { "topic": "fixtureテスト", "note": "Goの標準的なテーブル駆動テストではなく、`fixtures/*.env`という実ファイルを読み込んで期待値マップと突き合わせる方式。この後のコミット(seq17)でfixture網羅がさらに進む。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

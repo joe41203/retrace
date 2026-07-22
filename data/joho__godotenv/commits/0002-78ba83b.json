@@ -1,0 +1,84 @@
+{
+  "seq": 2,
+  "sha": "78ba83b776f06f652fb3f1ee7d1044199d3c5f86",
+  "parents": [
+    "ccd8bf5602a5846ca9800623861ad6e22369a5c3"
+  ],
+  "author": {
+    "name": "John Barton (joho)",
+    "email": "jrbarton@gmail.com",
+    "date": "2013-07-30T11:46:52+10:00"
+  },
+  "message": "First failing tests extracted from dotenv",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 5,
+    "additions": 50,
+    "deletions": 0
+  },
+  "files": [
+    {
+      "path": "fixtures/exported.env",
+      "status": "A",
+      "additions": 2,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "fixtures/plain.env",
+      "status": "A",
+      "additions": 5,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "fixtures/quoted.env",
+      "status": "A",
+      "additions": 8,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "godotenv.go",
+      "status": "A",
+      "additions": 5,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "godotenv_test.go",
+      "status": "A",
+      "additions": 30,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/fixtures/exported.env b/fixtures/exported.env\nnew file mode 100644\nindex 0000000..5821377\n--- /dev/null\n+++ b/fixtures/exported.env\n@@ -0,0 +1,2 @@\n+export OPTION_A=2\n+export OPTION_B='\\n'\ndiff --git a/fixtures/plain.env b/fixtures/plain.env\nnew file mode 100644\nindex 0000000..c983b06\n--- /dev/null\n+++ b/fixtures/plain.env\n@@ -0,0 +1,5 @@\n+OPTION_A=1\n+OPTION_B=2\n+OPTION_C= 3\n+OPTION_D =4\n+OPTION_E = 5\ndiff --git a/fixtures/quoted.env b/fixtures/quoted.env\nnew file mode 100644\nindex 0000000..a03ce24\n--- /dev/null\n+++ b/fixtures/quoted.env\n@@ -0,0 +1,8 @@\n+OPTION_A='1'\n+OPTION_B='2'\n+OPTION_C=''\n+OPTION_D='\\n'\n+OPTION_E=\"1\"\n+OPTION_F=\"2\"\n+OPTION_G=\"\"\n+OPTION_H=\"\\n\"\ndiff --git a/godotenv.go b/godotenv.go\nnew file mode 100644\nindex 0000000..d667e7f\n--- /dev/null\n+++ b/godotenv.go\n@@ -0,0 +1,5 @@\n+package godotenv\n+\n+func Load(filenames ...string) (err error) {\n+\treturn\n+}\ndiff --git a/godotenv_test.go b/godotenv_test.go\nnew file mode 100644\nindex 0000000..d698b9a\n--- /dev/null\n+++ b/godotenv_test.go\n@@ -0,0 +1,30 @@\n+package godotenv\n+\n+import (\n+\t\"os\"\n+\t\"testing\"\n+)\n+\n+func TestLoadPlainEnv(t *testing.T) {\n+\tenvFileName := \"fixtures/plain.env\"\n+\terr := Load(envFileName)\n+\tif err != nil {\n+\t\tt.Fatalf(\"Error loading %v\", envFileName)\n+\t}\n+\n+\tplainValues := map[string]string{\n+\t\t\"OPTION_A\": \"1\",\n+\t\t\"OPTION_B\": \"2\",\n+\t\t\"OPTION_C\": \"3\",\n+\t\t\"OPTION_D\": \"4\",\n+\t\t\"OPTION_E\": \"5\",\n+\t}\n+\n+\tfor k := range plainValues {\n+\t\tenvValue := os.Getenv(k)\n+\t\tv := plainValues[k]\n+\t\tif envValue != v {\n+\t\t\tt.Errorf(\"Mismatch for key '%v': expected '%v' got '%v'\", k, v, envValue)\n+\t\t}\n+\t}\n+}\n",
+  "diffTruncated": false,
+  "tree": [
+    ".gitignore",
+    "fixtures/exported.env",
+    "fixtures/plain.env",
+    "fixtures/quoted.env",
+    "godotenv.go",
+    "godotenv_test.go"
+  ],
+  "explanation": {
+    "what": "godotenv.go に空実装の Load(filenames ...string) (err error) を追加し、godotenv_test.go に TestLoadPlainEnv を書いた。あわせて Ruby の dotenv 由来と思われる fixtures/plain.env、fixtures/quoted.env、fixtures/exported.env の3種のテスト用 .env ファイルを追加した。Load はまだ何もせず return するだけなので、テストは環境変数が設定されず失敗する状態(赤)になる。",
+    "why": "コミット件名の通り、実装より先に失敗するテストを書くところから始めている。おそらく Ruby 版 dotenv の挙動(プレーンな KEY=VALUE、前後の空白、シングル/ダブルクォート、export 付き)をそのまま fixture として移植し、Go 版が満たすべき仕様を先にテストとして固定する狙いだと考えられる。",
+    "highlights": [
+      {"file": "godotenv_test.go", "note": "os.Getenv で実際の環境変数を検証する TestLoadPlainEnv。この時点では Load が空実装のため失敗する"},
+      {"file": "fixtures/plain.env", "note": "OPTION_C/D/E で = の前後にスペースを混ぜ、トリム処理が必要になることを先に示している"}
+    ],
+    "langNotes": [
+      {"topic": "TDD の red-green", "note": "先にテストを書いて失敗(red)させ、後から実装して成功(green)させる進め方。このコミットは red の状態を作った段階で、次のコミットで green にする流れになっている。"},
+      {"topic": "os.Setenv / os.Getenv", "note": "Go 標準ライブラリ os パッケージのプロセス環境変数 API。Load は内部で os.Setenv を呼ぶ想定で、テストは os.Getenv で読み戻して検証する。"}
+    ],
+    "diagram": null,
+    "evidence": "inferred",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

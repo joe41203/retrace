@@ -1,0 +1,64 @@
+{
+  "seq": 37,
+  "sha": "8350eb932e01726d1e195d2faa19b21d1ea16feb",
+  "parents": [
+    "68b1921266b95895e9d787876f4c3506b7a4a39b"
+  ],
+  "author": {
+    "name": "John Barton (joho)",
+    "email": "jrbarton@gmail.com",
+    "date": "2014-07-14T19:36:35+10:00"
+  },
+  "message": "Remove commented out code and go fmt tests.",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 1,
+    "deletions": 3
+  },
+  "files": [
+    {
+      "path": "godotenv.go",
+      "status": "M",
+      "additions": 0,
+      "deletions": 2,
+      "binary": false
+    },
+    {
+      "path": "godotenv_test.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/godotenv.go b/godotenv.go\nindex b811130..6b643f3 100644\n--- a/godotenv.go\n+++ b/godotenv.go\n@@ -88,8 +88,6 @@ func loadFile(filename string) (err error) {\n \n func readFile(filename string) (envMap map[string]string, err error) {\n \tfile, err := os.Open(filename)\n-\n-\t// content, err := ioutil.ReadFile(filename)\n \tif err != nil {\n \t\treturn\n \t}\ndiff --git a/godotenv_test.go b/godotenv_test.go\nindex 705855c..85b012f 100644\n--- a/godotenv_test.go\n+++ b/godotenv_test.go\n@@ -33,7 +33,7 @@ func loadEnvAndCompareValues(t *testing.T, envFileName string, expectedValues ma\n func TestLoadWithNoArgsLoadsDotEnv(t *testing.T) {\n \terr := Load()\n \tpathError := err.(*os.PathError)\n-\tif pathError == nil || pathError.Op != \"open\" || pathError.Path != \".env\"{\n+\tif pathError == nil || pathError.Op != \"open\" || pathError.Path != \".env\" {\n \t\tt.Errorf(\"Didn't try and open .env by default\")\n \t}\n }\n",
+  "diffTruncated": false,
+  "tree": [
+    ".gitignore",
+    "LICENCE",
+    "README.md",
+    "autoload/autoload.go",
+    "fixtures/equals.env",
+    "fixtures/exported.env",
+    "fixtures/plain.env",
+    "fixtures/quoted.env",
+    "godotenv.go",
+    "godotenv_test.go",
+    "wercker.yml"
+  ],
+  "explanation": {
+    "what": "直前の seq36 で残ったコメントアウト済みコード(`// content, err := ioutil.ReadFile(filename)`)を削除し、godotenv_test.go に対して gofmt を実行して1箇所の空白の乱れ(`.env\" {` の間のスペース欠落)を整形した。",
+    "why": "コミットメッセージの通り、bufio.Scanner への切り替えで不要になった旧実装のコメントを掃除し、フォーマットを gofmt の規約に合わせるクリーンアップ。",
+    "highlights": [],
+    "langNotes": [
+      { "topic": "gofmt", "note": "Go では公式フォーマッタ gofmt(または go fmt)でコードの見た目を統一するのが強い慣習になっている。このコミットはその整形を単独で流した結果の差分。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

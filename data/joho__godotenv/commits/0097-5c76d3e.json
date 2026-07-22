@@ -1,0 +1,73 @@
+{
+  "seq": 97,
+  "sha": "5c76d3e02c63f90a1bfae60738bbc24ba16f05c4",
+  "parents": [
+    "85a22371267105132a9ef0393ff91c33ca694f9d"
+  ],
+  "author": {
+    "name": "John Barton",
+    "email": "jb@johnbarton.co",
+    "date": "2022-10-30T12:38:35+11:00"
+  },
+  "message": "Add punctuation to please godoc (#197)\n\nFixes issue reported over at https://github.com/golang/go/issues/55888",
+  "pr": {
+    "number": 197,
+    "title": "Fix godoc formatting",
+    "body": "Fixes issue reported over at https://github.com/golang/go/issues/55888\r\n\r\nSee https://tip.golang.org/doc/comment#headings",
+    "url": "https://github.com/joho/godotenv/pull/197"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 10,
+    "deletions": 10
+  },
+  "files": [
+    {
+      "path": "godotenv.go",
+      "status": "M",
+      "additions": 10,
+      "deletions": 10,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/godotenv.go b/godotenv.go\nindex 975d7bc..6edd15d 100644\n--- a/godotenv.go\n+++ b/godotenv.go\n@@ -30,15 +30,15 @@ const doubleQuoteSpecialChars = \"\\\\\\n\\r\\\"!$`\"\n \n // Load will read your env file(s) and load them into ENV for this process.\n //\n-// Call this function as close as possible to the start of your program (ideally in main)\n+// Call this function as close as possible to the start of your program (ideally in main).\n //\n-// If you call Load without any args it will default to loading .env in the current path\n+// If you call Load without any args it will default to loading .env in the current path.\n //\n-// You can otherwise tell it which files to load (there can be more than one) like\n+// You can otherwise tell it which files to load (there can be more than one) like:\n //\n //\t\tgodotenv.Load(\"fileone\", \"filetwo\")\n //\n-// It's important to note that it WILL NOT OVERRIDE an env variable that already exists - consider the .env file to set dev vars or sensible defaults\n+// It's important to note that it WILL NOT OVERRIDE an env variable that already exists - consider the .env file to set dev vars or sensible defaults.\n func Load(filenames ...string) (err error) {\n \tfilenames = filenamesOrDefault(filenames)\n \n@@ -53,11 +53,11 @@ func Load(filenames ...string) (err error) {\n \n // Overload will read your env file(s) and load them into ENV for this process.\n //\n-// Call this function as close as possible to the start of your program (ideally in main)\n+// Call this function as close as possible to the start of your program (ideally in main).\n //\n-// If you call Overload without any args it will default to loading .env in the current path\n+// If you call Overload without any args it will default to loading .env in the current path.\n //\n-// You can otherwise tell it which files to load (there can be more than one) like\n+// You can otherwise tell it which files to load (there can be more than one) like:\n //\n //\t\tgodotenv.Overload(\"fileone\", \"filetwo\")\n //\n@@ -124,7 +124,7 @@ func Parse(r io.Reader) (envMap map[string]string, err error) {\n \treturn\n }\n \n-//Unmarshal reads an env file from a string, returning a map of keys and values.\n+// Unmarshal reads an env file from a string, returning a map of keys and values.\n func Unmarshal(str string) (envMap map[string]string, err error) {\n \treturn Parse(strings.NewReader(str))\n }\n@@ -132,7 +132,7 @@ func Unmarshal(str string) (envMap map[string]string, err error) {\n // Exec loads env vars from the specified filenames (empty map falls back to default)\n // then executes the cmd specified.\n //\n-// Simply hooks up os.Stdin/err/out to the command and calls Run()\n+// Simply hooks up os.Stdin/err/out to the command and calls Run().\n //\n // If you want more fine grained control over your command it's recommended\n // that you use `Load()` or `Read()` and the `os/exec` package yourself.\n@@ -146,7 +146,7 @@ func Exec(filenames []string, cmd string, cmdArgs []string) error {\n \treturn command.Run()\n }\n \n-// Write serializes the given environment and writes it to a file\n+// Write serializes the given environment and writes it to a file.\n func Write(envMap map[string]string, filename string) error {\n \tcontent, err := Marshal(envMap)\n \tif err != nil {\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/dependabot.yml",
+    ".github/workflows/ci.yml",
+    ".github/workflows/codeql-analysis.yml",
+    ".github/workflows/release.yml",
+    ".gitignore",
+    "LICENCE",
+    "README.md",
+    "autoload/autoload.go",
+    "cmd/godotenv/cmd.go",
+    "fixtures/equals.env",
+    "fixtures/exported.env",
+    "fixtures/invalid1.env",
+    "fixtures/plain.env",
+    "fixtures/quoted.env",
+    "fixtures/substitutions.env",
+    "go.mod",
+    "godotenv.go",
+    "godotenv_test.go"
+  ],
+  "explanation": {
+    "what": "godotenv.go の Load / Overload / Unmarshal / Exec / Write の doc コメントに欠けていた句読点(ピリオド・コロン)を追加し、また `//Unmarshal` のようにスラッシュ直後にスペースがなかった箇所を `// Unmarshal` に修正した。",
+    "why": "PR 本文がリンクする golang/go#55888 の通り、Go 1.19 で刷新された godoc のコメント整形(見出し判定は文末の句読点の有無に影響される)によって、句読点を欠く文が意図しない形式で表示される問題が報告されたため、既存の doc コメントを godoc の新しい記法(https://tip.golang.org/doc/comment#headings)に合わせて修正した。",
+    "highlights": [
+      { "file": "godotenv.go", "note": "Load/Overload/Write 等の doc コメントの文末に句読点を追加" }
+    ],
+    "langNotes": [
+      { "topic": "godoc コメント規約", "note": "Go 1.19 から godoc のコメント解析ルールが整理され、見出し(Headings)や箇条書きの判定に文の区切り方(句読点の有無)が関わるようになった。エクスポートされる識別子の直前コメントはそのまま公開ドキュメントになるため、文法的な体裁が表示崩れに直結する。" }
+    ],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [
+      { "type": "pr", "number": 197, "url": "https://github.com/joho/godotenv/pull/197" }
+    ],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

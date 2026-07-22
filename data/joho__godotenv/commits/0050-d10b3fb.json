@@ -1,0 +1,82 @@
+{
+  "seq": 50,
+  "sha": "d10b3fbe007de7a25e086524ad17597afa3d238b",
+  "parents": [
+    "726cc8b906e3d31c70a9671c90a13716a8d3f50d",
+    "0a959c8d8f3b513915e8776a590170dd6573f828"
+  ],
+  "author": {
+    "name": "John Barton",
+    "email": "jrbarton@gmail.com",
+    "date": "2017-02-22T08:49:41+11:00"
+  },
+  "message": "Merge pull request #24 from joho/setup_travis\n\nMove CI",
+  "pr": {
+    "number": 24,
+    "title": "Move CI",
+    "body": "Move CI over to travis as wercker's dropping their non-docker builds soon.\r\n\r\nAlso added a badge to the appveyor windows build while I was in there.",
+    "url": "https://github.com/joho/godotenv/pull/24"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 3,
+    "additions": 9,
+    "deletions": 2
+  },
+  "files": [
+    {
+      "path": ".travis.yml",
+      "status": "A",
+      "additions": 8,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "README.md",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "wercker.yml",
+      "status": "D",
+      "additions": 0,
+      "deletions": 1,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/.travis.yml b/.travis.yml\nnew file mode 100644\nindex 0000000..df65350\n--- /dev/null\n+++ b/.travis.yml\n@@ -0,0 +1,8 @@\n+language: go\n+\n+go:\n+  - 1.8\n+\n+os:\n+  - linux\n+  - osx\ndiff --git a/README.md b/README.md\nindex 05c47e6..aa6442b 100644\n--- a/README.md\n+++ b/README.md\n@@ -1,4 +1,4 @@\n-# GoDotEnv [![wercker status](https://app.wercker.com/status/507594c2ec7e60f19403a568dfea0f78 \"wercker status\")](https://app.wercker.com/project/bykey/507594c2ec7e60f19403a568dfea0f78)\n+# GoDotEnv [![Build Status](https://travis-ci.org/joho/godotenv.svg?branch=master)](https://travis-ci.org/joho/godotenv) [![Build status](https://ci.appveyor.com/api/projects/status/9v40vnfvvgde64u4?svg=true)](https://ci.appveyor.com/project/joho/godotenv)\n \n A Go (golang) port of the Ruby dotenv project (which loads env vars from a .env file)\n \ndiff --git a/wercker.yml b/wercker.yml\ndeleted file mode 100644\nindex c716ac9..0000000\n--- a/wercker.yml\n+++ /dev/null\n@@ -1 +0,0 @@\n-box: pjvds/golang\n",
+  "diffTruncated": false,
+  "tree": [
+    ".gitignore",
+    ".travis.yml",
+    "LICENCE",
+    "README.md",
+    "autoload/autoload.go",
+    "cmd/godotenv/cmd.go",
+    "fixtures/equals.env",
+    "fixtures/exported.env",
+    "fixtures/invalid1.env",
+    "fixtures/plain.env",
+    "fixtures/quoted.env",
+    "godotenv.go",
+    "godotenv_test.go"
+  ],
+  "explanation": {
+    "what": "wercker.yml を削除して新規に .travis.yml を追加し、CI基盤を wercker から Travis CI へ移行した。Go 1.8 を linux/osx の両方でビルドする設定にし、README.md のバッジも wercker status バッジから Travis CI バッジ + AppVeyor(windows) バッジの2つに置き換えた。",
+    "why": "PR本文に明記されている通り、wercker が Docker を使わないビルドのサポートを打ち切る予定だったため、CI を Travis に移行する必要があった。ついでに以前から存在していた AppVeyor(windows 向け)のバッジも README に追加している。",
+    "highlights": [
+      { "file": ".travis.yml", "note": "Go 1.8 を linux と osx で走らせる最小構成のTravis設定" },
+      { "file": "README.md", "note": "バッジが wercker から travis-ci.org + appveyor の2本立てに変わり、CI基盤の移行が可視化されている" }
+    ],
+    "langNotes": [
+      { "topic": "Travis CI (.travis.yml)", "note": "`.travis.yml` は Travis CI にビルド設定を伝える YAML ファイルで、`language: go` と `go:` キーでテスト対象の Go バージョンを、`os:` キーで実行OSを指定する。当時の Go OSS プロジェクトでは wercker や Travis が定番の CI サービスだった。" }
+    ],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [{ "type": "pr", "number": 24, "url": "https://github.com/joho/godotenv/pull/24" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

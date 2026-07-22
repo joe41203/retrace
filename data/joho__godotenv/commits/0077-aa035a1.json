@@ -1,0 +1,67 @@
+{
+  "seq": 77,
+  "sha": "aa035a1808759a133b9e01922487197e2c70c782",
+  "parents": [
+    "23296b91aa473eb89d3ef2227622297b786cfad5"
+  ],
+  "author": {
+    "name": "John Barton",
+    "email": "jb@johnbarton.co",
+    "date": "2020-11-11T12:54:49+11:00"
+  },
+  "message": "Non amd tests (#122)\n\n* Add non-amd64 tests\n\n* Try shifting env around\n\n* Update input to match action\n\n* Include git\n\n* Comment out IBM Z for now and quieten apt-get",
+  "pr": {
+    "number": 122,
+    "title": "Non amd tests",
+    "body": "#120 Added testing for the powerpc architecture for _reasons_\r\n\r\nThis PR makes sure we keep parity with GH actions based CI",
+    "url": "https://github.com/joho/godotenv/pull/122"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 45,
+    "deletions": 2
+  },
+  "files": [
+    {
+      "path": ".github/workflows/ci.yml",
+      "status": "M",
+      "additions": 45,
+      "deletions": 2,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/.github/workflows/ci.yml b/.github/workflows/ci.yml\nindex b31cdbf..6f91de3 100644\n--- a/.github/workflows/ci.yml\n+++ b/.github/workflows/ci.yml\n@@ -3,9 +3,10 @@ name: CI\n on: [push]\n \n jobs:\n-  build:\n+  test:\n     runs-on: ${{ matrix.os }}\n     strategy:\n+      fail-fast: false\n       matrix:\n         go: [ '1.15', '1.14' ]\n         os: [ ubuntu-latest, macOS-latest, windows-latest ]\n@@ -16,4 +17,46 @@ jobs:\n         uses: actions/setup-go@v2\n         with:\n           go-version: ${{ matrix.go }}\n-      - run: go test\n\\ No newline at end of file\n+      - run: go test\n+\n+  test-non-amd64:\n+    strategy:\n+      fail-fast: false\n+      matrix:\n+        arch:\n+          # For some reasons this is segfaulting on go env\n+          # - name: IBM Z and LinuxONE\n+          #   architecture: \"s390x\"\n+          - name: POWER8\n+            architecture: \"ppc64le\"\n+    \n+    runs-on: ubuntu-latest\n+    name: Test on ${{ matrix.arch.name }} \n+    steps:\n+      - uses: actions/checkout@v2\n+      - uses: uraimo/run-on-arch-action@master\n+        with:\n+          arch: ${{ matrix.arch.architecture }}\n+          distro: ubuntu20.04\n+          env: | # YAML pipe\n+            GOARCH: ${{ matrix.arch.architecture }}\n+            CGO_ENABLED: 0\n+          run: |\n+            apt-get update\n+            apt-get install -q -y curl wget git\n+            latestGo=$(curl \"https://golang.org/VERSION?m=text\")\n+            wget \"https://dl.google.com/go/${latestGo}.linux-${GOARCH}.tar.gz\"\n+            rm -f $(which go)\n+            rm -rf /usr/local/go\n+            tar -C /usr/local -xzf \"${latestGo}.linux-${GOARCH}.tar.gz\"\n+            export PATH=/usr/local/go/bin:$PATH\n+            printf \"Using go at: $(which go)\\n\"\n+            printf \"Go version: $(go version)\\n\"\n+            printf \"\\n\\nGo environment:\\n\\n\"\n+            go env\n+            printf \"\\n\\nSystem environment:\\n\\n\"\n+            env\n+            go get -insecure -v -t -d ./...\n+            go test ./...\n+            cd ./cmd/godotenv\n+            go build -trimpath -ldflags=\"-w -s\" -v\n\\ No newline at end of file\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/ci.yml",
+    ".gitignore",
+    "LICENCE",
+    "README.md",
+    "autoload/autoload.go",
+    "cmd/godotenv/cmd.go",
+    "fixtures/equals.env",
+    "fixtures/exported.env",
+    "fixtures/invalid1.env",
+    "fixtures/plain.env",
+    "fixtures/quoted.env",
+    "fixtures/substitutions.env",
+    "godotenv.go",
+    "godotenv_test.go"
+  ],
+  "explanation": {
+    "what": "ci.yml の既存ジョブ名を build から test にリネームし、新たに test-non-amd64 ジョブを追加した。uraimo/run-on-arch-action を使い POWER8(ppc64le)アーキテクチャ上でGoを手動インストールしてテスト・ビルドを行う。s390x(IBM Z)向けの設定はコメントアウトされている。",
+    "why": "PRのbodyによれば、#120(Travis での ppc64le 対応)と同等のアーキテクチャカバレッジを GitHub Actions ベースのCIでも維持するための追加。",
+    "highlights": [
+      { "file": ".github/workflows/ci.yml", "note": "test-non-amd64 ジョブは uraimo/run-on-arch-action でエミュレートしたppc64le環境上でGoを都度ダウンロード・インストールしてから go test を実行している" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [
+      { "type": "pr", "number": 122, "url": "https://github.com/joho/godotenv/pull/122" }
+    ],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

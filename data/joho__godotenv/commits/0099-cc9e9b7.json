@@ -1,0 +1,124 @@
+{
+  "seq": 99,
+  "sha": "cc9e9b7de7cabb89c4619f757a44883860c285c2",
+  "parents": [
+    "0f21d20acbcc34afe1201f21c9df8acec8a65da8"
+  ],
+  "author": {
+    "name": "John Barton",
+    "email": "jb@johnbarton.co",
+    "date": "2023-01-27T13:14:16+11:00"
+  },
+  "message": "Multiline string support (#156)\n\n* refactor dotenv parser in order to support multi-line variable values declaration\r\n\r\nSigned-off-by: x1unix <denis0051@gmail.com>\r\n\r\n* Add multi-line var values test case and update comment test\r\n\r\nSigned-off-by: x1unix <denis0051@gmail.com>\r\n\r\n* Expand fixture tests to include multiline strings\r\n\r\n* Update go versions to test against\r\n\r\n* Switch to GOINSECURE for power8 CI task\r\n\r\n* When tests fail, show source version of string (inc special chars)\r\n\r\n* Update parser.go\r\n\r\nCo-authored-by: Austin Sasko <austintyler0239@yahoo.com>\r\n\r\n* Fix up bad merge\r\n\r\n* Add a full fixture for comments for extra piece of mind\r\n\r\n* Fix up some lint/staticcheck recommendations\r\n\r\n* Test against go 1.19 too\r\n\r\nSigned-off-by: x1unix <denis0051@gmail.com>\r\nCo-authored-by: x1unix <denis0051@gmail.com>\r\nCo-authored-by: Austin Sasko <austintyler0239@yahoo.com>",
+  "pr": {
+    "number": 156,
+    "title": "Multiline string support",
+    "body": "Supersedes #118 (same PR, but rebased off master and with some extra test coverage) and fixes #117",
+    "url": "https://github.com/joho/godotenv/pull/156"
+  },
+  "linkedIssues": [
+    {
+      "number": 117,
+      "title": "Library can't parse multiline values properly",
+      "body": "Library doesn't parse multi-line variable values properly.\r\n\r\n**Input**:\r\n\r\n```bash\r\nURLS=\"foo\r\nbar\"\r\n```\r\n\r\n**Expected:**\r\n\r\n```go\r\nmap[string]string{\r\n  \"URLS\": \"foo\\nbar\",\r\n}\r\n```\r\n\r\n**Got:**\r\n\r\n```go\r\nmap[string]string{\r\n  \"URLS\": \"foo\",\r\n  \"bar\",\r\n}\r\n```\r\n",
+      "url": "https://github.com/joho/godotenv/issues/117"
+    }
+  ],
+  "stats": {
+    "filesChanged": 6,
+    "additions": 325,
+    "deletions": 70
+  },
+  "files": [
+    {
+      "path": ".github/workflows/ci.yml",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "fixtures/comments.env",
+      "status": "A",
+      "additions": 4,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "fixtures/quoted.env",
+      "status": "M",
+      "additions": 10,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "godotenv.go",
+      "status": "M",
+      "additions": 29,
+      "deletions": 43,
+      "binary": false
+    },
+    {
+      "path": "godotenv_test.go",
+      "status": "M",
+      "additions": 74,
+      "deletions": 26,
+      "binary": false
+    },
+    {
+      "path": "parser.go",
+      "status": "A",
+      "additions": 207,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/.github/workflows/ci.yml b/.github/workflows/ci.yml\nindex c740ad0..1aef374 100644\n--- a/.github/workflows/ci.yml\n+++ b/.github/workflows/ci.yml\n@@ -8,7 +8,7 @@ jobs:\n     strategy:\n       fail-fast: false\n       matrix:\n-        go: [ '1.18', '1.17', '1.16', '1.15' ]\n+        go: [ '1.19', '1.18', '1.17', '1.16', '1.15' ]\n         os: [ ubuntu-latest, macOS-latest, windows-latest ]\n     name: ${{ matrix.os }} Go ${{ matrix.go }} Tests\n     steps:\ndiff --git a/fixtures/comments.env b/fixtures/comments.env\nnew file mode 100644\nindex 0000000..af9781f\n--- /dev/null\n+++ b/fixtures/comments.env\n@@ -0,0 +1,4 @@\n+# Full line comment\n+foo=bar # baz\n+bar=foo#baz\n+baz=\"foo\"#bar\ndiff --git a/fixtures/quoted.env b/fixtures/quoted.env\nindex cc6376a..7958933 100644\n--- a/fixtures/quoted.env\n+++ b/fixtures/quoted.env\n@@ -7,3 +7,13 @@ OPTION_F=\"2\"\n OPTION_G=\"\"\n OPTION_H=\"\\n\"\n OPTION_I = \"echo 'asd'\"\n+OPTION_J='line 1\n+line 2'\n+OPTION_K='line one\n+this is \\'quoted\\'\n+one more line'\n+OPTION_L=\"line 1\n+line 2\"\n+OPTION_M=\"line one\n+this is \\\"quoted\\\"\n+one more line\"\ndiff --git a/godotenv.go b/godotenv.go\nindex 6edd15d..368e804 100644\n--- a/godotenv.go\n+++ b/godotenv.go\n@@ -14,10 +14,10 @@\n package godotenv\n \n import (\n-\t\"bufio\"\n \t\"errors\"\n \t\"fmt\"\n \t\"io\"\n+\t\"io/ioutil\"\n \t\"os\"\n \t\"os/exec\"\n \t\"regexp\"\n@@ -28,6 +28,16 @@ import (\n \n const doubleQuoteSpecialChars = \"\\\\\\n\\r\\\"!$`\"\n \n+// Parse reads an env file from io.Reader, returning a map of keys and values.\n+func Parse(r io.Reader) (map[string]string, error) {\n+\tdata, err := ioutil.ReadAll(r)\n+\tif err != nil {\n+\t\treturn nil, err\n+\t}\n+\n+\treturn UnmarshalBytes(data)\n+}\n+\n // Load will read your env file(s) and load them into ENV for this process.\n //\n // Call this function as close as possible to the start of your program (ideally in main).\n@@ -96,37 +106,17 @@ func Read(filenames ...string) (envMap map[string]string, err error) {\n \treturn\n }\n \n-// Parse reads an env file from io.Reader, returning a map of keys and values.\n-func Parse(r io.Reader) (envMap map[string]string, err error) {\n-\tenvMap = make(map[string]string)\n-\n-\tvar lines []string\n-\tscanner := bufio.NewScanner(r)\n-\tfor scanner.Scan() {\n-\t\tlines = append(lines, scanner.Text())\n-\t}\n-\n-\tif err = scanner.Err(); err != nil {\n-\t\treturn\n-\t}\n-\n-\tfor _, fullLine := range lines {\n-\t\tif !isIgnoredLine(fullLine) {\n-\t\t\tvar key, value string\n-\t\t\tkey, value, err = parseLine(fullLine, envMap)\n-\n-\t\t\tif err != nil {\n-\t\t\t\treturn\n-\t\t\t}\n-\t\t\tenvMap[key] = value\n-\t\t}\n-\t}\n-\treturn\n-}\n-\n // Unmarshal reads an env file from a string, returning a map of keys and values.\n func Unmarshal(str string) (envMap map[string]string, err error) {\n-\treturn Parse(strings.NewReader(str))\n+\treturn UnmarshalBytes([]byte(str))\n+}\n+\n+// UnmarshalBytes parses env file from byte slice of chars, returning a map of keys and values.\n+func UnmarshalBytes(src []byte) (map[string]string, error) {\n+\tout := make(map[string]string)\n+\terr := parseBytes(src, out)\n+\n+\treturn out, err\n }\n \n // Exec loads env vars from the specified filenames (empty map falls back to default)\n@@ -137,7 +127,9 @@ func Unmarshal(str string) (envMap map[string]string, err error) {\n // If you want more fine grained control over your command it's recommended\n // that you use `Load()` or `Read()` and the `os/exec` package yourself.\n func Exec(filenames []string, cmd string, cmdArgs []string) error {\n-\tLoad(filenames...)\n+\tif err := Load(filenames...); err != nil {\n+\t\treturn err\n+\t}\n \n \tcommand := exec.Command(cmd, cmdArgs...)\n \tcommand.Stdin = os.Stdin\n@@ -161,8 +153,7 @@ func Write(envMap map[string]string, filename string) error {\n \tif err != nil {\n \t\treturn err\n \t}\n-\tfile.Sync()\n-\treturn err\n+\treturn file.Sync()\n }\n \n // Marshal outputs the given environment as a dotenv-formatted environment file.\n@@ -202,7 +193,7 @@ func loadFile(filename string, overload bool) error {\n \n \tfor key, value := range envMap {\n \t\tif !currentEnv[key] || overload {\n-\t\t\tos.Setenv(key, value)\n+\t\t\t_ = os.Setenv(key, value)\n \t\t}\n \t}\n \n@@ -259,15 +250,15 @@ func parseLine(line string, envMap map[string]string) (key string, value string,\n \t}\n \n \tif len(splitString) != 2 {\n-\t\terr = errors.New(\"Can't separate key from value\")\n+\t\terr = errors.New(\"can't separate key from value\")\n \t\treturn\n \t}\n \n \t// Parse the key\n \tkey = splitString[0]\n-\tif strings.HasPrefix(key, \"export\") {\n-\t\tkey = strings.TrimPrefix(key, \"export\")\n-\t}\n+\n+\tkey = strings.TrimPrefix(key, \"export\")\n+\n \tkey = strings.TrimSpace(key)\n \n \tkey = exportRegex.ReplaceAllString(splitString[0], \"$1\")\n@@ -343,11 +334,6 @@ func expandVariables(v string, m map[string]string) string {\n \t})\n }\n \n-func isIgnoredLine(line string) bool {\n-\ttrimmedLine := strings.TrimSpace(line)\n-\treturn len(trimmedLine) == 0 || strings.HasPrefix(trimmedLine, \"#\")\n-}\n-\n func doubleQuoteEscape(line string) string {\n \tfor _, c := range doubleQuoteSpecialChars {\n \t\ttoReplace := \"\\\\\" + string(c)\ndiff --git a/godotenv_test.go b/godotenv_test.go\nindex 49f6fe0..017d6b6 100644\n--- a/godotenv_test.go\n+++ b/godotenv_test.go\n@@ -35,7 +35,7 @@ func loadEnvAndCompareValues(t *testing.T, loader func(files ...string) error, e\n \t\tenvValue := os.Getenv(k)\n \t\tv := expectedValues[k]\n \t\tif envValue != v {\n-\t\t\tt.Errorf(\"Mismatch for key '%v': expected '%v' got '%v'\", k, v, envValue)\n+\t\t\tt.Errorf(\"Mismatch for key '%v': expected '%#v' got '%#v'\", k, v, envValue)\n \t\t}\n \t}\n }\n@@ -189,6 +189,10 @@ func TestLoadQuotedEnv(t *testing.T) {\n \t\t\"OPTION_G\": \"\",\n \t\t\"OPTION_H\": \"\\n\",\n \t\t\"OPTION_I\": \"echo 'asd'\",\n+\t\t\"OPTION_J\": \"line 1\\nline 2\",\n+\t\t\"OPTION_K\": \"line one\\nthis is \\\\'quoted\\\\'\\none more line\",\n+\t\t\"OPTION_L\": \"line 1\\nline 2\",\n+\t\t\"OPTION_M\": \"line one\\nthis is \\\"quoted\\\"\\none more line\",\n \t}\n \n \tloadEnvAndCompareValues(t, Load, envFileName, expectedValues, noopPresets)\n@@ -271,6 +275,34 @@ func TestExpanding(t *testing.T) {\n \n }\n \n+func TestVariableStringValueSeparator(t *testing.T) {\n+\tinput := \"TEST_URLS=\\\"stratum+tcp://stratum.antpool.com:3333\\nstratum+tcp://stratum.antpool.com:443\\\"\"\n+\twant := map[string]string{\n+\t\t\"TEST_URLS\": \"stratum+tcp://stratum.antpool.com:3333\\nstratum+tcp://stratum.antpool.com:443\",\n+\t}\n+\tgot, err := Parse(strings.NewReader(input))\n+\tif err != nil {\n+\t\tt.Error(err)\n+\t}\n+\n+\tif len(got) != len(want) {\n+\t\tt.Fatalf(\n+\t\t\t\"unexpected value:\\nwant:\\n\\t%#v\\n\\ngot:\\n\\t%#v\", want, got)\n+\t}\n+\n+\tfor k, wantVal := range want {\n+\t\tgotVal, ok := got[k]\n+\t\tif !ok {\n+\t\t\tt.Fatalf(\"key %q doesn't present in result\", k)\n+\t\t}\n+\t\tif wantVal != gotVal {\n+\t\t\tt.Fatalf(\n+\t\t\t\t\"mismatch in %q value:\\nwant:\\n\\t%s\\n\\ngot:\\n\\t%s\", k,\n+\t\t\t\twantVal, gotVal)\n+\t\t}\n+\t}\n+}\n+\n func TestActualEnvVarsAreLeftAlone(t *testing.T) {\n \tos.Clearenv()\n \tos.Setenv(\"OPTION_A\", \"actualenv\")\n@@ -377,33 +409,38 @@ func TestParsing(t *testing.T) {\n }\n \n func TestLinesToIgnore(t *testing.T) {\n-\t// it 'ignores empty lines' do\n-\t// expect(env(\"\\n \\t  \\nfoo=bar\\n \\nfizz=buzz\")).to eql('foo' => 'bar', 'fizz' => 'buzz')\n-\tif !isIgnoredLine(\"\\n\") {\n-\t\tt.Error(\"Line with nothing but line break wasn't ignored\")\n-\t}\n-\n-\tif !isIgnoredLine(\"\\r\\n\") {\n-\t\tt.Error(\"Line with nothing but windows-style line break wasn't ignored\")\n-\t}\n-\n-\tif !isIgnoredLine(\"\\t\\t \") {\n-\t\tt.Error(\"Line full of whitespace wasn't ignored\")\n-\t}\n-\n-\t// it 'ignores comment lines' do\n-\t// expect(env(\"\\n\\n\\n # HERE GOES FOO \\nfoo=bar\")).to eql('foo' => 'bar')\n-\tif !isIgnoredLine(\"# comment\") {\n-\t\tt.Error(\"Comment wasn't ignored\")\n-\t}\n-\n-\tif !isIgnoredLine(\"\\t#comment\") {\n-\t\tt.Error(\"Indented comment wasn't ignored\")\n+\tcases := map[string]struct {\n+\t\tinput string\n+\t\twant  string\n+\t}{\n+\t\t\"Line with nothing but line break\": {\n+\t\t\tinput: \"\\n\",\n+\t\t},\n+\t\t\"Line with nothing but windows-style line break\": {\n+\t\t\tinput: \"\\r\\n\",\n+\t\t},\n+\t\t\"Line full of whitespace\": {\n+\t\t\tinput: \"\\t\\t \",\n+\t\t},\n+\t\t\"Comment\": {\n+\t\t\tinput: \"# Comment\",\n+\t\t},\n+\t\t\"Indented comment\": {\n+\t\t\tinput: \"\\t # comment\",\n+\t\t},\n+\t\t\"non-ignored value\": {\n+\t\t\tinput: `export OPTION_B='\\n'`,\n+\t\t\twant:  `export OPTION_B='\\n'`,\n+\t\t},\n \t}\n \n-\t// make sure we're not getting false positives\n-\tif isIgnoredLine(`export OPTION_B='\\n'`) {\n-\t\tt.Error(\"ignoring a perfectly valid line to parse\")\n+\tfor n, c := range cases {\n+\t\tt.Run(n, func(t *testing.T) {\n+\t\t\tgot := string(getStatementStart([]byte(c.input)))\n+\t\t\tif got != c.want {\n+\t\t\t\tt.Errorf(\"Expected:\\t %q\\nGot:\\t %q\", c.want, got)\n+\t\t\t}\n+\t\t})\n \t}\n }\n \n@@ -424,6 +461,17 @@ func TestErrorParsing(t *testing.T) {\n \t}\n }\n \n+func TestComments(t *testing.T) {\n+\tenvFileName := \"fixtures/comments.env\"\n+\texpectedValues := map[string]string{\n+\t\t\"foo\": \"bar\",\n+\t\t\"bar\": \"foo#baz\",\n+\t\t\"baz\": \"foo\",\n+\t}\n+\n+\tloadEnvAndCompareValues(t, Load, envFileName, expectedValues, noopPresets)\n+}\n+\n func TestWrite(t *testing.T) {\n \twriteAndCompare := func(env string, expected string) {\n \t\tenvMap, _ := Unmarshal(env)\ndiff --git a/parser.go b/parser.go\nnew file mode 100644\nindex 0000000..196418c\n--- /dev/null\n+++ b/parser.go\n@@ -0,0 +1,207 @@\n+package godotenv\n+\n+import (\n+\t\"bytes\"\n+\t\"errors\"\n+\t\"fmt\"\n+\t\"strings\"\n+\t\"unicode\"\n+)\n+\n+const (\n+\tcharComment       = '#'\n+\tprefixSingleQuote = '\\''\n+\tprefixDoubleQuote = '\"'\n+\n+\texportPrefix = \"export\"\n+)\n+\n+func parseBytes(src []byte, out map[string]string) error {\n+\tsrc = bytes.Replace(src, []byte(\"\\r\\n\"), []byte(\"\\n\"), -1)\n+\tcutset := src\n+\tfor {\n+\t\tcutset = getStatementStart(cutset)\n+\t\tif cutset == nil {\n+\t\t\t// reached end of file\n+\t\t\tbreak\n+\t\t}\n+\n+\t\tkey, left, err := locateKeyName(cutset)\n+\t\tif err != nil {\n+\t\t\treturn err\n+\t\t}\n+\n+\t\tvalue, left, err := extractVarValue(left, out)\n+\t\tif err != nil {\n+\t\t\treturn err\n+\t\t}\n+\n+\t\tout[key] = value\n+\t\tcutset = left\n+\t}\n+\n+\treturn nil\n+}\n+\n+// getStatementPosition returns position of statement begin.\n+//\n+// It skips any comment line or non-whitespace character.\n+func getStatementStart(src []byte) []byte {\n+\tpos := indexOfNonSpaceChar(src)\n+\tif pos == -1 {\n+\t\treturn nil\n+\t}\n+\n+\tsrc = src[pos:]\n+\tif src[0] != charComment {\n+\t\treturn src\n+\t}\n+\n+\t// skip comment section\n+\tpos = bytes.IndexFunc(src, isCharFunc('\\n'))\n+\tif pos == -1 {\n+\t\treturn nil\n+\t}\n+\n+\treturn getStatementStart(src[pos:])\n+}\n+\n+// locateKeyName locates and parses key name and returns rest of slice\n+func locateKeyName(src []byte) (key string, cutset []byte, err error) {\n+\t// trim \"export\" and space at beginning\n+\tsrc = bytes.TrimLeftFunc(bytes.TrimPrefix(src, []byte(exportPrefix)), isSpace)\n+\n+\t// locate key name end and validate it in single loop\n+\toffset := 0\n+loop:\n+\tfor i, char := range src {\n+\t\trchar := rune(char)\n+\t\tif isSpace(rchar) {\n+\t\t\tcontinue\n+\t\t}\n+\n+\t\tswitch char {\n+\t\tcase '=', ':':\n+\t\t\t// library also supports yaml-style value declaration\n+\t\t\tkey = string(src[0:i])\n+\t\t\toffset = i + 1\n+\t\t\tbreak loop\n+\t\tcase '_':\n+\t\tdefault:\n+\t\t\t// variable name should match [A-Za-z0-9_]\n+\t\t\tif unicode.IsLetter(rchar) || unicode.IsNumber(rchar) {\n+\t\t\t\tcontinue\n+\t\t\t}\n+\n+\t\t\treturn \"\", nil, fmt.Errorf(\n+\t\t\t\t`unexpected character %q in variable name near %q`,\n+\t\t\t\tstring(char), string(src))\n+\t\t}\n+\t}\n+\n+\tif len(src) == 0 {\n+\t\treturn \"\", nil, errors.New(\"zero length string\")\n+\t}\n+\n+\t// trim whitespace\n+\tkey = strings.TrimRightFunc(key, unicode.IsSpace)\n+\tcutset = bytes.TrimLeftFunc(src[offset:], isSpace)\n+\treturn key, cutset, nil\n+}\n+\n+// extractVarValue extracts variable value and returns rest of slice\n+func extractVarValue(src []byte, vars map[string]string) (value string, rest []byte, err error) {\n+\tquote, hasPrefix := hasQuotePrefix(src)\n+\tif !hasPrefix {\n+\t\t// unquoted value - read until whitespace\n+\t\tend := bytes.IndexFunc(src, unicode.IsSpace)\n+\t\tif end == -1 {\n+\t\t\treturn expandVariables(string(src), vars), nil, nil\n+\t\t}\n+\n+\t\treturn expandVariables(string(src[0:end]), vars), src[end:], nil\n+\t}\n+\n+\t// lookup quoted string terminator\n+\tfor i := 1; i < len(src); i++ {\n+\t\tif char := src[i]; char != quote {\n+\t\t\tcontinue\n+\t\t}\n+\n+\t\t// skip escaped quote symbol (\\\" or \\', depends on quote)\n+\t\tif prevChar := src[i-1]; prevChar == '\\\\' {\n+\t\t\tcontinue\n+\t\t}\n+\n+\t\t// trim quotes\n+\t\ttrimFunc := isCharFunc(rune(quote))\n+\t\tvalue = string(bytes.TrimLeftFunc(bytes.TrimRightFunc(src[0:i], trimFunc), trimFunc))\n+\t\tif quote == prefixDoubleQuote {\n+\t\t\t// unescape newlines for double quote (this is compat feature)\n+\t\t\t// and expand environment variables\n+\t\t\tvalue = expandVariables(expandEscapes(value), vars)\n+\t\t}\n+\n+\t\treturn value, src[i+1:], nil\n+\t}\n+\n+\t// return formatted error if quoted string is not terminated\n+\tvalEndIndex := bytes.IndexFunc(src, isCharFunc('\\n'))\n+\tif valEndIndex == -1 {\n+\t\tvalEndIndex = len(src)\n+\t}\n+\n+\treturn \"\", nil, fmt.Errorf(\"unterminated quoted value %s\", src[:valEndIndex])\n+}\n+\n+func expandEscapes(str string) string {\n+\tout := escapeRegex.ReplaceAllStringFunc(str, func(match string) string {\n+\t\tc := strings.TrimPrefix(match, `\\`)\n+\t\tswitch c {\n+\t\tcase \"n\":\n+\t\t\treturn \"\\n\"\n+\t\tcase \"r\":\n+\t\t\treturn \"\\r\"\n+\t\tdefault:\n+\t\t\treturn match\n+\t\t}\n+\t})\n+\treturn unescapeCharsRegex.ReplaceAllString(out, \"$1\")\n+}\n+\n+func indexOfNonSpaceChar(src []byte) int {\n+\treturn bytes.IndexFunc(src, func(r rune) bool {\n+\t\treturn !unicode.IsSpace(r)\n+\t})\n+}\n+\n+// hasQuotePrefix reports whether charset starts with single or double quote and returns quote character\n+func hasQuotePrefix(src []byte) (prefix byte, isQuored bool) {\n+\tif len(src) == 0 {\n+\t\treturn 0, false\n+\t}\n+\n+\tswitch prefix := src[0]; prefix {\n+\tcase prefixDoubleQuote, prefixSingleQuote:\n+\t\treturn prefix, true\n+\tdefault:\n+\t\treturn 0, false\n+\t}\n+}\n+\n+func isCharFunc(char rune) func(rune) bool {\n+\treturn func(v rune) bool {\n+\t\treturn v == char\n+\t}\n+}\n+\n+// isSpace reports whether the rune is a space character but not line break character\n+//\n+// this differs from unicode.IsSpace, which also applies line break as space\n+func isSpace(r rune) bool {\n+\tswitch r {\n+\tcase '\\t', '\\v', '\\f', '\\r', ' ', 0x85, 0xA0:\n+\t\treturn true\n+\t}\n+\treturn false\n+}\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/dependabot.yml",
+    ".github/workflows/ci.yml",
+    ".github/workflows/codeql-analysis.yml",
+    ".github/workflows/release.yml",
+    ".gitignore",
+    "LICENCE",
+    "README.md",
+    "autoload/autoload.go",
+    "cmd/godotenv/cmd.go",
+    "fixtures/comments.env",
+    "fixtures/equals.env",
+    "fixtures/exported.env",
+    "fixtures/invalid1.env",
+    "fixtures/plain.env",
+    "fixtures/quoted.env",
+    "fixtures/substitutions.env",
+    "go.mod",
+    "godotenv.go",
+    "godotenv_test.go",
+    "parser.go"
+  ],
+  "explanation": {
+    "what": "パーサを行単位の bufio.Scanner ベースから、ファイル全体をバイト列として扱う新しい parser.go(parseBytes/getStatementStart/locateKeyName/extractVarValue)に置き換えた。これによりシングルクォート・ダブルクォートで囲まれた値の中に改行を含む複数行文字列(例 `OPTION_J='line 1\\nline 2'`)を正しく1つの値として解析できるようになった。あわせて Parse/Unmarshal は新設の UnmarshalBytes 経由になり、Exec と loadFile のエラーハンドリングも強化され、fixtures/comments.env などコメント処理のテストケースも追加された。",
+    "why": "linkedIssues #117 が報告する通り、従来の行単位パーサは `URLS=\"foo\\nbar\"` のような複数行の値を1行ずつ別々のキーとして誤って分割していた。PR 本文にある通り以前に一度提出された #118 を土台に、テストを拡充した上でこの根本原因(行ベースの走査では引用符をまたぐ改行を追えないこと)を解消するためにバイト列ベースの状態遷移パーサへ書き換えた。",
+    "highlights": [
+      { "file": "parser.go", "note": "getStatementStart→locateKeyName→extractVarValue の3段階で1文ずつ切り出す新パーサ" },
+      { "file": "fixtures/quoted.env", "note": "OPTION_J〜M に複数行値・エスケープされたクォートを追加した回帰用フィクスチャ" },
+      { "file": "godotenv.go", "note": "旧 Parse/isIgnoredLine を削除し UnmarshalBytes に委譲" }
+    ],
+    "langNotes": [
+      { "topic": "[]byte とカーソル方式のパース", "note": "Go の文字列処理では文字列を []byte にキャストしてスライスで前進しながら解析する書き方がよく使われる。ここでは cutset という []byte のスライスを次第に短くしていくことで、正規表現や行分割に頼らずに1パスで走査している。" },
+      { "topic": "bytes.IndexFunc / TrimLeftFunc", "note": "bytes パッケージの *Func 系関数は述語関数(rune -> bool)を渡してバイト列を走査できる。isSpace や isCharFunc のような小さなヘルパー関数と組み合わせ、空白や特定文字の位置を関数型スタイルで探している。" },
+      { "topic": "多値関数の戻り値の慣習", "note": "locateKeyName や extractVarValue は (result, rest []byte, err error) の3値を返す。Go では『処理結果』『残りの入力』『エラー』を同時に返す関数シグネチャがパーサ実装の定番パターンになっている。" }
+    ],
+    "diagram": {
+      "mermaid": "flowchart TD\n  A[\"parseBytes(src, out)\"] --> B[\"getStatementStart: コメント/空白をスキップ\"]\n  B -->|\"入力終端\"| F[\"終了\"]\n  B -->|\"文の先頭\"| C[\"locateKeyName: export接頭辞とキー名を抽出\"]\n  C --> D[\"extractVarValue: クォート種別を判定\"]\n  D -->|\"クォートなし\"| E[\"空白まで読み取り expandVariables\"]\n  D -->|\"' または \\\" で開始\"| G[\"対応する終端クォートまで読み取り(改行を含めてよい)\"]\n  G -->|\"ダブルクォートのみ\"| H[\"expandEscapes + expandVariables\"]\n  E --> I[\"out[key]=value, 残りをcutsetへ\"]\n  H --> I\n  I --> B",
+      "caption": "1文ずつ切り出す新パーサ(parser.go)の状態遷移。クォート内の改行を読み飛ばせる点が複数行文字列対応の核心。"
+    },
+    "evidence": "issue",
+    "refs": [
+      { "type": "pr", "number": 156, "url": "https://github.com/joho/godotenv/pull/156" }
+    ],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

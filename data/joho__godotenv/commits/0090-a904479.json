@@ -1,0 +1,73 @@
+{
+  "seq": 90,
+  "sha": "a904479007e635a5c2d35a512f890cd62e915cfd",
+  "parents": [
+    "a582f0c9d34ad0d898a1b0261e9b2d2148dd61eb"
+  ],
+  "author": {
+    "name": "John Barton",
+    "email": "jb@johnbarton.co",
+    "date": "2022-06-12T15:09:09+12:00"
+  },
+  "message": "Create codeql-analysis.yml (#186)",
+  "pr": {
+    "number": 186,
+    "title": "Setup codeql",
+    "body": "Let's see if this is helpful or not.",
+    "url": "https://github.com/joho/godotenv/pull/186"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 72,
+    "deletions": 0
+  },
+  "files": [
+    {
+      "path": ".github/workflows/codeql-analysis.yml",
+      "status": "A",
+      "additions": 72,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/.github/workflows/codeql-analysis.yml b/.github/workflows/codeql-analysis.yml\nnew file mode 100644\nindex 0000000..db5c760\n--- /dev/null\n+++ b/.github/workflows/codeql-analysis.yml\n@@ -0,0 +1,72 @@\n+# For most projects, this workflow file will not need changing; you simply need\n+# to commit it to your repository.\n+#\n+# You may wish to alter this file to override the set of languages analyzed,\n+# or to provide custom queries or build logic.\n+#\n+# ******** NOTE ********\n+# We have attempted to detect the languages in your repository. Please check\n+# the `language` matrix defined below to confirm you have the correct set of\n+# supported CodeQL languages.\n+#\n+name: \"CodeQL\"\n+\n+on:\n+  push:\n+    branches: [ \"main\" ]\n+  pull_request:\n+    # The branches below must be a subset of the branches above\n+    branches: [ \"main\" ]\n+  schedule:\n+    - cron: '31 4 * * 2'\n+\n+jobs:\n+  analyze:\n+    name: Analyze\n+    runs-on: ubuntu-latest\n+    permissions:\n+      actions: read\n+      contents: read\n+      security-events: write\n+\n+    strategy:\n+      fail-fast: false\n+      matrix:\n+        language: [ 'go' ]\n+        # CodeQL supports [ 'cpp', 'csharp', 'go', 'java', 'javascript', 'python', 'ruby' ]\n+        # Learn more about CodeQL language support at https://aka.ms/codeql-docs/language-support\n+\n+    steps:\n+    - name: Checkout repository\n+      uses: actions/checkout@v3\n+\n+    # Initializes the CodeQL tools for scanning.\n+    - name: Initialize CodeQL\n+      uses: github/codeql-action/init@v2\n+      with:\n+        languages: ${{ matrix.language }}\n+        # If you wish to specify custom queries, you can do so here or in a config file.\n+        # By default, queries listed here will override any specified in a config file.\n+        # Prefix the list here with \"+\" to use these queries and those in the config file.\n+        \n+        # Details on CodeQL's query packs refer to : https://docs.github.com/en/code-security/code-scanning/automatically-scanning-your-code-for-vulnerabilities-and-errors/configuring-code-scanning#using-queries-in-ql-packs\n+        # queries: security-extended,security-and-quality\n+\n+        \n+    # Autobuild attempts to build any compiled languages  (C/C++, C#, or Java).\n+    # If this step fails, then you should remove it and run the build manually (see below)\n+    - name: Autobuild\n+      uses: github/codeql-action/autobuild@v2\n+\n+    # ℹ️ Command-line programs to run using the OS shell.\n+    # 📚 See https://docs.github.com/en/actions/using-workflows/workflow-syntax-for-github-actions#jobsjob_idstepsrun\n+\n+    #   If the Autobuild fails above, remove it and uncomment the following three lines. \n+    #   modify them (or add more) to build your code if your project, please refer to the EXAMPLE below for guidance.\n+\n+    # - run: |\n+    #   echo \"Run, Build Application using script\"\n+    #   ./location_of_script_within_repo/buildscript.sh\n+\n+    - name: Perform CodeQL Analysis\n+      uses: github/codeql-action/analyze@v2\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/dependabot.yml",
+    ".github/workflows/ci.yml",
+    ".github/workflows/codeql-analysis.yml",
+    ".github/workflows/release.yml",
+    ".gitignore",
+    "LICENCE",
+    "README.md",
+    "autoload/autoload.go",
+    "cmd/godotenv/cmd.go",
+    "fixtures/equals.env",
+    "fixtures/exported.env",
+    "fixtures/invalid1.env",
+    "fixtures/plain.env",
+    "fixtures/quoted.env",
+    "fixtures/substitutions.env",
+    "go.mod",
+    "godotenv.go",
+    "godotenv_test.go"
+  ],
+  "explanation": {
+    "what": ".github/workflows/codeql-analysis.yml を新規追加した。push・pull_request・週次スケジュール(cron)をトリガーに、Go を対象言語として CodeQL による静的解析を実行する GitHub 標準テンプレートそのままの内容。",
+    "why": "PR本文「Let's see if this is helpful or not.」の通り、GitHub のセキュリティスキャン機能である CodeQL を試験的に導入した。GitHub がリポジトリ設定画面から生成する既定テンプレートをほぼそのまま追加している。",
+    "highlights": [
+      { "file": ".github/workflows/codeql-analysis.yml", "note": "security-events: write 権限と matrix.language: [go] がポイント" }
+    ],
+    "langNotes": [
+      { "topic": "codeql", "note": "CodeQL は GitHub 純正の静的解析(セキュリティスキャン)エンジン。コードをクエリ可能なデータベースに変換し、既知の脆弱性パターンを検出する。このワークフローは push・PR・週次cronの3トリガーで自動実行される。" }
+    ],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [
+      { "type": "pr", "number": 186, "url": "https://github.com/joho/godotenv/pull/186" }
+    ],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

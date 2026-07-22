@@ -1,0 +1,58 @@
+{
+  "seq": 46,
+  "sha": "f6581828bb37238bc1ce8e561d9e4050630a304d",
+  "parents": [
+    "d29c003c2004e9492c04379b4fd48960dfbaa9a8"
+  ],
+  "author": {
+    "name": "John Barton (joho)",
+    "email": "jrbarton@gmail.com",
+    "date": "2015-03-23T12:17:14+11:00"
+  },
+  "message": "outdent else because golint said so.",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 1,
+    "deletions": 2
+  },
+  "files": [
+    {
+      "path": "godotenv.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 2,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/godotenv.go b/godotenv.go\nindex 3b035d1..277bde2 100644\n--- a/godotenv.go\n+++ b/godotenv.go\n@@ -86,9 +86,8 @@ func Exec(filenames []string, cmd string, cmdArgs []string) error {\n func filenamesOrDefault(filenames []string) []string {\n \tif len(filenames) == 0 {\n \t\treturn []string{\".env\"}\n-\t} else {\n-\t\treturn filenames\n \t}\n+\treturn filenames\n }\n \n func loadFile(filename string) error {\n",
+  "diffTruncated": false,
+  "tree": [
+    ".gitignore",
+    "LICENCE",
+    "README.md",
+    "autoload/autoload.go",
+    "cmd/godotenv/cmd.go",
+    "fixtures/equals.env",
+    "fixtures/exported.env",
+    "fixtures/plain.env",
+    "fixtures/quoted.env",
+    "godotenv.go",
+    "godotenv_test.go",
+    "wercker.yml"
+  ],
+  "explanation": {
+    "what": "filenamesOrDefault 関数の `if ... { return ... } else { return ... }` を、if ブロックの中で早期 return し、else を取り除いてそのまま関数末尾で return する形に書き換えた。",
+    "why": "コミットメッセージの通り golint の指摘に対応したもの。golint は「if 節が return で終わる場合、後続の else は不要(indent-error-flow)」と指摘するため、それに従い else を外して片方の分岐をアウトデントした。",
+    "highlights": [],
+    "langNotes": [
+      { "topic": "golint indent-error-flow", "note": "golint は if ブロックが return で終わっている場合、対応する else を書かずにコードをフラットに保つスタイルを推奨する。Go のコミュニティでは早期 return によってネストを浅くする書き方が好まれる。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

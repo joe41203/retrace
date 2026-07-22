@@ -1,0 +1,92 @@
+{
+  "seq": 115,
+  "sha": "529bc6089997cb92479d1c543d1a6befd15bc750",
+  "parents": [
+    "f57f0eebf60a7fcec0f4b3cc98c7ad3e565c5764",
+    "b724238db6209280ed96a4e04aa2af38063763d9"
+  ],
+  "author": {
+    "name": "John Barton",
+    "email": "jb@johnbarton.co",
+    "date": "2026-05-19T15:54:54+10:00"
+  },
+  "message": "Merge branch 'fix/escaped-backslash-quote'\n\nfix: don't treat closing quote as escaped after an escaped backslash\n\nThe quoted-value terminator loop in extractVarValue treated any\nbackslash before a quote as an escape, so values ending in an even\nnumber of backslashes (e.g. FOO=\"bar\\\\\") parsed as \"unterminated\nquoted value\". Replace the single-byte check with a walk-back that\ncounts the preceding backslash run — escape only when odd.\n\nCloses #225. Does not address #226 (TrimRightFunc stripping a\nlegitimate escaped quote at the tail of a value) — that's a\nseparate bug in a different code path.",
+  "pr": {
+    "number": 262,
+    "title": "fix: don't treat closing quote as escaped after an escaped backslash",
+    "body": "When scanning for a quoted value's terminator, a closing quote was skipped whenever the preceding byte was a backslash, even if that backslash was itself escaped, so `FOO=\"bar\\\\\"` failed with \"unterminated quoted value\". The quote is now considered escaped only when preceded by an odd number of backslashes, matching the behaviour of the reference dotenv parsers. Closes #225",
+    "url": "https://github.com/joho/godotenv/pull/262"
+  },
+  "linkedIssues": [
+    {
+      "number": 225,
+      "title": "extractVarValue assumes a quote is escaped if a backslash precedes it, even if the backslash is escaped",
+      "body": "Given a .env with only one line:\r\n`FOO = \"\\\\\"`\r\n\r\ngodotenv.Read(\".env\") will return an error because the ``prevChar == '\\\\'``, even though it's escaped.\r\n\r\n```\r\n// lookup quoted string terminator\r\nfor i := 1; i < len(src); i++ {\r\n\tif char := src[i]; char != quote {\r\n\t\tcontinue\r\n\t}\r\n\r\n\t// skip escaped quote symbol (\\\" or \\', depends on quote)\r\n\tif prevChar := src[i-1]; prevChar == '\\\\' {\r\n\t\tcontinue\r\n\t}\r\n\r\n\t// trim quotes\r\n\ttrimFunc := isCharFunc(rune(quote))\r\n\tvalue = string(bytes.TrimLeftFunc(bytes.TrimRightFunc(src[0:i], trimFunc), trimFunc))\r\n\tif quote == prefixDoubleQuote {\r\n\t\t// unescape newlines for double quote (this is compat feature)\r\n\t\t// and expand environment variables\r\n\t\tvalue = expandVariables(expandEscapes(value), vars)\r\n\t}\r\n\r\n\treturn value, src[i+1:], nil\r\n}\r\n```\r\n\r\nextractVarValue should instead check whether the quote symbol is preceded by an odd number of backslashes (escaped) or an even number (not escaped).",
+      "url": "https://github.com/joho/godotenv/issues/225"
+    }
+  ],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 9,
+    "deletions": 2
+  },
+  "files": [
+    {
+      "path": "godotenv_test.go",
+      "status": "M",
+      "additions": 3,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "parser.go",
+      "status": "M",
+      "additions": 6,
+      "deletions": 2,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/godotenv_test.go b/godotenv_test.go\nindex 96fde99..9e111a9 100644\n--- a/godotenv_test.go\n+++ b/godotenv_test.go\n@@ -342,6 +342,9 @@ func TestParsing(t *testing.T) {\n \t// parses escaped double quotes\n \tparseAndCompare(t, `FOO=\"escaped\\\"bar\"`, \"FOO\", `escaped\"bar`)\n \n+\t// a trailing escaped backslash does not escape the closing quote\n+\tparseAndCompare(t, `FOO=\"bar\\\\\"`, \"FOO\", `bar\\`)\n+\n \t// parses single quotes inside double quotes\n \tparseAndCompare(t, `FOO=\"'d'\"`, \"FOO\", `'d'`)\n \ndiff --git a/parser.go b/parser.go\nindex 49fc292..bf5e8f9 100644\n--- a/parser.go\n+++ b/parser.go\n@@ -166,8 +166,12 @@ func extractVarValue(src []byte, vars map[string]string) (value string, rest []b\n \t\t\tcontinue\n \t\t}\n \n-\t\t// skip escaped quote symbol (\\\" or \\', depends on quote)\n-\t\tif prevChar := src[i-1]; prevChar == '\\\\' {\n+\t\t// skip escaped quote symbol; a quote is escaped only when preceded by an odd number of backslashes\n+\t\tbackslashes := 0\n+\t\tfor j := i - 1; j >= 0 && src[j] == '\\\\'; j-- {\n+\t\t\tbackslashes++\n+\t\t}\n+\t\tif backslashes%2 == 1 {\n \t\t\tcontinue\n \t\t}\n \n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/dependabot.yml",
+    ".github/workflows/ci.yml",
+    ".github/workflows/codeql-analysis.yml",
+    ".github/workflows/release.yml",
+    ".gitignore",
+    "LICENCE",
+    "README.md",
+    "autoload/autoload.go",
+    "cmd/godotenv/cmd.go",
+    "fixtures/comments.env",
+    "fixtures/equals.env",
+    "fixtures/exported.env",
+    "fixtures/invalid1.env",
+    "fixtures/plain.env",
+    "fixtures/quoted.env",
+    "fixtures/substitutions.env",
+    "go.mod",
+    "godotenv.go",
+    "godotenv_test.go",
+    "parser.go"
+  ],
+  "explanation": {
+    "what": "extractVarValue のクォート終端検出を修正するブランチ 'fix/escaped-backslash-quote' をマージした。閉じクォートの直前が単に1文字のバックスラッシュかどうかだけを見ていた判定(if prevChar := src[i-1]; prevChar == '\\\\')を、直前に連続するバックスラッシュの個数を数えて奇数のときだけエスケープとみなす処理に置き換えた。あわせて `FOO=\"bar\\\\\"` が `bar\\` として正しくパースできることを確認するテストを追加している。",
+    "why": "linkedIssue #225 の通り、従来の実装は閉じクォート直前のバックスラッシュが1つでもあれば無条件に「エスケープされたクォート」とみなしていたため、`FOO=\"bar\\\\\"` のように偶数個(2個)のバックスラッシュで終わる値(=バックスラッシュ自体がエスケープされているだけでクォートはエスケープされていない)が「unterminated quoted value」エラーになっていた。PR本文が述べる通り、直前のバックスラッシュの連続数が奇数か偶数かで判定することで、他の dotenv 実装と同様の挙動に合わせた。メッセージ本文にある #226(TrimRightFunc が末尾の正しくエスケープされたクォートを削ってしまう問題)は別の不具合として今回は対象外にしている。",
+    "highlights": [
+      { "file": "parser.go", "note": "prevChar == '\\\\' の単純比較から、直前のバックスラッシュ連続数を数えて奇偶判定するループへの変更" },
+      { "file": "godotenv_test.go", "note": "FOO=\"bar\\\\\" が bar\\ になることを確認する回帰テスト" }
+    ],
+    "langNotes": [
+      { "topic": "escaped backslash before a quote", "note": "`\\\\` は「エスケープされたバックスラッシュ1文字」を表すため、閉じクォートの直前に偶数個並んでいれば実際のバックスラッシュ文字の並びであり、クォート自体はエスケープされていない。奇数個ならクォートの直前の1つがそのクォートをエスケープしている。連続数の奇偶で判定するのはシェルや他言語のクォート解析でも使われる典型的なテクニック。" }
+    ],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [
+      { "type": "pr", "number": 262, "url": "https://github.com/joho/godotenv/pull/262" },
+      { "type": "issue", "number": 225, "url": "https://github.com/joho/godotenv/issues/225" }
+    ],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

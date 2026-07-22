@@ -1,0 +1,66 @@
+{
+  "seq": 114,
+  "sha": "f57f0eebf60a7fcec0f4b3cc98c7ad3e565c5764",
+  "parents": [
+    "3ec7e17a8db025f18ae066e6f220354b9de09754"
+  ],
+  "author": {
+    "name": "John Barton",
+    "email": "jb@johnbarton.co",
+    "date": "2026-05-19T14:17:09+10:00"
+  },
+  "message": "Add an extra test coverage for #261",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 4,
+    "deletions": 0
+  },
+  "files": [
+    {
+      "path": "godotenv_test.go",
+      "status": "M",
+      "additions": 4,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/godotenv_test.go b/godotenv_test.go\nindex c07e6f3..96fde99 100644\n--- a/godotenv_test.go\n+++ b/godotenv_test.go\n@@ -441,6 +441,10 @@ func TestLinesToIgnore(t *testing.T) {\n \t\t\"Indented comment\": {\n \t\t\tinput: \"\\t # comment\",\n \t\t},\n+\t\t\"Multiple consecutive comments\": {\n+\t\t\tinput: \"# one\\n# two\\n# three\\nFOO=bar\",\n+\t\t\twant:  \"FOO=bar\",\n+\t\t},\n \t\t\"non-ignored value\": {\n \t\t\tinput: `export OPTION_B='\\n'`,\n \t\t\twant:  `export OPTION_B='\\n'`,\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/dependabot.yml",
+    ".github/workflows/ci.yml",
+    ".github/workflows/codeql-analysis.yml",
+    ".github/workflows/release.yml",
+    ".gitignore",
+    "LICENCE",
+    "README.md",
+    "autoload/autoload.go",
+    "cmd/godotenv/cmd.go",
+    "fixtures/comments.env",
+    "fixtures/equals.env",
+    "fixtures/exported.env",
+    "fixtures/invalid1.env",
+    "fixtures/plain.env",
+    "fixtures/quoted.env",
+    "fixtures/substitutions.env",
+    "go.mod",
+    "godotenv.go",
+    "godotenv_test.go",
+    "parser.go"
+  ],
+  "explanation": {
+    "what": "godotenv_test.go の TestLinesToIgnore に「Multiple consecutive comments」というケースを追加し、`# one\\n# two\\n# three\\nFOO=bar` という入力から `FOO=bar` が正しく取り出せることを検証するテストを足した。",
+    "why": "コミットメッセージの \"Add an extra test coverage for #261\" が示す通り、直前の #261(getStatementStart の再帰→ループ書き換え)に対する追加のテストカバレッジ。連続するコメント行を複数回読み飛ばす経路を明示的に検証し、書き換え後の挙動が変わっていないことを裏付けている。",
+    "highlights": [
+      { "file": "godotenv_test.go", "note": "連続するコメント行を読み飛ばす getStatementStart のループを狙ったテストケース" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

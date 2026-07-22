@@ -1,0 +1,70 @@
+{
+  "seq": 83,
+  "sha": "ddf83eb33bbb136f62617a409142b74b91dbcff3",
+  "parents": [
+    "f562099a4320c6cf2a806734921872cbe57ad585"
+  ],
+  "author": {
+    "name": "Alexander Klein",
+    "email": "x.klein.14@gmail.com",
+    "date": "2021-03-04T10:35:31+01:00"
+  },
+  "message": "Add missing newline to created env files (#133)",
+  "pr": {
+    "number": 133,
+    "title": "Add missing newline to created env files",
+    "body": "This fixes issue https://github.com/joho/godotenv/issues/132 by adding a newline to created env files.",
+    "url": "https://github.com/joho/godotenv/pull/133"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 1,
+    "deletions": 1
+  },
+  "files": [
+    {
+      "path": "godotenv.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/godotenv.go b/godotenv.go\nindex 8e311f4..466f2eb 100644\n--- a/godotenv.go\n+++ b/godotenv.go\n@@ -157,7 +157,7 @@ func Write(envMap map[string]string, filename string) error {\n \t\treturn err\n \t}\n \tdefer file.Close()\n-\t_, err = file.WriteString(content)\n+\t_, err = file.WriteString(content + \"\\n\")\n \tif err != nil {\n \t\treturn err\n \t}\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/ci.yml",
+    ".github/workflows/release.yml",
+    ".gitignore",
+    "LICENCE",
+    "README.md",
+    "autoload/autoload.go",
+    "cmd/godotenv/cmd.go",
+    "fixtures/equals.env",
+    "fixtures/exported.env",
+    "fixtures/invalid1.env",
+    "fixtures/plain.env",
+    "fixtures/quoted.env",
+    "fixtures/substitutions.env",
+    "go.mod",
+    "godotenv.go",
+    "godotenv_test.go",
+    "renovate.json"
+  ],
+  "explanation": {
+    "what": "godotenv.go の Write() 関数が生成する .env ファイルの末尾に、改行文字(\\n)を追加するよう1行修正した。",
+    "why": "PR本文に記載の通り、Write() が生成するファイルに末尾改行がなく、それに起因する不具合(issue #132)を解消するための修正。POSIX的なテキストファイルの慣習(末尾改行あり)に合わせる意図と読める。",
+    "highlights": [
+      { "file": "godotenv.go", "note": "file.WriteString(content) → file.WriteString(content + \"\\n\") で末尾改行を保証" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [
+      { "type": "pr", "number": 133, "url": "https://github.com/joho/godotenv/pull/133" }
+    ],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

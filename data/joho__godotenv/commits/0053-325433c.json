@@ -1,0 +1,81 @@
+{
+  "seq": 53,
+  "sha": "325433c502d409f3c3dc820098fb0cfe38d98dc7",
+  "parents": [
+    "eaf676fc033919bc7814b970310973dcfe6197e1",
+    "034acc219052fab168a0b5c5c6537b3c9260e47c"
+  ],
+  "author": {
+    "name": "John Barton",
+    "email": "jrbarton@gmail.com",
+    "date": "2017-03-29T07:01:54+11:00"
+  },
+  "message": "Merge pull request #29 from joho/respect_empty_external_env_vars\n\nRespect preset empty external env vars",
+  "pr": {
+    "number": 29,
+    "title": "Respect preset empty external env vars",
+    "body": "Fix for #28.\r\n\r\n`os.Getenv()` returns a string, but no error or boolean to specify set/unset. I'd naively checked for an empty string to assert that a value isn't set in env but an empty value is still valid.\r\n\r\nThis changes the env check to manually iterate over the raw env to see which keys are present.",
+    "url": "https://github.com/joho/godotenv/pull/29"
+  },
+  "linkedIssues": [
+    {
+      "number": 28,
+      "title": "if env var is set to an empty value in the environment, godotenv will overwrite it",
+      "body": "let's say I have an empty environment, and a `.env` file containing:\r\n\r\n    COLOR=blue\r\n\r\nthen:\r\n\r\n    $ godotenv env\r\n    COLOR=blue\r\n\r\nNow I set COLOR to an empty value:\r\n\r\n    $ COLOR= godotenv env\r\n    COLOR=blue\r\n\r\nI don't think it should override my setting.  I tested with the ruby `dotenv`, it respects the env var being set, even to an empty value:\r\n\r\n    $ COLOR= dotenv env\r\n    COLOR=\r\n\r\n",
+      "url": "https://github.com/joho/godotenv/issues/28"
+    }
+  ],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 10,
+    "deletions": 1
+  },
+  "files": [
+    {
+      "path": "godotenv.go",
+      "status": "M",
+      "additions": 8,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "godotenv_test.go",
+      "status": "M",
+      "additions": 2,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/godotenv.go b/godotenv.go\nindex 016acc1..0d9066c 100644\n--- a/godotenv.go\n+++ b/godotenv.go\n@@ -119,8 +119,15 @@ func loadFile(filename string, overload bool) error {\n \t\treturn err\n \t}\n \n+\tcurrentEnv := map[string]bool{}\n+\trawEnv := os.Environ()\n+\tfor _, rawEnvLine := range rawEnv {\n+\t\tkey := strings.Split(rawEnvLine, \"=\")[0]\n+\t\tcurrentEnv[key] = true\n+\t}\n+\n \tfor key, value := range envMap {\n-\t\tif os.Getenv(key) == \"\" || overload {\n+\t\tif !currentEnv[key] || overload {\n \t\t\tos.Setenv(key, value)\n \t\t}\n \t}\ndiff --git a/godotenv_test.go b/godotenv_test.go\nindex 0a1aff6..a62bf87 100644\n--- a/godotenv_test.go\n+++ b/godotenv_test.go\n@@ -100,10 +100,12 @@ func TestLoadDoesNotOverride(t *testing.T) {\n \t// ensure NO overload\n \tpresets := map[string]string{\n \t\t\"OPTION_A\": \"do_not_override\",\n+\t\t\"OPTION_B\": \"\",\n \t}\n \n \texpectedValues := map[string]string{\n \t\t\"OPTION_A\": \"do_not_override\",\n+\t\t\"OPTION_B\": \"\",\n \t}\n \tloadEnvAndCompareValues(t, Load, envFileName, expectedValues, presets)\n }\n",
+  "diffTruncated": false,
+  "tree": [
+    ".gitignore",
+    ".travis.yml",
+    "LICENCE",
+    "README.md",
+    "autoload/autoload.go",
+    "cmd/godotenv/cmd.go",
+    "fixtures/equals.env",
+    "fixtures/exported.env",
+    "fixtures/invalid1.env",
+    "fixtures/plain.env",
+    "fixtures/quoted.env",
+    "godotenv.go",
+    "godotenv_test.go"
+  ],
+  "explanation": {
+    "what": "loadFile 内で「既に外部環境変数として設定済みか」を判定するロジックを、`os.Getenv(key) == \"\"` による空文字列判定から、`os.Environ()` を1行ずつ走査して構築した `currentEnv map[string]bool` によるキー存在判定(`!currentEnv[key]`)に置き換えた。テストにも空文字列を外部環境変数としてプリセットするケースを追加している。",
+    "why": "`os.Getenv` は変数が未設定の場合も空文字列にセットされている場合も同じ空文字列を返すため区別ができず、外部環境で `COLOR=` のように空値が明示的に設定されていても .env 側の値で上書きしてしまうバグがあった(issue #28)。PR body にある通り `os.Environ()` から生の `KEY=VALUE` 行を集めてキーの有無だけを見ることで、「未設定」と「空値が設定済み」を区別できるようにした。",
+    "highlights": [
+      { "file": "godotenv.go", "note": "os.Environ() を走査して currentEnv を作り、キーの存在有無で上書き可否を判定する変更" }
+    ],
+    "langNotes": [
+      { "topic": "os.Environ / os.Getenv", "note": "Go の os.Getenv は変数が未設定でも空文字列を返すため、「未設定」と「空文字列が設定済み」を区別できない。区別が必要な場合は os.LookupEnv(bool付き)や、本コミットのように os.Environ() が返す `\"KEY=VALUE\"` 形式の文字列群を自前で走査する方法がある。" }
+    ],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [{ "type": "pr", "number": 29, "url": "https://github.com/joho/godotenv/pull/29" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

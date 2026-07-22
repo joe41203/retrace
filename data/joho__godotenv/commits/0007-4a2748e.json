@@ -1,0 +1,59 @@
+{
+  "seq": 7,
+  "sha": "4a2748eb3c53d0eec35964f820a4f5122b1bdf8c",
+  "parents": [
+    "b10c02f9b06dc1edce11a7840a49c113ef545fcf"
+  ],
+  "author": {
+    "name": "John Barton (joho)",
+    "email": "jrbarton@gmail.com",
+    "date": "2013-07-30T18:34:51+10:00"
+  },
+  "message": "Yaml style bro.",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 14,
+    "deletions": 0
+  },
+  "files": [
+    {
+      "path": "godotenv.go",
+      "status": "M",
+      "additions": 10,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "godotenv_test.go",
+      "status": "M",
+      "additions": 4,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/godotenv.go b/godotenv.go\nindex e58a80f..7b215ea 100644\n--- a/godotenv.go\n+++ b/godotenv.go\n@@ -60,6 +60,16 @@ func parseLine(line string) (key string, value string, err error) {\n \n \tsplitString := strings.Split(line, \"=\")\n \n+\tif len(splitString) != 2 {\n+\t\t// try yaml mode!\n+\t\tsplitString = strings.Split(line, \":\")\n+\t}\n+\n+\tif len(splitString) != 2 {\n+\t\terr = errors.New(\"Can't separate key from value\")\n+\t\treturn\n+\t}\n+\n \tkey = strings.Trim(splitString[0], \" \")\n \n \tvalue = strings.Trim(splitString[1], \" \\\"'\")\ndiff --git a/godotenv_test.go b/godotenv_test.go\nindex 44ffe58..eaf0bf3 100644\n--- a/godotenv_test.go\n+++ b/godotenv_test.go\n@@ -63,4 +63,8 @@ func TestParsing(t *testing.T) {\n \n \t// parses escaped double quotes\n \tparseAndCompare(t, \"FOO=escaped\\\\\\\"bar\\\"\", \"FOO\", \"escaped\\\"bar\")\n+\n+\t// parses yaml style options\n+\tparseAndCompare(t, \"OPTION_A: 1\", \"OPTION_A\", \"1\")\n+\n }\n",
+  "diffTruncated": false,
+  "tree": [
+    ".gitignore",
+    "fixtures/exported.env",
+    "fixtures/plain.env",
+    "fixtures/quoted.env",
+    "godotenv.go",
+    "godotenv_test.go"
+  ],
+  "explanation": {
+    "what": "parseLine で \"=\" による分割が1つの要素にならない場合、\":\" での分割を試みる「YAML モード」を追加した。どちらでも2要素に分割できなければ errors.New(\"Can't separate key from value\") を返すようにした。TestParsing に \"OPTION_A: 1\" が \"OPTION_A\" => \"1\" にパースされるケースを追加した。",
+    "why": "おそらく件名の \"Yaml style bro.\" が示す通り、.env ファイルの中に YAML ライクな \"key: value\" 記法が使われるケースを吸収するための対応と考えられる。同時に、区切り文字が見つからない不正な行に対してエラーを返す分岐が初めて入った。",
+    "highlights": [
+      {"file": "godotenv.go", "note": "= で分割できない場合に : でも試す fallback。区切りが見つからなければ初めて明示的なエラーを返す"}
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "inferred",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

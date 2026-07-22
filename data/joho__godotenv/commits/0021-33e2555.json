@@ -1,0 +1,63 @@
+{
+  "seq": 21,
+  "sha": "33e2555609e489dda34f8c3edd46a669f5a1b824",
+  "parents": [
+    "6697f812dd83f8426a3e2fa6739459bcc4371fb7"
+  ],
+  "author": {
+    "name": "John Barton (joho)",
+    "email": "jrbarton@gmail.com",
+    "date": "2013-07-31T14:16:18+10:00"
+  },
+  "message": "Licence and more readme",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 82,
+    "deletions": 4
+  },
+  "files": [
+    {
+      "path": "LICENCE",
+      "status": "A",
+      "additions": 23,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "README.md",
+      "status": "M",
+      "additions": 59,
+      "deletions": 4,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/LICENCE b/LICENCE\nnew file mode 100644\nindex 0000000..e7ddd51\n--- /dev/null\n+++ b/LICENCE\n@@ -0,0 +1,23 @@\n+Copyright (c) 2013 John Barton\n+\n+MIT License\n+\n+Permission is hereby granted, free of charge, to any person obtaining\n+a copy of this software and associated documentation files (the\n+\"Software\"), to deal in the Software without restriction, including\n+without limitation the rights to use, copy, modify, merge, publish,\n+distribute, sublicense, and/or sell copies of the Software, and to\n+permit persons to whom the Software is furnished to do so, subject to\n+the following conditions:\n+\n+The above copyright notice and this permission notice shall be\n+included in all copies or substantial portions of the Software.\n+\n+THE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND,\n+EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF\n+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND\n+NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE\n+LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION\n+OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION\n+WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.\n+\ndiff --git a/README.md b/README.md\nindex f8973f5..4ebf0e4 100644\n--- a/README.md\n+++ b/README.md\n@@ -1,5 +1,60 @@\n-# GoDotEnv\n-## A Go (golang) port of the Ruby dotenv project (which loads env vars from a .env file)\n+# GoDotEnv [![wercker status](https://app.wercker.com/status/507594c2ec7e60f19403a568dfea0f78/m \"wercker status\")](https://app.wercker.com/project/bykey/507594c2ec7e60f19403a568dfea0f78)\n \n-## Build Status\n-[![wercker status](https://app.wercker.com/status/507594c2ec7e60f19403a568dfea0f78/m \"wercker status\")](https://app.wercker.com/project/bykey/507594c2ec7e60f19403a568dfea0f78)\n+A Go (golang) port of the Ruby dotenv project (which loads env vars from a .env file)\n+\n+## Installation\n+\n+```shell\n+go get github.com/joho/godotenv\n+```\n+\n+## Usage\n+\n+Add your application configuration to your `.env` file in the root of your project:\n+\n+```shell\n+S3_BUCKET=YOURS3BUCKET\n+SECRET_KEY=YOURSECRETKEYGOESHERE\n+```\n+\n+Then in your Go app you can do something like\n+\n+```go\n+import (\n+    \"github.com/joho/godotenv\"\n+    \"os\"\n+)\n+\n+err := godotenv.Load()\n+if err != nil {\n+  os.Fatal(\"Error loading .env file\")\n+}\n+\n+s3Bucket := os.Getenv(\"S3_BUCKET\")\n+secretKey := os.Getenv(\"SECRET_KEY\")\n+```\n+\n+While `.env` in the project root is the default, you don't have to be constrained\n+\n+```go\n+_ := godotenv.Load(\"somerandomfile\")\n+_ := godotenv.Load(\"filenumberone.env\", \"filenumbertwo.env\")\n+```\n+\n+Are all valid options\n+\n+## Contributing\n+\n+Contributions are most welcome! The parser itself is pretty stupidly naive and I wouldn't be surprised if it breaks with edge cases.\n+\n+*code changes without tests will not be accepted*\n+\n+1. Fork it\n+2. Create your feature branch (`git checkout -b my-new-feature`)\n+3. Commit your changes (`git commit -am 'Added some feature'`)\n+4. Push to the branch (`git push origin my-new-feature`)\n+5. Create new Pull Request\n+\n+## Who?\n+\n+The original library [dotenv](https://github.com/bkeepers/dotenv) was written by [Brandon Keepers](http://opensoul.org/), and this port was done by [John Barton](http://whoisjohnbarton.com) based off the tests/fixtures in the original library.\n",
+  "diffTruncated": false,
+  "tree": [
+    ".gitignore",
+    "LICENCE",
+    "README.md",
+    "fixtures/exported.env",
+    "fixtures/plain.env",
+    "fixtures/quoted.env",
+    "godotenv.go",
+    "godotenv_test.go",
+    "wercker.yml"
+  ],
+  "explanation": {
+    "what": "MIT LicenceファイルをLICENCEとして新規追加し、READMEをInstallation・Usage・Contributing・Whoの各節を持つ形に大幅拡充した。Usage節ではgodotenv.Load()を呼んでからos.Getenvで値を取り出す最小サンプルコードを示している。",
+    "why": "コミットメッセージ「Licence and more readme」が示す通り、ライブラリとして公開するための最低限の体裁(ライセンス表記と使い方ドキュメント)を整える作業。README冒頭にはwerckerのビルドバッジも追加されており、外部の利用者に向けて配布準備を進めている。",
+    "highlights": [
+      { "file": "README.md", "note": "Load()→os.Getenvという基本の使い方サンプルが初めて明文化された箇所" },
+      { "file": "LICENCE", "note": "MITライセンス全文。OSSとして再利用可能にする法的な裏付け" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

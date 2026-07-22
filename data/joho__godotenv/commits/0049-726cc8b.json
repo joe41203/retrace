@@ -1,0 +1,82 @@
+{
+  "seq": 49,
+  "sha": "726cc8b906e3d31c70a9671c90a13716a8d3f50d",
+  "parents": [
+    "4ed13390c0acd2ff4e371e64d8b97c8954138243",
+    "861984c215bcdfd5113951cecf84939ec2675d59"
+  ],
+  "author": {
+    "name": "John Barton",
+    "email": "jrbarton@gmail.com",
+    "date": "2016-12-17T10:05:37+11:00"
+  },
+  "message": "Merge pull request #22 from mmilata/dont-swallow-errors\n\nImprove error handling",
+  "pr": {
+    "number": 22,
+    "title": "Improve error handling",
+    "body": "* propagate errors from `scanner` (e.g.: passing path to directory to `Read()`)\r\n* propagate line parsing errors when parsing file - currently they are quietly ignored",
+    "url": "https://github.com/joho/godotenv/pull/22"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 3,
+    "additions": 28,
+    "deletions": 3
+  },
+  "files": [
+    {
+      "path": "fixtures/invalid1.env",
+      "status": "A",
+      "additions": 2,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "godotenv.go",
+      "status": "M",
+      "additions": 9,
+      "deletions": 3,
+      "binary": false
+    },
+    {
+      "path": "godotenv_test.go",
+      "status": "M",
+      "additions": 17,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/fixtures/invalid1.env b/fixtures/invalid1.env\nnew file mode 100644\nindex 0000000..38f7e0e\n--- /dev/null\n+++ b/fixtures/invalid1.env\n@@ -0,0 +1,2 @@\n+INVALID LINE\n+foo=bar\ndiff --git a/godotenv.go b/godotenv.go\nindex 94b2676..a098dd2 100644\n--- a/godotenv.go\n+++ b/godotenv.go\n@@ -143,13 +143,19 @@ func readFile(filename string) (envMap map[string]string, err error) {\n \t\tlines = append(lines, scanner.Text())\n \t}\n \n+\tif err = scanner.Err(); err != nil {\n+\t\treturn\n+\t}\n+\n \tfor _, fullLine := range lines {\n \t\tif !isIgnoredLine(fullLine) {\n-\t\t\tkey, value, err := parseLine(fullLine)\n+\t\t\tvar key, value string\n+\t\t\tkey, value, err = parseLine(fullLine)\n \n-\t\t\tif err == nil {\n-\t\t\t\tenvMap[key] = value\n+\t\t\tif err != nil {\n+\t\t\t\treturn\n \t\t\t}\n+\t\t\tenvMap[key] = value\n \t\t}\n \t}\n \treturn\ndiff --git a/godotenv_test.go b/godotenv_test.go\nindex e93539e..2d26ee4 100644\n--- a/godotenv_test.go\n+++ b/godotenv_test.go\n@@ -269,3 +269,20 @@ func TestLinesToIgnore(t *testing.T) {\n \t\tt.Error(\"ignoring a perfectly valid line to parse\")\n \t}\n }\n+\n+func TestErrorReadDirectory(t *testing.T) {\n+\tenvFileName := \"fixtures/\"\n+\tenvMap, err := Read(envFileName)\n+\n+\tif err == nil {\n+\t\tt.Errorf(\"Expected error, got %v\", envMap)\n+\t}\n+}\n+\n+func TestErrorParsing(t *testing.T) {\n+\tenvFileName := \"fixtures/invalid1.env\"\n+\tenvMap, err := Read(envFileName)\n+\tif err == nil {\n+\t\tt.Errorf(\"Expected error, got %v\", envMap)\n+\t}\n+}\n",
+  "diffTruncated": false,
+  "tree": [
+    ".gitignore",
+    "LICENCE",
+    "README.md",
+    "autoload/autoload.go",
+    "cmd/godotenv/cmd.go",
+    "fixtures/equals.env",
+    "fixtures/exported.env",
+    "fixtures/invalid1.env",
+    "fixtures/plain.env",
+    "fixtures/quoted.env",
+    "godotenv.go",
+    "godotenv_test.go",
+    "wercker.yml"
+  ],
+  "explanation": {
+    "what": "readFile 内で bufio.Scanner がファイル読み取り中に返すエラー(scanner.Err())をこれまで無視していたのをチェックして返すようにし、さらに parseLine が行のパースに失敗したときにその行を envMap に無言で入れず(あるいは無視せず)、即座にエラーとして関数を抜けるよう変更した。ディレクトリを誤って渡した場合(fixtures/)や不正な行(INVALID LINE)を含むファイル用の新規フィクスチャ fixtures/invalid1.env とテスト TestErrorReadDirectory / TestErrorParsing を追加した。",
+    "why": "PR本文に明記されている通り、scanner のエラー(例: Read() にディレクトリのパスを渡した場合)とパース時のエラーがこれまで静かに握りつぶされており、呼び出し側がエラーに気づけない問題があった。この PR はその2箇所のエラーハンドリングを、無視せず呼び出し元に伝播する形に修正している。",
+    "highlights": [
+      { "file": "godotenv.go", "note": "scanner.Err() のチェック追加と、parseLine のエラーを従来の `if err == nil { envMap[key]=value }` から `if err != nil { return }` に反転させた箇所が読みどころ" },
+      { "file": "fixtures/invalid1.env", "note": "パースエラーを意図的に起こすための新規フィクスチャ(1行目が不正な形式)" }
+    ],
+    "langNotes": [
+      { "topic": "エラーを握りつぶさない設計", "note": "Go は例外機構を持たず、関数はエラーを戻り値として明示的に返す。呼び出し側が `if err != nil` でチェックし忘れたり、意図的に無視したりすると、このコミット以前のように問題が静かに隠れてしまう。Go のコードレビューでは「エラーを握りつぶしていないか」が重要な観点になる。" }
+    ],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [{ "type": "pr", "number": 22, "url": "https://github.com/joho/godotenv/pull/22" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}
