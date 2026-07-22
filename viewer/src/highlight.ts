@@ -30,7 +30,17 @@ for (const lang of [
 	refractor.register(lang);
 }
 
-export { refractor };
+// react-diff-view の tokenize は refractor.highlight() が「children 配列」を返すことを
+// 前提にしている(refractor v3 の挙動)。refractor v4 の highlight() は
+// {type:'root', children:[...]} を返すため、そのまま渡すとハイライトが機能せず
+// 素の diff にフォールバックしてしまう。children 配列を返すアダプタでラップして解消する。
+export const refractorAdapter = {
+	highlight(value: string, language: string) {
+		return refractor.highlight(value, language).children;
+	},
+	// tokenize 側が言語の登録有無を確認する場合に備えて委譲しておく。
+	listLanguages: () => refractor.listLanguages(),
+};
 
 // 拡張子 -> refractor 言語名。DESIGN.md の最低カバー: Go/TS/JS/JSON/YAML/Markdown/shell/CSS/HTML。
 const EXT_TO_LANG: Record<string, string> = {

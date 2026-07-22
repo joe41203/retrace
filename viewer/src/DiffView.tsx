@@ -19,7 +19,7 @@ import {
 	useRef,
 	useState,
 } from "react";
-import { languageFromPath, refractor } from "./highlight";
+import { languageFromPath, refractorAdapter } from "./highlight";
 import type { Commit, CommitFile } from "./types";
 
 const BIG_FILE_LINES = 500;
@@ -33,8 +33,14 @@ function tokenizeHunks(hunks: HunkData[], path: string, changes: number) {
 	const language = languageFromPath(path);
 	if (!language) return undefined;
 	try {
-		return tokenize(hunks, { highlight: true, refractor, language });
-	} catch {
+		return tokenize(hunks, {
+			highlight: true,
+			refractor: refractorAdapter,
+			language,
+		});
+	} catch (err) {
+		// silent fallback すると「色が付かない」原因が追えないので警告を残す。
+		console.warn(`[retrace] tokenize failed for ${path} (${language})`, err);
 		return undefined;
 	}
 }
