@@ -1,0 +1,46 @@
+Retrace — OSS のコミット履歴を、最初から追体験する
+
+# ヒーロー
+7 リポジトリ・1,500+ コミットを収録
+OSS を最初のコミットから読み解く、追体験ツール。
+実在の OSS を Initial commit から順に、diff と LLM 解説付きで1コミットずつ。
+「何を・なぜ・読みどころ」を辿りながら、設計が育つ過程をそのまま体験する。
+CTA: リポジトリを選んで始める / 仕組みを見る
+
+# ターミナル風デモ（LP-A の実画面）
+$ retrace open nakabonne/ali --seq 6
+# Enable to attack  5ab1a75 · 6 files +84 -36
+何を: ダミー波形を描く periodic 関数を削除し、実際に attacker.Attack を呼ぶ goroutine と
+      その結果を折れ線に反映する redrawChart へ置き換えた。
+なぜ: コミットメッセージ通り、実際に負荷生成できる状態にするのが目的。
+      TODO から中断処理が未実装と分かる。
+- func Attack(target string, resCh chan *Result) *Metrics {
++ func Attack(ctx context.Context, target string, ...) {
+
+# 課題（The Problem）
+完成したコードは読める。でも「どう育ったか」は見えない。
+- git log を追っても: コミットメッセージだけでは「なぜ」が分からない。
+- 完成品から逆算しても: どこが起点でどう分岐したのか、辿る取っ掛かりが掴めない。
+- 写経しても: 「その順番で作った理由」が抜け落ちる。
+
+# 仕組み（How it works）
+1コミットずつ、意図ごと読み解く。
+機械抽出した diff・ファイルツリー・PR に、LLM が書いた解説を重ねる。
+- mainline を古い順に: first-parent で辿る一本道を Initial commit から。
+- 何を・なぜ・読みどころ: 各コミットに意図の解説。PR や issue を根拠に。
+- diff とツリーを並べて: unified / split の diff、変更ファイルツリー、checkout コマンドまで。
+
+# 収録 OSS（Go 中心）
+nakabonne/ali — Go · 202 コミット
+alecthomas/kong — Go · 491 コミット
+julienschmidt/httprouter — Go · 269 コミット
+cristalhq/aconfig — Go · 168 コミット
+sourcegraph/conc — Go · 153 コミット
+joho/godotenv — Go · 129 コミット
+
+# 最終CTA
+さあ、最初のコミットから。
+読みたい OSS を選んで、Initial commit から追体験を始めよう。進捗はブラウザに自動保存される。
+
+# フッター
+Retrace — ローカル学習ツール · LLM は解説生成にのみ使用

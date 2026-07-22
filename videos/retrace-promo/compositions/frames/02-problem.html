@@ -1,0 +1,292 @@
+<template>
+  <style>
+    /* ── 02-problem — Problem: 完成コードは読める、でも育ち方は見えない ──
+       DARK-FIRST: navy 地 + faint green grid。kinetic-type-beats の signature で
+       statement をビートで build → payoff 語「見えない。」を赤で slam。
+       以後 hold、赤語に低振幅 jitter のみ。confirmed sketch のレイアウト維持。 */
+
+    /* JetBrains Mono は Latin/chrome。日本語は sibling frames と同じく
+       システム/汎用 gothic fallback に委ねる（フォント staging はプロジェクト側の責務）。 */
+    #root {
+      position: relative;
+      width: 1920px;
+      height: 1080px;
+      overflow: hidden;
+      font-family: "JetBrains Mono", "Noto Sans JP", sans-serif;
+      container-type: size;
+    }
+    #root * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    /* 全画面の地は #root ではなく専用 clip レイヤーに（assembler の clip-gate 対策） */
+    .prb-ground {
+      position: absolute;
+      inset: 0;
+      background: #0a0e14;
+    }
+    .prb-grid {
+      position: absolute;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(63, 185, 80, 0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(63, 185, 80, 0.03) 1px, transparent 1px);
+      background-size: 64px 64px;
+    }
+
+    /* コピー領域は上 83% に収める（keep-out 遵守） */
+    .prb-wrap {
+      position: absolute;
+      inset: 0;
+      padding: 130px 150px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+    }
+
+    /* kicker — dim・トラッキング広め・大文字 */
+    .prb-kicker {
+      font-size: 26px;
+      letter-spacing: 0.16em;
+      color: #7d8ba0;
+      text-transform: uppercase;
+      margin-bottom: 34px;
+    }
+    .prb-kword {
+      display: inline-block;
+      white-space: pre;
+      will-change: transform, opacity;
+    }
+
+    /* headline — cream 本文、chunk 単位 reveal */
+    .prb-h {
+      font-size: 78px;
+      color: #d6deeb;
+      line-height: 1.18;
+      letter-spacing: -0.02em;
+    }
+    .prb-chunk {
+      display: inline-block;
+      white-space: pre;
+      will-change: transform, opacity;
+    }
+    /* 「読める」— 最初 cream、直後に dim へ沈む（色 tween 対象） */
+    .prb-fade { color: #d6deeb; }
+    /* 「見えない。」— 赤 payoff。inline-block で beat-slam の transform を受ける */
+    .prb-red {
+      display: inline-block;
+      color: #f85149;
+      transform-origin: 50% 50%;
+      text-shadow: 0 0 0 rgba(248, 81, 73, 0);
+      will-change: transform, opacity, text-shadow;
+    }
+
+    /* 失敗カード3枚 — 赤ラベル → muted 本文の読み順 */
+    .prb-cards {
+      display: flex;
+      gap: 26px;
+      margin-top: 72px;
+    }
+    .prb-card {
+      flex: 1;
+      border: 1px solid #1c2530;
+      border-radius: 10px;
+      background: #0f151f;
+      padding: 30px 28px;
+      will-change: transform, opacity;
+    }
+    .prb-card .prb-q {
+      color: #f85149;
+      font-size: 28px;
+      margin-bottom: 14px;
+      will-change: opacity;
+    }
+    .prb-card .prb-b {
+      color: #7d8ba0;
+      font-size: 22px;
+      line-height: 1.55;
+      will-change: opacity;
+    }
+  </style>
+
+  <div data-hf-id="hf-4vxr" id="root" data-composition-id="02-problem" data-start="0" data-duration="6.6" data-width="1920" data-height="1080">
+    <!-- 全画面の地（最下トラック・全尺 clip） -->
+    <div data-hf-id="hf-ju50" class="prb-ground clip" data-start="0" data-duration="6.6" data-track-index="0">
+      <div data-hf-id="hf-6ot1" class="prb-grid"></div>
+    </div>
+
+    <!-- コピー（見出し + カード） -->
+    <div data-hf-id="hf-0ujy" class="prb-wrap clip" data-start="0" data-duration="6.6" data-track-index="1">
+      <div data-hf-id="hf-v2fm" class="prb-kicker" id="prb-kicker"><!-- kicker words injected --></div>
+
+      <div data-hf-id="hf-yxo3" class="prb-h">
+        <span data-hf-id="hf-i6em" class="prb-chunk">完成したコードは</span><span data-hf-id="hf-owlu" class="prb-chunk prb-fade" id="prb-fade">読める</span><span data-hf-id="hf-si2v" class="prb-chunk">。</span><br data-hf-id="hf-x5px">
+        <span data-hf-id="hf-gcvy" class="prb-chunk">でも </span><span data-hf-id="hf-p4nh" class="prb-chunk">"どう育ったか" </span><span data-hf-id="hf-ky9c" class="prb-chunk">は</span><span data-hf-id="hf-vk4w" class="prb-red" id="prb-red">見えない。</span>
+      </div>
+
+      <div data-hf-id="hf-jigu" class="prb-cards">
+        <div data-hf-id="hf-b2q5" class="prb-card" id="prb-card-0">
+          <div data-hf-id="hf-ohay" class="prb-q">git log を追っても</div>
+          <div data-hf-id="hf-4dds" class="prb-b">メッセージだけでは「なぜ」が分からない。</div>
+        </div>
+        <div data-hf-id="hf-ab2c" class="prb-card" id="prb-card-1">
+          <div data-hf-id="hf-whv3" class="prb-q">完成品から逆算しても</div>
+          <div data-hf-id="hf-ltc1" class="prb-b">どこが起点でどう分岐したか掴めない。</div>
+        </div>
+        <div data-hf-id="hf-iyy7" class="prb-card" id="prb-card-2">
+          <div data-hf-id="hf-hepk" class="prb-q">写経しても</div>
+          <div data-hf-id="hf-zw85" class="prb-b">「その順番で作った理由」が抜け落ちる。</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+  <script>
+    (function () {
+      // ── kicker を per-word span に分解（per-word staggered reveal 用）──
+      var kickerWords = ["THE", " ", "PROBLEM"];
+      var kickerEl = document.getElementById("prb-kicker");
+      var kwordEls = [];
+      kickerWords.forEach(function (w) {
+        var span = document.createElement("span");
+        span.className = "prb-kword";
+        span.textContent = w;
+        kickerEl.appendChild(span);
+        if (w.trim().length) kwordEls.push(span);
+      });
+
+      // headline: fade 語・赤語・chunk 群を取得（赤語は別要素で slam）
+      var fadeEl = document.getElementById("prb-fade");
+      var redEl = document.getElementById("prb-red");
+
+      // DOM 順の chunk 配列（赤語は含まない）
+      var allChunks = Array.prototype.slice.call(document.querySelectorAll(".prb-h .prb-chunk"));
+      // 1行目 = fadeEl とその前後（index 0..2）、2行目手前 = index 3..5
+      var line1 = allChunks.slice(0, 3);   // 完成したコードは / 読める / 。
+      var line2 = allChunks.slice(3, 6);   // でも / "どう育ったか" / は
+
+      var cards = [
+        document.getElementById("prb-card-0"),
+        document.getElementById("prb-card-1"),
+        document.getElementById("prb-card-2")
+      ];
+
+      window.__timelines = window.__timelines || {};
+      var tl = gsap.timeline({ paused: true });
+
+      // ══ Scene 1 (0.0–1.0s) ══
+      // kicker per-word reveal → 1行目 chunk reveal → 「読める」が cream→dim に沈む
+      kwordEls.forEach(function (el, i) {
+        tl.fromTo(el,
+          { y: 10, opacity: 0 },
+          { y: 0, opacity: 1, duration: 0.32, ease: "power3.out" },
+          0.05 + i * 0.12
+        );
+      });
+
+      line1.forEach(function (el, i) {
+        tl.fromTo(el,
+          { y: 16, opacity: 0 },
+          { y: 0, opacity: 1, duration: 0.4, ease: "power3.out" },
+          0.42 + i * 0.14
+        );
+      });
+
+      // 「読める」cream→dim（#4a5568）。chunk 着地直後、velocity-matched に沈める
+      tl.to(fadeEl,
+        { color: "#4a5568", opacity: 0.85, duration: 0.5, ease: "power2.inOut" },
+        0.98
+      );
+
+      // ══ Scene 2 (1.0–2.4s) ══
+      // 2行目「でも "どう育ったか" は」を per-word/chunk で刻む
+      line2.forEach(function (el, i) {
+        tl.fromTo(el,
+          { y: 16, opacity: 0 },
+          { y: 0, opacity: 1, duration: 0.36, ease: "power3.out" },
+          1.15 + i * 0.22
+        );
+      });
+
+      // 「見えない。」kinetic beat-slam（power3・overshoot なし）
+      var SLAM = 1.98;
+      tl.fromTo(redEl,
+        { scale: 1.4, opacity: 0, filter: "blur(10px)" },
+        { scale: 1, opacity: 1, filter: "blur(0px)", duration: 0.42, ease: "power3.out" },
+        SLAM
+      );
+      // 控えめな赤 keyword-glow（asr-keyword-glow 相当・attack→release、finite）
+      // driver 方式：赤語1語だけに envelope を当てる。glow は text-shadow でグリフに寄せる。
+      (function () {
+        var GLOW_START = SLAM;
+        var GLOW_DUR = 1.1;               // attack〜release を含む有限窓
+        var ATTACK = 0.42;               // slam の着地と一致
+        var SUSTAIN_END = 0.62;
+        var MAX_BLUR = 20;               // 控えめ（赤・restrained）
+        var driver = { t: 0 };
+        tl.to(driver,
+          {
+            t: GLOW_DUR,
+            duration: GLOW_DUR,
+            ease: "none",
+            onUpdate: function () {
+              var t = driver.t, env;
+              if (t < ATTACK) env = t / ATTACK;
+              else if (t < SUSTAIN_END) env = 1;
+              else env = Math.max(0, 1 - (t - SUSTAIN_END) / (GLOW_DUR - SUSTAIN_END));
+              var blur = MAX_BLUR * env;
+              redEl.style.textShadow = "0 0 " + blur + "px rgba(248, 81, 73, " + (0.55 * env) + ")";
+            }
+          },
+          GLOW_START
+        );
+        // glow 窓の後は残さない（0 に固定）
+        tl.set(redEl, { textShadow: "0 0 0 rgba(248, 81, 73, 0)" }, GLOW_START + GLOW_DUR);
+      })();
+
+      // ══ Scene 3 (2.4–4.6s) ══
+      // 失敗カード3枚を左→右で逐次 reveal（fade + up, stagger, power3）
+      // 各カードの赤ラベル → muted 本文の読み順（body を僅かに遅らせる）
+      var CARD_START = 2.5;
+      var CARD_STEP = 0.62;
+      cards.forEach(function (card, i) {
+        var at = CARD_START + i * CARD_STEP;
+        tl.fromTo(card,
+          { y: 40, opacity: 0 },
+          { y: 0, opacity: 1, duration: 0.55, ease: "power3.out" },
+          at
+        );
+        // 読み順：赤ラベルが先、本文が僅かに遅れて立ち上がる
+        var q = card.querySelector(".prb-q");
+        var b = card.querySelector(".prb-b");
+        tl.fromTo(q, { opacity: 0 }, { opacity: 1, duration: 0.3, ease: "power2.out" }, at + 0.06);
+        tl.fromTo(b, { opacity: 0 }, { opacity: 1, duration: 0.34, ease: "power2.out" }, at + 0.24);
+      });
+
+      // ══ Scene 4 (4.6–6.0s) ══
+      // 全要素 resolved、hold。赤の「見えない。」に低振幅 finite jitter のみ。
+      // sine-wave-loop（LOW 端）: phase 駆動 onUpdate、ease:"none"、有限窓。pan/push なし。
+      (function () {
+        var JITTER_START = 4.6;
+        var JITTER_DUR = 1.4;            // 6.0s まで
+        var Y_AMP = 2.4;                // px・低振幅
+        var CYCLES = 3;                 // period ≈ 0.47s
+        var phase = { p: 0 };
+        tl.to(phase,
+          {
+            p: Math.PI * 2 * CYCLES,
+            duration: JITTER_DUR,
+            ease: "none",
+            onUpdate: function () {
+              var s = Math.sin(phase.p);
+              // slam 着地の resting transform（scale 1 / y 0）に ADD する
+              redEl.style.transform = "translateY(" + (s * Y_AMP) + "px) scale(1)";
+            }
+          },
+          JITTER_START
+        );
+      })();
+
+      window.__timelines["02-problem"] = tl;
+    })();
+  </script>
+</template>

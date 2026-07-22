@@ -1,0 +1,188 @@
+<template>
+  <div data-hf-id="hf-1ihn" id="root" data-composition-id="07-cta" data-start="0" data-duration="4" data-width="1920" data-height="1080">
+
+    <!-- full-bleed ground: navy + subtle green grid (clip layer, never on #root) -->
+    <div data-hf-id="hf-n224" class="clip cta-bg" data-start="0" data-duration="4" data-track-index="0"></div>
+
+    <!-- ambient green glow blooms behind the wordmark (z below hero) -->
+    <div data-hf-id="hf-2tvj" class="clip cta-glow" data-start="0" data-duration="4" data-track-index="1"></div>
+
+    <!-- center lockup: wordmark + caret, headline, sub -->
+    <div data-hf-id="hf-76sr" class="clip cta-stage" data-start="0" data-duration="4" data-track-index="2">
+      <div data-hf-id="hf-ebrb" class="cta-wm">
+        <span data-hf-id="hf-ppb3" class="cta-prompt">&gt;_</span>&#160;Retrace<span data-hf-id="hf-95jz" class="cta-caret"></span>
+      </div>
+      <div data-hf-id="hf-m7j5" class="cta-head">
+        <span data-hf-id="hf-p27x" class="cta-w">さあ、</span><span data-hf-id="hf-i7c0" class="cta-w">最初の</span><span data-hf-id="hf-16d6" class="cta-w">コミットから。</span>
+      </div>
+      <div data-hf-id="hf-ywvz" class="cta-sub">
+        <span data-hf-id="hf-sfxb" class="cta-sw">読みたい</span><span data-hf-id="hf-pl8l" class="cta-sw">OSS を</span><span data-hf-id="hf-3x4t" class="cta-sw">選んで、</span><span data-hf-id="hf-6769" class="cta-sw">追体験を</span><span data-hf-id="hf-7kb8" class="cta-sw">始めよう。</span>
+      </div>
+    </div>
+
+    <!-- loop-line: self-draws from bottom edge upward toward where Frame 1's $ sits -->
+    <svg data-hf-id="hf-uat5" class="clip cta-loop" data-start="0" data-duration="4" data-track-index="3" viewBox="0 0 1920 1080" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+      <path data-hf-id="hf-w6z9" id="cta-loop-path" class="cta-loop-line" d="M 960 1080 L 960 812 C 960 762 998 742 1046 742 L 1360 742 C 1408 742 1446 722 1446 672 L 1446 360" />
+    </svg>
+
+    <style>
+      /* root establishes the positioning context for absolute clips (styled via #root, never a class) */
+      #root { position: relative; width: 1920px; height: 1080px; overflow: hidden; }
+
+      /* full-bleed ground rides on a clip layer */
+      .cta-bg {
+        position: absolute; inset: 0;
+        background: #0a0e14;
+        background-image:
+          linear-gradient(rgba(63,185,80,0.03) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(63,185,80,0.03) 1px, transparent 1px);
+        background-size: 64px 64px;
+      }
+
+      /* ambient bloom halo — sits behind the hero lockup */
+      .cta-glow {
+        position: absolute; left: 50%; top: 42%;
+        width: 1400px; height: 820px;
+        margin-left: -700px; margin-top: -410px;
+        background: radial-gradient(ellipse 58% 54% at 50% 50%,
+          rgba(63,185,80,0.30), rgba(63,185,80,0.06) 55%, transparent 72%);
+        opacity: 0;
+        pointer-events: none;
+      }
+
+      /* center stage — Latin + mono voice; CJK falls to a covering stack */
+      .cta-stage {
+        position: absolute; inset: 0;
+        display: flex; flex-direction: column;
+        align-items: center; justify-content: center;
+        font-family: "JetBrains Mono", "Noto Sans JP", monospace;
+      }
+
+      .cta-wm {
+        font-size: 116px;
+        color: #3fb950;
+        font-weight: 700;
+        letter-spacing: -0.02em;
+        line-height: 1.0;
+        white-space: nowrap;
+        display: flex; align-items: baseline;
+      }
+      .cta-prompt { color: #56d364; }
+      .cta-caret {
+        display: inline-block;
+        width: 26px; height: 82px;
+        background: #3fb950;
+        margin-left: 16px;
+        transform: translateY(10px);
+        opacity: 0;
+      }
+
+      .cta-head {
+        margin-top: 46px;
+        font-size: 54px;
+        color: #d6deeb;
+        letter-spacing: -0.02em;
+        line-height: 1.1;
+        font-family: "JetBrains Mono", "Noto Sans JP", monospace;
+      }
+      .cta-head .cta-w { display: inline-block; opacity: 0; }
+
+      .cta-sub {
+        margin-top: 26px;
+        font-size: 28px;
+        color: #7d8ba0;
+        letter-spacing: 0.01em;
+        line-height: 1.3;
+        font-family: "JetBrains Mono", "Noto Sans JP", monospace;
+      }
+      .cta-sub .cta-sw { display: inline-block; opacity: 0; margin-right: 2px; }
+
+      /* loop-line drawing from the bottom edge upward */
+      .cta-loop {
+        position: absolute; inset: 0;
+        width: 1920px; height: 1080px;
+        pointer-events: none;
+      }
+      .cta-loop-line {
+        fill: none;
+        stroke: #3fb950;
+        stroke-width: 4;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+        filter: drop-shadow(0 0 6px rgba(63,185,80,0.55));
+      }
+    </style>
+
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <script>
+      (function () {
+        window.__timelines = window.__timelines || {};
+        var tl = gsap.timeline({ paused: true });
+
+        // ── Scene 1 (0.0–1.0s): ambient glow bloom + wordmark spring-pop ──
+        // Glow blooms in soft, landing on the wordmark's settle (one beat).
+        tl.fromTo(".cta-glow",
+          { opacity: 0, scale: 0.85 },
+          { opacity: 0.28, scale: 1, duration: 0.9, ease: "power2.out" },
+          0.05);
+
+        // >_ Retrace spring-pop entrance — power3, NO overshoot.
+        tl.fromTo(".cta-wm",
+          { opacity: 0, scale: 0.62, y: 18 },
+          { opacity: 1, scale: 1, y: 0, duration: 0.8, ease: "power3.out" },
+          0.10);
+
+        // Caret blink — finite discrete on/off tweens (no repeat/yoyo).
+        // Appears with the wordmark settle, then blinks a bounded number of times.
+        tl.set(".cta-caret", { opacity: 1 }, 0.85);
+        var caretTimes = [1.20, 1.75, 2.30, 2.85, 3.40];
+        caretTimes.forEach(function (t) {
+          tl.set(".cta-caret", { opacity: 0 }, t);
+          tl.set(".cta-caret", { opacity: 1 }, t + 0.28);
+        });
+
+        // ── Scene 2 (1.0–2.4s): headline then sub, per-word reading-order reveal ──
+        var headWords = gsap.utils.toArray(".cta-head .cta-w");
+        headWords.forEach(function (el, i) {
+          tl.fromTo(el,
+            { opacity: 0, y: 16 },
+            { opacity: 1, y: 0, duration: 0.42, ease: "power3.out" },
+            1.05 + i * 0.16);
+        });
+
+        var subWords = gsap.utils.toArray(".cta-sub .cta-sw");
+        subWords.forEach(function (el, i) {
+          tl.fromTo(el,
+            { opacity: 0, y: 12 },
+            { opacity: 1, y: 0, duration: 0.36, ease: "power3.out" },
+            1.75 + i * 0.11);
+        });
+
+        // ── Scene 3 (2.4–4.0s): loop-line self-draws bottom→up (svg-path-draw) ──
+        var path = document.getElementById("cta-loop-path");
+        if (path) {
+          var len = path.getTotalLength() * 1.02; // slight overestimate is safe
+          path.style.strokeDasharray = String(len);
+          path.style.strokeDashoffset = String(len); // fully hidden at start
+          tl.fromTo(path,
+            { strokeDashoffset: len },
+            { strokeDashoffset: 0, duration: 1.15, ease: "power2.out" },
+            2.40);
+        }
+
+        // ── FINAL exit (only frame allowed one): gentle overall fade at the end.
+        // Everything but the caret settles down; caret-only feel remains.
+        tl.to([".cta-wm", ".cta-head", ".cta-sub", ".cta-glow", ".cta-loop", ".cta-bg"],
+          { opacity: 0, duration: 0.5, ease: "power1.inOut" },
+          3.55);
+        // Keep the caret last: fade it a touch behind the rest so it reads as
+        // the lingering cursor before black.
+        tl.to(".cta-caret",
+          { opacity: 0, duration: 0.35, ease: "power1.in" },
+          3.70);
+
+        window.__timelines["07-cta"] = tl;
+      })();
+    </script>
+  </div>
+</template>

@@ -1,0 +1,409 @@
+<template>
+  <style>
+    /* ===== 04-commit-lane — Proof: Commit Lane（見せ場） =====
+       DARK-FIRST. navy 地・グリッド・緑の一本道。ノードが下→上へ一定速度で流れる。
+       中央 crisp / 上下端 dim（depth-of-field）。Scene4 で減速→静止（seq6 中央）→hold。
+       すべて finite tween・fromTo・index 由来の決定的値。CSS transition/keyframes 不使用。 */
+
+    #root {
+      position: relative;
+      width: 1920px;
+      height: 1080px;
+      background: #0a0e14;
+      font-family: "JetBrains Mono", "Noto Sans JP", monospace;
+      overflow: hidden;
+      container-type: size;
+    }
+
+    /* --- full-bleed background clip (グリッド地) --- */
+    .cl-bg {
+      position: absolute;
+      inset: 0;
+      background:
+        radial-gradient(1200px 700px at 640px 520px, rgba(63, 185, 80, 0.05), transparent 70%),
+        #0a0e14;
+    }
+    .cl-bg::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(63, 185, 80, 0.035) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(63, 185, 80, 0.035) 1px, transparent 1px);
+      background-size: 64px 64px;
+    }
+
+    /* --- 上部の kicker + head --- */
+    .cl-kicker {
+      position: absolute;
+      top: 52px;
+      left: 0;
+      right: 0;
+      text-align: center;
+      font-size: 26px;
+      font-weight: 500;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: #7d8ba0;
+      opacity: 0;
+    }
+    .cl-kicker .spk { color: #3fb950; }
+    .cl-head {
+      position: absolute;
+      top: 96px;
+      left: 0;
+      right: 0;
+      text-align: center;
+      font-size: 32px;
+      color: #7d8ba0;
+      letter-spacing: -0.01em;
+    }
+    .cl-head .w {
+      display: inline-block;
+      opacity: 0;
+      white-space: pre;
+    }
+    .cl-head .em { color: #d6deeb; font-weight: 500; }
+
+    /* --- レーン viewport（top 150 .. bottom 896, 中央 523） --- */
+    .cl-lane-vp {
+      position: absolute;
+      top: 150px;
+      left: 0;
+      right: 0;
+      height: 746px;
+      overflow: hidden;
+    }
+
+    /* 縦の一本道（固定）— SVG self-draw で1本引く */
+    .cl-lane-svg {
+      position: absolute;
+      top: 0;
+      left: 622px;
+      width: 8px;
+      height: 746px;
+      overflow: visible;
+    }
+    .cl-lane-svg path {
+      fill: none;
+      stroke: #3fb950;
+      stroke-width: 4;
+      stroke-linecap: round;
+    }
+    /* レーンの微光（jitter 対象・固定位置） */
+    .cl-lane-glow {
+      position: absolute;
+      top: 0;
+      left: 618px;
+      width: 16px;
+      height: 746px;
+      background: linear-gradient(180deg,
+        rgba(63, 185, 80, 0) 0%,
+        rgba(63, 185, 80, 0.28) 22%,
+        rgba(63, 185, 80, 0.28) 78%,
+        rgba(63, 185, 80, 0) 100%);
+      filter: blur(7px);
+      opacity: 0;
+    }
+
+    /* 流れるノード群（このコンテナだけを並進） */
+    .cl-nodes {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 100%;
+    }
+    /* 各ノード: center を y=40+150*i にする（wrapper top 基準） */
+    .cl-node {
+      position: absolute;
+      left: 360px;
+      right: 220px;
+      height: 96px;
+      margin-top: -48px; /* center を top 座標に合わせる */
+      display: flex;
+      align-items: center;
+      /* --dim: opacity(1=crisp) / --dof: px blur — driver が毎フレーム書く */
+      opacity: 1;
+      filter: blur(0px);
+      will-change: filter, opacity;
+    }
+    .cl-dot {
+      position: absolute;
+      left: 266px; /* lane 中心(622+4=626) に合わせる: node.left=360 → 360+266=626 */
+      top: 50%;
+      width: 24px;
+      height: 24px;
+      margin: -12px 0 0 -12px;
+      border-radius: 50%;
+      background: #0a0e14;
+      border: 3px solid #3fb950;
+      box-shadow: 0 0 16px rgba(63, 185, 80, 0.55);
+      transform: scale(0);
+      z-index: 3;
+    }
+    .cl-card {
+      position: absolute;
+      left: 320px; /* dot(626) の右へ */
+      width: 900px;
+      border: 1px solid #1c2530;
+      border-radius: 10px;
+      background: #0f151f;
+      padding: 18px 26px;
+      opacity: 0;
+      z-index: 2;
+    }
+    .cl-card::before {
+      /* dot からカードへ伸びる短いコネクタ */
+      content: "";
+      position: absolute;
+      left: -30px;
+      top: 50%;
+      width: 30px;
+      height: 2px;
+      margin-top: -1px;
+      background: rgba(63, 185, 80, 0.45);
+    }
+    .cl-meta {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+    }
+    .cl-seq { color: #7d8ba0; font-size: 22px; font-weight: 500; }
+    .cl-sha { color: #39c5cf; font-size: 22px; }
+    .cl-subj { color: #d6deeb; font-size: 24px; letter-spacing: -0.005em; }
+    .cl-badge { margin-left: auto; font-size: 21px; white-space: nowrap; }
+    .cl-add { color: #56d364; }
+    .cl-del { color: #f85149; }
+
+    /* 端フェード用マスク（depth-of-field: 端だけ） */
+    .cl-fade {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background: linear-gradient(180deg,
+        #0a0e14 0%,
+        rgba(10, 14, 20, 0.85) 6%,
+        rgba(10, 14, 20, 0) 22%,
+        rgba(10, 14, 20, 0) 78%,
+        rgba(10, 14, 20, 0.85) 94%,
+        #0a0e14 100%);
+      z-index: 5;
+    }
+
+    /* 下部の note（keep-out 内・y<=896） */
+    .cl-note {
+      position: absolute;
+      left: 64px;
+      top: 852px;
+      font-size: 22px;
+      color: #7a8496;
+      letter-spacing: 0.02em;
+      opacity: 0;
+    }
+    .cl-note .spk { color: #3fb950; }
+  </style>
+
+  <div data-hf-id="hf-bpz9" id="root" data-composition-id="04-commit-lane" data-start="0" data-duration="9.4" data-width="1920" data-height="1080">
+
+    <!-- full-bleed background on a clip layer (never on #root) -->
+    <div data-hf-id="hf-1pbq" class="cl-bg clip" data-start="0" data-duration="9.4" data-track-index="0"></div>
+
+    <!-- kicker + head（Scene1: per-word reveal） -->
+    <div data-hf-id="hf-isfg" class="cl-kicker" id="cl-kicker"><span data-hf-id="hf-6o16" class="spk">✱</span>&#160;FIRST-PARENT MAINLINE</div>
+    <div data-hf-id="hf-8lvq" class="cl-head" id="cl-head"></div>
+
+    <!-- レーン viewport -->
+    <div data-hf-id="hf-ds3j" class="cl-lane-vp" data-layout-allow-overflow>
+      <div data-hf-id="hf-4zjm" class="cl-lane-glow" id="cl-lane-glow"></div>
+      <svg data-hf-id="hf-dij6" class="cl-lane-svg" viewBox="0 0 8 746" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+        <path data-hf-id="hf-vid8" id="cl-lane-path" d="M 4 746 L 4 0" />
+      </svg>
+      <div data-hf-id="hf-d3lu" class="cl-nodes" id="cl-nodes" data-layout-allow-overflow>
+        <!-- ノードは JS が生成（seq1..seq10, seq 昇順で下方向） -->
+      </div>
+      <div data-hf-id="hf-an2o" class="cl-fade"></div>
+    </div>
+
+    <div data-hf-id="hf-t20m" class="cl-note" id="cl-note"><span data-hf-id="hf-ul7y" class="spk">✱</span>&#160;mainline を、Initial commit から古い順に</div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+  <script>
+    (function () {
+      // ---- deterministic commit data (seq 昇順 = 下方向) ----
+      // seq1 が最古(最下段アンカー)。higher seq が下から供給され上へ抜ける。
+      var COMMITS = [
+        { seq: 1,  sha: "0e3aa10", subj: "Initial commit",              add: 120, del: 0  },
+        { seq: 2,  sha: "7b12d94", subj: "Add project scaffold",        add: 86,  del: 4  },
+        { seq: 3,  sha: "c4f0a21", subj: "Wire request runner",         add: 142, del: 18 },
+        { seq: 4,  sha: "2d9e5c8", subj: "Parse target from flags",     add: 64,  del: 9  },
+        { seq: 5,  sha: "1c0be9f", subj: "Draw dummy chart",            add: 64,  del: 2  },
+        { seq: 6,  sha: "5ab1a75", subj: "Enable to attack",           add: 84,  del: 36 },
+        { seq: 7,  sha: "9d24e7b", subj: "Refactor result channel",     add: 58,  del: 31 },
+        { seq: 8,  sha: "a3f1c02", subj: "Add unit tests for attacker", add: 120, del: 4  },
+        { seq: 9,  sha: "e70bd35", subj: "Render latency histogram",    add: 97,  del: 12 },
+        { seq: 10, sha: "f81c9a4", subj: "Stream results to stdout",    add: 73,  del: 21 }
+      ];
+
+      // geometry
+      var NODE_PITCH = 150;   // node center 間隔
+      var FIRST_OFFSET = 40;  // seq1(i=0) center の wrapper-top からの距離
+      var LANE_H = 746;       // viewport 高
+      var CENTER = LANE_H / 2; // 373 (viewport-local center)
+      // 座標系: node center(local wrapper) = FIRST_OFFSET + i*PITCH. viewport 内 screen-local y =
+      //   center_local + ty.  center を 373 に合わせたい。
+      // seq1(i=0) center_local=40. screen y = 40 + ty. Scene2 で seq1 を viewport 下部 y≈640 に:
+      //   ty_s2 = 640-40 = 600.  seq6(i=5) center_local=40+750=790 → 端で 373: ty_end=373-790=-417.
+      var TY_S2 = 600;
+      var TY_END = -417;
+      var TY_MID = TY_S2 - (TY_S2 - TY_END - 150); // 減速前の値 = 600-867 = -267
+
+      var nodesWrap = document.getElementById("cl-nodes");
+      var nodeEls = [];
+      COMMITS.forEach(function (c, i) {
+        var n = document.createElement("div");
+        n.className = "cl-node";
+        n.style.top = (FIRST_OFFSET + i * NODE_PITCH) + "px";
+        n.setAttribute("data-i", String(i));
+        n.innerHTML =
+          '<div class="cl-dot"></div>' +
+          '<div class="cl-card">' +
+            '<div class="cl-meta">' +
+              '<span class="cl-seq">seq ' + c.seq + '</span>' +
+              '<span class="cl-sha">' + c.sha + '</span>' +
+              '<span class="cl-subj">' + c.subj + '</span>' +
+              '<span class="cl-badge"><span class="cl-add">+' + c.add + '</span> <span class="cl-del">-' + c.del + '</span></span>' +
+            '</div>' +
+          '</div>';
+        nodesWrap.appendChild(n);
+        nodeEls.push(n);
+      });
+
+      // ---- head per-word split ----
+      var headEl = document.getElementById("cl-head");
+      var HEAD_WORDS = ["mainline ", "を、", "Initial commit", " から", "古い順に。"];
+      var EM_IDX = 2; // "Initial commit" を強調
+      var wordEls = HEAD_WORDS.map(function (w, i) {
+        var s = document.createElement("span");
+        s.className = "w" + (i === EM_IDX ? " em" : "");
+        s.textContent = w;
+        headEl.appendChild(s);
+        return s;
+      });
+
+      // ---- depth-of-field / crisp-center driver ----
+      // 毎フレーム、各ノードの viewport-local screen y から中央距離 → opacity + blur。
+      // 中央付近 crisp(cream, opacity1, blur0)、端へ dim(opacity↓, blur↑)。決定的。
+      var CRISP_HALF = 150;   // この距離内は完全 crisp
+      var FALL_RANGE = 320;   // これを超えると最大 dim
+      var MAX_BLUR = 3.4;     // px（小面なので軽量）
+      var MIN_OP = 0.16;
+      function applyDof() {
+        var ty = scroll.ty;
+        for (var k = 0; k < nodeEls.length; k++) {
+          var el = nodeEls[k];
+          var i = k;
+          var centerLocal = FIRST_OFFSET + i * NODE_PITCH; // wrapper-local
+          var screenY = centerLocal + ty;                  // viewport-local (0..746)
+          var d = Math.abs(screenY - CENTER);
+          var t; // 0=crisp .. 1=full dim
+          if (d <= CRISP_HALF) t = 0;
+          else if (d >= FALL_RANGE) t = 1;
+          else t = (d - CRISP_HALF) / (FALL_RANGE - CRISP_HALF);
+          // ease で端フェードを滑らかに
+          var te = t * t * (3 - 2 * t);
+          var op = 1 - te * (1 - MIN_OP);
+          var bl = te * MAX_BLUR;
+          el.style.opacity = op.toFixed(3);
+          el.style.filter = "blur(" + bl.toFixed(2) + "px)";
+        }
+      }
+
+      // ---- lane jitter (Scene4 hold) — 低振幅・決定的 sine ----
+      var laneGlow = document.getElementById("cl-lane-glow");
+
+      // ---- timeline ----
+      window.__timelines = window.__timelines || {};
+      var tl = gsap.timeline({ paused: true });
+      window.__timelines["04-commit-lane"] = tl;
+
+      // scroll 状態 — 単一ソース。applyDof を onUpdate で回す。
+      var scroll = { ty: TY_S2 };
+      function writeScroll() {
+        nodesWrap.style.transform = "translateY(" + scroll.ty + "px)";
+        applyDof();
+      }
+      // seed frame0（Scene1 は静止: S2 位置で待機）
+      writeScroll();
+
+      // ===== Scene 1 (0.0–1.2s): 地→lane 引き→head per-word =====
+      // lane self-draw (svg-path-draw, power3)
+      var lanePath = document.getElementById("cl-lane-path");
+      var len = lanePath.getTotalLength() * 1.05;
+      lanePath.style.strokeDasharray = String(len);
+      lanePath.style.strokeDashoffset = String(len);
+      tl.fromTo(lanePath, { strokeDashoffset: len },
+        { strokeDashoffset: 0, duration: 0.9, ease: "power3.out" }, 0.05);
+      tl.fromTo(laneGlow, { opacity: 0 }, { opacity: 1, duration: 0.7, ease: "power1.out" }, 0.5);
+      // kicker
+      tl.fromTo("#cl-kicker", { opacity: 0, y: -10 },
+        { opacity: 1, y: 0, duration: 0.5, ease: "power2.out" }, 0.15);
+      // head per-word staggered reveal
+      tl.fromTo(wordEls, { opacity: 0, y: 14 },
+        { opacity: 1, y: 0, duration: 0.5, ease: "power2.out", stagger: 0.11 }, 0.35);
+      // note（下部・薄く）
+      tl.fromTo("#cl-note", { opacity: 0, x: -14 },
+        { opacity: 0.9, x: 0, duration: 0.6, ease: "power2.out" }, 0.7);
+
+      // ===== Scene 2 (1.2–3.0s): ノード点灯（下→上 stagger）＋カード横入り =====
+      // 初期可視ノード(seq1..3 付近)を index 由来 stagger で。dot pop → card slide-in。
+      // seq1(i=0) を先頭（最下段アンカー）に、続いて上/下の近傍。index 由来なので決定的。
+      var dots = Array.prototype.slice.call(document.querySelectorAll(".cl-dot"));
+      var cards = Array.prototype.slice.call(document.querySelectorAll(".cl-card"));
+      // dot 点灯: 全 dot を i 順に stagger（見えないものは端 fade で隠れる）
+      tl.fromTo(dots, { scale: 0 },
+        { scale: 1, duration: 0.42, ease: "power2.out", stagger: 0.07 }, 1.25);
+      // card 横入り（lane から velocity-matched に出る）: x を右方向へ
+      tl.fromTo(cards, { opacity: 0, x: -40 },
+        { opacity: 1, x: 0, duration: 0.5, ease: "power2.out", stagger: 0.07 }, 1.35);
+
+      // ===== Scene 3 (3.0–7.5s): 一定速度で上へスクロール（linear cruise） =====
+      // TY_S2(600) → TY_MID(-267) を ease:none で等速。カメラ酔い回避。
+      // 開始は 1.5s（S2 のカード入りと僅かに重ねて流れが途切れない）。
+      // fromTo で seek-safe（逆方向シークでも ty が確定）。immediateRender:true は
+      // t=0 で ty=TY_S2（静止期の正値）を書くので無害。
+      tl.fromTo(scroll, { ty: TY_S2 }, {
+        ty: TY_MID,
+        duration: 5.9,           // 1.5 → 7.4
+        ease: "none",
+        onUpdate: writeScroll
+      }, 1.5);
+
+      // ===== Scene 4 (7.5–9.0s): 減速→静止（seq6 中央）→hold =====
+      // TY_MID(-267) → TY_END(-417) を power2.out でブレーキ（最後の150px）。
+      // immediateRender:false — cruise の from(TY_S2) を build 時に上書きしないため。
+      tl.fromTo(scroll, { ty: TY_MID }, {
+        ty: TY_END,
+        duration: 1.0,           // 7.4 → 8.4
+        ease: "power2.out",
+        immediateRender: false,
+        onUpdate: writeScroll
+      }, 7.4);
+
+      // hold 中: 緑レーンの流れ感だけ低振幅 jitter（決定的 sine, opacity/scaleX）
+      var jit = { p: 0 };
+      tl.to(jit, {
+        p: 1,
+        duration: 0.6,           // 8.4 → 9.0
+        ease: "none",
+        onUpdate: function () {
+          var ph = jit.p * Math.PI * 4;          // 2 周期
+          var g = 0.86 + Math.sin(ph) * 0.14;    // 0.72..1.0
+          laneGlow.style.opacity = g.toFixed(3);
+          laneGlow.style.transform = "scaleX(" + (0.94 + (Math.sin(ph) * 0.5 + 0.5) * 0.12).toFixed(3) + ")";
+        }
+      }, 8.4);
+    })();
+  </script>
+</template>

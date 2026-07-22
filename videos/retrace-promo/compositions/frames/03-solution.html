@@ -1,0 +1,222 @@
+<template>
+  <style>
+    /* ── 03-solution — Solution: titlecard-reveal（意図的な breather） ──
+       DARK-FIRST: navy 地 → ターミナルカードが ONE restrained move でせり上がり、
+       >_ Retrace（緑・唯一の voltage）→ lead per-word → sub の順に落ち着いて着地。
+       以後 hold。カードは静止、キャレット点滅のみ。 */
+
+    /* JetBrains Mono は Latin/chrome。日本語は sibling frames と同じく
+       システム/汎用 gothic fallback に委ねる（フォント staging はプロジェクト側の責務）。 */
+    #root {
+      position: relative;
+      width: 1920px;
+      height: 1080px;
+      overflow: hidden;
+      font-family: "JetBrains Mono", "Noto Sans JP", sans-serif;
+      container-type: size;
+    }
+    #root * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    /* 全画面の地は #root ではなく専用 clip レイヤーに（assembler の clip-gate 対策） */
+    .sol-ground {
+      position: absolute;
+      inset: 0;
+      background: #0a0e14;
+    }
+    .sol-grid {
+      position: absolute;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(63, 185, 80, 0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(63, 185, 80, 0.03) 1px, transparent 1px);
+      background-size: 64px 64px;
+    }
+
+    /* ステージ：カードは水平中央・垂直は僅かに上（keep-out 83% 遵守） */
+    .sol-stage {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    /* ── ターミナルカード（主役サーフェス）── */
+    .sol-term {
+      width: 1120px;
+      border: 1px solid #1c2530;
+      border-radius: 12px;
+      background: #070a0f;
+      overflow: hidden;
+      box-shadow: 0 1px 3px rgba(7, 10, 15, 0.5), 0 24px 60px rgba(0, 0, 0, 0.45);
+      will-change: transform, opacity;
+    }
+    .sol-bar {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      padding: 15px 20px;
+      background: #0f151f;
+      border-bottom: 1px solid #1c2530;
+    }
+    .sol-dot { width: 13px; height: 13px; border-radius: 50%; }
+    .sol-dot.r { background: #ff5f57; }
+    .sol-dot.y { background: #febc2e; }
+    .sol-dot.g { background: #28c840; }
+    .sol-path {
+      margin-left: 16px;
+      font-family: "JetBrains Mono", "Noto Sans JP", monospace;
+      font-size: 20px;
+      letter-spacing: 0.01em;
+      color: #7a8496;
+    }
+    .sol-path .sol-cyan { color: #39c5cf; }
+
+    .sol-body { padding: 50px 46px 52px; }
+
+    /* >_ Retrace — 唯一の緑 voltage */
+    .sol-wm {
+      display: inline-flex;
+      align-items: baseline;
+      font-family: "JetBrains Mono", "Noto Sans JP", monospace;
+      font-size: 66px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      color: #3fb950;
+      will-change: transform, opacity;
+    }
+    .sol-caret {
+      display: inline-block;
+      width: 0.5ch;
+      margin-left: 4px;
+      color: #3fb950;
+      transform: translateZ(0);
+    }
+
+    /* lead — 機械抽出 × LLM 解説（cream 本文、per-word reveal） */
+    .sol-lead {
+      font-size: 33px;
+      line-height: 1.5;
+      color: #d6deeb;
+      margin-top: 30px;
+      max-width: 100%;
+    }
+    .sol-word {
+      display: inline-block;
+      white-space: pre;
+      will-change: transform, opacity;
+    }
+    .sol-lead .sol-amber { color: #d29922; }
+
+    /* sub — 何を・なぜ・読みどころ（muted、最後に静かに） */
+    .sol-sub {
+      font-size: 26px;
+      line-height: 1.5;
+      color: #7d8ba0;
+      margin-top: 20px;
+      will-change: transform, opacity;
+    }
+    .sol-sub .sol-em { color: #d6deeb; }
+  </style>
+
+  <div data-hf-id="hf-qpfa" id="root" data-composition-id="03-solution" data-start="0" data-duration="5.5" data-width="1920" data-height="1080">
+    <!-- 全画面の地（最下トラック・全尺 clip） -->
+    <div data-hf-id="hf-0jox" class="sol-ground clip" data-start="0" data-duration="5.5" data-track-index="0">
+      <div data-hf-id="hf-05mz" class="sol-grid"></div>
+    </div>
+
+    <!-- カード（主役サーフェス） -->
+    <div data-hf-id="hf-nfh3" class="sol-stage clip" data-start="0" data-duration="5.5" data-track-index="1">
+      <div data-hf-id="hf-5vgi" class="sol-term" id="sol-term">
+        <div data-hf-id="hf-mwum" class="sol-bar">
+          <span data-hf-id="hf-dk7p" class="sol-dot r"></span>
+          <span data-hf-id="hf-q2q6" class="sol-dot y"></span>
+          <span data-hf-id="hf-ahco" class="sol-dot g"></span>
+          <span data-hf-id="hf-g11w" class="sol-path">retrace — nakabonne/ali · <span data-hf-id="hf-zp73" class="sol-cyan">commit #6</span></span>
+        </div>
+        <div data-hf-id="hf-jgjj" class="sol-body">
+          <div data-hf-id="hf-1svq" class="sol-wm" id="sol-wm"><span data-hf-id="hf-gz9o">&gt;_ Retrace</span><span data-hf-id="hf-vlwq" class="sol-caret" id="sol-caret">▍</span></div>
+          <div data-hf-id="hf-tbq6" class="sol-lead" id="sol-lead"><!-- words injected by script --></div>
+          <div data-hf-id="hf-aayb" class="sol-sub" id="sol-sub">1コミットずつ、<span data-hf-id="hf-21i6" class="sol-em">"何を・なぜ・読みどころ"</span> を辿る。</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+  <script>
+    (function () {
+      // ── lead を per-word span に分解（読み順 reveal 用）──
+      // amber を当てる語を marker で挟む。改行は <br> トークンで表現。
+      var leadTokens = [
+        "機械抽出した ", "diff・", "ツリー・", "PR ", "に、", "\n",
+        { amber: '"意図の解説"' }, " を", "重ねる。"
+      ];
+      var leadEl = document.getElementById("sol-lead");
+      var wordEls = [];
+      leadTokens.forEach(function (tok) {
+        if (tok === "\n") {
+          leadEl.appendChild(document.createElement("br"));
+          return;
+        }
+        var span = document.createElement("span");
+        span.className = "sol-word";
+        if (typeof tok === "object") {
+          span.className += " sol-amber";
+          span.textContent = tok.amber;
+        } else {
+          span.textContent = tok;
+        }
+        leadEl.appendChild(span);
+        wordEls.push(span);
+      });
+
+      window.__timelines = window.__timelines || {};
+      var tl = gsap.timeline({ paused: true });
+
+      // ── Scene 1 (0.0–1.4s): カードが slide-up + crossfade（穏やか settle, power3, no bounce）──
+      // spring-pop-entrance の calm register: scale で押さず slide-up 主体の落ち着いた着地。
+      tl.fromTo("#sol-term",
+        { y: 64, opacity: 0, scale: 0.985 },
+        { y: 0, opacity: 1, scale: 1, duration: 1.1, ease: "power3.out" },
+        0.1
+      );
+
+      // ── Scene 2 (1.4–2.8s): >_ Retrace（緑）→ lead per-word staggered reveal（読み順, power3）──
+      tl.fromTo("#sol-wm",
+        { y: 14, opacity: 0 },
+        { y: 0, opacity: 1, duration: 0.55, ease: "power3.out" },
+        1.4
+      );
+      // キャレットは wordmark 着地まで隠し、hold で点滅させる
+      tl.set("#sol-caret", { opacity: 0 }, 0);
+
+      var LEAD_START = 1.85;
+      var STAGGER = Math.min(0.075, 0.85 / wordEls.length);
+      wordEls.forEach(function (el, i) {
+        tl.fromTo(el,
+          { y: 12, opacity: 0 },
+          { y: 0, opacity: 1, duration: 0.5, ease: "power3.out" },
+          LEAD_START + i * STAGGER
+        );
+      });
+
+      // ── Scene 3 (2.8–5.0s): sub が最後に静かに reveal → 以後 hold ──
+      tl.fromTo("#sol-sub",
+        { y: 12, opacity: 0 },
+        { y: 0, opacity: 1, duration: 0.7, ease: "power3.out" },
+        2.85
+      );
+
+      // ── hold 中のキャレット点滅（finite・決定的。repeat/yoyo なし）──
+      // 3.4s 以降、0.53s 周期で on/off を離散 set。5.0s まで到達。
+      var caretOn = true;
+      for (var t = 3.4; t <= 4.95; t += 0.265) {
+        tl.set("#sol-caret", { opacity: caretOn ? 1 : 0 }, t);
+        caretOn = !caretOn;
+      }
+
+      window.__timelines["03-solution"] = tl;
+    })();
+  </script>
+</template>

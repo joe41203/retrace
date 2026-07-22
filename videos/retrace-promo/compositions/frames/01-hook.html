@@ -1,0 +1,339 @@
+<template>
+  <style>
+    /* ---- 01-hook : Code-editorial dark-first. navy ground + faint green grid,
+           terminal type-on (git log --reverse) collapsing into the >_ Retrace wordmark ---- */
+    #root {
+      position: relative;
+      width: 1920px;
+      height: 1080px;
+      font-family: "JetBrains Mono", "Noto Sans JP", ui-monospace, monospace;
+      color: #d6deeb;
+      overflow: hidden;
+    }
+
+    /* full-bleed ground rides on a clip layer, never on #root */
+    .h01-ground {
+      position: absolute;
+      inset: 0;
+      background: #0a0e14;
+    }
+    .h01-grid {
+      position: absolute;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(63, 185, 80, 0.035) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(63, 185, 80, 0.035) 1px, transparent 1px);
+      background-size: 64px 64px;
+    }
+    /* faint vignette so the centred terminal reads as the focal plane */
+    .h01-vignette {
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(120% 90% at 50% 44%, rgba(10, 14, 20, 0) 40%, rgba(6, 9, 14, 0.72) 100%);
+    }
+
+    /* stage keeps content in the top ~83% (caption keep-out): centre near 0.42h */
+    .h01-stage {
+      position: absolute;
+      left: 0;
+      right: 0;
+      top: 0;
+      height: 896px; /* 0.83 * 1080 keep-out cutoff */
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    /* --- the receding command block (Scene 1 + 2) --- */
+    .h01-cmdwrap {
+      position: absolute;
+      left: 50%;
+      top: 448px; /* vertical centre of the keep-out region */
+      width: 1120px;
+      margin-left: -560px;
+      margin-top: -70px;
+      will-change: transform, filter, opacity;
+    }
+    .h01-cmdline {
+      display: flex;
+      align-items: baseline;
+      white-space: pre;
+      font-size: 56px;
+      letter-spacing: -0.01em;
+      line-height: 1.1;
+    }
+    .h01-prompt {
+      color: #3fb950;
+      margin-right: 22px;
+      opacity: 0; /* lit by the timeline */
+    }
+    .h01-cmd {
+      white-space: pre;
+      color: #d6deeb;
+    }
+    .h01-caret {
+      display: inline-block;
+      width: 18px;
+      height: 44px;
+      margin-left: 4px;
+      background: #3fb950; /* colored block, not a glyph — overridden per segment */
+      vertical-align: -6px;
+      opacity: 0;
+    }
+
+    /* comment line (Scene 2) — dim, per-word staggered */
+    .h01-comment {
+      margin-top: 34px;
+      font-size: 34px;
+      color: #7a8496;
+      letter-spacing: 0.005em;
+      white-space: pre;
+    }
+    .h01-word {
+      display: inline-block;
+      opacity: 0;
+      will-change: transform, opacity;
+    }
+
+    /* --- the wordmark (Scene 3) --- */
+    /* Centred via inset+margin (NOT a CSS transform) so the GSAP scale tween owns
+       the whole transform without dropping any centering offset. */
+    .h01-mark {
+      position: absolute;
+      left: 0;
+      right: 0;
+      top: 448px;
+      margin-top: -72px; /* half of the ~144px mark height → vertical centre */
+      display: flex;
+      align-items: baseline;
+      justify-content: center;
+      white-space: pre;
+      transform-origin: 50% 50%;
+      opacity: 0;
+      will-change: transform, opacity;
+    }
+    .h01-mark-prompt {
+      color: #3fb950;
+      font-size: 128px;
+      letter-spacing: -0.02em;
+      margin-right: 6px;
+    }
+    .h01-mark-name {
+      color: #3fb950;
+      font-size: 128px;
+      letter-spacing: -0.03em;
+    }
+    .h01-mark-caret {
+      display: inline-block;
+      width: 34px;
+      height: 96px;
+      margin-left: 18px;
+      background: #56d364;
+      vertical-align: -8px;
+      opacity: 0;
+    }
+
+    /* kicker under the mark — the indexical layer, arrives on the hold.
+       Centred via inset (NOT a CSS transform) so the GSAP y-tween is conflict-free. */
+    .h01-kicker {
+      position: absolute;
+      left: 0;
+      right: 0;
+      top: 596px;
+      text-align: center;
+      font-size: 26px;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: #7d8ba0;
+      white-space: pre;
+      opacity: 0;
+      will-change: transform, opacity;
+    }
+    .h01-kicker .spk {
+      color: #3fb950;
+      margin-right: 12px;
+    }
+  </style>
+
+  <div data-hf-id="hf-7sdp" id="root" data-composition-id="01-hook" data-start="0" data-duration="5.4" data-width="1920" data-height="1080">
+    <!-- full-bleed ground on a clip layer -->
+    <div data-hf-id="hf-k9y6" class="h01-ground clip" data-start="0" data-duration="5.4" data-track-index="0"></div>
+    <div data-hf-id="hf-j8t1" class="h01-grid clip" data-start="0" data-duration="5.4" data-track-index="1"></div>
+    <div data-hf-id="hf-3hsj" class="h01-vignette clip" data-start="0" data-duration="5.4" data-track-index="2"></div>
+
+    <div data-hf-id="hf-aj92" class="h01-stage clip" data-start="0" data-duration="5.4" data-track-index="3">
+      <!-- Scene 1 + 2 : command + comment, recedes in Scene 3 -->
+      <div data-hf-id="hf-a5vm" class="h01-cmdwrap" id="h01-cmdwrap">
+        <div data-hf-id="hf-ny28" class="h01-cmdline">
+          <span data-hf-id="hf-7w9d" class="h01-prompt" id="h01-prompt">$</span><span data-hf-id="hf-qoon" class="h01-cmd" id="h01-cmd"></span><span data-hf-id="hf-wwpl" class="h01-caret" id="h01-caret">&#160;</span>
+        </div>
+        <div data-hf-id="hf-1f58" class="h01-comment" id="h01-comment"></div>
+      </div>
+
+      <!-- Scene 3 : brand pop -->
+      <div data-hf-id="hf-3f3a" class="h01-mark" id="h01-mark">
+        <span data-hf-id="hf-2png" class="h01-mark-prompt">&gt;_</span><span data-hf-id="hf-kww6" class="h01-mark-name">Retrace</span><span data-hf-id="hf-4rb3" class="h01-mark-caret" id="h01-mark-caret">&#160;</span>
+      </div>
+      <div data-hf-id="hf-jh9i" class="h01-kicker" id="h01-kicker"><span data-hf-id="hf-6o16" class="spk">✱</span>最初のコミットから、順に。</div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+  <script>
+    (function () {
+      window.__timelines = window.__timelines || {};
+      var tl = gsap.timeline({ paused: true });
+      window.__timelines["01-hook"] = tl;
+
+      var DURATION = 5;
+
+      var promptEl = document.getElementById("h01-prompt");
+      var cmdEl = document.getElementById("h01-cmd");
+      var caretEl = document.getElementById("h01-caret");
+      var commentEl = document.getElementById("h01-comment");
+      var cmdwrapEl = document.getElementById("h01-cmdwrap");
+      var markEl = document.getElementById("h01-mark");
+      var markCaretEl = document.getElementById("h01-mark-caret");
+      var kickerEl = document.getElementById("h01-kicker");
+
+      // ---- Scene 1 : prompt lights, then git log --reverse types on ----
+      // discrete-text-sequence : reverse-searched SEQUENCE of { t, text }.
+      var FULL_CMD = "git log --reverse";
+      var TYPE_START = 0.42; // caret/prompt settle, then keys begin
+      var TYPE_END = 1.62; // command fully typed before Scene 2
+      // Build a per-character schedule with a slight non-uniform cadence.
+      var CMD_SEQ = [{ t: 0, text: "" }];
+      (function () {
+        var span = TYPE_END - TYPE_START;
+        for (var i = 1; i <= FULL_CMD.length; i++) {
+          // ease-in-ish cadence: slower on the two word-break spaces
+          var frac = i / FULL_CMD.length;
+          var ch = FULL_CMD.charAt(i - 1);
+          var t = TYPE_START + span * frac;
+          if (ch === " ") t += 0.02; // tiny hitch at word breaks
+          CMD_SEQ.push({ t: t, text: FULL_CMD.substring(0, i) });
+        }
+      })();
+      function cmdTextAt(time) {
+        for (var i = CMD_SEQ.length - 1; i >= 0; i--) {
+          if (time >= CMD_SEQ[i].t) return CMD_SEQ[i].text;
+        }
+        return "";
+      }
+      // change-times baked from the sequence (seek-safe "solid while typing")
+      var CMD_CHANGE_TIMES = [];
+      for (var ci = 1; ci < CMD_SEQ.length; ci++) {
+        if (CMD_SEQ[ci].text !== CMD_SEQ[ci - 1].text) CMD_CHANGE_TIMES.push(CMD_SEQ[ci].t);
+      }
+      var TYPING_GRACE = 0.1;
+
+      // prompt fades in
+      tl.fromTo(promptEl, { opacity: 0 }, { opacity: 1, duration: 0.3, ease: "power2.out" }, 0.12);
+
+      // caret appears with the prompt (before first keystroke)
+      tl.set(caretEl, { opacity: 1 }, 0.28);
+
+      // linear driver writes the typed text every frame
+      var cmdDriver = { t: 0 };
+      tl.to(
+        cmdDriver,
+        {
+          t: DURATION,
+          duration: DURATION,
+          ease: "none",
+          onUpdate: function () {
+            cmdEl.textContent = cmdTextAt(cmdDriver.t);
+          },
+        },
+        0
+      );
+
+      // ---- caret : deterministic sin square-wave blink, solid while typing ----
+      // BLINK over the whole timeline; whole-number cycles so it doesn't pop on the last frame.
+      var BLINK_CYCLES = 6; // ~0.83s period over 5s
+      var blink = { p: 0 };
+      tl.to(
+        blink,
+        {
+          p: Math.PI * 2 * BLINK_CYCLES,
+          duration: DURATION,
+          ease: "none",
+          onUpdate: function () {
+            var t = blink.p / (Math.PI * 2 * BLINK_CYCLES) * DURATION; // recovered scene time
+            var isTyping = false;
+            for (var k = 0; k < CMD_CHANGE_TIMES.length; k++) {
+              if (CMD_CHANGE_TIMES[k] <= t && t - CMD_CHANGE_TIMES[k] < TYPING_GRACE) {
+                isTyping = true;
+                break;
+              }
+            }
+            var lit = isTyping ? true : Math.sin(blink.p) > 0;
+            caretEl.style.opacity = lit ? "1" : "0";
+            // the mark caret shares the same blink phase once it is on screen
+            markCaretEl.style.opacity = Math.sin(blink.p) > 0 ? "1" : "0";
+          },
+        },
+        0
+      );
+
+      // ---- Scene 2 (1.8–2.8s) : comment reveals per-word, dim, staggered (power3) ----
+      var COMMENT = ["#", "最初の", "コミット", "から、", "順に。"];
+      commentEl.innerHTML = "";
+      var commentWords = [];
+      for (var w = 0; w < COMMENT.length; w++) {
+        var span = document.createElement("span");
+        span.className = "h01-word";
+        span.textContent = COMMENT[w] + (w === 0 ? " " : "");
+        commentEl.appendChild(span);
+        commentWords.push(span);
+      }
+      var COMMENT_START = 1.86;
+      commentWords.forEach(function (el, i) {
+        tl.fromTo(
+          el,
+          { opacity: 0, y: 14 },
+          { opacity: 1, y: 0, duration: 0.42, ease: "power3.out" },
+          COMMENT_START + i * 0.075
+        );
+      });
+
+      // caret parks after the command settles; hide it as the block recedes so the
+      // wordmark caret takes over (set at the cut, not a fade → seek-safe hard swap)
+      // ---- Scene 3 (2.8–5.0s) : command block recedes (inverse zoom-through light
+      //      translate + blur + fade), Retrace wordmark spring-pops and holds ----
+      var RECEDE_AT = 2.86;
+      // exit: recede AWAY (scale down slightly) + rise + blur + fade — inverse zoom-through
+      tl.to(
+        cmdwrapEl,
+        { y: -120, scale: 0.86, filter: "blur(10px)", duration: 0.34, ease: "power3.in" },
+        RECEDE_AT
+      );
+      tl.to(cmdwrapEl, { opacity: 0, duration: 0.26, ease: "none" }, RECEDE_AT + 0.02);
+      // kill the typing caret at the cut so only one caret is ever visible
+      tl.set(caretEl, { opacity: 0 }, RECEDE_AT + 0.2);
+
+      // brand pop : incoming arrives slightly oversized (as if from behind camera),
+      // retracts into the focal plane on a long-tail settle, NO overshoot (power3.out)
+      var POP_AT = RECEDE_AT + 0.24; // ~3.10s — hero visible well within the frame
+      tl.fromTo(
+        markEl,
+        { opacity: 0, scale: 1.14, filter: "blur(10px)" },
+        { opacity: 1, scale: 1, filter: "blur(0px)", duration: 0.62, ease: "power3.out" },
+        POP_AT
+      );
+      // The mark caret opacity is driven every frame by the blink onUpdate below;
+      // while the mark itself is opacity:0 (pre-pop) the caret is hidden with its parent,
+      // so no explicit reveal is needed here (keeps a single source of truth, seek-safe).
+
+      // kicker (indexical line) arrives on the hold, quiet per the reading order
+      tl.fromTo(
+        kickerEl,
+        { opacity: 0, y: 12 },
+        { opacity: 1, y: 0, duration: 0.5, ease: "power3.out" },
+        POP_AT + 0.55
+      );
+
+      // hold to the end — only the caret blink continues (finite, driven above)
+    })();
+  </script>
+</template>

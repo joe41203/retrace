@@ -1,0 +1,340 @@
+<template>
+  <style>
+    /* ---- 05-explanation : Proof — 何を / なぜ / 読みどころ + diff ---- */
+    #root {
+      position: relative;
+      width: 1920px;
+      height: 1080px;
+      overflow: hidden;
+      font-family: "JetBrains Mono", "Noto Sans JP", ui-monospace, monospace;
+      color: #d6deeb;
+    }
+
+    /* full-bleed dark ground on its own clip layer (never on #root) */
+    .exp-bg {
+      position: absolute;
+      inset: 0;
+      background: #0a0e14;
+    }
+    .exp-grid {
+      position: absolute;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(63, 185, 80, 0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(63, 185, 80, 0.03) 1px, transparent 1px);
+      background-size: 64px 64px;
+    }
+
+    /* stage centers the terminal card; card sits high enough for the 83% keep-out */
+    .exp-stage {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .exp-card {
+      width: 1420px;
+      border: 1px solid #2a3a4a;
+      border-radius: 12px;
+      background: #070a0f;
+      box-shadow: 0 1px 3px rgba(7, 10, 15, 0.5), 0 24px 60px rgba(0, 0, 0, 0.35);
+      overflow: hidden;
+      transform-origin: 50% 50%;
+      /* nudge the whole card up so its bottom clears y=896 (83% of 1080) */
+      margin-bottom: 96px;
+    }
+
+    /* ---- title bar : signal-light dots + path + evidence badge ---- */
+    .exp-bar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 16px 22px;
+      background: #0f151f;
+      border-bottom: 1px solid #1c2530;
+    }
+    .exp-dot {
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+    }
+    .exp-dot.r { background: #ff5f57; }
+    .exp-dot.y { background: #febc2e; }
+    .exp-dot.g { background: #28c840; }
+    .exp-path {
+      margin-left: 16px;
+      font-size: 22px;
+      letter-spacing: 0.01em;
+      color: #7d8ba0;
+    }
+    .exp-path .sha { color: #39c5cf; }
+    .exp-ev {
+      margin-left: auto;
+      font-size: 21px;
+      color: #3fb950;
+      border: 1px solid rgba(63, 185, 80, 0.35);
+      border-radius: 999px;
+      padding: 6px 18px;
+      white-space: nowrap;
+    }
+    .exp-ev .check { font-weight: 500; }
+
+    /* ---- body : label rows + diff ---- */
+    .exp-body { padding: 46px 54px 48px; }
+
+    .exp-row {
+      display: flex;
+      gap: 26px;
+      margin-bottom: 28px;
+      font-size: 29px;
+      line-height: 1.5;
+      will-change: transform, opacity;
+    }
+    .exp-lbl {
+      color: #d29922;
+      flex: 0 0 168px;
+      font-weight: 500;
+      letter-spacing: 0.01em;
+    }
+    .exp-txt {
+      color: #d6deeb;
+      flex: 1;
+    }
+    /* the "読みどころ" keyword that will glow on the green add-line */
+    .exp-kw {
+      color: #d6deeb;
+      padding: 0 2px;
+      border-radius: 3px;
+    }
+
+    /* diff panel */
+    .exp-diff {
+      margin-top: 34px;
+      border-top: 1px solid #1c2530;
+      padding-top: 30px;
+      font-size: 27px;
+      line-height: 1.85;
+      white-space: nowrap;
+    }
+    .exp-line {
+      display: block;
+      min-height: 50px;
+    }
+    .exp-del { color: #f85149; }
+    .exp-add { color: #56d364; }
+    /* the green add-line carries a type-on caret */
+    .exp-caret {
+      display: inline-block;
+      width: 13px;
+      color: #56d364;
+    }
+  </style>
+
+  <div data-hf-id="hf-5z4e" id="root" data-composition-id="05-explanation" data-start="0" data-duration="8.5" data-width="1920" data-height="1080">
+    <!-- full-bleed ground on the lowest clip track -->
+    <div data-hf-id="hf-gfcb" class="exp-bg clip" data-start="0" data-duration="8.5" data-track-index="0"></div>
+    <div data-hf-id="hf-wv20" class="exp-grid clip" data-start="0" data-duration="8.5" data-track-index="2"></div>
+
+    <div data-hf-id="hf-wfz7" class="exp-stage clip" data-start="0" data-duration="8.5" data-track-index="1">
+      <div data-hf-id="hf-ndda" class="exp-card" id="exp-card">
+        <!-- title bar defines first (Scene 1) -->
+        <div data-hf-id="hf-dy0t" class="exp-bar">
+          <span data-hf-id="hf-fnty" class="exp-dot r"></span>
+          <span data-hf-id="hf-ka4d" class="exp-dot y"></span>
+          <span data-hf-id="hf-haqr" class="exp-dot g"></span>
+          <span data-hf-id="hf-4b34" class="exp-path">retrace — nakabonne/ali · commit #6 · <span data-hf-id="hf-x5xd" class="sha">5ab1a75</span></span>
+          <span data-hf-id="hf-qgey" class="exp-ev" id="exp-ev"><span data-hf-id="hf-qb1c" class="check">✓</span> PR 根拠あり</span>
+        </div>
+
+        <div data-hf-id="hf-2pxq" class="exp-body">
+          <!-- Scene 2 : one label-row at a time -->
+          <div data-hf-id="hf-b7ko" class="exp-row" id="exp-row-1">
+            <span data-hf-id="hf-vb72" class="exp-lbl">何を:</span>
+            <span data-hf-id="hf-3u09" class="exp-txt">ダミー波形の periodic 関数を削除し、attacker.Attack を呼ぶ goroutine へ置き換えた。</span>
+          </div>
+          <div data-hf-id="hf-m32b" class="exp-row" id="exp-row-2">
+            <span data-hf-id="hf-o18t" class="exp-lbl">なぜ:</span>
+            <span data-hf-id="hf-m2em" class="exp-txt">実際に負荷生成できる状態にするのが目的（コミットメッセージ / PR が根拠）。</span>
+          </div>
+          <div data-hf-id="hf-i4ya" class="exp-row" id="exp-row-3">
+            <span data-hf-id="hf-ua5s" class="exp-lbl">読みどころ:</span>
+            <span data-hf-id="hf-gee8" class="exp-txt">Attack のシグネチャに <span data-hf-id="hf-3a4w" class="exp-kw" id="exp-kw">ctx</span> が入り、中断可能になった点。</span>
+          </div>
+
+          <!-- Scene 3 : diff types on -->
+          <div data-hf-id="hf-ut7j" class="exp-diff">
+            <span data-hf-id="hf-c34j" class="exp-line exp-del" id="exp-del"></span>
+            <span data-hf-id="hf-q687" class="exp-line exp-add" id="exp-add"><span data-hf-id="hf-5h57" id="exp-add-text"></span><span data-hf-id="hf-kv86" class="exp-caret" id="exp-caret">▋</span></span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+  <script>
+    (function () {
+      window.__timelines = window.__timelines || {};
+      var tl = gsap.timeline({ paused: true });
+
+      // ---------------------------------------------------------------
+      // Scene 1 (0.0–1.2s): inverse zoom-through arrival at the card.
+      //   Card scales up from a slightly zoomed-in read, un-blurs and
+      //   settles. Title bar + evidence badge are the first thing to land.
+      // ---------------------------------------------------------------
+      tl.fromTo(
+        "#exp-card",
+        { scale: 0.86, opacity: 0, filter: "blur(14px)" },
+        { scale: 1, opacity: 1, filter: "blur(0px)", duration: 1.0, ease: "power3.out" },
+        0.0
+      );
+      // evidence badge lands with a touch of confidence just after the card
+      tl.fromTo(
+        "#exp-ev",
+        { opacity: 0, y: -8 },
+        { opacity: 1, y: 0, duration: 0.5, ease: "power3.out" },
+        0.55
+      );
+
+      // ---------------------------------------------------------------
+      // Scene 2 (1.2–3.4s): reveal ONE label-row at a time, in reading
+      //   order — amber label first, then the cream body. Staggered per
+      //   row, NOT front-loaded. power3.
+      // ---------------------------------------------------------------
+      var rowStarts = [1.25, 1.95, 2.68];
+      ["#exp-row-1", "#exp-row-2", "#exp-row-3"].forEach(function (id, i) {
+        var t0 = rowStarts[i];
+        // amber label chunk
+        tl.fromTo(
+          id + " .exp-lbl",
+          { opacity: 0, x: -14 },
+          { opacity: 1, x: 0, duration: 0.34, ease: "power3.out" },
+          t0
+        );
+        // cream body chunk follows the label
+        tl.fromTo(
+          id + " .exp-txt",
+          { opacity: 0, y: 10 },
+          { opacity: 1, y: 0, duration: 0.42, ease: "power3.out" },
+          t0 + 0.16
+        );
+      });
+
+      // ---------------------------------------------------------------
+      // Scene 3 (3.4–6.2s): diff types on (discrete-text-sequence).
+      //   First the red "- func Attack(...)" line, then the green
+      //   "+ func Attack(ctx context.Context, ...)" line. Discrete state
+      //   swaps at thresholds — instant jumps, no smear.
+      // ---------------------------------------------------------------
+      var DEL_FULL = "- func Attack(target string, resCh chan *Result) *Metrics {";
+      var ADD_FULL = "+ func Attack(ctx context.Context, target string, ...) {";
+
+      // red del line: type on 3.45 -> 4.55
+      var delState = { n: 0 };
+      var delEl = null;
+      tl.to(
+        delState,
+        {
+          n: DEL_FULL.length,
+          duration: 1.1,
+          ease: "none",
+          onUpdate: function () {
+            if (!delEl) delEl = document.getElementById("exp-del");
+            if (delEl) delEl.textContent = DEL_FULL.substring(0, Math.floor(delState.n));
+          },
+        },
+        3.45
+      );
+
+      // green add line: type on 4.75 -> 5.95 (lands after del completes)
+      var addState = { n: 0 };
+      var addEl = null;
+      tl.to(
+        addState,
+        {
+          n: ADD_FULL.length,
+          duration: 1.2,
+          ease: "none",
+          onUpdate: function () {
+            if (!addEl) addEl = document.getElementById("exp-add-text");
+            if (addEl) addEl.textContent = ADD_FULL.substring(0, Math.floor(addState.n));
+          },
+        },
+        4.75
+      );
+
+      // Restrained GREEN keyword-glow (asr-keyword-glow envelope) on the
+      // evidence badge and the word "ctx" the moment the green + line lands.
+      // Finite tween, single driver, decays to a rest breadcrumb — no repeat.
+      var GLOW_START = 5.95; // green line has just fully landed
+      var GLOW_DUR = 1.4;
+      var ATTACK = 0.22;
+      var RELEASE = 0.6;
+      var REST = 0.14;
+      function glowEnv(local) {
+        if (local < 0) return 0;
+        if (local < ATTACK) return local / ATTACK; // attack to 1
+        var relEnd = ATTACK + RELEASE;
+        if (local < relEnd) return 1 - ((local - ATTACK) / RELEASE) * (1 - REST); // decay to rest
+        return REST; // hold breadcrumb
+      }
+      var glowDriver = { t: 0 };
+      var evEl = null, kwEl = null;
+      tl.to(
+        glowDriver,
+        {
+          t: GLOW_DUR,
+          duration: GLOW_DUR,
+          ease: "none",
+          onUpdate: function () {
+            if (!evEl) evEl = document.getElementById("exp-ev");
+            if (!kwEl) kwEl = document.getElementById("exp-kw");
+            var env = glowEnv(glowDriver.t);
+            // green glow hugging the glyphs (text-shadow), badge edge lifts
+            if (kwEl) {
+              kwEl.style.textShadow = "0 0 " + (18 * env).toFixed(2) + "px rgba(86,211,100," + (0.85 * env).toFixed(3) + ")";
+              kwEl.style.color = env > 0.25 ? "#56d364" : "#d6deeb";
+            }
+            if (evEl) {
+              evEl.style.textShadow = "0 0 " + (16 * env).toFixed(2) + "px rgba(63,185,80," + (0.7 * env).toFixed(3) + ")";
+              evEl.style.borderColor = "rgba(63,185,80," + (0.35 + 0.4 * env).toFixed(3) + ")";
+            }
+          },
+        },
+        GLOW_START
+      );
+
+      // ---------------------------------------------------------------
+      // Caret blink — deterministic sin square wave across the whole
+      // duration (finite, no CSS animation). Only motion during the
+      // Scene 4 hold (6.2–8.0s): the confidence breather.
+      // ---------------------------------------------------------------
+      var TOTAL = 8;
+      var BLINK_CYCLES = 13; // ~0.6s per cycle
+      var blink = { p: 0 };
+      var caretEl = null;
+      tl.to(
+        blink,
+        {
+          p: Math.PI * 2 * BLINK_CYCLES,
+          duration: TOTAL,
+          ease: "none",
+          onUpdate: function () {
+            if (!caretEl) caretEl = document.getElementById("exp-caret");
+            if (!caretEl) return;
+            // caret hidden until the green line begins typing, then blinks
+            if (blink.p / (Math.PI * 2 * BLINK_CYCLES) * TOTAL < 4.75) {
+              caretEl.style.opacity = "0";
+            } else {
+              caretEl.style.opacity = Math.sin(blink.p) > 0 ? "1" : "0";
+            }
+          },
+        },
+        0
+      );
+
+      window.__timelines["05-explanation"] = tl;
+    })();
+  </script>
+</template>
