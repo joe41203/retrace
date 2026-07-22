@@ -3,6 +3,7 @@
 // - prefers-color-scheme に追従してテーマを切替
 // - 描画失敗時はエラーで画面を壊さず、mermaid ソースをコードブロックとして表示
 import { useEffect, useRef, useState } from "react";
+import DiagramModal from "./DiagramModal";
 import type { Diagram as DiagramData } from "./types";
 
 function prefersDark(): boolean {
@@ -34,6 +35,7 @@ let diagramSeq = 0;
 export default function Diagram({ diagram }: { diagram: DiagramData }) {
 	const [svg, setSvg] = useState<string | null>(null);
 	const [failed, setFailed] = useState(false);
+	const [zoomed, setZoomed] = useState(false);
 	const idRef = useRef(`mermaid-${(diagramSeq += 1)}`);
 
 	useEffect(() => {
@@ -70,16 +72,34 @@ export default function Diagram({ diagram }: { diagram: DiagramData }) {
 				<pre className="diagram-fallback">{diagram.mermaid}</pre>
 			) : svg ? (
 				// mermaid が生成する SVG。securityLevel: 'strict' でサニタイズ済み。
-				<div
-					className="diagram-render"
-					// biome-ignore lint/security/noDangerouslySetInnerHtml: mermaid strict モードのサニタイズ済み SVG を描画するため
-					dangerouslySetInnerHTML={{ __html: svg }}
-				/>
+				// 狭い右ペインでは縮小されるので、クリックで全画面モーダルに拡大表示する。
+				<button
+					type="button"
+					className="diagram-render diagram-render-clickable"
+					onClick={() => setZoomed(true)}
+					title="クリックで拡大"
+					aria-label="ダイアグラムを拡大表示"
+				>
+					<div
+						// biome-ignore lint/security/noDangerouslySetInnerHtml: mermaid strict モードのサニタイズ済み SVG を描画するため
+						dangerouslySetInnerHTML={{ __html: svg }}
+					/>
+					<span className="diagram-zoom-hint" aria-hidden="true">
+						⤢ 拡大
+					</span>
+				</button>
 			) : (
 				<div className="diagram-render">図を描画中…</div>
 			)}
 			{diagram.caption && (
 				<div className="diagram-caption">{diagram.caption}</div>
+			)}
+			{zoomed && svg && (
+				<DiagramModal
+					svg={svg}
+					caption={diagram.caption}
+					onClose={() => setZoomed(false)}
+				/>
 			)}
 		</div>
 	);
