@@ -1,0 +1,665 @@
+@import 'react-diff-view/style/index.css';
+
+/* GitHub 風の配色。prefers-color-scheme でライト/ダーク切替。 */
+:root {
+  --bg: #ffffff;
+  --bg-subtle: #f6f8fa;
+  --bg-inset: #f0f3f6;
+  --border: #d0d7de;
+  --border-muted: #d8dee4;
+  --fg: #1f2328;
+  --fg-muted: #656d76;
+  --fg-subtle: #8c959f;
+  --accent: #0969da;
+  --accent-fg: #ffffff;
+  --success: #1a7f37;
+  --success-bg: #dafbe1;
+  --attention: #9a6700;
+  --attention-bg: #fff8c5;
+  --purple: #8250df;
+  --purple-bg: #fbefff;
+  --danger: #cf222e;
+  --read-check: #1a7f37;
+  --shadow: 0 1px 3px rgba(31, 35, 40, 0.12);
+  --mono: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace;
+  color-scheme: light;
+
+  /* react-diff-view のテーマ変数(ライト = GitHub 風) */
+  --diff-background-color: var(--bg);
+  --diff-text-color: var(--fg);
+  --diff-font-family: var(--mono);
+  --diff-selection-background-color: #b3d7ff;
+  --diff-gutter-insert-background-color: #ccffd8;
+  --diff-gutter-delete-background-color: #ffd7d5;
+  --diff-gutter-selected-background-color: #fffbdd;
+  --diff-code-insert-background-color: #e6ffec;
+  --diff-code-delete-background-color: #ffebe9;
+  --diff-code-insert-edit-background-color: #abf2bc;
+  --diff-code-delete-edit-background-color: #ff818266;
+  --diff-code-selected-background-color: #fffbdd;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0d1117;
+    --bg-subtle: #161b22;
+    --bg-inset: #010409;
+    --border: #30363d;
+    --border-muted: #21262d;
+    --fg: #e6edf3;
+    --fg-muted: #8b949e;
+    --fg-subtle: #6e7681;
+    --accent: #2f81f7;
+    --accent-fg: #ffffff;
+    --success: #3fb950;
+    --success-bg: #12261e;
+    --attention: #d29922;
+    --attention-bg: #272115;
+    --purple: #a371f7;
+    --purple-bg: #1d1b2e;
+    --danger: #f85149;
+    --read-check: #3fb950;
+    --shadow: 0 1px 3px rgba(1, 4, 9, 0.5);
+    color-scheme: dark;
+
+    /* react-diff-view のテーマ変数(ダーク = GitHub Dark 相当) */
+    --diff-background-color: var(--bg);
+    --diff-text-color: var(--fg);
+    --diff-selection-background-color: #264f78;
+    --diff-gutter-insert-background-color: #1a3326;
+    --diff-gutter-delete-background-color: #3a1c1e;
+    --diff-gutter-selected-background-color: #332b00;
+    --diff-code-insert-background-color: #12261e;
+    --diff-code-delete-background-color: #25171c;
+    --diff-code-insert-edit-background-color: #1f6f3f66;
+    --diff-code-delete-edit-background-color: #a4242466;
+    --diff-code-selected-background-color: #332b00;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  font-family:
+    -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Hiragino Sans', 'Noto Sans JP', Meiryo, sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--fg);
+  background: var(--bg);
+}
+
+a {
+  color: var(--accent);
+  text-decoration: none;
+}
+a:hover {
+  text-decoration: underline;
+}
+
+/* ---------- レイアウト ---------- */
+
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.app-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-subtle);
+  flex: 0 0 auto;
+}
+.app-header .brand {
+  font-weight: 700;
+  font-size: 16px;
+}
+.app-header .brand small {
+  font-weight: 400;
+  color: var(--fg-muted);
+  margin-left: 8px;
+}
+.app-header .spacer {
+  flex: 1;
+}
+.app-header .repo-link {
+  font-size: 13px;
+}
+.app-header select {
+  font: inherit;
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--fg);
+}
+
+.overall-progress {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--fg-muted);
+  min-width: 180px;
+}
+.progress-track {
+  flex: 1;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--bg-inset);
+  overflow: hidden;
+  border: 1px solid var(--border-muted);
+}
+.progress-fill {
+  height: 100%;
+  background: var(--success);
+  transition: width 0.2s ease;
+}
+
+.panes {
+  display: grid;
+  grid-template-columns: 320px minmax(0, 1fr) 360px;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+.pane {
+  min-height: 0;
+  overflow-y: auto;
+  border-right: 1px solid var(--border);
+}
+.pane:last-child {
+  border-right: none;
+}
+.pane-left {
+  background: var(--bg-subtle);
+}
+.pane-right {
+  background: var(--bg-subtle);
+}
+
+/* ---------- 左ペイン: 章 + コミット一覧 ---------- */
+
+.chapter {
+  border-bottom: 1px solid var(--border);
+}
+.chapter-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 10px 12px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: var(--fg);
+  text-align: left;
+  font: inherit;
+}
+.chapter-header:hover {
+  background: var(--bg-inset);
+}
+.chapter-caret {
+  color: var(--fg-subtle);
+  font-size: 11px;
+  width: 12px;
+  flex: 0 0 auto;
+}
+.chapter-title {
+  font-weight: 600;
+  flex: 1;
+  min-width: 0;
+}
+.chapter-count {
+  font-size: 11px;
+  color: var(--fg-muted);
+  flex: 0 0 auto;
+}
+.chapter-progress {
+  height: 4px;
+  border-radius: 999px;
+  background: var(--bg-inset);
+  margin: 0 12px 8px 32px;
+  overflow: hidden;
+}
+.chapter-progress .progress-fill {
+  background: var(--success);
+}
+.chapter-summary {
+  padding: 0 12px 10px 32px;
+  font-size: 12px;
+  color: var(--fg-muted);
+}
+
+.commit-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.commit-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 12px 8px 20px;
+  border: none;
+  border-top: 1px solid var(--border-muted);
+  background: transparent;
+  cursor: pointer;
+  color: var(--fg);
+  text-align: left;
+  font: inherit;
+}
+.commit-item:hover {
+  background: var(--bg-inset);
+}
+.commit-item.active {
+  background: var(--bg-inset);
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+.commit-read-mark {
+  flex: 0 0 auto;
+  width: 16px;
+  text-align: center;
+  color: var(--read-check);
+  font-size: 12px;
+  line-height: 1.5;
+}
+.commit-read-mark.unread {
+  color: var(--border);
+}
+.commit-body {
+  flex: 1;
+  min-width: 0;
+}
+.commit-subject {
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.commit-meta-row {
+  display: flex;
+  gap: 8px;
+  font-size: 11px;
+  color: var(--fg-muted);
+  margin-top: 2px;
+}
+.commit-seq {
+  color: var(--fg-subtle);
+  font-variant-numeric: tabular-nums;
+}
+.pr-tag {
+  color: var(--accent);
+}
+
+/* ---------- 中央ペイン ---------- */
+
+.pane-center {
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+}
+.commit-header {
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--border);
+  flex: 0 0 auto;
+}
+.commit-header h2 {
+  margin: 0 0 6px;
+  font-size: 18px;
+  line-height: 1.3;
+}
+.commit-header .sub {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  font-size: 12px;
+  color: var(--fg-muted);
+  align-items: center;
+}
+.commit-header .sha {
+  font-family: var(--mono);
+}
+.commit-message-full {
+  margin-top: 10px;
+  padding: 10px 12px;
+  background: var(--bg-subtle);
+  border: 1px solid var(--border-muted);
+  border-radius: 6px;
+  font-family: var(--mono);
+  font-size: 12px;
+  white-space: pre-wrap;
+  color: var(--fg-muted);
+  max-height: 140px;
+  overflow-y: auto;
+}
+
+.tabs {
+  display: flex;
+  gap: 4px;
+  padding: 8px 18px 0;
+  border-bottom: 1px solid var(--border);
+  flex: 0 0 auto;
+  align-items: center;
+}
+.tab-btn {
+  padding: 6px 12px;
+  border: 1px solid transparent;
+  border-bottom: none;
+  border-radius: 6px 6px 0 0;
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+  color: var(--fg-muted);
+}
+.tab-btn.active {
+  color: var(--fg);
+  background: var(--bg);
+  border-color: var(--border);
+  margin-bottom: -1px;
+  font-weight: 600;
+}
+.tabs .spacer {
+  flex: 1;
+}
+.view-toggle {
+  display: inline-flex;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+  margin-bottom: 6px;
+}
+.view-toggle button {
+  padding: 4px 10px;
+  border: none;
+  background: var(--bg);
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  color: var(--fg-muted);
+}
+.view-toggle button.active {
+  background: var(--accent);
+  color: var(--accent-fg);
+}
+
+.center-scroll {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  padding: 12px 18px 40px;
+}
+
+.banner {
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  margin-bottom: 12px;
+  border: 1px solid;
+}
+.banner-warn {
+  background: var(--attention-bg);
+  border-color: var(--attention);
+  color: var(--attention);
+}
+
+/* diff ファイルカード */
+.file-card {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  margin-bottom: 12px;
+  overflow: hidden;
+  background: var(--bg);
+}
+.file-card-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: var(--bg-subtle);
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  font-family: var(--mono);
+  font-size: 12px;
+}
+.file-card-header.collapsed {
+  border-bottom: none;
+}
+.file-card-header:hover {
+  background: var(--bg-inset);
+}
+.file-card-caret {
+  color: var(--fg-subtle);
+  width: 12px;
+  flex: 0 0 auto;
+}
+.file-path {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.file-stat {
+  flex: 0 0 auto;
+  font-size: 11px;
+}
+.file-stat .add {
+  color: var(--success);
+}
+.file-stat .del {
+  color: var(--danger);
+}
+.status-badge {
+  flex: 0 0 auto;
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  color: var(--fg-muted);
+}
+.file-note {
+  padding: 20px 12px;
+  color: var(--fg-muted);
+  font-size: 13px;
+  text-align: center;
+}
+.diff-scroll {
+  overflow-x: auto;
+}
+.diff-scroll .diff {
+  font-size: 12px;
+}
+
+/* highlight ハイライト対象ファイル */
+.file-card.highlighted .file-card-header {
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+
+/* ---------- ファイルツリー ---------- */
+
+.tree {
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 1.8;
+}
+.tree-node {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 1px 6px;
+  border-radius: 4px;
+}
+.tree-node.dir {
+  color: var(--fg-muted);
+  font-weight: 600;
+}
+.tree-node.file.changed {
+  cursor: pointer;
+}
+.tree-node.file.changed:hover {
+  background: var(--bg-inset);
+}
+.tree-changed-badge {
+  font-size: 10px;
+  padding: 0 5px;
+  border-radius: 999px;
+  color: var(--accent-fg);
+  background: var(--accent);
+}
+
+/* ---------- 右ペイン: 解説カード ---------- */
+
+.explanation {
+  padding: 16px;
+}
+.exp-section {
+  margin-bottom: 16px;
+}
+.exp-section h3 {
+  margin: 0 0 6px;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--fg-subtle);
+}
+.exp-section p {
+  margin: 0;
+}
+.evidence-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+}
+.evidence-pr {
+  color: var(--success);
+  background: var(--success-bg);
+  border-color: var(--success);
+}
+.evidence-issue {
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  border-color: var(--accent);
+}
+.evidence-message {
+  color: var(--fg-muted);
+  background: var(--bg-inset);
+  border-color: var(--border);
+}
+.evidence-inferred {
+  color: var(--attention);
+  background: var(--attention-bg);
+  border-color: var(--attention);
+}
+
+.highlight-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.highlight-list li {
+  padding: 8px 10px;
+  border: 1px solid var(--border-muted);
+  border-radius: 6px;
+  margin-bottom: 6px;
+  background: var(--bg);
+}
+.highlight-file {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--accent);
+  display: block;
+  margin-bottom: 2px;
+}
+.refs-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.ref-chip {
+  font-size: 11px;
+  padding: 2px 8px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--bg);
+}
+.exp-meta {
+  font-size: 11px;
+  color: var(--fg-subtle);
+  border-top: 1px solid var(--border-muted);
+  padding-top: 10px;
+}
+
+.empty-explanation {
+  padding: 24px 16px;
+  color: var(--fg-muted);
+  font-size: 13px;
+}
+.empty-explanation code {
+  font-family: var(--mono);
+  background: var(--bg-inset);
+  padding: 1px 5px;
+  border-radius: 4px;
+}
+
+/* ---------- 状態表示 ---------- */
+
+.center-status,
+.pane-status {
+  padding: 24px 18px;
+  color: var(--fg-muted);
+}
+.error-box {
+  margin: 16px;
+  padding: 12px;
+  border: 1px solid var(--danger);
+  border-radius: 6px;
+  color: var(--danger);
+  font-size: 13px;
+}
+.kbd-hint {
+  font-size: 11px;
+  color: var(--fg-subtle);
+}
+kbd {
+  font-family: var(--mono);
+  font-size: 11px;
+  padding: 1px 5px;
+  border: 1px solid var(--border);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  background: var(--bg-subtle);
+}
+
+.icon-btn {
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--fg-muted);
+  border-radius: 6px;
+  padding: 3px 8px;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.icon-btn:hover {
+  background: var(--bg-inset);
+}
