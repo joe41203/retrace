@@ -137,13 +137,120 @@ a:hover {
 .app-header .repo-link {
   font-size: 13px;
 }
-.app-header select {
+/* ---------- ヘッダーのリポジトリ切替メニュー(RepoSwitcher) ---------- */
+
+.repo-switcher {
+  position: relative;
+}
+.repo-switcher-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   font: inherit;
-  padding: 4px 8px;
+  padding: 4px 10px;
   border: 1px solid var(--border);
   border-radius: 6px;
   background: var(--bg);
   color: var(--fg);
+  cursor: pointer;
+}
+.repo-switcher-trigger:hover {
+  background: var(--bg-inset);
+  border-color: var(--fg-subtle);
+}
+.repo-switcher-current {
+  font-weight: 600;
+  font-size: 13px;
+}
+.repo-switcher-caret {
+  color: var(--fg-muted);
+  font-size: 10px;
+}
+.repo-switcher-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 30;
+  width: 300px;
+  max-width: 80vw;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+.repo-switcher-search {
+  font: inherit;
+  font-size: 13px;
+  padding: 8px 10px;
+  border: none;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--fg);
+  outline: none;
+}
+.repo-switcher-list {
+  max-height: 320px;
+  overflow-y: auto;
+  padding: 4px;
+}
+.repo-switcher-item {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  font: inherit;
+  text-align: left;
+  padding: 7px 10px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--fg);
+  cursor: pointer;
+}
+.repo-switcher-item:hover {
+  background: var(--bg-inset);
+}
+.repo-switcher-item.is-active {
+  background: var(--purple-bg);
+}
+.repo-switcher-item.is-active .repo-switcher-item-name {
+  font-weight: 700;
+}
+.repo-switcher-item-name {
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.repo-switcher-item-meta {
+  flex: 0 0 auto;
+  font-size: 11px;
+  color: var(--fg-muted);
+  font-variant-numeric: tabular-nums;
+}
+.repo-switcher-empty {
+  padding: 12px 10px;
+  color: var(--fg-muted);
+  font-size: 13px;
+  text-align: center;
+}
+.repo-switcher-back {
+  font: inherit;
+  font-size: 12px;
+  text-align: left;
+  padding: 8px 12px;
+  border: none;
+  border-top: 1px solid var(--border);
+  background: var(--bg-subtle);
+  color: var(--accent);
+  cursor: pointer;
+}
+.repo-switcher-back:hover {
+  background: var(--bg-inset);
 }
 
 .overall-progress {
@@ -1053,4 +1160,213 @@ body.is-resizing .resize-handle {
 body.is-resizing {
   user-select: none;
   cursor: col-resize;
+}
+
+/* ---------- リポジトリ選択画面(RepoPicker) ---------- */
+
+.picker {
+  height: 100%;
+  overflow-y: auto;
+  background: var(--bg);
+}
+.picker-inner {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 56px 24px 80px;
+}
+.picker-head {
+  margin-bottom: 28px;
+}
+.picker-title {
+  margin: 0;
+  font-size: 30px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+.picker-title small {
+  display: block;
+  margin-top: 6px;
+  font-size: 14px;
+  font-weight: 400;
+  color: var(--fg-muted);
+}
+.picker-lead {
+  margin: 10px 0 0;
+  color: var(--fg-muted);
+  font-size: 15px;
+}
+.picker-resume {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  text-align: left;
+  margin-bottom: 24px;
+  padding: 14px 18px;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  border-radius: 10px;
+  background: var(--bg-subtle);
+  color: var(--fg);
+  cursor: pointer;
+}
+.picker-resume:hover {
+  background: var(--bg-inset);
+  border-color: var(--accent);
+}
+.picker-resume-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--accent);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.picker-resume-repo {
+  font-size: 15px;
+  font-weight: 700;
+}
+.picker-resume-pct {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--fg-muted);
+  font-variant-numeric: tabular-nums;
+}
+.picker-search {
+  font: inherit;
+  font-size: 15px;
+  width: 100%;
+  padding: 10px 14px;
+  margin-bottom: 20px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--fg);
+  outline: none;
+}
+.picker-search:focus {
+  border-color: var(--accent);
+}
+.picker-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 14px;
+}
+.repo-card {
+  display: flex;
+  flex-direction: column;
+  text-align: left;
+  padding: 16px 18px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg);
+  color: var(--fg);
+  cursor: pointer;
+  transition:
+    border-color 0.12s ease,
+    box-shadow 0.12s ease,
+    transform 0.12s ease;
+}
+.repo-card:hover {
+  border-color: var(--accent);
+  box-shadow: var(--shadow);
+  transform: translateY(-1px);
+}
+.repo-card.is-done {
+  border-left: 3px solid var(--success);
+}
+.repo-card-owner {
+  font-size: 12px;
+  color: var(--fg-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.repo-card-name {
+  font-size: 17px;
+  font-weight: 700;
+  margin-top: 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.repo-card-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+  color: var(--fg-muted);
+  margin-top: 6px;
+  font-variant-numeric: tabular-nums;
+}
+.lang-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.lang-dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex: 0 0 auto;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.06) inset;
+}
+/* 切替メニューの行内ドットは名前の前に少し詰めて置く */
+.repo-switcher-item-name .lang-dot {
+  width: 8px;
+  height: 8px;
+  margin-right: 6px;
+  vertical-align: middle;
+}
+.repo-card-progress {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 14px;
+}
+/* カード内の進捗トラックは伸縮させる(overall-progress と共用の .progress-track) */
+.repo-card-progress .progress-track {
+  flex: 1;
+}
+.repo-card-pct {
+  flex: 0 0 auto;
+  font-size: 11px;
+  color: var(--fg-muted);
+  font-variant-numeric: tabular-nums;
+}
+.repo-card.is-done .repo-card-pct {
+  color: var(--success);
+  font-weight: 600;
+}
+.picker-empty {
+  margin-top: 24px;
+  padding: 32px;
+  text-align: center;
+  color: var(--fg-muted);
+  border: 1px dashed var(--border);
+  border-radius: 10px;
+}
+
+/* Top → LP への導線(選択画面フッター) */
+.picker-footer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 40px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border);
+  font-size: 13px;
+  color: var(--fg-subtle);
+}
+.picker-footer-label {
+  color: var(--fg-muted);
+}
+.picker-footer a {
+  color: var(--fg-muted);
+}
+.picker-footer a:hover {
+  color: var(--accent);
+}
+.picker-footer-sep {
+  color: var(--fg-subtle);
 }

@@ -442,6 +442,7 @@ const entry = {
   owner: repo.owner,
   repo: repo.repo,
   commitCount: commits.length,
+  language: 'Go', // fixture の代表値(language フィールドの網羅)
 };
 const idx = datasets.findIndex((d) => d && d.id === DATASET_ID);
 if (idx >= 0) datasets[idx] = entry;

@@ -43,8 +43,10 @@ flowchart LR
 ### data/datasets.json(全データセットの目次)
 
 ```json
-[{ "id": "nakabonne__ali", "owner": "nakabonne", "repo": "ali", "commitCount": 200 }]
+[{ "id": "nakabonne__ali", "owner": "nakabonne", "repo": "ali", "commitCount": 200, "language": "Go" }]
 ```
+
+`language` は GitHub API(`repos/<owner>/<repo>` の `language`)から取得する主要言語。取得できない場合は `null`(または欠落)。ビューアの選択画面・切替メニューで言語バッジとして表示する。
 
 ### repo.json
 

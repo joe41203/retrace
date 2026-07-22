@@ -53,20 +53,25 @@ async function ensureRepo(owner, repo, id) {
   return repoDir;
 }
 
-async function getDefaultBranch(owner, repo, repoDir) {
-  // gh api を優先。失敗したらローカルの origin/HEAD から推定。
+// GitHub API からリポジトリ情報(defaultBranch / language)をまとめて取得する。
+// default_branch が取れない場合はローカルの origin/HEAD から推定する。
+async function getRepoInfo(owner, repo, repoDir) {
+  // gh api を優先。失敗したら null が返る。
   const info = await ghApi(`repos/${owner}/${repo}`);
-  if (info?.default_branch) return info.default_branch;
-  try {
-    const out = await git(repoDir, ["symbolic-ref", "refs/remotes/origin/HEAD"], {
-      allowFail: true,
-    });
-    const m = /origin\/(.+)\s*$/.exec(out);
-    if (m) return m[1].trim();
-  } catch {
-    /* ignore */
+  const language = info?.language ?? null; // 主要言語。取れなければ null。
+  let defaultBranch = info?.default_branch ?? null;
+  if (!defaultBranch) {
+    try {
+      const out = await git(repoDir, ["symbolic-ref", "refs/remotes/origin/HEAD"], {
+        allowFail: true,
+      });
+      const m = /origin\/(.+)\s*$/.exec(out);
+      if (m) defaultBranch = m[1].trim();
+    } catch {
+      /* ignore */
+    }
   }
-  return "main";
+  return { defaultBranch: defaultBranch ?? "main", language };
 }
 
 // ---- files 配列(name-status × numstat の突合) ----------------------------
@@ -247,8 +252,8 @@ async function main() {
   console.log(`[retrace] 抽出開始: ${owner}/${repo}`);
 
   const repoDir = await ensureRepo(owner, repo, id);
-  const defaultBranch = await getDefaultBranch(owner, repo, repoDir);
-  console.log(`[repo] defaultBranch = ${defaultBranch}`);
+  const { defaultBranch, language } = await getRepoInfo(owner, repo, repoDir);
+  console.log(`[repo] defaultBranch = ${defaultBranch} / language = ${language ?? "(不明)"}`);
 
   // mainline: first-parent を逆順(古い順)
   const revList = await git(repoDir, [
@@ -369,7 +374,7 @@ async function main() {
     extractedAt,
   });
 
-  await upsertDataset({ id, owner, repo, commitCount: mainlineCount });
+  await upsertDataset({ id, owner, repo, commitCount: mainlineCount, language });
 
   const secs = ((Date.now() - startedAt) / 1000).toFixed(1);
   console.log("");

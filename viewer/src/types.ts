@@ -6,6 +6,7 @@ export interface DatasetEntry {
 	owner: string;
 	repo: string;
 	commitCount: number;
+	language?: string | null; // GitHub API の主要言語。取得できなければ null/欠落。
 }
 
 export interface Repo {
