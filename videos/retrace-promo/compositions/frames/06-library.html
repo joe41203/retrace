@@ -112,23 +112,25 @@
 
       tl.fromTo(wordEls,
         { y: 30, opacity: 0 },
-        { y: 0, opacity: 1, duration: 0.55, ease: "power3.out", stagger: 0.11 }, 0.28);
+        { y: 0, opacity: 1, duration: 0.5, ease: "expo.out", stagger: 0.075 }, 0.24);
 
       tl.fromTo(q("#lib-sub"),
         { y: 20, opacity: 0 },
         { y: 0, opacity: 1, duration: 0.6, ease: "power3.out" }, 0.95);
 
-      // Scene 2 (1.2–3.6s): 6 cards self-assemble in a staggered cascade
-      // (row → column order), plain stagger-up + fade, power3.
+      // Scene 2 (1.2–3.6s): 6 cards self-assemble in a driving staggered cascade
+      // (row → column order), stagger-up + fade. Tempo tightened for v2 (tighter
+      // stagger + a crisper expo stop) — NO color/shadow/scale tweens (those white
+      // out the headless render on this frame), only numeric pacing changes.
       var cards = qa(".lib-repo");
       var cardStart = 1.2;
-      var cardStagger = 0.13;
+      var cardStagger = 0.09;
       cards.forEach(function (card, i) {
         var at = cardStart + i * cardStagger;
-        // Card container: stagger-up + fade.
+        // Card container: stagger-up + fade, crisp expo landing.
         tl.fromTo(card,
           { y: 46, opacity: 0 },
-          { y: 0, opacity: 1, duration: 0.62, ease: "power3.out" }, at);
+          { y: 0, opacity: 1, duration: 0.52, ease: "expo.out" }, at);
         // Inside each card: owner → name → (lang dot + commit count) order.
         var owner = card.querySelector(".lib-owner");
         var name = card.querySelector(".lib-name");

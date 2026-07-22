@@ -14,7 +14,7 @@
 - duration: 5s
 - poster: 3.5s
 - transition_in: cut
-- status: built
+- status: animated
 - voiceover: ""
 - src: compositions/frames/01-hook.html
 - type: hook

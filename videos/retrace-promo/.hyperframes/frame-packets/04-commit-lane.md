@@ -14,7 +14,7 @@
 - duration: 9s
 - poster: 5s
 - transition_in: crossfade
-- status: built
+- status: animated
 - voiceover: ""
 - src: compositions/frames/04-commit-lane.html
 - type: feature_showcase

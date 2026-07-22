@@ -13,7 +13,7 @@
 - scene: 課題の霞が晴れ、ターミナルカード（信号機ドット + `retrace — nakabonne/ali · commit #6`）が一枚せり上がる。retrace の一行定義が落ち着いて着地
 - duration: 5s
 - transition_in: blur-crossfade
-- status: built
+- status: animated
 - voiceover: ""
 - src: compositions/frames/03-solution.html
 - type: product_intro

@@ -1,9 +1,10 @@
 <template>
   <style>
-    /* ── 03-solution — Solution: titlecard-reveal（意図的な breather） ──
+    /* ── 03-solution — Solution: titlecard-reveal（意図的な breather・v2）──
        DARK-FIRST: navy 地 → ターミナルカードが ONE restrained move でせり上がり、
-       >_ Retrace（緑・唯一の voltage）→ lead per-word → sub の順に落ち着いて着地。
-       以後 hold。カードは静止、キャレット点滅のみ。 */
+       控えめなカメラ push-in を添える。>_ Retrace（緑・唯一の voltage）着地に
+       短い緑 bloom → lead per-word（少しキビキビ）→ sub の順に落ち着いて着地。
+       以後 hold（low motion is the payload）。カードは静止、キャレット点滅のみ。 */
 
     /* JetBrains Mono は Latin/chrome。日本語は sibling frames と同じく
        システム/汎用 gothic fallback に委ねる（フォント staging はプロジェクト側の責務）。 */
@@ -32,13 +33,15 @@
       background-size: 64px 64px;
     }
 
-    /* ステージ：カードは水平中央・垂直は僅かに上（keep-out 83% 遵守） */
+    /* ステージ：カードは水平中央・垂直は僅かに上（keep-out 83% 遵守）。
+       カメラ push-in はこのステージ層に scale で載せる（CSS transform は付けない） */
     .sol-stage {
       position: absolute;
       inset: 0;
       display: flex;
       align-items: center;
       justify-content: center;
+      will-change: transform;
     }
 
     /* ── ターミナルカード（主役サーフェス）── */
@@ -74,7 +77,8 @@
 
     .sol-body { padding: 50px 46px 52px; }
 
-    /* >_ Retrace — 唯一の緑 voltage */
+    /* >_ Retrace — 唯一の緑 voltage。着地の bloom は --sol-glow を GSAP で駆動し
+       text-shadow に流し込む（CSS animation/transition は使わない・seek-safe）。 */
     .sol-wm {
       display: inline-flex;
       align-items: baseline;
@@ -84,6 +88,10 @@
       letter-spacing: -0.02em;
       color: #3fb950;
       will-change: transform, opacity;
+      --sol-glow: 0;
+      text-shadow:
+        0 0 calc(18px * var(--sol-glow)) rgba(63, 185, 80, calc(0.55 * var(--sol-glow))),
+        0 0 calc(42px * var(--sol-glow)) rgba(63, 185, 80, calc(0.28 * var(--sol-glow)));
     }
     .sol-caret {
       display: inline-block;
@@ -125,8 +133,8 @@
       <div data-hf-id="hf-05mz" class="sol-grid"></div>
     </div>
 
-    <!-- カード（主役サーフェス） -->
-    <div data-hf-id="hf-nfh3" class="sol-stage clip" data-start="0" data-duration="5.5" data-track-index="1">
+    <!-- カード（主役サーフェス）。stage 層でカメラ push-in を担う -->
+    <div data-hf-id="hf-nfh3" class="sol-stage clip" id="sol-stage" data-start="0" data-duration="5.5" data-track-index="1">
       <div data-hf-id="hf-5vgi" class="sol-term" id="sol-term">
         <div data-hf-id="hf-mwum" class="sol-bar">
           <span data-hf-id="hf-dk7p" class="sol-dot r"></span>
@@ -174,42 +182,64 @@
       window.__timelines = window.__timelines || {};
       var tl = gsap.timeline({ paused: true });
 
-      // ── Scene 1 (0.0–1.4s): カードが slide-up + crossfade（穏やか settle, power3, no bounce）──
-      // spring-pop-entrance の calm register: scale で押さず slide-up 主体の落ち着いた着地。
+      // ── Scene 1 (0.0–1.4s): カードが slide-up + crossfade、控えめカメラ push-in を添える ──
+      // spring-pop-entrance の calm register。scale はカード自身では押さず、
+      // stage 層の push-in（0.965 → 1.0, power3）が「カメラが寄る」感を担う。
+      // breather の性格は保つ：push は控えめ・単発・overshoot なし。
+      tl.fromTo("#sol-stage",
+        { scale: 0.965 },
+        { scale: 1, duration: 1.4, ease: "power3.out" },
+        0
+      );
       tl.fromTo("#sol-term",
-        { y: 64, opacity: 0, scale: 0.985 },
-        { y: 0, opacity: 1, scale: 1, duration: 1.1, ease: "power3.out" },
-        0.1
+        { y: 72, opacity: 0 },
+        { y: 0, opacity: 1, duration: 1.05, ease: "power3.out" },
+        0.08
       );
 
-      // ── Scene 2 (1.4–2.8s): >_ Retrace（緑）→ lead per-word staggered reveal（読み順, power3）──
-      tl.fromTo("#sol-wm",
-        { y: 14, opacity: 0 },
-        { y: 0, opacity: 1, duration: 0.55, ease: "power3.out" },
-        1.4
-      );
       // キャレットは wordmark 着地まで隠し、hold で点滅させる
       tl.set("#sol-caret", { opacity: 0 }, 0);
+      // 緑 bloom は初期 0（着地の瞬間だけ短く咲かせる）
+      tl.set("#sol-wm", { "--sol-glow": 0 }, 0);
 
-      var LEAD_START = 1.85;
-      var STAGGER = Math.min(0.075, 0.85 / wordEls.length);
+      // ── Scene 2 (1.4–2.8s): >_ Retrace（緑）着地 → 短い緑 bloom → lead per-word（少しキビキビ）──
+      var WM_AT = 1.4;
+      tl.fromTo("#sol-wm",
+        { y: 16, opacity: 0 },
+        { y: 0, opacity: 1, duration: 0.48, ease: "power3.out" },
+        WM_AT
+      );
+      // 着地に合わせた短い緑 bloom：0 → peak → 微かな残光。finite・repeat/yoyo なし。
+      tl.fromTo("#sol-wm",
+        { "--sol-glow": 0 },
+        { "--sol-glow": 1, duration: 0.26, ease: "power2.out" },
+        WM_AT + 0.28
+      );
+      tl.to("#sol-wm",
+        { "--sol-glow": 0.14, duration: 0.55, ease: "power2.inOut" },
+        WM_AT + 0.54
+      );
+
+      // lead per-word：少しキビキビ（短め duration・タイトな stagger、読み順、power3）
+      var LEAD_START = 1.78;
+      var STAGGER = Math.min(0.058, 0.62 / wordEls.length);
       wordEls.forEach(function (el, i) {
         tl.fromTo(el,
           { y: 12, opacity: 0 },
-          { y: 0, opacity: 1, duration: 0.5, ease: "power3.out" },
+          { y: 0, opacity: 1, duration: 0.4, ease: "power3.out" },
           LEAD_START + i * STAGGER
         );
       });
 
-      // ── Scene 3 (2.8–5.0s): sub が最後に静かに reveal → 以後 hold ──
+      // ── Scene 3 (2.8–5.0s): sub が最後に静かに reveal → 以後 hold（落ち着き）──
       tl.fromTo("#sol-sub",
         { y: 12, opacity: 0 },
         { y: 0, opacity: 1, duration: 0.7, ease: "power3.out" },
-        2.85
+        2.8
       );
 
       // ── hold 中のキャレット点滅（finite・決定的。repeat/yoyo なし）──
-      // 3.4s 以降、0.53s 周期で on/off を離散 set。5.0s まで到達。
+      // 3.4s 以降、0.265s 周期で on/off を離散 set。5.0s まで到達。
       var caretOn = true;
       for (var t = 3.4; t <= 4.95; t += 0.265) {
         tl.set("#sol-caret", { opacity: caretOn ? 1 : 0 }, t);

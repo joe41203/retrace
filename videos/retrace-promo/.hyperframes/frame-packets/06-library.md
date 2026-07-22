@@ -13,7 +13,7 @@
 - scene: 収録リポジトリのカードが下からスタッガで積み上がる。各カードに owner/name・Go の言語ドット・コミット数・進捗バー
 - duration: 5s
 - transition_in: push-slide UP
-- status: built
+- status: animated
 - voiceover: ""
 - src: compositions/frames/06-library.html
 - type: social_proof

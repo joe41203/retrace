@@ -30,6 +30,28 @@ t=0 では最初に読む1要素だけを出し、以降の行・カード・ノ
   誇張しない（retrace は「LLM が解説を書く」ツール。「AI がコードを書く」ではない）。
 - **caption band**: 字幕は無効化（音声なし）だが下 ~17% は空けて重心を上 83% に置く（LP 埋め込みでの下端安定）。
 
+### v2 ダイナミック強化（2026-07-23 追記・要望反映）
+
+上品な土台は保ちつつ、テンポとカメラワークを1段引き上げる。retrace の世界観（ダーク端末・緑・
+JetBrains Mono）と seek-safe 規律（fromTo・paused GSAP・no repeat/yoyo・no random/wall-clock・
+CSS animation 不可）は厳守。以下を各フレームに効かせる:
+
+- **カメラワークを足す**: フレーム root（または .stage）に軽い push-in / pull-back / 横スライドを
+  1フレームにつき1つ入れて"生きた画"にする（`multi-phase-camera` 系。振幅は控えめ・power3。ただし
+  カメラ酔い回避のため後半 ~40% で新たな push を始めない＝doctrine 準拠）。Frame 4 の commit lane は
+  従来の等速縦スクロールに、最後 seq 6 へ寄る軽い zoom-to-target を足して締める。
+- **reveal のテンポUP**: 各 reveal の到達を少し速く・キレよく（entrance は `expo.out`/`power4.out` 可、
+  overshoot は依然禁止）。要素間の stagger を詰めて"畳みかける"。ただし front-load はしない
+  （読み順は維持、間を詰めるだけ）。
+- **diff / コードのタイピング演出を強調**: Frame 1 の `git log --reverse`、Frame 5 の diff（- 旧 → + 新）は
+  カーソル付き type-on を"見える速さ"でキビキビ。行確定時に軽いフラッシュ（`asr-keyword-glow` 短い envelope）。
+- **ノード点灯にリズム**: Frame 4/6 の各ノード・カードの着地に、着地の瞬間だけ短い発光（bloom）を重ねて
+  "点いた"感を出す（finite tween）。
+- **見せ場を持ち上げる**: Frame 4（Commit Lane）と Frame 5（解説）は本動画のピーク。ここは動きの密度を
+  最も高くしてよい（lane の流速に緩急、diff の畳みかけ、寄りで締める）。
+- 依然 **禁止**: bouncy/overshoot 既定、lazy breathing、全要素の独立ドリフト、repeat/yoyo、無限モーション、
+  Math.random/Date.now。「ダイナミック」は"速さと締まり"であって"うるささ"ではない。
+
 ## Frame 1 — Hook: git log --reverse
 
 - scene: 暗いターミナルに `$ git log --reverse` がライブでタイプされ、キャレット点滅から `>_ Retrace` のワードマークへ切り替わる

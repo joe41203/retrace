@@ -13,7 +13,7 @@
 - scene: Commit Lane の1ノードにフォーカスが寄り、解説カードが展開。上段に「何を/なぜ/読みどころ」（amber ラベル）、下段に diff の `- 旧` → `+ 新`（赤→緑）。右肩に evidence バッジ
 - duration: 8s
 - transition_in: zoom-through
-- status: built
+- status: animated
 - voiceover: ""
 - src: compositions/frames/05-explanation.html
 - type: feature_showcase

@@ -14,7 +14,7 @@
 - duration: 4s
 - poster: 2.5s
 - transition_in: blur-crossfade
-- status: built
+- status: animated
 - voiceover: ""
 - src: compositions/frames/07-cta.html
 - type: cta

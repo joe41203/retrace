@@ -1,9 +1,13 @@
 <template>
   <style>
-    /* ===== 04-commit-lane — Proof: Commit Lane（見せ場） =====
-       DARK-FIRST. navy 地・グリッド・緑の一本道。ノードが下→上へ一定速度で流れる。
-       中央 crisp / 上下端 dim（depth-of-field）。Scene4 で減速→静止（seq6 中央）→hold。
-       すべて finite tween・fromTo・index 由来の決定的値。CSS transition/keyframes 不使用。 */
+    /* ===== 04-commit-lane — Proof: Commit Lane（見せ場 v2） =====
+       DARK-FIRST. navy 地・グリッド・緑の一本道。ノードが下→上へ流れる。
+       v2 強化:
+        - lane の流速に緩急（rhythmic velocity・痙攣でなく緩急）
+        - 各ノードが中央を通過する瞬間に緑 bloom（dot glow + halo pulse・finite）
+        - 終盤 seq6 中央で減速→静止→軽い zoom-to-target（寄り）で締める
+       すべて finite tween・fromTo・index/位置 由来の決定的値。
+       CSS transition/keyframes・Math.random/Date.now・repeat/yoyo 不使用。 */
 
     #root {
       position: relative;
@@ -31,6 +35,18 @@
         linear-gradient(rgba(63, 185, 80, 0.035) 1px, transparent 1px),
         linear-gradient(90deg, rgba(63, 185, 80, 0.035) 1px, transparent 1px);
       background-size: 64px 64px;
+    }
+    /* 中央のフォーカスバンド（zoom-to-target で灯る薄い光。既定は透明） */
+    .cl-focus-band {
+      position: absolute;
+      left: 0;
+      right: 0;
+      top: 449px;      /* viewport top(150)+CENTER(373)-74 → 中央帯 */
+      height: 148px;
+      pointer-events: none;
+      background: radial-gradient(680px 120px at 626px 74px, rgba(63, 185, 80, 0.12), transparent 72%);
+      opacity: 0;
+      z-index: 1;
     }
 
     /* --- 上部の kicker + head --- */
@@ -73,6 +89,14 @@
       right: 0;
       height: 746px;
       overflow: hidden;
+    }
+
+    /* camera wrapper — zoom-to-target の押し込みは全レーン内容をまとめて変換 */
+    .cl-world {
+      position: absolute;
+      inset: 0;
+      transform-origin: 626px 373px; /* lane 中心 = 寄せの中心 */
+      will-change: transform;
     }
 
     /* 縦の一本道（固定）— SVG self-draw で1本引く */
@@ -123,7 +147,7 @@
       margin-top: -48px; /* center を top 座標に合わせる */
       display: flex;
       align-items: center;
-      /* --dim: opacity(1=crisp) / --dof: px blur — driver が毎フレーム書く */
+      /* opacity / blur は driver が毎フレーム書く（中央 crisp / 端 dim） */
       opacity: 1;
       filter: blur(0px);
       will-change: filter, opacity;
@@ -141,6 +165,22 @@
       box-shadow: 0 0 16px rgba(63, 185, 80, 0.55);
       transform: scale(0);
       z-index: 3;
+    }
+    /* dot の bloom halo（中央通過で灯る。driver が opacity/scale を書く） */
+    .cl-halo {
+      position: absolute;
+      left: 266px;
+      top: 50%;
+      width: 24px;
+      height: 24px;
+      margin: -12px 0 0 -12px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(86, 211, 100, 0.9) 0%, rgba(63, 185, 80, 0.45) 42%, transparent 72%);
+      opacity: 0;
+      transform: scale(1);
+      pointer-events: none;
+      z-index: 2;
+      will-change: transform, opacity;
     }
     .cl-card {
       position: absolute;
@@ -173,8 +213,9 @@
     .cl-sha { color: #39c5cf; font-size: 22px; }
     .cl-subj { color: #d6deeb; font-size: 24px; letter-spacing: -0.005em; }
     .cl-badge { margin-left: auto; font-size: 21px; white-space: nowrap; }
-    .cl-add { color: #56d364; }
-    .cl-del { color: #f85149; }
+    /* add/del バッジ: driver が中央通過時に点灯感（color/text-shadow）を強める */
+    .cl-add { color: #3fb950; will-change: color; }
+    .cl-del { color: #f85149; will-change: color; }
 
     /* 端フェード用マスク（depth-of-field: 端だけ） */
     .cl-fade {
@@ -215,12 +256,15 @@
 
     <!-- レーン viewport -->
     <div data-hf-id="hf-ds3j" class="cl-lane-vp" data-layout-allow-overflow>
-      <div data-hf-id="hf-4zjm" class="cl-lane-glow" id="cl-lane-glow"></div>
-      <svg data-hf-id="hf-dij6" class="cl-lane-svg" viewBox="0 0 8 746" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
-        <path data-hf-id="hf-vid8" id="cl-lane-path" d="M 4 746 L 4 0" />
-      </svg>
-      <div data-hf-id="hf-d3lu" class="cl-nodes" id="cl-nodes" data-layout-allow-overflow>
-        <!-- ノードは JS が生成（seq1..seq10, seq 昇順で下方向） -->
+      <div data-hf-id="hf-fcs0" class="cl-focus-band" id="cl-focus-band"></div>
+      <div data-hf-id="hf-wrld" class="cl-world" id="cl-world" data-layout-allow-overflow>
+        <div data-hf-id="hf-4zjm" class="cl-lane-glow" id="cl-lane-glow"></div>
+        <svg data-hf-id="hf-dij6" class="cl-lane-svg" viewBox="0 0 8 746" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+          <path data-hf-id="hf-vid8" id="cl-lane-path" d="M 4 746 L 4 0" />
+        </svg>
+        <div data-hf-id="hf-d3lu" class="cl-nodes" id="cl-nodes" data-layout-allow-overflow>
+          <!-- ノードは JS が生成（seq1..seq10, seq 昇順で下方向） -->
+        </div>
       </div>
       <div data-hf-id="hf-an2o" class="cl-fade"></div>
     </div>
@@ -257,16 +301,22 @@
       //   ty_s2 = 640-40 = 600.  seq6(i=5) center_local=40+750=790 → 端で 373: ty_end=373-790=-417.
       var TY_S2 = 600;
       var TY_END = -417;
-      var TY_MID = TY_S2 - (TY_S2 - TY_END - 150); // 減速前の値 = 600-867 = -267
 
       var nodesWrap = document.getElementById("cl-nodes");
+      var world = document.getElementById("cl-world");
+      var focusBand = document.getElementById("cl-focus-band");
+      var laneGlow = document.getElementById("cl-lane-glow");
       var nodeEls = [];
+      var haloEls = [];
+      var addEls = [];
+      var delEls = [];
       COMMITS.forEach(function (c, i) {
         var n = document.createElement("div");
         n.className = "cl-node";
         n.style.top = (FIRST_OFFSET + i * NODE_PITCH) + "px";
         n.setAttribute("data-i", String(i));
         n.innerHTML =
+          '<div class="cl-halo"></div>' +
           '<div class="cl-dot"></div>' +
           '<div class="cl-card">' +
             '<div class="cl-meta">' +
@@ -278,6 +328,9 @@
           '</div>';
         nodesWrap.appendChild(n);
         nodeEls.push(n);
+        haloEls.push(n.querySelector(".cl-halo"));
+        addEls.push(n.querySelector(".cl-add"));
+        delEls.push(n.querySelector(".cl-del"));
       });
 
       // ---- head per-word split ----
@@ -292,49 +345,85 @@
         return s;
       });
 
-      // ---- depth-of-field / crisp-center driver ----
-      // 毎フレーム、各ノードの viewport-local screen y から中央距離 → opacity + blur。
-      // 中央付近 crisp(cream, opacity1, blur0)、端へ dim(opacity↓, blur↑)。決定的。
+      // ---- per-frame driver: DoF(中央 crisp / 端 dim) + 中央通過 bloom ----
+      // すべて scroll.ty から決定的に算出。毎フレームは applyLane() が一括で書く。
       var CRISP_HALF = 150;   // この距離内は完全 crisp
       var FALL_RANGE = 320;   // これを超えると最大 dim
       var MAX_BLUR = 3.4;     // px（小面なので軽量）
       var MIN_OP = 0.16;
-      function applyDof() {
+      var BLOOM_RANGE = 96;   // 中央からこの距離内で bloom（着地の点灯感）
+      function smooth(t) { return t * t * (3 - 2 * t); }
+      function applyLane() {
         var ty = scroll.ty;
         for (var k = 0; k < nodeEls.length; k++) {
           var el = nodeEls[k];
-          var i = k;
-          var centerLocal = FIRST_OFFSET + i * NODE_PITCH; // wrapper-local
+          var centerLocal = FIRST_OFFSET + k * NODE_PITCH; // wrapper-local
           var screenY = centerLocal + ty;                  // viewport-local (0..746)
           var d = Math.abs(screenY - CENTER);
-          var t; // 0=crisp .. 1=full dim
+          // --- DoF: 中央 crisp → 端 dim ---
+          var t;
           if (d <= CRISP_HALF) t = 0;
           else if (d >= FALL_RANGE) t = 1;
           else t = (d - CRISP_HALF) / (FALL_RANGE - CRISP_HALF);
-          // ease で端フェードを滑らかに
-          var te = t * t * (3 - 2 * t);
-          var op = 1 - te * (1 - MIN_OP);
-          var bl = te * MAX_BLUR;
-          el.style.opacity = op.toFixed(3);
-          el.style.filter = "blur(" + bl.toFixed(2) + "px)";
+          var te = smooth(t);
+          el.style.opacity = (1 - te * (1 - MIN_OP)).toFixed(3);
+          el.style.filter = "blur(" + (te * MAX_BLUR).toFixed(2) + "px)";
+          // --- bloom: 中央通過の瞬間だけ短く灯る（0=遠い → 1=中央）---
+          var b = d >= BLOOM_RANGE ? 0 : smooth(1 - d / BLOOM_RANGE);
+          var halo = haloEls[k];
+          halo.style.opacity = (b * 0.9).toFixed(3);
+          halo.style.transform = "scale(" + (1 + b * 3.2).toFixed(3) + ")";
+          // dot 自体の点灯感も上げる（box-shadow 半径 + 明るさ）
+          var dotEl = el.querySelector(".cl-dot");
+          if (dotEl) {
+            var glow = 16 + b * 26;
+            var al = (0.55 + b * 0.4).toFixed(3);
+            dotEl.style.boxShadow = "0 0 " + glow.toFixed(1) + "px rgba(63, 185, 80, " + al + ")";
+            dotEl.style.borderColor = b > 0.5 ? "#56d364" : "#3fb950";
+          }
+          // add/del バッジの点灯感（中央で bright、離れると base）
+          addEls[k].style.color = b > 0 ? "rgb(" + Math.round(63 + b * 23) + "," + Math.round(185 + b * 26) + "," + Math.round(80 + b * 20) + ")" : "#3fb950";
+          addEls[k].style.textShadow = b > 0.35 ? "0 0 12px rgba(86,211,100," + (b * 0.5).toFixed(2) + ")" : "none";
+          delEls[k].style.textShadow = b > 0.35 ? "0 0 12px rgba(248,81,73," + (b * 0.4).toFixed(2) + ")" : "none";
         }
       }
 
-      // ---- lane jitter (Scene4 hold) — 低振幅・決定的 sine ----
-      var laneGlow = document.getElementById("cl-lane-glow");
+      // ---- rhythmic flow ease（GSAP custom ease function・決定的） ----
+      // scroll.ty を「単一の直接プロパティ tween」で TY_S2 → TY_END へ動かし、その ease に
+      // 緩急リズム＋末尾デセルを織り込む。proxy を介さないので他 tween と scroll.ty を奪い合わず、
+      // seek でも確実に反映される（前バージョンの property 競合を回避）。
+      //   e(p) = base(p) + ripple(p)
+      //   base   : ほぼ等速 cruise ＋ 末尾で滑らかに減速（linear と ease-out の blend）
+      //   ripple : 低振幅 sin（N 回の accel/decel・末尾で 0 へ収束し停止をクリーンに）
+      // e(0)=0, e(1)=1, 全域で単調増加（逆流なし＝カメラ酔い回避）。数値検証済み。
+      var FLOW_CYCLES = 3;                 // 流れの中で緩急を 3 回
+      var FLOW_AMP = 0.03;                 // ripple 振幅（小＝痙攣でなく緩急）
+      var CRUISE_MIX = 0.45;               // 0=完全等速, 1=完全 ease-out（末尾デセルの強さ）
+      var TWO_PI_N = Math.PI * 2 * FLOW_CYCLES;
+      function rhythmEase(p) {
+        var base = (1 - CRUISE_MIX) * p + CRUISE_MIX * (1 - Math.pow(1 - p, 2.2));
+        var ripple = FLOW_AMP * Math.sin(TWO_PI_N * p) * (1 - p);
+        return base + ripple;
+      }
 
       // ---- timeline ----
       window.__timelines = window.__timelines || {};
       var tl = gsap.timeline({ paused: true });
       window.__timelines["04-commit-lane"] = tl;
 
-      // scroll 状態 — 単一ソース。applyDof を onUpdate で回す。
+      // scroll 状態 — 単一ソース。applyLane を onUpdate で回す。
       var scroll = { ty: TY_S2 };
       function writeScroll() {
         nodesWrap.style.transform = "translateY(" + scroll.ty + "px)";
-        applyDof();
+        applyLane();
+      }
+      // camera 状態（zoom-to-target・単一ソース）
+      var cam = { scale: 1 };
+      function applyCamera() {
+        world.style.transform = "scale(" + cam.scale + ")";
       }
       // seed frame0（Scene1 は静止: S2 位置で待機）
+      applyCamera();
       writeScroll();
 
       // ===== Scene 1 (0.0–1.2s): 地→lane 引き→head per-word =====
@@ -344,66 +433,66 @@
       lanePath.style.strokeDasharray = String(len);
       lanePath.style.strokeDashoffset = String(len);
       tl.fromTo(lanePath, { strokeDashoffset: len },
-        { strokeDashoffset: 0, duration: 0.9, ease: "power3.out" }, 0.05);
-      tl.fromTo(laneGlow, { opacity: 0 }, { opacity: 1, duration: 0.7, ease: "power1.out" }, 0.5);
+        { strokeDashoffset: 0, duration: 0.85, ease: "power3.out" }, 0.05);
+      tl.fromTo(laneGlow, { opacity: 0 }, { opacity: 1, duration: 0.6, ease: "power1.out" }, 0.45);
       // kicker
       tl.fromTo("#cl-kicker", { opacity: 0, y: -10 },
         { opacity: 1, y: 0, duration: 0.5, ease: "power2.out" }, 0.15);
       // head per-word staggered reveal
       tl.fromTo(wordEls, { opacity: 0, y: 14 },
-        { opacity: 1, y: 0, duration: 0.5, ease: "power2.out", stagger: 0.11 }, 0.35);
+        { opacity: 1, y: 0, duration: 0.5, ease: "power2.out", stagger: 0.1 }, 0.35);
       // note（下部・薄く）
       tl.fromTo("#cl-note", { opacity: 0, x: -14 },
         { opacity: 0.9, x: 0, duration: 0.6, ease: "power2.out" }, 0.7);
 
       // ===== Scene 2 (1.2–3.0s): ノード点灯（下→上 stagger）＋カード横入り =====
-      // 初期可視ノード(seq1..3 付近)を index 由来 stagger で。dot pop → card slide-in。
-      // seq1(i=0) を先頭（最下段アンカー）に、続いて上/下の近傍。index 由来なので決定的。
+      // dot pop（キビキビ・back 抑制で overshoot なし）→ card slide-in。index 由来 stagger で決定的。
       var dots = Array.prototype.slice.call(document.querySelectorAll(".cl-dot"));
       var cards = Array.prototype.slice.call(document.querySelectorAll(".cl-card"));
       // dot 点灯: 全 dot を i 順に stagger（見えないものは端 fade で隠れる）
       tl.fromTo(dots, { scale: 0 },
-        { scale: 1, duration: 0.42, ease: "power2.out", stagger: 0.07 }, 1.25);
-      // card 横入り（lane から velocity-matched に出る）: x を右方向へ
+        { scale: 1, duration: 0.34, ease: "power3.out", stagger: 0.06 }, 1.2);
+      // card 横入り（lane から velocity-matched に出る）
       tl.fromTo(cards, { opacity: 0, x: -40 },
-        { opacity: 1, x: 0, duration: 0.5, ease: "power2.out", stagger: 0.07 }, 1.35);
+        { opacity: 1, x: 0, duration: 0.46, ease: "power2.out", stagger: 0.06 }, 1.32);
 
-      // ===== Scene 3 (3.0–7.5s): 一定速度で上へスクロール（linear cruise） =====
-      // TY_S2(600) → TY_MID(-267) を ease:none で等速。カメラ酔い回避。
-      // 開始は 1.5s（S2 のカード入りと僅かに重ねて流れが途切れない）。
-      // fromTo で seek-safe（逆方向シークでも ty が確定）。immediateRender:true は
-      // t=0 で ty=TY_S2（静止期の正値）を書くので無害。
+      // ===== Scene 3 → 4a (1.5–7.8s): 緩急スクロール＋末尾デセル（seq6 中央で停止） =====
+      // scroll.ty を単一の直接プロパティ tween で TY_S2 → TY_END へ。ease=rhythmEase が
+      // 「ほぼ等速 cruise ＋ 3 回の緩急 ＋ 末尾の滑らかな減速→停止」を一本で担う。
+      // onUpdate: writeScroll が毎フレーム DoF/bloom を再計算（seek でも確実に反映）。
+      // 停止点 TY_END=-417 で seq6(i=5) がちょうど中央(373)に来る。
       tl.fromTo(scroll, { ty: TY_S2 }, {
-        ty: TY_MID,
-        duration: 5.9,           // 1.5 → 7.4
-        ease: "none",
+        ty: TY_END,
+        duration: 6.3,                      // 1.5 → 7.8
+        ease: rhythmEase,
         onUpdate: writeScroll
       }, 1.5);
 
-      // ===== Scene 4 (7.5–9.0s): 減速→静止（seq6 中央）→hold =====
-      // TY_MID(-267) → TY_END(-417) を power2.out でブレーキ（最後の150px）。
-      // immediateRender:false — cruise の from(TY_S2) を build 時に上書きしないため。
-      tl.fromTo(scroll, { ty: TY_MID }, {
-        ty: TY_END,
-        duration: 1.0,           // 7.4 → 8.4
-        ease: "power2.out",
-        immediateRender: false,
-        onUpdate: writeScroll
-      }, 7.4);
+      // ===== Scene 4b (7.8–8.9s): seq6 中央で軽い zoom-to-target（寄り）で締める =====
+      // viewport-change（単一 world scale・別オブジェクトなので scroll.ty と競合しない）。
+      // bouncy 無し・power2.inOut。中央帯も薄く灯して締める。次フレームの寄りへ繋ぐ。
+      tl.to(cam, {
+        scale: 1.14,
+        duration: 1.1,                      // 7.8 → 8.9
+        ease: "power2.inOut",
+        onUpdate: applyCamera
+      }, 7.8);
+      tl.fromTo(focusBand, { opacity: 0 },
+        { opacity: 1, duration: 0.9, ease: "power2.out" }, 7.8);
 
-      // hold 中: 緑レーンの流れ感だけ低振幅 jitter（決定的 sine, opacity/scaleX）
+      // (c) hold（8.9–9.4s）: 緑レーンの流れ感だけ低振幅 sine で残す（決定的・repeat なし）。
       var jit = { p: 0 };
       tl.to(jit, {
         p: 1,
-        duration: 0.6,           // 8.4 → 9.0
+        duration: 0.5,                      // 8.9 → 9.4
         ease: "none",
         onUpdate: function () {
-          var ph = jit.p * Math.PI * 4;          // 2 周期
-          var g = 0.86 + Math.sin(ph) * 0.14;    // 0.72..1.0
+          var ph = jit.p * Math.PI * 4;             // 2 周期
+          var g = 0.86 + Math.sin(ph) * 0.12;       // 0.74..0.98
           laneGlow.style.opacity = g.toFixed(3);
-          laneGlow.style.transform = "scaleX(" + (0.94 + (Math.sin(ph) * 0.5 + 0.5) * 0.12).toFixed(3) + ")";
+          laneGlow.style.transform = "scaleX(" + (0.95 + (Math.sin(ph) * 0.5 + 0.5) * 0.1).toFixed(3) + ")";
         }
-      }, 8.4);
+      }, 8.9);
     })();
   </script>
 </template>

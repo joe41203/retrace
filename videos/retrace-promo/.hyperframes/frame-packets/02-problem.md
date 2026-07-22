@@ -13,7 +13,7 @@
 - scene: 中央に完成した Go の関数ブロックが静止。「読める」→しかし履歴（育ち方）はグレーアウトして霞み、「どう育ったか」だけが赤く残る
 - duration: 6s
 - transition_in: zoom-through
-- status: built
+- status: animated
 - voiceover: ""
 - src: compositions/frames/02-problem.html
 - type: pain_point

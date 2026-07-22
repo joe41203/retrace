@@ -3,7 +3,9 @@
     /* ── 02-problem — Problem: 完成コードは読める、でも育ち方は見えない ──
        DARK-FIRST: navy 地 + faint green grid。kinetic-type-beats の signature で
        statement をビートで build → payoff 語「見えない。」を赤で slam。
-       以後 hold、赤語に低振幅 jitter のみ。confirmed sketch のレイアウト維持。 */
+       v2: 控えめ push-in カメラ1つ / 見出し reveal をキビキビ /
+       赤 beat-slam を鋭く＋短い赤フラッシュ / カード着地に短い bloom。
+       レイアウト・文言・配色・フォント維持。confirmed sketch のレイアウト維持。 */
 
     /* JetBrains Mono は Latin/chrome。日本語は sibling frames と同じく
        システム/汎用 gothic fallback に委ねる（フォント staging はプロジェクト側の責務）。 */
@@ -32,7 +34,17 @@
       background-size: 64px 64px;
     }
 
-    /* コピー領域は上 83% に収める（keep-out 遵守） */
+    /* 短い赤フラッシュ用の全画面レイヤー（slam ビートで一瞬だけ発火・opacity 0 常駐） */
+    .prb-flash {
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(120% 90% at 50% 58%, rgba(248, 81, 73, 0.22), rgba(248, 81, 73, 0) 70%);
+      opacity: 0;
+      will-change: opacity;
+    }
+
+    /* コピー領域は上 83% に収める（keep-out 遵守）。
+       控えめ push-in はこの wrap の scale に載せる（transform-origin 中央）。 */
     .prb-wrap {
       position: absolute;
       inset: 0;
@@ -40,6 +52,8 @@
       display: flex;
       flex-direction: column;
       justify-content: center;
+      transform-origin: 50% 46%;
+      will-change: transform;
     }
 
     /* kicker — dim・トラッキング広め・大文字 */
@@ -86,20 +100,34 @@
       margin-top: 72px;
     }
     .prb-card {
+      position: relative;
       flex: 1;
       border: 1px solid #1c2530;
       border-radius: 10px;
       background: #0f151f;
       padding: 30px 28px;
+      transform-origin: 50% 60%;
       will-change: transform, opacity;
     }
+    /* カード着地の一瞬の bloom（緑エッジではなく赤基調の弱発光・opacity 0 常駐） */
+    .prb-bloom {
+      position: absolute;
+      inset: -1px;
+      border-radius: 10px;
+      box-shadow: 0 0 0 1px rgba(248, 81, 73, 0), 0 0 26px 2px rgba(248, 81, 73, 0);
+      opacity: 0;
+      pointer-events: none;
+      will-change: opacity;
+    }
     .prb-card .prb-q {
+      position: relative;
       color: #f85149;
       font-size: 28px;
       margin-bottom: 14px;
       will-change: opacity;
     }
     .prb-card .prb-b {
+      position: relative;
       color: #7d8ba0;
       font-size: 22px;
       line-height: 1.55;
@@ -124,19 +152,25 @@
 
       <div data-hf-id="hf-jigu" class="prb-cards">
         <div data-hf-id="hf-b2q5" class="prb-card" id="prb-card-0">
+          <div data-hf-id="hf-bl00" class="prb-bloom"></div>
           <div data-hf-id="hf-ohay" class="prb-q">git log を追っても</div>
           <div data-hf-id="hf-4dds" class="prb-b">メッセージだけでは「なぜ」が分からない。</div>
         </div>
         <div data-hf-id="hf-ab2c" class="prb-card" id="prb-card-1">
+          <div data-hf-id="hf-bl01" class="prb-bloom"></div>
           <div data-hf-id="hf-whv3" class="prb-q">完成品から逆算しても</div>
           <div data-hf-id="hf-ltc1" class="prb-b">どこが起点でどう分岐したか掴めない。</div>
         </div>
         <div data-hf-id="hf-iyy7" class="prb-card" id="prb-card-2">
+          <div data-hf-id="hf-bl02" class="prb-bloom"></div>
           <div data-hf-id="hf-hepk" class="prb-q">写経しても</div>
           <div data-hf-id="hf-zw85" class="prb-b">「その順番で作った理由」が抜け落ちる。</div>
         </div>
       </div>
     </div>
+
+    <!-- 短い赤フラッシュ（slam ビートで一瞬。最上位トラック・全尺常駐で opacity のみ駆動） -->
+    <div data-hf-id="hf-flsh" class="prb-flash clip" data-start="0" data-duration="6.6" data-track-index="2"></div>
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
@@ -164,6 +198,9 @@
       var line1 = allChunks.slice(0, 3);   // 完成したコードは / 読める / 。
       var line2 = allChunks.slice(3, 6);   // でも / "どう育ったか" / は
 
+      var wrapEl = document.querySelector(".prb-wrap");
+      var flashEl = document.querySelector(".prb-flash");
+
       var cards = [
         document.getElementById("prb-card-0"),
         document.getElementById("prb-card-1"),
@@ -173,55 +210,78 @@
       window.__timelines = window.__timelines || {};
       var tl = gsap.timeline({ paused: true });
 
+      // ══ 控えめ push-in カメラ（1つだけ）══
+      // wrap 全体を 1.0 → 1.035 へ push3。前半で効かせ、60%(≈3.96s)より前に完了。
+      // 後半は新規 push を作らない（doctrine 準拠）。exit ではなく着地して静止。
+      tl.fromTo(wrapEl,
+        { scale: 1.0 },
+        { scale: 1.035, duration: 2.6, ease: "power3.out" },
+        0.0
+      );
+
       // ══ Scene 1 (0.0–1.0s) ══
       // kicker per-word reveal → 1行目 chunk reveal → 「読める」が cream→dim に沈む
+      // v2: stagger を詰めてキビキビ（expo.out・overshoot なし）
       kwordEls.forEach(function (el, i) {
         tl.fromTo(el,
           { y: 10, opacity: 0 },
-          { y: 0, opacity: 1, duration: 0.32, ease: "power3.out" },
-          0.05 + i * 0.12
+          { y: 0, opacity: 1, duration: 0.28, ease: "expo.out" },
+          0.04 + i * 0.08
         );
       });
 
       line1.forEach(function (el, i) {
         tl.fromTo(el,
-          { y: 16, opacity: 0 },
-          { y: 0, opacity: 1, duration: 0.4, ease: "power3.out" },
-          0.42 + i * 0.14
+          { y: 14, opacity: 0 },
+          { y: 0, opacity: 1, duration: 0.34, ease: "expo.out" },
+          0.34 + i * 0.09
         );
       });
 
       // 「読める」cream→dim（#4a5568）。chunk 着地直後、velocity-matched に沈める
       tl.to(fadeEl,
-        { color: "#4a5568", opacity: 0.85, duration: 0.5, ease: "power2.inOut" },
-        0.98
+        { color: "#4a5568", opacity: 0.85, duration: 0.42, ease: "power2.inOut" },
+        0.9
       );
 
       // ══ Scene 2 (1.0–2.4s) ══
-      // 2行目「でも "どう育ったか" は」を per-word/chunk で刻む
+      // 2行目「でも "どう育ったか" は」を per-word/chunk で刻む（畳みかけ・間を詰める）
       line2.forEach(function (el, i) {
         tl.fromTo(el,
-          { y: 16, opacity: 0 },
-          { y: 0, opacity: 1, duration: 0.36, ease: "power3.out" },
-          1.15 + i * 0.22
+          { y: 14, opacity: 0 },
+          { y: 0, opacity: 1, duration: 0.3, ease: "expo.out" },
+          1.12 + i * 0.16
         );
       });
 
       // 「見えない。」kinetic beat-slam（power3・overshoot なし）
-      var SLAM = 1.98;
+      // v2: より鋭く。slam を短く・強く（scale 1.55 から一気に着地）
+      var SLAM = 1.9;
       tl.fromTo(redEl,
-        { scale: 1.4, opacity: 0, filter: "blur(10px)" },
-        { scale: 1, opacity: 1, filter: "blur(0px)", duration: 0.42, ease: "power3.out" },
+        { scale: 1.55, opacity: 0, filter: "blur(12px)" },
+        { scale: 1, opacity: 1, filter: "blur(0px)", duration: 0.34, ease: "power3.out" },
         SLAM
       );
+
+      // v2: 短い赤フラッシュ（slam の瞬間に一瞬だけ・finite・0 に戻る内部ビート）
+      tl.fromTo(flashEl,
+        { opacity: 0 },
+        { opacity: 1, duration: 0.09, ease: "power2.out" },
+        SLAM
+      );
+      tl.to(flashEl,
+        { opacity: 0, duration: 0.34, ease: "power2.in" },
+        SLAM + 0.09
+      );
+
       // 控えめな赤 keyword-glow（asr-keyword-glow 相当・attack→release、finite）
       // driver 方式：赤語1語だけに envelope を当てる。glow は text-shadow でグリフに寄せる。
       (function () {
         var GLOW_START = SLAM;
         var GLOW_DUR = 1.1;               // attack〜release を含む有限窓
-        var ATTACK = 0.42;               // slam の着地と一致
-        var SUSTAIN_END = 0.62;
-        var MAX_BLUR = 20;               // 控えめ（赤・restrained）
+        var ATTACK = 0.34;               // slam の着地と一致
+        var SUSTAIN_END = 0.56;
+        var MAX_BLUR = 22;               // 控えめ（赤・restrained）— v2 でわずかに強く
         var driver = { t: 0 };
         tl.to(driver,
           {
@@ -234,7 +294,7 @@
               else if (t < SUSTAIN_END) env = 1;
               else env = Math.max(0, 1 - (t - SUSTAIN_END) / (GLOW_DUR - SUSTAIN_END));
               var blur = MAX_BLUR * env;
-              redEl.style.textShadow = "0 0 " + blur + "px rgba(248, 81, 73, " + (0.55 * env) + ")";
+              redEl.style.textShadow = "0 0 " + blur + "px rgba(248, 81, 73, " + (0.6 * env) + ")";
             }
           },
           GLOW_START
@@ -246,20 +306,33 @@
       // ══ Scene 3 (2.4–4.6s) ══
       // 失敗カード3枚を左→右で逐次 reveal（fade + up, stagger, power3）
       // 各カードの赤ラベル → muted 本文の読み順（body を僅かに遅らせる）
+      // v2: 着地に短い bloom フラッシュを重ねてリズムを出す
       var CARD_START = 2.5;
-      var CARD_STEP = 0.62;
+      var CARD_STEP = 0.6;
       cards.forEach(function (card, i) {
         var at = CARD_START + i * CARD_STEP;
         tl.fromTo(card,
           { y: 40, opacity: 0 },
-          { y: 0, opacity: 1, duration: 0.55, ease: "power3.out" },
+          { y: 0, opacity: 1, duration: 0.5, ease: "power3.out" },
           at
         );
         // 読み順：赤ラベルが先、本文が僅かに遅れて立ち上がる
         var q = card.querySelector(".prb-q");
         var b = card.querySelector(".prb-b");
-        tl.fromTo(q, { opacity: 0 }, { opacity: 1, duration: 0.3, ease: "power2.out" }, at + 0.06);
-        tl.fromTo(b, { opacity: 0 }, { opacity: 1, duration: 0.34, ease: "power2.out" }, at + 0.24);
+        tl.fromTo(q, { opacity: 0 }, { opacity: 1, duration: 0.28, ease: "power2.out" }, at + 0.05);
+        tl.fromTo(b, { opacity: 0 }, { opacity: 1, duration: 0.32, ease: "power2.out" }, at + 0.2);
+
+        // 着地の一瞬の bloom（発火→減衰、内部ビート・0 に戻る）
+        var bloom = card.querySelector(".prb-bloom");
+        tl.fromTo(bloom,
+          { opacity: 0 },
+          { opacity: 1, duration: 0.12, ease: "power2.out" },
+          at + 0.24
+        );
+        tl.to(bloom,
+          { opacity: 0, duration: 0.42, ease: "power2.in" },
+          at + 0.36
+        );
       });
 
       // ══ Scene 4 (4.6–6.0s) ══

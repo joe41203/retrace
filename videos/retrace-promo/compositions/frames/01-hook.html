@@ -1,7 +1,9 @@
 <template>
   <style>
     /* ---- 01-hook : Code-editorial dark-first. navy ground + faint green grid,
-           terminal type-on (git log --reverse) collapsing into the >_ Retrace wordmark ---- */
+           terminal type-on (git log --reverse) collapsing into the >_ Retrace wordmark.
+           v2 — dynamic pass: a subtle underlying push-in camera, crisper type-on with a
+           green line-commit flash, and a fast, sharp brand landing with a finite bloom. ---- */
     #root {
       position: relative;
       width: 1920px;
@@ -43,6 +45,14 @@
       align-items: center;
       justify-content: center;
     }
+    /* camera layer — carries the subtle push-in so the clip-gated stage keeps its
+       own transform clean. Origin at the focal plane (centre of the keep-out). */
+    .h01-camera {
+      position: absolute;
+      inset: 0;
+      transform-origin: 50% 448px;
+      will-change: transform;
+    }
 
     /* --- the receding command block (Scene 1 + 2) --- */
     .h01-cmdwrap {
@@ -70,6 +80,20 @@
     .h01-cmd {
       white-space: pre;
       color: #d6deeb;
+    }
+    /* green line-commit flash — a finite overlay tint on the command text.
+       Sits over the cmd glyphs, driven from 0 → peak → 0 by one tween. */
+    .h01-cmdflash {
+      position: absolute;
+      left: 0;
+      right: 0;
+      top: -6px;
+      bottom: -6px;
+      pointer-events: none;
+      border-radius: 4px;
+      background: rgba(63, 185, 80, 0.0);
+      box-shadow: 0 0 0 rgba(63, 185, 80, 0);
+      opacity: 0;
     }
     .h01-caret {
       display: inline-block;
@@ -111,6 +135,28 @@
       transform-origin: 50% 50%;
       opacity: 0;
       will-change: transform, opacity;
+    }
+    /* landing bloom — a finite green glow behind the wordmark at the pop instant */
+    .h01-bloom {
+      position: absolute;
+      left: 0;
+      right: 0;
+      top: 448px;
+      margin-top: -72px;
+      height: 144px;
+      pointer-events: none;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      will-change: opacity, transform;
+    }
+    .h01-bloom-core {
+      width: 900px;
+      height: 190px;
+      border-radius: 9999px;
+      background: radial-gradient(60% 70% at 50% 50%, rgba(86, 211, 100, 0.5) 0%, rgba(63, 185, 80, 0.22) 38%, rgba(63, 185, 80, 0) 72%);
+      filter: blur(6px);
     }
     .h01-mark-prompt {
       color: #3fb950;
@@ -162,19 +208,24 @@
     <div data-hf-id="hf-3hsj" class="h01-vignette clip" data-start="0" data-duration="5.4" data-track-index="2"></div>
 
     <div data-hf-id="hf-aj92" class="h01-stage clip" data-start="0" data-duration="5.4" data-track-index="3">
-      <!-- Scene 1 + 2 : command + comment, recedes in Scene 3 -->
-      <div data-hf-id="hf-a5vm" class="h01-cmdwrap" id="h01-cmdwrap">
-        <div data-hf-id="hf-ny28" class="h01-cmdline">
-          <span data-hf-id="hf-7w9d" class="h01-prompt" id="h01-prompt">$</span><span data-hf-id="hf-qoon" class="h01-cmd" id="h01-cmd"></span><span data-hf-id="hf-wwpl" class="h01-caret" id="h01-caret">&#160;</span>
+      <!-- camera layer carries the subtle push-in -->
+      <div data-hf-id="hf-cam0" class="h01-camera" id="h01-camera">
+        <!-- Scene 1 + 2 : command + comment, recedes in Scene 3 -->
+        <div data-hf-id="hf-a5vm" class="h01-cmdwrap" id="h01-cmdwrap">
+          <div data-hf-id="hf-ny28" class="h01-cmdline">
+            <span data-hf-id="hf-7w9d" class="h01-prompt" id="h01-prompt">$</span><span data-hf-id="hf-qoon" class="h01-cmd" id="h01-cmd"></span><span data-hf-id="hf-wwpl" class="h01-caret" id="h01-caret">&#160;</span>
+            <div data-hf-id="hf-cfl0" class="h01-cmdflash" id="h01-cmdflash"></div>
+          </div>
+          <div data-hf-id="hf-1f58" class="h01-comment" id="h01-comment"></div>
         </div>
-        <div data-hf-id="hf-1f58" class="h01-comment" id="h01-comment"></div>
-      </div>
 
-      <!-- Scene 3 : brand pop -->
-      <div data-hf-id="hf-3f3a" class="h01-mark" id="h01-mark">
-        <span data-hf-id="hf-2png" class="h01-mark-prompt">&gt;_</span><span data-hf-id="hf-kww6" class="h01-mark-name">Retrace</span><span data-hf-id="hf-4rb3" class="h01-mark-caret" id="h01-mark-caret">&#160;</span>
+        <!-- Scene 3 : brand pop (bloom sits behind the mark) -->
+        <div data-hf-id="hf-blm0" class="h01-bloom" id="h01-bloom"><div data-hf-id="hf-blm1" class="h01-bloom-core"></div></div>
+        <div data-hf-id="hf-3f3a" class="h01-mark" id="h01-mark">
+          <span data-hf-id="hf-2png" class="h01-mark-prompt">&gt;_</span><span data-hf-id="hf-kww6" class="h01-mark-name">Retrace</span><span data-hf-id="hf-4rb3" class="h01-mark-caret" id="h01-mark-caret">&#160;</span>
+        </div>
+        <div data-hf-id="hf-jh9i" class="h01-kicker" id="h01-kicker"><span data-hf-id="hf-6o16" class="spk">✱</span>最初のコミットから、順に。</div>
       </div>
-      <div data-hf-id="hf-jh9i" class="h01-kicker" id="h01-kicker"><span data-hf-id="hf-6o16" class="spk">✱</span>最初のコミットから、順に。</div>
     </div>
   </div>
 
@@ -187,30 +238,44 @@
 
       var DURATION = 5;
 
+      var cameraEl = document.getElementById("h01-camera");
       var promptEl = document.getElementById("h01-prompt");
       var cmdEl = document.getElementById("h01-cmd");
+      var cmdFlashEl = document.getElementById("h01-cmdflash");
       var caretEl = document.getElementById("h01-caret");
       var commentEl = document.getElementById("h01-comment");
       var cmdwrapEl = document.getElementById("h01-cmdwrap");
+      var bloomEl = document.getElementById("h01-bloom");
       var markEl = document.getElementById("h01-mark");
       var markCaretEl = document.getElementById("h01-mark-caret");
       var kickerEl = document.getElementById("h01-kicker");
 
-      // ---- Scene 1 : prompt lights, then git log --reverse types on ----
+      // ---- Camera : a single subtle push-in running underneath the whole shot ----
+      // Starts at t=0, resolves by ~2.9s (well inside the front 60%) — no new push
+      // begins in the back 40%. power3 ease; small scale so it reads as "alive", not "zoom".
+      tl.fromTo(
+        cameraEl,
+        { scale: 1.0 },
+        { scale: 1.035, duration: 2.9, ease: "power3.out" },
+        0
+      );
+
+      // ---- Scene 1 : prompt lights, then git log --reverse types on (crisper) ----
       // discrete-text-sequence : reverse-searched SEQUENCE of { t, text }.
       var FULL_CMD = "git log --reverse";
-      var TYPE_START = 0.42; // caret/prompt settle, then keys begin
-      var TYPE_END = 1.62; // command fully typed before Scene 2
-      // Build a per-character schedule with a slight non-uniform cadence.
+      var TYPE_START = 0.36; // caret/prompt settle, then keys begin
+      var TYPE_END = 1.42; // command fully typed — snappier than v1 (was 1.62)
+      var COMMIT_AT = TYPE_END + 0.06; // the moment the line is "entered"
+      // Build a per-character schedule with a slight non-uniform, punchy cadence.
       var CMD_SEQ = [{ t: 0, text: "" }];
       (function () {
         var span = TYPE_END - TYPE_START;
         for (var i = 1; i <= FULL_CMD.length; i++) {
-          // ease-in-ish cadence: slower on the two word-break spaces
+          // brisk, near-linear cadence with a tiny hitch on the two word-break spaces
           var frac = i / FULL_CMD.length;
           var ch = FULL_CMD.charAt(i - 1);
           var t = TYPE_START + span * frac;
-          if (ch === " ") t += 0.02; // tiny hitch at word breaks
+          if (ch === " ") t += 0.03; // small hitch at word breaks — reads as intent
           CMD_SEQ.push({ t: t, text: FULL_CMD.substring(0, i) });
         }
       })();
@@ -225,13 +290,13 @@
       for (var ci = 1; ci < CMD_SEQ.length; ci++) {
         if (CMD_SEQ[ci].text !== CMD_SEQ[ci - 1].text) CMD_CHANGE_TIMES.push(CMD_SEQ[ci].t);
       }
-      var TYPING_GRACE = 0.1;
+      var TYPING_GRACE = 0.09;
 
-      // prompt fades in
-      tl.fromTo(promptEl, { opacity: 0 }, { opacity: 1, duration: 0.3, ease: "power2.out" }, 0.12);
+      // prompt fades in — a touch quicker
+      tl.fromTo(promptEl, { opacity: 0 }, { opacity: 1, duration: 0.26, ease: "power2.out" }, 0.1);
 
       // caret appears with the prompt (before first keystroke)
-      tl.set(caretEl, { opacity: 1 }, 0.28);
+      tl.set(caretEl, { opacity: 1 }, 0.24);
 
       // linear driver writes the typed text every frame
       var cmdDriver = { t: 0 };
@@ -246,6 +311,20 @@
           },
         },
         0
+      );
+
+      // ---- Line-commit flash : short green bloom over the command on "enter" ----
+      // finite 0 → peak → 0 tint + glow, keyed to the command completing. No repeat/yoyo.
+      tl.fromTo(
+        cmdFlashEl,
+        { opacity: 0, background: "rgba(63,185,80,0)", boxShadow: "0 0 0px rgba(63,185,80,0)" },
+        { opacity: 1, background: "rgba(63,185,80,0.16)", boxShadow: "0 0 22px rgba(63,185,80,0.35)", duration: 0.14, ease: "power2.out" },
+        COMMIT_AT
+      );
+      tl.to(
+        cmdFlashEl,
+        { opacity: 0, background: "rgba(63,185,80,0)", boxShadow: "0 0 0px rgba(63,185,80,0)", duration: 0.34, ease: "power2.in" },
+        COMMIT_AT + 0.14
       );
 
       // ---- caret : deterministic sin square-wave blink, solid while typing ----
@@ -287,13 +366,13 @@
         commentEl.appendChild(span);
         commentWords.push(span);
       }
-      var COMMENT_START = 1.86;
+      var COMMENT_START = 1.7;
       commentWords.forEach(function (el, i) {
         tl.fromTo(
           el,
           { opacity: 0, y: 14 },
-          { opacity: 1, y: 0, duration: 0.42, ease: "power3.out" },
-          COMMENT_START + i * 0.075
+          { opacity: 1, y: 0, duration: 0.38, ease: "power3.out" },
+          COMMENT_START + i * 0.07
         );
       });
 
@@ -301,25 +380,40 @@
       // wordmark caret takes over (set at the cut, not a fade → seek-safe hard swap)
       // ---- Scene 3 (2.8–5.0s) : command block recedes (inverse zoom-through light
       //      translate + blur + fade), Retrace wordmark spring-pops and holds ----
-      var RECEDE_AT = 2.86;
-      // exit: recede AWAY (scale down slightly) + rise + blur + fade — inverse zoom-through
+      var RECEDE_AT = 2.72;
+      // exit: recede AWAY (scale down slightly) + rise + blur + fade — inverse zoom-through.
+      // Snappier velocity so the swap feels decisive, matching the sharper landing.
       tl.to(
         cmdwrapEl,
-        { y: -120, scale: 0.86, filter: "blur(10px)", duration: 0.34, ease: "power3.in" },
+        { y: -128, scale: 0.84, filter: "blur(11px)", duration: 0.3, ease: "power3.in" },
         RECEDE_AT
       );
-      tl.to(cmdwrapEl, { opacity: 0, duration: 0.26, ease: "none" }, RECEDE_AT + 0.02);
+      tl.to(cmdwrapEl, { opacity: 0, duration: 0.24, ease: "none" }, RECEDE_AT + 0.02);
       // kill the typing caret at the cut so only one caret is ever visible
-      tl.set(caretEl, { opacity: 0 }, RECEDE_AT + 0.2);
+      tl.set(caretEl, { opacity: 0 }, RECEDE_AT + 0.18);
 
       // brand pop : incoming arrives slightly oversized (as if from behind camera),
-      // retracts into the focal plane on a long-tail settle, NO overshoot (power3.out)
-      var POP_AT = RECEDE_AT + 0.24; // ~3.10s — hero visible well within the frame
+      // retracts into the focal plane FAST and SHARP — expo.out, NO overshoot.
+      var POP_AT = RECEDE_AT + 0.2; // ~2.92s — hero visible well within the frame
       tl.fromTo(
         markEl,
-        { opacity: 0, scale: 1.14, filter: "blur(10px)" },
-        { opacity: 1, scale: 1, filter: "blur(0px)", duration: 0.62, ease: "power3.out" },
+        { opacity: 0, scale: 1.16, filter: "blur(12px)" },
+        { opacity: 1, scale: 1, filter: "blur(0px)", duration: 0.46, ease: "expo.out" },
         POP_AT
+      );
+
+      // landing bloom : a short finite green glow that flares at the pop instant and
+      // fades — punctuation on the arrival, not a lingering glow. No repeat/yoyo.
+      tl.fromTo(
+        bloomEl,
+        { opacity: 0, scale: 0.82 },
+        { opacity: 1, scale: 1.02, duration: 0.2, ease: "power2.out" },
+        POP_AT + 0.02
+      );
+      tl.to(
+        bloomEl,
+        { opacity: 0, scale: 1.08, duration: 0.5, ease: "power2.in" },
+        POP_AT + 0.22
       );
       // The mark caret opacity is driven every frame by the blink onUpdate below;
       // while the mark itself is opacity:0 (pre-pop) the caret is hidden with its parent,
@@ -330,7 +424,7 @@
         kickerEl,
         { opacity: 0, y: 12 },
         { opacity: 1, y: 0, duration: 0.5, ease: "power3.out" },
-        POP_AT + 0.55
+        POP_AT + 0.5
       );
 
       // hold to the end — only the caret blink continues (finite, driven above)

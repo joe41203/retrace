@@ -22,7 +22,12 @@
 
     <!-- loop-line: self-draws from bottom edge upward toward where Frame 1's $ sits -->
     <svg data-hf-id="hf-uat5" class="clip cta-loop" data-start="0" data-duration="4" data-track-index="3" viewBox="0 0 1920 1080" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
-      <path data-hf-id="hf-w6z9" id="cta-loop-path" class="cta-loop-line" d="M 960 1080 L 960 812 C 960 762 998 742 1046 742 L 1360 742 C 1408 742 1446 722 1446 672 L 1446 360" />
+      <!-- one continuous route split into rhythmic segments (rise · step · rise) -->
+      <path data-hf-id="hf-w6z1" id="cta-loop-s1" class="cta-loop-line" d="M 960 1080 L 960 812 C 960 762 998 742 1046 742 L 1200 742" />
+      <path data-hf-id="hf-w6z2" id="cta-loop-s2" class="cta-loop-line" d="M 1200 742 L 1360 742 C 1408 742 1446 722 1446 672 L 1446 512" />
+      <path data-hf-id="hf-w6z3" id="cta-loop-s3" class="cta-loop-line" d="M 1446 512 L 1446 360" />
+      <!-- leading spark: travels up the final segment and off the top edge (upward send) -->
+      <circle data-hf-id="hf-w6z4" id="cta-loop-spark" class="cta-loop-spark" cx="1446" cy="360" r="7" />
     </svg>
 
     <style>
@@ -45,7 +50,7 @@
         width: 1400px; height: 820px;
         margin-left: -700px; margin-top: -410px;
         background: radial-gradient(ellipse 58% 54% at 50% 50%,
-          rgba(63,185,80,0.30), rgba(63,185,80,0.06) 55%, transparent 72%);
+          rgba(63,185,80,0.34), rgba(63,185,80,0.07) 55%, transparent 72%);
         opacity: 0;
         pointer-events: none;
       }
@@ -111,6 +116,11 @@
         stroke-linejoin: round;
         filter: drop-shadow(0 0 6px rgba(63,185,80,0.55));
       }
+      .cta-loop-spark {
+        fill: #7ee787;
+        opacity: 0;
+        filter: drop-shadow(0 0 10px rgba(86,211,100,0.9));
+      }
     </style>
 
     <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
@@ -120,66 +130,102 @@
         var tl = gsap.timeline({ paused: true });
 
         // ── Scene 1 (0.0–1.0s): ambient glow bloom + wordmark spring-pop ──
-        // Glow blooms in soft, landing on the wordmark's settle (one beat).
+        // Bloom PAST peak on the wordmark's settle (pulse-on-arrival), then ease
+        // down to a steady hold — a stronger, punchier bloom that lands as ONE
+        // beat with the wordmark. Peak stays under the 0.45 ceiling.
         tl.fromTo(".cta-glow",
-          { opacity: 0, scale: 0.85 },
-          { opacity: 0.28, scale: 1, duration: 0.9, ease: "power2.out" },
-          0.05);
+          { opacity: 0, scale: 0.82 },
+          { opacity: 0.40, scale: 1.05, duration: 0.62, ease: "power2.out" },
+          0.06);
+        tl.to(".cta-glow",
+          { opacity: 0.26, scale: 1.0, duration: 0.42, ease: "power2.inOut" },
+          0.68);
 
-        // >_ Retrace spring-pop entrance — power3, NO overshoot.
+        // >_ Retrace — sharp, fast landing. expo.out, NO overshoot (scale → 1.0).
+        // Starts smaller + lower for more snap; resolves with the bloom peak.
         tl.fromTo(".cta-wm",
-          { opacity: 0, scale: 0.62, y: 18 },
-          { opacity: 1, scale: 1, y: 0, duration: 0.8, ease: "power3.out" },
+          { opacity: 0, scale: 0.52, y: 26 },
+          { opacity: 1, scale: 1, y: 0, duration: 0.62, ease: "expo.out" },
           0.10);
 
-        // Caret blink — finite discrete on/off tweens (no repeat/yoyo).
-        // Appears with the wordmark settle, then blinks a bounded number of times.
-        tl.set(".cta-caret", { opacity: 1 }, 0.85);
-        var caretTimes = [1.20, 1.75, 2.30, 2.85, 3.40];
+        // Caret snaps in on the wordmark settle, then blinks a bounded number of
+        // times — finite discrete on/off tweens (no repeat/yoyo).
+        tl.set(".cta-caret", { opacity: 1 }, 0.72);
+        var caretTimes = [1.10, 1.65, 2.20, 2.75, 3.30];
         caretTimes.forEach(function (t) {
           tl.set(".cta-caret", { opacity: 0 }, t);
-          tl.set(".cta-caret", { opacity: 1 }, t + 0.28);
+          tl.set(".cta-caret", { opacity: 1 }, t + 0.26);
         });
 
-        // ── Scene 2 (1.0–2.4s): headline then sub, per-word reading-order reveal ──
+        // ── Scene 2 (1.0–2.4s): headline then sub, snappy per-word reveal ──
+        // Tighter stagger + shorter, sharper tweens read as crisp, not sleepy.
         var headWords = gsap.utils.toArray(".cta-head .cta-w");
         headWords.forEach(function (el, i) {
           tl.fromTo(el,
-            { opacity: 0, y: 16 },
-            { opacity: 1, y: 0, duration: 0.42, ease: "power3.out" },
-            1.05 + i * 0.16);
+            { opacity: 0, y: 18 },
+            { opacity: 1, y: 0, duration: 0.32, ease: "expo.out" },
+            1.00 + i * 0.13);
         });
 
         var subWords = gsap.utils.toArray(".cta-sub .cta-sw");
         subWords.forEach(function (el, i) {
           tl.fromTo(el,
             { opacity: 0, y: 12 },
-            { opacity: 1, y: 0, duration: 0.36, ease: "power3.out" },
-            1.75 + i * 0.11);
+            { opacity: 1, y: 0, duration: 0.28, ease: "power3.out" },
+            1.62 + i * 0.09);
         });
 
-        // ── Scene 3 (2.4–4.0s): loop-line self-draws bottom→up (svg-path-draw) ──
-        var path = document.getElementById("cta-loop-path");
-        if (path) {
-          var len = path.getTotalLength() * 1.02; // slight overestimate is safe
-          path.style.strokeDasharray = String(len);
-          path.style.strokeDashoffset = String(len); // fully hidden at start
-          tl.fromTo(path,
-            { strokeDashoffset: len },
-            { strokeDashoffset: 0, duration: 1.15, ease: "power2.out" },
-            2.40);
-        }
+        // ── Scene 3 (2.4–4.0s): loop-line self-draws bottom→up, rhythmically ──
+        // Three segments (rise · step · final rise) each draw with power2.out,
+        // staggered at ~75% of the prior so it reads as ONE continuous pen with
+        // rhythm — accelerating toward the top edge.
+        var segs = ["#cta-loop-s1", "#cta-loop-s2", "#cta-loop-s3"];
+        var lens = [];
+        segs.forEach(function (sel) {
+          var p = document.querySelector(sel);
+          if (!p) { lens.push(0); return; }
+          var len = p.getTotalLength() * 1.02; // slight overestimate is safe
+          lens.push(len);
+          p.style.strokeDasharray = String(len);
+          p.style.strokeDashoffset = String(len); // fully hidden at start
+        });
+        // Durations proportional to feel: long rise, quick step, decisive final rise.
+        var segStart = [2.40, 2.86, 3.18];
+        var segDur   = [0.62, 0.42, 0.40];
+        segs.forEach(function (sel, i) {
+          var p = document.querySelector(sel);
+          if (!p) return;
+          tl.fromTo(p,
+            { strokeDashoffset: lens[i] },
+            { strokeDashoffset: 0, duration: segDur[i], ease: "power2.out" },
+            segStart[i]);
+        });
+
+        // Leading spark: rides the final segment upward and continues OFF the top
+        // edge — the light "upward send" toward the next loop's terminal ($ up top).
+        // One finite pass; fades as it clears the frame.
+        tl.fromTo("#cta-loop-spark",
+          { attr: { cy: 508 }, opacity: 0 },
+          { attr: { cy: 356 }, opacity: 0.95, duration: 0.30, ease: "power2.out" },
+          3.20);
+        tl.to("#cta-loop-spark",
+          { attr: { cy: 210 }, opacity: 0, duration: 0.40, ease: "power2.in" },
+          3.50);
 
         // ── FINAL exit (only frame allowed one): gentle overall fade at the end.
-        // Everything but the caret settles down; caret-only feel remains.
-        tl.to([".cta-wm", ".cta-head", ".cta-sub", ".cta-glow", ".cta-loop", ".cta-bg"],
-          { opacity: 0, duration: 0.5, ease: "power1.inOut" },
+        // A soft upward lift on the lockup carries the eye toward the next loop's
+        // top-of-frame terminal as everything settles out.
+        tl.to([".cta-wm", ".cta-head", ".cta-sub"],
+          { opacity: 0, y: -22, duration: 0.5, ease: "power2.inOut" },
           3.55);
+        tl.to([".cta-glow", ".cta-loop", ".cta-bg"],
+          { opacity: 0, duration: 0.5, ease: "power1.inOut" },
+          3.60);
         // Keep the caret last: fade it a touch behind the rest so it reads as
         // the lingering cursor before black.
         tl.to(".cta-caret",
-          { opacity: 0, duration: 0.35, ease: "power1.in" },
-          3.70);
+          { opacity: 0, duration: 0.30, ease: "power1.in" },
+          3.66);
 
         window.__timelines["07-cta"] = tl;
       })();

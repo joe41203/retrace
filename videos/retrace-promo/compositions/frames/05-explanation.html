@@ -1,6 +1,6 @@
 <template>
   <style>
-    /* ---- 05-explanation : Proof — 何を / なぜ / 読みどころ + diff ---- */
+    /* ---- 05-explanation : Proof — 何を / なぜ / 読みどころ + diff (v2 見せ場) ---- */
     #root {
       position: relative;
       width: 1920px;
@@ -33,6 +33,12 @@
       align-items: center;
       justify-content: center;
     }
+    /* wrapper carries the arrival zoom-through (scale/blur/opacity) so the inner
+       card can carry its own independent push-in transform without conflict */
+    .exp-zoom {
+      transform-origin: 50% 44%;
+      will-change: transform, opacity, filter;
+    }
     .exp-card {
       width: 1420px;
       border: 1px solid #2a3a4a;
@@ -40,9 +46,10 @@
       background: #070a0f;
       box-shadow: 0 1px 3px rgba(7, 10, 15, 0.5), 0 24px 60px rgba(0, 0, 0, 0.35);
       overflow: hidden;
-      transform-origin: 50% 50%;
+      transform-origin: 50% 42%;
       /* nudge the whole card up so its bottom clears y=896 (83% of 1080) */
       margin-bottom: 96px;
+      will-change: transform;
     }
 
     /* ---- title bar : signal-light dots + path + evidence badge ---- */
@@ -53,6 +60,7 @@
       padding: 16px 22px;
       background: #0f151f;
       border-bottom: 1px solid #1c2530;
+      will-change: transform, opacity;
     }
     .exp-dot {
       width: 14px;
@@ -77,6 +85,7 @@
       border-radius: 999px;
       padding: 6px 18px;
       white-space: nowrap;
+      will-change: transform, opacity;
     }
     .exp-ev .check { font-weight: 500; }
 
@@ -96,10 +105,12 @@
       flex: 0 0 168px;
       font-weight: 500;
       letter-spacing: 0.01em;
+      will-change: transform, opacity;
     }
     .exp-txt {
       color: #d6deeb;
       flex: 1;
+      will-change: transform, opacity;
     }
     /* the "読みどころ" keyword that will glow on the green add-line */
     .exp-kw {
@@ -137,35 +148,38 @@
     <div data-hf-id="hf-wv20" class="exp-grid clip" data-start="0" data-duration="8.5" data-track-index="2"></div>
 
     <div data-hf-id="hf-wfz7" class="exp-stage clip" data-start="0" data-duration="8.5" data-track-index="1">
-      <div data-hf-id="hf-ndda" class="exp-card" id="exp-card">
-        <!-- title bar defines first (Scene 1) -->
-        <div data-hf-id="hf-dy0t" class="exp-bar">
-          <span data-hf-id="hf-fnty" class="exp-dot r"></span>
-          <span data-hf-id="hf-ka4d" class="exp-dot y"></span>
-          <span data-hf-id="hf-haqr" class="exp-dot g"></span>
-          <span data-hf-id="hf-4b34" class="exp-path">retrace — nakabonne/ali · commit #6 · <span data-hf-id="hf-x5xd" class="sha">5ab1a75</span></span>
-          <span data-hf-id="hf-qgey" class="exp-ev" id="exp-ev"><span data-hf-id="hf-qb1c" class="check">✓</span> PR 根拠あり</span>
-        </div>
-
-        <div data-hf-id="hf-2pxq" class="exp-body">
-          <!-- Scene 2 : one label-row at a time -->
-          <div data-hf-id="hf-b7ko" class="exp-row" id="exp-row-1">
-            <span data-hf-id="hf-vb72" class="exp-lbl">何を:</span>
-            <span data-hf-id="hf-3u09" class="exp-txt">ダミー波形の periodic 関数を削除し、attacker.Attack を呼ぶ goroutine へ置き換えた。</span>
-          </div>
-          <div data-hf-id="hf-m32b" class="exp-row" id="exp-row-2">
-            <span data-hf-id="hf-o18t" class="exp-lbl">なぜ:</span>
-            <span data-hf-id="hf-m2em" class="exp-txt">実際に負荷生成できる状態にするのが目的（コミットメッセージ / PR が根拠）。</span>
-          </div>
-          <div data-hf-id="hf-i4ya" class="exp-row" id="exp-row-3">
-            <span data-hf-id="hf-ua5s" class="exp-lbl">読みどころ:</span>
-            <span data-hf-id="hf-gee8" class="exp-txt">Attack のシグネチャに <span data-hf-id="hf-3a4w" class="exp-kw" id="exp-kw">ctx</span> が入り、中断可能になった点。</span>
+      <!-- zoom wrapper carries the inverse zoom-through arrival -->
+      <div data-hf-id="hf-zoom" class="exp-zoom" id="exp-zoom">
+        <div data-hf-id="hf-ndda" class="exp-card" id="exp-card">
+          <!-- title bar defines first (Scene 1) -->
+          <div data-hf-id="hf-dy0t" class="exp-bar" id="exp-bar">
+            <span data-hf-id="hf-fnty" class="exp-dot r"></span>
+            <span data-hf-id="hf-ka4d" class="exp-dot y"></span>
+            <span data-hf-id="hf-haqr" class="exp-dot g"></span>
+            <span data-hf-id="hf-4b34" class="exp-path">retrace — nakabonne/ali · commit #6 · <span data-hf-id="hf-x5xd" class="sha">5ab1a75</span></span>
+            <span data-hf-id="hf-qgey" class="exp-ev" id="exp-ev"><span data-hf-id="hf-qb1c" class="check">✓</span> PR 根拠あり</span>
           </div>
 
-          <!-- Scene 3 : diff types on -->
-          <div data-hf-id="hf-ut7j" class="exp-diff">
-            <span data-hf-id="hf-c34j" class="exp-line exp-del" id="exp-del"></span>
-            <span data-hf-id="hf-q687" class="exp-line exp-add" id="exp-add"><span data-hf-id="hf-5h57" id="exp-add-text"></span><span data-hf-id="hf-kv86" class="exp-caret" id="exp-caret">▋</span></span>
+          <div data-hf-id="hf-2pxq" class="exp-body">
+            <!-- Scene 2 : one label-row at a time -->
+            <div data-hf-id="hf-b7ko" class="exp-row" id="exp-row-1">
+              <span data-hf-id="hf-vb72" class="exp-lbl">何を:</span>
+              <span data-hf-id="hf-3u09" class="exp-txt">ダミー波形の periodic 関数を削除し、attacker.Attack を呼ぶ goroutine へ置き換えた。</span>
+            </div>
+            <div data-hf-id="hf-m32b" class="exp-row" id="exp-row-2">
+              <span data-hf-id="hf-o18t" class="exp-lbl">なぜ:</span>
+              <span data-hf-id="hf-m2em" class="exp-txt">実際に負荷生成できる状態にするのが目的（コミットメッセージ / PR が根拠）。</span>
+            </div>
+            <div data-hf-id="hf-i4ya" class="exp-row" id="exp-row-3">
+              <span data-hf-id="hf-ua5s" class="exp-lbl">読みどころ:</span>
+              <span data-hf-id="hf-gee8" class="exp-txt">Attack のシグネチャに <span data-hf-id="hf-3a4w" class="exp-kw" id="exp-kw">ctx</span> が入り、中断可能になった点。</span>
+            </div>
+
+            <!-- Scene 3 : diff types on -->
+            <div data-hf-id="hf-ut7j" class="exp-diff">
+              <span data-hf-id="hf-c34j" class="exp-line exp-del" id="exp-del"></span>
+              <span data-hf-id="hf-q687" class="exp-line exp-add" id="exp-add"><span data-hf-id="hf-5h57" id="exp-add-text"></span><span data-hf-id="hf-kv86" class="exp-caret" id="exp-caret">▋</span></span>
+            </div>
           </div>
         </div>
       </div>
@@ -178,106 +192,127 @@
       window.__timelines = window.__timelines || {};
       var tl = gsap.timeline({ paused: true });
 
-      // ---------------------------------------------------------------
-      // Scene 1 (0.0–1.2s): inverse zoom-through arrival at the card.
-      //   Card scales up from a slightly zoomed-in read, un-blurs and
-      //   settles. Title bar + evidence badge are the first thing to land.
-      // ---------------------------------------------------------------
+      // ===============================================================
+      // Scene 1 (0.0–1.2s): inverse zoom-through ARRIVAL at the card.
+      //   We come THROUGH from Frame 4's node — start pushed in past 1
+      //   (scale 1.16) and heavily blurred, then punch to rest crisply.
+      //   expo.out gives the "arriving at" 締まり with NO overshoot.
+      //   The zoom lives on the wrapper so the card keeps its own push-in
+      //   transform later (no transform conflict).
+      // ===============================================================
       tl.fromTo(
-        "#exp-card",
-        { scale: 0.86, opacity: 0, filter: "blur(14px)" },
-        { scale: 1, opacity: 1, filter: "blur(0px)", duration: 1.0, ease: "power3.out" },
+        "#exp-zoom",
+        { scale: 1.16, opacity: 0, filter: "blur(20px)" },
+        { scale: 1, opacity: 1, filter: "blur(0px)", duration: 0.82, ease: "expo.out" },
         0.0
       );
-      // evidence badge lands with a touch of confidence just after the card
+      // title bar chrome slides down into place, snapping the top edge —
+      // reinforces the "landed" read of the arrival.
+      tl.fromTo(
+        "#exp-bar",
+        { y: -18, opacity: 0 },
+        { y: 0, opacity: 1, duration: 0.5, ease: "expo.out" },
+        0.18
+      );
+      // evidence badge lands crisply just after the bar — defines early,
+      // per the packet ("evidence バッジが先に定着").
       tl.fromTo(
         "#exp-ev",
-        { opacity: 0, y: -8 },
-        { opacity: 1, y: 0, duration: 0.5, ease: "power3.out" },
-        0.55
+        { opacity: 0, y: -10, scale: 0.92 },
+        { opacity: 1, y: 0, scale: 1, duration: 0.42, ease: "expo.out" },
+        0.42
       );
 
-      // ---------------------------------------------------------------
-      // Scene 2 (1.2–3.4s): reveal ONE label-row at a time, in reading
-      //   order — amber label first, then the cream body. Staggered per
-      //   row, NOT front-loaded. power3.
-      // ---------------------------------------------------------------
-      var rowStarts = [1.25, 1.95, 2.68];
+      // ===============================================================
+      // Scene 2 (1.2–3.4s): reveal ONE label-row at a time in reading
+      //   order — amber label first, then the cream body. v2: tighter
+      //   stagger (畳みかける), expo.out, NO overshoot. amber→cream rhythm.
+      // ===============================================================
+      var rowStarts = [1.18, 1.74, 2.32];
       ["#exp-row-1", "#exp-row-2", "#exp-row-3"].forEach(function (id, i) {
         var t0 = rowStarts[i];
-        // amber label chunk
+        // amber label chunk snaps in from the left
         tl.fromTo(
           id + " .exp-lbl",
-          { opacity: 0, x: -14 },
-          { opacity: 1, x: 0, duration: 0.34, ease: "power3.out" },
+          { opacity: 0, x: -18 },
+          { opacity: 1, x: 0, duration: 0.3, ease: "expo.out" },
           t0
         );
-        // cream body chunk follows the label
+        // cream body chunk follows the label a beat later (reading rhythm)
         tl.fromTo(
           id + " .exp-txt",
-          { opacity: 0, y: 10 },
-          { opacity: 1, y: 0, duration: 0.42, ease: "power3.out" },
-          t0 + 0.16
+          { opacity: 0, y: 12 },
+          { opacity: 1, y: 0, duration: 0.36, ease: "expo.out" },
+          t0 + 0.12
         );
       });
 
-      // ---------------------------------------------------------------
-      // Scene 3 (3.4–6.2s): diff types on (discrete-text-sequence).
-      //   First the red "- func Attack(...)" line, then the green
-      //   "+ func Attack(ctx context.Context, ...)" line. Discrete state
-      //   swaps at thresholds — instant jumps, no smear.
-      // ---------------------------------------------------------------
+      // ===============================================================
+      // Scene 3 (3.4–6.2s): diff types on (discrete-text-sequence /
+      //   smooth char-slice). v2: KEEP IT KEYBOARD-CRISP — a visible,
+      //   kinetic speed. Red del line first, then the green + line.
+      // ===============================================================
       var DEL_FULL = "- func Attack(target string, resCh chan *Result) *Metrics {";
       var ADD_FULL = "+ func Attack(ctx context.Context, target string, ...) {";
 
-      // red del line: type on 3.45 -> 4.55
+      // red del line: type on 3.30 -> 4.18 (キビキビ, ~0.016s/char feel)
       var delState = { n: 0 };
       var delEl = null;
       tl.to(
         delState,
         {
           n: DEL_FULL.length,
-          duration: 1.1,
+          duration: 0.88,
           ease: "none",
           onUpdate: function () {
             if (!delEl) delEl = document.getElementById("exp-del");
             if (delEl) delEl.textContent = DEL_FULL.substring(0, Math.floor(delState.n));
           },
         },
-        3.45
+        3.30
       );
 
-      // green add line: type on 4.75 -> 5.95 (lands after del completes)
+      // green add line: type on 4.42 -> 5.34 (snappy; lands after del)
       var addState = { n: 0 };
       var addEl = null;
       tl.to(
         addState,
         {
           n: ADD_FULL.length,
-          duration: 1.2,
+          duration: 0.92,
           ease: "none",
           onUpdate: function () {
             if (!addEl) addEl = document.getElementById("exp-add-text");
             if (addEl) addEl.textContent = ADD_FULL.substring(0, Math.floor(addState.n));
           },
         },
-        4.75
+        4.42
       );
 
-      // Restrained GREEN keyword-glow (asr-keyword-glow envelope) on the
-      // evidence badge and the word "ctx" the moment the green + line lands.
-      // Finite tween, single driver, decays to a rest breadcrumb — no repeat.
-      var GLOW_START = 5.95; // green line has just fully landed
-      var GLOW_DUR = 1.4;
-      var ATTACK = 0.22;
-      var RELEASE = 0.6;
-      var REST = 0.14;
+      // ONE gentle push-in on the whole card, timed to the green + line
+      // landing — a single camera lean toward the payoff. fromTo, no bounce.
+      tl.fromTo(
+        "#exp-card",
+        { scale: 1 },
+        { scale: 1.028, duration: 0.85, ease: "power2.out" },
+        4.9
+      );
+
+      // GREEN keyword-glow (asr-keyword-glow envelope) on the evidence badge
+      // and the word "ctx" the MOMENT the green + line lands. v2: a touch
+      // stronger — the confidence spike of the shot. Finite, single driver,
+      // decays to a rest breadcrumb — no repeat/yoyo.
+      var GLOW_START = 5.34;  // green line has just fully landed
+      var GLOW_DUR = 1.5;
+      var ATTACK = 0.20;
+      var RELEASE = 0.62;
+      var REST = 0.16;
       function glowEnv(local) {
         if (local < 0) return 0;
-        if (local < ATTACK) return local / ATTACK; // attack to 1
+        if (local < ATTACK) return local / ATTACK;                       // attack to 1
         var relEnd = ATTACK + RELEASE;
         if (local < relEnd) return 1 - ((local - ATTACK) / RELEASE) * (1 - REST); // decay to rest
-        return REST; // hold breadcrumb
+        return REST;                                                     // hold breadcrumb
       }
       var glowDriver = { t: 0 };
       var evEl = null, kwEl = null;
@@ -291,27 +326,32 @@
             if (!evEl) evEl = document.getElementById("exp-ev");
             if (!kwEl) kwEl = document.getElementById("exp-kw");
             var env = glowEnv(glowDriver.t);
-            // green glow hugging the glyphs (text-shadow), badge edge lifts
+            // green glow hugging the glyphs (text-shadow) + a small scale pop
             if (kwEl) {
-              kwEl.style.textShadow = "0 0 " + (18 * env).toFixed(2) + "px rgba(86,211,100," + (0.85 * env).toFixed(3) + ")";
-              kwEl.style.color = env > 0.25 ? "#56d364" : "#d6deeb";
+              kwEl.style.textShadow =
+                "0 0 " + (22 * env).toFixed(2) + "px rgba(86,211,100," + (0.92 * env).toFixed(3) + ")";
+              kwEl.style.color = env > 0.22 ? "#56d364" : "#d6deeb";
+              kwEl.style.transform = "scale(" + (1 + 0.06 * env).toFixed(3) + ")";
+              kwEl.style.display = "inline-block";
             }
             if (evEl) {
-              evEl.style.textShadow = "0 0 " + (16 * env).toFixed(2) + "px rgba(63,185,80," + (0.7 * env).toFixed(3) + ")";
-              evEl.style.borderColor = "rgba(63,185,80," + (0.35 + 0.4 * env).toFixed(3) + ")";
+              evEl.style.textShadow =
+                "0 0 " + (20 * env).toFixed(2) + "px rgba(63,185,80," + (0.78 * env).toFixed(3) + ")";
+              evEl.style.borderColor = "rgba(63,185,80," + (0.35 + 0.45 * env).toFixed(3) + ")";
             }
           },
         },
         GLOW_START
       );
 
-      // ---------------------------------------------------------------
+      // ===============================================================
       // Caret blink — deterministic sin square wave across the whole
       // duration (finite, no CSS animation). Only motion during the
-      // Scene 4 hold (6.2–8.0s): the confidence breather.
-      // ---------------------------------------------------------------
+      // Scene 4 hold (6.2–8.0s): the confidence breather. push/breathing なし.
+      // ===============================================================
       var TOTAL = 8;
       var BLINK_CYCLES = 13; // ~0.6s per cycle
+      var GREEN_TYPE_START = 4.42;
       var blink = { p: 0 };
       var caretEl = null;
       tl.to(
@@ -323,8 +363,10 @@
           onUpdate: function () {
             if (!caretEl) caretEl = document.getElementById("exp-caret");
             if (!caretEl) return;
+            // scene-local time reconstructed from the driver phase
+            var sceneT = (blink.p / (Math.PI * 2 * BLINK_CYCLES)) * TOTAL;
             // caret hidden until the green line begins typing, then blinks
-            if (blink.p / (Math.PI * 2 * BLINK_CYCLES) * TOTAL < 4.75) {
+            if (sceneT < GREEN_TYPE_START) {
               caretEl.style.opacity = "0";
             } else {
               caretEl.style.opacity = Math.sin(blink.p) > 0 ? "1" : "0";
