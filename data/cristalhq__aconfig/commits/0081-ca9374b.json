@@ -1,0 +1,79 @@
+{
+  "seq": 81,
+  "sha": "ca9374b7261f9c5c6b230d39b96fdba3051754a3",
+  "parents": [
+    "7d865091f5b192d7f7a19f6e62fc0b7d369cc467"
+  ],
+  "author": {
+    "name": "Oleg Kovalov",
+    "email": "oleg@hey.com",
+    "date": "2020-12-19T09:04:46+01:00"
+  },
+  "message": "simplify ifs (#37)",
+  "pr": {
+    "number": 37,
+    "title": "simplify ifs",
+    "body": "",
+    "url": "https://github.com/cristalhq/aconfig/pull/37"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 6,
+    "deletions": 4
+  },
+  "files": [
+    {
+      "path": "aconfig.go",
+      "status": "M",
+      "additions": 6,
+      "deletions": 4,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/aconfig.go b/aconfig.go\nindex b16b83c..7c9ee69 100644\n--- a/aconfig.go\n+++ b/aconfig.go\n@@ -70,6 +70,7 @@ type Field interface {\n }\n \n // LoaderFor creates a new Loader based on a given configuration structure.\n+// Supports only non-nil structures.\n func LoaderFor(dst interface{}, cfg Config) *Loader {\n \tassertStruct(dst)\n \n@@ -113,12 +114,13 @@ func (l *Loader) parseFields() {\n }\n \n // Flags returngs flag.FlagSet to create your own flags.\n+// FlagSet name is Config.FlagPrefix and error handling is set to ContinueOnError.\n func (l *Loader) Flags() *flag.FlagSet {\n \treturn l.flagSet\n }\n \n // WalkFields iterates over configuration fields.\n-// Easy way to create documentation or other stuff.\n+// Easy way to create documentation or user-friendly help.\n func (l *Loader) WalkFields(fn func(f Field) bool) {\n \tfor _, f := range l.fields {\n \t\tif !fn(f) {\n@@ -202,7 +204,7 @@ func (l *Loader) loadFromFile() error {\n \t\t\tdelete(actualFields, name)\n \t\t}\n \n-\t\tif !l.config.AllowUnknownFields && len(actualFields) != 0 {\n+\t\tif !l.config.AllowUnknownFields {\n \t\t\tfor env, value := range actualFields {\n \t\t\t\treturn fmt.Errorf(\"unknown field in file %s: %s:%s\", file, env, value)\n \t\t\t}\n@@ -227,7 +229,7 @@ func (l *Loader) loadEnvironment() error {\n \t\tdelete(actualEnv, envName)\n \t}\n \n-\tif !l.config.AllowUnknownEnvs && l.config.EnvPrefix != \"\" && len(actualEnv) != 0 {\n+\tif !l.config.AllowUnknownEnvs && l.config.EnvPrefix != \"\" {\n \t\tfor env, value := range actualEnv {\n \t\t\tif strings.HasPrefix(env, l.config.EnvPrefix) {\n \t\t\t\treturn fmt.Errorf(\"unknown environment var %s : %s\", env, value)\n@@ -261,7 +263,7 @@ func (l *Loader) loadFlags() error {\n \t\tdelete(actualFlags, flagName)\n \t}\n \n-\tif !l.config.AllowUnknownFlags && l.config.FlagPrefix != \"\" && len(actualFlags) != 0 {\n+\tif !l.config.AllowUnknownFlags && l.config.FlagPrefix != \"\" {\n \t\tfor flag, value := range actualFlags {\n \t\t\tif strings.HasPrefix(flag, l.config.FlagPrefix) {\n \t\t\t\treturn fmt.Errorf(\"unknown flag %s : %s\", flag, value)\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/build.yml",
+    "LICENSE",
+    "README.md",
+    "aconfig.go",
+    "aconfig_test.go",
+    "aconfigdotenv/dotenv.go",
+    "aconfigdotenv/dotenv_test.go",
+    "aconfigdotenv/go.mod",
+    "aconfigdotenv/go.sum",
+    "aconfigtoml/go.mod",
+    "aconfigtoml/go.sum",
+    "aconfigtoml/toml.go",
+    "aconfigtoml/toml_test.go",
+    "aconfigyaml/go.mod",
+    "aconfigyaml/go.sum",
+    "aconfigyaml/yaml.go",
+    "aconfigyaml/yaml_test.go",
+    "example_test.go",
+    "go.mod",
+    "reflection.go",
+    "testdata/bad_config.json",
+    "testdata/config1.json",
+    "testdata/example_config.json",
+    "testdata/unknown.ext",
+    "testdata/with_additional_fields.json",
+    "testfile.json",
+    "utils.go",
+    "utils_test.go"
+  ],
+  "explanation": {
+    "what": "aconfig.go のコメントを2箇所追加・修正しつつ、loadFromFile/loadEnvironment/loadFlags 内の「未知フィールドがあるときだけエラーを返す」条件式から冗長な len(...) != 0 チェックを取り除いた。AllowUnknownFields/AllowUnknownEnvs/AllowUnknownFlags が false であればそのまま for ループに入り、ループ内の range が空マップなら何もせず nil を返すため、事前の長さチェックがなくても挙動は変わらない。",
+    "why": "コミットメッセージ・PR タイトルとも「simplify ifs(if を単純化する)」とだけあり、詳細な理由の記載はない。3箇所とも同じパターン(`!AllowUnknown... && len(actual...) != 0` の条件で早期リターンのためのループに入る)になっており、`len(map) != 0` は range が空なら自然に何もしないため常に冗長だった、という技術的背景は diff から読み取れる。あわせて LoaderFor・Flags・WalkFields のコメントを補足し、ドキュメントとしての説明も強化している。",
+    "highlights": [
+      { "file": "aconfig.go", "note": "3つの if 条件から `len(actualFields) != 0` 相当の冗長な長さチェックを削除。range の空マップ耐性を利用したシンプル化。" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [{ "type": "pr", "number": 37, "url": "https://github.com/cristalhq/aconfig/pull/37" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

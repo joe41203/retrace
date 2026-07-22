@@ -1,0 +1,87 @@
+{
+  "seq": 112,
+  "sha": "4d4472d89d20d16896cc8bbbd5ae8152f13a9449",
+  "parents": [
+    "4036e83548347a236b71eb0d2e9d7289ae79cb35"
+  ],
+  "author": {
+    "name": "Oleg Kovalov",
+    "email": "oleg@hey.com",
+    "date": "2021-05-16T13:43:56+02:00"
+  },
+  "message": "better error messages (#75)",
+  "pr": {
+    "number": 75,
+    "title": "better error messages",
+    "body": "",
+    "url": "https://github.com/cristalhq/aconfig/pull/75"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 4,
+    "deletions": 4
+  },
+  "files": [
+    {
+      "path": "aconfig.go",
+      "status": "M",
+      "additions": 4,
+      "deletions": 4,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/aconfig.go b/aconfig.go\nindex 35ff9c3..f63f895 100644\n--- a/aconfig.go\n+++ b/aconfig.go\n@@ -281,7 +281,7 @@ func (l *Loader) loadFromFile() error {\n \t\text := strings.ToLower(filepath.Ext(file))\n \t\tdecoder, ok := l.config.FileDecoders[ext]\n \t\tif !ok {\n-\t\t\treturn fmt.Errorf(\"file format '%q' isn't supported\", ext)\n+\t\t\treturn fmt.Errorf(\"file format %q isn't supported\", ext)\n \t\t}\n \n \t\tactualFields, err := decoder.DecodeFile(file)\n@@ -311,7 +311,7 @@ func (l *Loader) loadFromFile() error {\n \n \t\tif !l.config.AllowUnknownFields {\n \t\t\tfor env, value := range actualFields {\n-\t\t\t\treturn fmt.Errorf(\"unknown field in file %q: %s=%s (see AllowUnknownFields config param)\", file, env, value)\n+\t\t\t\treturn fmt.Errorf(\"unknown field in file %q: %s=%v (see AllowUnknownFields config param)\", file, env, value)\n \t\t\t}\n \t\t}\n \n@@ -337,7 +337,7 @@ func (l *Loader) loadEnvironment() error {\n \tif !l.config.AllowUnknownEnvs && l.config.EnvPrefix != \"\" {\n \t\tfor env, value := range actualEnvs {\n \t\t\tif strings.HasPrefix(env, l.config.EnvPrefix) {\n-\t\t\t\treturn fmt.Errorf(\"unknown environment var %s=%s (see AllowUnknownEnvs config param)\", env, value)\n+\t\t\t\treturn fmt.Errorf(\"unknown environment var %s=%v (see AllowUnknownEnvs config param)\", env, value)\n \t\t\t}\n \t\t}\n \t}\n@@ -358,7 +358,7 @@ func (l *Loader) loadFlags() error {\n \tif !l.config.AllowUnknownFlags && l.config.FlagPrefix != \"\" {\n \t\tfor flag, value := range actualFlags {\n \t\t\tif strings.HasPrefix(flag, l.config.FlagPrefix) {\n-\t\t\t\treturn fmt.Errorf(\"unknown flag %s=%s (see AllowUnknownFlags config param)\", flag, value)\n+\t\t\t\treturn fmt.Errorf(\"unknown flag %s=%v (see AllowUnknownFlags config param)\", flag, value)\n \t\t\t}\n \t\t}\n \t}\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/build.yml",
+    "LICENSE",
+    "README.md",
+    "aconfig.go",
+    "aconfig_test.go",
+    "aconfigdotenv/dotenv.go",
+    "aconfigdotenv/dotenv_test.go",
+    "aconfigdotenv/go.mod",
+    "aconfigdotenv/go.sum",
+    "aconfighcl/go.mod",
+    "aconfighcl/go.sum",
+    "aconfighcl/hcl.go",
+    "aconfighcl/hcl_test.go",
+    "aconfigtoml/go.mod",
+    "aconfigtoml/go.sum",
+    "aconfigtoml/toml.go",
+    "aconfigtoml/toml_test.go",
+    "aconfigyaml/go.mod",
+    "aconfigyaml/go.sum",
+    "aconfigyaml/yaml.go",
+    "aconfigyaml/yaml_test.go",
+    "doc.go",
+    "example_test.go",
+    "go.mod",
+    "reflection.go",
+    "testdata/bad_config.json",
+    "testdata/config.json",
+    "testdata/config1.json",
+    "testdata/config2.json",
+    "testdata/config3.json",
+    "testdata/example_config.json",
+    "testdata/unknown.ext",
+    "testdata/unknown_fields.json",
+    "testfile.json",
+    "utils.go",
+    "utils_test.go"
+  ],
+  "explanation": {
+    "what": "aconfig.go 内の複数のエラーメッセージを微修正した。ファイル形式未対応エラーの `%q` の二重引用符(`'%q'`)を単なる `%q` に直し、未知フィールド・未知環境変数・未知フラグのエラーで値のフォーマット指定子を `%s` から `%v` に変更した。",
+    "why": "PR タイトルの通りエラーメッセージの改善が目的。`'%q'` は `%q` 自体が既に引用符付きの表現を生成するため二重になっており見た目が不自然だった。また `%s` は値が文字列でない場合(interface{} 型の value 等)にも安全に文字列化できる `%v` へ統一する意図と読める。",
+    "highlights": [
+      { "file": "aconfig.go", "note": "`'%q'` → `%q`、value の `%s` → `%v` という3箇所のエラーフォーマット修正" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [{ "type": "pr", "number": 75, "url": "https://github.com/cristalhq/aconfig/pull/75" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

@@ -1,0 +1,84 @@
+{
+  "seq": 33,
+  "sha": "4319d93925732b21b20352d6cfcde9a402cee9b2",
+  "parents": [
+    "6a14ae7e502365abbc77b8ebdd1097ce362684fb"
+  ],
+  "author": {
+    "name": "Oleg Kovalov",
+    "email": "iamolegkovalov@gmail.com",
+    "date": "2020-07-23T16:37:02+02:00"
+  },
+  "message": "proper flag handling",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 3,
+    "additions": 118,
+    "deletions": 39
+  },
+  "files": [
+    {
+      "path": "aconfig.go",
+      "status": "M",
+      "additions": 52,
+      "deletions": 8,
+      "binary": false
+    },
+    {
+      "path": "aconfig_test.go",
+      "status": "M",
+      "additions": 62,
+      "deletions": 27,
+      "binary": false
+    },
+    {
+      "path": "example_test.go",
+      "status": "M",
+      "additions": 4,
+      "deletions": 4,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/aconfig.go b/aconfig.go\nindex 2b52e37..d6912c8 100644\n--- a/aconfig.go\n+++ b/aconfig.go\n@@ -19,8 +19,9 @@ const defaultValueTag = \"default\"\n \n // Loader of user configuration.\n type Loader struct {\n-\tconfig LoaderConfig\n-\tfields []*fieldData\n+\tconfig  LoaderConfig\n+\tfields  []*fieldData\n+\tflagSet *flag.FlagSet\n }\n \n // LoaderConfig to configure configuration loader.\n@@ -38,14 +39,38 @@ type LoaderConfig struct {\n \n // NewLoader creates a new Loader based on a config.\n // Zero-value config is acceptable.\n-func NewLoader(config LoaderConfig) *Loader {\n+func NewLoaderFor(cfg interface{}, config LoaderConfig) *Loader {\n \tif config.EnvPrefix != \"\" {\n \t\tconfig.EnvPrefix += \"_\"\n \t}\n \tif config.FlagPrefix != \"\" {\n \t\tconfig.FlagPrefix += \".\"\n \t}\n-\treturn &Loader{config: config}\n+\tl := &Loader{config: config}\n+\tl.preLoad(cfg)\n+\treturn l\n+}\n+\n+func (l *Loader) preLoad(cfg interface{}) {\n+\tfields := getFields(cfg)\n+\n+\tl.flagSet = flag.NewFlagSet(l.config.FlagPrefix, flag.ContinueOnError)\n+\n+\tfor _, field := range fields {\n+\t\tflagName := l.getFlagName(field.Name)\n+\t\tenvName := l.getEnvName(field.Name)\n+\t\tv, ok := os.LookupEnv(envName)\n+\n+\t\tdefaultValue := field.DefaultValue\n+\t\tif ok {\n+\t\t\tdefaultValue = v\n+\t\t}\n+\t\tl.flagSet.String(flagName, defaultValue, \"\")\n+\t}\n+}\n+\n+func (l *Loader) Flags() *flag.FlagSet {\n+\treturn l.flagSet\n }\n \n // Load configuration into a given param.\n@@ -58,6 +83,17 @@ func (l *Loader) Load(into interface{}) error {\n \treturn nil\n }\n \n+// LoadWithFiles configuration into a given param.\n+func (l *Loader) LoadWithFiles(into interface{}, files []string) error {\n+\tl.fields = getFields(into)\n+\tl.config.Files = files\n+\n+\tif err := l.loadSources(into); err != nil {\n+\t\treturn fmt.Errorf(\"aconfig: cannot load config: %w\", err)\n+\t}\n+\treturn nil\n+}\n+\n func (l *Loader) loadSources(into interface{}) error {\n \tif !l.config.SkipDefaults {\n \t\tif err := l.loadDefaults(); err != nil {\n@@ -133,14 +169,21 @@ func (l *Loader) loadEnvironment() error {\n }\n \n func (l *Loader) loadFlags() error {\n-\tif !flag.Parsed() {\n-\t\tflag.Parse()\n+\tif !l.flagSet.Parsed() {\n+\t\tif err := l.flagSet.Parse(os.Args[1:]); err != nil {\n+\t\t\treturn err\n+\t\t}\n \t}\n \n+\tactualFlags := map[string]*flag.Flag{}\n+\tl.flagSet.Visit(func(f *flag.Flag) {\n+\t\tactualFlags[f.Name] = f\n+\t})\n+\n \tfor _, field := range l.fields {\n \t\tflagName := l.getFlagName(field.Name)\n-\t\tflg := flag.Lookup(flagName)\n-\t\tif flg == nil {\n+\t\tflg, ok := actualFlags[flagName]\n+\t\tif !ok {\n \t\t\tcontinue\n \t\t}\n \t\tif err := l.setFieldData(field, flg.Value.String()); err != nil {\n@@ -206,6 +249,7 @@ type fieldData struct {\n \tField        reflect.StructField\n \tValue        reflect.Value\n \tDefaultValue string\n+\tIsSet        bool\n }\n \n func newFieldData(field reflect.StructField, value reflect.Value, parent *fieldData) *fieldData {\ndiff --git a/aconfig_test.go b/aconfig_test.go\nindex 56aef0f..92629fc 100644\n--- a/aconfig_test.go\n+++ b/aconfig_test.go\n@@ -2,7 +2,6 @@ package aconfig\n \n import (\n \t\"encoding/json\"\n-\t\"flag\"\n \t\"os\"\n \t\"path/filepath\"\n \t\"reflect\"\n@@ -82,7 +81,7 @@ func (m MyDuration) Duration() (time.Duration, error) {\n }\n \n func TestLoadDefaults(t *testing.T) {\n-\tloader := NewLoader(LoaderConfig{\n+\tloader := NewLoaderFor(&TestConfig{}, LoaderConfig{\n \t\tSkipFile: true,\n \t\tSkipEnv:  true,\n \t\tSkipFlag: true,\n@@ -102,16 +101,17 @@ func TestLoadDefaults(t *testing.T) {\n }\n \n func TestLoadDefault_AllTypesConfig(t *testing.T) {\n-\tloader := NewLoader(LoaderConfig{\n+\tloader := NewLoaderFor(&AllTypesConfig{}, LoaderConfig{\n \t\tSkipFile: true,\n \t\tSkipEnv:  true,\n \t\tSkipFlag: true,\n \t})\n-\tvar cfg, want AllTypesConfig\n+\tvar cfg AllTypesConfig\n \tif err := loader.Load(&cfg); err != nil {\n \t\tt.Fatal(err)\n \t}\n \n+\tvar want AllTypesConfig\n \tloadFile(t, \"testdata/all_types_config.json\", &want)\n \n \tif got := cfg; got != want {\n@@ -120,16 +120,17 @@ func TestLoadDefault_AllTypesConfig(t *testing.T) {\n }\n \n func TestLoadDefault_DurationConfig(t *testing.T) {\n-\tloader := NewLoader(LoaderConfig{\n+\tloader := NewLoaderFor(&DurationConfig{}, LoaderConfig{\n \t\tSkipFile: true,\n \t\tSkipEnv:  true,\n \t\tSkipFlag: true,\n \t})\n-\tvar cfg, want DurationConfig\n+\tvar cfg DurationConfig\n \tif err := loader.Load(&cfg); err != nil {\n \t\tt.Fatal(err)\n \t}\n \n+\tvar want DurationConfig\n \tloadFile(t, \"testdata/my_duration_config.json\", &want)\n \n \tif got := cfg; got != want {\n@@ -138,16 +139,17 @@ func TestLoadDefault_DurationConfig(t *testing.T) {\n }\n \n func TestLoadDefault_OtherNumbersConfig(t *testing.T) {\n-\tloader := NewLoader(LoaderConfig{\n+\tloader := NewLoaderFor(&OtherNumbersConfig{}, LoaderConfig{\n \t\tSkipFile: true,\n \t\tSkipEnv:  true,\n \t\tSkipFlag: true,\n \t})\n-\tvar cfg, want OtherNumbersConfig\n+\tvar cfg OtherNumbersConfig\n \tif err := loader.Load(&cfg); err != nil {\n \t\tt.Fatal(err)\n \t}\n \n+\tvar want OtherNumbersConfig\n \tloadFile(t, \"testdata/other_numbers_config.json\", &want)\n \n \tif got := cfg; got != want {\n@@ -159,7 +161,7 @@ func TestLoadFile(t *testing.T) {\n \tf := func(filepath string) {\n \t\tt.Helper()\n \n-\t\tloader := NewLoader(LoaderConfig{\n+\t\tloader := NewLoaderFor(&TestConfig{}, LoaderConfig{\n \t\t\tSkipDefaults: true,\n \t\t\tSkipEnv:      true,\n \t\t\tSkipFlag:     true,\n@@ -182,6 +184,32 @@ func TestLoadFile(t *testing.T) {\n \tf(\"testdata/config1.toml\")\n }\n \n+func TestLoadFile_WithFiles(t *testing.T) {\n+\tf := func(filepath string) {\n+\t\tt.Helper()\n+\n+\t\tloader := NewLoaderFor(&TestConfig{}, LoaderConfig{\n+\t\t\tSkipDefaults: true,\n+\t\t\tSkipEnv:      true,\n+\t\t\tSkipFlag:     true,\n+\t\t})\n+\t\tvar cfg, want TestConfig\n+\t\tif err := loader.LoadWithFiles(&cfg, []string{filepath}); err != nil {\n+\t\t\tt.Fatal(err)\n+\t\t}\n+\n+\t\tloadFile(t, filepath, &want)\n+\n+\t\tif got := cfg; !reflect.DeepEqual(got, want) {\n+\t\t\tt.Fatalf(\"want %v, got %v\", want, got)\n+\t\t}\n+\t}\n+\n+\tf(\"testdata/config1.json\")\n+\tf(\"testdata/config1.yaml\")\n+\tf(\"testdata/config1.toml\")\n+}\n+\n func TestLoadEnv(t *testing.T) {\n \tsetEnv(t, \"TST_STR\", \"str-env\")\n \tsetEnv(t, \"TST_INT\", \"121\")\n@@ -190,7 +218,7 @@ func TestLoadEnv(t *testing.T) {\n \tsetEnv(t, \"TST_EM\", \"em-env\")\n \tdefer os.Clearenv()\n \n-\tloader := NewLoader(LoaderConfig{\n+\tloader := NewLoaderFor(&TestConfig{}, LoaderConfig{\n \t\tSkipDefaults: true,\n \t\tSkipFile:     true,\n \t\tSkipFlag:     true,\n@@ -211,20 +239,27 @@ func TestLoadEnv(t *testing.T) {\n }\n \n func TestLoadFlag(t *testing.T) {\n-\tsetFlag(\"tst.str\", \"str-flag\")\n-\tsetFlag(\"tst.int\", \"1001\")\n-\tsetFlag(\"tst.httpport\", \"30000\")\n-\tsetFlag(\"tst.sub.float\", \"123.321\")\n-\tsetFlag(\"tst.ptrsub.float\", \"321.123\")\n-\tsetFlag(\"tst.em\", \"em-flag\")\n-\n-\tloader := NewLoader(LoaderConfig{\n+\tloader := NewLoaderFor(&TestConfig{}, LoaderConfig{\n \t\tSkipDefaults: true,\n \t\tSkipFile:     true,\n \t\tSkipEnv:      true,\n \t\tFlagPrefix:   \"tst\",\n \t})\n \n+\tflags := []string{\n+\t\t\"-tst.str=str-flag\",\n+\t\t\"-tst.int=1001\",\n+\t\t\"-tst.int=1001\",\n+\t\t\"-tst.httpport=30000\",\n+\t\t\"-tst.sub.float=123.321\",\n+\t\t\"-tst.em=em-flag\",\n+\t}\n+\n+\t// hack for test :(\n+\tif err := loader.Flags().Parse(flags); err != nil {\n+\t\tt.Fatal(err)\n+\t}\n+\n \tvar cfg TestConfig\n \tif err := loader.Load(&cfg); err != nil {\n \t\tt.Fatal(err)\n@@ -242,7 +277,7 @@ func TestBadDefauts(t *testing.T) {\n \tf := func(cfg interface{}) {\n \t\tt.Helper()\n \n-\t\tloader := NewLoader(LoaderConfig{\n+\t\tloader := NewLoaderFor(cfg, LoaderConfig{\n \t\t\tSkipFile: true,\n \t\t\tSkipEnv:  true,\n \t\t\tSkipFlag: true,\n@@ -337,7 +372,7 @@ func TestBadFiles(t *testing.T) {\n \tf := func(filepath string) {\n \t\tt.Helper()\n \n-\t\tloader := NewLoader(LoaderConfig{\n+\t\tloader := NewLoaderFor(&TestConfig{}, LoaderConfig{\n \t\t\tSkipDefaults: true,\n \t\t\tSkipEnv:      true,\n \t\t\tSkipFlag:     true,\n@@ -358,7 +393,7 @@ func TestBadEnvs(t *testing.T) {\n \tsetEnv(t, \"TST_HTTPPORT\", \"30a00\")\n \tdefer os.Clearenv()\n \n-\tloader := NewLoader(LoaderConfig{\n+\tloader := NewLoaderFor(&TestConfig{}, LoaderConfig{\n \t\tSkipDefaults: true,\n \t\tSkipFile:     true,\n \t\tSkipFlag:     true,\n@@ -375,15 +410,19 @@ func TestBadFlags(t *testing.T) {\n \ttype Config struct {\n \t\tField int\n \t}\n-\tsetFlag(\"tst.field\", \"10a01\")\n \n-\tloader := NewLoader(LoaderConfig{\n+\tloader := NewLoaderFor(&Config{}, LoaderConfig{\n \t\tSkipDefaults: true,\n \t\tSkipFile:     true,\n \t\tSkipEnv:      true,\n \t\tFlagPrefix:   \"tst\",\n \t})\n \n+\t// hack for test :(\n+\tif err := loader.Flags().Parse([]string{\"-tst.field=10a01\"}); err != nil {\n+\t\tt.Fatal(err)\n+\t}\n+\n \tvar cfg Config\n \tif err := loader.Load(&cfg); err == nil {\n \t\tt.Fatal(err)\n@@ -414,7 +453,3 @@ func setEnv(t *testing.T, key, value string) {\n \t\tt.Fatal(err)\n \t}\n }\n-\n-func setFlag(flg, value string) {\n-\tflag.String(flg, value, \"testing\")\n-}\ndiff --git a/example_test.go b/example_test.go\nindex 74f2847..136e0bf 100644\n--- a/example_test.go\n+++ b/example_test.go\n@@ -20,7 +20,7 @@ type MyConfig struct {\n // Just load defaults from struct defenition.\n //\n func Example_Defaults() {\n-\tloader := aconfig.NewLoader(aconfig.LoaderConfig{\n+\tloader := aconfig.NewLoaderFor(&MyConfig{}, aconfig.LoaderConfig{\n \t\tSkipFile: true,\n \t\tSkipEnv:  true,\n \t\tSkipFlag: true,\n@@ -45,7 +45,7 @@ func Example_Defaults() {\n // Load defaults from struct defenition and overwrite with a file.\n //\n func Example_File() {\n-\tloader := aconfig.NewLoader(aconfig.LoaderConfig{\n+\tloader := aconfig.NewLoaderFor(&MyConfig{}, aconfig.LoaderConfig{\n \t\tSkipEnv:  true,\n \t\tSkipFlag: true,\n \t\tFiles:    []string{\"testdata/example_config.json\"},\n@@ -76,7 +76,7 @@ func Example_Env() {\n \tos.Setenv(\"EXAMPLE_AUTH_PASS\", \"env-pass\")\n \tdefer os.Clearenv()\n \n-\tloader := aconfig.NewLoader(aconfig.LoaderConfig{\n+\tloader := aconfig.NewLoaderFor(&MyConfig{}, aconfig.LoaderConfig{\n \t\tSkipFlag:  true,\n \t\tEnvPrefix: \"EXAMPLE\",\n \t\tFiles:     []string{\"testdata/example_config.json\"},\n@@ -107,7 +107,7 @@ func Example_Flag() {\n \tflag.String(\"ex.auth.user\", \"flag-user\", \"app user\")\n \tflag.String(\"ex.auth.pass\", \"flag-pass\", \"app pass\")\n \n-\tloader := aconfig.NewLoader(aconfig.LoaderConfig{\n+\tloader := aconfig.NewLoaderFor(&MyConfig{}, aconfig.LoaderConfig{\n \t\tEnvPrefix:  \"EXAMPLE\",\n \t\tFlagPrefix: \"ex\",\n \t\tFiles:      []string{\"testdata/example_config.json\"},\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/build.yml",
+    "LICENSE",
+    "README.md",
+    "aconfig.go",
+    "aconfig_test.go",
+    "example_test.go",
+    "go.mod",
+    "go.sum",
+    "testdata/all_types_config.json",
+    "testdata/bad_config.json",
+    "testdata/config1.json",
+    "testdata/config1.toml",
+    "testdata/config1.yaml",
+    "testdata/example_config.json",
+    "testdata/my_duration_config.json",
+    "testdata/other_numbers_config.json",
+    "testdata/test_config_def.json",
+    "testdata/test_config_env.json",
+    "testdata/test_config_flag.json",
+    "testdata/unknown.ext"
+  ],
+  "explanation": {
+    "what": "flag処理をグローバルな`flag`パッケージ直接利用から、Loaderが専有する`*flag.FlagSet`(`l.flagSet`)へ切り替えた。あわせてコンストラクタを`NewLoader(config)`から`NewLoaderFor(cfg, config)`に変更し、生成直後に`preLoad`でconfig構造体のフィールドをフラグとして事前登録する。ユーザーが自分の追加フラグを定義できるよう`Loader.Flags()`で内部FlagSetを公開し、テストもグローバル`flag.String`によるsetFlagヘルパーをやめて`loader.Flags().Parse(...)`を直接呼ぶ形に書き換えている。",
+    "why": "従来のグローバル`flag`パッケージ利用では、テスト間でフラグ定義が使い回されて汚染されたり、ライブラリ利用者側のflag名と衝突するリスクがあった。専用のFlagSetをLoaderごとに持たせることでフラグの所有権をLoaderに閉じ込め、`NewLoaderFor`で対象の設定構造体を渡しておくことで事前にどんなフラグが必要かをreflectで把握できるようにしたと考えられる。",
+    "highlights": [
+      { "file": "aconfig.go", "note": "NewLoaderFor → preLoad でflag.NewFlagSetを構築し、getFieldsの結果をflagSet.Stringとして事前登録" },
+      { "file": "aconfig.go", "note": "loadFlagsがflag.Lookupではなくflag.FlagSet.Visitで実際に指定されたフラグだけ拾うように変更" }
+    ],
+    "langNotes": [
+      { "topic": "flag.FlagSet", "note": "Go標準の`flag`パッケージはデフォルトで`flag.CommandLine`というグローバルFlagSetを暗黙に使うが、`flag.NewFlagSet(name, errorHandling)`で独立したフラグ集合を作れる。ライブラリがグローバル状態を汚さないための定石。" },
+      { "topic": "FlagSet.Visit", "note": "`Visit`はコマンドラインで実際に指定されたフラグだけを走査するのに対し、`VisitAll`は定義済み全フラグを走査する。このコミットでは「明示的に指定されたフラグのみ設定を上書きする」ために前者を使っている。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

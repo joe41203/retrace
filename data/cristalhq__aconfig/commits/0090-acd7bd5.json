@@ -1,0 +1,96 @@
+{
+  "seq": 90,
+  "sha": "acd7bd5a6ff65705dc1fcd0e04e956074a9f76a6",
+  "parents": [
+    "6fdb278db453dbb4354e720b08dbe35d7b1ed589"
+  ],
+  "author": {
+    "name": "Yury Makarov",
+    "email": "mef4mail@gmail.com",
+    "date": "2021-02-23T17:32:43+03:00"
+  },
+  "message": "close testfile.yaml (#46)",
+  "pr": {
+    "number": 46,
+    "title": "close testfile.yaml",
+    "body": "in go1.16 failed test aconfigyaml because testfile.yaml lock to remove.",
+    "url": "https://github.com/cristalhq/aconfig/pull/46"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 2,
+    "deletions": 0
+  },
+  "files": [
+    {
+      "path": "aconfigyaml/yaml.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "aconfigyaml/yaml_test.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/aconfigyaml/yaml.go b/aconfigyaml/yaml.go\nindex 476a521..0fadef0 100644\n--- a/aconfigyaml/yaml.go\n+++ b/aconfigyaml/yaml.go\n@@ -17,6 +17,7 @@ func New() *Decoder { return &Decoder{} }\n // DecodeFile implements aconfig.FileDecoder.\n func (d *Decoder) DecodeFile(filename string) (map[string]interface{}, error) {\n \tf, err := os.Open(filename)\n+\tdefer f.Close()\n \tif err != nil {\n \t\treturn nil, err\n \t}\ndiff --git a/aconfigyaml/yaml_test.go b/aconfigyaml/yaml_test.go\nindex efea8ae..69171ed 100644\n--- a/aconfigyaml/yaml_test.go\n+++ b/aconfigyaml/yaml_test.go\n@@ -73,6 +73,7 @@ func createTestFile(t *testing.T) string {\n \tfilepath := dir + \"/testfile.yaml\"\n \n \tf, err := os.Create(filepath)\n+\tdefer f.Close()\n \tif err != nil {\n \t\tt.Fatal(err)\n \t}\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/build.yml",
+    "LICENSE",
+    "README.md",
+    "aconfig.go",
+    "aconfig_test.go",
+    "aconfigdotenv/dotenv.go",
+    "aconfigdotenv/dotenv_test.go",
+    "aconfigdotenv/go.mod",
+    "aconfigdotenv/go.sum",
+    "aconfighcl/go.mod",
+    "aconfighcl/go.sum",
+    "aconfighcl/hcl.go",
+    "aconfighcl/hcl_test.go",
+    "aconfigtoml/go.mod",
+    "aconfigtoml/go.sum",
+    "aconfigtoml/toml.go",
+    "aconfigtoml/toml_test.go",
+    "aconfigyaml/go.mod",
+    "aconfigyaml/go.sum",
+    "aconfigyaml/yaml.go",
+    "aconfigyaml/yaml_test.go",
+    "doc.go",
+    "example_test.go",
+    "go.mod",
+    "reflection.go",
+    "testdata/bad_config.json",
+    "testdata/config.json",
+    "testdata/config1.json",
+    "testdata/config2.json",
+    "testdata/config3.json",
+    "testdata/example_config.json",
+    "testdata/unknown.ext",
+    "testdata/unknown_fields.json",
+    "testfile.json",
+    "utils.go",
+    "utils_test.go"
+  ],
+  "explanation": {
+    "what": "aconfigyaml/yaml.go の Decoder.DecodeFile と yaml_test.go の createTestFile で、os.Open / os.Create で取得した *os.File に対して defer f.Close() を追加した。ただし defer 文がエラーチェック(if err != nil)より前に置かれているため、Open/Create が失敗して f が nil でも Close 呼び出し自体は defer に積まれる形になっている。",
+    "why": "PR body に明記されている通り、Go 1.16 環境で aconfigyaml のテストが失敗するようになった。原因は一時作成した testfile.yaml をテスト内で開いたまま Close していなかったため、Windows など一部環境でファイルがロックされたまま削除(t.Cleanup の os.RemoveAll)しようとして失敗していたためと考えられる。defer Close を追加してファイルハンドルを確実に解放するようにした。",
+    "highlights": [
+      { "file": "aconfigyaml/yaml.go", "note": "os.Open 直後に defer f.Close() を追加。ファイルハンドルの解放漏れを防ぐ。" }
+    ],
+    "langNotes": [
+      { "topic": "defer によるリソース解放", "note": "Go では os.Open/os.Create が返す *os.File を defer f.Close() で関数終了時に確実に閉じるのが定石。この commit のように defer をエラーチェックより前に書くと nil file の Close を呼ぶリスクがあるため、本来は err チェック後に defer するのがより安全とされる。" }
+    ],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [{ "type": "pr", "number": 46, "url": "https://github.com/cristalhq/aconfig/pull/46" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

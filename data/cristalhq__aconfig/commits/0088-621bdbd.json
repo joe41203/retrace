@@ -1,0 +1,139 @@
+{
+  "seq": 88,
+  "sha": "621bdbdf33719c5e0cc7ea19639f5c495124c0eb",
+  "parents": [
+    "cb9b2149b98cab5b06c5d634b60f6c23dc297b2e"
+  ],
+  "author": {
+    "name": "Oleg Kovalov",
+    "email": "oleg@hey.com",
+    "date": "2021-01-15T18:38:40+01:00"
+  },
+  "message": "add HCL (#43)",
+  "pr": {
+    "number": 43,
+    "title": "add HCL",
+    "body": "",
+    "url": "https://github.com/cristalhq/aconfig/pull/43"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 8,
+    "additions": 262,
+    "deletions": 2
+  },
+  "files": [
+    {
+      "path": "README.md",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "aconfig.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "aconfighcl/go.mod",
+      "status": "A",
+      "additions": 8,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "aconfighcl/go.sum",
+      "status": "A",
+      "additions": 6,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "aconfighcl/hcl.go",
+      "status": "A",
+      "additions": 86,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "aconfighcl/hcl_test.go",
+      "status": "A",
+      "additions": 155,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "reflection.go",
+      "status": "M",
+      "additions": 4,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "utils.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/README.md b/README.md\nindex bc760fa..df42e01 100644\n--- a/README.md\n+++ b/README.md\n@@ -18,7 +18,7 @@ There are many solutions regarding configuration loading in Go. I was looking fo\n * Automatic fields mapping.\r\n * Supports different sources:\r\n   * defaults in the code\r\n-  * files (JSON, YAML, TOML)\r\n+  * files (JSON, YAML, TOML, DotENV, HCL)\r\n   * environment variables\r\n   * command-line flags\r\n * Dependency-free (file parsers are optional).\r\ndiff --git a/aconfig.go b/aconfig.go\nindex 4277a52..138cf3f 100644\n--- a/aconfig.go\n+++ b/aconfig.go\n@@ -14,6 +14,7 @@ const (\n \tjsonNameTag     = \"json\"\n \tyamlNameTag     = \"yaml\"\n \ttomlNameTag     = \"toml\"\n+\thclNameTag      = \"hcl\"\n \tenvNameTag      = \"env\"\n \tflagNameTag     = \"flag\"\n )\ndiff --git a/aconfighcl/go.mod b/aconfighcl/go.mod\nnew file mode 100644\nindex 0000000..ced63b8\n--- /dev/null\n+++ b/aconfighcl/go.mod\n@@ -0,0 +1,8 @@\n+module github.com/cristalhq/aconfig/aconfighcl\n+\n+go 1.15\n+\n+require (\n+\tgithub.com/cristalhq/aconfig v0.10.0\n+\tgithub.com/hashicorp/hcl v1.0.0\n+)\ndiff --git a/aconfighcl/go.sum b/aconfighcl/go.sum\nnew file mode 100644\nindex 0000000..5ab4beb\n--- /dev/null\n+++ b/aconfighcl/go.sum\n@@ -0,0 +1,6 @@\n+github.com/cristalhq/aconfig v0.10.0 h1:5dyXjRkUBDuueSHFYxlLdxpZrnzGHwlffhL16NiT+XQ=\n+github.com/cristalhq/aconfig v0.10.0/go.mod h1:0ZBp7dUf0F2Jr7YbLjw8OVlAD0eeV2bU3NwmVgeUReo=\n+github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=\n+github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=\n+github.com/hashicorp/hcl v1.0.0 h1:0Anlzjpi4vEasTeNFn2mLJgTSwt0+6sfsiTG8qcWGx4=\n+github.com/hashicorp/hcl v1.0.0/go.mod h1:E5yfLk+7swimpb2L/Alb/PJmXilQ/rhwaUYs4T20WEQ=\ndiff --git a/aconfighcl/hcl.go b/aconfighcl/hcl.go\nnew file mode 100644\nindex 0000000..60f0a09\n--- /dev/null\n+++ b/aconfighcl/hcl.go\n@@ -0,0 +1,86 @@\n+package aconfighcl\r\n+\r\n+import (\r\n+\t\"fmt\"\r\n+\t\"io/ioutil\"\r\n+\t\"strings\"\r\n+\r\n+\t\"github.com/hashicorp/hcl\"\r\n+)\r\n+\r\n+// Decoder of HCL files for aconfig.\r\n+type Decoder struct{}\r\n+\r\n+// New HCL decoder for aconfig.\r\n+func New() *Decoder { return &Decoder{} }\r\n+\r\n+// DecodeFile implements aconfig.FileDecoder.\r\n+func (d *Decoder) DecodeFile(filename string) (map[string]interface{}, error) {\r\n+\tb, err := ioutil.ReadFile(filename)\r\n+\tif err != nil {\r\n+\t\treturn nil, err\r\n+\t}\r\n+\r\n+\tf, err := hcl.ParseBytes(b)\r\n+\tif err != nil {\r\n+\t\treturn nil, err\r\n+\t}\r\n+\r\n+\tvar raw map[string]interface{}\r\n+\tif err := hcl.DecodeObject(&raw, f); err != nil {\r\n+\t\treturn nil, err\r\n+\t}\r\n+\r\n+\tres := map[string]interface{}{}\r\n+\r\n+\tfor key, value := range raw {\r\n+\t\tflatten(\"\", key, value, res)\r\n+\t}\r\n+\treturn res, nil\r\n+}\r\n+\r\n+// copied and adapted from aconfig/utils.go\r\n+//\r\n+func flatten(prefix, key string, curr interface{}, res map[string]interface{}) {\r\n+\tswitch curr := curr.(type) {\r\n+\tcase []map[string]interface{}:\r\n+\t\tfor _, v := range curr {\r\n+\t\t\tflatten(prefix+key, \"\", v, res)\r\n+\t\t}\r\n+\tcase []map[interface{}]interface{}:\r\n+\t\tfor k, v := range curr {\r\n+\t\t\tflatten(prefix+key+\".\", fmt.Sprint(k), v, res)\r\n+\t\t}\r\n+\r\n+\tcase map[string]interface{}:\r\n+\t\tfor k, v := range curr {\r\n+\t\t\tflatten(prefix+key+\".\", k, v, res)\r\n+\t\t}\r\n+\r\n+\tcase map[interface{}]interface{}:\r\n+\t\tfor k, v := range curr {\r\n+\t\t\tif k, ok := k.(string); ok {\r\n+\t\t\t\tflatten(prefix+key+\".\", k, v, res)\r\n+\t\t\t}\r\n+\t\t}\r\n+\tcase []interface{}:\r\n+\t\tb := &strings.Builder{}\r\n+\t\tfor i, v := range curr {\r\n+\t\t\tif i > 0 {\r\n+\t\t\t\tb.WriteByte(',')\r\n+\t\t\t}\r\n+\t\t\tb.WriteString(fmt.Sprint(v))\r\n+\t\t}\r\n+\t\tres[prefix+key] = b.String()\r\n+\tcase bool:\r\n+\t\tres[prefix+key] = fmt.Sprint(curr)\r\n+\tcase string:\r\n+\t\tres[prefix+key] = curr\r\n+\tcase float64:\r\n+\t\tres[prefix+key] = fmt.Sprint(curr)\r\n+\tcase int, int8, int16, int32:\r\n+\t\tres[prefix+key] = fmt.Sprint(curr)\r\n+\tdefault:\r\n+\t\tpanic(fmt.Sprintf(\"%s::%s got %T %v\", prefix, key, curr, curr))\r\n+\t}\r\n+}\r\ndiff --git a/aconfighcl/hcl_test.go b/aconfighcl/hcl_test.go\nnew file mode 100644\nindex 0000000..c0527b5\n--- /dev/null\n+++ b/aconfighcl/hcl_test.go\n@@ -0,0 +1,155 @@\n+package aconfighcl_test\r\n+\r\n+import (\r\n+\t\"os\"\r\n+\t\"reflect\"\r\n+\t\"testing\"\r\n+\r\n+\t\"github.com/cristalhq/aconfig\"\r\n+\t\"github.com/cristalhq/aconfig/aconfighcl\"\r\n+)\r\n+\r\n+func TestHCL(t *testing.T) {\r\n+\tfilepath := createTestFile(t)\r\n+\r\n+\tvar cfg structConfig\r\n+\tloader := aconfig.LoaderFor(&cfg, aconfig.Config{\r\n+\t\tSkipDefaults: true,\r\n+\t\tSkipEnv:      true,\r\n+\t\tSkipFlags:    true,\r\n+\t\tFileDecoders: map[string]aconfig.FileDecoder{\r\n+\t\t\t\".hcl\": aconfighcl.New(),\r\n+\t\t},\r\n+\t\tFiles: []string{filepath},\r\n+\t})\r\n+\r\n+\tif err := loader.Load(); err != nil {\r\n+\t\tt.Fatal(err)\r\n+\t}\r\n+\r\n+\ti := int32(42)\r\n+\tj := int64(420)\r\n+\twant := structConfig{\r\n+\t\tA: \"b\",\r\n+\t\tC: 10,\r\n+\t\tE: 123.456,\r\n+\t\tB: []byte(\"abc\"),\r\n+\t\tI: &i,\r\n+\t\tJ: &j,\r\n+\t\tY: structY{\r\n+\t\t\tX: \"y\",\r\n+\t\t\tZ: []string{\"1\", \"2\", \"3\"},\r\n+\t\t\tA: structD{\r\n+\t\t\t\tI: true,\r\n+\t\t\t},\r\n+\t\t},\r\n+\t\tAA: structA{\r\n+\t\t\tX: \"y\",\r\n+\t\t\tBB: structB{\r\n+\t\t\t\tCC: structC{\r\n+\t\t\t\t\tMM: \"n\",\r\n+\t\t\t\t\tBB: []byte(\"boo\"),\r\n+\t\t\t\t},\r\n+\t\t\t\tDD: []string{\"x\", \"y\", \"z\"},\r\n+\t\t\t},\r\n+\t\t},\r\n+\t\tStructM: StructM{\r\n+\t\t\tM: \"n\",\r\n+\t\t},\r\n+\t}\r\n+\r\n+\tif got := cfg; !reflect.DeepEqual(want, got) {\r\n+\t\tt.Fatalf(\"want %v, got %v\", want, got)\r\n+\t}\r\n+}\r\n+\r\n+func createTestFile(t *testing.T) string {\r\n+\tt.Helper()\r\n+\tdir := t.TempDir()\r\n+\tt.Cleanup(func() {\r\n+\t\tos.RemoveAll(dir)\r\n+\t})\r\n+\r\n+\tfilepath := dir + \"/testfile.hcl\"\r\n+\r\n+\tf, err := os.Create(filepath)\r\n+\tif err != nil {\r\n+\t\tt.Fatal(err)\r\n+\t}\r\n+\t_, err = f.WriteString(testfileContent)\r\n+\tif err != nil {\r\n+\t\tt.Fatal(err)\r\n+\t}\r\n+\treturn filepath\r\n+}\r\n+\r\n+type structConfig struct {\r\n+\tA string  `hcl:\"a\"`\r\n+\tC int     `hcl:\"c\"`\r\n+\tE float64 `hcl:\"e\"`\r\n+\tB []byte  `hcl:\"b\"`\r\n+\tI *int32  `hcl:\"i\"`\r\n+\tJ *int64  `hcl:\"j\"`\r\n+\tY structY `hcl:\"y\"`\r\n+\r\n+\tAA structA `hcl:\"A\"`\r\n+\tStructM\r\n+}\r\n+\r\n+type structY struct {\r\n+\tX string   `hcl:\"x\"`\r\n+\tZ []string `hcl:\"z\"`\r\n+\tA structD  `hcl:\"A\"`\r\n+}\r\n+\r\n+type structA struct {\r\n+\tX  string  `hcl:\"x\"`\r\n+\tBB structB `hcl:\"B\"`\r\n+}\r\n+\r\n+type structB struct {\r\n+\tCC structC  `hcl:\"C\"`\r\n+\tDD []string `hcl:\"D\"`\r\n+}\r\n+\r\n+type structC struct {\r\n+\tMM string `hcl:\"m\"`\r\n+\tBB []byte `hcl:\"b\"`\r\n+}\r\n+\r\n+type structD struct {\r\n+\tI bool `hcl:\"i\"`\r\n+}\r\n+\r\n+type StructM struct {\r\n+\tM string `hcl:\"M\"`\r\n+}\r\n+\r\n+const testfileContent = `\r\n+\"a\" = \"b\"\r\n+\"c\" = 10\r\n+\"e\" = 123.456\r\n+\"b\" = \"abc\"\r\n+\"i\" = 42\r\n+\"j\" = 420\r\n+\r\n+\"y\" = {\r\n+\t\"x\" = \"y\"\r\n+\t\"z\" = [\"1\", \"2\", \"3\"]\r\n+\t\"A\" = {\r\n+\t\t\"i\" = true\r\n+\t}\r\n+}\r\n+\"A\" = {\r\n+\t\"x\" = \"y\"\r\n+\t\"B\" = {\r\n+\t\t\"C\" = {\r\n+\t\t\t\"m\" = \"n\"\r\n+\t\t\t\"b\" = \"boo\"\r\n+\t\t}\r\n+\t\t\"D\" = [\"x\", \"y\", \"z\"]\r\n+\t}\r\n+}\r\n+\r\n+\"M\" = \"n\"\r\n+`\r\ndiff --git a/reflection.go b/reflection.go\nindex 38c2e22..04094a1 100644\n--- a/reflection.go\n+++ b/reflection.go\n@@ -18,6 +18,7 @@ type fieldData struct {\n \tjsonName     string\n \tyamlName     string\n \ttomlName     string\n+\thclName      string\n \tenvName      string\n \tflagName     string\n }\n@@ -40,6 +41,7 @@ func (l *Loader) newFieldData(field reflect.StructField, value reflect.Value, pa\n \t\tjsonName:     l.makeTagValue(field, jsonNameTag, words),\n \t\tyamlName:     l.makeTagValue(field, yamlNameTag, words),\n \t\ttomlName:     l.makeTagValue(field, tomlNameTag, words),\n+\t\thclName:      l.makeTagValue(field, hclNameTag, words),\n \t\tenvName:      l.makeEnvName(field, words),\n \t\tflagName:     l.makeTagValue(field, flagNameTag, words),\n \t}\n@@ -74,6 +76,8 @@ func (f *fieldData) Tag(tag string) string {\n \t\treturn f.yamlName\n \tcase tomlNameTag:\n \t\treturn f.tomlName\n+\tcase hclNameTag:\n+\t\treturn f.hclName\n \tcase envNameTag:\n \t\treturn f.envName\n \tcase flagNameTag:\ndiff --git a/utils.go b/utils.go\nindex 8b8605e..501975e 100644\n--- a/utils.go\n+++ b/utils.go\n@@ -51,7 +51,7 @@ func (l *Loader) makeTagValue(field reflect.StructField, tag string, words []str\n \t\treturn v\n \t}\n \tswitch tag {\n-\tcase jsonNameTag, yamlNameTag, tomlNameTag:\n+\tcase jsonNameTag, yamlNameTag, tomlNameTag, hclNameTag:\n \t\tif l.config.DontGenerateTags {\n \t\t\treturn field.Name\n \t\t}\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/build.yml",
+    "LICENSE",
+    "README.md",
+    "aconfig.go",
+    "aconfig_test.go",
+    "aconfigdotenv/dotenv.go",
+    "aconfigdotenv/dotenv_test.go",
+    "aconfigdotenv/go.mod",
+    "aconfigdotenv/go.sum",
+    "aconfighcl/go.mod",
+    "aconfighcl/go.sum",
+    "aconfighcl/hcl.go",
+    "aconfighcl/hcl_test.go",
+    "aconfigtoml/go.mod",
+    "aconfigtoml/go.sum",
+    "aconfigtoml/toml.go",
+    "aconfigtoml/toml_test.go",
+    "aconfigyaml/go.mod",
+    "aconfigyaml/go.sum",
+    "aconfigyaml/yaml.go",
+    "aconfigyaml/yaml_test.go",
+    "doc.go",
+    "example_test.go",
+    "go.mod",
+    "reflection.go",
+    "testdata/bad_config.json",
+    "testdata/config.json",
+    "testdata/config1.json",
+    "testdata/config2.json",
+    "testdata/config3.json",
+    "testdata/example_config.json",
+    "testdata/unknown.ext",
+    "testdata/unknown_fields.json",
+    "testfile.json",
+    "utils.go",
+    "utils_test.go"
+  ],
+  "explanation": {
+    "what": "新しいサブモジュール aconfighcl(独自の go.mod を持つ)を追加し、HashiCorp の github.com/hashicorp/hcl を使って HCL 形式の設定ファイルを読み込む Decoder を実装した。aconfig.go には hclNameTag(\"hcl\")定数、reflection.go の fieldData に hclName フィールドと Tag() での分岐を追加し、utils.go の makeTagValue でも hcl タグを DontGenerateTags の対象に含めた。aconfighcl/hcl.go の flatten はネストした map/slice/bool/string/float64/int を1階層のキーに畳み込み、README にも \"HCL\" をサポート形式一覧に追記した。",
+    "why": "PR タイトルは「add HCL」のみで詳細な記載はない。おそらく既に JSON/YAML/TOML/DotENV をサブモジュールとして提供していた aconfig に、HashiCorp 系ツール(Terraform 等)で広く使われる HCL 形式のサポートを追加する目的と考えられる。既存の aconfigyaml/aconfigtoml と同じ「Decoder 構造体 + New() + DecodeFile(filename) + flatten」というパターンを踏襲しており、他のサブモジュールと一貫した設計になっている。",
+    "highlights": [
+      { "file": "aconfighcl/hcl.go", "note": "aconfigyaml/aconfigtoml と同型の Decoder 実装。flatten で入れ子構造をドット区切りキーに変換している。" },
+      { "file": "reflection.go", "note": "hclNameTag が既存の json/yaml/toml と並ぶ第4のフォーマットタグとして fieldData に組み込まれた箇所。" }
+    ],
+    "langNotes": [
+      { "topic": "サブモジュール(独立 go.mod)としてのデコーダ追加", "note": "aconfighcl は本体 aconfig とは別の go.mod を持つ独立モジュール。これにより HCL を使わないユーザーは hashicorp/hcl への依存を go.mod に持ち込まずに済む。aconfigyaml・aconfigtoml と同じ構成パターン。" }
+    ],
+    "diagram": null,
+    "evidence": "inferred",
+    "refs": [{ "type": "pr", "number": 43, "url": "https://github.com/cristalhq/aconfig/pull/43" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

@@ -1,0 +1,96 @@
+{
+  "seq": 121,
+  "sha": "69d209aa4611239a6eaf8524876b6b9060a92377",
+  "parents": [
+    "877f87e5b26340704b107f057e78aea46f62f532"
+  ],
+  "author": {
+    "name": "Oleg Kovalov",
+    "email": "oleg@hey.com",
+    "date": "2021-05-26T19:25:09+02:00"
+  },
+  "message": "duplicate name (#87)",
+  "pr": {
+    "number": 87,
+    "title": "duplicate name",
+    "body": "Signed-off-by: Oleg Kovalov <oleg@hey.com>",
+    "url": "https://github.com/cristalhq/aconfig/pull/87"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 101,
+    "deletions": 18
+  },
+  "files": [
+    {
+      "path": "aconfig.go",
+      "status": "M",
+      "additions": 48,
+      "deletions": 18,
+      "binary": false
+    },
+    {
+      "path": "aconfig_test.go",
+      "status": "M",
+      "additions": 53,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/aconfig.go b/aconfig.go\nindex c3d1691..4c1d060 100644\n--- a/aconfig.go\n+++ b/aconfig.go\n@@ -48,6 +48,9 @@ type Config struct {\n \t// If default is set and this option is enabled (or required tag is set) there will be an error.\n \tAllFieldRequired bool\n \n+\t// AllowDuplicates set to true will not fail on duplicated names on fields (env, flag, etc...)\n+\tAllowDuplicates bool\n+\n \t// AllowUnknownFields set to true will not fail on unknown fields in files.\n \tAllowUnknownFields bool\n \n@@ -214,22 +217,22 @@ func (l *Loader) parseFlags() error {\n func (l *Loader) loadSources() error {\n \tif !l.config.SkipDefaults {\n \t\tif err := l.loadDefaults(); err != nil {\n-\t\t\treturn err\n+\t\t\treturn fmt.Errorf(\"loading defaults: %w\", err)\n \t\t}\n \t}\n \tif !l.config.SkipFiles {\n \t\tif err := l.loadFiles(); err != nil {\n-\t\t\treturn err\n+\t\t\treturn fmt.Errorf(\"loading files: %w\", err)\n \t\t}\n \t}\n \tif !l.config.SkipEnv {\n \t\tif err := l.loadEnvironment(); err != nil {\n-\t\t\treturn err\n+\t\t\treturn fmt.Errorf(\"loading environment: %w\", err)\n \t\t}\n \t}\n \tif !l.config.SkipFlags {\n \t\tif err := l.loadFlags(); err != nil {\n-\t\t\treturn err\n+\t\t\treturn fmt.Errorf(\"loading flags: %w\", err)\n \t\t}\n \t}\n \treturn nil\n@@ -349,6 +352,7 @@ func (l *Loader) loadFileFlag() error {\n \n func (l *Loader) loadEnvironment() error {\n \tactualEnvs := getEnv()\n+\tdupls := make(map[string]struct{})\n \n \tfor _, field := range l.fields {\n \t\tenvName := l.fullTag(l.config.EnvPrefix, field, envNameTag)\n@@ -356,16 +360,24 @@ func (l *Loader) loadEnvironment() error {\n \t\t\tcontinue\n \t\t}\n \n-\t\tif err := l.setField(field, envName, actualEnvs); err != nil {\n+\t\tif err := l.setField(field, envName, actualEnvs, dupls); err != nil {\n \t\t\treturn err\n \t\t}\n \t}\n \n-\tif !l.config.AllowUnknownEnvs && l.config.EnvPrefix != \"\" {\n-\t\tfor env, value := range actualEnvs {\n-\t\t\tif strings.HasPrefix(env, l.config.EnvPrefix) {\n-\t\t\t\treturn fmt.Errorf(\"unknown environment var %s=%v (see AllowUnknownEnvs config param)\", env, value)\n-\t\t\t}\n+\treturn l.postEnvCheck(actualEnvs, dupls)\n+}\n+\n+func (l *Loader) postEnvCheck(values map[string]interface{}, dupls map[string]struct{}) error {\n+\tfor name := range dupls {\n+\t\tdelete(values, name)\n+\t}\n+\tif l.config.AllowUnknownEnvs || l.config.EnvPrefix == \"\" {\n+\t\treturn nil\n+\t}\n+\tfor env, value := range values {\n+\t\tif strings.HasPrefix(env, l.config.EnvPrefix) {\n+\t\t\treturn fmt.Errorf(\"unknown environment var %s=%v (see AllowUnknownEnvs config param)\", env, value)\n \t\t}\n \t}\n \treturn nil\n@@ -373,6 +385,7 @@ func (l *Loader) loadEnvironment() error {\n \n func (l *Loader) loadFlags() error {\n \tactualFlags := getFlags(l.flagSet)\n+\tdupls := make(map[string]struct{})\n \n \tfor _, field := range l.fields {\n \t\tflagName := l.fullTag(l.config.FlagPrefix, field, flagNameTag)\n@@ -380,22 +393,37 @@ func (l *Loader) loadFlags() error {\n \t\t\tcontinue\n \t\t}\n \n-\t\tif err := l.setField(field, flagName, actualFlags); err != nil {\n+\t\tif err := l.setField(field, flagName, actualFlags, dupls); err != nil {\n \t\t\treturn err\n \t\t}\n \t}\n+\treturn l.postFlagCheck(actualFlags, dupls)\n+}\n \n-\tif !l.config.AllowUnknownFlags && l.config.FlagPrefix != \"\" {\n-\t\tfor flag, value := range actualFlags {\n-\t\t\tif strings.HasPrefix(flag, l.config.FlagPrefix) {\n-\t\t\t\treturn fmt.Errorf(\"unknown flag %s=%v (see AllowUnknownFlags config param)\", flag, value)\n-\t\t\t}\n+func (l *Loader) postFlagCheck(values map[string]interface{}, dupls map[string]struct{}) error {\n+\tfor name := range dupls {\n+\t\tdelete(values, name)\n+\t}\n+\tif l.config.AllowUnknownFlags || l.config.FlagPrefix == \"\" {\n+\t\treturn nil\n+\t}\n+\tfor flag, value := range values {\n+\t\tif strings.HasPrefix(flag, l.config.EnvPrefix) {\n+\t\t\treturn fmt.Errorf(\"unknown flag %s=%v (see AllowUnknownFlags config param)\", flag, value)\n \t\t}\n \t}\n \treturn nil\n }\n \n-func (l *Loader) setField(field *fieldData, name string, values map[string]interface{}) error {\n+// TODO(cristaloleg): revisit\n+func (l *Loader) setField(field *fieldData, name string, values map[string]interface{}, dupls map[string]struct{}) error {\n+\tif !l.config.AllowDuplicates {\n+\t\tif _, ok := dupls[name]; ok {\n+\t\t\treturn fmt.Errorf(\"field %q is duplicated\", name)\n+\t\t}\n+\t\tdupls[name] = struct{}{}\n+\t}\n+\n \tval, ok := values[name]\n \tif !ok {\n \t\treturn nil\n@@ -406,6 +434,8 @@ func (l *Loader) setField(field *fieldData, name string, values map[string]inter\n \t}\n \n \tfield.isSet = true\n-\tdelete(values, name)\n+\tif !l.config.AllowDuplicates {\n+\t\tdelete(values, name)\n+\t}\n \treturn nil\n }\ndiff --git a/aconfig_test.go b/aconfig_test.go\nindex 19f8cbc..97ef2a5 100644\n--- a/aconfig_test.go\n+++ b/aconfig_test.go\n@@ -490,6 +490,59 @@ func TestSkipName(t *testing.T) {\n \t}\n }\n \n+func TestDuplicatedName(t *testing.T) {\n+\tsetEnv(t, \"FOO_BAR\", \"str-env\")\n+\tdefer os.Clearenv()\n+\n+\ttype Foo struct {\n+\t\tBar string\n+\t}\n+\ttype ExactConfig struct {\n+\t\tFoo    Foo\n+\t\tFooBar string\n+\t}\n+\tvar cfg ExactConfig\n+\n+\tloader := LoaderFor(&cfg, Config{\n+\t\tSkipFlags:       true,\n+\t\tAllowDuplicates: true,\n+\t})\n+\tif err := loader.Load(); err != nil {\n+\t\tt.Error(err)\n+\t}\n+\n+\twant := ExactConfig{\n+\t\tFoo: Foo{\n+\t\t\tBar: \"str-env\",\n+\t\t},\n+\t\tFooBar: \"str-env\",\n+\t}\n+\n+\tif got := cfg; !reflect.DeepEqual(want, got) {\n+\t\tt.Fatalf(\"want %v, got %v\", want, got)\n+\t}\n+}\n+\n+func TestFailOnDuplicatedName(t *testing.T) {\n+\ttype Foo struct {\n+\t\tBar string\n+\t}\n+\ttype ExactConfig struct {\n+\t\tFoo    Foo\n+\t\tFooBar string\n+\t}\n+\tvar cfg ExactConfig\n+\n+\tloader := LoaderFor(&cfg, Config{\n+\t\tSkipFlags: true,\n+\t})\n+\n+\terr := loader.Load()\n+\tif !strings.Contains(err.Error(), \"is duplicated\") {\n+\t\tt.Fatalf(\"got %s\", err.Error())\n+\t}\n+}\n+\n func TestUsage(t *testing.T) {\n \tloader := LoaderFor(&EmbeddedConfig{}, Config{})\n \n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/build.yml",
+    "LICENSE",
+    "README.md",
+    "aconfig.go",
+    "aconfig_test.go",
+    "aconfigdotenv/dotenv.go",
+    "aconfigdotenv/dotenv_test.go",
+    "aconfigdotenv/go.mod",
+    "aconfigdotenv/go.sum",
+    "aconfighcl/go.mod",
+    "aconfighcl/go.sum",
+    "aconfighcl/hcl.go",
+    "aconfighcl/hcl_test.go",
+    "aconfigtoml/go.mod",
+    "aconfigtoml/go.sum",
+    "aconfigtoml/toml.go",
+    "aconfigtoml/toml_test.go",
+    "aconfigyaml/go.mod",
+    "aconfigyaml/go.sum",
+    "aconfigyaml/yaml.go",
+    "aconfigyaml/yaml_test.go",
+    "doc.go",
+    "example_test.go",
+    "go.mod",
+    "reflection.go",
+    "testdata/bad_config.json",
+    "testdata/config.json",
+    "testdata/config1.json",
+    "testdata/config2.json",
+    "testdata/config3.json",
+    "testdata/example_config.json",
+    "testdata/unknown_fields.json",
+    "utils.go",
+    "utils_test.go"
+  ],
+  "explanation": {
+    "what": "Config に AllowDuplicates フィールドを追加し、env/flag の名前解決で同じ名前が複数フィールドにマッチした場合の挙動を制御できるようにした。setField に dupls という map[string]struct{} を渡して既出の名前を記録し、AllowDuplicates が false ならエラーを返す。加えて loadSources 内の各 load 呼び出しのエラーに fmt.Errorf(\"...: %w\", err) でコンテキストを付与した。",
+    "why": "struct のネストによって Foo.Bar と FooBar のような異なるフィールドが同じ環境変数名/フラグ名に解決されるケースがあり、これを許容するか拒否するかを利用者が選べるようにするための変更。テストの TestDuplicatedName / TestFailOnDuplicatedName が両方の挙動を検証している。",
+    "highlights": [
+      { "file": "aconfig.go", "note": "setField の第4引数 dupls で重複検出。AllowDuplicates=true なら values から delete せず後続フィールドにも値を配れるようにしている" },
+      { "file": "aconfig_test.go", "note": "TestFailOnDuplicatedName で「Foo.Bar」と「FooBar」が同名解決される具体例を確認できる" }
+    ],
+    "langNotes": [
+      { "topic": "error wrapping (%w)", "note": "Go 1.13 以降の fmt.Errorf(\"...: %w\", err) は errors.Is/As で元エラーを辿れる形でラップする。このコミットで loadSources 内の各エラーに文脈(loading defaults/files/environment/flags)を付与している。" },
+      { "topic": "map[string]struct{}", "note": "Go で「集合(セット)」を表す定番イディオム。値に空 struct{} を使うことで追加のメモリを消費せずキーの存在有無だけを管理できる。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [{ "type": "pr", "number": 87, "url": "https://github.com/cristalhq/aconfig/pull/87" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

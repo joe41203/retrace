@@ -1,0 +1,113 @@
+{
+  "seq": 165,
+  "sha": "08a69481e584a1f75b603bc3f29d85e1ff29105c",
+  "parents": [
+    "ccf2e24cf260e134dac9673e579ff3668d45b38e"
+  ],
+  "author": {
+    "name": "d-enk",
+    "email": "d-enk@ya.ru",
+    "date": "2025-04-15T19:14:24+03:00"
+  },
+  "message": "fix: do not make element for nil pointer",
+  "pr": {
+    "number": 159,
+    "title": "Fix: correctly support nested structs",
+    "body": "Close https://github.com/cristalhq/aconfig/issues/157",
+    "url": "https://github.com/cristalhq/aconfig/pull/159"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 3,
+    "additions": 7,
+    "deletions": 0
+  },
+  "files": [
+    {
+      "path": "aconfig_test.go",
+      "status": "M",
+      "additions": 2,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "reflection.go",
+      "status": "M",
+      "additions": 4,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "testdata/slice-deep-structs.json",
+      "status": "M",
+      "additions": 1,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/aconfig_test.go b/aconfig_test.go\nindex fc84c63..a9d1308 100644\n--- a/aconfig_test.go\n+++ b/aconfig_test.go\n@@ -1577,6 +1577,7 @@ func TestSliceOfDeepStructs(t *testing.T) {\n \t\tName     String\n \t\tStrings  []String\n \t\tIntegers []int\n+\t\tNullable *struct{}\n \t\tBooleans []bool\n \t\tStructs  []NestedStruct\n \t}\n@@ -1601,6 +1602,7 @@ func TestSliceOfDeepStructs(t *testing.T) {\n \t\t\t\t\tName:     \"service1\",\n \t\t\t\t\tStrings:  []String{\"string1\", \"string2\"},\n \t\t\t\t\tIntegers: []int{1, 2},\n+\t\t\t\t\tNullable: nil,\n \t\t\t\t\tBooleans: []bool{true, false},\n \t\t\t\t\tStructs: []NestedStruct{\n \t\t\t\t\t\t{1},\ndiff --git a/reflection.go b/reflection.go\nindex 940ba2c..3d05e62 100644\n--- a/reflection.go\n+++ b/reflection.go\n@@ -147,6 +147,10 @@ func (l *Loader) getFieldsHelper(valueObject reflect.Value, parent *fieldData) [\n }\n \n func (l *Loader) setFieldData(field *fieldData, value interface{}) error {\n+\tif value == nil {\n+\t\treturn nil\n+\t}\n+\n \t// unwrap pointers\n \tfor field.value.Type().Kind() == reflect.Ptr {\n \t\tif field.value.IsNil() {\ndiff --git a/testdata/slice-deep-structs.json b/testdata/slice-deep-structs.json\nindex 7668e4f..e35a191 100644\n--- a/testdata/slice-deep-structs.json\n+++ b/testdata/slice-deep-structs.json\n@@ -5,6 +5,7 @@\n         \"name\": \"service1\",\n         \"strings\": [\"string1\", \"string2\"],\n         \"integers\": [1, 2],\n+        \"nullable\": null,\n         \"booleans\": [true, false],\n         \"structs\": [{ \"key\": 1 }, { \"key\": 2 }, { \"key\": 3 }]\n       }\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/dependabot.yml",
+    ".github/workflows/build.yml",
+    "LICENSE",
+    "README.md",
+    "aconfig.go",
+    "aconfig_test.go",
+    "aconfigdotenv/dotenv.go",
+    "aconfigdotenv/dotenv_test.go",
+    "aconfigdotenv/go.mod",
+    "aconfigdotenv/go.sum",
+    "aconfigdotenv/testdata/config.env",
+    "aconfighcl/go.mod",
+    "aconfighcl/go.sum",
+    "aconfighcl/hcl.go",
+    "aconfighcl/hcl_test.go",
+    "aconfighcl/testdata/config.hcl",
+    "aconfigtoml/go.mod",
+    "aconfigtoml/go.sum",
+    "aconfigtoml/testdata/config.toml",
+    "aconfigtoml/toml.go",
+    "aconfigtoml/toml_test.go",
+    "aconfigyaml/go.mod",
+    "aconfigyaml/go.sum",
+    "aconfigyaml/res.yaml",
+    "aconfigyaml/testdata/config.yaml",
+    "aconfigyaml/yaml.go",
+    "aconfigyaml/yaml_test.go",
+    "doc.go",
+    "example_test.go",
+    "go.mod",
+    "go.sum",
+    "parser.go",
+    "reflection.go",
+    "testdata/bad_config.json",
+    "testdata/complex.json",
+    "testdata/config.json",
+    "testdata/config1.json",
+    "testdata/config2.json",
+    "testdata/config3.json",
+    "testdata/example_config.json",
+    "testdata/slice-deep-structs.json",
+    "testdata/slice-struct-primitive-slice.json",
+    "testdata/toy.json",
+    "testdata/unknown_fields.json",
+    "utils.go",
+    "utils_test.go"
+  ],
+  "explanation": {
+    "what": "reflection.go の setFieldData 冒頭に `if value == nil { return nil }` を追加した。これにより、設定ファイル側の値が JSON の null などで nil の場合、ポインタ型フィールドに対して不要な要素確保(reflect.New 相当の処理)をせず、フィールドをゼロ値(nilポインタ)のまま残すようになった。テストのTestSliceOfDeepStructs に `Nullable *struct{}` フィールドと、対応する `\"nullable\": null` を持つ testdata を追加して検証している。",
+    "why": "seq164でネストしたstructのスライスを正しく処理できるようにした直後、null値を持つポインタフィールドがあると setFieldData がポインタの unwrap 処理(`for field.value.Type().Kind() == reflect.Ptr` のループ)に入り、本来nilのままでよいはずの要素を確保してしまう問題が見つかったための追加修正とみられる。同じPR(#159)の一連の作業の中で見つかった関連バグの修正であり、コミットメッセージも簡潔に「do not make element for nil pointer」とその意図を述べている。",
+    "highlights": [
+      { "file": "reflection.go", "note": "setFieldData 冒頭の nil ガード1行が、ポインタ unwrap ループの誤動作を防ぐ" }
+    ],
+    "langNotes": [
+      { "topic": "nil ポインタと reflect", "note": "Go の reflect でポインタ型フィールドを辿るとき、value が nil の場合に無条件で reflect.New 等を呼んで要素を確保してしまうと、本来 nil であるべきフィールドに空struct等が入ってしまう。設定ローダのようにnullable値を扱うコードでは、値がnilかどうかを最初にチェックする必要がある。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [{ "type": "pr", "number": 159, "url": "https://github.com/cristalhq/aconfig/pull/159" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

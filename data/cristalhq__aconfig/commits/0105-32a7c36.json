@@ -1,0 +1,107 @@
+{
+  "seq": 105,
+  "sha": "32a7c36247cc25b7d8bb990d9ec947737b3bcc54",
+  "parents": [
+    "5ba546e2070dbdde4478e5d15b3a265fdc32425f"
+  ],
+  "author": {
+    "name": "aovlllo",
+    "email": "32036729+aovlllo@users.noreply.github.com",
+    "date": "2021-03-14T10:44:05+03:00"
+  },
+  "message": "Add config parsing for pointers to structs (#65)",
+  "pr": {
+    "number": 65,
+    "title": "Add config parsing for pointers to structs",
+    "body": "#64 ",
+    "url": "https://github.com/cristalhq/aconfig/pull/65"
+  },
+  "linkedIssues": [
+    {
+      "number": 64,
+      "title": "Config loading doesn't work for struct pointers",
+      "body": "This small example will fail with error `cannot load config: type kind \"struct\" isn't supported`:\r\n\r\n``` go\r\ntype s1 struct {\r\n\tA *s2\r\n}\r\n\r\ntype s2 struct {\r\n        B string\r\n}\r\n\r\nvar cfg s1\r\nloader := aconfig.LoaderFor(&cfg, aconfig.Config{\r\n\tFiles:           []string{\"/var/opt/myapp/config.json\", \"ouch.yaml\"},\r\n\tFileDecoders: map[string]aconfig.FileDecoder{\r\n\t\t// from `aconfigyaml` submodule\r\n\t\t// see submodules in repo for more formats\r\n\t\t\".yaml\": aconfigyaml.New(),\r\n\t},\r\n})\r\n\r\nflagSet := loader.Flags()\r\n\r\nif err := loader.Load(); err != nil {\r\n\tpanic(err)\r\n}\r\n```\r\n\r\nI prepared quick fix and additional test for this case in my fork, but I don't know your ideology for pointers in configs. I guess some note about this limitation should be added to Readme at least If you don't want to fix this behavior",
+      "url": "https://github.com/cristalhq/aconfig/issues/64"
+    }
+  ],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 23,
+    "deletions": 2
+  },
+  "files": [
+    {
+      "path": "aconfig_test.go",
+      "status": "M",
+      "additions": 14,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "reflection.go",
+      "status": "M",
+      "additions": 9,
+      "deletions": 1,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/aconfig_test.go b/aconfig_test.go\nindex 397d210..959e37d 100644\n--- a/aconfig_test.go\n+++ b/aconfig_test.go\n@@ -193,6 +193,9 @@ func TestJSON(t *testing.T) {\n \t\t\tM: \"n\",\n \t\t},\n \t\tM: mInterface,\n+\t\tP: &structP{\n+\t\t\tP: \"r\",\n+\t\t},\n \t}\n \tif got := cfg; !reflect.DeepEqual(want, got) {\n \t\tt.Fatalf(\"want %v, got %v\", want, got)\n@@ -1002,6 +1005,8 @@ type structConfig struct {\n \tStructM\n \n \tM interface{} `json:\"M\"`\n+\n+\tP *structP `json:\"P\"`\n }\n \n type structY struct {\n@@ -1033,6 +1038,10 @@ type StructM struct {\n \tM string\n }\n \n+type structP struct {\n+\tP string `json:\"P\"`\n+}\n+\n const testfileContent = `{\n     \"a\": \"b\",\n     \"c\": 10,\n@@ -1062,6 +1071,10 @@ const testfileContent = `{\n \n \t\"m\": \"n\",\n \n-\t\"M\":[\"q\", \"w\"]\n+\t\"M\":[\"q\", \"w\"],\n+\t\n+\t\"P\": {\n+\t\t\"P\": \"r\"\n+\t}\n }\n `\ndiff --git a/reflection.go b/reflection.go\nindex a893b01..42d7cbd 100644\n--- a/reflection.go\n+++ b/reflection.go\n@@ -108,13 +108,21 @@ func (l *Loader) getFieldsHelper(valueObject reflect.Value, parent *fieldData) [\n \t\tfd := l.newFieldData(field, value, parent)\n \n \t\t// if it's a struct - expand and process it's fields\n-\t\tif field.Type.Kind() == reflect.Struct {\n+\t\tkind := field.Type.Kind()\n+\t\tif kind == reflect.Ptr {\n+\t\t\tkind = field.Type.Elem().Kind()\n+\t\t}\n+\t\tif kind == reflect.Struct {\n \t\t\tvar subFieldParent *fieldData\n \t\t\tif field.Anonymous {\n \t\t\t\tsubFieldParent = parent\n \t\t\t} else {\n \t\t\t\tsubFieldParent = fd\n \t\t\t}\n+\t\t\tif field.Type.Kind() == reflect.Ptr {\n+\t\t\t\tvalue.Set(reflect.New(field.Type.Elem()))\n+\t\t\t\tvalue = value.Elem()\n+\t\t\t}\n \t\t\tfields = append(fields, l.getFieldsHelper(value, subFieldParent)...)\n \t\t\tcontinue\n \t\t}\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/build.yml",
+    "LICENSE",
+    "README.md",
+    "aconfig.go",
+    "aconfig_test.go",
+    "aconfigdotenv/dotenv.go",
+    "aconfigdotenv/dotenv_test.go",
+    "aconfigdotenv/go.mod",
+    "aconfigdotenv/go.sum",
+    "aconfighcl/go.mod",
+    "aconfighcl/go.sum",
+    "aconfighcl/hcl.go",
+    "aconfighcl/hcl_test.go",
+    "aconfigtoml/go.mod",
+    "aconfigtoml/go.sum",
+    "aconfigtoml/toml.go",
+    "aconfigtoml/toml_test.go",
+    "aconfigyaml/go.mod",
+    "aconfigyaml/go.sum",
+    "aconfigyaml/yaml.go",
+    "aconfigyaml/yaml_test.go",
+    "doc.go",
+    "example_test.go",
+    "go.mod",
+    "reflection.go",
+    "testdata/bad_config.json",
+    "testdata/config.json",
+    "testdata/config1.json",
+    "testdata/config2.json",
+    "testdata/config3.json",
+    "testdata/example_config.json",
+    "testdata/unknown.ext",
+    "testdata/unknown_fields.json",
+    "testfile.json",
+    "utils.go",
+    "utils_test.go"
+  ],
+  "explanation": {
+    "what": "getFieldsHelper でフィールドの種類判定に使う kind を、field.Type.Kind() が reflect.Ptr の場合は field.Type.Elem().Kind() (ポインタの指す先の型)に読み替えるよう変更した。さらに実際にポインタ型だった場合は value.Set(reflect.New(field.Type.Elem())) でゼロ値の実体を new し、value をその実体(Elem())に付け替えてから再帰処理に渡している。テストにも *structP 型フィールドを持つ設定と対応する JSON を追加した。",
+    "why": "issue #64 で報告された通り、構造体へのポインタ(`A *s2`)フィールドを持つ設定は kind が reflect.Ptr のままとなり、struct 用の再帰展開に入らず 'type kind \"struct\" isn't supported' エラーで失敗していた。この PR はポインタの場合だけ指す先の kind を見て struct 展開に入れるようにし、かつポインタ自体が nil のままだと reflect.Value に値を書き込めないため reflect.New で確保してから処理する、という2段の対応を行っている。",
+    "highlights": [
+      { "file": "reflection.go", "note": "ポインタの kind 読み替えと reflect.New によるポインタの実体確保" }
+    ],
+    "langNotes": [
+      { "topic": "reflect.New と nil ポインタの初期化", "note": "Go の構造体フィールドが *T 型で nil のままだと reflect 経由で中身のフィールドに値を設定できない。reflect.New(T) で新しい T のゼロ値を確保しそのポインタを value.Set() で書き込み、Elem() で指す先の reflect.Value を取り出してから再帰的にフィールドを埋める、という手順がここで初めて登場する。" },
+      { "topic": "reflect.Kind と Elem()", "note": "reflect.Type.Kind() は型の種別(Struct/Ptr/Slice など)を返す列挙値。ポインタ型 kind==Ptr の場合、Elem() で「ポインタが指す先の型」を取得できる。struct 判定にはこの間接参照を辿る必要がある。" }
+    ],
+    "diagram": null,
+    "evidence": "issue",
+    "refs": [
+      { "type": "pr", "number": 65, "url": "https://github.com/cristalhq/aconfig/pull/65" },
+      { "type": "issue", "number": 64, "url": "https://github.com/cristalhq/aconfig/issues/64" }
+    ],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

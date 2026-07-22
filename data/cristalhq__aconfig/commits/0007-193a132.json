@@ -1,0 +1,67 @@
+{
+  "seq": 7,
+  "sha": "193a13295643b9be0dc1a6159cdad50bd13471fa",
+  "parents": [
+    "feaeb055b82bf2da0ca19aa70d30ddb5f73e2c8c"
+  ],
+  "author": {
+    "name": "Oleg Kovalov",
+    "email": "iamolegkovalov@gmail.com",
+    "date": "2020-07-22T09:47:15+02:00"
+  },
+  "message": "invert config flags",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 26,
+    "deletions": 26
+  },
+  "files": [
+    {
+      "path": "aconfig.go",
+      "status": "M",
+      "additions": 8,
+      "deletions": 18,
+      "binary": false
+    },
+    {
+      "path": "aconfig_test.go",
+      "status": "M",
+      "additions": 18,
+      "deletions": 8,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/aconfig.go b/aconfig.go\nindex b978a8a..9ddbe96 100644\n--- a/aconfig.go\n+++ b/aconfig.go\n@@ -23,10 +23,10 @@ type Loader struct {\n }\n \n type LoaderConfig struct {\n-\tUseDefaults bool\n-\tUseFile     bool\n-\tUseEnv      bool\n-\tUseFlag     bool\n+\tSkipDefaults bool\n+\tSkipFile     bool\n+\tSkipEnv      bool\n+\tSkipFlag     bool\n \n \tEnvPrefix  string\n \tFlagPrefix string\n@@ -34,16 +34,6 @@ type LoaderConfig struct {\n \tFiles []string\n }\n \n-// DefaultConfig ...\n-func DefaultConfig() LoaderConfig {\n-\treturn LoaderConfig{\n-\t\tUseDefaults: true,\n-\t\tUseFile:     true,\n-\t\tUseEnv:      true,\n-\t\tUseFlag:     true,\n-\t}\n-}\n-\n func NewLoader(config LoaderConfig) *Loader {\n \tif config.EnvPrefix != \"\" {\n \t\tconfig.EnvPrefix += \"_\"\n@@ -57,22 +47,22 @@ func NewLoader(config LoaderConfig) *Loader {\n func (l *Loader) Load(into interface{}) error {\n \tl.fields = getFields(into)\n \n-\tif l.config.UseDefaults {\n+\tif !l.config.SkipDefaults {\n \t\tif err := l.loadDefaults(); err != nil {\n \t\t\treturn err\n \t\t}\n \t}\n-\tif l.config.UseFile {\n+\tif !l.config.SkipFile {\n \t\tif err := l.loadFromFile(into); err != nil {\n \t\t\treturn err\n \t\t}\n \t}\n-\tif l.config.UseEnv {\n+\tif !l.config.SkipEnv {\n \t\tif err := l.loadEnvironment(); err != nil {\n \t\t\treturn err\n \t\t}\n \t}\n-\tif l.config.UseFlag {\n+\tif !l.config.SkipFlag {\n \t\tif err := l.loadFlags(); err != nil {\n \t\t\treturn err\n \t\t}\ndiff --git a/aconfig_test.go b/aconfig_test.go\nindex 117629f..2a61f1a 100644\n--- a/aconfig_test.go\n+++ b/aconfig_test.go\n@@ -61,7 +61,9 @@ func (m MyDuration) Duration() (time.Duration, error) {\n \n func TestLoadDefault_AllTypesConfig(t *testing.T) {\n \tloader := NewLoader(LoaderConfig{\n-\t\tUseDefaults: true,\n+\t\tSkipFile: true,\n+\t\tSkipEnv:  true,\n+\t\tSkipFlag: true,\n \t})\n \tvar cfg, want AllTypesConfig\n \tif err := loader.Load(&cfg); err != nil {\n@@ -76,7 +78,9 @@ func TestLoadDefault_AllTypesConfig(t *testing.T) {\n }\n func TestLoadDefault_DurationConfig(t *testing.T) {\n \tloader := NewLoader(LoaderConfig{\n-\t\tUseDefaults: true,\n+\t\tSkipFile: true,\n+\t\tSkipEnv:  true,\n+\t\tSkipFlag: true,\n \t})\n \tvar cfg, want DurationConfig\n \tif err := loader.Load(&cfg); err != nil {\n@@ -93,8 +97,10 @@ func TestLoadDefault_DurationConfig(t *testing.T) {\n func TestLoadFile(t *testing.T) {\n \tfilepath := \"testdata/config1.json\"\n \tloader := NewLoader(LoaderConfig{\n-\t\tUseFile: true,\n-\t\tFiles:   []string{filepath},\n+\t\tSkipDefaults: true,\n+\t\tSkipEnv:      true,\n+\t\tSkipFlag:     true,\n+\t\tFiles:        []string{filepath},\n \t})\n \tvar cfg, want TestConfig\n \tif err := loader.Load(&cfg); err != nil {\n@@ -117,8 +123,10 @@ func TestLoadEnv(t *testing.T) {\n \tdefer os.Clearenv()\n \n \tloader := NewLoader(LoaderConfig{\n-\t\tUseEnv:    true,\n-\t\tEnvPrefix: \"tst\",\n+\t\tSkipDefaults: true,\n+\t\tSkipFile:     true,\n+\t\tSkipFlag:     true,\n+\t\tEnvPrefix:    \"tst\",\n \t})\n \n \tvar cfg TestConfig\n@@ -144,8 +152,10 @@ func TestLoadFlag(t *testing.T) {\n \tflag.Parse()\n \n \tloader := NewLoader(LoaderConfig{\n-\t\tUseFlag:    true,\n-\t\tFlagPrefix: \"tst\",\n+\t\tSkipDefaults: true,\n+\t\tSkipFile:     true,\n+\t\tSkipEnv:      true,\n+\t\tFlagPrefix:   \"tst\",\n \t})\n \n \tvar cfg TestConfig\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/build.yml",
+    "LICENSE",
+    "README.md",
+    "aconfig.go",
+    "aconfig_test.go",
+    "go.mod",
+    "go.sum",
+    "testdata/all_types_config.json",
+    "testdata/config1.json",
+    "testdata/my_duration_config.json",
+    "testdata/test_config_env.json",
+    "testdata/test_config_flag.json"
+  ],
+  "explanation": {
+    "what": "LoaderConfig のフィールドを UseDefaults/UseFile/UseEnv/UseFlag から SkipDefaults/SkipFile/SkipEnv/SkipFlag に反転し、Load 内の条件も if l.config.UseXxx から if !l.config.SkipXxx に変更した。あわせて DefaultConfig() 関数を削除し、既存テストの LoaderConfig リテラルもすべて SkipXxx: true の組み合わせに書き換えた。",
+    "why": "おそらく Go の bool のゼロ値が false であるため、UseXxx 方式では LoaderConfig{} をゼロ値のまま使うと全ソースが無効になってしまう。Skip 方式に反転すればゼロ値(すべて false)がデフォルトで「全ソース有効」を意味するようになり、DefaultConfig() のような補助関数なしで直感的な既定動作を得られる設計変更だと考えられる。",
+    "highlights": [
+      { "file": "aconfig.go", "note": "DefaultConfig() の削除は、ゼロ値がそのまま「全部有効」になったため不要になったことを示す" }
+    ],
+    "langNotes": [
+      { "topic": "ゼロ値 (zero value)", "note": "Go では変数を初期化せずに宣言すると型ごとの既定値(bool は false、int は 0 など)が入る。struct リテラルで一部フィールドだけ指定した場合も残りはゼロ値になる。このコミットは「未指定=false」という性質を利用し、フラグの意味を反転させることで LoaderConfig{} だけで妥当な既定動作を得られるようにしている。" }
+    ],
+    "diagram": null,
+    "evidence": "inferred",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

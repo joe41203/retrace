@@ -1,0 +1,69 @@
+{
+  "seq": 11,
+  "sha": "8a0ddc3ae4c4a6c38626c7a3c34f4c6d844eb997",
+  "parents": [
+    "1fcf05e4e29a7a79970a1c19dfb26985c033e10c"
+  ],
+  "author": {
+    "name": "Oleg Kovalov",
+    "email": "iamolegkovalov@gmail.com",
+    "date": "2020-07-22T14:23:57+02:00"
+  },
+  "message": "test for bad file",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 4,
+    "deletions": 0
+  },
+  "files": [
+    {
+      "path": "aconfig_test.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "testdata/bad_config.json",
+      "status": "A",
+      "additions": 3,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/aconfig_test.go b/aconfig_test.go\nindex b9b2450..00010d6 100644\n--- a/aconfig_test.go\n+++ b/aconfig_test.go\n@@ -298,6 +298,7 @@ func TestBadFiles(t *testing.T) {\n \t}\n \n \tf(\"testdata/no_such_file.json\")\n+\tf(\"testdata/bad_config.json\")\n \tf(\"testdata/unknown.ext\")\n }\n \ndiff --git a/testdata/bad_config.json b/testdata/bad_config.json\nnew file mode 100644\nindex 0000000..b99a406\n--- /dev/null\n+++ b/testdata/bad_config.json\n@@ -0,0 +1,3 @@\n+{\n+  BOO\n+}\n\\ No newline at end of file\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/build.yml",
+    "LICENSE",
+    "README.md",
+    "aconfig.go",
+    "aconfig_test.go",
+    "go.mod",
+    "go.sum",
+    "testdata/all_types_config.json",
+    "testdata/bad_config.json",
+    "testdata/config1.json",
+    "testdata/config1.toml",
+    "testdata/config1.yaml",
+    "testdata/my_duration_config.json",
+    "testdata/test_config_env.json",
+    "testdata/test_config_flag.json",
+    "testdata/unknown.ext"
+  ],
+  "explanation": {
+    "what": "壊れたJSON(`testdata/bad_config.json`、中身は `{ BOO }` のような構文エラー)をテストケースとして追加し、`TestBadFiles` からロードして失敗することを検証している。",
+    "why": "コミットメッセージ「test for bad file」の通り、存在しないファイルや未知拡張子だけでなく、パース自体が失敗する壊れたファイルのケースをテストに足す意図と読める。",
+    "highlights": [
+      { "file": "testdata/bad_config.json", "note": "意図的に構文が壊れたJSON。デコーダのエラー処理を確認するためのフィクスチャ" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

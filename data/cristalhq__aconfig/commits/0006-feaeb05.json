@@ -1,0 +1,60 @@
+{
+  "seq": 6,
+  "sha": "feaeb055b82bf2da0ca19aa70d30ddb5f73e2c8c",
+  "parents": [
+    "6a252bf9d8f57d8327a54eec4058e52672570e00"
+  ],
+  "author": {
+    "name": "Oleg Kovalov",
+    "email": "iamolegkovalov@gmail.com",
+    "date": "2020-07-21T22:40:41+02:00"
+  },
+  "message": "add CI",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 38,
+    "deletions": 0
+  },
+  "files": [
+    {
+      "path": ".github/workflows/build.yml",
+      "status": "A",
+      "additions": 38,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/.github/workflows/build.yml b/.github/workflows/build.yml\nnew file mode 100644\nindex 0000000..8b601c1\n--- /dev/null\n+++ b/.github/workflows/build.yml\n@@ -0,0 +1,38 @@\n+name: build\n+on: [push, pull_request]\n+jobs:\n+\n+  build:\n+    name: Build & Test\n+    runs-on: ubuntu-latest\n+    steps:\n+\n+    - name: Set up Go 1.14\n+      uses: actions/setup-go@v1\n+      with:\n+        go-version: 1.14\n+      id: go\n+\n+    - name: Check out code\n+      uses: actions/checkout@v1\n+\n+    - name: Download module dependencies\n+      env: \n+         GOPROXY: \"https://proxy.golang.org\"\n+      run: go mod download\n+\n+    - name: Build\n+      run: go build .\n+\n+    - name: Test\n+      run: go test -v ./...\n+\n+    - name: Generate Coverage\n+      run: go test -coverprofile=coverage.txt\n+\n+    - name: Upload Coverage\n+      uses: codecov/codecov-action@v1\n+      with:\n+        token: ${{secrets.CODECOV_TOKEN}}\n+        file: ./coverage.txt\n+        fail_ci_if_error: false\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/build.yml",
+    "LICENSE",
+    "README.md",
+    "aconfig.go",
+    "aconfig_test.go",
+    "go.mod",
+    "go.sum",
+    "testdata/all_types_config.json",
+    "testdata/config1.json",
+    "testdata/my_duration_config.json",
+    "testdata/test_config_env.json",
+    "testdata/test_config_flag.json"
+  ],
+  "explanation": {
+    "what": ".github/workflows/build.yml を追加し、GitHub Actions で Go 1.14 環境をセットアップ、go mod download・go build・go test -v ./...・go test -coverprofile によるカバレッジ計測・codecov/codecov-action によるカバレッジアップロードを行う CI パイプラインを定義した。",
+    "why": "push と pull_request をトリガーに自動ビルド・テスト・カバレッジ計測を行い、README にあるビルド状況/カバレッジバッジ(既に seq5 で追加済み)を実際に機能させるための CI 基盤を整備した。",
+    "highlights": [
+      { "file": ".github/workflows/build.yml", "note": "fail_ci_if_error: false でカバレッジアップロード失敗時もビルド自体は失敗させない設定" }
+    ],
+    "langNotes": [
+      { "topic": "go mod download / go test -coverprofile", "note": "go mod download は go.mod に列挙された依存モジュールを事前に取得するコマンド。-coverprofile はテストのカバレッジ計測結果をファイルに出力するオプションで、後段の codecov アップロードに使われる。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

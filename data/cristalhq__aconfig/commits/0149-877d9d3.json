@@ -1,0 +1,109 @@
+{
+  "seq": 149,
+  "sha": "877d9d3e3cdb00a345e6dfd152dca73794165f95",
+  "parents": [
+    "6eccaaa1e569cdf2704ede729762de4ec2619ae5"
+  ],
+  "author": {
+    "name": "Asaf Alima",
+    "email": "asafalima@users.noreply.github.com",
+    "date": "2022-10-13T13:53:36+03:00"
+  },
+  "message": "Support struct with slice of primitives (#134)",
+  "pr": {
+    "number": 134,
+    "title": "Support struct with slice of primitives",
+    "body": "",
+    "url": "https://github.com/cristalhq/aconfig/pull/134"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 3,
+    "additions": 64,
+    "deletions": 7
+  },
+  "files": [
+    {
+      "path": "aconfig_test.go",
+      "status": "M",
+      "additions": 34,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "reflection.go",
+      "status": "M",
+      "additions": 20,
+      "deletions": 7,
+      "binary": false
+    },
+    {
+      "path": "testdata/slice-struct-primitive-slice.json",
+      "status": "A",
+      "additions": 10,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/aconfig_test.go b/aconfig_test.go\nindex 622fa67..10e80d5 100644\n--- a/aconfig_test.go\n+++ b/aconfig_test.go\n@@ -1414,6 +1414,40 @@ func TestFileConfigFlagDelim(t *testing.T) {\n \tmustEqual(t, cfg, want)\n }\n \n+func TestSliceOfStructsWithSliceOfPrimitives(t *testing.T) {\n+\ttype TestService struct {\n+\t\tName     string\n+\t\tStrings  []string\n+\t\tIntegers []int\n+\t\tBooleans []bool\n+\t}\n+\n+\ttype TestConfig struct {\n+\t\tServices []TestService\n+\t}\n+\tvar cfg TestConfig\n+\tloader := LoaderFor(&cfg, Config{\n+\t\tSkipDefaults: true,\n+\t\tSkipEnv:      true,\n+\t\tSkipFlags:    true,\n+\t\tFiles:        []string{\"testdata/slice-struct-primitive-slice.json\"},\n+\t})\n+\n+\tfailIfErr(t, loader.Load())\n+\n+\twant := TestConfig{\n+\t\tServices: []TestService{\n+\t\t\t{\n+\t\t\t\tName:     \"service1\",\n+\t\t\t\tStrings:  []string{\"string1\", \"string2\"},\n+\t\t\t\tIntegers: []int{1, 2},\n+\t\t\t\tBooleans: []bool{true, false},\n+\t\t\t},\n+\t\t},\n+\t}\n+\tmustEqual(t, cfg, want)\n+}\n+\n func failIfOk(t testing.TB, err error) {\n \tt.Helper()\n \tif err == nil {\ndiff --git a/reflection.go b/reflection.go\nindex 21f72c6..f0bce1a 100644\n--- a/reflection.go\n+++ b/reflection.go\n@@ -201,7 +201,7 @@ func (l *Loader) setFieldData(field *fieldData, value interface{}) error {\n \t\t\t\tvv := mii(val)\n \n \t\t\t\tfd := l.newFieldData(reflect.StructField{}, slice.Index(i), nil)\n-\t\t\t\tif err := m2s(vv, fd.value); err != nil {\n+\t\t\t\tif err := l.m2s(vv, fd.value); err != nil {\n \t\t\t\t\treturn err\n \t\t\t\t}\n \t\t\t}\n@@ -345,7 +345,7 @@ func (l *Loader) setMap(field *fieldData, value string) error {\n \treturn nil\n }\n \n-func m2s(m map[string]interface{}, structValue reflect.Value) error {\n+func (l *Loader) m2s(m map[string]interface{}, structValue reflect.Value) error {\n \tfor name, value := range m {\n \t\tname = strings.Title(name)\n \t\tstructFieldValue := structValue.FieldByName(name)\n@@ -362,11 +362,20 @@ func m2s(m map[string]interface{}, structValue reflect.Value) error {\n \t\t\tif structFieldValue.Kind() == reflect.Slice && val.Kind() == reflect.Slice {\n \t\t\t\tvals := value.([]interface{})\n \t\t\t\tslice := reflect.MakeSlice(structFieldValue.Type(), len(vals), len(vals))\n-\t\t\t\tfor i := 0; i < len(vals); i++ {\n-\t\t\t\t\ta := mii(vals[i])\n-\t\t\t\t\tb := slice.Index(i)\n-\t\t\t\t\tif err := m2s(a, b); err != nil {\n-\t\t\t\t\t\treturn err\n+\t\t\t\tif isPrimitive(structFieldValue.Type().Elem()) {\n+\t\t\t\t\tfor i := 0; i < len(vals); i++ {\n+\t\t\t\t\t\tfd := l.newFieldData(reflect.StructField{}, slice.Index(i), nil)\n+\t\t\t\t\t\tif err := l.setFieldData(fd, vals[i]); err != nil {\n+\t\t\t\t\t\t\treturn fmt.Errorf(\"incorrect slice item %q: %w\", vals[i], err)\n+\t\t\t\t\t\t}\n+\t\t\t\t\t}\n+\t\t\t\t} else {\n+\t\t\t\t\tfor i := 0; i < len(vals); i++ {\n+\t\t\t\t\t\ta := mii(vals[i])\n+\t\t\t\t\t\tb := slice.Index(i)\n+\t\t\t\t\t\tif err := l.m2s(a, b); err != nil {\n+\t\t\t\t\t\t\treturn err\n+\t\t\t\t\t\t}\n \t\t\t\t\t}\n \t\t\t\t}\n \t\t\t\tstructFieldValue.Set(slice)\n@@ -395,3 +404,7 @@ func mii(m interface{}) map[string]interface{} {\n \t\tpanic(fmt.Sprintf(\"%T %v\", m, m))\n \t}\n }\n+\n+func isPrimitive(v reflect.Type) bool {\n+\treturn v.Kind() < reflect.Array || v.Kind() == reflect.String\n+}\ndiff --git a/testdata/slice-struct-primitive-slice.json b/testdata/slice-struct-primitive-slice.json\nnew file mode 100644\nindex 0000000..0010a0e\n--- /dev/null\n+++ b/testdata/slice-struct-primitive-slice.json\n@@ -0,0 +1,10 @@\n+{\n+  \"services\": [\n+    {\n+      \"name\": \"service1\",\n+      \"strings\": [\"string1\", \"string2\"],\n+      \"integers\": [1, 2],\n+      \"booleans\": [true, false]\n+    }\n+  ]\n+}\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/dependabot.yml",
+    ".github/workflows/build.yml",
+    "LICENSE",
+    "README.md",
+    "aconfig.go",
+    "aconfig_test.go",
+    "aconfigdotenv/dotenv.go",
+    "aconfigdotenv/dotenv_test.go",
+    "aconfigdotenv/go.mod",
+    "aconfigdotenv/go.sum",
+    "aconfigdotenv/testdata/config.env",
+    "aconfighcl/go.mod",
+    "aconfighcl/go.sum",
+    "aconfighcl/hcl.go",
+    "aconfighcl/hcl_test.go",
+    "aconfighcl/testdata/config.hcl",
+    "aconfigtoml/go.mod",
+    "aconfigtoml/go.sum",
+    "aconfigtoml/testdata/config.toml",
+    "aconfigtoml/toml.go",
+    "aconfigtoml/toml_test.go",
+    "aconfigyaml/go.mod",
+    "aconfigyaml/go.sum",
+    "aconfigyaml/res.yaml",
+    "aconfigyaml/testdata/config.yaml",
+    "aconfigyaml/yaml.go",
+    "aconfigyaml/yaml_test.go",
+    "doc.go",
+    "example_test.go",
+    "go.mod",
+    "reflection.go",
+    "testdata/bad_config.json",
+    "testdata/complex.json",
+    "testdata/config.json",
+    "testdata/config1.json",
+    "testdata/config2.json",
+    "testdata/config3.json",
+    "testdata/example_config.json",
+    "testdata/slice-struct-primitive-slice.json",
+    "testdata/toy.json",
+    "testdata/unknown_fields.json",
+    "utils.go",
+    "utils_test.go"
+  ],
+  "explanation": {
+    "what": "構造体スライス内の各要素が持つスライスフィールドについて、要素の型が string/int/bool のようなプリミティブか構造体かで処理を分けるようにした。従来は map から struct へ変換する `m2s` を無条件に再帰していたため、プリミティブのスライス(例: `Strings []string`)を正しく詰め替えられなかった。プリミティブの場合は `l.setFieldData` を直接呼ぶ経路を追加し、新設した `isPrimitive` で判定する。あわせて `m2s` をパッケージ関数から `*Loader` のメソッドに変更している。テストは `Services []TestService`(各 TestService が Strings/Integers/Booleans を持つ)を JSON から読み込んで検証する。",
+    "why": "PR タイトル \"Support struct with slice of primitives\" の通り、構造体のスライスの中にさらにプリミティブ型のスライスを持つケースが未対応だったための機能追加。PR body は空でこれ以上の背景記述はない。",
+    "highlights": [
+      { "file": "reflection.go", "note": "isPrimitive で要素型を判定し、プリミティブなら setFieldData、構造体なら m2s の再帰に振り分ける" },
+      { "file": "testdata/slice-struct-primitive-slice.json", "note": "Strings/Integers/Booleans を持つ service のテストデータ" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [{ "type": "pr", "number": 134, "url": "https://github.com/cristalhq/aconfig/pull/134" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

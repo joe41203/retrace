@@ -1,0 +1,96 @@
+{
+  "seq": 150,
+  "sha": "80e06caacb6304a9a408e58b41a96bc4e5186712",
+  "parents": [
+    "877d9d3e3cdb00a345e6dfd152dca73794165f95"
+  ],
+  "author": {
+    "name": "Tom",
+    "email": "github@junk1tm.me",
+    "date": "2022-10-15T11:04:25+04:00"
+  },
+  "message": "fix(HCL): read file from fs instead of os (#135)",
+  "pr": {
+    "number": 135,
+    "title": "fix(HCL): read file from fs instead of os",
+    "body": "I believe it was a bug because `ioutil` reads directly from `os`, not `fs.FS`",
+    "url": "https://github.com/cristalhq/aconfig/pull/135"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 1,
+    "deletions": 2
+  },
+  "files": [
+    {
+      "path": "aconfighcl/hcl.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 2,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/aconfighcl/hcl.go b/aconfighcl/hcl.go\nindex 79aa92d..fdd4561 100644\n--- a/aconfighcl/hcl.go\n+++ b/aconfighcl/hcl.go\n@@ -2,7 +2,6 @@ package aconfighcl\n \n import (\n \t\"io/fs\"\n-\t\"io/ioutil\"\n \n \t\"github.com/hashicorp/hcl\"\n )\n@@ -22,7 +21,7 @@ func (d *Decoder) Format() string {\n \n // DecodeFile implements aconfig.FileDecoder.\n func (d *Decoder) DecodeFile(filename string) (map[string]interface{}, error) {\n-\tb, err := ioutil.ReadFile(filename)\n+\tb, err := fs.ReadFile(d.fsys, filename)\n \tif err != nil {\n \t\treturn nil, err\n \t}\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/dependabot.yml",
+    ".github/workflows/build.yml",
+    "LICENSE",
+    "README.md",
+    "aconfig.go",
+    "aconfig_test.go",
+    "aconfigdotenv/dotenv.go",
+    "aconfigdotenv/dotenv_test.go",
+    "aconfigdotenv/go.mod",
+    "aconfigdotenv/go.sum",
+    "aconfigdotenv/testdata/config.env",
+    "aconfighcl/go.mod",
+    "aconfighcl/go.sum",
+    "aconfighcl/hcl.go",
+    "aconfighcl/hcl_test.go",
+    "aconfighcl/testdata/config.hcl",
+    "aconfigtoml/go.mod",
+    "aconfigtoml/go.sum",
+    "aconfigtoml/testdata/config.toml",
+    "aconfigtoml/toml.go",
+    "aconfigtoml/toml_test.go",
+    "aconfigyaml/go.mod",
+    "aconfigyaml/go.sum",
+    "aconfigyaml/res.yaml",
+    "aconfigyaml/testdata/config.yaml",
+    "aconfigyaml/yaml.go",
+    "aconfigyaml/yaml_test.go",
+    "doc.go",
+    "example_test.go",
+    "go.mod",
+    "reflection.go",
+    "testdata/bad_config.json",
+    "testdata/complex.json",
+    "testdata/config.json",
+    "testdata/config1.json",
+    "testdata/config2.json",
+    "testdata/config3.json",
+    "testdata/example_config.json",
+    "testdata/slice-struct-primitive-slice.json",
+    "testdata/toy.json",
+    "testdata/unknown_fields.json",
+    "utils.go",
+    "utils_test.go"
+  ],
+  "explanation": {
+    "what": "aconfighcl の DecodeFile が `ioutil.ReadFile(filename)` で常に OS のファイルシステムから直接読んでいた箇所を、`fs.ReadFile(d.fsys, filename)` に変更した。",
+    "why": "PR body に「ioutil は os から直接読み込むのでバグだと思う」とある通り、#126(Support fsys for all decoders)で HCL デコーダにも fsys フィールドを追加したにもかかわらず、実際のファイル読み込み処理だけ ioutil.ReadFile の os 直読みのまま取り残されていた見落としの修正。embed.FS 等を渡しても HCL だけは反映されない状態になっていた。",
+    "highlights": [
+      { "file": "aconfighcl/hcl.go", "note": "ioutil.ReadFile(filename) から fs.ReadFile(d.fsys, filename) へ。fsys フィールドを実際に使う経路に修正" }
+    ],
+    "langNotes": [
+      { "topic": "fs.ReadFile", "note": "io/fs パッケージのヘルパー関数で、fs.FS を実装する任意のファイルシステムからファイル全体を読み込める。os.ReadFile相当の処理を fs.FS 抽象の上で行うためのもので、embed.FS のようなインメモリ実装にも同じコードで対応できる。" }
+    ],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [{ "type": "pr", "number": 135, "url": "https://github.com/cristalhq/aconfig/pull/135" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

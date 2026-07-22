@@ -1,0 +1,102 @@
+{
+  "seq": 99,
+  "sha": "4dd7fbf89b5df092c0bc6c1144a3673a9c2bac37",
+  "parents": [
+    "08b8af2679c28d358f7f6503fa011e57ab7a78b1"
+  ],
+  "author": {
+    "name": "Oleg Kovalov",
+    "email": "oleg@hey.com",
+    "date": "2021-02-27T22:22:09+01:00"
+  },
+  "message": "refactor setField (#55)",
+  "pr": {
+    "number": 55,
+    "title": "refactor setField",
+    "body": "",
+    "url": "https://github.com/cristalhq/aconfig/pull/55"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 3,
+    "additions": 43,
+    "deletions": 32
+  },
+  "files": [
+    {
+      "path": "aconfig.go",
+      "status": "M",
+      "additions": 27,
+      "deletions": 24,
+      "binary": false
+    },
+    {
+      "path": "reflection.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "utils.go",
+      "status": "M",
+      "additions": 15,
+      "deletions": 7,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/aconfig.go b/aconfig.go\nindex 597c609..2d4c5c7 100644\n--- a/aconfig.go\n+++ b/aconfig.go\n@@ -133,7 +133,7 @@ func (l *Loader) parseFields() {\n \n \tif !l.config.SkipFlags {\n \t\tfor _, field := range l.fields {\n-\t\t\tflagName := l.config.FlagPrefix + field.fullTag(flagNameTag)\n+\t\t\tflagName := l.config.FlagPrefix + l.fullTag(field, flagNameTag)\n \t\t\tl.flagSet.String(flagName, field.defaultValue, field.usage)\n \t\t}\n \t}\n@@ -241,7 +241,7 @@ func (l *Loader) loadFromFile() error {\n \t\ttag := ext[1:]\n \n \t\tfor _, field := range l.fields {\n-\t\t\tname := field.fullTag(tag)\n+\t\t\tname := l.fullTag(field, tag)\n \t\t\tvalue, ok := actualFields[name]\n \t\t\tif !ok {\n \t\t\t\tactualFields, _ = l.find(actualFields, name)\n@@ -317,23 +317,18 @@ func (l *Loader) find(actualFields map[string]interface{}, name string) (map[str\n }\n \n func (l *Loader) loadEnvironment() error {\n-\tactualEnv := getEnv()\n+\tactualEnvs := getEnv()\n \n \tfor _, field := range l.fields {\n-\t\tenvName := l.config.EnvPrefix + field.fullTag(envNameTag)\n-\t\tv, ok := actualEnv[envName]\n-\t\tif !ok {\n-\t\t\tcontinue\n-\t\t}\n-\t\tif err := l.setFieldData(field, v); err != nil {\n+\t\tenvName := l.config.EnvPrefix + l.fullTag(field, envNameTag)\n+\n+\t\tif err := l.setField(field, envName, actualEnvs); err != nil {\n \t\t\treturn err\n \t\t}\n-\t\tfield.isSet = true\n-\t\tdelete(actualEnv, envName)\n \t}\n \n \tif !l.config.AllowUnknownEnvs && l.config.EnvPrefix != \"\" {\n-\t\tfor env, value := range actualEnv {\n+\t\tfor env, value := range actualEnvs {\n \t\t\tif strings.HasPrefix(env, l.config.EnvPrefix) {\n \t\t\t\treturn fmt.Errorf(\"unknown environment var %s=%s (see AllowUnknownEnvs config param)\", env, value)\n \t\t\t}\n@@ -349,22 +344,14 @@ func (l *Loader) loadFlags() error {\n \t\t}\n \t}\n \n-\tactualFlags := map[string]*flag.Flag{}\n-\tl.flagSet.Visit(func(f *flag.Flag) {\n-\t\tactualFlags[f.Name] = f\n-\t})\n+\tactualFlags := getFlags(l.flagSet)\n \n \tfor _, field := range l.fields {\n-\t\tflagName := l.config.FlagPrefix + field.fullTag(flagNameTag)\n-\t\tflg, ok := actualFlags[flagName]\n-\t\tif !ok {\n-\t\t\tcontinue\n-\t\t}\n-\t\tif err := l.setFieldData(field, flg.Value.String()); err != nil {\n+\t\tflagName := l.config.FlagPrefix + l.fullTag(field, flagNameTag)\n+\n+\t\tif err := l.setField(field, flagName, actualFlags); err != nil {\n \t\t\treturn err\n \t\t}\n-\t\tfield.isSet = true\n-\t\tdelete(actualFlags, flagName)\n \t}\n \n \tif !l.config.AllowUnknownFlags && l.config.FlagPrefix != \"\" {\n@@ -376,3 +363,19 @@ func (l *Loader) loadFlags() error {\n \t}\n \treturn nil\n }\n+\n+func (l *Loader) setField(field *fieldData, name string, values map[string]interface{}) error {\n+\tprintln(name)\n+\tval, ok := values[name]\n+\tif !ok {\n+\t\treturn nil\n+\t}\n+\n+\tif err := l.setFieldData(field, val); err != nil {\n+\t\treturn err\n+\t}\n+\n+\tfield.isSet = true\n+\tdelete(values, name)\n+\treturn nil\n+}\ndiff --git a/reflection.go b/reflection.go\nindex b9f73af..2bd03ed 100644\n--- a/reflection.go\n+++ b/reflection.go\n@@ -61,7 +61,7 @@ func (f *fieldData) Name() string {\n \treturn f.name\n }\n \n-func (f *fieldData) fullTag(tag string) string {\n+func (l *Loader) fullTag(f *fieldData, tag string) string {\n \tsep := \".\"\n \tif tag == envNameTag {\n \t\tsep = \"_\"\ndiff --git a/utils.go b/utils.go\nindex 2942733..bb887ba 100644\n--- a/utils.go\n+++ b/utils.go\n@@ -2,6 +2,7 @@ package aconfig\n \n import (\n \t\"encoding/json\"\n+\t\"flag\"\n \t\"fmt\"\n \t\"os\"\n \t\"reflect\"\n@@ -22,23 +23,30 @@ func assertStruct(x interface{}) {\n \t}\n }\n \n-func getEnv() map[string]string {\n+func getEnv() map[string]interface{} {\n \tenv := os.Environ()\n-\tres := make(map[string]string, len(env))\n+\tres := make(map[string]interface{}, len(env))\n \n \tfor _, s := range env {\n \t\tfor j := 0; j < len(s); j++ {\n-\t\t\tif s[j] != '=' {\n-\t\t\t\tcontinue\n+\t\t\tif s[j] == '=' {\n+\t\t\t\tkey, value := s[:j], s[j+1:]\n+\t\t\t\tres[key] = value\n+\t\t\t\tbreak\n \t\t\t}\n-\n-\t\t\tkey, value := s[:j], s[j+1:]\n-\t\t\tres[key] = value\n \t\t}\n \t}\n \treturn res\n }\n \n+func getFlags(flagSet *flag.FlagSet) map[string]interface{} {\n+\tres := map[string]interface{}{}\n+\tflagSet.Visit(func(f *flag.Flag) {\n+\t\tres[f.Name] = f.Value\n+\t})\n+\treturn res\n+}\n+\n func makeName(name string, parent *fieldData) string {\n \tif parent == nil {\n \t\treturn name\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/build.yml",
+    "LICENSE",
+    "README.md",
+    "aconfig.go",
+    "aconfig_test.go",
+    "aconfigdotenv/dotenv.go",
+    "aconfigdotenv/dotenv_test.go",
+    "aconfigdotenv/go.mod",
+    "aconfigdotenv/go.sum",
+    "aconfighcl/go.mod",
+    "aconfighcl/go.sum",
+    "aconfighcl/hcl.go",
+    "aconfighcl/hcl_test.go",
+    "aconfigtoml/go.mod",
+    "aconfigtoml/go.sum",
+    "aconfigtoml/toml.go",
+    "aconfigtoml/toml_test.go",
+    "aconfigyaml/go.mod",
+    "aconfigyaml/go.sum",
+    "aconfigyaml/yaml.go",
+    "aconfigyaml/yaml_test.go",
+    "doc.go",
+    "example_test.go",
+    "go.mod",
+    "reflection.go",
+    "testdata/bad_config.json",
+    "testdata/config.json",
+    "testdata/config1.json",
+    "testdata/config2.json",
+    "testdata/config3.json",
+    "testdata/example_config.json",
+    "testdata/unknown.ext",
+    "testdata/unknown_fields.json",
+    "testfile.json",
+    "utils.go",
+    "utils_test.go"
+  ],
+  "explanation": {
+    "what": "loadEnvironment と loadFlags にそれぞれ個別にあった「値を探す→setFieldData→isSet=true→delete」という重複ロジックを、共通の setField(field, name, values map[string]interface{}) メソッドに抽出した。getEnv() の戻り値型を map[string]string から map[string]interface{} に変え、flagの取得も getFlags(flagSet) という新関数に切り出して同じ map[string]interface{} 形式に揃えた。fieldData.fullTag は Loader のメソッド化(l.fullTag(f, tag))された。",
+    "why": "PR タイトルの「refactor setField」の通り、環境変数・フラグそれぞれの読み込みで同じパターンが繰り返されていたのを一本化する整理。env と flag の値の型を interface{} に統一したことで、次のコミット(#56)でデリミタ設定を扱いやすくする下地にもなっている。",
+    "highlights": [
+      { "file": "aconfig.go", "note": "setField() に env/flag共通の「探す→設定→isSet→delete」ロジックを集約" },
+      { "file": "utils.go", "note": "getEnv/getFlags の戻り値をmap[string]interface{}に統一" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [{ "type": "pr", "number": 55, "url": "https://github.com/cristalhq/aconfig/pull/55" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

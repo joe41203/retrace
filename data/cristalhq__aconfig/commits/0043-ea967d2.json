@@ -1,0 +1,101 @@
+{
+  "seq": 43,
+  "sha": "ea967d28edd7e3b0aad5685dc2344d6ee24f765a",
+  "parents": [
+    "33c0748c97d27cb11404eddb731ef7ffbe2ae015"
+  ],
+  "author": {
+    "name": "Oleg Kovalov",
+    "email": "iamolegkovalov@gmail.com",
+    "date": "2020-07-26T21:31:07+02:00"
+  },
+  "message": "add WalkFields (#7)",
+  "pr": {
+    "number": 7,
+    "title": "add WalkFields",
+    "body": "Fixes #4 ",
+    "url": "https://github.com/cristalhq/aconfig/pull/7"
+  },
+  "linkedIssues": [
+    {
+      "number": 4,
+      "title": "Description of configs",
+      "body": "## Problem\r\n\r\nHaving an option to generate default flags is really nice! but it's not that useful if I cannot write help for this. So for example:\r\n```\r\n❯❯❯ ./samplego --help\r\nUsage:\r\n  -myauth.lease string\r\n    \t (default \"3s\")\r\n  -myauth.multiple string\r\n\r\n  -myauth.mypass string\r\n    \t (default \"def-pass\")\r\n  -myauth.myuser string\r\n    \t (default \"def-user\")\r\n  -port string\r\n```\r\nI want to communicate to a user what are those properties.\r\n\r\n## Proposal\r\n\r\nIdeally, I'd like to put a comment like this\r\n```\r\ntype MyAuth struct {\r\n\t// user that will use the server\r\n\tMyUser string `yaml:\"myUser\" default:\"def-user\"`\r\n}\r\n```\r\nbut I don't think it's technically possible to then use it in the code (unless some generator that will parse it?)\r\n\r\nso the other option would be to introduce a tag for it.\r\n```\r\ntype MyAuth struct {\r\n\tMyUser string `yaml:\"myUser\" default:\"def-user\" description:\"user that will user server\"`\r\n}\r\n```\r\nThis way I could even reuse it and autogenerate generate configuration for yaml and envvars ",
+      "url": "https://github.com/cristalhq/aconfig/issues/4"
+    }
+  ],
+  "stats": {
+    "filesChanged": 3,
+    "additions": 163,
+    "deletions": 52
+  },
+  "files": [
+    {
+      "path": "README.md",
+      "status": "M",
+      "additions": 4,
+      "deletions": 3,
+      "binary": false
+    },
+    {
+      "path": "aconfig.go",
+      "status": "M",
+      "additions": 97,
+      "deletions": 49,
+      "binary": false
+    },
+    {
+      "path": "aconfig_test.go",
+      "status": "M",
+      "additions": 62,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/README.md b/README.md\nindex 32da986..78f3d21 100644\n--- a/README.md\n+++ b/README.md\n@@ -20,8 +20,9 @@ There are more than 2000 repositories on Github regarding configuration in Go. I\n   * defaults in code\n   * files (JSON, YAML, TOML)\n   * environment variables\n-  * command-line flags  \n-* Dependency-free (except file parsers)\n+  * command-line flags\n+* Dependency-free (except file parsers).\n+* Walk over configuration fields.\n \n ## Install\n \n@@ -35,7 +36,7 @@ go get github.com/cristalhq/aconfig\n \n ```go\n type MyConfig struct {\n-\tPort int `default:\"1111\"`\n+\tPort int `default:\"1111\" usage:\"just give a number\"`\n \tAuth struct {\n \t\tUser string `default:\"def-user\"`\n \t\tPass string `default:\"def-pass\"`\ndiff --git a/aconfig.go b/aconfig.go\nindex fa6d6ff..ca844b2 100644\n--- a/aconfig.go\n+++ b/aconfig.go\n@@ -44,6 +44,22 @@ type loaderConfig struct {\n \tFiles []string\n }\n \n+// Field of the user configuration structure.\n+// Done as an interface to export less things in lib.\n+type Field interface {\n+\t// Name of the field.\n+\tName() string\n+\n+\t// DefaultValue of the field.\n+\tDefaultValue() string\n+\n+\t// Usage of the field (set in `usage` tag).\n+\tUsage() string\n+\n+\t// Tag returns a given tag for a field.\n+\tTag(tag string) string\n+}\n+\n // Loader creates a new Loader based on a config.\n // Zero-value config is acceptable.\n func LoaderFor(src interface{}) *Loader {\n@@ -92,18 +108,18 @@ func (l *Loader) WithFlagPrefix(prefix string) *Loader {\n }\n \n func (l *Loader) Build() *Loader {\n-\tl.preLoad(l.src)\n+\tl.parseFields(l.src)\n \tl.isBuilt = true\n \treturn l\n }\n \n-func (l *Loader) preLoad(cfg interface{}) {\n+func (l *Loader) parseFields(cfg interface{}) {\n \tl.flagSet = flag.NewFlagSet(l.config.FlagPrefix, flag.ContinueOnError)\n+\tl.fields = getFields(cfg)\n \n-\tfields := getFields(cfg)\n-\tfor _, field := range fields {\n+\tfor _, field := range l.fields {\n \t\tflagName := l.getFlagName(field)\n-\t\tl.flagSet.String(flagName, field.DefaultValue, field.Usage)\n+\t\tl.flagSet.String(flagName, field.defaultValue, field.usage)\n \t}\n }\n \n@@ -114,11 +130,23 @@ func (l *Loader) Flags() *flag.FlagSet {\n \treturn l.flagSet\n }\n \n+// WalkFields iterates over configuration fields.\n+// Easy way to create documentation or other stuff.\n+func (l *Loader) WalkFields(fn func(f Field)) {\n+\tif !l.isBuilt {\n+\t\tpanic(\"aconfig: before using loader you must run Build method\")\n+\t}\n+\tfor _, f := range l.fields {\n+\t\tfn(f)\n+\t}\n+}\n+\n // Load configuration into a given param.\n func (l *Loader) Load(into interface{}) error {\n \tif !l.isBuilt {\n \t\tpanic(\"aconfig: before using loader you must run Build method\")\n \t}\n+\t// we need to get fields once more, 'cause `into` is new for us\n \tl.fields = getFields(into)\n \n \tif err := l.loadSources(into); err != nil {\n@@ -132,6 +160,7 @@ func (l *Loader) LoadWithFiles(into interface{}, files []string) error {\n \tif !l.isBuilt {\n \t\tpanic(\"aconfig: before using loader you must run Build method\")\n \t}\n+\t// we need to get fields once more, 'cause `into` is new for us\n \tl.fields = getFields(into)\n \tl.config.Files = files\n \n@@ -167,7 +196,7 @@ func (l *Loader) loadSources(into interface{}) error {\n \n func (l *Loader) loadDefaults() error {\n \tfor _, fd := range l.fields {\n-\t\tif err := l.setFieldData(fd, fd.DefaultValue); err != nil {\n+\t\tif err := l.setFieldData(fd, fd.defaultValue); err != nil {\n \t\t\treturn err\n \t\t}\n \t}\n@@ -241,17 +270,17 @@ func (l *Loader) loadFlags() error {\n }\n \n func (l *Loader) getEnvName(field *fieldData) string {\n-\tname := field.Name\n-\tif field.EnvName != \"\" {\n-\t\tname = field.EnvName\n+\tname := field.name\n+\tif field.envName != \"\" {\n+\t\tname = field.envName\n \t}\n \treturn strings.ToUpper(l.config.EnvPrefix + strings.ReplaceAll(name, \".\", \"_\"))\n }\n \n func (l *Loader) getFlagName(field *fieldData) string {\n-\tname := field.Name\n-\tif field.FlagName != \"\" {\n-\t\tname = field.FlagName\n+\tname := field.name\n+\tif field.flagName != \"\" {\n+\t\tname = field.flagName\n \t}\n \treturn strings.ToLower(l.config.FlagPrefix + name)\n }\n@@ -300,24 +329,24 @@ func getFieldsHelper(valueObject reflect.Value, parent *fieldData) []*fieldData\n }\n \n type fieldData struct {\n-\tName         string\n-\tField        reflect.StructField\n-\tValue        reflect.Value\n-\tDefaultValue string\n-\tEnvName      string\n-\tFlagName     string\n-\tUsage        string\n+\tname         string\n+\tfield        reflect.StructField\n+\tvalue        reflect.Value\n+\tdefaultValue string\n+\tenvName      string\n+\tflagName     string\n+\tusage        string\n }\n \n func newFieldData(field reflect.StructField, value reflect.Value, parent *fieldData) *fieldData {\n \treturn &fieldData{\n-\t\tName:         makeName(field.Name, parent),\n-\t\tValue:        value,\n-\t\tField:        field,\n-\t\tDefaultValue: field.Tag.Get(defaultValueTag),\n-\t\tEnvName:      field.Tag.Get(envNameTag),\n-\t\tFlagName:     field.Tag.Get(flagNameTag),\n-\t\tUsage:        field.Tag.Get(usageTag),\n+\t\tname:         makeName(field.Name, parent),\n+\t\tvalue:        value,\n+\t\tfield:        field,\n+\t\tdefaultValue: field.Tag.Get(defaultValueTag),\n+\t\tenvName:      field.Tag.Get(envNameTag),\n+\t\tflagName:     field.Tag.Get(flagNameTag),\n+\t\tusage:        field.Tag.Get(usageTag),\n \t}\n }\n \n@@ -329,23 +358,42 @@ func makeName(name string, parent *fieldData) string {\n \tif parent == nil {\n \t\treturn name\n \t}\n-\treturn parent.Name + \".\" + name\n+\treturn parent.name + \".\" + name\n+}\n+\n+func (f *fieldData) Name() string {\n+\treturn f.name\n+}\n+\n+// DefaultValue of the field.\n+func (f *fieldData) DefaultValue() string {\n+\treturn f.defaultValue\n+}\n+\n+// Usage of the field (set in `usage` tag) .\n+func (f *fieldData) Usage() string {\n+\treturn f.usage\n+}\n+\n+// Tag returns a given tag for a field.\n+func (f *fieldData) Tag(tag string) string {\n+\treturn f.field.Tag.Get(tag)\n }\n \n func setFieldDataHelper(field *fieldData, value string) error {\n \t// unwrap pointers\n-\tfor field.Value.Type().Kind() == reflect.Ptr {\n-\t\tif field.Value.IsNil() {\n-\t\t\tfield.Value.Set(reflect.New(field.Value.Type().Elem()))\n+\tfor field.value.Type().Kind() == reflect.Ptr {\n+\t\tif field.value.IsNil() {\n+\t\t\tfield.value.Set(reflect.New(field.value.Type().Elem()))\n \t\t}\n-\t\tfield.Value = field.Value.Elem()\n+\t\tfield.value = field.value.Elem()\n \t}\n \n \tif value == \"\" {\n \t\treturn nil\n \t}\n \n-\tswitch kind := field.Value.Type().Kind(); kind {\n+\tswitch kind := field.value.Type().Kind(); kind {\n \tcase reflect.Bool:\n \t\treturn setBool(field, value)\n \n@@ -380,57 +428,57 @@ func setBool(field *fieldData, value string) error {\n \tif err != nil {\n \t\treturn err\n \t}\n-\tfield.Value.SetBool(val)\n+\tfield.value.SetBool(val)\n \treturn nil\n }\n \n func setInt(field *fieldData, value string) error {\n-\tval, err := strconv.ParseInt(value, 0, field.Value.Type().Bits())\n+\tval, err := strconv.ParseInt(value, 0, field.value.Type().Bits())\n \tif err != nil {\n \t\treturn err\n \t}\n-\tfield.Value.SetInt(val)\n+\tfield.value.SetInt(val)\n \treturn nil\n }\n \n func setInt64(field *fieldData, value string) error {\n-\tif field.Field.Type == reflect.TypeOf(time.Second) {\n+\tif field.field.Type == reflect.TypeOf(time.Second) {\n \t\tval, err := time.ParseDuration(value)\n \t\tif err != nil {\n \t\t\treturn err\n \t\t}\n-\t\tfield.Value.Set(reflect.ValueOf(val))\n+\t\tfield.value.Set(reflect.ValueOf(val))\n \t\treturn nil\n \t}\n \treturn setInt(field, value)\n }\n \n func setUint(field *fieldData, value string) error {\n-\tval, err := strconv.ParseUint(value, 0, field.Value.Type().Bits())\n+\tval, err := strconv.ParseUint(value, 0, field.value.Type().Bits())\n \tif err != nil {\n \t\treturn err\n \t}\n-\tfield.Value.SetUint(val)\n+\tfield.value.SetUint(val)\n \treturn nil\n }\n \n func setFloat(field *fieldData, value string) error {\n-\tval, err := strconv.ParseFloat(value, field.Value.Type().Bits())\n+\tval, err := strconv.ParseFloat(value, field.value.Type().Bits())\n \tif err != nil {\n \t\treturn err\n \t}\n-\tfield.Value.SetFloat(val)\n+\tfield.value.SetFloat(val)\n \treturn nil\n }\n \n func setString(field *fieldData, value string) error {\n-\tfield.Value.SetString(value)\n+\tfield.value.SetString(value)\n \treturn nil\n }\n \n func setSlice(field *fieldData, value string) error {\n \tvals := strings.Split(value, \",\")\n-\tslice := reflect.MakeSlice(field.Field.Type, len(vals), len(vals))\n+\tslice := reflect.MakeSlice(field.field.Type, len(vals), len(vals))\n \tfor i, val := range vals {\n \t\tval = strings.TrimSpace(val)\n \n@@ -439,13 +487,13 @@ func setSlice(field *fieldData, value string) error {\n \t\t\treturn fmt.Errorf(\"incorrect slice item %q: %w\", val, err)\n \t\t}\n \t}\n-\tfield.Value.Set(slice)\n+\tfield.value.Set(slice)\n \treturn nil\n }\n \n func setMap(field *fieldData, value string) error {\n \tvals := strings.Split(value, \",\")\n-\tmapField := reflect.MakeMapWithSize(field.Field.Type, len(vals))\n+\tmapField := reflect.MakeMapWithSize(field.field.Type, len(vals))\n \n \tfor _, val := range vals {\n \t\tentry := strings.SplitN(val, \":\", 2)\n@@ -455,17 +503,17 @@ func setMap(field *fieldData, value string) error {\n \t\tkey := strings.TrimSpace(entry[0])\n \t\tval := strings.TrimSpace(entry[1])\n \n-\t\tfdk := newSimpleFieldData(reflect.New(field.Field.Type.Key()).Elem())\n+\t\tfdk := newSimpleFieldData(reflect.New(field.field.Type.Key()).Elem())\n \t\tif err := setFieldDataHelper(fdk, key); err != nil {\n \t\t\treturn fmt.Errorf(\"incorrect map key %q: %w\", key, err)\n \t\t}\n \n-\t\tfdv := newSimpleFieldData(reflect.New(field.Field.Type.Elem()).Elem())\n+\t\tfdv := newSimpleFieldData(reflect.New(field.field.Type.Elem()).Elem())\n \t\tif err := setFieldDataHelper(fdv, val); err != nil {\n \t\t\treturn fmt.Errorf(\"incorrect map value %q: %w\", val, err)\n \t\t}\n-\t\tmapField.SetMapIndex(fdk.Value, fdv.Value)\n+\t\tmapField.SetMapIndex(fdk.value, fdv.value)\n \t}\n-\tfield.Value.Set(mapField)\n+\tfield.value.Set(mapField)\n \treturn nil\n }\ndiff --git a/aconfig_test.go b/aconfig_test.go\nindex 25229dc..d76c1f0 100644\n--- a/aconfig_test.go\n+++ b/aconfig_test.go\n@@ -487,6 +487,68 @@ func TestCustomNames(t *testing.T) {\n \t}\n }\n \n+func TestWalkFields(t *testing.T) {\n+\ttype Config struct {\n+\t\tA int `default:\"-1\" env:\"one\" marco:\"polo\"`\n+\t\tB struct {\n+\t\t\tC int `default:\"-1\" flag:\"two\" usage:\"pretty simple usage duh\"`\n+\t\t\tD struct {\n+\t\t\t\tE int `default:\"-1\" env:\"three\"`\n+\t\t\t}\n+\t\t}\n+\t}\n+\n+\tfields := []Field{\n+\t\t&fieldData{\n+\t\t\tname:         \"A\",\n+\t\t\tenvName:      \"one\",\n+\t\t\tdefaultValue: \"-1\",\n+\t\t},\n+\t\t&fieldData{\n+\t\t\tname:         \"B.C\",\n+\t\t\tflagName:     \"two\",\n+\t\t\tdefaultValue: \"-1\",\n+\t\t\tusage:        \"pretty simple usage duh\",\n+\t\t},\n+\t\t&fieldData{\n+\t\t\tname:         \"B.D.E\",\n+\t\t\tenvName:      \"three\",\n+\t\t\tdefaultValue: \"-1\",\n+\t\t},\n+\t}\n+\n+\ti := 0\n+\n+\tLoaderFor(&Config{}).Build().WalkFields(func(f Field) {\n+\t\twantFields := fields[i]\n+\t\tif f.Name() != wantFields.Name() {\n+\t\t\tt.Fatalf(\"got name %v, want %v\", f.Name(), wantFields.Name())\n+\t\t}\n+\t\tif f.DefaultValue() != wantFields.DefaultValue() {\n+\t\t\tt.Fatalf(\"got default %#v, want %#v\", f.DefaultValue(), wantFields.DefaultValue())\n+\t\t}\n+\t\tif f.Usage() != wantFields.Usage() {\n+\t\t\tt.Fatalf(\"got usage %#v, want %#v\", f.Usage(), wantFields.Usage())\n+\t\t}\n+\t\ti++\n+\t})\n+\n+\tif want := 3; i != want {\n+\t\tt.Fatalf(\"got %v, want %v\", i, want)\n+\t}\n+\n+\ti = 0\n+\tLoaderFor(&Config{}).Build().WalkFields(func(f Field) {\n+\t\tif i > 0 {\n+\t\t\treturn\n+\t\t}\n+\t\tif got := f.Tag(\"marco\"); got != \"polo\" {\n+\t\t\tt.Fatalf(\"got %v, want %v\", got, \"polo\")\n+\t\t}\n+\t\ti++\n+\t})\n+}\n+\n func loadFile(t *testing.T, file string, dst interface{}) {\n \tf, err := os.Open(file)\n \tif err != nil {\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/build.yml",
+    "LICENSE",
+    "README.md",
+    "aconfig.go",
+    "aconfig_test.go",
+    "example_test.go",
+    "go.mod",
+    "go.sum",
+    "testdata/all_types_config.json",
+    "testdata/bad_config.json",
+    "testdata/config1.json",
+    "testdata/config1.toml",
+    "testdata/config1.yaml",
+    "testdata/example_config.json",
+    "testdata/my_duration_config.json",
+    "testdata/other_numbers_config.json",
+    "testdata/test_config_def.json",
+    "testdata/test_config_env.json",
+    "testdata/test_config_flag.json",
+    "testdata/unknown.ext"
+  ],
+  "explanation": {
+    "what": "設定フィールドを外部から走査できる `WalkFields(fn func(f Field))` を追加した。あわせて内部の `fieldData` 構造体のフィールドを全て非公開(小文字始まり)にし、外部公開用に `Field` インターフェース(`Name`/`DefaultValue`/`Usage`/`Tag`メソッド)を新設して、WalkFields ではこのインターフェース越しにフィールド情報を渡すようにした。`Build`内の処理も `preLoad` から `parseFields` にリネームし、そこで取得した `l.fields` を後続処理と共有する形に整理した。",
+    "why": "PR本文は \"Fixes #4\" のみだが、リンクされた issue #4 に動機がある。`--help` でフラグ一覧は自動生成できるものの、各設定項目が何を意味するか利用者に説明する手段がなく、コメントをタグ化してドキュメント生成に使いたいという要望だった。issue ではタグ経由でメタデータを引き回す案が出ており、本コミットではその実現手段として、フィールドをコールバックで走査できる WalkFields API を用意し、descriptionに限らず任意のタグを `Tag(tag string)` で取得できる汎用的な設計にした。",
+    "highlights": [
+      { "file": "aconfig.go", "note": "Field インターフェースの新設と、fieldData の非公開化(Value→value 等)によるカプセル化" },
+      { "file": "aconfig.go", "note": "WalkFields が isBuilt チェック→panic のガードを持つ点はLoad系メソッドと同じパターン" },
+      { "file": "aconfig_test.go", "note": "TestWalkFields でネストしたstructのフィールドが `B.C` のようなドット区切り名で列挙されることを確認している" }
+    ],
+    "langNotes": [
+      { "topic": "WalkFields (visitor pattern)", "note": "コールバック関数を受け取って内部コレクションを1件ずつ渡す、Go でよく使われるビジターパターン。ここでは reflect で集めた非公開の fieldData を直接見せず、公開インターフェース Field を介して安全に公開している。" },
+      { "topic": "interface による情報隠蔽", "note": "Go にはクラスの private/public 修飾子がなく、フィールド名の先頭大文字/小文字だけでパッケージ内外の可視性が決まる。fieldData の全フィールドを小文字にして構造体自体を隠しつつ、必要なメソッドだけを持つ Field インターフェースを外部公開する、という Go 的なカプセル化手法。" },
+      { "topic": "panic による前提条件チェック", "note": "Build() を呼ばずに WalkFields や Load を使うとpanicする設計。Go では回復不能な誤用(呼び出し順序違反など)を早期にクラッシュさせるために panic を使うことがある。" }
+    ],
+    "diagram": {
+      "mermaid": "flowchart LR\n  A[\"LoaderFor(cfg)\"] --> B[\"Build()\"]\n  B --> C[\"parseFields: getFields で l.fields を構築\"]\n  C --> D[\"WalkFields(fn)\"]\n  D --> E[\"fieldData を Field インターフェース経由で fn に渡す\"]\n  B -.->|\"未Build\"| F[\"panic\"]",
+      "caption": "WalkFields はBuild時に集めたfieldDataをFieldインターフェース越しにコールバックへ渡す"
+    },
+    "evidence": "pr",
+    "refs": [{ "type": "pr", "number": 7, "url": "https://github.com/cristalhq/aconfig/pull/7" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

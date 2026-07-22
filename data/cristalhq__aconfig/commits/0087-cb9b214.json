@@ -1,0 +1,119 @@
+{
+  "seq": 87,
+  "sha": "cb9b2149b98cab5b06c5d634b60f6c23dc297b2e",
+  "parents": [
+    "3c8f035dd2ba0c15fb8ca3af3986222c6179193c"
+  ],
+  "author": {
+    "name": "Oleg Kovalov",
+    "email": "oleg@hey.com",
+    "date": "2021-01-15T18:32:25+01:00"
+  },
+  "message": "update decoders (#44)",
+  "pr": {
+    "number": 44,
+    "title": "update decoders",
+    "body": "",
+    "url": "https://github.com/cristalhq/aconfig/pull/44"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 6,
+    "additions": 60,
+    "deletions": 122
+  },
+  "files": [
+    {
+      "path": "aconfig_test.go",
+      "status": "M",
+      "additions": 18,
+      "deletions": 7,
+      "binary": false
+    },
+    {
+      "path": "aconfigdotenv/dotenv_test.go",
+      "status": "M",
+      "additions": 2,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "aconfigtoml/toml.go",
+      "status": "M",
+      "additions": 2,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "aconfigtoml/toml_test.go",
+      "status": "M",
+      "additions": 13,
+      "deletions": 102,
+      "binary": false
+    },
+    {
+      "path": "aconfigyaml/yaml.go",
+      "status": "M",
+      "additions": 2,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "aconfigyaml/yaml_test.go",
+      "status": "M",
+      "additions": 23,
+      "deletions": 12,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/aconfig_test.go b/aconfig_test.go\nindex 2fab01f..cf75a1a 100644\n--- a/aconfig_test.go\n+++ b/aconfig_test.go\n@@ -171,6 +171,9 @@ func TestJSON(t *testing.T) {\n \t\tY: structY{\n \t\t\tX: \"y\",\n \t\t\tZ: []int{1, 2, 3},\n+\t\t\tA: structD{\n+\t\t\t\tI: true,\n+\t\t\t},\n \t\t},\n \t\tAA: structA{\n \t\t\tX: \"y\",\n@@ -975,9 +978,7 @@ type structConfig struct {\n type structY struct {\n \tX string\n \tZ []int\n-\tA struct {\n-\t\tI bool\n-\t}\n+\tA structD\n }\n \n type structA struct {\n@@ -995,6 +996,10 @@ type structC struct {\n \tBB []byte `json:\"b\"`\n }\n \n+type structD struct {\n+\tI bool\n+}\n+\n type StructM struct {\n \tM string\n }\n@@ -1005,12 +1010,16 @@ const testfileContent = `{\n     \"e\": 123.456,\n     \"b\": \"abc\",\n     \"i\": 42,\n-    \"j\": 420,\n-    \"m\": \"n\",\n+\t\"j\": 420,\n+\n     \"y\": {\n         \"x\": \"y\",\n-        \"z\": [1, \"2\", \"3\"]\n+\t\t\"z\": [1, \"2\", \"3\"],\n+\t\t\"a\": {\n+\t\t\t\"i\": true\n+\t\t}\n     },\n+\n     \"A\": {\n         \"x\": \"y\",\n         \"B\": {\n@@ -1020,6 +1029,8 @@ const testfileContent = `{\n             },\n             \"D\": [\"x\", \"y\", \"z\"]\n         }\n-    }\n+\t},\n+\n+\t\"m\": \"n\"\n }\n `\ndiff --git a/aconfigdotenv/dotenv_test.go b/aconfigdotenv/dotenv_test.go\nindex 33d63e4..53acf4b 100644\n--- a/aconfigdotenv/dotenv_test.go\n+++ b/aconfigdotenv/dotenv_test.go\n@@ -127,7 +127,6 @@ E=123.456\n B=abc\r\n I=42\r\n J=420\r\n-M=n\r\n \r\n Y_X=y\r\n Y_Z=1,2,3\r\n@@ -136,4 +135,6 @@ A_x=y\n A_B_C_m=n\r\n A_B_C_b=boo\r\n A_B_D=x,y,z\r\n+\r\n+M=n\r\n `\r\ndiff --git a/aconfigtoml/toml.go b/aconfigtoml/toml.go\nindex 6c0c0db..57c919f 100644\n--- a/aconfigtoml/toml.go\n+++ b/aconfigtoml/toml.go\n@@ -53,6 +53,8 @@ func flatten(prefix, key string, curr interface{}, res map[string]interface{}) {\n \t\tres[prefix+key] = b.String()\n \tcase string:\n \t\tres[prefix+key] = curr\n+\tcase bool:\n+\t\tres[prefix+key] = fmt.Sprint(curr)\n \tcase float64:\n \t\tres[prefix+key] = fmt.Sprint(curr)\n \tcase int64:\ndiff --git a/aconfigtoml/toml_test.go b/aconfigtoml/toml_test.go\nindex 75b6186..360308f 100644\n--- a/aconfigtoml/toml_test.go\n+++ b/aconfigtoml/toml_test.go\n@@ -39,6 +39,9 @@ func TestTOML(t *testing.T) {\n \t\tY: structY{\n \t\t\tX: \"y\",\n \t\t\tZ: []string{\"1\", \"2\", \"3\"},\n+\t\t\tA: structD{\n+\t\t\t\tI: true,\n+\t\t\t},\n \t\t},\n \t\tAA: structA{\n \t\t\tX: \"y\",\n@@ -96,9 +99,7 @@ type structConfig struct {\n type structY struct {\n \tX string\n \tZ []string\n-\tA struct {\n-\t\tI bool\n-\t}\n+\tA structD\n }\n \n type structA struct {\n@@ -116,6 +117,10 @@ type structC struct {\n \tBB []byte `toml:\"b\"`\n }\n \n+type structD struct {\n+\tI bool\n+}\n+\n type StructM struct {\n \tM string\n }\n@@ -132,110 +137,16 @@ m = \"n\"\n [y]\n x = \"y\"\n z = [ 1, 2, 3 ]\n+    [y.a]\n+    i = true\n \n [A]\n     x = \"y\"\n \n+\t[A.B]\n+\tD = [\"x\", \"y\", \"z\"]\n+\n     [A.B.C]\n \tm = \"n\"\n \tb = \"boo\"\n-\n-    [A.B]\n-    D = [\"x\", \"y\", \"z\"]\n-        # [C]\n-        # [A.B.C]\n `\n-\n-// package aconfigtoml_test\n-\n-// import (\n-// \t\"reflect\"\n-// \t\"testing\"\n-\n-// \t\"github.com/cristalhq/aconfig\"\n-// \t\"github.com/cristalhq/aconfig/aconfigtoml\"\n-// )\n-\n-// func TestTOML(t *testing.T) {\n-// \tvar cfg, want TestConfig\n-\n-// \ti := int32(42)\n-// \twant = TestConfig{\n-// \t\tA: \"b\",\n-// \t\tC: 10,\n-// \t\tE: 123.456,\n-// \t\tB: []byte(\"abc\"),\n-// \t\tP: &i,\n-// \t\tY: structY{\n-// \t\t\tX: \"y\",\n-// \t\t\t// TODO: Z: []string{\"1\", \"2\", \"3\"},\n-// \t\t},\n-// \t\tAA: structA{\n-// \t\t\tX: \"y\",\n-// \t\t\tBB: structB{\n-// \t\t\t\tCC: structC{\n-// \t\t\t\t\tMM: \"n\",\n-// \t\t\t\t},\n-// \t\t\t\t// TODO: DD: []string{\"x\", \"y\", \"z\"},\n-// \t\t\t},\n-// \t\t},\n-// \t\tStructM: StructM{\n-// \t\t\tM: \"n\",\n-// \t\t},\n-// \t}\n-\n-// \tloader := aconfig.LoaderFor(&cfg, aconfig.Config{\n-// \t\tSkipDefaults:    true,\n-// \t\tSkipEnv: true,\n-// \t\tSkipFlags:       true,\n-// \t\tFileDecoders: map[string]aconfig.FileDecoder{\n-// \t\t\t\".toml\": aconfigtoml.New(),\n-// \t\t},\n-// \t\tFiles: []string{\"testfile.toml\"},\n-// \t})\n-\n-// \tif err := loader.Load(); err != nil {\n-// \t\tt.Fatal(err)\n-// \t}\n-// \tif got := cfg; !reflect.DeepEqual(got, want) {\n-// \t\tt.Fatalf(\"want %v, got %v\", want, got)\n-// \t}\n-// }\n-\n-// type TestConfig struct {\n-// \tA string\n-// \tC int\n-// \tE float64\n-// \tB []byte\n-// \tP *int32\n-// \tY structY\n-\n-// \tAA structA `toml:\"A\"`\n-// \tStructM\n-// }\n-\n-// type structY struct {\n-// \tX string\n-// \tZ []string\n-// \tA struct {\n-// \t\tI bool\n-// \t}\n-// }\n-\n-// type structA struct {\n-// \tX  string  `toml:\"x\"`\n-// \tBB structB `toml:\"B\"`\n-// }\n-\n-// type structB struct {\n-// \tCC structC  `toml:\"C\"`\n-// \tDD []string `toml:\"D\"`\n-// }\n-\n-// type structC struct {\n-// \tMM string `toml:\"m\"`\n-// }\n-\n-// type StructM struct {\n-// \tM string\n-// }\ndiff --git a/aconfigyaml/yaml.go b/aconfigyaml/yaml.go\nindex 0c4b8a4..476a521 100644\n--- a/aconfigyaml/yaml.go\n+++ b/aconfigyaml/yaml.go\n@@ -55,6 +55,8 @@ func flatten(prefix, key string, curr interface{}, res map[string]interface{}) {\n \t\tres[prefix+key] = b.String()\n \tcase string:\n \t\tres[prefix+key] = curr\n+\tcase bool:\n+\t\tres[prefix+key] = fmt.Sprint(curr)\n \tcase float64:\n \t\tres[prefix+key] = fmt.Sprint(curr)\n \tcase int, int8, int16, int32:\ndiff --git a/aconfigyaml/yaml_test.go b/aconfigyaml/yaml_test.go\nindex c54ae97..efea8ae 100644\n--- a/aconfigyaml/yaml_test.go\n+++ b/aconfigyaml/yaml_test.go\n@@ -39,6 +39,9 @@ func TestYAML(t *testing.T) {\n \t\tY: structY{\n \t\t\tX: \"y\",\n \t\t\tZ: []string{\"1\", \"2\", \"3\"},\n+\t\t\tA: structD{\n+\t\t\t\tI: true,\n+\t\t\t},\n \t\t},\n \t\tAA: structA{\n \t\t\tX: \"y\",\n@@ -96,9 +99,7 @@ type structConfig struct {\n type structY struct {\n \tX string\n \tZ []string\n-\tA struct {\n-\t\tI bool\n-\t}\n+\tA structD\n }\n \n type structA struct {\n@@ -116,6 +117,10 @@ type structC struct {\n \tBB []byte `yaml:\"b\"`\n }\n \n+type structD struct {\n+\tI bool\n+}\n+\n type StructM struct {\n \tM string\n }\n@@ -127,21 +132,27 @@ const testfileContent = `\n     \"e\": 123.456,\n     \"b\": \"abc\",\n     \"i\": 42,\n-    \"j\": 420,\n-    \"m\": \"n\",\n+\t\"j\": 420,\n+\n     \"y\": {\n-        \"x\": \"y\",\n-        \"z\": [\"1\", \"2\", \"3\"]\n-    },\n+\t\t\"x\": \"y\",\n+\t\t\"z\": [\"1\", \"2\", \"3\"],\n+\t\t\"a\": {\n+\t\t\t\"i\": true\n+\t\t}\n+\t},\n+\n     \"A\": {\n-        \"x\": \"y\",\n+\t\t\"x\": \"y\",\n         \"B\": {\n-            \"C\": {\n-                \"m\": \"n\",\n+\t\t\t\"C\": {\n+\t\t\t\t\"m\": \"n\",\n                 \"b\": \"boo\",\n             },\n             \"D\": [\"x\", \"y\", \"z\"]\n         }\n-    }\n+\t},\n+\n+\t\"m\": \"n\"\n }\n `\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/build.yml",
+    "LICENSE",
+    "README.md",
+    "aconfig.go",
+    "aconfig_test.go",
+    "aconfigdotenv/dotenv.go",
+    "aconfigdotenv/dotenv_test.go",
+    "aconfigdotenv/go.mod",
+    "aconfigdotenv/go.sum",
+    "aconfigtoml/go.mod",
+    "aconfigtoml/go.sum",
+    "aconfigtoml/toml.go",
+    "aconfigtoml/toml_test.go",
+    "aconfigyaml/go.mod",
+    "aconfigyaml/go.sum",
+    "aconfigyaml/yaml.go",
+    "aconfigyaml/yaml_test.go",
+    "doc.go",
+    "example_test.go",
+    "go.mod",
+    "reflection.go",
+    "testdata/bad_config.json",
+    "testdata/config.json",
+    "testdata/config1.json",
+    "testdata/config2.json",
+    "testdata/config3.json",
+    "testdata/example_config.json",
+    "testdata/unknown.ext",
+    "testdata/unknown_fields.json",
+    "testfile.json",
+    "utils.go",
+    "utils_test.go"
+  ],
+  "explanation": {
+    "what": "aconfigtoml/toml.go と aconfigyaml/yaml.go の flatten 関数に bool ケースの分岐を追加し、ネストした bool 値(例: structY.A.I)を文字列に変換できるようにした。あわせて structY のネスト struct(旧 structY.A の無名 struct)を明示的な structD 型に置き換え、JSON/TOML/YAML 各テストの testfileContent やテストデータの構造を統一・整理した。aconfigtoml/toml_test.go からは大量のコメントアウト済みの旧テストコードも削除した。",
+    "why": "PR タイトルは「update decoders」のみで詳細な記載はない。おそらく flatten の switch 文に bool ケースが元々なく、ネストした bool フィールドを持つ構造体(structY.A.I bool)を各フォーマットから読み込むテストを追加しようとした際に、bool 型の値が処理されず flatten の default 節で panic していたため、それを塞ぐために bool 分岐を追加したと考えられる。",
+    "highlights": [
+      { "file": "aconfigtoml/toml.go", "note": "flatten の switch に `case bool:` を追加。これがないとネストした bool フィールドで default 節の panic に落ちる。" },
+      { "file": "aconfigyaml/yaml.go", "note": "同様に yaml デコーダの flatten にも bool ケースを追加。" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "inferred",
+    "refs": [{ "type": "pr", "number": 44, "url": "https://github.com/cristalhq/aconfig/pull/44" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

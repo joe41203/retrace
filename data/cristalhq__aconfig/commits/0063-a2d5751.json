@@ -1,0 +1,117 @@
+{
+  "seq": 63,
+  "sha": "a2d575185e8afc386a03b9637bbd07823148172c",
+  "parents": [
+    "a3290ca876db23146a200d449921f34f0de09f5c"
+  ],
+  "author": {
+    "name": "Oleg Kovalov",
+    "email": "oleg@hey.com",
+    "date": "2020-09-17T13:19:57+02:00"
+  },
+  "message": "add bytes slice support (#20)",
+  "pr": {
+    "number": 20,
+    "title": "add bytes slice support",
+    "body": "",
+    "url": "https://github.com/cristalhq/aconfig/pull/20"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 7,
+    "additions": 15,
+    "deletions": 0
+  },
+  "files": [
+    {
+      "path": "aconfig_test.go",
+      "status": "M",
+      "additions": 3,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "reflection.go",
+      "status": "M",
+      "additions": 7,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "testdata/config1.json",
+      "status": "M",
+      "additions": 1,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "testdata/config1.yaml",
+      "status": "M",
+      "additions": 1,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "testdata/test_config_def.json",
+      "status": "M",
+      "additions": 1,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "testdata/test_config_env.json",
+      "status": "M",
+      "additions": 1,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "testdata/test_config_flag.json",
+      "status": "M",
+      "additions": 1,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/aconfig_test.go b/aconfig_test.go\nindex 99738bc..774466d 100644\n--- a/aconfig_test.go\n+++ b/aconfig_test.go\n@@ -15,6 +15,7 @@ import (\n \n type TestConfig struct {\n \tStr      string `default:\"str-def\"`\n+\tBytes    []byte `default:\"bytes-def\"`\n \tInt      *int32 `default:\"123\"`\n \tHTTPPort int    `default:\"8080\"`\n \tParam    int    // no default tag, so default value\n@@ -220,6 +221,7 @@ func TestLoadFile_WithFiles(t *testing.T) {\n \n func TestLoadEnv(t *testing.T) {\n \tsetEnv(t, \"TST_STR\", \"str-env\")\n+\tsetEnv(t, \"TST_BYTES\", \"bytes-env\")\n \tsetEnv(t, \"TST_INT\", \"121\")\n \tsetEnv(t, \"TST_HTTP_PORT\", \"3000\")\n \tsetEnv(t, \"TST_SUB_FLOAT\", \"222.333\")\n@@ -258,6 +260,7 @@ func TestLoadFlag(t *testing.T) {\n \n \tflags := []string{\n \t\t\"-tst.str=str-flag\",\n+\t\t\"-tst.bytes=bytes-flag\",\n \t\t\"-tst.int=1001\",\n \t\t\"-tst.int=1001\",\n \t\t\"-tst.http_port=30000\",\ndiff --git a/reflection.go b/reflection.go\nindex d40bc5c..be71078 100644\n--- a/reflection.go\n+++ b/reflection.go\n@@ -199,6 +199,13 @@ func setString(field *fieldData, value string) error {\n }\n \n func setSlice(field *fieldData, value string) error {\n+\t// Special case for []byte\n+\tif field.field.Type.Elem().Kind() == reflect.Uint8 {\n+\t\tvalue := reflect.ValueOf([]byte(value))\n+\t\tfield.value.Set(value)\n+\t\treturn nil\n+\t}\n+\n \tvals := strings.Split(value, \",\")\n \tslice := reflect.MakeSlice(field.field.Type, len(vals), len(vals))\n \tfor i, val := range vals {\ndiff --git a/testdata/config1.json b/testdata/config1.json\nindex 8d8dd11..8442f24 100644\n--- a/testdata/config1.json\n+++ b/testdata/config1.json\n@@ -1,5 +1,6 @@\n {\n   \"Str\": \"str-json\",\n+  \"Bytes\": \"Ynl0ZXMtZW52\",\n   \"Int\": 101,\n   \"HTTPPort\": 65000,\n   \"Sub\": {\ndiff --git a/testdata/config1.yaml b/testdata/config1.yaml\nindex 8ea4bec..a59f37d 100644\n--- a/testdata/config1.yaml\n+++ b/testdata/config1.yaml\n@@ -1,4 +1,5 @@\n Str: \"str-yaml\"\n+Bytes: \"Ynl0ZXMteWFtbA==\"\n Int: 101\n HTTPPort\": 65000\n Sub:\ndiff --git a/testdata/test_config_def.json b/testdata/test_config_def.json\nindex bf7249b..2d1fa0c 100644\n--- a/testdata/test_config_def.json\n+++ b/testdata/test_config_def.json\n@@ -1,5 +1,6 @@\n {\n   \"Str\": \"str-def\",\n+  \"Bytes\": \"Ynl0ZXMtZGVm\",\n   \"Int\": 123,\n   \"HTTPPort\": 8080,\n   \"Sub\": {\ndiff --git a/testdata/test_config_env.json b/testdata/test_config_env.json\nindex ac315e9..3c891cb 100644\n--- a/testdata/test_config_env.json\n+++ b/testdata/test_config_env.json\n@@ -1,5 +1,6 @@\n {\n   \"Str\": \"str-env\",\n+  \"Bytes\": \"Ynl0ZXMtZW52\",\n   \"Int\": 121,\n   \"HTTPPort\": 3000,\n   \"Sub\": {\ndiff --git a/testdata/test_config_flag.json b/testdata/test_config_flag.json\nindex 012105d..fc3da82 100644\n--- a/testdata/test_config_flag.json\n+++ b/testdata/test_config_flag.json\n@@ -1,5 +1,6 @@\n {\n   \"Str\": \"str-flag\",\n+  \"Bytes\": \"Ynl0ZXMtZmxhZw==\",\n   \"Int\": 1001,\n   \"HTTPPort\": 30000,\n   \"Sub\": {\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/build.yml",
+    "LICENSE",
+    "README.md",
+    "aconfig.go",
+    "aconfig_test.go",
+    "example_test.go",
+    "go.mod",
+    "go.sum",
+    "reflection.go",
+    "testdata/all_types_config.json",
+    "testdata/bad_config.json",
+    "testdata/config1.json",
+    "testdata/config1.toml",
+    "testdata/config1.yaml",
+    "testdata/example_config.json",
+    "testdata/my_duration_config.json",
+    "testdata/other_numbers_config.json",
+    "testdata/test_config_def.json",
+    "testdata/test_config_env.json",
+    "testdata/test_config_flag.json",
+    "testdata/unknown.ext",
+    "utils.go"
+  ],
+  "explanation": {
+    "what": "reflection.go の setSlice に `[]byte` 用の特別分岐を追加し、要素型が reflect.Uint8 のスライスは通常のカンマ区切りパースではなく `[]byte(value)` へ直接変換するようにした。TestConfig に Bytes フィールドを追加し、各種 testdata(JSON/YAML)にも base64 エンコードされた Bytes 値を追記している。",
+    "why": "PR #20 のタイトルは「add bytes slice support」のみで本文は空だが、diff から動機は明確に読み取れる。既存の setSlice はどんなスライスも `strings.Split(value, \",\")` してから要素ごとに再帰的にセットする実装だったため、[]byte のようなバイト列指定には合わず、専用の特別扱いが必要だった。",
+    "highlights": [
+      { "file": "reflection.go", "note": "setSlice冒頭でElem().Kind()がreflect.Uint8のときだけ[]byte変換して早期returnする分岐" }
+    ],
+    "langNotes": [
+      { "topic": "[]byte と reflect.Uint8", "note": "Go の []byte は要素型 uint8 のスライスのエイリアスで、reflect 上は区別できない。そのためこのライブラリは reflect.Slice の中でもElem().Kind()==reflect.Uint8のケースを個別に判定し、カンマ区切りパースと衝突しないようにしている。" }
+    ],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [{ "type": "pr", "number": 20, "url": "https://github.com/cristalhq/aconfig/pull/20" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

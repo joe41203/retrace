@@ -1,0 +1,95 @@
+{
+  "seq": 41,
+  "sha": "520432de49ee0ba45db0978d56942588e41095e0",
+  "parents": [
+    "96463cf63b3ead5fbfef83f1cb98a7395d5e6ae3"
+  ],
+  "author": {
+    "name": "Oleg Kovalov",
+    "email": "iamolegkovalov@gmail.com",
+    "date": "2020-07-26T19:59:34+02:00"
+  },
+  "message": "custom env and flag names (#5)",
+  "pr": {
+    "number": 5,
+    "title": "custom env and flag names",
+    "body": "Fixes #3 ",
+    "url": "https://github.com/cristalhq/aconfig/pull/5"
+  },
+  "linkedIssues": [
+    {
+      "number": 3,
+      "title": "Override flag and env",
+      "body": "## Problem\r\n\r\nHaving such a config\r\n```\r\ntype MyConfig struct {\r\n\tPort int\r\n\tMyAuth MyAuth `yaml:\"myAuth\"`\r\n}\r\n\r\ntype MyAuth struct {\r\n\tMyUser string `yaml:\"myUser\" default:\"def-user\"`\r\n}\r\n```\r\nI can parametrize it with\r\n```\r\nAPP_MYAUTH_MYUSER=jakub\r\n--myauth.myuser jakub\r\n```\r\n\r\nWhat I would like to do is to handle CamelCase config properly. In such cases I'd rather have something like this:\r\n```\r\nAPP_MY_AUTH_MY_USER=jakub\r\n--my-auth-my-user=jakub\r\n```\r\n\r\nIn other words, I'd like to override default env and flag.\r\n\r\nNote: With yaml I had to put `myauth.myuser`, but `yaml` tag is taken into account.\r\n\r\n## Proposal\r\n\r\nHow about introducing new tag\r\n```\r\ntype MyConfig struct {\r\n\tPort int\r\n\tMyAuth MyAuth `yaml:\"myAuth\"`\r\n}\r\n\r\ntype MyAuth struct {\r\n\tMyUser string `yaml:\"myUser\" env:\"my_auth_my_user\" flag:\"my-auth-my-user\" default:\"def-user\"`\r\n}\r\n```\r\n\r\n`env` could also be hierarchical like this:\r\n```\r\ntype MyConfig struct {\r\n\tPort int\r\n\tMyAuth MyAuth `yaml:\"myAuth\" env:\"my_auth\"`\r\n}\r\n\r\ntype MyAuth struct {\r\n\tMyUser string `yaml:\"myUser\" env:\"my_user\" default:\"def-user\"`\r\n}\r\n```\r\nBut I've got bad experience with it from envconfig. because you then don't know if you need parse `app_myauth_my_user` or just `app_my_user` if `env:\"my_auth\"` is missing.",
+      "url": "https://github.com/cristalhq/aconfig/issues/3"
+    }
+  ],
+  "stats": {
+    "filesChanged": 3,
+    "additions": 55,
+    "deletions": 7
+  },
+  "files": [
+    {
+      "path": "README.md",
+      "status": "M",
+      "additions": 1,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "aconfig.go",
+      "status": "M",
+      "additions": 21,
+      "deletions": 7,
+      "binary": false
+    },
+    {
+      "path": "aconfig_test.go",
+      "status": "M",
+      "additions": 33,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/README.md b/README.md\nindex 664b324..34c6fbf 100644\n--- a/README.md\n+++ b/README.md\n@@ -40,6 +40,7 @@ type MyConfig struct {\n \t\tUser string `default:\"def-user\"`\n \t\tPass string `default:\"def-pass\"`\n \t}\n+\tPass string `default:\"\" env:\"SECRET\" flag:\"sec_ret\"`\n }\n \n loader := aconfig.LoaderFor(&MyConfig{}).\ndiff --git a/aconfig.go b/aconfig.go\nindex abc5e17..fa6d6ff 100644\n--- a/aconfig.go\n+++ b/aconfig.go\n@@ -17,6 +17,8 @@ import (\n \n const (\n \tdefaultValueTag = \"default\"\n+\tenvNameTag      = \"env\"\n+\tflagNameTag     = \"flag\"\n \tusageTag        = \"usage\"\n )\n \n@@ -100,7 +102,7 @@ func (l *Loader) preLoad(cfg interface{}) {\n \n \tfields := getFields(cfg)\n \tfor _, field := range fields {\n-\t\tflagName := l.getFlagName(field.Name)\n+\t\tflagName := l.getFlagName(field)\n \t\tl.flagSet.String(flagName, field.DefaultValue, field.Usage)\n \t}\n }\n@@ -201,7 +203,7 @@ func (l *Loader) loadFromFile(dst interface{}) error {\n \n func (l *Loader) loadEnvironment() error {\n \tfor _, field := range l.fields {\n-\t\tenvName := l.getEnvName(field.Name)\n+\t\tenvName := l.getEnvName(field)\n \t\tv, ok := os.LookupEnv(envName)\n \t\tif !ok {\n \t\t\tcontinue\n@@ -226,7 +228,7 @@ func (l *Loader) loadFlags() error {\n \t})\n \n \tfor _, field := range l.fields {\n-\t\tflagName := l.getFlagName(field.Name)\n+\t\tflagName := l.getFlagName(field)\n \t\tflg, ok := actualFlags[flagName]\n \t\tif !ok {\n \t\t\tcontinue\n@@ -238,11 +240,19 @@ func (l *Loader) loadFlags() error {\n \treturn nil\n }\n \n-func (l *Loader) getEnvName(name string) string {\n+func (l *Loader) getEnvName(field *fieldData) string {\n+\tname := field.Name\n+\tif field.EnvName != \"\" {\n+\t\tname = field.EnvName\n+\t}\n \treturn strings.ToUpper(l.config.EnvPrefix + strings.ReplaceAll(name, \".\", \"_\"))\n }\n \n-func (l *Loader) getFlagName(name string) string {\n+func (l *Loader) getFlagName(field *fieldData) string {\n+\tname := field.Name\n+\tif field.FlagName != \"\" {\n+\t\tname = field.FlagName\n+\t}\n \treturn strings.ToLower(l.config.FlagPrefix + name)\n }\n \n@@ -294,15 +304,19 @@ type fieldData struct {\n \tField        reflect.StructField\n \tValue        reflect.Value\n \tDefaultValue string\n+\tEnvName      string\n+\tFlagName     string\n \tUsage        string\n }\n \n func newFieldData(field reflect.StructField, value reflect.Value, parent *fieldData) *fieldData {\n \treturn &fieldData{\n-\t\tName:         makaName(field.Name, parent),\n+\t\tName:         makeName(field.Name, parent),\n \t\tValue:        value,\n \t\tField:        field,\n \t\tDefaultValue: field.Tag.Get(defaultValueTag),\n+\t\tEnvName:      field.Tag.Get(envNameTag),\n+\t\tFlagName:     field.Tag.Get(flagNameTag),\n \t\tUsage:        field.Tag.Get(usageTag),\n \t}\n }\n@@ -311,7 +325,7 @@ func newSimpleFieldData(value reflect.Value) *fieldData {\n \treturn newFieldData(reflect.StructField{}, value, nil)\n }\n \n-func makaName(name string, parent *fieldData) string {\n+func makeName(name string, parent *fieldData) string {\n \tif parent == nil {\n \t\treturn name\n \t}\ndiff --git a/aconfig_test.go b/aconfig_test.go\nindex 334faca..25229dc 100644\n--- a/aconfig_test.go\n+++ b/aconfig_test.go\n@@ -454,6 +454,39 @@ func TestBadFlags(t *testing.T) {\n \t}\n }\n \n+func TestCustomNames(t *testing.T) {\n+\ttype Config struct {\n+\t\tA int `default:\"-1\" env:\"one\"`\n+\t\tB int `default:\"-1\" flag:\"two\"`\n+\t\tC int `default:\"-1\" env:\"three\" flag:\"four\"`\n+\t}\n+\n+\tloader := LoaderFor(&Config{}).Build()\n+\n+\tsetEnv(t, \"ONE\", \"1\")\n+\tsetEnv(t, \"three\", \"3\")\n+\tdefer os.Clearenv()\n+\n+\tif err := loader.Flags().Parse([]string{\"-two=2\", \"-four=4\"}); err != nil {\n+\t\tt.Fatal(err)\n+\t}\n+\n+\tvar cfg Config\n+\tif err := loader.Load(&cfg); err != nil {\n+\t\tt.Fatal(err)\n+\t}\n+\n+\tif want := 1; cfg.A != want {\n+\t\tt.Errorf(\"got %#v, want %#v\", cfg.A, want)\n+\t}\n+\tif want := 2; cfg.B != want {\n+\t\tt.Errorf(\"got %#v, want %#v\", cfg.B, want)\n+\t}\n+\tif want := 4; cfg.C != want {\n+\t\tt.Errorf(\"got %#v, want %#v\", cfg.C, want)\n+\t}\n+}\n+\n func loadFile(t *testing.T, file string, dst interface{}) {\n \tf, err := os.Open(file)\n \tif err != nil {\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/build.yml",
+    "LICENSE",
+    "README.md",
+    "aconfig.go",
+    "aconfig_test.go",
+    "example_test.go",
+    "go.mod",
+    "go.sum",
+    "testdata/all_types_config.json",
+    "testdata/bad_config.json",
+    "testdata/config1.json",
+    "testdata/config1.toml",
+    "testdata/config1.yaml",
+    "testdata/example_config.json",
+    "testdata/my_duration_config.json",
+    "testdata/other_numbers_config.json",
+    "testdata/test_config_def.json",
+    "testdata/test_config_env.json",
+    "testdata/test_config_flag.json",
+    "testdata/unknown.ext"
+  ],
+  "explanation": {
+    "what": "struct タグに新しい `env` と `flag` を追加し、フィールドごとに環境変数名・フラグ名を明示的に上書きできるようにした。`fieldData` に `EnvName`/`FlagName` を持たせ、`getEnvName`/`getFlagName` は field 全体を受け取ってタグがあればそちらを優先するよう変更した。あわせて `TestCustomNames` を追加し、READMEにも1行例を足した。",
+    "why": "PR本文は \"Fixes #3\" のみだが、リンクされた issue #3 に詳しい背景がある。ネストした struct フィールドはデフォルトで `APP_MYAUTH_MYUSER` のようなキャメルケース由来の読みにくい env 名・flag 名になってしまうため、`env:\"my_auth_my_user\"` のようにタグで明示的に上書きしたいという要望が出発点。issue では階層的な env プレフィックスの提案もあったが、それは envconfig で経験した曖昧さの問題があるため見送られ、フィールド単位の完全上書き方式が採用された。",
+    "highlights": [
+      { "file": "aconfig.go", "note": "getEnvName/getFlagName が name:string ではなく field:*fieldData を受け取るようになり、タグ優先のフォールバックロジックが入った" },
+      { "file": "aconfig_test.go", "note": "TestCustomNames で env/flag タグの併用・片方のみ指定のケースを確認している" }
+    ],
+    "langNotes": [
+      { "topic": "struct tag", "note": "Go の struct タグはフィールド定義の後ろに書ける文字列メタデータ(`env:\"x\" flag:\"y\"`)で、`reflect.StructField.Tag.Get(\"env\")` のように reflect 経由で読み出す。ここでは default/usage に加えて env/flag という新しいタグキーを増設している。" }
+    ],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [{ "type": "pr", "number": 5, "url": "https://github.com/cristalhq/aconfig/pull/5" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

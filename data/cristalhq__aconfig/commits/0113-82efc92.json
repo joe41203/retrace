@@ -1,0 +1,87 @@
+{
+  "seq": 113,
+  "sha": "82efc9210694bea93d8045e05ff7cf12c7a2dfdb",
+  "parents": [
+    "4d4472d89d20d16896cc8bbbd5ae8152f13a9449"
+  ],
+  "author": {
+    "name": "Oleg Kovalov",
+    "email": "oleg@hey.com",
+    "date": "2021-05-16T14:03:59+02:00"
+  },
+  "message": "bump coverage for splitNameByWords (#76)",
+  "pr": {
+    "number": 76,
+    "title": "bump coverage for splitNameByWords",
+    "body": "",
+    "url": "https://github.com/cristalhq/aconfig/pull/76"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 1,
+    "deletions": 0
+  },
+  "files": [
+    {
+      "path": "utils_test.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/utils_test.go b/utils_test.go\nindex b07c4b7..71dca1f 100644\n--- a/utils_test.go\n+++ b/utils_test.go\n@@ -21,6 +21,7 @@ func Test_splitNameByWords(t *testing.T) {\n \t\t{\"\", args{\"ApiKey\"}, []string{\"Api\", \"Key\"}},\n \t\t{\"\", args{\"APIKey\"}, []string{\"API\", \"Key\"}},\n \t\t{\"\", args{\"Type2\"}, []string{\"Type\", \"2\"}},\n+\t\t{\"\", args{\"Type∆\"}, []string{\"Type\", \"∆\"}},\n \t\t{\"\", args{\"MarshalJSONStruct\"}, []string{\"Marshal\", \"JSON\", \"Struct\"}},\n \t}\n \tfor _, tt := range tests {\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/build.yml",
+    "LICENSE",
+    "README.md",
+    "aconfig.go",
+    "aconfig_test.go",
+    "aconfigdotenv/dotenv.go",
+    "aconfigdotenv/dotenv_test.go",
+    "aconfigdotenv/go.mod",
+    "aconfigdotenv/go.sum",
+    "aconfighcl/go.mod",
+    "aconfighcl/go.sum",
+    "aconfighcl/hcl.go",
+    "aconfighcl/hcl_test.go",
+    "aconfigtoml/go.mod",
+    "aconfigtoml/go.sum",
+    "aconfigtoml/toml.go",
+    "aconfigtoml/toml_test.go",
+    "aconfigyaml/go.mod",
+    "aconfigyaml/go.sum",
+    "aconfigyaml/yaml.go",
+    "aconfigyaml/yaml_test.go",
+    "doc.go",
+    "example_test.go",
+    "go.mod",
+    "reflection.go",
+    "testdata/bad_config.json",
+    "testdata/config.json",
+    "testdata/config1.json",
+    "testdata/config2.json",
+    "testdata/config3.json",
+    "testdata/example_config.json",
+    "testdata/unknown.ext",
+    "testdata/unknown_fields.json",
+    "testfile.json",
+    "utils.go",
+    "utils_test.go"
+  ],
+  "explanation": {
+    "what": "`splitNameByWords` (フィールド名を単語単位に分割してenv/flag名を組み立てるための内部関数)のテストケースに、`∆`のようなASCII範囲外の記号1文字が末尾に付く入力(`Type∆`)を追加した。",
+    "why": "PR タイトル「bump coverage for splitNameByWords」の通り、この関数のテストカバレッジを底上げする目的。数字だけでなく非ASCII文字が続くケースでも単語境界を正しく切り出せることを確認している。",
+    "highlights": [
+      { "file": "utils_test.go", "note": "`Type∆` → `[\"Type\", \"∆\"]` という非ASCII文字を含む分割ケースを追加" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [{ "type": "pr", "number": 76, "url": "https://github.com/cristalhq/aconfig/pull/76" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

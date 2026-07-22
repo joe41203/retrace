@@ -1,0 +1,89 @@
+{
+  "seq": 106,
+  "sha": "531db3d6c724c5dd3c48fde8ce07cfa1987b53df",
+  "parents": [
+    "32a7c36247cc25b7d8bb990d9ec947737b3bcc54"
+  ],
+  "author": {
+    "name": "wweir",
+    "email": "wweir@foxmail.com",
+    "date": "2021-03-22T16:04:41+08:00"
+  },
+  "message": "fix for empty default value (#66)",
+  "pr": {
+    "number": 66,
+    "title": "fix for empty default value",
+    "body": "",
+    "url": "https://github.com/cristalhq/aconfig/pull/66"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 3,
+    "deletions": 2
+  },
+  "files": [
+    {
+      "path": "aconfig.go",
+      "status": "M",
+      "additions": 3,
+      "deletions": 2,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/aconfig.go b/aconfig.go\nindex bacfc88..a6628cf 100644\n--- a/aconfig.go\n+++ b/aconfig.go\n@@ -244,10 +244,11 @@ func (l *Loader) checkRequired() error {\n \n func (l *Loader) loadDefaults() error {\n \tfor _, field := range l.fields {\n-\t\tif err := l.setFieldData(field, field.Tag(defaultValueTag)); err != nil {\n+\t\tdefaultValue := field.Tag(defaultValueTag)\n+\t\tif err := l.setFieldData(field, defaultValue); err != nil {\n \t\t\treturn err\n \t\t}\n-\t\tfield.isSet = true\n+\t\tfield.isSet = (defaultValue != \"\")\n \t}\n \treturn nil\n }\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/build.yml",
+    "LICENSE",
+    "README.md",
+    "aconfig.go",
+    "aconfig_test.go",
+    "aconfigdotenv/dotenv.go",
+    "aconfigdotenv/dotenv_test.go",
+    "aconfigdotenv/go.mod",
+    "aconfigdotenv/go.sum",
+    "aconfighcl/go.mod",
+    "aconfighcl/go.sum",
+    "aconfighcl/hcl.go",
+    "aconfighcl/hcl_test.go",
+    "aconfigtoml/go.mod",
+    "aconfigtoml/go.sum",
+    "aconfigtoml/toml.go",
+    "aconfigtoml/toml_test.go",
+    "aconfigyaml/go.mod",
+    "aconfigyaml/go.sum",
+    "aconfigyaml/yaml.go",
+    "aconfigyaml/yaml_test.go",
+    "doc.go",
+    "example_test.go",
+    "go.mod",
+    "reflection.go",
+    "testdata/bad_config.json",
+    "testdata/config.json",
+    "testdata/config1.json",
+    "testdata/config2.json",
+    "testdata/config3.json",
+    "testdata/example_config.json",
+    "testdata/unknown.ext",
+    "testdata/unknown_fields.json",
+    "testfile.json",
+    "utils.go",
+    "utils_test.go"
+  ],
+  "explanation": {
+    "what": "loadDefaults() で、default タグの値を一旦 defaultValue 変数に受けてから field.isSet に代入するように変更した。以前は defaultValue の有無に関わらず field.isSet = true としていたが、変更後は field.isSet = (defaultValue != \"\") となり、default タグが空文字(未指定)のフィールドは isSet が true にならない。",
+    "why": "default タグを持たないフィールドまで isSet = true とマークしてしまうと、後続の env/flag/file からの上書き処理や required チェックで『既に値が設定済み』と誤認される可能性がある。PR タイトルの \"fix for empty default value\" が示す通り、default 値が実際には空だったケースの isSet 判定を正しくするための修正。",
+    "highlights": [
+      { "file": "aconfig.go", "note": "isSet を defaultValue の非空判定に変更した1行" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [
+      { "type": "pr", "number": 66, "url": "https://github.com/cristalhq/aconfig/pull/66" }
+    ],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

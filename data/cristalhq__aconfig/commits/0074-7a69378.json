@@ -1,0 +1,78 @@
+{
+  "seq": 74,
+  "sha": "7a69378db6b80718e7983659ed6a81c2537d081b",
+  "parents": [
+    "5b1abef8295280715192f42d69bdf9ffe3704e1e"
+  ],
+  "author": {
+    "name": "Oleg Kovalov",
+    "email": "oleg@hey.com",
+    "date": "2020-11-23T23:22:24+01:00"
+  },
+  "message": "update readme",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 28,
+    "deletions": 27
+  },
+  "files": [
+    {
+      "path": "README.md",
+      "status": "M",
+      "additions": 28,
+      "deletions": 27,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/README.md b/README.md\nindex 38fec86..792d07d 100644\n--- a/README.md\n+++ b/README.md\n@@ -1,9 +1,9 @@\n # aconfig\n \n-[![Build Status][build-img]][build-url]\n-[![GoDoc][pkg-img]][pkg-url]\n-[![Go Report Card][reportcard-img]][reportcard-url]\n-[![Coverage][coverage-img]][coverage-url]\n+[![build-img]][build-url]\n+[![pkg-img]][pkg-url]\n+[![reportcard-img]][reportcard-url]\n+[![coverage-img]][coverage-url]\n \n Simple, useful and opinionated config loader.\n \n@@ -14,18 +14,15 @@ There are more than 2000 repositories on Github regarding configuration in Go. I\n ## Features\n \n * Simple API.\n-* Automates a lot of things.\n-  * config params names\n-  * config loading\n-  * generates documentation\n-* Opinionated.\n+* Clean and tested code.\n+* Automatic naming.\n * Supports different sources:\n-  * defaults in code\n-  * files (JSON, YAML, TOML, HCL)\n+  * defaults in the code\n+  * files (JSON, YAML, TOML)\n   * environment variables\n   * command-line flags\n-* Dependency-free (except file parsers).\n-* Walk over configuration fields.\n+* Dependency-free (even file-parsers are optional).\n+* Walk over configuration fields (automate what you want)\n \n ## Install\n \n@@ -48,20 +45,24 @@ type MyConfig struct {\n }\n \n var cfg MyConfig\n-loader := aconfig.LoaderFor(&cfg).\n+loader := aconfig.LoaderFor(&cfg, aconfig.Config{\n \t// feel free to skip some steps :)\n-\t// SkipDefaults().\n-\t// SkipFiles().\n-\t// SkipEnvironment().\n-\t// SkipFlags().\n-\tWithFiles([]string{\"file.json\", \"ouch.yaml\"}).\n-\t// see submodules in repo for more formats\n-\tWithFileDecoder(\".yaml\", aconfigyaml.New()). \n-\tWithEnvPrefix(\"APP\").\n-\tWithFlagPrefix(\"app\").\n-\tBuild()\n-\n-flagSet := loader.Flags() // Important: use exactly this flags to define your own\n+\t// SkipDefaults:    true,\n+\t// SkipFiles:       true,\n+\t// SkipEnvironment: true,\n+\t// SkipFlags:       true,\n+\tFiles:           []string{\"/var/opt/myapp/config.json\", \"ouch.yaml\"},\n+\tEnvPrefix:       \"APP\",\n+\tFlagPrefix:      \"app\",\n+\tFileDecoders: map[string]aconfig.FileDecoder{\n+\t\t// from `aconfigyaml` submodule\n+\t\t// see submodules in repo for more formats\n+\t\t\".yaml\": aconfigyaml.New(),\n+\t},\n+})\n+\n+// IMPORTANT: define your own flags with `flagSet`\n+flagSet := loader.Flags()\n \n if err := loader.Load(); err != nil {\n \tpanic(err)\n@@ -81,7 +82,7 @@ Integration with `spf13/cobra` [playground](https://play.golang.org/p/OsCR8qTCN0\n \n ## Documentation\n \n-See here: [pkg.go.dev][pkg-url].\n+See [these docs][pkg-url].\n \n ## License\n \n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/build.yml",
+    "LICENSE",
+    "README.md",
+    "aconfig.go",
+    "aconfig_test.go",
+    "aconfighcl/go.mod",
+    "aconfighcl/go.sum",
+    "aconfighcl/hcl.go",
+    "aconfighcl/hcl_test.go",
+    "aconfigtoml/go.mod",
+    "aconfigtoml/go.sum",
+    "aconfigtoml/toml.go",
+    "aconfigtoml/toml_test.go",
+    "aconfigyaml/go.mod",
+    "aconfigyaml/go.sum",
+    "aconfigyaml/yaml.go",
+    "aconfigyaml/yaml_test.go",
+    "example_test.go",
+    "go.mod",
+    "go.sum",
+    "reflection.go",
+    "testdata/all_types_config.json",
+    "testdata/bad_config.json",
+    "testdata/config1.json",
+    "testdata/example_config.json",
+    "testdata/my_duration_config.json",
+    "testdata/other_numbers_config.json",
+    "testdata/test_config_def.json",
+    "testdata/test_config_env.json",
+    "testdata/test_config_flag.json",
+    "testdata/unknown.ext",
+    "utils.go"
+  ],
+  "explanation": {
+    "what": "README のバッジ表記を簡略化し、Features セクションの説明文を整理。使用例のコードブロックを前コミット(#31)で導入した Config 構造体渡し方式に合わせて書き換え、HCL のサポートに触れていた記述を削除している。",
+    "why": "PR には紐付いておらず、コミットメッセージは「update readme」のみ。直前の #31(use config struct)で公開 API が変わったため、README のサンプルコードをそれに追従させる後始末のコミットと読める。",
+    "highlights": [
+      { "file": "README.md", "note": "使用例が LoaderFor(&cfg).Skip...().Build() から LoaderFor(&cfg, aconfig.Config{...}) に書き換わっている" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

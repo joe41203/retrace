@@ -1,0 +1,68 @@
+{
+  "seq": 65,
+  "sha": "c74590eea6f1df649e405d7629dc2d3b6cc6bd92",
+  "parents": [
+    "0d550ef6ada1cde59565456255033e3fb778bd36"
+  ],
+  "author": {
+    "name": "Oleg Kovalov",
+    "email": "iamolegkovalov@gmail.com",
+    "date": "2020-09-17T16:18:06+02:00"
+  },
+  "message": "update readme",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 12,
+    "deletions": 7
+  },
+  "files": [
+    {
+      "path": "README.md",
+      "status": "M",
+      "additions": 12,
+      "deletions": 7,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/README.md b/README.md\nindex 60e3e47..6f2e1b6 100644\n--- a/README.md\n+++ b/README.md\n@@ -15,6 +15,9 @@ There are more than 2000 repositories on Github regarding configuration in Go. I\n \n * Simple API.\n * Automates a lot of things.\n+  * config params names\n+  * config loading\n+  * generates documentation\n * Opinionated.\n * Supports different sources:\n   * defaults in code\n@@ -44,7 +47,8 @@ type MyConfig struct {\n \tPass string `default:\"\" env:\"SECRET\" flag:\"sec_ret\"`\n }\n \n-loader := aconfig.LoaderFor(&MyConfig{}).\n+var cfg MyConfig\n+loader := aconfig.LoaderFor(&cfg).\n \t// feel free to skip some steps :)\n \t// SkipDefaults().\n \t// SkipFiles().\n@@ -55,10 +59,9 @@ loader := aconfig.LoaderFor(&MyConfig{}).\n \tWithFlagPrefix(\"app\").\n \tBuild()\n \n-flagSet := loader.Flags() // now use exactly this flags to define your own\n+flagSet := loader.Flags() // Important: use exactly this flags to define your own\n \n-var cfg MyConfig\n-if err := loader.Load(&cfg); err != nil {\n+if err := loader.Load(); err != nil {\n \tpanic(err)\n }\n \n@@ -66,11 +69,13 @@ if err := loader.Load(&cfg); err != nil {\n //\n // 1. defaults set in structure tags (see structure defenition)\n // 2. loaded from files `file.json` if not `ouch.yaml` will be used\n-// 3. from corresponding environment variables with prefix `APP`\n-// 4. and command-line flags if they are\n+// 3. from corresponding environment variables with the prefix `APP_`\n+// 4. command-line flags with the prefix `app.` if they are \n ```\n \n-Also see examples: [examples_test.go](https://github.com/cristalhq/aconfig/blob/master/example_test.go) or integration with `spf13/Cobra` using `AddGoFlagSet` [playground](https://play.golang.org/p/OsCR8qTCN0H)\n+Also see examples: [examples_test.go](https://github.com/cristalhq/aconfig/blob/master/example_test.go).\n+\n+Integration with `spf13/cobra` [playground](https://play.golang.org/p/OsCR8qTCN0H).\n \n ## Documentation\n \n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/build.yml",
+    "LICENSE",
+    "README.md",
+    "aconfig.go",
+    "aconfig_test.go",
+    "example_test.go",
+    "go.mod",
+    "go.sum",
+    "reflection.go",
+    "testdata/all_types_config.json",
+    "testdata/bad_config.json",
+    "testdata/config1.json",
+    "testdata/config1.toml",
+    "testdata/config1.yaml",
+    "testdata/example_config.json",
+    "testdata/my_duration_config.json",
+    "testdata/other_numbers_config.json",
+    "testdata/test_config_def.json",
+    "testdata/test_config_env.json",
+    "testdata/test_config_flag.json",
+    "testdata/unknown.ext",
+    "utils.go"
+  ],
+  "explanation": {
+    "what": "README.md のみを更新。「自動化される項目」の箇条書きを具体化(パラメータ名の生成・設定読み込み・ドキュメント生成)し、サンプルコードを直前のAPI変更(`var cfg` を先に宣言してから LoaderFor(&cfg) に渡し、Load() を引数なしで呼ぶ新しい形)に合わせて修正した。env/flagのprefix付与に関する説明文言も明確化している。",
+    "why": "PR紐付けのないコミットで、コミットメッセージも「update readme」のみ。おそらく直前の一連のコミット(#19split into files、#20 bytes support、#21 Field.Tag改善)でAPI・実装が変わった後、READMEのサンプルとAPI実態のずれを解消する定型的なドキュメント追従と考えられる。",
+    "highlights": [
+      { "file": "README.md", "note": "loader.Load(&cfg) から loader.Load() へ、サンプルコードをAPI変更後の形に更新した箇所" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "inferred",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

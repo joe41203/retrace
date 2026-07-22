@@ -1,0 +1,64 @@
+{
+  "seq": 14,
+  "sha": "7948d7b92a4395c45723e5a14fa1ae5fc237919c",
+  "parents": [
+    "3fcbd0a5a1cb6fba631cb49f6254a2ace2387c8b"
+  ],
+  "author": {
+    "name": "Oleg Kovalov",
+    "email": "iamolegkovalov@gmail.com",
+    "date": "2020-07-22T23:21:47+02:00"
+  },
+  "message": "add lib prefix for top level error",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 7,
+    "deletions": 0
+  },
+  "files": [
+    {
+      "path": "aconfig.go",
+      "status": "M",
+      "additions": 7,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/aconfig.go b/aconfig.go\nindex ec52e6e..1fb3c06 100644\n--- a/aconfig.go\n+++ b/aconfig.go\n@@ -47,6 +47,13 @@ func NewLoader(config LoaderConfig) *Loader {\n func (l *Loader) Load(into interface{}) error {\n \tl.fields = getFields(into)\n \n+\tif err := l.loadSources(into); err != nil {\n+\t\treturn fmt.Errorf(\"aconfig: cannot load config: %w\", err)\n+\t}\n+\treturn nil\n+}\n+\n+func (l *Loader) loadSources(into interface{}) error {\n \tif !l.config.SkipDefaults {\n \t\tif err := l.loadDefaults(); err != nil {\n \t\t\treturn err\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/build.yml",
+    "LICENSE",
+    "README.md",
+    "aconfig.go",
+    "aconfig_test.go",
+    "go.mod",
+    "go.sum",
+    "testdata/all_types_config.json",
+    "testdata/bad_config.json",
+    "testdata/config1.json",
+    "testdata/config1.toml",
+    "testdata/config1.yaml",
+    "testdata/my_duration_config.json",
+    "testdata/test_config_env.json",
+    "testdata/test_config_flag.json",
+    "testdata/unknown.ext"
+  ],
+  "explanation": {
+    "what": "`Loader.Load` の中身を `loadSources` という新しい内部メソッドに切り出し、`Load` はその戻り値のエラーを `fmt.Errorf(\"aconfig: cannot load config: %w\", err)` でラップして返すだけにした。",
+    "why": "コミットメッセージ「add lib prefix for top level error」の通り、ライブラリの公開APIである `Load` から返るエラーに `aconfig:` というプレフィックスを一貫して付け、呼び出し側がエラーの発生元を識別しやすくする意図と読める。",
+    "highlights": [
+      { "file": "aconfig.go", "note": "Load が薄いラッパーになり、実処理は loadSources に分離された" }
+    ],
+    "langNotes": [
+      { "topic": "%w によるエラーラップ", "note": "fmt.Errorf の %w 動詞は元のエラーを保持したまま新しいメッセージを被せる Go 1.13 以降の機能。errors.Is/As で元のエラーを判定・取り出せるまま、ライブラリ名などの文脈情報を追加できる。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

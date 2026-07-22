@@ -1,0 +1,65 @@
+{
+  "seq": 18,
+  "sha": "d261b445e14bf7f656e059b8d5f81260caea14fa",
+  "parents": [
+    "3f40f7ad5b5704780c8a650c342036c5340cb514"
+  ],
+  "author": {
+    "name": "Oleg Kovalov",
+    "email": "iamolegkovalov@gmail.com",
+    "date": "2020-07-22T23:45:57+02:00"
+  },
+  "message": "remove parent field",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 8,
+    "deletions": 13
+  },
+  "files": [
+    {
+      "path": "aconfig.go",
+      "status": "M",
+      "additions": 8,
+      "deletions": 13,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/aconfig.go b/aconfig.go\nindex ce65a7d..da736f1 100644\n--- a/aconfig.go\n+++ b/aconfig.go\n@@ -184,19 +184,18 @@ func getFieldsHelper(valueObject reflect.Value, parent *fieldData) []*fieldData\n \t\tif field.Type.Kind() != reflect.Struct {\n \t\t\tfields = append(fields, fd)\n \t\t} else {\n-\t\t\tparent := fd\n-\t\t\t// remove prefix fpr embedded struct\n-\t\t\tif field.Anonymous {\n-\t\t\t\tparent = fd.Parent\n+\t\t\tfieldParent := parent\n+\t\t\t// remove prefix for embedded struct\n+\t\t\tif !field.Anonymous {\n+\t\t\t\tfieldParent = fd\n \t\t\t}\n-\t\t\tfields = append(fields, getFieldsHelper(value, parent)...)\n+\t\t\tfields = append(fields, getFieldsHelper(value, fieldParent)...)\n \t\t}\n \t}\n \treturn fields\n }\n \n type fieldData struct {\n-\tParent       *fieldData\n \tName         string\n \tField        reflect.StructField\n \tValue        reflect.Value\n@@ -206,7 +205,6 @@ type fieldData struct {\n func newFieldData(field reflect.StructField, value reflect.Value, parent *fieldData) *fieldData {\n \treturn &fieldData{\n \t\tName:         makaName(field.Name, parent),\n-\t\tParent:       parent,\n \t\tValue:        value,\n \t\tField:        field,\n \t\tDefaultValue: field.Tag.Get(defaultValueTag),\n@@ -311,8 +309,7 @@ func setSlice(field *fieldData, value string) error {\n \tfor i, val := range vals {\n \t\tval = strings.TrimSpace(val)\n \t\tfd := &fieldData{\n-\t\t\tParent: field,\n-\t\t\tValue:  slice.Index(i),\n+\t\t\tValue: slice.Index(i),\n \t\t}\n \t\tif err := setFieldDataHelper(fd, val); err != nil {\n \t\t\treturn fmt.Errorf(\"incorrect slice item %q: %w\", val, err)\n@@ -335,16 +332,14 @@ func setMap(field *fieldData, value string) error {\n \t\tval := strings.TrimSpace(entry[1])\n \n \t\tfdk := &fieldData{\n-\t\t\tParent: field,\n-\t\t\tValue:  reflect.New(field.Field.Type.Key()).Elem(),\n+\t\t\tValue: reflect.New(field.Field.Type.Key()).Elem(),\n \t\t}\n \t\tif err := setFieldDataHelper(fdk, key); err != nil {\n \t\t\treturn fmt.Errorf(\"incorrect map key %q: %w\", key, err)\n \t\t}\n \n \t\tfdv := &fieldData{\n-\t\t\tParent: field,\n-\t\t\tValue:  reflect.New(field.Field.Type.Elem()).Elem(),\n+\t\t\tValue: reflect.New(field.Field.Type.Elem()).Elem(),\n \t\t}\n \t\tif err := setFieldDataHelper(fdv, val); err != nil {\n \t\t\treturn fmt.Errorf(\"incorrect map value %q: %w\", val, err)\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/build.yml",
+    "LICENSE",
+    "README.md",
+    "aconfig.go",
+    "aconfig_test.go",
+    "go.mod",
+    "go.sum",
+    "testdata/all_types_config.json",
+    "testdata/bad_config.json",
+    "testdata/config1.json",
+    "testdata/config1.toml",
+    "testdata/config1.yaml",
+    "testdata/my_duration_config.json",
+    "testdata/test_config_def.json",
+    "testdata/test_config_env.json",
+    "testdata/test_config_flag.json",
+    "testdata/unknown.ext"
+  ],
+  "explanation": {
+    "what": "`fieldData` struct から `Parent *fieldData` フィールドを削除し、`getFieldsHelper` の再帰呼び出しでは親を辿らず、呼び出し側が管理するローカル変数 `fieldParent` を渡すように変更した。embedded(匿名)struct のとき親を引き継ぐかどうかの判定も `if field.Anonymous { parent = fd.Parent }` から `if !field.Anonymous { fieldParent = fd }` に反転している。あわせて setSlice/setMap 内の一時的な fieldData 生成からも Parent の設定を削除した。",
+    "why": "コミットメッセージ「remove parent field」の通り、fieldDataからParentフィールドを取り除くのが直接の目的。おそらく直前のコミット(seq17)でフルネームの解決を生成時のmakaNameに一本化したことで、fieldDataが実行時に親を遡って参照する必要がなくなり、Parentフィールド自体が不要になったための整理と考えられる。",
+    "highlights": [
+      { "file": "aconfig.go", "note": "Anonymous(embedded struct)判定の条件が反転しているため、挙動が変わっていないか読む際は注意が必要な箇所" }
+    ],
+    "langNotes": [
+      { "topic": "struct embedding と reflect.StructField.Anonymous", "note": "Go の struct embedding(匿名フィールド)は reflect.StructField.Anonymous で判定できる。embedded struct のフィールドは名前空間上「親を経由しない」ため、フルネームのプレフィックスを付けるかどうかの分岐にこのフラグが使われている。" }
+    ],
+    "diagram": null,
+    "evidence": "inferred",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

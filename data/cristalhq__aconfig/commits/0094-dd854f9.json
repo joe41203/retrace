@@ -1,0 +1,87 @@
+{
+  "seq": 94,
+  "sha": "dd854f991720f85284cc96c4a8c3fdd02ec84c1b",
+  "parents": [
+    "28582d5426270fa10e2bb47ebd25f00abfdd6778"
+  ],
+  "author": {
+    "name": "Yury Makarov",
+    "email": "mef4mail@gmail.com",
+    "date": "2021-02-27T18:10:21+03:00"
+  },
+  "message": "Fix for hcl (#50)",
+  "pr": {
+    "number": 50,
+    "title": "Fix for hcl",
+    "body": "",
+    "url": "https://github.com/cristalhq/aconfig/pull/50"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 12,
+    "deletions": 1
+  },
+  "files": [
+    {
+      "path": "aconfig.go",
+      "status": "M",
+      "additions": 12,
+      "deletions": 1,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/aconfig.go b/aconfig.go\nindex 3aa6c86..dcf021d 100644\n--- a/aconfig.go\n+++ b/aconfig.go\n@@ -296,7 +296,18 @@ func (l *Loader) find(actualFields map[string]interface{}, name string) (map[str\n \t\t\tactualFields[subName+\".\"+fmt.Sprint(k)] = v\n \t\t}\n \t\tdelete(actualFields, subName)\n-\n+\tcase []map[string]interface{}:\n+\t\tfor _, m := range val {\n+\t\t\tfor k, v := range m {\n+\t\t\t\tactualFields[subName+\".\"+k] = v\n+\t\t\t}\n+\t\t}\n+\tcase []map[interface{}]interface{}:\n+\t\tfor _, m := range val {\n+\t\t\tfor k, v := range m {\n+\t\t\t\tactualFields[subName+\".\"+fmt.Sprint(k)] = v\n+\t\t\t}\n+\t\t}\n \t}\n \treturn actualFields, true\n }\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/build.yml",
+    "LICENSE",
+    "README.md",
+    "aconfig.go",
+    "aconfig_test.go",
+    "aconfigdotenv/dotenv.go",
+    "aconfigdotenv/dotenv_test.go",
+    "aconfigdotenv/go.mod",
+    "aconfigdotenv/go.sum",
+    "aconfighcl/go.mod",
+    "aconfighcl/go.sum",
+    "aconfighcl/hcl.go",
+    "aconfighcl/hcl_test.go",
+    "aconfigtoml/go.mod",
+    "aconfigtoml/go.sum",
+    "aconfigtoml/toml.go",
+    "aconfigtoml/toml_test.go",
+    "aconfigyaml/go.mod",
+    "aconfigyaml/go.sum",
+    "aconfigyaml/yaml.go",
+    "aconfigyaml/yaml_test.go",
+    "doc.go",
+    "example_test.go",
+    "go.mod",
+    "reflection.go",
+    "testdata/bad_config.json",
+    "testdata/config.json",
+    "testdata/config1.json",
+    "testdata/config2.json",
+    "testdata/config3.json",
+    "testdata/example_config.json",
+    "testdata/unknown.ext",
+    "testdata/unknown_fields.json",
+    "testfile.json",
+    "utils.go",
+    "utils_test.go"
+  ],
+  "explanation": {
+    "what": "aconfig.go の find() に []map[string]interface{} と []map[interface{}]interface{} の case を追加し、それぞれの要素の map を actualFields にフラット化するようにした。",
+    "why": "PR タイトルは「Fix for hcl」で、直前の #49(seq93)で導入した find() が HCL decoder が返す \"配列に包まれた map\"(HCL の構文上、ネストしたブロックが []map[string]interface{} として出てくることがある)を処理できていなかったための修正と見られる。ただし本コミットの diff だけでは HCL 側の呼び出し経路までは確認できないため、動機はおそらく HCL 特有のデータ形状への対応。",
+    "highlights": [
+      { "file": "aconfig.go", "note": "find() のswitchに []map[string]interface{} / []map[interface{}]interface{} が追加された" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "inferred",
+    "refs": [{ "type": "pr", "number": 50, "url": "https://github.com/cristalhq/aconfig/pull/50" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

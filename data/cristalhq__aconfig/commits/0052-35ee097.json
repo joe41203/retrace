@@ -1,0 +1,87 @@
+{
+  "seq": 52,
+  "sha": "35ee09775b049ce533b1823d64154f1ce94735f6",
+  "parents": [
+    "0cdb12df1f8f16f5ecc5668cf08ea88f83b33d6d"
+  ],
+  "author": {
+    "name": "Oleg Kovalov",
+    "email": "iamolegkovalov@gmail.com",
+    "date": "2020-07-30T22:49:05+02:00"
+  },
+  "message": "add anonymous types test",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 4,
+    "additions": 14,
+    "deletions": 0
+  },
+  "files": [
+    {
+      "path": "aconfig_test.go",
+      "status": "M",
+      "additions": 5,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "testdata/test_config_def.json",
+      "status": "M",
+      "additions": 3,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "testdata/test_config_env.json",
+      "status": "M",
+      "additions": 3,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "testdata/test_config_flag.json",
+      "status": "M",
+      "additions": 3,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/aconfig_test.go b/aconfig_test.go\nindex 6116122..17e37a3 100644\n--- a/aconfig_test.go\n+++ b/aconfig_test.go\n@@ -19,6 +19,9 @@ type TestConfig struct {\n \tHTTPPort int    `default:\"8080\"`\n \tParam    int    // no default tag, so default value\n \tSub      SubConfig\n+\tAnon     struct {\n+\t\tIsAnon bool `default:\"true\"`\n+\t}\n \n \tSlice []int          `default:\"1,2,3\" usage:\"just pass elements\"`\n \tMap1  map[string]int `default:\"a:1,b:2,c:3\"`\n@@ -220,6 +223,7 @@ func TestLoadEnv(t *testing.T) {\n \tsetEnv(t, \"TST_INT\", \"121\")\n \tsetEnv(t, \"TST_HTTPPORT\", \"3000\")\n \tsetEnv(t, \"TST_SUB_FLOAT\", \"222.333\")\n+\tsetEnv(t, \"TST_ANON_ISANON\", \"true\")\n \tsetEnv(t, \"TST_EM\", \"em-env\")\n \tdefer os.Clearenv()\n \n@@ -257,6 +261,7 @@ func TestLoadFlag(t *testing.T) {\n \t\t\"-tst.int=1001\",\n \t\t\"-tst.httpport=30000\",\n \t\t\"-tst.sub.float=123.321\",\n+\t\t\"-tst.anon.isanon=true\",\n \t\t\"-tst.em=em-flag\",\n \t}\n \ndiff --git a/testdata/test_config_def.json b/testdata/test_config_def.json\nindex 638fee6..bf7249b 100644\n--- a/testdata/test_config_def.json\n+++ b/testdata/test_config_def.json\n@@ -5,6 +5,9 @@\n   \"Sub\": {\n     \"Float\": 123.123\n   },\n+  \"Anon\": {\n+    \"IsAnon\": true\n+  },\n   \"Slice\": [\n     1,\n     2,\ndiff --git a/testdata/test_config_env.json b/testdata/test_config_env.json\nindex 45abb76..ac315e9 100644\n--- a/testdata/test_config_env.json\n+++ b/testdata/test_config_env.json\n@@ -5,6 +5,9 @@\n   \"Sub\": {\n     \"Float\": 222.333\n   },\n+  \"Anon\": {\n+    \"IsAnon\": true\n+  },\n   \"PtrSub\": {\n     \"Float\": 444.555\n   },\ndiff --git a/testdata/test_config_flag.json b/testdata/test_config_flag.json\nindex 16045e3..012105d 100644\n--- a/testdata/test_config_flag.json\n+++ b/testdata/test_config_flag.json\n@@ -5,6 +5,9 @@\n   \"Sub\": {\n     \"Float\": 123.321\n   },\n+  \"Anon\": {\n+    \"IsAnon\": true\n+  },\n   \"PtrSub\": {\n     \"Float\": 321.123\n   },\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/build.yml",
+    "LICENSE",
+    "README.md",
+    "aconfig.go",
+    "aconfig_test.go",
+    "example_test.go",
+    "go.mod",
+    "go.sum",
+    "testdata/all_types_config.json",
+    "testdata/bad_config.json",
+    "testdata/config1.json",
+    "testdata/config1.toml",
+    "testdata/config1.yaml",
+    "testdata/example_config.json",
+    "testdata/my_duration_config.json",
+    "testdata/other_numbers_config.json",
+    "testdata/test_config_def.json",
+    "testdata/test_config_env.json",
+    "testdata/test_config_flag.json",
+    "testdata/unknown.ext"
+  ],
+  "explanation": {
+    "what": "テスト用の TestConfig にタグ付きの無名 struct フィールド(Anon)を追加し、env/flag/JSON の各ロード経路でこの匿名フィールドの値が正しく反映されることを確認するテストケースを追加した。testdata の JSON ゴールデンファイル群にも対応する Anon.IsAnon エントリを追加している。",
+    "why": "コミットメッセージの通り、フィールドの型に名前のない struct(匿名型)を config 構造体の一部として使えることを検証するためのテスト追加。既存の SubConfig のような名前付きネスト構造体だけでなく、名前をつけずにその場で書ける struct フィールドでも WalkFields や名前生成ロジックが正しく動くことをカバーしている。",
+    "highlights": [
+      { "file": "aconfig_test.go", "note": "TestConfig に Anon struct { IsAnon bool } を追加し、env/flag の期待値にも tst.anon.isanon 系を追加" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

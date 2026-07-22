@@ -1,0 +1,65 @@
+{
+  "seq": 22,
+  "sha": "e14120e063709754390144465197c52cdbe8d989",
+  "parents": [
+    "d8ca6e93c011031cb533db240ecc42753e8a5cd6"
+  ],
+  "author": {
+    "name": "Oleg Kovalov",
+    "email": "iamolegkovalov@gmail.com",
+    "date": "2020-07-23T00:09:11+02:00"
+  },
+  "message": "update readme",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 11,
+    "deletions": 9
+  },
+  "files": [
+    {
+      "path": "README.md",
+      "status": "M",
+      "additions": 11,
+      "deletions": 9,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/README.md b/README.md\nindex 92ee37a..75caf7e 100644\n--- a/README.md\n+++ b/README.md\n@@ -31,18 +31,20 @@ go get github.com/cristalhq/aconfig\n \n ```go\n type MyConfig struct {\n-\tPort int `default:\"port\"`\n+\tPort int `default:\"1111\"`\n \tAuth struct {\n-\t\tUser string `default:\"admin\"`\n-\t\tPass stirng `default:\"github\"`\n+\t\tUser string `default:\"def-user\"`\n+\t\tPass string `default:\"def-pass\"`\n \t}\n }\n \n-loader := aconfig.NewLoader(aconfig.Config{\n-\tUseDefaults: true,\n-\tUseFile:     true,\n-\tUseEnv:      true,\n-\tUseFlag:     true,\n+loader := aconfig.NewLoader(aconfig.LoaderConfig{\n+\t// skip some steps, if you want to :)\n+    // SkipDefaults: true,\n+    // SkipFile: true,\n+    // SkipEnv:  true,\n+    // SkipFlag: true,\n+\n \tFiles:       []string{\"file.json\", \"ouch.yaml\"},\n \tFlagPrefix:  \"app\",\n \tEnvPrefix:   \"APP\",\n@@ -61,7 +63,7 @@ if err := loader.Load(&cfg); err != nil {\n // 4. and command-line flags if they are\n ```\n \n-Also see examples: TODO\n+Also see examples: [this above](https://github.com/cristalhq/aconfig/blob/master/example_test.go)\n \n ## Documentation\n \n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/build.yml",
+    "LICENSE",
+    "README.md",
+    "aconfig.go",
+    "aconfig_test.go",
+    "example_test.go",
+    "go.mod",
+    "go.sum",
+    "testdata/all_types_config.json",
+    "testdata/bad_config.json",
+    "testdata/config1.json",
+    "testdata/config1.toml",
+    "testdata/config1.yaml",
+    "testdata/example_config.json",
+    "testdata/my_duration_config.json",
+    "testdata/test_config_def.json",
+    "testdata/test_config_env.json",
+    "testdata/test_config_flag.json",
+    "testdata/unknown.ext"
+  ],
+  "explanation": {
+    "what": "README のコード例を直前コミットで追加した実際の型定義・API名(LoaderConfig、Skip* フラグ)に合わせて修正した。誤字(stirng→string)も直し、「Also see examples: TODO」だったリンクを実際に追加した example_test.go への GitHub リンクに差し替えている。",
+    "why": "おそらく直前コミット(add examples)で example_test.go を追加した際に、README の例が旧 API(aconfig.Config、UseDefaults 等)のまま残っていたのに気付き、実装と一致させる後始末をしたと考えられる。",
+    "highlights": [
+      { "file": "README.md", "note": "Config→LoaderConfig、UseXxx→SkipXxx への呼称変更が README にも反映されている" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "inferred",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

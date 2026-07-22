@@ -1,0 +1,109 @@
+{
+  "seq": 100,
+  "sha": "619764696fd941d8640c12802ee8f949893cfe6f",
+  "parents": [
+    "4dd7fbf89b5df092c0bc6c1144a3673a9c2bac37"
+  ],
+  "author": {
+    "name": "Oleg Kovalov",
+    "email": "oleg@hey.com",
+    "date": "2021-02-27T22:34:46+01:00"
+  },
+  "message": "configure env and flag delims (#56)",
+  "pr": {
+    "number": 56,
+    "title": "configure env and flag delims",
+    "body": "",
+    "url": "https://github.com/cristalhq/aconfig/pull/56"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 4,
+    "additions": 27,
+    "deletions": 19
+  },
+  "files": [
+    {
+      "path": "aconfig.go",
+      "status": "M",
+      "additions": 12,
+      "deletions": 4,
+      "binary": false
+    },
+    {
+      "path": "aconfig_test.go",
+      "status": "M",
+      "additions": 10,
+      "deletions": 10,
+      "binary": false
+    },
+    {
+      "path": "example_test.go",
+      "status": "M",
+      "additions": 3,
+      "deletions": 3,
+      "binary": false
+    },
+    {
+      "path": "reflection.go",
+      "status": "M",
+      "additions": 2,
+      "deletions": 2,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/aconfig.go b/aconfig.go\nindex 2d4c5c7..7e55154 100644\n--- a/aconfig.go\n+++ b/aconfig.go\n@@ -37,6 +37,9 @@ type Config struct {\n \tEnvPrefix  string // EnvPrefix for environment variables.\n \tFlagPrefix string // FlagPrefix for flag parameters.\n \n+\tEnvDelimiter  string // EnvDelimiter for environment variables. If not set - default is \".\".\n+\tFlagDelimiter string // FlagDelimiter for flag parameters. If not set - default is \".\".\n+\n \t// AllFieldsRequired set to true will fail config loading if one of the fields was not set.\n \t// File, environment, flag must provide a value for the field.\n \t// If default is set and this option is enabled (or required tag is set) there will be an error.\n@@ -109,12 +112,18 @@ func LoaderFor(dst interface{}, cfg Config) *Loader {\n }\n \n func (l *Loader) init() {\n-\tif l.config.EnvPrefix != \"\" {\n-\t\tl.config.EnvPrefix += \"_\"\n+\tif l.config.EnvDelimiter == \"\" {\n+\t\tl.config.EnvDelimiter = \".\"\n+\t}\n+\tif l.config.FlagDelimiter == \"\" {\n+\t\tl.config.FlagDelimiter = \".\"\n \t}\n \n+\tif l.config.EnvPrefix != \"\" {\n+\t\tl.config.EnvPrefix += l.config.EnvDelimiter\n+\t}\n \tif l.config.FlagPrefix != \"\" {\n-\t\tl.config.FlagPrefix += \".\"\n+\t\tl.config.FlagPrefix += l.config.FlagDelimiter\n \t}\n \n \tif _, ok := l.config.FileDecoders[\".json\"]; !ok {\n@@ -365,7 +374,6 @@ func (l *Loader) loadFlags() error {\n }\n \n func (l *Loader) setField(field *fieldData, name string, values map[string]interface{}) error {\n-\tprintln(name)\n \tval, ok := values[name]\n \tif !ok {\n \t\treturn nil\ndiff --git a/aconfig_test.go b/aconfig_test.go\nindex 397d210..9aa3f8d 100644\n--- a/aconfig_test.go\n+++ b/aconfig_test.go\n@@ -297,13 +297,13 @@ func TestFileMerging(t *testing.T) {\n }\n \n func TestEnv(t *testing.T) {\n-\tsetEnv(t, \"TST_STR\", \"str-env\")\n-\tsetEnv(t, \"TST_BYTES\", \"bytes-env\")\n-\tsetEnv(t, \"TST_INT\", \"121\")\n-\tsetEnv(t, \"TST_HTTP_PORT\", \"3000\")\n-\tsetEnv(t, \"TST_SUB_FLOAT\", \"222.333\")\n-\tsetEnv(t, \"TST_ANON_IS_ANON\", \"true\")\n-\tsetEnv(t, \"TST_EM\", \"em-env\")\n+\tsetEnv(t, \"TST.STR\", \"str-env\")\n+\tsetEnv(t, \"TST.BYTES\", \"bytes-env\")\n+\tsetEnv(t, \"TST.INT\", \"121\")\n+\tsetEnv(t, \"TST.HTTP_PORT\", \"3000\")\n+\tsetEnv(t, \"TST.SUB.FLOAT\", \"222.333\")\n+\tsetEnv(t, \"TST.ANON.IS_ANON\", \"true\")\n+\tsetEnv(t, \"TST.EM\", \"em-env\")\n \tdefer os.Clearenv()\n \n \tvar cfg TestConfig\n@@ -548,7 +548,7 @@ func TestFileNotFound(t *testing.T) {\n }\n \n func TestBadEnvs(t *testing.T) {\n-\tsetEnv(t, \"TST_HTTP_PORT\", \"30a00\")\n+\tsetEnv(t, \"TST.HTTP_PORT\", \"30a00\")\n \tdefer os.Clearenv()\n \n \tloader := LoaderFor(&TestConfig{}, Config{\n@@ -600,8 +600,8 @@ func TestUnknownFields(t *testing.T) {\n }\n \n func TestUnknownEnvs(t *testing.T) {\n-\tsetEnv(t, \"TST_STR\", \"defined\")\n-\tsetEnv(t, \"TST_UNKNOWN\", \"42\")\n+\tsetEnv(t, \"TST.STR\", \"defined\")\n+\tsetEnv(t, \"TST.UNKNOWN\", \"42\")\n \tsetEnv(t, \"JUST_ENV\", \"JUST_VALUE\")\n \tdefer os.Clearenv()\n \ndiff --git a/example_test.go b/example_test.go\nindex 6239545..634eff5 100644\n--- a/example_test.go\n+++ b/example_test.go\n@@ -112,9 +112,9 @@ func Example_File() {\n // And then overwrite with environment variables.\n //\n func Example_Env() {\n-\tos.Setenv(\"EXAMPLE_HTTP_PORT\", \"3333\")\n-\tos.Setenv(\"EXAMPLE_AUTH_USER\", \"env-user\")\n-\tos.Setenv(\"EXAMPLE_AUTH_PASS\", \"env-pass\")\n+\tos.Setenv(\"EXAMPLE.HTTP_PORT\", \"3333\")\n+\tos.Setenv(\"EXAMPLE.AUTH.USER\", \"env-user\")\n+\tos.Setenv(\"EXAMPLE.AUTH.PASS\", \"env-pass\")\n \tdefer os.Clearenv()\n \n \tvar cfg MyConfig\ndiff --git a/reflection.go b/reflection.go\nindex 2bd03ed..87bb360 100644\n--- a/reflection.go\n+++ b/reflection.go\n@@ -62,9 +62,9 @@ func (f *fieldData) Name() string {\n }\n \n func (l *Loader) fullTag(f *fieldData, tag string) string {\n-\tsep := \".\"\n+\tsep := l.config.FlagDelimiter\n \tif tag == envNameTag {\n-\t\tsep = \"_\"\n+\t\tsep = l.config.EnvDelimiter\n \t}\n \tres := f.Tag(tag)\n \tfor p := f.parent; p != nil; p = p.parent {\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/build.yml",
+    "LICENSE",
+    "README.md",
+    "aconfig.go",
+    "aconfig_test.go",
+    "aconfigdotenv/dotenv.go",
+    "aconfigdotenv/dotenv_test.go",
+    "aconfigdotenv/go.mod",
+    "aconfigdotenv/go.sum",
+    "aconfighcl/go.mod",
+    "aconfighcl/go.sum",
+    "aconfighcl/hcl.go",
+    "aconfighcl/hcl_test.go",
+    "aconfigtoml/go.mod",
+    "aconfigtoml/go.sum",
+    "aconfigtoml/toml.go",
+    "aconfigtoml/toml_test.go",
+    "aconfigyaml/go.mod",
+    "aconfigyaml/go.sum",
+    "aconfigyaml/yaml.go",
+    "aconfigyaml/yaml_test.go",
+    "doc.go",
+    "example_test.go",
+    "go.mod",
+    "reflection.go",
+    "testdata/bad_config.json",
+    "testdata/config.json",
+    "testdata/config1.json",
+    "testdata/config2.json",
+    "testdata/config3.json",
+    "testdata/example_config.json",
+    "testdata/unknown.ext",
+    "testdata/unknown_fields.json",
+    "testfile.json",
+    "utils.go",
+    "utils_test.go"
+  ],
+  "explanation": {
+    "what": "Config に EnvDelimiter・FlagDelimiter フィールドを追加し、それぞれ未設定時は \".\" をデフォルトにするようにした。従来 init() で EnvPrefix には固定で \"_\" を、FlagPrefix には固定で \".\" を付与していたのを、両方とも設定可能な delimiter を使うよう変更。reflection.go の fullTag もハードコードされていた \".\"/\"_\" ではなく l.config.FlagDelimiter / l.config.EnvDelimiter を参照するようにし、テストとexampleの環境変数名区切りをアンダースコアからドットに変更した。setField 内のデバッグ用 println(name) も削除した。",
+    "why": "PR タイトルの「configure env and flag delims」の通り、環境変数名・フラグ名のネスト区切り文字をハードコードから設定可能にする変更。これにより、ネストしたstructのフィールド名を環境変数に落とすときの区切り(従来はenvが\"_\"固定、flagが\".\"固定)をライブラリ利用側で統一・変更できるようになった。",
+    "highlights": [
+      { "file": "aconfig.go", "note": "Config.EnvDelimiter / FlagDelimiter を追加し、init()でデフォルト値\".\"を設定" },
+      { "file": "reflection.go", "note": "fullTag がハードコードの区切り文字ではなくConfigの設定値を参照するように変更" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [{ "type": "pr", "number": 56, "url": "https://github.com/cristalhq/aconfig/pull/56" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

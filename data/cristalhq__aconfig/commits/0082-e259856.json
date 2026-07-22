@@ -1,0 +1,117 @@
+{
+  "seq": 82,
+  "sha": "e259856056b16d417ecc3c6bde748d0b73eb495f",
+  "parents": [
+    "ca9374b7261f9c5c6b230d39b96fdba3051754a3"
+  ],
+  "author": {
+    "name": "Oleg Kovalov",
+    "email": "oleg@hey.com",
+    "date": "2020-12-19T17:09:43+01:00"
+  },
+  "message": "file features (#38)",
+  "pr": {
+    "number": 38,
+    "title": "file features",
+    "body": "",
+    "url": "https://github.com/cristalhq/aconfig/pull/38"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 6,
+    "additions": 97,
+    "deletions": 21
+  },
+  "files": [
+    {
+      "path": "aconfig.go",
+      "status": "M",
+      "additions": 16,
+      "deletions": 3,
+      "binary": false
+    },
+    {
+      "path": "aconfig_test.go",
+      "status": "M",
+      "additions": 58,
+      "deletions": 7,
+      "binary": false
+    },
+    {
+      "path": "testdata/config.json",
+      "status": "A",
+      "additions": 12,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "testdata/config1.json",
+      "status": "M",
+      "additions": 3,
+      "deletions": 11,
+      "binary": false
+    },
+    {
+      "path": "testdata/config2.json",
+      "status": "A",
+      "additions": 3,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "testdata/config3.json",
+      "status": "A",
+      "additions": 5,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/aconfig.go b/aconfig.go\nindex 7c9ee69..205edcf 100644\n--- a/aconfig.go\n+++ b/aconfig.go\n@@ -40,9 +40,11 @@ type Config struct {\n \tAllowUnknownFlags  bool\n \tAllowUnknownEnvs   bool\n \n-\tStopOnFileError bool\n-\tFiles           []string\n-\tFileDecoders    map[string]FileDecoder\n+\tFailOnFileNotFound bool\n+\tMergeFiles         bool\n+\n+\tFiles        []string\n+\tFileDecoders map[string]FileDecoder\n }\n \n // FileDecoder is used to read config from files. See aconfig submodules.\n@@ -178,6 +180,13 @@ func (l *Loader) loadDefaults() error {\n \n func (l *Loader) loadFromFile() error {\n \tfor _, file := range l.config.Files {\n+\t\tif _, err := os.Stat(file); os.IsNotExist(err) {\n+\t\t\tif l.config.FailOnFileNotFound {\n+\t\t\t\treturn err\n+\t\t\t}\n+\t\t\tcontinue\n+\t\t}\n+\n \t\text := strings.ToLower(filepath.Ext(file))\n \t\tdecoder, ok := l.config.FileDecoders[ext]\n \t\tif !ok {\n@@ -209,6 +218,10 @@ func (l *Loader) loadFromFile() error {\n \t\t\t\treturn fmt.Errorf(\"unknown field in file %s: %s:%s\", file, env, value)\n \t\t\t}\n \t\t}\n+\n+\t\tif l.config.MergeFiles {\n+\t\t\tcontinue\n+\t\t}\n \t\treturn nil\n \t}\n \treturn nil\ndiff --git a/aconfig_test.go b/aconfig_test.go\nindex 3383f80..e624f07 100644\n--- a/aconfig_test.go\n+++ b/aconfig_test.go\n@@ -191,7 +191,7 @@ func TestJSON(t *testing.T) {\n }\n \n func TestFile(t *testing.T) {\n-\tfilepath := \"testdata/config1.json\"\n+\tfilepath := \"testdata/config.json\"\n \n \tvar cfg TestConfig\n \tloader := LoaderFor(&cfg, Config{\n@@ -225,7 +225,7 @@ func TestFile(t *testing.T) {\n }\n \n func TestFile_WithFile(t *testing.T) {\n-\tfilepath := \"testdata/config1.json\"\n+\tfilepath := \"testdata/config.json\"\n \n \tvar cfg TestConfig\n \tloader := LoaderFor(&cfg, Config{\n@@ -257,6 +257,36 @@ func TestFile_WithFile(t *testing.T) {\n \t}\n }\n \n+func TestFileMerging(t *testing.T) {\n+\tfile1 := \"testdata/config1.json\"\n+\tfile2 := \"testdata/config2.json\"\n+\tfile3 := \"testdata/config3.json\"\n+\n+\tvar cfg TestConfig\n+\tloader := LoaderFor(&cfg, Config{\n+\t\tSkipDefaults:    true,\n+\t\tSkipEnvironment: true,\n+\t\tSkipFlags:       true,\n+\t\tMergeFiles:      true,\n+\t\tFiles:           []string{file1, file2, file3},\n+\t})\n+\tif err := loader.Load(); err != nil {\n+\t\tt.Fatal(err)\n+\t}\n+\n+\twant := TestConfig{\n+\t\tStr:      \"111\",\n+\t\tHTTPPort: 222,\n+\t\tSub: SubConfig{\n+\t\t\tFloat: 333.333,\n+\t\t},\n+\t}\n+\n+\tif got := cfg; !reflect.DeepEqual(want, got) {\n+\t\tt.Fatalf(\"want %v, got %v\", want, got)\n+\t}\n+}\n+\n func TestEnv(t *testing.T) {\n \tsetEnv(t, \"TST_STR\", \"str-env\")\n \tsetEnv(t, \"TST_BYTES\", \"bytes-env\")\n@@ -470,11 +500,11 @@ func TestBadFiles(t *testing.T) {\n \n \t\tvar cfg TestConfig\n \t\tloader := LoaderFor(&cfg, Config{\n-\t\t\tSkipDefaults:    true,\n-\t\t\tSkipEnvironment: true,\n-\t\t\tSkipFlags:       true,\n-\t\t\tStopOnFileError: true,\n-\t\t\tFiles:           []string{filepath},\n+\t\t\tSkipDefaults:       true,\n+\t\t\tSkipEnvironment:    true,\n+\t\t\tSkipFlags:          true,\n+\t\t\tFailOnFileNotFound: true,\n+\t\t\tFiles:              []string{filepath},\n \t\t})\n \n \t\tif err := loader.Load(); err == nil {\n@@ -487,6 +517,27 @@ func TestBadFiles(t *testing.T) {\n \tf(\"testdata/unknown.ext\")\n }\n \n+func TestFileNotFound(t *testing.T) {\n+\tf := func(filepath string) {\n+\t\tt.Helper()\n+\n+\t\tloader := LoaderFor(&TestConfig{}, Config{\n+\t\t\tSkipDefaults:       true,\n+\t\t\tSkipEnvironment:    true,\n+\t\t\tSkipFlags:          true,\n+\t\t\tFailOnFileNotFound: false,\n+\t\t\tFiles:              []string{filepath},\n+\t\t})\n+\n+\t\tif err := loader.Load(); err != nil {\n+\t\t\tt.Fatal(err)\n+\t\t}\n+\t}\n+\n+\tf(\"testdata/config.json\")\n+\tf(\"testdata/not_found.json\")\n+}\n+\n func TestBadEnvs(t *testing.T) {\n \tsetEnv(t, \"TST_HTTP_PORT\", \"30a00\")\n \tdefer os.Clearenv()\ndiff --git a/testdata/config.json b/testdata/config.json\nnew file mode 100644\nindex 0000000..2ea5f04\n--- /dev/null\n+++ b/testdata/config.json\n@@ -0,0 +1,12 @@\n+{\n+  \"str\": \"str-json\",\n+  \"bytes\": \"Ynl0ZXMtanNvbg==\",\n+  \"int\": 101,\n+  \"http_port\": 65000,\n+  \"sub\": {\n+    \"float\": 999.111\n+  },\n+  \"anon\": {\n+    \"is_anon\": true\n+  }\n+}\ndiff --git a/testdata/config1.json b/testdata/config1.json\nindex 7cc0f0c..57aaa5a 100644\n--- a/testdata/config1.json\n+++ b/testdata/config1.json\n@@ -1,12 +1,4 @@\n {\n-  \"str\": \"str-json\",\n-  \"bytes\": \"Ynl0ZXMtanNvbg==\",\n-  \"int\": 101,\n-  \"http_port\": 65000,\n-  \"sub\": {\n-    \"float\": 999.111\n-  },\n-  \"anon\": {\n-    \"is_anon\": true\n-  }\n-}\n\\ No newline at end of file\n+  \"str\": \"111\",\n+  \"http_port\": 111\n+}\ndiff --git a/testdata/config2.json b/testdata/config2.json\nnew file mode 100644\nindex 0000000..20f28f1\n--- /dev/null\n+++ b/testdata/config2.json\n@@ -0,0 +1,3 @@\n+{\n+  \"http_port\": 222\n+}\ndiff --git a/testdata/config3.json b/testdata/config3.json\nnew file mode 100644\nindex 0000000..b1fa571\n--- /dev/null\n+++ b/testdata/config3.json\n@@ -0,0 +1,5 @@\n+{\n+  \"sub\": {\n+    \"float\": 333.333\n+  }\n+}\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/build.yml",
+    "LICENSE",
+    "README.md",
+    "aconfig.go",
+    "aconfig_test.go",
+    "aconfigdotenv/dotenv.go",
+    "aconfigdotenv/dotenv_test.go",
+    "aconfigdotenv/go.mod",
+    "aconfigdotenv/go.sum",
+    "aconfigtoml/go.mod",
+    "aconfigtoml/go.sum",
+    "aconfigtoml/toml.go",
+    "aconfigtoml/toml_test.go",
+    "aconfigyaml/go.mod",
+    "aconfigyaml/go.sum",
+    "aconfigyaml/yaml.go",
+    "aconfigyaml/yaml_test.go",
+    "example_test.go",
+    "go.mod",
+    "reflection.go",
+    "testdata/bad_config.json",
+    "testdata/config.json",
+    "testdata/config1.json",
+    "testdata/config2.json",
+    "testdata/config3.json",
+    "testdata/example_config.json",
+    "testdata/unknown.ext",
+    "testdata/with_additional_fields.json",
+    "testfile.json",
+    "utils.go",
+    "utils_test.go"
+  ],
+  "explanation": {
+    "what": "Config 構造体の StopOnFileError を FailOnFileNotFound に改名し、新たに MergeFiles を追加した。loadFromFile は各ファイルについて os.Stat でファイル存在を確認し、存在しなければ FailOnFileNotFound の値に応じてエラーを返すかスキップするようにした。MergeFiles が true の場合は1ファイル読み込んで成功しても return せず次のファイルへ continue し、複数ファイルの値をマージできるようにした。testdata/config.json・config2.json・config3.json を新設し、TestFileMerging と TestFileNotFound で検証している。",
+    "why": "おそらく従来は Files に複数ファイルを指定しても最初に読めたファイルで処理を打ち切っていたため、base 設定と環境別設定を分割してマージする(例: base.yaml + prod.yaml)使い方ができなかったことが動機と考えられる。また存在しないファイルを指定した場合の挙動(即エラーか無視か)が名前(StopOnFileError)から誤解を招きやすく、FailOnFileNotFound という意図の明確な名前に変更したとみられる。",
+    "highlights": [
+      { "file": "aconfig.go", "note": "os.Stat による存在確認と MergeFiles 分岐(continue で次ファイルへ)がこの機能の中心。" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "inferred",
+    "refs": [{ "type": "pr", "number": 38, "url": "https://github.com/cristalhq/aconfig/pull/38" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

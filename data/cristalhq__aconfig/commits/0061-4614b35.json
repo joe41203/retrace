@@ -1,0 +1,78 @@
+{
+  "seq": 61,
+  "sha": "4614b351a38c909b8a1162bf3fa3e8c00511cefb",
+  "parents": [
+    "6399e4aef7b27f7be31c45f8cfafc05667b772af"
+  ],
+  "author": {
+    "name": "Oleg Kovalov",
+    "email": "oleg@hey.com",
+    "date": "2020-09-17T12:29:04+02:00"
+  },
+  "message": "fix flags parse (#18)",
+  "pr": {
+    "number": 18,
+    "title": "fix flags parse",
+    "body": "",
+    "url": "https://github.com/cristalhq/aconfig/pull/18"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 2,
+    "deletions": 24
+  },
+  "files": [
+    {
+      "path": "aconfig.go",
+      "status": "M",
+      "additions": 2,
+      "deletions": 13,
+      "binary": false
+    },
+    {
+      "path": "aconfig_test.go",
+      "status": "M",
+      "additions": 0,
+      "deletions": 11,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/aconfig.go b/aconfig.go\nindex 5748ac7..86a04eb 100644\n--- a/aconfig.go\n+++ b/aconfig.go\n@@ -2,7 +2,6 @@ package aconfig\n \n import (\n \t\"encoding/json\"\n-\t\"errors\"\n \t\"flag\"\n \t\"fmt\"\n \t\"os\"\n@@ -43,7 +42,6 @@ type loaderConfig struct {\n \tEnvPrefix  string\n \tFlagPrefix string\n \n-\tFailOnNotParsedFlags  bool\n \tShouldStopOnFileError bool\n \tFiles                 []string\n }\n@@ -111,14 +109,6 @@ func (l *Loader) WithEnvPrefix(prefix string) *Loader {\n \treturn l\n }\n \n-// FailOnNotParsedFlags to not forget parse flags explicitly.\n-// Use `l.FlagSet().Parse(os.Args[1:])` in your code for this.\n-//\n-func (l *Loader) FailOnNotParsedFlags() *Loader {\n-\tl.config.FailOnNotParsedFlags = true\n-\treturn l\n-}\n-\n // StopOnFileError to stop configuration loading on file error.\n func (l *Loader) StopOnFileError() *Loader {\n \tl.config.ShouldStopOnFileError = true\n@@ -275,10 +265,9 @@ func (l *Loader) loadEnvironment() error {\n \n func (l *Loader) loadFlags() error {\n \tif !l.flagSet.Parsed() {\n-\t\tif l.config.FailOnNotParsedFlags {\n-\t\t\treturn errors.New(\"flags must be parsed\")\n+\t\tif err := l.flagSet.Parse(os.Args[1:]); err != nil {\n+\t\t\treturn err\n \t\t}\n-\t\treturn nil\n \t}\n \n \tactualFlags := map[string]*flag.Flag{}\ndiff --git a/aconfig_test.go b/aconfig_test.go\nindex 192a71c..18923c2 100644\n--- a/aconfig_test.go\n+++ b/aconfig_test.go\n@@ -413,17 +413,6 @@ func TestBadDefauts(t *testing.T) {\n \t}{})\n }\n \n-func TestNotParsedFlags(t *testing.T) {\n-\tloader := LoaderFor(&TestConfig{}).\n-\t\tFailOnNotParsedFlags().\n-\t\tBuild()\n-\n-\tvar cfg TestConfig\n-\tif err := loader.Load(&cfg); err == nil {\n-\t\tt.Fatal(err)\n-\t}\n-}\n-\n func TestBadFiles(t *testing.T) {\n \tf := func(filepath string) {\n \t\tt.Helper()\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/build.yml",
+    "LICENSE",
+    "README.md",
+    "aconfig.go",
+    "aconfig_test.go",
+    "example_test.go",
+    "go.mod",
+    "go.sum",
+    "testdata/all_types_config.json",
+    "testdata/bad_config.json",
+    "testdata/config1.json",
+    "testdata/config1.toml",
+    "testdata/config1.yaml",
+    "testdata/example_config.json",
+    "testdata/my_duration_config.json",
+    "testdata/other_numbers_config.json",
+    "testdata/test_config_def.json",
+    "testdata/test_config_env.json",
+    "testdata/test_config_flag.json",
+    "testdata/unknown.ext"
+  ],
+  "explanation": {
+    "what": "Loader の `FailOnNotParsedFlags` オプションとそれに対応するテストを削除し、代わりに `loadFlags` 内で `flag.FlagSet` が未パースの場合は `os.Args[1:]` を使って自動的に `Parse` するよう変更した。",
+    "why": "従来はユーザーが `l.FlagSet().Parse(os.Args[1:])` を明示的に呼ばないと `FailOnNotParsedFlags` がエラーを返す設計だったが、これは呼び出し側に余計な手順を強いていた。PR #18 のタイトル通り「フラグのパース方法を修正する」ために、明示的な呼び出しを要求するオプションごと廃止し、ライブラリ側でパース漏れを吸収する形にしたと考えられる。",
+    "highlights": [
+      { "file": "aconfig.go", "note": "loadFlags 内、未パース時に自身で flagSet.Parse(os.Args[1:]) を呼ぶよう変更された箇所" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [{ "type": "pr", "number": 18, "url": "https://github.com/cristalhq/aconfig/pull/18" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

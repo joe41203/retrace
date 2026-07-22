@@ -1,0 +1,95 @@
+{
+  "seq": 131,
+  "sha": "0d8016d665dd7a8876dba754ad17b910c24cf033",
+  "parents": [
+    "de23397e03c0b9c4072082fa4f2a050abafc1011"
+  ],
+  "author": {
+    "name": "Oleg Kovalov",
+    "email": "oleg@hey.com",
+    "date": "2021-09-06T17:58:51+02:00"
+  },
+  "message": "Fix omitempty in tags (#107)",
+  "pr": {
+    "number": 107,
+    "title": "Fix omitempty in tags",
+    "body": "",
+    "url": "https://github.com/cristalhq/aconfig/pull/107"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 21,
+    "deletions": 0
+  },
+  "files": [
+    {
+      "path": "aconfig_test.go",
+      "status": "M",
+      "additions": 18,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "reflection.go",
+      "status": "M",
+      "additions": 3,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/aconfig_test.go b/aconfig_test.go\nindex e22d413..f91002d 100644\n--- a/aconfig_test.go\n+++ b/aconfig_test.go\n@@ -167,6 +167,24 @@ func TestJSON(t *testing.T) {\n \t}\n }\n \n+func TestJSONWithOmitempty(t *testing.T) {\n+\ttype TestConfig struct {\n+\t\tAPIKey string `json:\"b,omitempty\"`\n+\t}\n+\n+\tvar cfg TestConfig\n+\tloader := LoaderFor(&cfg, Config{\n+\t\tSkipDefaults:       true,\n+\t\tSkipEnv:            true,\n+\t\tSkipFlags:          true,\n+\t\tAllowUnknownFields: true,\n+\t\tFiles:              []string{createTestFile(t)},\n+\t})\n+\tif err := loader.Load(); err != nil {\n+\t\tt.Fatal(err)\n+\t}\n+}\n+\n func TestCustomFile(t *testing.T) {\n \tfilepath := createTestFile(t, \"custom.config\")\n \ndiff --git a/reflection.go b/reflection.go\nindex 891a207..07c6b97 100644\n--- a/reflection.go\n+++ b/reflection.go\n@@ -84,6 +84,9 @@ func (l *Loader) fullTag(prefix string, f *fieldData, tag string) string {\n \tif before, _, ok := cut(res, \",exact\"); ok {\n \t\treturn before\n \t}\n+\tif before, _, ok := cut(res, \",omitempty\"); ok {\n+\t\treturn before\n+\t}\n \tfor p := f.parent; p != nil; p = p.parent {\n \t\tif p.Tag(tag) != \"-\" {\n \t\t\tres = p.Tag(tag) + sep + res\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/build.yml",
+    "LICENSE",
+    "README.md",
+    "aconfig.go",
+    "aconfig_test.go",
+    "aconfigdotenv/dotenv.go",
+    "aconfigdotenv/dotenv_test.go",
+    "aconfigdotenv/go.mod",
+    "aconfigdotenv/go.sum",
+    "aconfighcl/go.mod",
+    "aconfighcl/go.sum",
+    "aconfighcl/hcl.go",
+    "aconfighcl/hcl_test.go",
+    "aconfigtoml/go.mod",
+    "aconfigtoml/go.sum",
+    "aconfigtoml/toml.go",
+    "aconfigtoml/toml_test.go",
+    "aconfigyaml/go.mod",
+    "aconfigyaml/go.sum",
+    "aconfigyaml/yaml.go",
+    "aconfigyaml/yaml_test.go",
+    "doc.go",
+    "example_test.go",
+    "go.mod",
+    "reflection.go",
+    "testdata/bad_config.json",
+    "testdata/complex.json",
+    "testdata/config.json",
+    "testdata/config1.json",
+    "testdata/config2.json",
+    "testdata/config3.json",
+    "testdata/example_config.json",
+    "testdata/toy.json",
+    "testdata/unknown_fields.json",
+    "utils.go",
+    "utils_test.go"
+  ],
+  "explanation": {
+    "what": "reflection.go の fullTag で、タグ値から `,exact` を取り除く処理と同様に `,omitempty` サフィックスも取り除くようにした。あわせて aconfig_test.go に omitempty 付きタグを持つ構造体を JSON ファイルから読み込む TestJSONWithOmitempty を追加している。",
+    "why": "PR タイトルの通り、struct タグに `json:\"b,omitempty\"` のような omitempty 指定があると、aconfig がこの修飾子込みの文字列をそのままフィールド名として扱ってしまい、値の対応付けが壊れる不具合を修正するもの。`,exact` と同じ cut() パターンで対処しており、既存のタグパース処理に一貫した形で修飾子除去を追加している。",
+    "highlights": [
+      { "file": "reflection.go", "note": "fullTag() で `,omitempty` を cut() で切り落とす2行の追加が本質的な修正" },
+      { "file": "aconfig_test.go", "note": "TestJSONWithOmitempty が omitempty 付きタグでの読み込みを再現・検証する回帰テスト" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [{ "type": "pr", "number": 107, "url": "https://github.com/cristalhq/aconfig/pull/107" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

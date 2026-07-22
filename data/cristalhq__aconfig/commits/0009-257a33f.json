@@ -1,0 +1,63 @@
+{
+  "seq": 9,
+  "sha": "257a33f013c5b6b248d34027c0e667b56b2c8f93",
+  "parents": [
+    "afb4c42280fb5e29806aeba649d2bab0e227b2c5"
+  ],
+  "author": {
+    "name": "Oleg Kovalov",
+    "email": "iamolegkovalov@gmail.com",
+    "date": "2020-07-22T12:06:36+02:00"
+  },
+  "message": "test cleanups",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 38,
+    "deletions": 17
+  },
+  "files": [
+    {
+      "path": "aconfig_test.go",
+      "status": "M",
+      "additions": 38,
+      "deletions": 17,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/aconfig_test.go b/aconfig_test.go\nindex 2a61f1a..27447c8 100644\n--- a/aconfig_test.go\n+++ b/aconfig_test.go\n@@ -4,8 +4,13 @@ import (\n \t\"encoding/json\"\n \t\"flag\"\n \t\"os\"\n+\t\"path/filepath\"\n+\t\"strings\"\n \t\"testing\"\n \t\"time\"\n+\n+\t\"github.com/BurntSushi/toml\"\n+\t\"gopkg.in/yaml.v2\"\n )\n \n type TestConfig struct {\n@@ -76,6 +81,7 @@ func TestLoadDefault_AllTypesConfig(t *testing.T) {\n \t\tt.Fatalf(\"want %v, got %v\", want, got)\n \t}\n }\n+\n func TestLoadDefault_DurationConfig(t *testing.T) {\n \tloader := NewLoader(LoaderConfig{\n \t\tSkipFile: true,\n@@ -95,23 +101,30 @@ func TestLoadDefault_DurationConfig(t *testing.T) {\n }\n \n func TestLoadFile(t *testing.T) {\n-\tfilepath := \"testdata/config1.json\"\n-\tloader := NewLoader(LoaderConfig{\n-\t\tSkipDefaults: true,\n-\t\tSkipEnv:      true,\n-\t\tSkipFlag:     true,\n-\t\tFiles:        []string{filepath},\n-\t})\n-\tvar cfg, want TestConfig\n-\tif err := loader.Load(&cfg); err != nil {\n-\t\tt.Fatal(err)\n+\tf := func(filepath string) {\n+\t\tt.Helper()\n+\n+\t\tloader := NewLoader(LoaderConfig{\n+\t\t\tSkipDefaults: true,\n+\t\t\tSkipEnv:      true,\n+\t\t\tSkipFlag:     true,\n+\t\t\tFiles:        []string{filepath},\n+\t\t})\n+\t\tvar cfg, want TestConfig\n+\t\tif err := loader.Load(&cfg); err != nil {\n+\t\t\tt.Fatal(err)\n+\t\t}\n+\n+\t\tloadFile(t, filepath, &want)\n+\n+\t\tif got := cfg; got != want {\n+\t\t\tt.Fatalf(\"want %v, got %v\", want, got)\n+\t\t}\n \t}\n \n-\tloadFile(t, filepath, &want)\n-\n-\tif got := cfg; got != want {\n-\t\tt.Fatalf(\"want %v, got %v\", want, got)\n-\t}\n+\tf(\"testdata/config1.json\")\n+\tf(\"testdata/config1.yaml\")\n+\tf(\"testdata/config1.toml\")\n }\n \n func TestLoadEnv(t *testing.T) {\n@@ -149,7 +162,6 @@ func TestLoadFlag(t *testing.T) {\n \tsetFlag(\"tst.sub.float\", \"123.321\")\n \tsetFlag(\"tst.ptrsub.float\", \"321.123\")\n \tsetFlag(\"tst.em\", \"em-flag\")\n-\tflag.Parse()\n \n \tloader := NewLoader(LoaderConfig{\n \t\tSkipDefaults: true,\n@@ -176,7 +188,16 @@ func loadFile(t *testing.T, file string, dst interface{}) {\n \tif err != nil {\n \t\tt.Fatal(err)\n \t}\n-\tif err := json.NewDecoder(f).Decode(dst); err != nil {\n+\text := strings.ToLower(filepath.Ext(file))\n+\tswitch ext {\n+\tcase \".yaml\", \".yml\":\n+\t\terr = yaml.NewDecoder(f).Decode(dst)\n+\tcase \".json\":\n+\t\terr = json.NewDecoder(f).Decode(dst)\n+\tcase \".toml\":\n+\t\t_, err = toml.DecodeReader(f, dst)\n+\t}\n+\tif err != nil {\n \t\tt.Fatal(err)\n \t}\n }\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/build.yml",
+    "LICENSE",
+    "README.md",
+    "aconfig.go",
+    "aconfig_test.go",
+    "go.mod",
+    "go.sum",
+    "testdata/all_types_config.json",
+    "testdata/config1.json",
+    "testdata/config1.toml",
+    "testdata/config1.yaml",
+    "testdata/my_duration_config.json",
+    "testdata/test_config_env.json",
+    "testdata/test_config_flag.json",
+    "testdata/unknown.ext"
+  ],
+  "explanation": {
+    "what": "TestLoadFile を、ファイルパスを1つ受け取るクロージャ f(filepath string) にリファクタリングし、config1.json・config1.yaml・config1.toml の3つに対して同じ検証を繰り返し呼び出す形にした。loadFile ヘルパーも拡張子で分岐して yaml.NewDecoder / toml.DecodeReader / json.NewDecoder を使い分けるよう修正し、TestLoadFlag の重複した flag.Parse() 呼び出しを削除した。",
+    "why": "前のコミットで追加した config1.yaml / config1.toml を実際にテストで使うための変更。おそらく1つのテストケースを関数化して複数フォーマットに対して使い回すことで、フォーマットが増えても呼び出し1行を足すだけで済むようにする狙いだと考えられる。",
+    "highlights": [
+      { "file": "aconfig_test.go", "note": "f(filepath string) というローカルクロージャに t.Helper() を付け、複数フォーマットの検証を1つのテスト関数内で使い回している" }
+    ],
+    "langNotes": [
+      { "topic": "t.Helper()", "note": "testing.T.Helper() を呼んだ関数はテスト失敗時のスタックトレース上でスキップされ、失敗箇所として呼び出し元の行が報告される。テスト内で定義するローカルなアサーションヘルパーによく使われるイディオム。" }
+    ],
+    "diagram": null,
+    "evidence": "inferred",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

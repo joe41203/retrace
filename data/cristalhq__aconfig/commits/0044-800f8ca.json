@@ -1,0 +1,73 @@
+{
+  "seq": 44,
+  "sha": "800f8cab3b9d7b62bd81e6f47855c79ba2064177",
+  "parents": [
+    "ea967d28edd7e3b0aad5685dc2344d6ee24f765a"
+  ],
+  "author": {
+    "name": "Oleg Kovalov",
+    "email": "iamolegkovalov@gmail.com",
+    "date": "2020-07-26T21:36:06+02:00"
+  },
+  "message": "test for panics for not built loader (#9)",
+  "pr": {
+    "number": 9,
+    "title": "test for panics for not built loader",
+    "body": "",
+    "url": "https://github.com/cristalhq/aconfig/pull/9"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 28,
+    "deletions": 0
+  },
+  "files": [
+    {
+      "path": "aconfig_test.go",
+      "status": "M",
+      "additions": 28,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/aconfig_test.go b/aconfig_test.go\nindex d76c1f0..e1f6ea7 100644\n--- a/aconfig_test.go\n+++ b/aconfig_test.go\n@@ -549,6 +549,34 @@ func TestWalkFields(t *testing.T) {\n \t})\n }\n \n+func TestPanicWhenNotBuilt(t *testing.T) {\n+\tf := func(fn func()) {\n+\t\tt.Helper()\n+\n+\t\tdefer func() {\n+\t\t\tt.Helper()\n+\t\t\tif err := recover(); err == nil {\n+\t\t\t\tt.Fatal()\n+\t\t\t}\n+\t\t}()\n+\t\tfn()\n+\t}\n+\n+\t// ok to pass nils\n+\tf(func() {\n+\t\t_ = LoaderFor(nil).Load(nil)\n+\t})\n+\tf(func() {\n+\t\t_ = LoaderFor(nil).LoadWithFiles(nil, nil)\n+\t})\n+\tf(func() {\n+\t\t_ = LoaderFor(nil).Flags()\n+\t})\n+\tf(func() {\n+\t\tLoaderFor(nil).WalkFields(nil)\n+\t})\n+}\n+\n func loadFile(t *testing.T, file string, dst interface{}) {\n \tf, err := os.Open(file)\n \tif err != nil {\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/build.yml",
+    "LICENSE",
+    "README.md",
+    "aconfig.go",
+    "aconfig_test.go",
+    "example_test.go",
+    "go.mod",
+    "go.sum",
+    "testdata/all_types_config.json",
+    "testdata/bad_config.json",
+    "testdata/config1.json",
+    "testdata/config1.toml",
+    "testdata/config1.yaml",
+    "testdata/example_config.json",
+    "testdata/my_duration_config.json",
+    "testdata/other_numbers_config.json",
+    "testdata/test_config_def.json",
+    "testdata/test_config_env.json",
+    "testdata/test_config_flag.json",
+    "testdata/unknown.ext"
+  ],
+  "explanation": {
+    "what": "`TestPanicWhenNotBuilt` を追加し、`Build()` を呼ぶ前に `Load`・`LoadWithFiles`・`Flags`・`WalkFields` を呼ぶと panic することをテストで確認した。`recover()` で panic を捕まえて `err == nil` なら `t.Fatal()` するヘルパー関数 `f` を使い、4つの未Buildケースをまとめて検証している。",
+    "why": "PR本文・issue本文ともに記述はなく、コミットメッセージ \"test for panics for not built loader\" がそのまま意図を表している。直前のコミット群で WalkFields を含む複数メソッドに「未Buildならpanic」というガード処理が入っていたため、その挙動を回帰テストとして固定する目的とみられる。",
+    "highlights": [
+      { "file": "aconfig_test.go", "note": "recover() を使って複数のpanic発生メソッドをテーブル的に検証するヘルパー関数 f" }
+    ],
+    "langNotes": [
+      { "topic": "recover() によるpanicのテスト", "note": "Go の panic は defer + recover() の組み合わせで捕捉できる。ここでは t.Helper() 付きの匿名関数内で defer recover() し、recover() の戻り値が nil(=panicしなかった)なら t.Fatal() でテスト失敗にしている。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [{ "type": "pr", "number": 9, "url": "https://github.com/cristalhq/aconfig/pull/9" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

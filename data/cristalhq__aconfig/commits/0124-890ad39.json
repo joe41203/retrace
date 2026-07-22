@@ -1,0 +1,109 @@
+{
+  "seq": 124,
+  "sha": "890ad39b0a4675fdaa2786b395152415fb6472db",
+  "parents": [
+    "f17250c045f631e3004e7630ed755f3b6d7d054f"
+  ],
+  "author": {
+    "name": "Oleg Kovalov",
+    "email": "oleg@hey.com",
+    "date": "2021-05-27T20:12:45+02:00"
+  },
+  "message": "experimental support for slice of structs (#91)\n\nSigned-off-by: Oleg Kovalov <oleg@hey.com>\r",
+  "pr": {
+    "number": 91,
+    "title": "experimental support for slice of structs",
+    "body": "Signed-off-by: Oleg Kovalov <oleg@hey.com>",
+    "url": "https://github.com/cristalhq/aconfig/pull/91"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 3,
+    "additions": 147,
+    "deletions": 0
+  },
+  "files": [
+    {
+      "path": "aconfig_test.go",
+      "status": "M",
+      "additions": 59,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "reflection.go",
+      "status": "M",
+      "additions": 69,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "testdata/complex.json",
+      "status": "A",
+      "additions": 19,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/aconfig_test.go b/aconfig_test.go\nindex 97ef2a5..efb2cbf 100644\n--- a/aconfig_test.go\n+++ b/aconfig_test.go\n@@ -1296,3 +1296,62 @@ var wantConfig = func() structConfig {\n \t\t},\n \t}\n }()\n+\n+type ConfigTest struct {\n+\tVCenter ConfigVCenter `json:\"vcenter\" env:\"VCENTER\"`\n+}\n+\n+type ConfigVCenter struct {\n+\tUser        string                  `json:\"user\" env:\"USER\"`\n+\tPassword    string                  `json:\"password\" env:\"PASSWORD\"`\n+\tPort        string                  `json:\"port\" env:\"PORT\"`\n+\tDatacenters []ConfigVCenterDCRegion `json:\"datacenters\" env:\"-\"`\n+}\n+\n+type ConfigVCenterDCRegion struct {\n+\tRegion    string            `json:\"region\"`\n+\tAddresses []ConfigVCenterDC `json:\"addresses\"`\n+}\n+\n+type ConfigVCenterDC struct {\n+\tZone       string `json:\"zone\"`\n+\tAddress    string `json:\"address\"`\n+\tDatacenter string `json:\"datacenter\"`\n+}\n+\n+func TestSliceStructs(t *testing.T) {\n+\tvar cfg ConfigTest\n+\tloader := LoaderFor(&cfg, Config{\n+\t\tSkipDefaults: true,\n+\t\tSkipEnv:      true,\n+\t\tSkipFlags:    true,\n+\t\tFiles:        []string{\"testdata/complex.json\"},\n+\t})\n+\n+\tif err := loader.Load(); err != nil {\n+\t\tt.Fatal(err)\n+\t}\n+\n+\twant := ConfigTest{\n+\t\tVCenter: ConfigVCenter{\n+\t\t\tUser:     \"user-test\",\n+\t\t\tPassword: \"pass-test\",\n+\t\t\tPort:     \"8080\",\n+\t\t\tDatacenters: []ConfigVCenterDCRegion{\n+\t\t\t\t{\n+\t\t\t\t\tRegion: \"region-test\",\n+\t\t\t\t\tAddresses: []ConfigVCenterDC{\n+\t\t\t\t\t\t{\n+\t\t\t\t\t\t\tZone:       \"zone-test\",\n+\t\t\t\t\t\t\tAddress:    \"address-test\",\n+\t\t\t\t\t\t\tDatacenter: \"datacenter-test\",\n+\t\t\t\t\t\t},\n+\t\t\t\t\t},\n+\t\t\t\t},\n+\t\t\t},\n+\t\t},\n+\t}\n+\tif got := cfg; !reflect.DeepEqual(want, got) {\n+\t\tt.Fatalf(\"want %v, got %v\", want, got)\n+\t}\n+}\ndiff --git a/reflection.go b/reflection.go\nindex e93a803..7d7a3b6 100644\n--- a/reflection.go\n+++ b/reflection.go\n@@ -175,6 +175,24 @@ func (l *Loader) setFieldData(field *fieldData, value interface{}) error {\n \t\treturn l.setInterface(field, value)\n \n \tcase reflect.Slice:\n+\t\tif field.field.Type.Elem().Kind() == reflect.Struct {\n+\t\t\tv, ok := value.([]interface{})\n+\t\t\tif !ok {\n+\t\t\t\tpanic(fmt.Errorf(\"%T %v\", value, value))\n+\t\t\t}\n+\n+\t\t\tslice := reflect.MakeSlice(field.field.Type, len(v), len(v))\n+\t\t\tfor i, val := range v {\n+\t\t\t\tvv := mii(val)\n+\n+\t\t\t\tfd := l.newFieldData(reflect.StructField{}, slice.Index(i), nil)\n+\t\t\t\tif err := m2s(vv, fd.value); err != nil {\n+\t\t\t\t\treturn err\n+\t\t\t\t}\n+\t\t\t}\n+\t\t\tfield.value.Set(slice)\n+\t\t\treturn nil\n+\t\t}\n \t\treturn l.setSlice(field, sliceToString(value))\n \n \tcase reflect.Map:\n@@ -291,3 +309,54 @@ func (l *Loader) setMap(field *fieldData, value string) error {\n \tfield.value.Set(mapField)\n \treturn nil\n }\n+\n+func m2s(m map[string]interface{}, structValue reflect.Value) error {\n+\tfor name, value := range m {\n+\t\tname = strings.Title(name)\n+\t\tstructFieldValue := structValue.FieldByName(name)\n+\t\tif !structFieldValue.IsValid() {\n+\t\t\treturn fmt.Errorf(\"no such field %q in struct\", name)\n+\t\t}\n+\n+\t\tif !structFieldValue.CanSet() {\n+\t\t\treturn fmt.Errorf(\"cannot set %q field value\", name)\n+\t\t}\n+\n+\t\tval := reflect.ValueOf(value)\n+\t\tif structFieldValue.Type() != val.Type() {\n+\t\t\tif structFieldValue.Kind() == reflect.Slice && val.Kind() == reflect.Slice {\n+\t\t\t\tvals := value.([]interface{})\n+\t\t\t\tslice := reflect.MakeSlice(structFieldValue.Type(), len(vals), len(vals))\n+\t\t\t\tfor i := 0; i < len(vals); i++ {\n+\t\t\t\t\ta := mii(vals[i])\n+\t\t\t\t\tb := slice.Index(i)\n+\t\t\t\t\tif err := m2s(a, b); err != nil {\n+\t\t\t\t\t\treturn err\n+\t\t\t\t\t}\n+\t\t\t\t}\n+\t\t\t\tstructFieldValue.Set(slice)\n+\t\t\t\tcontinue\n+\t\t\t} else {\n+\t\t\t\treturn fmt.Errorf(\"provided value type do not match struct field type (%v and %v)\", structFieldValue.Type(), val.Type())\n+\t\t\t}\n+\t\t}\n+\n+\t\tstructFieldValue.Set(val)\n+\t}\n+\treturn nil\n+}\n+\n+func mii(m interface{}) map[string]interface{} {\n+\tswitch m := m.(type) {\n+\tcase map[string]interface{}:\n+\t\treturn m\n+\tcase map[interface{}]interface{}:\n+\t\tres := map[string]interface{}{}\n+\t\tfor k, v := range m {\n+\t\t\tres[k.(string)] = v\n+\t\t}\n+\t\treturn res\n+\tdefault:\n+\t\tpanic(fmt.Sprintf(\"%T %v\", m, m))\n+\t}\n+}\ndiff --git a/testdata/complex.json b/testdata/complex.json\nnew file mode 100644\nindex 0000000..f7af7eb\n--- /dev/null\n+++ b/testdata/complex.json\n@@ -0,0 +1,19 @@\n+{\n+  \"vcenter\": {\n+    \"user\": \"user-test\",\n+    \"password\": \"pass-test\",\n+    \"port\": 8080,\n+    \"datacenters\": [\n+      {\n+        \"region\": \"region-test\",\n+        \"addresses\": [\n+          {\n+            \"zone\": \"zone-test\",\n+            \"address\": \"address-test\",\n+            \"datacenter\": \"datacenter-test\"\n+          }\n+        ]\n+      }\n+    ]\n+  }\n+}\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/build.yml",
+    "LICENSE",
+    "README.md",
+    "aconfig.go",
+    "aconfig_test.go",
+    "aconfigdotenv/dotenv.go",
+    "aconfigdotenv/dotenv_test.go",
+    "aconfigdotenv/go.mod",
+    "aconfigdotenv/go.sum",
+    "aconfighcl/go.mod",
+    "aconfighcl/go.sum",
+    "aconfighcl/hcl.go",
+    "aconfighcl/hcl_test.go",
+    "aconfigtoml/go.mod",
+    "aconfigtoml/go.sum",
+    "aconfigtoml/toml.go",
+    "aconfigtoml/toml_test.go",
+    "aconfigyaml/go.mod",
+    "aconfigyaml/go.sum",
+    "aconfigyaml/yaml.go",
+    "aconfigyaml/yaml_test.go",
+    "doc.go",
+    "example_test.go",
+    "go.mod",
+    "reflection.go",
+    "testdata/bad_config.json",
+    "testdata/complex.json",
+    "testdata/config.json",
+    "testdata/config1.json",
+    "testdata/config2.json",
+    "testdata/config3.json",
+    "testdata/example_config.json",
+    "testdata/unknown_fields.json",
+    "utils.go",
+    "utils_test.go"
+  ],
+  "explanation": {
+    "what": "reflection.go の setFieldData に、slice の要素種別が struct のケースを分岐追加した。JSON デコード後の value が []interface{} であることを前提に、reflect.MakeSlice で出力先スライスを確保し、各要素を新設の m2s(map to struct)関数で構造体にマッピングする。m2s は map[string]interface{} のキーを strings.Title で先頭大文字化してフィールド名と突き合わせ、ネストした slice of struct にも再帰的に対応する。mii(map interface to interface)というヘルパーで JSON/YAML 系デコーダが返す map[string]interface{} と map[interface{}]interface{} の差異も吸収している。テストは vcenter→datacenters→addresses という3階層ネストの JSON を complex.json として追加している。",
+    "why": "コミットメッセージ・PR タイトルが \"experimental support for slice of structs\" であり、それ以上の背景説明は無い。これまで aconfig は slice を文字列区切りとしてしか扱えなかったが、ファイルソース(JSON等)由来のネストした構造体スライスを直接デコードできるようにする機能追加で、experimental と明記されている点から破壊的変更の可能性を含む実験的実装だとわかる。",
+    "highlights": [
+      { "file": "reflection.go", "note": "setFieldData の reflect.Slice ケースに Elem().Kind() == reflect.Struct の分岐を追加。既存の setSlice(文字列区切り)とは別経路になる" },
+      { "file": "reflection.go", "note": "m2s は struct フィールドと slice-of-struct の両方を再帰的に埋める。panic(fmt.Sprintf(...)) で想定外の型を握りつぶさずクラッシュさせている点に注意" },
+      { "file": "testdata/complex.json", "note": "vcenter.datacenters[].addresses[] という3階層ネストが実際のテストケース" }
+    ],
+    "langNotes": [
+      { "topic": "reflect.MakeSlice / Value.Index", "note": "reflect.MakeSlice(type, len, cap) で実行時に型情報からスライスを新規生成し、Index(i) で要素の reflect.Value を取得して個別に埋める。Go の reflect パッケージで動的にコレクションを組み立てる典型パターン。" },
+      { "topic": "strings.Title", "note": "文字列の先頭を大文字化する関数(Go 1.18 で非推奨化されたが本コミット当時は現役)。JSON の小文字キー \"region\" を構造体フィールド名 \"Region\" に変換するのに使っている。" },
+      { "topic": "map[interface{}]interface{} と map[string]interface{}", "note": "YAML デコーダ(yaml.v2 等)はネストしたマップを map[interface{}]interface{} で返すことがあり、JSON の map[string]interface{} と型が異なる。mii 関数はこの違いを吸収して呼び出し側を単純化している。" }
+    ],
+    "diagram": {
+      "mermaid": "flowchart TD\n  A[\"JSON file decode\"] --> B[\"value: []interface{}\"]\n  B --> C[\"setFieldData: slice of struct 判定\"]\n  C --> D[\"reflect.MakeSlice で出力スライス確保\"]\n  D --> E[\"各要素を mii() で map[string]interface{} に正規化\"]\n  E --> F[\"m2s() でフィールド名突き合わせして代入\"]\n  F --> G{\"フィールド値がさらに slice of struct?\"}\n  G -- \"yes\" --> E\n  G -- \"no\" --> H[\"structFieldValue.Set(val)\"]",
+      "caption": "slice of struct を再帰的にデコードする m2s の処理フロー"
+    },
+    "evidence": "message",
+    "refs": [{ "type": "pr", "number": 91, "url": "https://github.com/cristalhq/aconfig/pull/91" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

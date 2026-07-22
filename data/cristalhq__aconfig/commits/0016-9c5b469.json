@@ -1,0 +1,70 @@
+{
+  "seq": 16,
+  "sha": "9c5b469293112aaad412189c8f3140015a09821f",
+  "parents": [
+    "316734830dd30d4e754cc41b22266d30ac419cb4"
+  ],
+  "author": {
+    "name": "Oleg Kovalov",
+    "email": "iamolegkovalov@gmail.com",
+    "date": "2020-07-22T23:25:20+02:00"
+  },
+  "message": "more bad cases",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 21,
+    "deletions": 1
+  },
+  "files": [
+    {
+      "path": "aconfig.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "aconfig_test.go",
+      "status": "M",
+      "additions": 20,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/aconfig.go b/aconfig.go\nindex 607b2c5..9f62dd4 100644\n--- a/aconfig.go\n+++ b/aconfig.go\n@@ -247,7 +247,7 @@ func setFieldDataHelper(field *fieldData, value string) error {\n \t\treturn setMap(field, value)\n \n \tdefault:\n-\t\treturn fmt.Errorf(\"aconfig: type %q isn't supported\", kind)\n+\t\treturn fmt.Errorf(\"type kind %q isn't supported\", kind)\n \t}\n }\n \ndiff --git a/aconfig_test.go b/aconfig_test.go\nindex 81f6a8d..04aa6b6 100644\n--- a/aconfig_test.go\n+++ b/aconfig_test.go\n@@ -280,6 +280,26 @@ func TestBadDefauts(t *testing.T) {\n \tf(&struct {\n \t\tDur time.Duration `default:\"1h_2m3s\"`\n \t}{})\n+\n+\tf(&struct {\n+\t\tSlice []int `default:\"1,a,2\"`\n+\t}{})\n+\n+\tf(&struct {\n+\t\tMap map[string]int `default:\"1:a,2:2\"`\n+\t}{})\n+\n+\tf(&struct {\n+\t\tMap map[int]string `default:\"a:1\"`\n+\t}{})\n+\n+\tf(&struct {\n+\t\tMap map[int]string `default:\"a1\"`\n+\t}{})\n+\n+\tf(&struct {\n+\t\tArray [2]string `default:\"a1\"`\n+\t}{})\n }\n \n func TestBadFiles(t *testing.T) {\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/build.yml",
+    "LICENSE",
+    "README.md",
+    "aconfig.go",
+    "aconfig_test.go",
+    "go.mod",
+    "go.sum",
+    "testdata/all_types_config.json",
+    "testdata/bad_config.json",
+    "testdata/config1.json",
+    "testdata/config1.toml",
+    "testdata/config1.yaml",
+    "testdata/my_duration_config.json",
+    "testdata/test_config_def.json",
+    "testdata/test_config_env.json",
+    "testdata/test_config_flag.json",
+    "testdata/unknown.ext"
+  ],
+  "explanation": {
+    "what": "未対応の型に対するエラーメッセージから `aconfig:` プレフィックスを外して `\"type kind %q isn't supported\"` に変更し、`TestBadDefauts` にslice要素の変換失敗・map(キー/値それぞれの変換失敗)・配列型 `[2]string` が未対応であることの5ケースを追加した。",
+    "why": "コミットメッセージ「more bad cases」の通り、直前のコミットで追加したslice/map対応やswitch文ベースのディスパッチに対する異常系テストを拡充する意図と読める。エラーメッセージの変更については、おそらく `aconfig:` プレフィックスがすでに呼び出し元の `Load`(seq14)で付与されるようになったため、内部エラーでの重複を避けたのだと考えられる。",
+    "highlights": [
+      { "file": "aconfig_test.go", "note": "配列型 [2]string がまだ未対応であることを示すテストケースが追加されている" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "inferred",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

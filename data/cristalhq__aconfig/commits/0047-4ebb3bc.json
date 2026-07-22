@@ -1,0 +1,79 @@
+{
+  "seq": 47,
+  "sha": "4ebb3bc841c068265bd331804b9b17e960c2c1a7",
+  "parents": [
+    "e0f92c78ebc1bcf08919d72a8007d6b90d3440cb"
+  ],
+  "author": {
+    "name": "Oleg Kovalov",
+    "email": "iamolegkovalov@gmail.com",
+    "date": "2020-07-27T14:52:34+02:00"
+  },
+  "message": "rework files (#10)",
+  "pr": {
+    "number": 10,
+    "title": "rework files",
+    "body": "",
+    "url": "https://github.com/cristalhq/aconfig/pull/10"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 22,
+    "deletions": 9
+  },
+  "files": [
+    {
+      "path": "aconfig.go",
+      "status": "M",
+      "additions": 19,
+      "deletions": 7,
+      "binary": false
+    },
+    {
+      "path": "aconfig_test.go",
+      "status": "M",
+      "additions": 3,
+      "deletions": 2,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/aconfig.go b/aconfig.go\nindex 8e77121..48db1eb 100644\n--- a/aconfig.go\n+++ b/aconfig.go\n@@ -41,7 +41,8 @@ type loaderConfig struct {\n \tEnvPrefix  string\n \tFlagPrefix string\n \n-\tFiles []string\n+\tShouldStopOnFileError bool\n+\tFiles                 []string\n }\n \n // Field of the user configuration structure.\n@@ -99,6 +100,11 @@ func (l *Loader) WithEnvPrefix(prefix string) *Loader {\n \treturn l\n }\n \n+func (l *Loader) StopOnFileError() *Loader {\n+\tl.config.ShouldStopOnFileError = true\n+\treturn l\n+}\n+\n func (l *Loader) WithFlagPrefix(prefix string) *Loader {\n \tl.config.FlagPrefix = prefix\n \tif l.config.FlagPrefix != \"\" {\n@@ -157,14 +163,14 @@ func (l *Loader) Load(into interface{}) error {\n \treturn nil\n }\n \n-// LoadWithFiles configuration into a given param.\n-func (l *Loader) LoadWithFiles(into interface{}, files []string) error {\n+// LoadWithFile configuration into a given param.\n+func (l *Loader) LoadWithFile(into interface{}, file string) error {\n \tif !l.isBuilt {\n \t\tpanic(\"aconfig: you must run Build method before using the loader\")\n \t}\n \t// we need to get fields once more, 'cause `into` is new for us\n \tl.fields = getFields(into)\n-\tl.config.Files = files\n+\tl.config.Files = []string{file}\n \n \tif err := l.loadSources(into); err != nil {\n \t\treturn fmt.Errorf(\"aconfig: cannot load config: %w\", err)\n@@ -209,7 +215,10 @@ func (l *Loader) loadFromFile(dst interface{}) error {\n \tfor _, file := range l.config.Files {\n \t\tf, err := os.Open(file)\n \t\tif err != nil {\n-\t\t\treturn err\n+\t\t\tif l.config.ShouldStopOnFileError {\n+\t\t\t\treturn err\n+\t\t\t}\n+\t\t\tcontinue\n \t\t}\n \t\tdefer func() { _ = f.Close() }()\n \n@@ -224,10 +233,13 @@ func (l *Loader) loadFromFile(dst interface{}) error {\n \t\tdefault:\n \t\t\treturn fmt.Errorf(\"file format '%q' isn't supported\", ext)\n \t\t}\n-\t\tif err != nil {\n+\n+\t\tif err == nil {\n+\t\t\treturn nil\n+\t\t}\n+\t\tif l.config.ShouldStopOnFileError {\n \t\t\treturn fmt.Errorf(\"file parsing error: %w\", err)\n \t\t}\n-\t\tbreak\n \t}\n \treturn nil\n }\ndiff --git a/aconfig_test.go b/aconfig_test.go\nindex b5da4a0..240afe3 100644\n--- a/aconfig_test.go\n+++ b/aconfig_test.go\n@@ -199,7 +199,7 @@ func TestLoadFile_WithFiles(t *testing.T) {\n \t\t\tBuild()\n \n \t\tvar cfg, want TestConfig\n-\t\tif err := loader.LoadWithFiles(&cfg, []string{filepath}); err != nil {\n+\t\tif err := loader.LoadWithFile(&cfg, filepath); err != nil {\n \t\t\tt.Fatal(err)\n \t\t}\n \n@@ -400,6 +400,7 @@ func TestBadFiles(t *testing.T) {\n \t\t\tSkipDefaults().\n \t\t\tSkipEnvironment().\n \t\t\tSkipFlags().\n+\t\t\tStopOnFileError().\n \t\t\tWithFiles([]string{filepath}).\n \t\t\tBuild()\n \n@@ -572,7 +573,7 @@ func TestPanicWhenNotBuilt(t *testing.T) {\n \t\t_ = LoaderFor(nil).Load(nil)\n \t})\n \tf(func() {\n-\t\t_ = LoaderFor(nil).LoadWithFiles(nil, nil)\n+\t\t_ = LoaderFor(nil).LoadWithFile(nil, \"\")\n \t})\n \tf(func() {\n \t\t_ = LoaderFor(nil).Flags()\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/build.yml",
+    "LICENSE",
+    "README.md",
+    "aconfig.go",
+    "aconfig_test.go",
+    "example_test.go",
+    "go.mod",
+    "go.sum",
+    "testdata/all_types_config.json",
+    "testdata/bad_config.json",
+    "testdata/config1.json",
+    "testdata/config1.toml",
+    "testdata/config1.yaml",
+    "testdata/example_config.json",
+    "testdata/my_duration_config.json",
+    "testdata/other_numbers_config.json",
+    "testdata/test_config_def.json",
+    "testdata/test_config_env.json",
+    "testdata/test_config_flag.json",
+    "testdata/unknown.ext"
+  ],
+  "explanation": {
+    "what": "複数ファイルを渡す `LoadWithFiles(into, files []string)` を単一ファイル用の `LoadWithFile(into, file string)` に変更した。また `loaderConfig` に `ShouldStopOnFileError bool` を追加し、`StopOnFileError()` ビルダーメソッドで有効化できるようにした。`loadFromFile` は、ファイルオープン・パースに失敗しても `ShouldStopOnFileError` が false ならエラーを無視して次のファイルを試す挙動に変更されている。",
+    "why": "PR本文・関連issueともに記述はないが、コミットメッセージ \"rework files\" とdiffの内容から、複数ファイルを順に試して最初に読めたものを使う(パースできなければ次を試す)というフォールバック挙動に統一し、その挙動の可否を明示的にオプトインできるようにする再設計とみられる。",
+    "highlights": [
+      { "file": "aconfig.go", "note": "loadFromFile がエラー時に continue するかreturnするかを ShouldStopOnFileError で分岐" },
+      { "file": "aconfig_test.go", "note": "TestBadFiles で StopOnFileError() を明示的に付けてエラーを検出するケースに変更されている" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [{ "type": "pr", "number": 10, "url": "https://github.com/cristalhq/aconfig/pull/10" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

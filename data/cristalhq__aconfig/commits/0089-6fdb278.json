@@ -1,0 +1,89 @@
+{
+  "seq": 89,
+  "sha": "6fdb278db453dbb4354e720b08dbe35d7b1ed589",
+  "parents": [
+    "621bdbdf33719c5e0cc7ea19639f5c495124c0eb"
+  ],
+  "author": {
+    "name": "Oleg Kovalov",
+    "email": "oleg@hey.com",
+    "date": "2021-02-17T15:31:26+01:00"
+  },
+  "message": "use string builder (#45)",
+  "pr": {
+    "number": 45,
+    "title": "use string builder",
+    "body": "",
+    "url": "https://github.com/cristalhq/aconfig/pull/45"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 5,
+    "deletions": 5
+  },
+  "files": [
+    {
+      "path": "utils.go",
+      "status": "M",
+      "additions": 5,
+      "deletions": 5,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/utils.go b/utils.go\nindex 501975e..9b0889f 100644\n--- a/utils.go\n+++ b/utils.go\n@@ -70,14 +70,14 @@ func (l *Loader) makeEnvName(field reflect.StructField, words []string) string {\n }\n \n func makeParsingName(words []string) string {\n-\tname := \"\"\n+\tvar name strings.Builder\n \tfor i, w := range words {\n \t\tif i > 0 {\n-\t\t\tname += \"_\"\n+\t\t\tname.WriteByte('_')\n \t\t}\n-\t\tname += strings.ToLower(w)\n+\t\tname.WriteString(strings.ToLower(w))\n \t}\n-\treturn name\n+\treturn name.String()\n }\n \n // based on https://github.com/fatih/camelcase\n@@ -115,7 +115,7 @@ func splitNameByWords(src string) []string {\n \t\t}\n \t}\n \n-\twords := []string{}\n+\twords := make([]string, 0, len(runes))\n \tfor _, s := range runes {\n \t\tif len(s) > 0 {\n \t\t\twords = append(words, string(s))\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/build.yml",
+    "LICENSE",
+    "README.md",
+    "aconfig.go",
+    "aconfig_test.go",
+    "aconfigdotenv/dotenv.go",
+    "aconfigdotenv/dotenv_test.go",
+    "aconfigdotenv/go.mod",
+    "aconfigdotenv/go.sum",
+    "aconfighcl/go.mod",
+    "aconfighcl/go.sum",
+    "aconfighcl/hcl.go",
+    "aconfighcl/hcl_test.go",
+    "aconfigtoml/go.mod",
+    "aconfigtoml/go.sum",
+    "aconfigtoml/toml.go",
+    "aconfigtoml/toml_test.go",
+    "aconfigyaml/go.mod",
+    "aconfigyaml/go.sum",
+    "aconfigyaml/yaml.go",
+    "aconfigyaml/yaml_test.go",
+    "doc.go",
+    "example_test.go",
+    "go.mod",
+    "reflection.go",
+    "testdata/bad_config.json",
+    "testdata/config.json",
+    "testdata/config1.json",
+    "testdata/config2.json",
+    "testdata/config3.json",
+    "testdata/example_config.json",
+    "testdata/unknown.ext",
+    "testdata/unknown_fields.json",
+    "testfile.json",
+    "utils.go",
+    "utils_test.go"
+  ],
+  "explanation": {
+    "what": "utils.go の makeParsingName を、文字列の += による連結から strings.Builder(WriteByte/WriteString)を使う実装に書き換えた。あわせて splitNameByWords 内の words スライスも `[]string{}` から `make([]string, 0, len(runes))` に変更し、あらかじめ容量を確保するようにした。",
+    "why": "PR タイトルは「use string builder」のみで詳細な記載はないが、変更内容自体が動機を語っている。Go では文字列の + 連結をループ内で繰り返すと毎回新しい文字列がアロケートされるため、strings.Builder に置き換えることで無駄なメモリ確保を減らす、慣用的なパフォーマンス改善である。",
+    "highlights": [
+      { "file": "utils.go", "note": "makeParsingName が strings.Builder ベースに書き換わった箇所。splitNameByWords 側のスライス事前確保も同種の最適化。" }
+    ],
+    "langNotes": [
+      { "topic": "strings.Builder", "note": "Go で文字列を繰り返し連結する際に使う型。+= による文字列連結はイミュータブルな string の性質上そのたびに新しいメモリ確保とコピーが発生するが、Builder は内部バッファに書き込み、最後に String() で1回だけ文字列化するためアロケーション回数を減らせる。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [{ "type": "pr", "number": 45, "url": "https://github.com/cristalhq/aconfig/pull/45" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

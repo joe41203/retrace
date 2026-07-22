@@ -1,0 +1,98 @@
+{
+  "seq": 108,
+  "sha": "e21901cd63f11ce194c41a90eedff32530fdb49c",
+  "parents": [
+    "9fc7049df8b394921aea930c62775819d53c0425"
+  ],
+  "author": {
+    "name": "Oleg Kovalov",
+    "email": "oleg@hey.com",
+    "date": "2021-04-01T18:55:51+02:00"
+  },
+  "message": "config file flag (#59)",
+  "pr": {
+    "number": 59,
+    "title": "config file flag",
+    "body": "",
+    "url": "https://github.com/cristalhq/aconfig/pull/59"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 17,
+    "deletions": 40
+  },
+  "files": [
+    {
+      "path": "aconfig.go",
+      "status": "M",
+      "additions": 17,
+      "deletions": 7,
+      "binary": false
+    },
+    {
+      "path": "aconfig_test.go",
+      "status": "M",
+      "additions": 0,
+      "deletions": 33,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/aconfig.go b/aconfig.go\nindex b5a583b..bbe2e51 100644\n--- a/aconfig.go\n+++ b/aconfig.go\n@@ -69,6 +69,9 @@ type Config struct {\n \t// Easy wat to cobine base.yaml with prod.yaml\n \tMergeFiles bool\n \n+\t// FileFlag to make easier pass file with a config via flags.\n+\tFileFlag string\n+\n \t// Files from which config should be loaded.\n \tFiles []string\n \n@@ -153,6 +156,10 @@ func (l *Loader) init() {\n \t\t\tl.flagSet.String(flagName, field.Tag(defaultValueTag), field.Tag(usageTag))\n \t\t}\n \t}\n+\tif l.config.FileFlag != \"\" {\n+\t\t// TODO: should be prefixed ?\n+\t\tl.flagSet.String(l.config.FileFlag, \"\", \"config file param\")\n+\t}\n }\n \n // Flags returngs flag.FlagSet to create your own flags.\n@@ -194,18 +201,12 @@ func (l *Loader) loadConfig() error {\n \n func (l *Loader) parseFlags() error {\n \t// TODO: too simple?\n-\tif l.flagSet.Parsed() || l.config.SkipFlags {\n+\tif l.flagSet.Parsed() || l.config.SkipFlags || l.config.FileFlag == \"\" {\n \t\treturn nil\n \t}\n \treturn l.flagSet.Parse(l.config.Args)\n }\n \n-// LoadWithFile configuration into a given param.\n-func (l *Loader) LoadWithFile(file string) error {\n-\tl.config.Files = []string{file}\n-\treturn l.Load()\n-}\n-\n func (l *Loader) loadSources() error {\n \tif !l.config.SkipDefaults {\n \t\tif err := l.loadDefaults(); err != nil {\n@@ -254,6 +255,15 @@ func (l *Loader) loadDefaults() error {\n }\n \n func (l *Loader) loadFromFile() error {\n+\tif l.config.FileFlag != \"\" {\n+\t\tflag := l.flagSet.Lookup(l.config.FileFlag)\n+\t\tif flag != nil {\n+\t\t\tconfigFile := flag.Value.String()\n+\t\t\t// TODO: do not ignore l.config.Files ?\n+\t\t\tl.config.Files = []string{configFile}\n+\t\t}\n+\t}\n+\n \tfor _, file := range l.config.Files {\n \t\tif _, err := os.Stat(file); os.IsNotExist(err) {\n \t\t\tif l.config.FailOnFileNotFound {\ndiff --git a/aconfig_test.go b/aconfig_test.go\nindex 959e37d..2dd7887 100644\n--- a/aconfig_test.go\n+++ b/aconfig_test.go\n@@ -236,39 +236,6 @@ func TestFile(t *testing.T) {\n \t}\n }\n \n-func TestFile_WithFile(t *testing.T) {\n-\tfilepath := \"testdata/config.json\"\n-\n-\tvar cfg TestConfig\n-\tloader := LoaderFor(&cfg, Config{\n-\t\tSkipDefaults: true,\n-\t\tSkipEnv:      true,\n-\t\tSkipFlags:    true,\n-\t})\n-\tif err := loader.LoadWithFile(filepath); err != nil {\n-\t\tt.Fatal(err)\n-\t}\n-\n-\twant := TestConfig{\n-\t\tStr:      \"str-json\",\n-\t\tBytes:    []byte(\"Ynl0ZXMtanNvbg==\"),\n-\t\tInt:      int32Ptr(101),\n-\t\tHTTPPort: 65000,\n-\t\tSub: SubConfig{\n-\t\t\tFloat: 999.111,\n-\t\t},\n-\t\tAnon: struct {\n-\t\t\tIsAnon bool `default:\"true\"`\n-\t\t}{\n-\t\t\tIsAnon: true,\n-\t\t},\n-\t}\n-\n-\tif got := cfg; !reflect.DeepEqual(want, got) {\n-\t\tt.Fatalf(\"want %v, got %v\", want, got)\n-\t}\n-}\n-\n func TestFileMerging(t *testing.T) {\n \tfile1 := \"testdata/config1.json\"\n \tfile2 := \"testdata/config2.json\"\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/build.yml",
+    "LICENSE",
+    "README.md",
+    "aconfig.go",
+    "aconfig_test.go",
+    "aconfigdotenv/dotenv.go",
+    "aconfigdotenv/dotenv_test.go",
+    "aconfigdotenv/go.mod",
+    "aconfigdotenv/go.sum",
+    "aconfighcl/go.mod",
+    "aconfighcl/go.sum",
+    "aconfighcl/hcl.go",
+    "aconfighcl/hcl_test.go",
+    "aconfigtoml/go.mod",
+    "aconfigtoml/go.sum",
+    "aconfigtoml/toml.go",
+    "aconfigtoml/toml_test.go",
+    "aconfigyaml/go.mod",
+    "aconfigyaml/go.sum",
+    "aconfigyaml/yaml.go",
+    "aconfigyaml/yaml_test.go",
+    "doc.go",
+    "example_test.go",
+    "go.mod",
+    "reflection.go",
+    "testdata/bad_config.json",
+    "testdata/config.json",
+    "testdata/config1.json",
+    "testdata/config2.json",
+    "testdata/config3.json",
+    "testdata/example_config.json",
+    "testdata/unknown.ext",
+    "testdata/unknown_fields.json",
+    "testfile.json",
+    "utils.go",
+    "utils_test.go"
+  ],
+  "explanation": {
+    "what": "Config に FileFlag string フィールドを追加し、指定されていれば init() で flagSet.String(FileFlag, \"\", ...) として自動登録するようにした。loadFromFile() では、FileFlag が設定されていれば flagSet.Lookup で値を引き、その値1つだけを l.config.Files に上書き設定する。あわせて、この機能追加以前に存在した LoadWithFile メソッドとそのテスト TestFile_WithFile を削除している。parseFlags() の早期リターン条件にも l.config.FileFlag == \"\" を追加した。",
+    "why": "PR タイトルの \"config file flag\" が示す通り、設定ファイルのパスをコマンドライン引数(-config=path.json のような形)で渡せるようにする機能。従来の LoadWithFile(file string) は呼び出し側が直接パス文字列を渡す方式で、コマンドラインフラグ経由の指定と両立しない冗長な API だったため、FileFlag という設定項目に一本化して置き換えたとみられる。",
+    "highlights": [
+      { "file": "aconfig.go", "note": "FileFlag の登録(init)と loadFromFile での flagSet.Lookup による読み出し" }
+    ],
+    "langNotes": [
+      { "topic": "flag.FlagSet.Lookup", "note": "Go の flag パッケージは Lookup(name) で登録済みフラグの *flag.Flag を取得でき、Value.String() で現在の値を文字列として読める。ここでは FileFlag という設定名のフラグが実際にコマンドラインで指定されたかどうかを、Parse 後に Lookup 経由で確認している。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [
+      { "type": "pr", "number": 59, "url": "https://github.com/cristalhq/aconfig/pull/59" }
+    ],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

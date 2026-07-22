@@ -1,0 +1,97 @@
+{
+  "seq": 134,
+  "sha": "8b60707c20692a9cbbe035873fa103df51b69271",
+  "parents": [
+    "e04b381e6e0c2fed47890ea618dd1b48587afb14"
+  ],
+  "author": {
+    "name": "Oleg Kovalov",
+    "email": "oleg@hey.com",
+    "date": "2021-11-04T09:13:06+01:00"
+  },
+  "message": "Fix panic with empty arrays (#112)",
+  "pr": {
+    "number": 112,
+    "title": "Fix panic with empty arrays",
+    "body": "Fixes #111 ",
+    "url": "https://github.com/cristalhq/aconfig/pull/112"
+  },
+  "linkedIssues": [
+    {
+      "number": 111,
+      "title": "Panic on parsing YAML configuration with empty lists",
+      "body": "Hi,\r\n\r\nI encounter panic when a list in the YAML configuration is empty:\r\n\r\n~~~go\r\npackage config_test\r\n\r\nimport (\r\n\t\"testing\"\r\n\r\n\t\"github.com/cristalhq/aconfig\"\r\n\t\"github.com/cristalhq/aconfig/aconfigyaml\"\r\n)\r\n\r\ntype (\r\n\tResourcesConfiguration struct {\r\n\t\tResourcesA []ResourceA `yaml:\"resources_a\"`\r\n\t\tResourcesB []ResourceB `yaml:\"resources_b\"`\r\n\t}\r\n\r\n\tResourceA struct {\r\n\t\tField string `yaml:\"field\"`\r\n\t}\r\n\r\n\tResourceB struct {\r\n\t\tField int `yaml:\"field\"`\r\n\t}\r\n)\r\n\r\nfunc TestLoadResources(t *testing.T) {\r\n\tresourcesConfiguration := new(ResourcesConfiguration)\r\n\r\n\tresourcesLoader := aconfig.LoaderFor(resourcesConfiguration,\r\n\t\taconfig.Config{\r\n\t\t\tSkipFlags:          true,\r\n\t\t\tFiles:              []string{\"asset_resources.yaml\"},\r\n\t\t\tFailOnFileNotFound: true,\r\n\t\t\tFileDecoders: map[string]aconfig.FileDecoder{\r\n\t\t\t\t\".yaml\": aconfigyaml.New(),\r\n\t\t\t},\r\n\t\t})\r\n\tif err := resourcesLoader.Load(); err != nil {\r\n\t\tt.Errorf(\"failed to load resources configurations [err=%s]\", err)\r\n\t}\r\n\r\n\tt.Logf(\"%v\", *resourcesConfiguration)\r\n}\r\n~~~\r\n\r\nTest file: _asset_resources.yaml_\r\n~~~yaml\r\nresources_a:\r\n\r\nresources_b:\r\n\r\n~~~\r\n\r\nPanic:\r\n~~~sh\r\n=== RUN   TestLoadResources\r\n--- FAIL: TestLoadResources (0.00s)\r\npanic: <nil> <nil> [recovered]\r\n\tpanic: <nil> <nil>\r\n\r\ngoroutine 20 [running]:\r\ntesting.tRunner.func1.2({0x1147b60, 0xc00009e680})\r\n\t/usr/local/go/src/testing/testing.go:1209 +0x24e\r\ntesting.tRunner.func1()\r\n\t/usr/local/go/src/testing/testing.go:1212 +0x218\r\npanic({0x1147b60, 0xc00009e680})\r\n\t/usr/local/go/src/runtime/panic.go:1038 +0x215\r\ngithub.com/cristalhq/aconfig.(*Loader).setFieldData(0x11496c0, 0xc0000ce210, {0x0, 0x0})\r\n\t/Users/user/go/pkg/mod/github.com/cristalhq/aconfig@v0.16.7/reflection.go:187 +0x9a5\r\ngithub.com/cristalhq/aconfig.(*Loader).loadFile(0xc000102000, {0x116b3c9, 0x14})\r\n\t/Users/user/go/pkg/mod/github.com/cristalhq/aconfig@v0.16.7/aconfig.go:330 +0x2f1\r\ngithub.com/cristalhq/aconfig.(*Loader).loadFiles(0xc000102000)\r\n\t/Users/user/go/pkg/mod/github.com/cristalhq/aconfig@v0.16.7/aconfig.go:290 +0xea\r\ngithub.com/cristalhq/aconfig.(*Loader).loadSources(0xc000102000)\r\n\t/Users/user/go/pkg/mod/github.com/cristalhq/aconfig@v0.16.7/aconfig.go:235 +0x7f\r\ngithub.com/cristalhq/aconfig.(*Loader).loadConfig(0xc000102000)\r\n\t/Users/user/go/pkg/mod/github.com/cristalhq/aconfig@v0.16.7/aconfig.go:211 +0x65\r\ngithub.com/cristalhq/aconfig.(*Loader).Load(0x1000000)\r\n\t/Users/user/go/pkg/mod/github.com/cristalhq/aconfig@v0.16.7/aconfig.go:201 +0x76\r\ngithub.com/ic2hrmk/project/subdir/test/config_test.TestLoadResources(0xc000083860)\r\n\t/Users/user/go/src/github.com/ic2hrmk/project/subdir/test/config/load_resources_test.go:37 +0x176\r\ntesting.tRunner(0xc000083860, 0x11741d0)\r\n\t/usr/local/go/src/testing/testing.go:1259 +0x102\r\ncreated by testing.(*T).Run\r\n\t/usr/local/go/src/testing/testing.go:1306 +0x35a\r\n\r\n~~~\r\n\r\nExpected:\r\n~~~sh\r\n=== RUN   TestLoadResources\r\n    load_resources_test.go:38: {[] []}\r\n--- PASS: TestLoadResources (0.00s)\r\nPASS\r\n~~~\r\n\r\nThanks!",
+      "url": "https://github.com/cristalhq/aconfig/issues/111"
+    }
+  ],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 3,
+    "deletions": 0
+  },
+  "files": [
+    {
+      "path": "reflection.go",
+      "status": "M",
+      "additions": 3,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/reflection.go b/reflection.go\nindex f7fe2ce..7555dfc 100644\n--- a/reflection.go\n+++ b/reflection.go\n@@ -182,6 +182,9 @@ func (l *Loader) setFieldData(field *fieldData, value interface{}) error {\n \n \tcase reflect.Slice:\n \t\tif field.field.Type.Elem().Kind() == reflect.Struct {\n+\t\t\tif value == nil {\n+\t\t\t\treturn nil\n+\t\t\t}\n \t\t\tv, ok := value.([]interface{})\n \t\t\tif !ok {\n \t\t\t\tpanic(fmt.Errorf(\"%T %v\", value, value))\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/build.yml",
+    "LICENSE",
+    "README.md",
+    "aconfig.go",
+    "aconfig_test.go",
+    "aconfigdotenv/dotenv.go",
+    "aconfigdotenv/dotenv_test.go",
+    "aconfigdotenv/go.mod",
+    "aconfigdotenv/go.sum",
+    "aconfighcl/go.mod",
+    "aconfighcl/go.sum",
+    "aconfighcl/hcl.go",
+    "aconfighcl/hcl_test.go",
+    "aconfigtoml/go.mod",
+    "aconfigtoml/go.sum",
+    "aconfigtoml/toml.go",
+    "aconfigtoml/toml_test.go",
+    "aconfigyaml/go.mod",
+    "aconfigyaml/go.sum",
+    "aconfigyaml/yaml.go",
+    "aconfigyaml/yaml_test.go",
+    "doc.go",
+    "example_test.go",
+    "go.mod",
+    "reflection.go",
+    "testdata/bad_config.json",
+    "testdata/complex.json",
+    "testdata/config.json",
+    "testdata/config1.json",
+    "testdata/config2.json",
+    "testdata/config3.json",
+    "testdata/example_config.json",
+    "testdata/toy.json",
+    "testdata/unknown_fields.json",
+    "utils.go",
+    "utils_test.go"
+  ],
+  "explanation": {
+    "what": "reflection.go の setFieldData() で、フィールドが構造体スライス(reflect.Slice かつ要素が Struct)の場合に value が nil ならそのまま return nil で抜けるガード節を追加した。",
+    "why": "linkedIssues #111 に投稿された再現コードとスタックトレースの通り、YAML で空のリスト(例: `resources_a:` の後に値が無い)を構造体スライスのフィールドにマッピングしようとすると value が nil になり、それを `[]interface{}` に型アサーションする箇所で panic していた。nil の時点で早期returnすることで、空リストを「要素0件のスライス」として扱えるようにしている。",
+    "highlights": [
+      { "file": "reflection.go", "note": "value == nil の3行のガードが panic 修正の全て" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "issue",
+    "refs": [
+      { "type": "pr", "number": 112, "url": "https://github.com/cristalhq/aconfig/pull/112" },
+      { "type": "issue", "number": 111, "url": "https://github.com/cristalhq/aconfig/issues/111" }
+    ],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

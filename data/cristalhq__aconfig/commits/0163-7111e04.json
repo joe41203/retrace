@@ -1,0 +1,122 @@
+{
+  "seq": 163,
+  "sha": "7111e04773005c1271da579d77dceccd4a5f3651",
+  "parents": [
+    "b4a66c3556ebe5534f51bd8492040922a7b62da0"
+  ],
+  "author": {
+    "name": "XIE Long",
+    "email": "XIELongDragon@users.noreply.github.com",
+    "date": "2024-10-09T16:06:32+08:00"
+  },
+  "message": "Fix panic while processing nested map and slice of structures #152 (#154)",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 5,
+    "additions": 59,
+    "deletions": 19
+  },
+  "files": [
+    {
+      "path": "aconfigtoml/go.mod",
+      "status": "M",
+      "additions": 3,
+      "deletions": 3,
+      "binary": false
+    },
+    {
+      "path": "aconfigtoml/go.sum",
+      "status": "M",
+      "additions": 4,
+      "deletions": 4,
+      "binary": false
+    },
+    {
+      "path": "aconfigtoml/testdata/config.toml",
+      "status": "M",
+      "additions": 9,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "aconfigtoml/toml_test.go",
+      "status": "M",
+      "additions": 10,
+      "deletions": 2,
+      "binary": false
+    },
+    {
+      "path": "reflection.go",
+      "status": "M",
+      "additions": 33,
+      "deletions": 10,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/aconfigtoml/go.mod b/aconfigtoml/go.mod\nindex 877f82f..4572f7b 100644\n--- a/aconfigtoml/go.mod\n+++ b/aconfigtoml/go.mod\n@@ -1,8 +1,8 @@\n module github.com/cristalhq/aconfig/aconfigtoml\n \n-go 1.16\n+go 1.18\n \n require (\n-\tgithub.com/BurntSushi/toml v1.1.0\n-\tgithub.com/cristalhq/aconfig v0.17.0\n+\tgithub.com/BurntSushi/toml v1.4.0\n+\tgithub.com/cristalhq/aconfig v0.18.5\n )\ndiff --git a/aconfigtoml/go.sum b/aconfigtoml/go.sum\nindex 8e5bdae..6b6ebd9 100644\n--- a/aconfigtoml/go.sum\n+++ b/aconfigtoml/go.sum\n@@ -1,4 +1,4 @@\n-github.com/BurntSushi/toml v1.1.0 h1:ksErzDEI1khOiGPgpwuI7x2ebx/uXQNw7xJpn9Eq1+I=\n-github.com/BurntSushi/toml v1.1.0/go.mod h1:CxXYINrC8qIiEnFrOxCa7Jy5BFHlXnUU2pbicEuybxQ=\n-github.com/cristalhq/aconfig v0.17.0 h1:VYqg0YOM5yUEx0KH/VwUYF2e/PNI7dcUE66y+xEx73s=\n-github.com/cristalhq/aconfig v0.17.0/go.mod h1:NXaRp+1e6bkO4dJn+wZ71xyaihMDYPtCSvEhMTm/H3E=\n+github.com/BurntSushi/toml v1.4.0 h1:kuoIxZQy2WRRk1pttg9asf+WVv6tWQuBNVmK8+nqPr0=\n+github.com/BurntSushi/toml v1.4.0/go.mod h1:ukJfTF/6rtPPRCnwkur4qwRxa8vTRFBF0uk2lLoLwho=\n+github.com/cristalhq/aconfig v0.18.5 h1:QqXH/Gy2c4QUQJTV2BN8UAuL/rqZ3IwhvxeC8OgzquA=\n+github.com/cristalhq/aconfig v0.18.5/go.mod h1:NXaRp+1e6bkO4dJn+wZ71xyaihMDYPtCSvEhMTm/H3E=\ndiff --git a/aconfigtoml/testdata/config.toml b/aconfigtoml/testdata/config.toml\nindex c67786b..a562641 100644\n--- a/aconfigtoml/testdata/config.toml\n+++ b/aconfigtoml/testdata/config.toml\n@@ -1,2 +1,11 @@\n foo = \"value1\"\n bar = \"value2\"\n+\n+[outter]\n+  [outter.inner]\n+    [[outter.inner.t1]]\n+      a = \"a\"\n+      b = \"b\"\n+    [[outter.inner.t1]]\n+      a = \"c\"\n+      b = \"d\"\n\\ No newline at end of file\ndiff --git a/aconfigtoml/toml_test.go b/aconfigtoml/toml_test.go\nindex 30164a1..94a35c6 100644\n--- a/aconfigtoml/toml_test.go\n+++ b/aconfigtoml/toml_test.go\n@@ -15,8 +15,12 @@ var configEmbed embed.FS\n \n func TestTOMLEmbed(t *testing.T) {\n \tvar cfg struct {\n-\t\tFoo string\n-\t\tBar string\n+\t\tFoo    string\n+\t\tBar    string\n+\t\tOutter map[string]map[string][]struct {\n+\t\t\tA string\n+\t\t\tB string\n+\t\t}\n \t}\n \tloader := aconfig.LoaderFor(&cfg, aconfig.Config{\n \t\tSkipDefaults:       true,\n@@ -40,6 +44,10 @@ func TestTOMLEmbed(t *testing.T) {\n \tif cfg.Bar != \"value2\" {\n \t\tt.Fatalf(\"have: %v\", cfg.Bar)\n \t}\n+\n+\tif cfg.Outter[\"inner\"][\"t1\"][0].A != \"a\" {\n+\t\tt.Fatalf(\"have: %v\", cfg.Outter[\"inner\"][\"t1\"][0].A)\n+\t}\n }\n \n func TestTOML(t *testing.T) {\ndiff --git a/reflection.go b/reflection.go\nindex 28494f3..cfcf9b3 100644\n--- a/reflection.go\n+++ b/reflection.go\n@@ -159,9 +159,11 @@ func (l *Loader) setFieldData(field *fieldData, value interface{}) error {\n \t\treturn nil\n \t}\n \n-\tpv := field.value.Addr().Interface()\n-\tif v, ok := pv.(encoding.TextUnmarshaler); ok {\n-\t\treturn v.UnmarshalText([]byte(fmt.Sprint(value)))\n+\tif field.value.CanAddr() {\n+\t\tpv := field.value.Addr().Interface()\n+\t\tif v, ok := pv.(encoding.TextUnmarshaler); ok {\n+\t\t\treturn v.UnmarshalText([]byte(fmt.Sprint(value)))\n+\t\t}\n \t}\n \n \tswitch kind := field.value.Type().Kind(); kind {\n@@ -186,26 +188,44 @@ func (l *Loader) setFieldData(field *fieldData, value interface{}) error {\n \tcase reflect.Interface:\n \t\treturn l.setInterface(field, value)\n \n+\tcase reflect.Struct:\n+\t\tfd := l.newFieldData(reflect.StructField{}, field.value, nil)\n+\t\treturn l.m2s(mii(value), fd.value)\n+\n \tcase reflect.Slice:\n \t\tif field.field.Type.Elem().Kind() == reflect.Struct {\n \t\t\tif value == nil {\n \t\t\t\treturn nil\n \t\t\t}\n-\t\t\tv, ok := value.([]interface{})\n+\n+\t\t\tif v, ok := value.([]interface{}); ok {\n+\t\t\t\tslice := reflect.MakeSlice(field.field.Type, len(v), len(v))\n+\t\t\t\tfor i, val := range v {\n+\t\t\t\t\tvv := mii(val)\n+\n+\t\t\t\t\tfd := l.newFieldData(reflect.StructField{}, slice.Index(i), nil)\n+\t\t\t\t\tif err := l.m2s(vv, fd.value); err != nil {\n+\t\t\t\t\t\treturn err\n+\t\t\t\t\t}\n+\t\t\t\t}\n+\t\t\t\tfield.value.Set(slice)\n+\t\t\t\treturn nil\n+\t\t\t}\n+\n+\t\t\tv, ok := value.([]map[string]interface{})\n \t\t\tif !ok {\n \t\t\t\tpanic(fmt.Errorf(\"%T %v\", value, value))\n \t\t\t}\n \n \t\t\tslice := reflect.MakeSlice(field.field.Type, len(v), len(v))\n \t\t\tfor i, val := range v {\n-\t\t\t\tvv := mii(val)\n-\n \t\t\t\tfd := l.newFieldData(reflect.StructField{}, slice.Index(i), nil)\n-\t\t\t\tif err := l.m2s(vv, fd.value); err != nil {\n+\t\t\t\tif err := l.m2s(val, fd.value); err != nil {\n \t\t\t\t\treturn err\n \t\t\t\t}\n \t\t\t}\n \t\t\tfield.value.Set(slice)\n+\n \t\t\treturn nil\n \t\t}\n \t\treturn l.setSlice(field, sliceToString(value))\n@@ -223,10 +243,12 @@ func (l *Loader) setFieldData(field *fieldData, value interface{}) error {\n \t\t\t\treturn fmt.Errorf(\"incorrect map key %q: %w\", key, err)\n \t\t\t}\n \n-\t\t\tfdv := l.newSimpleFieldData(reflect.New(field.field.Type.Elem()).Elem())\n+\t\t\tfdv := l.newFieldData(reflect.StructField{}, reflect.New(field.value.Type().Elem()).Elem(), field)\n+\t\t\tfdv.field.Type = field.value.Type().Elem()\n \t\t\tif err := l.setFieldData(fdv, val); err != nil {\n \t\t\t\treturn fmt.Errorf(\"incorrect map value %q: %w\", val, err)\n \t\t\t}\n+\n \t\t\tmapp.SetMapIndex(fdk.value, fdv.value)\n \t\t}\n \t\tfield.value.Set(mapp)\n@@ -309,6 +331,7 @@ func (l *Loader) setSlice(field *fieldData, value string) error {\n \t\tval = strings.TrimSpace(val)\n \n \t\tfd := l.newFieldData(reflect.StructField{}, slice.Index(i), nil)\n+\t\tfd.field.Type = field.field.Type.Elem()\n \t\tif err := l.setFieldData(fd, val); err != nil {\n \t\t\treturn fmt.Errorf(\"incorrect slice item %q: %w\", val, err)\n \t\t}\n@@ -334,8 +357,8 @@ func (l *Loader) setMap(field *fieldData, value string) error {\n \t\t\treturn fmt.Errorf(\"incorrect map key %q: %w\", key, err)\n \t\t}\n \n-\t\tfdv := l.newSimpleFieldData(reflect.New(field.field.Type.Elem()).Elem())\n-\t\tfdv.field.Type = field.field.Type.Elem()\n+\t\tfdv := l.newFieldData(reflect.StructField{}, reflect.New(field.value.Type().Elem()).Elem(), field)\n+\t\tfdv.field.Type = field.value.Type().Elem()\n \t\tif err := l.setFieldData(fdv, val); err != nil {\n \t\t\treturn fmt.Errorf(\"incorrect map value %q: %w\", val, err)\n \t\t}\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/dependabot.yml",
+    ".github/workflows/build.yml",
+    "LICENSE",
+    "README.md",
+    "aconfig.go",
+    "aconfig_test.go",
+    "aconfigdotenv/dotenv.go",
+    "aconfigdotenv/dotenv_test.go",
+    "aconfigdotenv/go.mod",
+    "aconfigdotenv/go.sum",
+    "aconfigdotenv/testdata/config.env",
+    "aconfighcl/go.mod",
+    "aconfighcl/go.sum",
+    "aconfighcl/hcl.go",
+    "aconfighcl/hcl_test.go",
+    "aconfighcl/testdata/config.hcl",
+    "aconfigtoml/go.mod",
+    "aconfigtoml/go.sum",
+    "aconfigtoml/testdata/config.toml",
+    "aconfigtoml/toml.go",
+    "aconfigtoml/toml_test.go",
+    "aconfigyaml/go.mod",
+    "aconfigyaml/go.sum",
+    "aconfigyaml/res.yaml",
+    "aconfigyaml/testdata/config.yaml",
+    "aconfigyaml/yaml.go",
+    "aconfigyaml/yaml_test.go",
+    "doc.go",
+    "example_test.go",
+    "go.mod",
+    "go.sum",
+    "parser.go",
+    "reflection.go",
+    "testdata/bad_config.json",
+    "testdata/complex.json",
+    "testdata/config.json",
+    "testdata/config1.json",
+    "testdata/config2.json",
+    "testdata/config3.json",
+    "testdata/example_config.json",
+    "testdata/slice-struct-primitive-slice.json",
+    "testdata/toy.json",
+    "testdata/unknown_fields.json",
+    "utils.go",
+    "utils_test.go"
+  ],
+  "explanation": {
+    "what": "reflection.go の Loader.setFieldData(旧来のフラット実装)に、map の value がネストした struct になるケース(reflect.Struct 分岐の追加)と、slice の要素が []interface{} 由来の非 map 値である場合のハンドリングを追加した。あわせて TextUnmarshaler 判定前に field.value.CanAddr() のチェックを挟み、アドレス化できない reflect.Value に対して Addr() を呼んで panic するのを防いでいる。aconfigtoml のテストデータに `[[outter.inner.t1]]` という TOML のネスト配列(map の中に配列を持つ構造)を追加し、それが正しく decode できることを検証している。",
+    "why": "コミットメッセージの \"Fix panic while processing nested map and slice of structures #152\" が示す通り、map の中に struct のスライスが入るような多段ネスト構成(TOMLの `map[string]map[string][]struct{...}`)で、既存の setFieldData が値の型を決め打ちしていたために panic していた不具合の修正。setFieldData 冒頭に CanAddr チェックを足したのも、ネストを辿る過程でアドレス不可な reflect.Value(mapのvalueなど)が渡ってくるケースに対応するため。",
+    "highlights": [
+      { "file": "reflection.go", "note": "setFieldData に case reflect.Struct を追加し、map の値が struct であるケースを mii()+m2s() で処理できるようにした" },
+      { "file": "aconfigtoml/testdata/config.toml", "note": "map→map→struct のスライスというネスト構成のテストケース `[[outter.inner.t1]]` を追加" }
+    ],
+    "langNotes": [
+      { "topic": "reflect.Value.CanAddr", "note": "reflect.Value はどのように取得したかによってアドレス取得(Addr())の可否が変わる。map の値などアドレス不可なValueに対して Addr() を呼ぶと panic するため、CanAddr() での事前チェックはreflectベースのコードで安全策として頻出する。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

@@ -1,0 +1,154 @@
+{
+  "seq": 77,
+  "sha": "f57019ede8c790a05382c1cd29dad52ef3ea2532",
+  "parents": [
+    "dbd6c0e97443bd45954d205ec5f78517260c4e3c"
+  ],
+  "author": {
+    "name": "Oleg Kovalov",
+    "email": "oleg@hey.com",
+    "date": "2020-12-18T10:36:55+01:00"
+  },
+  "message": "better tests (#35)",
+  "pr": {
+    "number": 35,
+    "title": "better tests",
+    "body": "",
+    "url": "https://github.com/cristalhq/aconfig/pull/35"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 12,
+    "additions": 257,
+    "deletions": 338
+  },
+  "files": [
+    {
+      "path": "aconfig.go",
+      "status": "M",
+      "additions": 4,
+      "deletions": 6,
+      "binary": false
+    },
+    {
+      "path": "aconfig_test.go",
+      "status": "M",
+      "additions": 234,
+      "deletions": 217,
+      "binary": false
+    },
+    {
+      "path": "reflection.go",
+      "status": "M",
+      "additions": 12,
+      "deletions": 3,
+      "binary": false
+    },
+    {
+      "path": "testdata/all_types_config.json",
+      "status": "D",
+      "additions": 0,
+      "deletions": 27,
+      "binary": false
+    },
+    {
+      "path": "testdata/config1.json",
+      "status": "M",
+      "additions": 2,
+      "deletions": 2,
+      "binary": false
+    },
+    {
+      "path": "testdata/my_duration_config.json",
+      "status": "D",
+      "additions": 0,
+      "deletions": 3,
+      "binary": false
+    },
+    {
+      "path": "testdata/other_numbers_config.json",
+      "status": "D",
+      "additions": 0,
+      "deletions": 10,
+      "binary": false
+    },
+    {
+      "path": "testdata/test_config_def.json",
+      "status": "D",
+      "additions": 0,
+      "deletions": 32,
+      "binary": false
+    },
+    {
+      "path": "testdata/test_config_env.json",
+      "status": "D",
+      "additions": 0,
+      "deletions": 16,
+      "binary": false
+    },
+    {
+      "path": "testdata/test_config_flag.json",
+      "status": "D",
+      "additions": 0,
+      "deletions": 16,
+      "binary": false
+    },
+    {
+      "path": "testfile.json",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "utils.go",
+      "status": "M",
+      "additions": 4,
+      "deletions": 5,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/aconfig.go b/aconfig.go\nindex 29bfd78..22ec6b7 100644\n--- a/aconfig.go\n+++ b/aconfig.go\n@@ -67,6 +67,8 @@ type Field interface {\n \n // LoaderFor creates a new Loader based on a given configuration structure.\n func LoaderFor(dst interface{}, cfg Config) *Loader {\n+\tassertStruct(dst)\n+\n \tl := &Loader{\n \t\tdst:    dst,\n \t\tconfig: cfg,\n@@ -185,16 +187,13 @@ func (l *Loader) loadFromFile() error {\n \n \t\tfor _, field := range l.fields {\n \t\t\tname := field.fullTag(tag)\n-\t\t\t// fmt.Printf(\"search %#v\\n\", name)\n \t\t\tvalue, ok := mappedFields[name]\n \t\t\tif !ok {\n \t\t\t\tcontinue\n \t\t\t}\n \n-\t\t\tif value, ok := value.(string); ok {\n-\t\t\t\tif err := setFieldData(field, value); err != nil {\n-\t\t\t\t\treturn err\n-\t\t\t\t}\n+\t\t\tif err := setFieldData(field, fmt.Sprint(value)); err != nil {\n+\t\t\t\treturn err\n \t\t\t}\n \t\t}\n \t\treturn nil\n@@ -205,7 +204,6 @@ func (l *Loader) loadFromFile() error {\n func (l *Loader) loadEnvironment() error {\n \tfor _, field := range l.fields {\n \t\tenvName := l.config.EnvPrefix + field.fullTag(envNameTag)\n-\t\t// println(envName)\n \t\tv, ok := os.LookupEnv(envName)\n \t\tif !ok {\n \t\t\tcontinue\ndiff --git a/aconfig_test.go b/aconfig_test.go\nindex efc3d95..eb9322b 100644\n--- a/aconfig_test.go\n+++ b/aconfig_test.go\n@@ -10,59 +10,44 @@ import (\n \t\"time\"\n )\n \n-type TestConfig struct {\n-\tStr string `default:\"str-def\"`\n-\t// Bytes    []byte `default:\"bytes-def\"`\n-\tInt      *int32 `default:\"123\"`\n-\tHTTPPort int    `default:\"8080\"`\n-\tParam    int    // no default tag, so default value\n-\tSub      SubConfig\n-\tAnon     struct {\n-\t\tIsAnon bool `default:\"true\"`\n-\t}\n-\n-\tSlice []int          `default:\"1,2,3\" usage:\"just pass elements\"`\n-\tMap1  map[string]int `default:\"a:1,b:2,c:3\"`\n-\tMap2  map[int]string `default:\"1:a,2:b,3:c\"`\n-\n-\tEmbeddedConfig\n-}\n-\n-type EmbeddedConfig struct {\n-\tEm string `default:\"em-def\" usage:\"use... em...field.\"`\n-}\n-\n-type SubConfig struct {\n-\tFloat float64 `default:\"123.123\"`\n-}\n-\n-type MyDuration string\n-\n-func (m MyDuration) Duration() (time.Duration, error) {\n-\treturn time.ParseDuration(string(m))\n-}\n-\n-func TestLoadDefaults(t *testing.T) {\n+func TestDefaults(t *testing.T) {\n \tvar cfg TestConfig\n \tloader := LoaderFor(&cfg, Config{\n \t\tSkipFiles:       true,\n \t\tSkipEnvironment: true,\n \t\tSkipFlags:       true,\n \t})\n-\n \tif err := loader.Load(); err != nil {\n \t\tt.Fatal(err)\n \t}\n \n-\tvar want TestConfig\n-\tloadFile(t, \"testdata/test_config_def.json\", &want)\n+\twant := TestConfig{\n+\t\tStr:      \"str-def\",\n+\t\tBytes:    []byte(\"bytes-def\"),\n+\t\tInt:      int32Ptr(123),\n+\t\tHTTPPort: 8080,\n+\t\tSub: SubConfig{\n+\t\t\tFloat: 123.123,\n+\t\t},\n+\t\tAnon: struct {\n+\t\t\tIsAnon bool `default:\"true\"`\n+\t\t}{\n+\t\t\tIsAnon: true,\n+\t\t},\n+\t\tSlice: []int{1, 2, 3},\n+\t\tMap1:  map[string]int{\"a\": 1, \"b\": 2, \"c\": 3},\n+\t\tMap2:  map[int]string{1: \"a\", 2: \"b\", 3: \"c\"},\n+\t\tEmbeddedConfig: EmbeddedConfig{\n+\t\t\tEm: \"em-def\",\n+\t\t},\n+\t}\n \n-\tif got := cfg; !reflect.DeepEqual(got, want) {\n+\tif got := cfg; !reflect.DeepEqual(want, got) {\n \t\tt.Fatalf(\"want %v, got %v\", want, got)\n \t}\n }\n \n-func TestLoadDefault_AllTypesConfig(t *testing.T) {\n+func TestDefaults_AllTypes(t *testing.T) {\n \ttype AllTypesConfig struct {\n \t\tBool   bool   `default:\"true\"`\n \t\tString string `default:\"str\"`\n@@ -92,45 +77,37 @@ func TestLoadDefault_AllTypesConfig(t *testing.T) {\n \t\tSkipEnvironment: true,\n \t\tSkipFlags:       true,\n \t})\n-\n \tif err := loader.Load(); err != nil {\n \t\tt.Fatal(err)\n \t}\n \n-\tvar want AllTypesConfig\n-\tloadFile(t, \"testdata/all_types_config.json\", &want)\n-\n-\tif got := cfg; got != want {\n-\t\tt.Fatalf(\"want %v, got %v\", want, got)\n-\t}\n-}\n-\n-func TestLoadDefault_DurationConfig(t *testing.T) {\n-\ttype DurationConfig struct {\n-\t\tMyDur MyDuration `default:\"1h2m3s\" json:\"my_dur\"`\n-\t}\n-\n-\tvar cfg DurationConfig\n-\tloader := LoaderFor(&cfg, Config{\n-\t\tSkipFiles:       true,\n-\t\tSkipEnvironment: true,\n-\t\tSkipFlags:       true,\n-\t})\n-\n-\tif err := loader.Load(); err != nil {\n-\t\tt.Fatal(err)\n+\twant := AllTypesConfig{\n+\t\tBool:    true,\n+\t\tString:  \"str\",\n+\t\tInt:     1,\n+\t\tInt8:    12,\n+\t\tInt16:   123,\n+\t\tInt32:   13,\n+\t\tInt64:   23,\n+\t\tUint:    1234,\n+\t\tUint8:   124,\n+\t\tUint16:  134,\n+\t\tUint32:  234,\n+\t\tUint64:  24,\n+\t\tFloat32: 1234.213,\n+\t\tFloat64: 1234.234,\n+\t\tDur:     time.Hour + 2*time.Minute + 3*time.Second,\n+\t\t// TODO\n+\t\t// Time :2000-04-05 10:20:30 +0000 UTC,\n \t}\n \n-\tvar want DurationConfig\n-\tloadFile(t, \"testdata/my_duration_config.json\", &want)\n-\n \tif got := cfg; got != want {\n \t\tt.Fatalf(\"want %v, got %v\", want, got)\n \t}\n }\n \n-func TestLoadDefault_OtherNumbersConfig(t *testing.T) {\n-\ttype OtherNumbersConfig struct {\n+func TestDefaults_OtherNumberFormats(t *testing.T) {\n+\ttype OtherNumberFormats struct {\n \t\tInt    int   `default:\"0b111\"`\n \t\tInt8   int8  `default:\"0o123\"`\n \t\tInt8x2 int8  `default:\"0123\"`\n@@ -142,76 +119,57 @@ func TestLoadDefault_OtherNumbersConfig(t *testing.T) {\n \t\tUint32 uint32 `default:\"0x123\"`\n \t}\n \n-\tvar cfg OtherNumbersConfig\n+\tvar cfg OtherNumberFormats\n \tloader := LoaderFor(&cfg, Config{\n \t\tSkipFiles:       true,\n \t\tSkipEnvironment: true,\n \t\tSkipFlags:       true,\n \t})\n-\n \tif err := loader.Load(); err != nil {\n \t\tt.Fatal(err)\n \t}\n \n-\tvar want OtherNumbersConfig\n-\tloadFile(t, \"testdata/other_numbers_config.json\", &want)\n+\twant := OtherNumberFormats{\n+\t\tInt:    7,\n+\t\tInt8:   83,\n+\t\tInt8x2: 83,\n+\t\tInt16:  291,\n \n-\tif got := cfg; got != want {\n-\t\tt.Fatalf(\"want %v, got %v\", want, got)\n+\t\tUint:   7,\n+\t\tUint8:  83,\n+\t\tUint16: 83,\n+\t\tUint32: 291,\n \t}\n-}\n \n-type structY struct {\n-\tX string\n-\tZ []string\n-\tA struct {\n-\t\tI bool\n+\tif got := cfg; got != want {\n+\t\tt.Fatalf(\"want %v, got %v\", want, got)\n \t}\n }\n \n-type structA struct {\n-\tX  string  `json:\"x\"`\n-\tBB structB `json:\"B\"`\n-}\n-\n-type structB struct {\n-\tCC structC  `json:\"C\"`\n-\tDD []string `json:\"D\"`\n-}\n-\n-type structC struct {\n-\tMM string `json:\"m\"`\n-}\n-\n-type StructM struct {\n-\tM string\n-}\n-\n func TestJSON(t *testing.T) {\n-\ttype TestConfig struct {\n-\t\tA string\n-\t\tC int\n-\t\tE float64\n-\t\tB []byte\n-\t\tP *int32\n-\t\tY structY\n-\n-\t\tAA structA `json:\"A\"`\n-\t\tStructM\n+\tvar cfg structConfig\n+\tloader := LoaderFor(&cfg, Config{\n+\t\tSkipDefaults:    true,\n+\t\tSkipEnvironment: true,\n+\t\tSkipFlags:       true,\n+\t\tFileDecoders: map[string]FileDecoder{\n+\t\t\t\".json\": &jsonDecoder{},\n+\t\t},\n+\t\tFiles: []string{\"testfile.json\"},\n+\t})\n+\tif err := loader.Load(); err != nil {\n+\t\tt.Fatal(err)\n \t}\n \n-\tvar cfg, want TestConfig\n-\n-\ti := int32(42)\n-\twant = TestConfig{\n+\twant := structConfig{\n \t\tA: \"b\",\n \t\tC: 10,\n \t\tE: 123.456,\n \t\tB: []byte(\"abc\"),\n-\t\tP: &i,\n+\t\tP: int32Ptr(42),\n \t\tY: structY{\n \t\t\tX: \"y\",\n-\t\t\t// TODO: Z: []string{\"1\", \"2\", \"3\"},\n+\t\t\tZ: []int{1, 2, 3},\n \t\t},\n \t\tAA: structA{\n \t\t\tX: \"y\",\n@@ -219,84 +177,86 @@ func TestJSON(t *testing.T) {\n \t\t\t\tCC: structC{\n \t\t\t\t\tMM: \"n\",\n \t\t\t\t},\n-\t\t\t\t// TODO: DD: []string{\"x\", \"y\", \"z\"},\n+\t\t\t\tDD: []string{\"x\", \"y\", \"z\"},\n \t\t\t},\n \t\t},\n \t\tStructM: StructM{\n \t\t\tM: \"n\",\n \t\t},\n \t}\n+\tif got := cfg; !reflect.DeepEqual(want, got) {\n+\t\tt.Fatalf(\"want %v, got %v\", want, got)\n+\t}\n+}\n \n+func TestFile(t *testing.T) {\n+\tfilepath := \"testdata/config1.json\"\n+\n+\tvar cfg TestConfig\n \tloader := LoaderFor(&cfg, Config{\n \t\tSkipDefaults:    true,\n \t\tSkipEnvironment: true,\n \t\tSkipFlags:       true,\n-\t\tFileDecoders: map[string]FileDecoder{\n-\t\t\t\".json\": &jsonDecoder{},\n-\t\t},\n-\t\tFiles: []string{\"testfile.json\"},\n+\t\tFiles:           []string{filepath},\n \t})\n-\n \tif err := loader.Load(); err != nil {\n \t\tt.Fatal(err)\n \t}\n-\tif got := cfg; !reflect.DeepEqual(got, want) {\n-\t\tt.Fatalf(\"want %v, got %v\", want, got)\n-\t}\n-}\n-\n-func TestLoadFile(t *testing.T) {\n-\tf := func(filepath string) {\n-\t\tt.Helper()\n \n-\t\tvar cfg, want TestConfig\n-\t\tloader := LoaderFor(&cfg, Config{\n-\t\t\tSkipDefaults:    true,\n-\t\t\tSkipEnvironment: true,\n-\t\t\tSkipFlags:       true,\n-\t\t\tFiles:           []string{filepath},\n-\t\t})\n-\n-\t\tif err := loader.Load(); err != nil {\n-\t\t\tt.Fatal(err)\n-\t\t}\n-\n-\t\tloadFile(t, filepath, &want)\n-\n-\t\tif got := cfg; !reflect.DeepEqual(got, want) {\n-\t\t\tt.Fatalf(\"want %v, got %v\", want, got)\n-\t\t}\n+\twant := TestConfig{\n+\t\tStr:      \"str-json\",\n+\t\tBytes:    []byte(\"Ynl0ZXMtanNvbg==\"),\n+\t\tInt:      int32Ptr(101),\n+\t\tHTTPPort: 65000,\n+\t\tSub: SubConfig{\n+\t\t\tFloat: 999.111,\n+\t\t},\n+\t\tAnon: struct {\n+\t\t\tIsAnon bool `default:\"true\"`\n+\t\t}{\n+\t\t\tIsAnon: true,\n+\t\t},\n \t}\n \n-\tf(\"testdata/config1.json\")\n+\tif got := cfg; !reflect.DeepEqual(want, got) {\n+\t\tt.Fatalf(\"want %v, got %v\", want, got)\n+\t}\n }\n \n-func TestLoadFile_WithFiles(t *testing.T) {\n-\tf := func(filepath string) {\n-\t\tt.Helper()\n+func TestFile_WithFile(t *testing.T) {\n+\tfilepath := \"testdata/config1.json\"\n \n-\t\tvar cfg, want TestConfig\n-\t\tloader := LoaderFor(&cfg, Config{\n-\t\t\tSkipDefaults:    true,\n-\t\t\tSkipEnvironment: true,\n-\t\t\tSkipFlags:       true,\n-\t\t})\n-\n-\t\tif err := loader.LoadWithFile(filepath); err != nil {\n-\t\t\tt.Fatal(err)\n-\t\t}\n-\n-\t\tloadFile(t, filepath, &want)\n+\tvar cfg TestConfig\n+\tloader := LoaderFor(&cfg, Config{\n+\t\tSkipDefaults:    true,\n+\t\tSkipEnvironment: true,\n+\t\tSkipFlags:       true,\n+\t})\n+\tif err := loader.LoadWithFile(filepath); err != nil {\n+\t\tt.Fatal(err)\n+\t}\n \n-\t\tif got := cfg; !reflect.DeepEqual(got, want) {\n-\t\t\tt.Fatalf(\"want %v, got %v\", want, got)\n-\t\t}\n+\twant := TestConfig{\n+\t\tStr:      \"str-json\",\n+\t\tBytes:    []byte(\"Ynl0ZXMtanNvbg==\"),\n+\t\tInt:      int32Ptr(101),\n+\t\tHTTPPort: 65000,\n+\t\tSub: SubConfig{\n+\t\t\tFloat: 999.111,\n+\t\t},\n+\t\tAnon: struct {\n+\t\t\tIsAnon bool `default:\"true\"`\n+\t\t}{\n+\t\t\tIsAnon: true,\n+\t\t},\n \t}\n \n-\tf(\"testdata/config1.json\")\n+\tif got := cfg; !reflect.DeepEqual(want, got) {\n+\t\tt.Fatalf(\"want %v, got %v\", want, got)\n+\t}\n }\n \n-func TestLoadEnv(t *testing.T) {\n+func TestEnv(t *testing.T) {\n \tsetEnv(t, \"TST_STR\", \"str-env\")\n \tsetEnv(t, \"TST_BYTES\", \"bytes-env\")\n \tsetEnv(t, \"TST_INT\", \"121\")\n@@ -313,20 +273,34 @@ func TestLoadEnv(t *testing.T) {\n \t\tSkipFlags:    true,\n \t\tEnvPrefix:    \"TST\",\n \t})\n-\n \tif err := loader.Load(); err != nil {\n \t\tt.Fatal(err)\n \t}\n \n-\tvar want TestConfig\n-\tloadFile(t, \"testdata/test_config_env.json\", &want)\n+\twant := TestConfig{\n+\t\tStr:      \"str-env\",\n+\t\tBytes:    []byte(\"bytes-env\"),\n+\t\tInt:      int32Ptr(121),\n+\t\tHTTPPort: 3000,\n+\t\tSub: SubConfig{\n+\t\t\tFloat: 222.333,\n+\t\t},\n+\t\tAnon: struct {\n+\t\t\tIsAnon bool `default:\"true\"`\n+\t\t}{\n+\t\t\tIsAnon: true,\n+\t\t},\n+\t\tEmbeddedConfig: EmbeddedConfig{\n+\t\t\tEm: \"em-env\",\n+\t\t},\n+\t}\n \n-\tif got := cfg; !reflect.DeepEqual(got, want) {\n+\tif got := cfg; !reflect.DeepEqual(want, got) {\n \t\tt.Fatalf(\"want %v, got %v\", want, got)\n \t}\n }\n \n-func TestLoadFlag(t *testing.T) {\n+func TestFlag(t *testing.T) {\n \tvar cfg TestConfig\n \tloader := LoaderFor(&cfg, Config{\n \t\tSkipDefaults:    true,\n@@ -337,9 +311,9 @@ func TestLoadFlag(t *testing.T) {\n \n \tflags := []string{\n \t\t\"-tst.str=str-flag\",\n+\t\t// TODO\n \t\t// \"-tst.bytes=bytes-flag\",\n \t\t\"-tst.int=1001\",\n-\t\t\"-tst.int=1001\",\n \t\t\"-tst.http_port=30000\",\n \t\t\"-tst.sub.float=123.321\",\n \t\t\"-tst.anon.is_anon=true\",\n@@ -354,10 +328,24 @@ func TestLoadFlag(t *testing.T) {\n \t\tt.Fatal(err)\n \t}\n \n-\tvar want TestConfig\n-\tloadFile(t, \"testdata/test_config_flag.json\", &want)\n+\twant := TestConfig{\n+\t\tStr:      \"str-flag\",\n+\t\tInt:      int32Ptr(1001),\n+\t\tHTTPPort: 30000,\n+\t\tSub: SubConfig{\n+\t\t\tFloat: 123.321,\n+\t\t},\n+\t\tAnon: struct {\n+\t\t\tIsAnon bool `default:\"true\"`\n+\t\t}{\n+\t\t\tIsAnon: true,\n+\t\t},\n+\t\tEmbeddedConfig: EmbeddedConfig{\n+\t\t\tEm: \"em-flag\",\n+\t\t},\n+\t}\n \n-\tif got := cfg; !reflect.DeepEqual(got, want) {\n+\tif got := cfg; !reflect.DeepEqual(want, got) {\n \t\tt.Fatalf(\"want %v, got %v\", want, got)\n \t}\n }\n@@ -502,8 +490,7 @@ func TestBadEnvs(t *testing.T) {\n \tsetEnv(t, \"TST_HTTP_PORT\", \"30a00\")\n \tdefer os.Clearenv()\n \n-\tvar cfg TestConfig\n-\tloader := LoaderFor(&cfg, Config{\n+\tloader := LoaderFor(&TestConfig{}, Config{\n \t\tSkipDefaults: true,\n \t\tSkipFiles:    true,\n \t\tSkipFlags:    true,\n@@ -516,23 +503,16 @@ func TestBadEnvs(t *testing.T) {\n }\n \n func TestBadFlags(t *testing.T) {\n-\ttype TestConfig struct {\n-\t\tField int\n-\t}\n-\n-\tvar cfg TestConfig\n-\tloader := LoaderFor(&cfg, Config{\n+\tloader := LoaderFor(&TestConfig{}, Config{\n \t\tSkipDefaults:    true,\n \t\tSkipFiles:       true,\n \t\tSkipEnvironment: true,\n \t\tFlagPrefix:      \"tst\",\n \t})\n \n-\t// hack for test :(\n-\tif err := loader.Flags().Parse([]string{\"-tst.field=10a01\"}); err != nil {\n+\tif err := loader.Flags().Parse([]string{\"-tst.param=10a01\"}); err != nil {\n \t\tt.Fatal(err)\n \t}\n-\n \tif err := loader.Load(); err == nil {\n \t\tt.Fatal(err)\n \t}\n@@ -579,7 +559,7 @@ func TestWalkFields(t *testing.T) {\n \t\t\tD struct {\n \t\t\t\tE int `default:\"-1\" env:\"three\" json:\"kek\" yaml:\"lel\" toml:\"mde\"`\n \t\t\t}\n-\t\t} ``\n+\t\t}\n \t}\n \n \tfields := []struct {\n@@ -617,7 +597,6 @@ func TestWalkFields(t *testing.T) {\n \t\tif f.Name() != wantFields.Name {\n \t\t\tt.Fatalf(\"got name %v, want %v\", f.Name(), wantFields.Name)\n \t\t}\n-\t\t// t.Logf(\"tags %v: %v %v %v\", f.Name(), f.Tag(\"json\"), f.Tag(\"yaml\"), f.Tag(\"toml\"))\n \n \t\tif parent, ok := f.Parent(); ok && parent.Name() != wantFields.ParentName {\n \t\t\tt.Fatalf(\"got name %v, want %v\", parent.Name(), wantFields.ParentName)\n@@ -677,9 +656,7 @@ func TestPassNonStructs(t *testing.T) {\n \t\t\t}\n \t\t}()\n \n-\t\tif err := LoaderFor(nil, Config{}).Load(); err != nil {\n-\t\t\tt.Fatal(err)\n-\t\t}\n+\t\t_ = LoaderFor(cfg, Config{})\n \t}\n \n \tf(nil)\n@@ -689,34 +666,6 @@ func TestPassNonStructs(t *testing.T) {\n \tf(func() {})\n }\n \n-func TestPanicWhenNotBuilt(t *testing.T) {\n-\tf := func(fn func()) {\n-\t\tt.Helper()\n-\n-\t\tdefer func() {\n-\t\t\tt.Helper()\n-\t\t\tif err := recover(); err == nil {\n-\t\t\t\tt.Fatal()\n-\t\t\t}\n-\t\t}()\n-\t\tfn()\n-\t}\n-\n-\t// ok to pass nils\n-\tf(func() {\n-\t\t_ = LoaderFor(nil, Config{}).Load()\n-\t})\n-\tf(func() {\n-\t\t_ = LoaderFor(nil, Config{}).LoadWithFile(\"\")\n-\t})\n-\tf(func() {\n-\t\t_ = LoaderFor(nil, Config{}).Flags()\n-\t})\n-\tf(func() {\n-\t\tLoaderFor(nil, Config{}).WalkFields(nil)\n-\t})\n-}\n-\n func loadFile(t *testing.T, file string, dst interface{}) {\n \tf, err := os.Open(file)\n \tif err != nil {\n@@ -737,3 +686,71 @@ func setEnv(t *testing.T, key, value string) {\n \t\tt.Fatal(err)\n \t}\n }\n+\n+func int32Ptr(a int32) *int32 {\n+\treturn &a\n+}\n+\n+type TestConfig struct {\n+\tStr      string `default:\"str-def\"`\n+\tBytes    []byte `default:\"bytes-def\"`\n+\tInt      *int32 `default:\"123\"`\n+\tHTTPPort int    `default:\"8080\"`\n+\tParam    int    // no default tag, so default value\n+\tSub      SubConfig\n+\tAnon     struct {\n+\t\tIsAnon bool `default:\"true\"`\n+\t}\n+\n+\tSlice []int          `default:\"1,2,3\" usage:\"just pass elements\"`\n+\tMap1  map[string]int `default:\"a:1,b:2,c:3\"`\n+\tMap2  map[int]string `default:\"1:a,2:b,3:c\"`\n+\n+\tEmbeddedConfig\n+}\n+\n+type EmbeddedConfig struct {\n+\tEm string `default:\"em-def\" usage:\"use... em...field.\"`\n+}\n+\n+type SubConfig struct {\n+\tFloat float64 `default:\"123.123\"`\n+}\n+\n+type structConfig struct {\n+\tA string\n+\tC int\n+\tE float64\n+\tB []byte\n+\tP *int32\n+\tY structY\n+\n+\tAA structA `json:\"A\"`\n+\tStructM\n+}\n+\n+type structY struct {\n+\tX string\n+\tZ []int\n+\tA struct {\n+\t\tI bool\n+\t}\n+}\n+\n+type structA struct {\n+\tX  string  `json:\"x\"`\n+\tBB structB `json:\"B\"`\n+}\n+\n+type structB struct {\n+\tCC structC  `json:\"C\"`\n+\tDD []string `json:\"D\"`\n+}\n+\n+type structC struct {\n+\tMM string `json:\"m\"`\n+}\n+\n+type StructM struct {\n+\tM string\n+}\ndiff --git a/reflection.go b/reflection.go\nindex f23704d..2575f9e 100644\n--- a/reflection.go\n+++ b/reflection.go\n@@ -8,13 +8,23 @@ import (\n \t\"time\"\n )\n \n-func getFields(x interface{}) []*fieldData {\n+func assertStruct(x interface{}) {\n+\tif x == nil {\n+\t\tpanic(\"aconfig: nil should not be passed to the Loader\")\n+\t}\n \tvalue := reflect.ValueOf(x)\n \tfor value.Type().Kind() == reflect.Ptr {\n \t\tvalue = value.Elem()\n \t}\n \tif value.Kind() != reflect.Struct {\n-\t\tpanic(\"aconfig: only struct can be passed to the loader\")\n+\t\tpanic(\"aconfig: only struct can be passed to the Loader\")\n+\t}\n+}\n+\n+func getFields(x interface{}) []*fieldData {\n+\tvalue := reflect.ValueOf(x)\n+\tfor value.Type().Kind() == reflect.Ptr {\n+\t\tvalue = value.Elem()\n \t}\n \treturn getFieldsHelper(value, nil)\n }\n@@ -67,7 +77,6 @@ type fieldData struct {\n func newFieldData(field reflect.StructField, value reflect.Value, parent *fieldData) *fieldData {\n \twords := splitNameByWords(field.Name)\n \tname := makeFlagName(field, parent, words) // it's ok to use flagName, fields have `_` and nesting is via `.`\n-\t// println(ifNotEmpty(field.Tag.Get(yamlNameTag), \"::\"+name))\n \n \treturn &fieldData{\n \t\tname:   makeName(field.Name, parent),\ndiff --git a/testdata/all_types_config.json b/testdata/all_types_config.json\ndeleted file mode 100644\nindex 46bccd4..0000000\n--- a/testdata/all_types_config.json\n+++ /dev/null\n@@ -1,27 +0,0 @@\n-{\n-  \"bool\": true,\n-  \"string\": \"str\",\n-\n-  \"int\": 1,\n-  \"int8\": 12,\n-  \"int16\": 123,\n-  \"int32\": 13,\n-  \"int64\": 23,\n-\n-  \"uint\": 1234,\n-  \"uint8\": 124,\n-  \"uint16\": 134,\n-  \"uint32\": 234,\n-  \"uint64\": 24,\n-\n-  \"float32\": 1234.213,\n-  \"float64\": 1234.234,\n-\n-  \"dur\": 3723000000000,\n-\n-  \"IDs\": [\n-    1,\n-    2,\n-    3\n-  ]\n-}\n\\ No newline at end of file\ndiff --git a/testdata/config1.json b/testdata/config1.json\nindex 6420b6d..0689852 100644\n--- a/testdata/config1.json\n+++ b/testdata/config1.json\n@@ -1,6 +1,6 @@\n {\n   \"Str\": \"str-json\",\n-  \"Bytes\": \"Ynl0ZXMtZW52\",\n+  \"Bytes\": \"Ynl0ZXMtanNvbg==\",\n   \"Int\": 101,\n   \"HTTPPort\": 65000,\n   \"Sub\": {\n@@ -8,7 +8,7 @@\n   },\n   \n   \"str\": \"str-json\",\n-  \"bytes\": \"Ynl0ZXMtZW52\",\n+  \"bytes\": \"Ynl0ZXMtanNvbg==\",\n   \"int\": 101,\n   \"http_port\": 65000,\n   \"sub\": {\ndiff --git a/testdata/my_duration_config.json b/testdata/my_duration_config.json\ndeleted file mode 100644\nindex cfc7048..0000000\n--- a/testdata/my_duration_config.json\n+++ /dev/null\n@@ -1,3 +0,0 @@\n-{\n-  \"my_dur\": \"1h2m3s\"\n-}\n\\ No newline at end of file\ndiff --git a/testdata/other_numbers_config.json b/testdata/other_numbers_config.json\ndeleted file mode 100644\nindex 625bfb4..0000000\n--- a/testdata/other_numbers_config.json\n+++ /dev/null\n@@ -1,10 +0,0 @@\n-{\n-  \"Int\": 7,\n-  \"Int8\": 83,\n-  \"Int8x2\": 83,\n-  \"Int16\": 291,\n-  \"Uint\": 7,\n-  \"Uint8\": 83,\n-  \"Uint16\": 83,\n-  \"Uint32\": 291\n-}\n\\ No newline at end of file\ndiff --git a/testdata/test_config_def.json b/testdata/test_config_def.json\ndeleted file mode 100644\nindex 2d1fa0c..0000000\n--- a/testdata/test_config_def.json\n+++ /dev/null\n@@ -1,32 +0,0 @@\n-{\n-  \"Str\": \"str-def\",\n-  \"Bytes\": \"Ynl0ZXMtZGVm\",\n-  \"Int\": 123,\n-  \"HTTPPort\": 8080,\n-  \"Sub\": {\n-    \"Float\": 123.123\n-  },\n-  \"Anon\": {\n-    \"IsAnon\": true\n-  },\n-  \"Slice\": [\n-    1,\n-    2,\n-    3\n-  ],\n-  \"Array\": [\n-    1,\n-    2\n-  ],\n-  \"Map1\": {\n-    \"a\": 1,\n-    \"b\": 2,\n-    \"c\": 3\n-  },\n-  \"Map2\": {\n-    \"1\": \"a\",\n-    \"2\": \"b\",\n-    \"3\": \"c\"\n-  },\n-  \"Em\": \"em-def\"\n-}\n\\ No newline at end of file\ndiff --git a/testdata/test_config_env.json b/testdata/test_config_env.json\ndeleted file mode 100644\nindex 3c891cb..0000000\n--- a/testdata/test_config_env.json\n+++ /dev/null\n@@ -1,16 +0,0 @@\n-{\n-  \"Str\": \"str-env\",\n-  \"Bytes\": \"Ynl0ZXMtZW52\",\n-  \"Int\": 121,\n-  \"HTTPPort\": 3000,\n-  \"Sub\": {\n-    \"Float\": 222.333\n-  },\n-  \"Anon\": {\n-    \"IsAnon\": true\n-  },\n-  \"PtrSub\": {\n-    \"Float\": 444.555\n-  },\n-  \"Em\": \"em-env\"\n-}\n\\ No newline at end of file\ndiff --git a/testdata/test_config_flag.json b/testdata/test_config_flag.json\ndeleted file mode 100644\nindex fc3da82..0000000\n--- a/testdata/test_config_flag.json\n+++ /dev/null\n@@ -1,16 +0,0 @@\n-{\n-  \"Str\": \"str-flag\",\n-  \"Bytes\": \"Ynl0ZXMtZmxhZw==\",\n-  \"Int\": 1001,\n-  \"HTTPPort\": 30000,\n-  \"Sub\": {\n-    \"Float\": 123.321\n-  },\n-  \"Anon\": {\n-    \"IsAnon\": true\n-  },\n-  \"PtrSub\": {\n-    \"Float\": 321.123\n-  },\n-  \"Em\": \"em-flag\"\n-}\n\\ No newline at end of file\ndiff --git a/testfile.json b/testfile.json\nindex f4dd2d2..cf1b2f0 100644\n--- a/testfile.json\n+++ b/testfile.json\n@@ -7,7 +7,7 @@\n     \"m\": \"n\",\n     \"y\": {\n         \"x\": \"y\",\n-        \"z\": [\"1\", \"2\", \"3\"]\n+        \"z\": [1, 2, 3]\n     },\n     \"A\": {\n         \"x\": \"y\",\ndiff --git a/utils.go b/utils.go\nindex ab54a0e..a555544 100644\n--- a/utils.go\n+++ b/utils.go\n@@ -108,12 +108,9 @@ func (d *jsonDecoder) DecodeFile(filename string) (map[string]interface{}, error\n \t}\n \n \tres := map[string]interface{}{}\n-\n \tfor key, value := range raw {\n-\t\t// fmt.Printf(\"k: %s, v: %v %[2]T\\n\", key, value)\n \t\tflatten(\"\", key, value, res)\n \t}\n-\t// fmt.Printf(\"map: %#v\\n\\n\", res)\n \treturn res, nil\n }\n \n@@ -131,13 +128,15 @@ func flatten(prefix, key string, curr interface{}, res map[string]interface{}) {\n \t\t\t}\n \t\t\tb.WriteString(fmt.Sprint(v))\n \t\t}\n+\t\tres[prefix+key] = b.String()\n+\tcase []string:\n \t\tres[prefix+key] = curr\n \tcase string:\n \t\tres[prefix+key] = curr\n \tcase float64:\n-\t\tres[prefix+key] = fmt.Sprintf(\"%v\", curr)\n+\t\tres[prefix+key] = fmt.Sprint(curr)\n \tcase bool:\n-\t\tres[prefix+key] = curr\n+\t\tres[prefix+key] = fmt.Sprint(curr)\n \tdefault:\n \t\tpanic(fmt.Sprintf(\"%s::%s got %T %v\", prefix, key, curr, curr))\n \t}\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/build.yml",
+    "LICENSE",
+    "README.md",
+    "aconfig.go",
+    "aconfig_test.go",
+    "aconfigtoml/go.mod",
+    "aconfigtoml/go.sum",
+    "aconfigtoml/testfile.toml",
+    "aconfigtoml/toml.go",
+    "aconfigtoml/toml_test.go",
+    "aconfigyaml/go.mod",
+    "aconfigyaml/go.sum",
+    "aconfigyaml/testfile.yaml",
+    "aconfigyaml/yaml.go",
+    "aconfigyaml/yaml_test.go",
+    "example_test.go",
+    "go.mod",
+    "reflection.go",
+    "testdata/bad_config.json",
+    "testdata/config1.json",
+    "testdata/example_config.json",
+    "testdata/unknown.ext",
+    "testfile.json",
+    "utils.go",
+    "utils_test.go"
+  ],
+  "explanation": {
+    "what": "テストを golden file(testdata/*.json との reflect.DeepEqual 比較)方式から、テストコード内に期待値を struct リテラルで直書きする方式に統一した。使われなくなった test_config_def.json 等の golden file を削除し、テスト名を TestLoadDefaults → TestDefaults のように整理。LoaderFor に assertStruct(dst) を追加してポインタでない・構造体でない値を渡した時点で早期 panic するようにし、これに伴い専用の TestPanicWhenNotBuilt テストは削除している。",
+    "why": "PR タイトルは \"better tests\" で本文は空。diff からは、期待値が別ファイルに分離されていると変更の影響が追いにくいため、テストとその期待値を1箇所にまとめて可読性を上げる意図が読める。assertStruct の追加は、前コミット(#31)の Config 構造体化で Build() 時点のバリデーションが失われていたのを LoaderFor 呼び出し時点のチェックとして復活させたものと考えられる。",
+    "highlights": [
+      { "file": "aconfig_test.go", "note": "loadFile(t, \"testdata/...\") での比較から、テスト関数内の want 構造体リテラルへ全面移行" },
+      { "file": "reflection.go", "note": "assertStruct(x) が nil/非構造体を渡した際に panic する入口チェックとして追加された" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [{ "type": "pr", "number": 35, "url": "https://github.com/cristalhq/aconfig/pull/35" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

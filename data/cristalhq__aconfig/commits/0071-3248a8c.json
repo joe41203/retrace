@@ -1,0 +1,97 @@
+{
+  "seq": 71,
+  "sha": "3248a8c7b45c28c3d178ce23550193db29262e02",
+  "parents": [
+    "356d322d0e048873cf1afcbc0da0b72d8478d899"
+  ],
+  "author": {
+    "name": "Oleg Kovalov",
+    "email": "oleg@hey.com",
+    "date": "2020-11-17T17:54:19+01:00"
+  },
+  "message": "small improvements (#30)",
+  "pr": {
+    "number": 30,
+    "title": "small improvements",
+    "body": "",
+    "url": "https://github.com/cristalhq/aconfig/pull/30"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 3,
+    "additions": 13,
+    "deletions": 15
+  },
+  "files": [
+    {
+      "path": "aconfig.go",
+      "status": "M",
+      "additions": 9,
+      "deletions": 10,
+      "binary": false
+    },
+    {
+      "path": "reflection.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 3,
+      "binary": false
+    },
+    {
+      "path": "utils.go",
+      "status": "M",
+      "additions": 3,
+      "deletions": 2,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/aconfig.go b/aconfig.go\nindex eb3efbc..cc25f03 100644\n--- a/aconfig.go\n+++ b/aconfig.go\n@@ -138,21 +138,20 @@ func (l *Loader) StopOnFileError() *Loader {\n \n // Build to initialize flags for a given configuration.\n func (l *Loader) Build() *Loader {\n-\tl.parseFields(l.dst)\n+\tl.flagSet = flag.NewFlagSet(l.config.FlagPrefix, flag.ContinueOnError)\n+\tl.parseFields()\n \tl.isBuilt = true\n \treturn l\n }\n \n-func (l *Loader) parseFields(cfg interface{}) {\n-\tl.flagSet = flag.NewFlagSet(l.config.FlagPrefix, flag.ContinueOnError)\n-\tl.fields = getFields(cfg)\n+func (l *Loader) parseFields() {\n+\tl.fields = getFields(l.dst)\n \n-\tif l.config.SkipFlag {\n-\t\treturn\n-\t}\n-\tfor _, field := range l.fields {\n-\t\tflagName := l.config.FlagPrefix + field.flagName\n-\t\tl.flagSet.String(flagName, field.defaultValue, field.usage)\n+\tif !l.config.SkipFlag {\n+\t\tfor _, field := range l.fields {\n+\t\t\tflagName := l.config.FlagPrefix + field.flagName\n+\t\t\tl.flagSet.String(flagName, field.defaultValue, field.usage)\n+\t\t}\n \t}\n }\n \ndiff --git a/reflection.go b/reflection.go\nindex 3485dd7..7ab8418 100644\n--- a/reflection.go\n+++ b/reflection.go\n@@ -32,11 +32,9 @@ func getFieldsHelper(valueObject reflect.Value, parent *fieldData) []*fieldData\n \t\t\tcontinue\n \t\t}\n \n-\t\t// TODO: pointers\n-\n \t\tfd := newFieldData(field, value, parent)\n \n-\t\t// if just a field - add and process next, else expand struct\n+\t\t// if it's a struct - expand and process it's fields\n \t\tif field.Type.Kind() == reflect.Struct {\n \t\t\tvar subFieldParent *fieldData\n \t\t\tif field.Anonymous {\ndiff --git a/utils.go b/utils.go\nindex deab100..635a186 100644\n--- a/utils.go\n+++ b/utils.go\n@@ -53,7 +53,7 @@ func splitNameByWords(src string) []string {\n \n \t// split into fields based on class of unicode character\n \tfor _, r := range src {\n-\t\tswitch true {\n+\t\tswitch {\n \t\tcase unicode.IsLower(r):\n \t\t\tclass = 1\n \t\tcase unicode.IsUpper(r):\n@@ -64,7 +64,8 @@ func splitNameByWords(src string) []string {\n \t\t\tclass = 4\n \t\t}\n \t\tif class == lastClass {\n-\t\t\trunes[len(runes)-1] = append(runes[len(runes)-1], r)\n+\t\t\tsz := len(runes) - 1\n+\t\t\trunes[sz] = append(runes[sz], r)\n \t\t} else {\n \t\t\trunes = append(runes, []rune{r})\n \t\t}\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/build.yml",
+    "LICENSE",
+    "README.md",
+    "aconfig.go",
+    "aconfig_test.go",
+    "aconfighcl/go.mod",
+    "aconfighcl/go.sum",
+    "aconfighcl/hcl.go",
+    "aconfighcl/hcl_test.go",
+    "aconfigtoml/go.mod",
+    "aconfigtoml/go.sum",
+    "aconfigtoml/toml.go",
+    "aconfigtoml/toml_test.go",
+    "aconfigyaml/go.mod",
+    "aconfigyaml/go.sum",
+    "aconfigyaml/yaml.go",
+    "aconfigyaml/yaml_test.go",
+    "example_test.go",
+    "go.mod",
+    "go.sum",
+    "reflection.go",
+    "testdata/all_types_config.json",
+    "testdata/bad_config.json",
+    "testdata/config1.json",
+    "testdata/example_config.json",
+    "testdata/my_duration_config.json",
+    "testdata/other_numbers_config.json",
+    "testdata/test_config_def.json",
+    "testdata/test_config_env.json",
+    "testdata/test_config_flag.json",
+    "testdata/unknown.ext",
+    "utils.go"
+  ],
+  "explanation": {
+    "what": "Loader.Build() 内で行っていた flagSet 生成とフィールド走査(parseFields)を分離し、parseFields は l.dst を直接参照する形に簡略化した。あわせて reflection.go のコメント整理、utils.go の splitNameByWords の switch true を switch に簡素化するなど、小さなリファクタを複数まとめている。",
+    "why": "PR タイトルは \"small improvements\" で本文は空。diff を見る限り機能追加ではなく、直前までに積み上がったコードの整理が目的で、後続の config 構造体化(#31)に向けた地ならしと読める。おそらく Build() の責務(flagSet 初期化とフィールド走査)を分けておくことで、次の変更をしやすくする意図があったと考えられる。",
+    "highlights": [
+      { "file": "aconfig.go", "note": "parseFields(cfg interface{}) が引数なしになり、flagSet 生成が Build() 側に移った" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [{ "type": "pr", "number": 30, "url": "https://github.com/cristalhq/aconfig/pull/30" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

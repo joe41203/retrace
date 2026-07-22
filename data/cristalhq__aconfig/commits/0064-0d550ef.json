@@ -1,0 +1,88 @@
+{
+  "seq": 64,
+  "sha": "0d550ef6ada1cde59565456255033e3fb778bd36",
+  "parents": [
+    "a2d575185e8afc386a03b9637bbd07823148172c"
+  ],
+  "author": {
+    "name": "Oleg Kovalov",
+    "email": "oleg@hey.com",
+    "date": "2020-09-17T14:55:41+02:00"
+  },
+  "message": "improve Field.Tag usage (#21)",
+  "pr": {
+    "number": 21,
+    "title": "improve Field.Tag usage",
+    "body": "",
+    "url": "https://github.com/cristalhq/aconfig/pull/21"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 3,
+    "additions": 54,
+    "deletions": 28
+  },
+  "files": [
+    {
+      "path": "aconfig.go",
+      "status": "M",
+      "additions": 15,
+      "deletions": 19,
+      "binary": false
+    },
+    {
+      "path": "example_test.go",
+      "status": "M",
+      "additions": 23,
+      "deletions": 4,
+      "binary": false
+    },
+    {
+      "path": "reflection.go",
+      "status": "M",
+      "additions": 16,
+      "deletions": 5,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/aconfig.go b/aconfig.go\nindex 8d3bb76..b1f3b11 100644\n--- a/aconfig.go\n+++ b/aconfig.go\n@@ -14,15 +14,15 @@ import (\n \n const (\n \tdefaultValueTag = \"default\"\n+\tusageTag        = \"usage\"\n \tenvNameTag      = \"env\"\n \tflagNameTag     = \"flag\"\n-\tusageTag        = \"usage\"\n )\n \n // Loader of user configuration.\n type Loader struct {\n \tconfig  loaderConfig\n-\tsrc     interface{}\n+\tdst     interface{}\n \tfields  []*fieldData\n \tflagSet *flag.FlagSet\n \tisBuilt bool\n@@ -62,8 +62,8 @@ type Field interface {\n }\n \n // LoaderFor creates a new Loader based on a given configuration structure.\n-func LoaderFor(src interface{}) *Loader {\n-\treturn &Loader{src: src}\n+func LoaderFor(dst interface{}) *Loader {\n+\treturn &Loader{dst: dst}\n }\n \n // SkipDefaults if you don't want to use them.\n@@ -105,12 +105,6 @@ func (l *Loader) WithEnvPrefix(prefix string) *Loader {\n \treturn l\n }\n \n-// StopOnFileError to stop configuration loading on file error.\n-func (l *Loader) StopOnFileError() *Loader {\n-\tl.config.ShouldStopOnFileError = true\n-\treturn l\n-}\n-\n // WithFlagPrefix to specify command-line flags prefix.\n func (l *Loader) WithFlagPrefix(prefix string) *Loader {\n \tl.config.FlagPrefix = prefix\n@@ -120,9 +114,15 @@ func (l *Loader) WithFlagPrefix(prefix string) *Loader {\n \treturn l\n }\n \n+// StopOnFileError to stop configuration loading on file error.\n+func (l *Loader) StopOnFileError() *Loader {\n+\tl.config.ShouldStopOnFileError = true\n+\treturn l\n+}\n+\n // Build to initialize flags for a given configuration.\n func (l *Loader) Build() *Loader {\n-\tl.parseFields(l.src)\n+\tl.parseFields(l.dst)\n \tl.isBuilt = true\n \treturn l\n }\n@@ -160,7 +160,7 @@ func (l *Loader) WalkFields(fn func(f Field) bool) {\n // Load configuration into a given param.\n func (l *Loader) Load() error {\n \tl.assertBuilt()\n-\tif err := l.loadSources(l.src); err != nil {\n+\tif err := l.loadSources(l.dst); err != nil {\n \t\treturn fmt.Errorf(\"aconfig: cannot load config: %w\", err)\n \t}\n \treturn nil\n@@ -204,7 +204,7 @@ func (l *Loader) loadSources(into interface{}) error {\n \n func (l *Loader) loadDefaults() error {\n \tfor _, fd := range l.fields {\n-\t\tif err := l.setFieldData(fd, fd.defaultValue); err != nil {\n+\t\tif err := setFieldData(fd, fd.defaultValue); err != nil {\n \t\t\treturn err\n \t\t}\n \t}\n@@ -251,7 +251,7 @@ func (l *Loader) loadEnvironment() error {\n \t\tif !ok {\n \t\t\tcontinue\n \t\t}\n-\t\tif err := l.setFieldData(field, v); err != nil {\n+\t\tif err := setFieldData(field, v); err != nil {\n \t\t\treturn err\n \t\t}\n \t}\n@@ -276,13 +276,9 @@ func (l *Loader) loadFlags() error {\n \t\tif !ok {\n \t\t\tcontinue\n \t\t}\n-\t\tif err := l.setFieldData(field, flg.Value.String()); err != nil {\n+\t\tif err := setFieldData(field, flg.Value.String()); err != nil {\n \t\t\treturn err\n \t\t}\n \t}\n \treturn nil\n }\n-\n-func (l *Loader) setFieldData(field *fieldData, value string) error {\n-\treturn setFieldDataHelper(field, value)\n-}\ndiff --git a/example_test.go b/example_test.go\nindex 834c637..0c560bc 100644\n--- a/example_test.go\n+++ b/example_test.go\n@@ -9,14 +9,14 @@ import (\n )\n \n type MyConfig struct {\n-\tHTTPPort int `default:\"1111\"`\n+\tHTTPPort int `default:\"1111\" usage:\"just a number\"`\n \tAuth     struct {\n-\t\tUser string `default:\"def-user\"`\n-\t\tPass string `default:\"def-pass\"`\n+\t\tUser string `default:\"def-user\" usage:\"your user\"`\n+\t\tPass string `default:\"def-pass\" usage:\"make it strong\"`\n \t}\n }\n \n-func Example_NewApi() {\n+func Example_SimpleUsage() {\n \tvar cfg MyConfig\n \tloader := aconfig.LoaderFor(&cfg).\n \t\tSkipDefaults().SkipFiles().SkipEnvironment().SkipFlags().\n@@ -40,6 +40,25 @@ func Example_NewApi() {\n \t// Auth.Pass: \"\"\n }\n \n+func Example_WalkFields() {\n+\tvar cfg MyConfig\n+\tloader := aconfig.LoaderFor(&cfg).\n+\t\tSkipFiles().\n+\t\tSkipEnvironment().\n+\t\tSkipFlags().\n+\t\tBuild()\n+\n+\tloader.WalkFields(func(f aconfig.Field) bool {\n+\t\tfmt.Printf(\"%v: %q %q %q %q\\n\", f.Name(), f.Tag(\"env\"), f.Tag(\"flag\"), f.Tag(\"default\"), f.Tag(\"usage\"))\n+\t\treturn true\n+\t})\n+\n+\t// Output:\n+\t// HTTPPort: \"HTTP_PORT\" \"http_port\" \"1111\" \"just a number\"\n+\t// Auth.User: \"AUTH_USER\" \"auth.user\" \"def-user\" \"your user\"\n+\t// Auth.Pass: \"AUTH_PASS\" \"auth.pass\" \"def-pass\" \"make it strong\"\n+}\n+\n // Just load defaults from struct defenition.\n //\n func Example_Defaults() {\ndiff --git a/reflection.go b/reflection.go\nindex be71078..3485dd7 100644\n--- a/reflection.go\n+++ b/reflection.go\n@@ -95,14 +95,25 @@ func (f *fieldData) Usage() string {\n }\n \n func (f *fieldData) Tag(tag string) string {\n-\treturn f.field.Tag.Get(tag)\n+\tswitch tag {\n+\tcase defaultValueTag:\n+\t\treturn f.defaultValue\n+\tcase usageTag:\n+\t\treturn f.usage\n+\tcase envNameTag:\n+\t\treturn f.envName\n+\tcase flagNameTag:\n+\t\treturn f.flagName\n+\tdefault:\n+\t\treturn f.field.Tag.Get(tag)\n+\t}\n }\n \n func (f *fieldData) Parent() (Field, bool) {\n \treturn f.parent, f.parent != nil\n }\n \n-func setFieldDataHelper(field *fieldData, value string) error {\n+func setFieldData(field *fieldData, value string) error {\n \t// unwrap pointers\n \tfor field.value.Type().Kind() == reflect.Ptr {\n \t\tif field.value.IsNil() {\n@@ -212,7 +223,7 @@ func setSlice(field *fieldData, value string) error {\n \t\tval = strings.TrimSpace(val)\n \n \t\tfd := newFieldData(reflect.StructField{}, slice.Index(i), nil)\n-\t\tif err := setFieldDataHelper(fd, val); err != nil {\n+\t\tif err := setFieldData(fd, val); err != nil {\n \t\t\treturn fmt.Errorf(\"incorrect slice item %q: %w\", val, err)\n \t\t}\n \t}\n@@ -233,12 +244,12 @@ func setMap(field *fieldData, value string) error {\n \t\tval := strings.TrimSpace(entry[1])\n \n \t\tfdk := newSimpleFieldData(reflect.New(field.field.Type.Key()).Elem())\n-\t\tif err := setFieldDataHelper(fdk, key); err != nil {\n+\t\tif err := setFieldData(fdk, key); err != nil {\n \t\t\treturn fmt.Errorf(\"incorrect map key %q: %w\", key, err)\n \t\t}\n \n \t\tfdv := newSimpleFieldData(reflect.New(field.field.Type.Elem()).Elem())\n-\t\tif err := setFieldDataHelper(fdv, val); err != nil {\n+\t\tif err := setFieldData(fdv, val); err != nil {\n \t\t\treturn fmt.Errorf(\"incorrect map value %q: %w\", val, err)\n \t\t}\n \t\tmapField.SetMapIndex(fdk.value, fdv.value)\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/build.yml",
+    "LICENSE",
+    "README.md",
+    "aconfig.go",
+    "aconfig_test.go",
+    "example_test.go",
+    "go.mod",
+    "go.sum",
+    "reflection.go",
+    "testdata/all_types_config.json",
+    "testdata/bad_config.json",
+    "testdata/config1.json",
+    "testdata/config1.toml",
+    "testdata/config1.yaml",
+    "testdata/example_config.json",
+    "testdata/my_duration_config.json",
+    "testdata/other_numbers_config.json",
+    "testdata/test_config_def.json",
+    "testdata/test_config_env.json",
+    "testdata/test_config_flag.json",
+    "testdata/unknown.ext",
+    "utils.go"
+  ],
+  "explanation": {
+    "what": "Field インターフェースの Tag(tag string) メソッドを、struct タグ文字列をそのまま reflect.StructField.Tag.Get(tag) で返す実装から、\"default\"/\"usage\"/\"env\"/\"flag\" の4種は fieldData が既に解決済みの defaultValue/usage/envName/flagName フィールドを返す実装に変更した。あわせて LoaderFor(src) / Loader.src を LoaderFor(dst) / Loader.dst にリネームし、Example_WalkFields というgodoc例を追加してTag呼び出しの実際の出力を示している。",
+    "why": "PR #21 のタイトルは「improve Field.Tag usage」。env名やflag名は親構造体のprefixを連結するなど生タグ値と異なる形に加工されているため(makeEnvName/makeFlagNameを参照)、Tag(\"env\")やTag(\"flag\")が生タグ値を返すと WalkFields 利用者が期待する実際の名前と食い違う。この不整合を解消する意図と考えられる。srcからdstへの改名は、この構造体が読み込み結果の書き込み先であることを名前で明確にする意図と見られる。",
+    "highlights": [
+      { "file": "reflection.go", "note": "Tag(tag) がdefault/usage/env/flagタグを解決済みの値から返すswitchに変わった箇所" },
+      { "file": "example_test.go", "note": "Example_WalkFieldsでTag(\"env\")等の実際の戻り値(prefix込みの名前)を確認できる" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [{ "type": "pr", "number": 21, "url": "https://github.com/cristalhq/aconfig/pull/21" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

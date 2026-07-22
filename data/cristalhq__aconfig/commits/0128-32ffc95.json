@@ -1,0 +1,114 @@
+{
+  "seq": 128,
+  "sha": "32ffc950c1ed5f0de288b13ff9fb69c102e26d9a",
+  "parents": [
+    "5ae6b2e987975aa3fa8a084d5a8fe2c9e70d61af"
+  ],
+  "author": {
+    "name": "Oleg Kovalov",
+    "email": "oleg@hey.com",
+    "date": "2021-08-14T15:51:55+02:00"
+  },
+  "message": "Fix map in map (#101)",
+  "pr": {
+    "number": 101,
+    "title": "Fix map in map",
+    "body": "Fixes #99 ",
+    "url": "https://github.com/cristalhq/aconfig/pull/101"
+  },
+  "linkedIssues": [
+    {
+      "number": 99,
+      "title": "No support for native map syntax in files",
+      "body": "Given the following `toy.json`:\r\n```\r\n{\r\n  \"options\": {\r\n    \"foo\": 0.4,\r\n    \"bar\": 0.25\r\n  }\r\n}\r\n```\r\n\r\nand the following program:\r\n```\r\npackage main\r\n\r\nimport (\r\n\t\"fmt\"\r\n\r\n\t\"github.com/cristalhq/aconfig\"\r\n)\r\n\r\nfunc main() {\r\n\tvar cfg struct {\r\n\t\tOptions map[string]float64\r\n\t}\r\n\tloader := aconfig.LoaderFor(&cfg, aconfig.Config{\r\n\t\tFiles: []string{\"toy.json\"},\r\n\t})\r\n\terr := loader.Load()\r\n\tfmt.Printf(\"%v\\n%+v\\n\", err, cfg)\r\n}\r\n```\r\n\r\nI expect the program to print:\r\n```\r\n<nil>\r\n{Options:map[bar:0.25 foo:0.4]}\r\n```\r\n\r\nBut instead, it prints:\r\n```\r\naconfig: cannot load config: loading files: incorrect map value \"0.25 foo:0.4]\": strconv.ParseFloat: parsing \"0.25 foo:0.4]\": invalid syntax\r\n{Options:map[]}\r\n```\r\n\r\nThe desired output is achieved if I replace `toy.json` with:\r\n```\r\n{\r\n  \"options\": \"foo:0.4,bar:0.25\"\r\n}\r\n```\r\n\r\nIt would be much more convenient to be able to specify maps with the config language’s native map syntax.",
+      "url": "https://github.com/cristalhq/aconfig/issues/99"
+    }
+  ],
+  "stats": {
+    "filesChanged": 3,
+    "additions": 55,
+    "deletions": 1
+  },
+  "files": [
+    {
+      "path": "aconfig_test.go",
+      "status": "M",
+      "additions": 29,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "reflection.go",
+      "status": "M",
+      "additions": 20,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "testdata/toy.json",
+      "status": "A",
+      "additions": 6,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/aconfig_test.go b/aconfig_test.go\nindex 2a91132..e9a350d 100644\n--- a/aconfig_test.go\n+++ b/aconfig_test.go\n@@ -1360,3 +1360,32 @@ func TestSliceStructs(t *testing.T) {\n \t\tt.Fatalf(\"want %v, got %v\", want, got)\n \t}\n }\n+\n+func TestMapOfMap(t *testing.T) {\n+\ttype TestConfig struct {\n+\t\tOptions map[string]float64\n+\t}\n+\tvar cfg TestConfig\n+\n+\tloader := LoaderFor(&cfg, Config{\n+\t\tSkipDefaults: true,\n+\t\tSkipEnv:      true,\n+\t\tSkipFlags:    true,\n+\t\tFiles:        []string{\"testdata/toy.json\"},\n+\t})\n+\n+\tif err := loader.Load(); err != nil {\n+\t\tt.Fatal(err)\n+\t}\n+\n+\tvar want = TestConfig{\n+\t\tOptions: map[string]float64{\n+\t\t\t\"foo\": 0.4,\n+\t\t\t\"bar\": 0.25,\n+\t\t},\n+\t}\n+\n+\tif got := cfg; !reflect.DeepEqual(want, got) {\n+\t\tt.Fatalf(\"want %v, got %v\", want, got)\n+\t}\n+}\ndiff --git a/reflection.go b/reflection.go\nindex 7d7a3b6..653ccf8 100644\n--- a/reflection.go\n+++ b/reflection.go\n@@ -196,7 +196,26 @@ func (l *Loader) setFieldData(field *fieldData, value interface{}) error {\n \t\treturn l.setSlice(field, sliceToString(value))\n \n \tcase reflect.Map:\n-\t\treturn l.setMap(field, fmt.Sprint(value))\n+\t\tv, ok := value.(map[string]interface{})\n+\t\tif !ok {\n+\t\t\treturn l.setMap(field, fmt.Sprint(value))\n+\t\t}\n+\n+\t\tmapp := reflect.MakeMapWithSize(field.field.Type, len(v))\n+\t\tfor key, val := range v {\n+\t\t\tfdk := l.newSimpleFieldData(reflect.New(field.field.Type.Key()).Elem())\n+\t\t\tif err := l.setFieldData(fdk, key); err != nil {\n+\t\t\t\treturn fmt.Errorf(\"incorrect map key %q: %w\", key, err)\n+\t\t\t}\n+\n+\t\t\tfdv := l.newSimpleFieldData(reflect.New(field.field.Type.Elem()).Elem())\n+\t\t\tif err := l.setFieldData(fdv, val); err != nil {\n+\t\t\t\treturn fmt.Errorf(\"incorrect map value %q: %w\", val, err)\n+\t\t\t}\n+\t\t\tmapp.SetMapIndex(fdk.value, fdv.value)\n+\t\t}\n+\t\tfield.value.Set(mapp)\n+\t\treturn nil\n \n \tdefault:\n \t\treturn fmt.Errorf(\"type kind %q isn't supported\", kind)\ndiff --git a/testdata/toy.json b/testdata/toy.json\nnew file mode 100644\nindex 0000000..0f23ddb\n--- /dev/null\n+++ b/testdata/toy.json\n@@ -0,0 +1,6 @@\n+{\n+  \"options\": {\n+    \"foo\": 0.4,\n+    \"bar\": 0.25\n+  }\n+}\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/build.yml",
+    "LICENSE",
+    "README.md",
+    "aconfig.go",
+    "aconfig_test.go",
+    "aconfigdotenv/dotenv.go",
+    "aconfigdotenv/dotenv_test.go",
+    "aconfigdotenv/go.mod",
+    "aconfigdotenv/go.sum",
+    "aconfighcl/go.mod",
+    "aconfighcl/go.sum",
+    "aconfighcl/hcl.go",
+    "aconfighcl/hcl_test.go",
+    "aconfigtoml/go.mod",
+    "aconfigtoml/go.sum",
+    "aconfigtoml/toml.go",
+    "aconfigtoml/toml_test.go",
+    "aconfigyaml/go.mod",
+    "aconfigyaml/go.sum",
+    "aconfigyaml/yaml.go",
+    "aconfigyaml/yaml_test.go",
+    "doc.go",
+    "example_test.go",
+    "go.mod",
+    "reflection.go",
+    "testdata/bad_config.json",
+    "testdata/complex.json",
+    "testdata/config.json",
+    "testdata/config1.json",
+    "testdata/config2.json",
+    "testdata/config3.json",
+    "testdata/example_config.json",
+    "testdata/toy.json",
+    "testdata/unknown_fields.json",
+    "utils.go",
+    "utils_test.go"
+  ],
+  "explanation": {
+    "what": "reflection.go の setFieldData の reflect.Map ケースを拡張し、value が map[string]interface{} である場合(JSON ファイルなどからネイティブなマップ構文でデコードされた場合)は、従来の \"key:val,key:val\" 文字列パースを経由せず、reflect.MakeMapWithSize でマップを直接構築するようにした。キー・値それぞれを newSimpleFieldData 経由で setFieldData に再帰させ、型に応じた変換をかけてから mapp.SetMapIndex で設定する。value が map[string]interface{} でない場合(env/flag 由来の文字列)は従来通り setMap にフォールバックする。",
+    "why": "linkedIssues #99 の通り、JSON ファイルで options: {foo: 0.4, bar: 0.25} のようにネイティブなマップとして書いた設定が、内部で文字列表現に変換されてから \"key:val\" パーサーに渡るためパースエラーになっていた(値に小数点や区切り文字が含まれると誤動作する)。ファイルソース由来のマップ値はパース前の構造化データのまま扱うことで、この問題を解消している。",
+    "highlights": [
+      { "file": "reflection.go", "note": "map[string]interface{} かどうかで従来の文字列パース経路とネイティブ経路を分岐。ネイティブ経路はキー・値を再帰的に setFieldData へ渡している" },
+      { "file": "testdata/toy.json", "note": "issue #99 の再現コードとほぼ同じ構造(options: {foo, bar})がそのままテストデータになっている" }
+    ],
+    "langNotes": [
+      { "topic": "reflect.MakeMapWithSize", "note": "reflect.MakeMap(type) の容量指定版で、実行時に型情報からマップを新規生成できる。reflect.Value.SetMapIndex(key, val) でキー・値のペアを設定する。" }
+    ],
+    "diagram": null,
+    "evidence": "issue",
+    "refs": [
+      { "type": "pr", "number": 101, "url": "https://github.com/cristalhq/aconfig/pull/101" },
+      { "type": "issue", "number": 99, "url": "https://github.com/cristalhq/aconfig/issues/99" }
+    ],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

@@ -1,0 +1,95 @@
+{
+  "seq": 133,
+  "sha": "e04b381e6e0c2fed47890ea618dd1b48587afb14",
+  "parents": [
+    "3bc76613f371ad5f5bea65e9772ad9c0a8adc0ee"
+  ],
+  "author": {
+    "name": "Emilijus Stankus",
+    "email": "emilijus@gmail.com",
+    "date": "2021-10-18T16:13:49+03:00"
+  },
+  "message": "Fix deep file parsing not working when flag delimiter is set (#110)\n\nCo-authored-by: Emilijus Stankus <e.stankus@nanoavionics.com>",
+  "pr": {
+    "number": 110,
+    "title": "Fix deep file parsing not working when flag delimiter is set",
+    "body": "File parsing with nested structure doesn't work currently when a different flag delimiter than default \".\" is set. So I tried to fix that here. \r\n\r\nCouldn't run the full test suite on my machine, so I am not 100% sure that this change doesn't break anything else.",
+    "url": "https://github.com/cristalhq/aconfig/pull/110"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 36,
+    "deletions": 1
+  },
+  "files": [
+    {
+      "path": "aconfig_test.go",
+      "status": "M",
+      "additions": 32,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "reflection.go",
+      "status": "M",
+      "additions": 4,
+      "deletions": 1,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/aconfig_test.go b/aconfig_test.go\nindex f91002d..506d44a 100644\n--- a/aconfig_test.go\n+++ b/aconfig_test.go\n@@ -1450,3 +1450,35 @@ func TestBad(t *testing.T) {\n \t\tt.Fatalf(\"want %v, got %v\", want, got)\n \t}\n }\n+\n+func TestFileConfigFlagDelim(t *testing.T) {\n+\ttype TestConfig struct {\n+\t\tOptions struct {\n+\t\t\tFoo float64\n+\t\t\tBar float64\n+\t\t}\n+\t}\n+\tvar cfg TestConfig\n+\n+\tloader := LoaderFor(&cfg, Config{\n+\t\tSkipDefaults:  true,\n+\t\tSkipEnv:       true,\n+\t\tSkipFlags:     true,\n+\t\tFlagDelimiter: \"_\",\n+\n+\t\tFiles: []string{\"testdata/toy.json\"},\n+\t})\n+\n+\tif err := loader.Load(); err != nil {\n+\t\tt.Fatal(err)\n+\t}\n+\n+\tvar want = TestConfig{Options: struct {\n+\t\tFoo float64\n+\t\tBar float64\n+\t}{0.4, 0.25}}\n+\n+\tif got := cfg; !reflect.DeepEqual(want, got) {\n+\t\tt.Fatalf(\"want %v, got %v\", want, got)\n+\t}\n+}\ndiff --git a/reflection.go b/reflection.go\nindex 07c6b97..f7fe2ce 100644\n--- a/reflection.go\n+++ b/reflection.go\n@@ -73,7 +73,10 @@ func (l *Loader) tagsForField(field reflect.StructField) map[string]string {\n }\n \n func (l *Loader) fullTag(prefix string, f *fieldData, tag string) string {\n-\tsep := l.config.FlagDelimiter\n+\tsep := \".\"\n+\tif tag == flagNameTag {\n+\t\tsep = l.config.FlagDelimiter\n+\t}\n \tif tag == envNameTag {\n \t\tsep = l.config.envDelimiter\n \t}\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/build.yml",
+    "LICENSE",
+    "README.md",
+    "aconfig.go",
+    "aconfig_test.go",
+    "aconfigdotenv/dotenv.go",
+    "aconfigdotenv/dotenv_test.go",
+    "aconfigdotenv/go.mod",
+    "aconfigdotenv/go.sum",
+    "aconfighcl/go.mod",
+    "aconfighcl/go.sum",
+    "aconfighcl/hcl.go",
+    "aconfighcl/hcl_test.go",
+    "aconfigtoml/go.mod",
+    "aconfigtoml/go.sum",
+    "aconfigtoml/toml.go",
+    "aconfigtoml/toml_test.go",
+    "aconfigyaml/go.mod",
+    "aconfigyaml/go.sum",
+    "aconfigyaml/yaml.go",
+    "aconfigyaml/yaml_test.go",
+    "doc.go",
+    "example_test.go",
+    "go.mod",
+    "reflection.go",
+    "testdata/bad_config.json",
+    "testdata/complex.json",
+    "testdata/config.json",
+    "testdata/config1.json",
+    "testdata/config2.json",
+    "testdata/config3.json",
+    "testdata/example_config.json",
+    "testdata/toy.json",
+    "testdata/unknown_fields.json",
+    "utils.go",
+    "utils_test.go"
+  ],
+  "explanation": {
+    "what": "reflection.go の fullTag() を修正し、区切り文字(sep)の決定ロジックを「タグが flagNameTag のときだけ FlagDelimiter を使い、それ以外(ファイル・環境変数由来のネストしたキー)はデフォルトの \".\" を使う」形に変更した。以前は無条件に FlagDelimiter を sep として使っていた。あわせて FlagDelimiter を \"_\" に変更したケースでネスト構造体(Options.Foo/Options.Bar)を JSON ファイルから正しく読めることを確認する TestFileConfigFlagDelim を追加している。",
+    "why": "PR body の説明通り、FlagDelimiter をデフォルトの \".\" 以外に変更すると、ファイルからのネスト構造体パースが壊れる不具合を修正するもの。fullTag はコマンドラインフラグ名の組み立てだけでなく、ファイル内のネストキー照合にも使われる共通関数だったため、FlagDelimiter がその全体に影響してしまっていた。投稿者はPR本文で「自分の環境ではフルテストが回せず、他を壊さないか100%の確信は持てない」と述べている。",
+    "highlights": [
+      { "file": "reflection.go", "note": "sep の決定を tag == flagNameTag の分岐に限定した変更が修正の核" },
+      { "file": "aconfig_test.go", "note": "TestFileConfigFlagDelim が FlagDelimiter 変更時のネスト構造体読み込みを検証する回帰テスト" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [{ "type": "pr", "number": 110, "url": "https://github.com/cristalhq/aconfig/pull/110" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

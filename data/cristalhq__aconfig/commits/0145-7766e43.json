@@ -1,0 +1,98 @@
+{
+  "seq": 145,
+  "sha": "7766e4373fd8196249c6e9bec536b169d7e6c3e5",
+  "parents": [
+    "2999b2a228d79dd8620b7284d41637ee0f39185b"
+  ],
+  "author": {
+    "name": "XIE Long",
+    "email": "XIELongDragon@users.noreply.github.com",
+    "date": "2022-07-19T16:33:43+08:00"
+  },
+  "message": "Support unmarshal custom type (#127)",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 29,
+    "deletions": 0
+  },
+  "files": [
+    {
+      "path": "aconfig_test.go",
+      "status": "M",
+      "additions": 23,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "reflection.go",
+      "status": "M",
+      "additions": 6,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/aconfig_test.go b/aconfig_test.go\nindex 2e658e2..2d130c3 100644\n--- a/aconfig_test.go\n+++ b/aconfig_test.go\n@@ -2,6 +2,7 @@ package aconfig\n \n import (\n \t\"embed\"\n+\t\"fmt\"\n \t\"io/ioutil\"\n \t\"net/url\"\n \t\"os\"\n@@ -11,6 +12,25 @@ import (\n \t\"time\"\n )\n \n+type LogLevel int8\n+\n+func (l *LogLevel) UnmarshalText(text []byte) error {\n+\tswitch string(text) {\n+\tcase \"debug\":\n+\t\t*l = -1\n+\tcase \"info\":\n+\t\t*l = 0\n+\tcase \"warn\":\n+\t\t*l = 1\n+\tcase \"error\":\n+\t\t*l = 2\n+\tdefault:\n+\t\treturn fmt.Errorf(\"unknown log level: %s\", text)\n+\t}\n+\n+\treturn nil\n+}\n+\n func TestDefaults(t *testing.T) {\n \tvar cfg TestConfig\n \tloader := LoaderFor(&cfg, Config{\n@@ -71,6 +91,8 @@ func TestDefaults_AllTypes(t *testing.T) {\n \n \t\tDur  time.Duration `default:\"1h2m3s\"`\n \t\tTime time.Time     `default:\"2000-04-05 10:20:30 +0000 UTC\"`\n+\n+\t\tLevel LogLevel `default:\"warn\"`\n \t}\n \n \tvar cfg AllTypesConfig\n@@ -101,6 +123,7 @@ func TestDefaults_AllTypes(t *testing.T) {\n \t\tDur:     time.Hour + 2*time.Minute + 3*time.Second,\n \t\t// TODO\n \t\t// Time :2000-04-05 10:20:30 +0000 UTC,\n+\t\tLevel: LogLevel(1),\n \t}\n \n \tif got := cfg; got != want {\ndiff --git a/reflection.go b/reflection.go\nindex 7555dfc..7ea1090 100644\n--- a/reflection.go\n+++ b/reflection.go\n@@ -1,6 +1,7 @@\n package aconfig\n \n import (\n+\t\"encoding\"\n \t\"fmt\"\n \t\"reflect\"\n \t\"strconv\"\n@@ -158,6 +159,11 @@ func (l *Loader) setFieldData(field *fieldData, value interface{}) error {\n \t\treturn nil\n \t}\n \n+\tpv := field.value.Addr().Interface()\n+\tif v, ok := pv.(encoding.TextUnmarshaler); ok {\n+\t\treturn v.UnmarshalText([]byte(fmt.Sprint(value)))\n+\t}\n+\n \tswitch kind := field.value.Type().Kind(); kind {\n \tcase reflect.Bool:\n \t\treturn l.setBool(field, fmt.Sprint(value))\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/dependabot.yml",
+    ".github/workflows/build.yml",
+    "LICENSE",
+    "README.md",
+    "aconfig.go",
+    "aconfig_test.go",
+    "aconfigdotenv/dotenv.go",
+    "aconfigdotenv/dotenv_test.go",
+    "aconfigdotenv/go.mod",
+    "aconfigdotenv/go.sum",
+    "aconfigdotenv/testdata/config.env",
+    "aconfighcl/go.mod",
+    "aconfighcl/go.sum",
+    "aconfighcl/hcl.go",
+    "aconfighcl/hcl_test.go",
+    "aconfighcl/testdata/config.hcl",
+    "aconfigtoml/go.mod",
+    "aconfigtoml/go.sum",
+    "aconfigtoml/testdata/config.toml",
+    "aconfigtoml/toml.go",
+    "aconfigtoml/toml_test.go",
+    "aconfigyaml/go.mod",
+    "aconfigyaml/go.sum",
+    "aconfigyaml/res.yaml",
+    "aconfigyaml/testdata/config.yaml",
+    "aconfigyaml/yaml.go",
+    "aconfigyaml/yaml_test.go",
+    "doc.go",
+    "example_test.go",
+    "go.mod",
+    "reflection.go",
+    "testdata/bad_config.json",
+    "testdata/complex.json",
+    "testdata/config.json",
+    "testdata/config1.json",
+    "testdata/config2.json",
+    "testdata/config3.json",
+    "testdata/example_config.json",
+    "testdata/toy.json",
+    "testdata/unknown_fields.json",
+    "utils.go",
+    "utils_test.go"
+  ],
+  "explanation": {
+    "what": "setFieldData でフィールドの値を設定する際、reflect.Kind によるプリミティブ型の分岐に入る前に、フィールドが `encoding.TextUnmarshaler` を実装していればその `UnmarshalText` を呼ぶ処理を追加した。テストでは int8 を基底型とする独自の LogLevel 型に UnmarshalText を実装し、`default:\"warn\"` タグから LogLevel(1) が復元されることを確認している。",
+    "why": "この変更に紐づく PR/issue の記録はなく、コミットメッセージ \"Support unmarshal custom type\" 以上の背景説明もない。aconfig は reflect.Kind で処理を分岐する既存実装だと int8 のような独自定義型を文字列表現(\"warn\" 等)から直接組み立てる手段がなく、TextUnmarshaler という Go 標準の慣習に乗ることでユーザー定義型にも対応させたものと見られる。",
+    "highlights": [
+      { "file": "reflection.go", "note": "setFieldData の switch 分岐前に encoding.TextUnmarshaler の型アサーションを追加" },
+      { "file": "aconfig_test.go", "note": "LogLevel 型と UnmarshalText の実装例。default タグの文字列がそのまま渡される挙動を確認できる" }
+    ],
+    "langNotes": [
+      { "topic": "encoding.TextUnmarshaler", "note": "標準ライブラリの `UnmarshalText([]byte) error` を実装する型全般が満たすインタフェース。json/xml 等の多くのエンコーダがこのインタフェースをサポートしており、aconfig もここで同じ慣習に乗ることで独自型のデコードをライブラリ側に実装せずに済ませている。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

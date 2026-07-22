@@ -1,0 +1,83 @@
+{
+  "seq": 69,
+  "sha": "4cffbbc6cb10c8a78db1eeddcd2d785724072480",
+  "parents": [
+    "16f0e9385ae8fe0fe1935b86447dde8e19bbe1b1"
+  ],
+  "author": {
+    "name": "Oleg Kovalov",
+    "email": "oleg@hey.com",
+    "date": "2020-11-14T13:32:27+01:00"
+  },
+  "message": "simplify internal api (#28)",
+  "pr": {
+    "number": 28,
+    "title": "simplify internal api",
+    "body": "",
+    "url": "https://github.com/cristalhq/aconfig/pull/28"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 5,
+    "deletions": 5
+  },
+  "files": [
+    {
+      "path": "aconfig.go",
+      "status": "M",
+      "additions": 5,
+      "deletions": 5,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/aconfig.go b/aconfig.go\nindex c7ad54e..eb3efbc 100644\n--- a/aconfig.go\n+++ b/aconfig.go\n@@ -176,7 +176,7 @@ func (l *Loader) WalkFields(fn func(f Field) bool) {\n // Load configuration into a given param.\n func (l *Loader) Load() error {\n \tl.assertBuilt()\n-\tif err := l.loadSources(l.dst); err != nil {\n+\tif err := l.loadSources(); err != nil {\n \t\treturn fmt.Errorf(\"aconfig: cannot load config: %w\", err)\n \t}\n \treturn nil\n@@ -194,14 +194,14 @@ func (l *Loader) assertBuilt() {\n \t}\n }\n \n-func (l *Loader) loadSources(into interface{}) error {\n+func (l *Loader) loadSources() error {\n \tif !l.config.SkipDefaults {\n \t\tif err := l.loadDefaults(); err != nil {\n \t\t\treturn err\n \t\t}\n \t}\n \tif !l.config.SkipFile {\n-\t\tif err := l.loadFromFile(into); err != nil {\n+\t\tif err := l.loadFromFile(); err != nil {\n \t\t\treturn err\n \t\t}\n \t}\n@@ -227,7 +227,7 @@ func (l *Loader) loadDefaults() error {\n \treturn nil\n }\n \n-func (l *Loader) loadFromFile(dst interface{}) error {\n+func (l *Loader) loadFromFile() error {\n \tfor _, file := range l.config.Files {\n \t\tf, err := os.Open(file)\n \t\tif err != nil {\n@@ -244,7 +244,7 @@ func (l *Loader) loadFromFile(dst interface{}) error {\n \t\t\treturn fmt.Errorf(\"file format '%q' isn't supported\", ext)\n \t\t}\n \n-\t\terr = d.DecodeFile(file, dst)\n+\t\terr = d.DecodeFile(file, l.dst)\n \t\tif err == nil {\n \t\t\treturn nil\n \t\t}\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/build.yml",
+    "LICENSE",
+    "README.md",
+    "aconfig.go",
+    "aconfig_test.go",
+    "aconfighcl/go.mod",
+    "aconfighcl/go.sum",
+    "aconfighcl/hcl.go",
+    "aconfighcl/hcl_test.go",
+    "aconfigtoml/go.mod",
+    "aconfigtoml/go.sum",
+    "aconfigtoml/toml.go",
+    "aconfigtoml/toml_test.go",
+    "aconfigyaml/go.mod",
+    "aconfigyaml/go.sum",
+    "aconfigyaml/yaml.go",
+    "aconfigyaml/yaml_test.go",
+    "example_test.go",
+    "go.mod",
+    "go.sum",
+    "reflection.go",
+    "testdata/all_types_config.json",
+    "testdata/bad_config.json",
+    "testdata/config1.json",
+    "testdata/example_config.json",
+    "testdata/my_duration_config.json",
+    "testdata/other_numbers_config.json",
+    "testdata/test_config_def.json",
+    "testdata/test_config_env.json",
+    "testdata/test_config_flag.json",
+    "testdata/unknown.ext",
+    "utils.go"
+  ],
+  "explanation": {
+    "what": "loadSources(into interface{}) と loadFromFile(dst interface{}) から引数を削除し、それぞれ loadSources() / loadFromFile() として、Loaderが既に保持しているフィールド l.dst を直接参照する形に変更した。呼び出し側の Load() も l.loadSources(l.dst) から l.loadSources() に単純化されている。",
+    "why": "PR #26 でのFileDecoder導入・#27でのテスト追加を経て、内部関数が引数として渡していた into/dstは常にLoaderが保持するl.dstと同一だったため、PR #28のタイトル「simplify internal api」通り冗長な引数受け渡しを削り、内部APIをシンプルにする整理コミットと考えられる。",
+    "highlights": [
+      { "file": "aconfig.go", "note": "loadSources/loadFromFileの引数が削除されl.dstを直接使うようになった箇所" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [{ "type": "pr", "number": 28, "url": "https://github.com/cristalhq/aconfig/pull/28" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

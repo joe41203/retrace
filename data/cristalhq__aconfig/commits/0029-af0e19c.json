@@ -1,0 +1,75 @@
+{
+  "seq": 29,
+  "sha": "af0e19c257339c028eb4a0796eed7f6bfb3aa90e",
+  "parents": [
+    "5ed7ad3c4121ae73472a54a3f58ceaa1fe56b735"
+  ],
+  "author": {
+    "name": "Oleg Kovalov",
+    "email": "iamolegkovalov@gmail.com",
+    "date": "2020-07-23T10:56:10+02:00"
+  },
+  "message": "support simple pointer types",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 9,
+    "deletions": 1
+  },
+  "files": [
+    {
+      "path": "aconfig.go",
+      "status": "M",
+      "additions": 8,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "aconfig_test.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/aconfig.go b/aconfig.go\nindex c4f67cf..060bbc5 100644\n--- a/aconfig.go\n+++ b/aconfig.go\n@@ -229,6 +229,14 @@ func makaName(name string, parent *fieldData) string {\n }\n \n func setFieldDataHelper(field *fieldData, value string) error {\n+\t// unwrap pointers\n+\tfor field.Value.Type().Kind() == reflect.Ptr {\n+\t\tif field.Value.IsNil() {\n+\t\t\tfield.Value.Set(reflect.New(field.Value.Type().Elem()))\n+\t\t}\n+\t\tfield.Value = field.Value.Elem()\n+\t}\n+\n \tswitch kind := field.Value.Type().Kind(); kind {\n \tcase reflect.Bool:\n \t\treturn setBool(field, value)\ndiff --git a/aconfig_test.go b/aconfig_test.go\nindex fc08fc0..9b2bd1f 100644\n--- a/aconfig_test.go\n+++ b/aconfig_test.go\n@@ -16,7 +16,7 @@ import (\n \n type TestConfig struct {\n \tStr      string `default:\"str-def\"`\n-\tInt      int32  `default:\"123\"`\n+\tInt      *int32 `default:\"123\"`\n \tHTTPPort int    `default:\"8080\"`\n \tSub      SubConfig\n \n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/build.yml",
+    "LICENSE",
+    "README.md",
+    "aconfig.go",
+    "aconfig_test.go",
+    "example_test.go",
+    "go.mod",
+    "go.sum",
+    "testdata/all_types_config.json",
+    "testdata/bad_config.json",
+    "testdata/config1.json",
+    "testdata/config1.toml",
+    "testdata/config1.yaml",
+    "testdata/example_config.json",
+    "testdata/my_duration_config.json",
+    "testdata/other_numbers_config.json",
+    "testdata/test_config_def.json",
+    "testdata/test_config_env.json",
+    "testdata/test_config_flag.json",
+    "testdata/unknown.ext"
+  ],
+  "explanation": {
+    "what": "setFieldDataHelper の先頭に、フィールドの型が reflect.Ptr である間ループしてポインタを剥がす処理を追加した。nil ポインタなら reflect.New で確保してから Elem() で指す先の値に field.Value を差し替える。テストの TestConfig.Int フィールドを int32 から *int32 に変えて動作確認している。",
+    "why": "メッセージの通り「単純なポインタ型のサポート」。default タグを持つフィールドが `*int32` のようなポインタ型でも、確保して実体に値を書き込めるようにする変更。",
+    "highlights": [
+      { "file": "aconfig.go", "note": "reflect.Ptr を for ループで剥がし、nil なら reflect.New で確保してから Elem() に値を書き込む" }
+    ],
+    "langNotes": [
+      { "topic": "reflect.New と Elem()", "note": "reflect.New(T) は T 型のゼロ値を指す新しいポインタ(reflect.Value)を返す。ポインタが指す実体を読み書きするには .Elem() で参照先の Value を取得する必要がある。nilポインタのフィールドに値を設定する定番パターン。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

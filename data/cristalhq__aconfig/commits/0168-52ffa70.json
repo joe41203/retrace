@@ -1,0 +1,112 @@
+{
+  "seq": 168,
+  "sha": "52ffa7065e3ea4675ef5da34e8d80920ddcc280a",
+  "parents": [
+    "8eed6310cd6b245544b8ba1b2cb22e28058ab51f"
+  ],
+  "author": {
+    "name": "sattellite",
+    "email": "null@sattellite.me",
+    "date": "2025-11-28T10:00:17+03:00"
+  },
+  "message": "Respect tag name for structs in a slice (#166)",
+  "pr": {
+    "number": 166,
+    "title": "respect tag name for structs in a slice",
+    "body": "I caught trouble when some fields in my structs have names that contains more then one uppercase letter. I fixed this trouble.\r\n\r\n```go\r\ntype A struct {\r\n  B struct {\r\n    C []struct{\r\n      ID       int    // previous m2s searches for an \"Id\"\r\n      UserName string // previous m2s searches for an \"Username\"\r\n    }\r\n  }\r\n}\r\n```\r\n\r\nNow the tag name is respected into account in the structures inside the slice.\r\n\r\n",
+    "url": "https://github.com/cristalhq/aconfig/pull/166"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 3,
+    "additions": 45,
+    "deletions": 22
+  },
+  "files": [
+    {
+      "path": "aconfig_test.go",
+      "status": "M",
+      "additions": 10,
+      "deletions": 8,
+      "binary": false
+    },
+    {
+      "path": "reflection.go",
+      "status": "M",
+      "additions": 33,
+      "deletions": 13,
+      "binary": false
+    },
+    {
+      "path": "testdata/slice-struct-primitive-slice.json",
+      "status": "M",
+      "additions": 2,
+      "deletions": 1,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/aconfig_test.go b/aconfig_test.go\nindex dcb7789..2311efd 100644\n--- a/aconfig_test.go\n+++ b/aconfig_test.go\n@@ -1536,10 +1536,11 @@ func TestFileConfigFlagDelim(t *testing.T) {\n \n func TestSliceOfStructsWithSliceOfPrimitives(t *testing.T) {\n \ttype TestService struct {\n-\t\tName     string\n-\t\tStrings  []string\n-\t\tIntegers []int\n-\t\tBooleans []bool\n+\t\tName           string\n+\t\tStrings        []string\n+\t\tIntegers       []int\n+\t\tBooleans       []bool\n+\t\tAnotherStrings []string `json:\"another_strings\"`\n \t}\n \n \ttype TestConfig struct {\n@@ -1558,10 +1559,11 @@ func TestSliceOfStructsWithSliceOfPrimitives(t *testing.T) {\n \twant := TestConfig{\n \t\tServices: []TestService{\n \t\t\t{\n-\t\t\t\tName:     \"service1\",\n-\t\t\t\tStrings:  []string{\"string1\", \"string2\"},\n-\t\t\t\tIntegers: []int{1, 2},\n-\t\t\t\tBooleans: []bool{true, false},\n+\t\t\t\tName:           \"service1\",\n+\t\t\t\tStrings:        []string{\"string1\", \"string2\"},\n+\t\t\t\tIntegers:       []int{1, 2},\n+\t\t\t\tBooleans:       []bool{true, false},\n+\t\t\t\tAnotherStrings: []string{\"another1\", \"another2\"},\n \t\t\t},\n \t\t},\n \t}\ndiff --git a/reflection.go b/reflection.go\nindex c4892e9..3d5f2b5 100644\n--- a/reflection.go\n+++ b/reflection.go\n@@ -358,22 +358,42 @@ func (l *Loader) setMap(field *fieldData, value string) error {\n }\n \n func (l *Loader) m2s(m map[string]interface{}, structValue reflect.Value) error {\n-\tfor name, value := range m {\n-\t\tname = strings.Title(name)\n-\t\tstructFieldValue := structValue.FieldByName(name)\n-\t\tif !structFieldValue.IsValid() {\n-\t\t\treturn fmt.Errorf(\"no such field %q in struct\", name)\n-\t\t}\n+\tfor _, dec := range l.config.FileDecoders {\n+\t\tfor name, value := range m {\n+\t\t\tstructFieldValue := structValue.FieldByName(name)\n+\t\t\tfor i := 0; i < structValue.NumField(); i++ {\n+\t\t\t\t// first try to find field by name\n+\t\t\t\ttagName := structValue.Type().Field(i).Tag.Get(dec.Format())\n+\t\t\t\t// if tag is set - use it\n+\t\t\t\tif strings.EqualFold(tagName, name) {\n+\t\t\t\t\tname = structValue.Type().Field(i).Name\n+\t\t\t\t\tstructFieldValue = structValue.FieldByName(name)\n+\t\t\t\t\tbreak\n+\t\t\t\t}\n+\t\t\t\t// if tag is not set - try to find field by name\n+\t\t\t\tif tagName == \"\" {\n+\t\t\t\t\tif strings.EqualFold(structValue.Type().Field(i).Name, name) {\n+\t\t\t\t\t\tname = structValue.Type().Field(i).Name\n+\t\t\t\t\t\tstructFieldValue = structValue.FieldByName(name)\n+\t\t\t\t\t\tbreak\n+\t\t\t\t\t}\n+\t\t\t\t}\n+\t\t\t}\n \n-\t\tif !structFieldValue.CanSet() {\n-\t\t\treturn fmt.Errorf(\"cannot set %q field value\", name)\n-\t\t}\n+\t\t\tif !structFieldValue.IsValid() {\n+\t\t\t\treturn fmt.Errorf(\"no such field %q in struct\", name)\n+\t\t\t}\n \n-\t\tfield, _ := structValue.Type().FieldByName(name)\n+\t\t\tif !structFieldValue.CanSet() {\n+\t\t\t\treturn fmt.Errorf(\"cannot set %q field value\", name)\n+\t\t\t}\n \n-\t\tfd := l.newFieldData(field, structFieldValue, nil)\n-\t\tif err := l.setFieldData(fd, value); err != nil {\n-\t\t\treturn err\n+\t\t\tfield, _ := structValue.Type().FieldByName(name)\n+\n+\t\t\tfd := l.newFieldData(field, structFieldValue, nil)\n+\t\t\tif err := l.setFieldData(fd, value); err != nil {\n+\t\t\t\treturn err\n+\t\t\t}\n \t\t}\n \t}\n \treturn nil\ndiff --git a/testdata/slice-struct-primitive-slice.json b/testdata/slice-struct-primitive-slice.json\nindex 0010a0e..d7676e0 100644\n--- a/testdata/slice-struct-primitive-slice.json\n+++ b/testdata/slice-struct-primitive-slice.json\n@@ -4,7 +4,8 @@\n       \"name\": \"service1\",\n       \"strings\": [\"string1\", \"string2\"],\n       \"integers\": [1, 2],\n-      \"booleans\": [true, false]\n+      \"booleans\": [true, false],\n+      \"another_strings\": [\"another1\", \"another2\"]\n     }\n   ]\n }\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/dependabot.yml",
+    ".github/workflows/build.yml",
+    "LICENSE",
+    "README.md",
+    "aconfig.go",
+    "aconfig_test.go",
+    "aconfigdotenv/dotenv.go",
+    "aconfigdotenv/dotenv_test.go",
+    "aconfigdotenv/go.mod",
+    "aconfigdotenv/go.sum",
+    "aconfigdotenv/testdata/config.env",
+    "aconfighcl/go.mod",
+    "aconfighcl/go.sum",
+    "aconfighcl/hcl.go",
+    "aconfighcl/hcl_test.go",
+    "aconfighcl/testdata/config.hcl",
+    "aconfigtoml/go.mod",
+    "aconfigtoml/go.sum",
+    "aconfigtoml/testdata/config.toml",
+    "aconfigtoml/toml.go",
+    "aconfigtoml/toml_test.go",
+    "aconfigyaml/go.mod",
+    "aconfigyaml/go.sum",
+    "aconfigyaml/res.yaml",
+    "aconfigyaml/testdata/config.yaml",
+    "aconfigyaml/yaml.go",
+    "aconfigyaml/yaml_test.go",
+    "doc.go",
+    "example_test.go",
+    "go.mod",
+    "go.sum",
+    "parser.go",
+    "reflection.go",
+    "testdata/bad_config.json",
+    "testdata/complex.json",
+    "testdata/config.json",
+    "testdata/config1.json",
+    "testdata/config2.json",
+    "testdata/config3.json",
+    "testdata/example_config.json",
+    "testdata/slice-deep-structs.json",
+    "testdata/slice-strings.json",
+    "testdata/slice-struct-primitive-slice.json",
+    "testdata/toy.json",
+    "testdata/unknown_fields.json",
+    "utils.go",
+    "utils_test.go"
+  ],
+  "explanation": {
+    "what": "reflection.go の m2s(map[string]interface{} を struct のフィールドに割り当てる関数)を、単純な strings.Title(name) によるフィールド名変換から、登録済みの各 FileDecoder のフォーマットタグ(json/yamlなど)を優先的に照合するロジックに書き換えた。structValue の各フィールドを順に見て、対応する format タグがあり値のキー名と大小無視で一致すればそのフィールドを使い、タグが無ければフィールド名同士を大小無視で比較する、という2段階の照合になっている。テストの TestSliceOfStructsWithSliceOfPrimitives に AnotherStrings フィールド(`json:\"another_strings\"`タグ付き)を追加して検証している。",
+    "why": "PR本文に示された再現コードの通り、スライスの中の struct にある `ID`(1文字目以外全て大文字)や `UserName`(複数の大文字を含む)のようなフィールド名は、旧実装の strings.Title ベースの単純な名前一致では正しく対応するキーを見つけられなかった(例えば\"Id\"や\"Username\"を探してしまう)。このコミットはスライス要素のstructに対しても、通常のトップレベルフィールドと同様にタグ名を尊重した照合を行うようにすることで、この不一致を解消している。",
+    "highlights": [
+      { "file": "reflection.go", "note": "m2s がFileDecoderのformatタグを優先的に照合し、タグが無い場合のみフィールド名の大小無視一致にフォールバックする2段階ロジックに変更" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [{ "type": "pr", "number": 166, "url": "https://github.com/cristalhq/aconfig/pull/166" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

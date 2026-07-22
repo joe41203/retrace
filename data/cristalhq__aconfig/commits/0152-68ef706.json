@@ -1,0 +1,96 @@
+{
+  "seq": 152,
+  "sha": "68ef706b9be71e4fa09b7b45fabeebc7b048f696",
+  "parents": [
+    "7672f5b40e7da86361c431ec3c2dbb6d2f04b8bc"
+  ],
+  "author": {
+    "name": "Oleg Kovalov",
+    "email": "oleg@hey.com",
+    "date": "2022-10-30T21:41:17+01:00"
+  },
+  "message": "Do not leak values in errors (#137)",
+  "pr": {
+    "number": 137,
+    "title": "Do not leak values in errors",
+    "body": "Kudos to @junk1tm ",
+    "url": "https://github.com/cristalhq/aconfig/pull/137"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 6,
+    "deletions": 6
+  },
+  "files": [
+    {
+      "path": "aconfig.go",
+      "status": "M",
+      "additions": 6,
+      "deletions": 6,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/aconfig.go b/aconfig.go\nindex 39f2e60..98f03c3 100644\n--- a/aconfig.go\n+++ b/aconfig.go\n@@ -345,8 +345,8 @@ func (l *Loader) loadFile(file string) error {\n \t}\n \n \tif !l.config.AllowUnknownFields {\n-\t\tfor env, value := range actualFields {\n-\t\t\treturn fmt.Errorf(\"unknown field in file %q: %s=%v (see AllowUnknownFields config param)\", file, env, value)\n+\t\tfor env := range actualFields {\n+\t\t\treturn fmt.Errorf(\"unknown field in file %q: %s (see AllowUnknownFields config param)\", file, env)\n \t\t}\n \t}\n \treturn nil\n@@ -394,9 +394,9 @@ func (l *Loader) postEnvCheck(values map[string]interface{}, dupls map[string]st\n \tfor name := range dupls {\n \t\tdelete(values, name)\n \t}\n-\tfor env, value := range values {\n+\tfor env := range values {\n \t\tif strings.HasPrefix(env, l.config.EnvPrefix) {\n-\t\t\treturn fmt.Errorf(\"unknown environment var %s=%v (see AllowUnknownEnvs config param)\", env, value)\n+\t\t\treturn fmt.Errorf(\"unknown environment var %s (see AllowUnknownEnvs config param)\", env)\n \t\t}\n \t}\n \treturn nil\n@@ -425,9 +425,9 @@ func (l *Loader) postFlagCheck(values map[string]interface{}, dupls map[string]s\n \tfor name := range dupls {\n \t\tdelete(values, name)\n \t}\n-\tfor flag, value := range values {\n+\tfor flag := range values {\n \t\tif strings.HasPrefix(flag, l.config.FlagPrefix) {\n-\t\t\treturn fmt.Errorf(\"unknown flag %s=%v (see AllowUnknownFlags config param)\", flag, value)\n+\t\t\treturn fmt.Errorf(\"unknown flag %s (see AllowUnknownFlags config param)\", flag)\n \t\t}\n \t}\n \treturn nil\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/dependabot.yml",
+    ".github/workflows/build.yml",
+    "LICENSE",
+    "README.md",
+    "aconfig.go",
+    "aconfig_test.go",
+    "aconfigdotenv/dotenv.go",
+    "aconfigdotenv/dotenv_test.go",
+    "aconfigdotenv/go.mod",
+    "aconfigdotenv/go.sum",
+    "aconfigdotenv/testdata/config.env",
+    "aconfighcl/go.mod",
+    "aconfighcl/go.sum",
+    "aconfighcl/hcl.go",
+    "aconfighcl/hcl_test.go",
+    "aconfighcl/testdata/config.hcl",
+    "aconfigtoml/go.mod",
+    "aconfigtoml/go.sum",
+    "aconfigtoml/testdata/config.toml",
+    "aconfigtoml/toml.go",
+    "aconfigtoml/toml_test.go",
+    "aconfigyaml/go.mod",
+    "aconfigyaml/go.sum",
+    "aconfigyaml/res.yaml",
+    "aconfigyaml/testdata/config.yaml",
+    "aconfigyaml/yaml.go",
+    "aconfigyaml/yaml_test.go",
+    "doc.go",
+    "example_test.go",
+    "go.mod",
+    "reflection.go",
+    "testdata/bad_config.json",
+    "testdata/complex.json",
+    "testdata/config.json",
+    "testdata/config1.json",
+    "testdata/config2.json",
+    "testdata/config3.json",
+    "testdata/example_config.json",
+    "testdata/slice-struct-primitive-slice.json",
+    "testdata/toy.json",
+    "testdata/unknown_fields.json",
+    "utils.go",
+    "utils_test.go"
+  ],
+  "explanation": {
+    "what": "aconfig.go の loadFile / postEnvCheck / postFlagCheck 内で、unknown field・unknown environment var・unknown flag のエラーメッセージから実際の値(value)を除去し、フィールド名・環境変数名・フラグ名だけを表示するように変更した。ループ変数を `for env, value := range` から `for env := range` に変えて未使用の value を排除している。",
+    "why": "PRタイトル\"Do not leak values in errors\"が示す通り、未知のフィールド・環境変数・フラグの値をそのままエラーメッセージに埋め込むと、パスワードやトークンなどの機密情報がログやエラー出力に漏れる恐れがあるための修正。",
+    "highlights": [
+      { "file": "aconfig.go", "note": "3箇所とも同じパターン: エラー文字列から %v の値埋め込みを削り、キー名のみ残す" }
+    ],
+    "langNotes": [
+      { "topic": "fmt.Errorf と %v", "note": "Go の fmt.Errorf は %v で任意の値を文字列化してエラーメッセージに埋め込めるが、値が機密情報を含みうる場合はこのコミットのように意図的に除外する設計判断が必要になる。" }
+    ],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [{ "type": "pr", "number": 137, "url": "https://github.com/cristalhq/aconfig/pull/137" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

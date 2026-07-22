@@ -1,0 +1,120 @@
+{
+  "seq": 135,
+  "sha": "2f40c1f1292c1fd67863c1c975fb0d16b3f3d3b2",
+  "parents": [
+    "8b60707c20692a9cbbe035873fa103df51b69271"
+  ],
+  "author": {
+    "name": "Oleg Kovalov",
+    "email": "oleg@hey.com",
+    "date": "2021-11-04T09:19:57+01:00"
+  },
+  "message": "Add yaml test with empty arrays (#113)",
+  "pr": {
+    "number": 113,
+    "title": "Add yaml test with empty arrays",
+    "body": "Updates #111 ",
+    "url": "https://github.com/cristalhq/aconfig/pull/113"
+  },
+  "linkedIssues": [
+    {
+      "number": 111,
+      "title": "Panic on parsing YAML configuration with empty lists",
+      "body": "Hi,\r\n\r\nI encounter panic when a list in the YAML configuration is empty:\r\n\r\n~~~go\r\npackage config_test\r\n\r\nimport (\r\n\t\"testing\"\r\n\r\n\t\"github.com/cristalhq/aconfig\"\r\n\t\"github.com/cristalhq/aconfig/aconfigyaml\"\r\n)\r\n\r\ntype (\r\n\tResourcesConfiguration struct {\r\n\t\tResourcesA []ResourceA `yaml:\"resources_a\"`\r\n\t\tResourcesB []ResourceB `yaml:\"resources_b\"`\r\n\t}\r\n\r\n\tResourceA struct {\r\n\t\tField string `yaml:\"field\"`\r\n\t}\r\n\r\n\tResourceB struct {\r\n\t\tField int `yaml:\"field\"`\r\n\t}\r\n)\r\n\r\nfunc TestLoadResources(t *testing.T) {\r\n\tresourcesConfiguration := new(ResourcesConfiguration)\r\n\r\n\tresourcesLoader := aconfig.LoaderFor(resourcesConfiguration,\r\n\t\taconfig.Config{\r\n\t\t\tSkipFlags:          true,\r\n\t\t\tFiles:              []string{\"asset_resources.yaml\"},\r\n\t\t\tFailOnFileNotFound: true,\r\n\t\t\tFileDecoders: map[string]aconfig.FileDecoder{\r\n\t\t\t\t\".yaml\": aconfigyaml.New(),\r\n\t\t\t},\r\n\t\t})\r\n\tif err := resourcesLoader.Load(); err != nil {\r\n\t\tt.Errorf(\"failed to load resources configurations [err=%s]\", err)\r\n\t}\r\n\r\n\tt.Logf(\"%v\", *resourcesConfiguration)\r\n}\r\n~~~\r\n\r\nTest file: _asset_resources.yaml_\r\n~~~yaml\r\nresources_a:\r\n\r\nresources_b:\r\n\r\n~~~\r\n\r\nPanic:\r\n~~~sh\r\n=== RUN   TestLoadResources\r\n--- FAIL: TestLoadResources (0.00s)\r\npanic: <nil> <nil> [recovered]\r\n\tpanic: <nil> <nil>\r\n\r\ngoroutine 20 [running]:\r\ntesting.tRunner.func1.2({0x1147b60, 0xc00009e680})\r\n\t/usr/local/go/src/testing/testing.go:1209 +0x24e\r\ntesting.tRunner.func1()\r\n\t/usr/local/go/src/testing/testing.go:1212 +0x218\r\npanic({0x1147b60, 0xc00009e680})\r\n\t/usr/local/go/src/runtime/panic.go:1038 +0x215\r\ngithub.com/cristalhq/aconfig.(*Loader).setFieldData(0x11496c0, 0xc0000ce210, {0x0, 0x0})\r\n\t/Users/user/go/pkg/mod/github.com/cristalhq/aconfig@v0.16.7/reflection.go:187 +0x9a5\r\ngithub.com/cristalhq/aconfig.(*Loader).loadFile(0xc000102000, {0x116b3c9, 0x14})\r\n\t/Users/user/go/pkg/mod/github.com/cristalhq/aconfig@v0.16.7/aconfig.go:330 +0x2f1\r\ngithub.com/cristalhq/aconfig.(*Loader).loadFiles(0xc000102000)\r\n\t/Users/user/go/pkg/mod/github.com/cristalhq/aconfig@v0.16.7/aconfig.go:290 +0xea\r\ngithub.com/cristalhq/aconfig.(*Loader).loadSources(0xc000102000)\r\n\t/Users/user/go/pkg/mod/github.com/cristalhq/aconfig@v0.16.7/aconfig.go:235 +0x7f\r\ngithub.com/cristalhq/aconfig.(*Loader).loadConfig(0xc000102000)\r\n\t/Users/user/go/pkg/mod/github.com/cristalhq/aconfig@v0.16.7/aconfig.go:211 +0x65\r\ngithub.com/cristalhq/aconfig.(*Loader).Load(0x1000000)\r\n\t/Users/user/go/pkg/mod/github.com/cristalhq/aconfig@v0.16.7/aconfig.go:201 +0x76\r\ngithub.com/ic2hrmk/project/subdir/test/config_test.TestLoadResources(0xc000083860)\r\n\t/Users/user/go/src/github.com/ic2hrmk/project/subdir/test/config/load_resources_test.go:37 +0x176\r\ntesting.tRunner(0xc000083860, 0x11741d0)\r\n\t/usr/local/go/src/testing/testing.go:1259 +0x102\r\ncreated by testing.(*T).Run\r\n\t/usr/local/go/src/testing/testing.go:1306 +0x35a\r\n\r\n~~~\r\n\r\nExpected:\r\n~~~sh\r\n=== RUN   TestLoadResources\r\n    load_resources_test.go:38: {[] []}\r\n--- PASS: TestLoadResources (0.00s)\r\nPASS\r\n~~~\r\n\r\nThanks!",
+      "url": "https://github.com/cristalhq/aconfig/issues/111"
+    }
+  ],
+  "stats": {
+    "filesChanged": 4,
+    "additions": 34,
+    "deletions": 3
+  },
+  "files": [
+    {
+      "path": "aconfigyaml/go.mod",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "aconfigyaml/go.sum",
+      "status": "M",
+      "additions": 2,
+      "deletions": 2,
+      "binary": false
+    },
+    {
+      "path": "aconfigyaml/res.yaml",
+      "status": "A",
+      "additions": 3,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "aconfigyaml/yaml_test.go",
+      "status": "M",
+      "additions": 28,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/aconfigyaml/go.mod b/aconfigyaml/go.mod\nindex eaa137f..641e50a 100644\n--- a/aconfigyaml/go.mod\n+++ b/aconfigyaml/go.mod\n@@ -3,6 +3,6 @@ module github.com/cristalhq/aconfig/aconfigyaml\n go 1.15\n \n require (\n-\tgithub.com/cristalhq/aconfig v0.16.1\n+\tgithub.com/cristalhq/aconfig v0.16.8\n \tgopkg.in/yaml.v2 v2.3.0\n )\ndiff --git a/aconfigyaml/go.sum b/aconfigyaml/go.sum\nindex bec1846..7ad29c2 100644\n--- a/aconfigyaml/go.sum\n+++ b/aconfigyaml/go.sum\n@@ -1,5 +1,5 @@\n-github.com/cristalhq/aconfig v0.16.1 h1:P3noQOujaPU5Of8E9fA1YYU3s/HUoPCIhpKkEgIQtfc=\n-github.com/cristalhq/aconfig v0.16.1/go.mod h1:NXaRp+1e6bkO4dJn+wZ71xyaihMDYPtCSvEhMTm/H3E=\n+github.com/cristalhq/aconfig v0.16.8 h1:lg8i0XHgfhvsnjNM5q/ou6jIHDRXlbBybjRP9t2fWuw=\n+github.com/cristalhq/aconfig v0.16.8/go.mod h1:NXaRp+1e6bkO4dJn+wZ71xyaihMDYPtCSvEhMTm/H3E=\n gopkg.in/check.v1 v0.0.0-20161208181325-20d25e280405 h1:yhCVgyC4o1eVCa2tZl7eS0r+SDo693bJlVdllGtEeKM=\n gopkg.in/check.v1 v0.0.0-20161208181325-20d25e280405/go.mod h1:Co6ibVJAznAaIkqp8huTwlJQCZ016jof/cbN4VW5Yz0=\n gopkg.in/yaml.v2 v2.3.0 h1:clyUAQHOM3G0M3f5vQj7LuJrETvjVot3Z5el9nffUtU=\ndiff --git a/aconfigyaml/res.yaml b/aconfigyaml/res.yaml\nnew file mode 100644\nindex 0000000..324649e\n--- /dev/null\n+++ b/aconfigyaml/res.yaml\n@@ -0,0 +1,3 @@\n+resources_a:\n+\n+resources_b:\n\\ No newline at end of file\ndiff --git a/aconfigyaml/yaml_test.go b/aconfigyaml/yaml_test.go\nindex 7bed2bb..bb21dec 100644\n--- a/aconfigyaml/yaml_test.go\n+++ b/aconfigyaml/yaml_test.go\n@@ -68,6 +68,34 @@ func TestYAML(t *testing.T) {\n \t}\n }\n \n+func TestLoadResources(t *testing.T) {\n+\ttype ResourceA struct {\n+\t\tField string `yaml:\"field\"`\n+\t}\n+\ttype ResourceB struct {\n+\t\tField int `yaml:\"field\"`\n+\t}\n+\ttype TestConfig struct {\n+\t\tResourcesA []ResourceA `yaml:\"resources_a\"`\n+\t\tResourcesB []ResourceB `yaml:\"resources_b\"`\n+\t}\n+\n+\tvar cfg TestConfig\n+\n+\tresourcesLoader := aconfig.LoaderFor(&cfg,\n+\t\taconfig.Config{\n+\t\t\tSkipFlags:          true,\n+\t\t\tFiles:              []string{\"res.yaml\"},\n+\t\t\tFailOnFileNotFound: true,\n+\t\t\tFileDecoders: map[string]aconfig.FileDecoder{\n+\t\t\t\t\".yaml\": aconfigyaml.New(),\n+\t\t\t},\n+\t\t})\n+\tif err := resourcesLoader.Load(); err != nil {\n+\t\tt.Errorf(\"failed to load resources configurations [err=%s]\", err)\n+\t}\n+}\n+\n func createTestFile(t *testing.T) string {\n \tt.Helper()\n \tdir := t.TempDir()\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/build.yml",
+    "LICENSE",
+    "README.md",
+    "aconfig.go",
+    "aconfig_test.go",
+    "aconfigdotenv/dotenv.go",
+    "aconfigdotenv/dotenv_test.go",
+    "aconfigdotenv/go.mod",
+    "aconfigdotenv/go.sum",
+    "aconfighcl/go.mod",
+    "aconfighcl/go.sum",
+    "aconfighcl/hcl.go",
+    "aconfighcl/hcl_test.go",
+    "aconfigtoml/go.mod",
+    "aconfigtoml/go.sum",
+    "aconfigtoml/toml.go",
+    "aconfigtoml/toml_test.go",
+    "aconfigyaml/go.mod",
+    "aconfigyaml/go.sum",
+    "aconfigyaml/res.yaml",
+    "aconfigyaml/yaml.go",
+    "aconfigyaml/yaml_test.go",
+    "doc.go",
+    "example_test.go",
+    "go.mod",
+    "reflection.go",
+    "testdata/bad_config.json",
+    "testdata/complex.json",
+    "testdata/config.json",
+    "testdata/config1.json",
+    "testdata/config2.json",
+    "testdata/config3.json",
+    "testdata/example_config.json",
+    "testdata/toy.json",
+    "testdata/unknown_fields.json",
+    "utils.go",
+    "utils_test.go"
+  ],
+  "explanation": {
+    "what": "aconfigyaml サブモジュールに、issue #111 の再現ケースそのままの構造体(ResourceA/ResourceB を要素に持つスライスを含む TestConfig)と、値の無い空リストを2つ持つ res.yaml を追加し、それを読み込んでもエラーにならないことを検証する TestLoadResources を追加した。あわせて aconfigyaml/go.mod・go.sum の aconfig 依存バージョンを v0.16.1 から v0.16.8(前コミットの panic 修正を含む版)へ更新している。",
+    "why": "前コミット(seq134)で本体(aconfig)側の panic は直したが、YAML デコーダを使う実際の利用シナリオ(サブモジュール aconfigyaml 経由)でも回帰しないことを issue 報告者のケースに忠実な形で確認するための追加テスト。PR body で issue #111 を「Updates」としており、前コミットの修正を検証・補完する位置づけ。",
+    "highlights": [
+      { "file": "aconfigyaml/yaml_test.go", "note": "TestLoadResources が issue #111 の再現コードをほぼそのまま移植した回帰テスト" },
+      { "file": "aconfigyaml/go.mod", "note": "aconfig 依存を v0.16.8 に上げて、panic 修正済みの本体を使うようにしている" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "issue",
+    "refs": [
+      { "type": "pr", "number": 113, "url": "https://github.com/cristalhq/aconfig/pull/113" },
+      { "type": "issue", "number": 111, "url": "https://github.com/cristalhq/aconfig/issues/111" }
+    ],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

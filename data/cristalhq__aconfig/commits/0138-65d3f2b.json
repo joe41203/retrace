@@ -1,0 +1,111 @@
+{
+  "seq": 138,
+  "sha": "65d3f2b43da40ef24c892766ef2f1519c63ce997",
+  "parents": [
+    "b6d6be75d842b96fad4634c559ef2218f3854eb5"
+  ],
+  "author": {
+    "name": "Oleg Kovalov",
+    "email": "oleg@hey.com",
+    "date": "2022-05-15T12:39:54+02:00"
+  },
+  "message": "Support fs.FS (#118)",
+  "pr": {
+    "number": 118,
+    "title": "Support fs.FS",
+    "body": "",
+    "url": "https://github.com/cristalhq/aconfig/pull/118"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 3,
+    "additions": 75,
+    "deletions": 3
+  },
+  "files": [
+    {
+      "path": "aconfig.go",
+      "status": "M",
+      "additions": 16,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "aconfig_test.go",
+      "status": "M",
+      "additions": 39,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "utils.go",
+      "status": "M",
+      "additions": 20,
+      "deletions": 2,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/aconfig.go b/aconfig.go\nindex d6c4fbd..384e3fe 100644\n--- a/aconfig.go\n+++ b/aconfig.go\n@@ -3,6 +3,7 @@ package aconfig\n import (\n \t\"flag\"\n \t\"fmt\"\n+\t\"io/fs\"\n \t\"os\"\n \t\"path/filepath\"\n \t\"strings\"\n@@ -24,6 +25,7 @@ type Loader struct {\n \tconfig  Config\n \tdst     interface{}\n \tfields  []*fieldData\n+\tfsys    fs.FS\n \tflagSet *flag.FlagSet\n \terrInit error\n }\n@@ -69,6 +71,9 @@ type Config struct {\n \t// FailOnFileNotFound will stop Loader on a first not found file from Files field in this structure.\n \tFailOnFileNotFound bool\n \n+\t// FileSystem from which files will be loaded. Default is nil (OS file system).\n+\tFileSystem fs.FS\n+\n \t// MergeFiles set to true will collect all the entries from all the given files.\n \t// Easy wat to cobine base.yaml with prod.yaml\n \tMergeFiles bool\n@@ -100,6 +105,7 @@ type Config struct {\n type FileDecoder interface {\n \tFormat() string\n \tDecodeFile(filename string) (map[string]interface{}, error)\n+\t// Init(fsys fs.FS)\n }\n \n // Field of the user configuration structure.\n@@ -142,12 +148,21 @@ func (l *Loader) init() {\n \t\tl.config.FlagPrefix += l.config.FlagDelimiter\n \t}\n \n+\tl.fsys = &fsOrOS{l.config.FileSystem}\n+\n \tif _, ok := l.config.FileDecoders[\".json\"]; !ok {\n \t\tif l.config.FileDecoders == nil {\n \t\t\tl.config.FileDecoders = map[string]FileDecoder{}\n \t\t}\n \t\tl.config.FileDecoders[\".json\"] = &jsonDecoder{}\n \t}\n+\tfor _, dec := range l.config.FileDecoders {\n+\t\tdec, ok := dec.(interface{ Init(fs.FS) })\n+\t\tif !ok {\n+\t\t\tcontinue\n+\t\t}\n+\t\tdec.Init(l.fsys)\n+\t}\n \n \tif l.config.Args == nil {\n \t\tl.config.Args = os.Args[1:]\n@@ -280,7 +295,7 @@ func (l *Loader) loadFiles() error {\n \t}\n \n \tfor _, file := range l.config.Files {\n-\t\tif _, err := os.Stat(file); os.IsNotExist(err) {\n+\t\tif _, err := fs.Stat(l.fsys, file); os.IsNotExist(err) {\n \t\t\tif l.config.FailOnFileNotFound {\n \t\t\t\treturn err\n \t\t\t}\ndiff --git a/aconfig_test.go b/aconfig_test.go\nindex 506d44a..e6d921b 100644\n--- a/aconfig_test.go\n+++ b/aconfig_test.go\n@@ -1,6 +1,7 @@\n package aconfig\n \n import (\n+\t\"embed\"\n \t\"io/ioutil\"\n \t\"net/url\"\n \t\"os\"\n@@ -242,6 +243,44 @@ func TestFile(t *testing.T) {\n \t}\n }\n \n+//go:embed testdata\n+var configEmbed embed.FS\n+\n+func TestFileEmbed(t *testing.T) {\n+\tfilepath := \"testdata/config.json\"\n+\n+\tvar cfg TestConfig\n+\tloader := LoaderFor(&cfg, Config{\n+\t\tSkipDefaults: true,\n+\t\tSkipEnv:      true,\n+\t\tSkipFlags:    true,\n+\t\tFiles:        []string{filepath},\n+\t\tFileSystem:   configEmbed,\n+\t})\n+\tif err := loader.Load(); err != nil {\n+\t\tt.Fatal(err)\n+\t}\n+\n+\twant := TestConfig{\n+\t\tStr:      \"str-json\",\n+\t\tBytes:    []byte(\"Ynl0ZXMtanNvbg==\"),\n+\t\tInt:      int32Ptr(101),\n+\t\tHTTPPort: 65000,\n+\t\tSub: SubConfig{\n+\t\t\tFloat: 999.111,\n+\t\t},\n+\t\tAnon: struct {\n+\t\t\tIsAnon bool `default:\"true\"`\n+\t\t}{\n+\t\t\tIsAnon: true,\n+\t\t},\n+\t}\n+\n+\tif got := cfg; !reflect.DeepEqual(want, got) {\n+\t\tt.Fatalf(\"want %v, got %v\", want, got)\n+\t}\n+}\n+\n func TestFileMerging(t *testing.T) {\n \tfile1 := \"testdata/config1.json\"\n \tfile2 := \"testdata/config2.json\"\ndiff --git a/utils.go b/utils.go\nindex c58fb41..2c9cc94 100644\n--- a/utils.go\n+++ b/utils.go\n@@ -4,6 +4,7 @@ import (\n \t\"encoding/json\"\n \t\"flag\"\n \t\"fmt\"\n+\t\"io/fs\"\n \t\"os\"\n \t\"reflect\"\n \t\"strings\"\n@@ -138,7 +139,24 @@ func cut(s, sep string) (before, after string, found bool) {\n \treturn s, \"\", false\n }\n \n-type jsonDecoder struct{}\n+var _ fs.FS = &fsOrOS{}\n+\n+type fsOrOS struct{ fs.FS }\n+\n+func (fs *fsOrOS) Open(name string) (fs.File, error) {\n+\tif fs.FS == nil {\n+\t\treturn os.Open(name)\n+\t}\n+\treturn fs.FS.Open(name)\n+}\n+\n+type jsonDecoder struct {\n+\tfsys fs.FS\n+}\n+\n+func (d *jsonDecoder) Init(fsys fs.FS) {\n+\td.fsys = fsys\n+}\n \n // Format of the decoder.\n func (d *jsonDecoder) Format() string {\n@@ -147,7 +165,7 @@ func (d *jsonDecoder) Format() string {\n \n // DecodeFile implements FileDecoder.\n func (d *jsonDecoder) DecodeFile(filename string) (map[string]interface{}, error) {\n-\tf, err := os.Open(filename)\n+\tf, err := d.fsys.Open(filename)\n \tif err != nil {\n \t\treturn nil, err\n \t}\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/build.yml",
+    "LICENSE",
+    "README.md",
+    "aconfig.go",
+    "aconfig_test.go",
+    "aconfigdotenv/dotenv.go",
+    "aconfigdotenv/dotenv_test.go",
+    "aconfigdotenv/go.mod",
+    "aconfigdotenv/go.sum",
+    "aconfighcl/go.mod",
+    "aconfighcl/go.sum",
+    "aconfighcl/hcl.go",
+    "aconfighcl/hcl_test.go",
+    "aconfigtoml/go.mod",
+    "aconfigtoml/go.sum",
+    "aconfigtoml/toml.go",
+    "aconfigtoml/toml_test.go",
+    "aconfigyaml/go.mod",
+    "aconfigyaml/go.sum",
+    "aconfigyaml/res.yaml",
+    "aconfigyaml/yaml.go",
+    "aconfigyaml/yaml_test.go",
+    "doc.go",
+    "example_test.go",
+    "go.mod",
+    "reflection.go",
+    "testdata/bad_config.json",
+    "testdata/complex.json",
+    "testdata/config.json",
+    "testdata/config1.json",
+    "testdata/config2.json",
+    "testdata/config3.json",
+    "testdata/example_config.json",
+    "testdata/toy.json",
+    "testdata/unknown_fields.json",
+    "utils.go",
+    "utils_test.go"
+  ],
+  "explanation": {
+    "what": "Config に新フィールド FileSystem fs.FS を追加し、Loader.init() で常に fsOrOS{l.config.FileSystem} という fs.FS 実装を組み立てて Loader.fsys に保持するようにした。fsOrOS.Open は FileSystem が nil なら os.Open にフォールバックし、そうでなければ渡された fs.FS の Open を使う。jsonDecoder には Init(fsys fs.FS) メソッドを追加してこの fsys を受け取り、DecodeFile 内の os.Open 呼び出しを d.fsys.Open に置き換えた。FileDecoder インターフェースにはコメントアウトされた `// Init(fs.FS)` が追加され、Init を実装するデコーダだけ init() 内のループで Init(l.fsys) が呼ばれる。loadFiles() のファイル存在チェックも os.Stat から fs.Stat(l.fsys, file) に変わっている。テストには embed.FS を使い testdata ディレクトリを埋め込んだ TestFileEmbed を追加した。",
+    "why": "PR タイトルの通り、設定ファイルの読み込み元を実 OS ファイルシステムに固定せず、Go 1.16 で導入された io/fs.FS 抽象を受け付けられるようにする機能追加。fsOrOS で「FileSystem 未指定なら従来通り os.Open」という後方互換を保ちながら、embed.FS のような仮想ファイルシステムやテスト用のインメモリ FS を注入できるようにしている。FileDecoder インターフェースの Init メソッドはコメントアウトされたままで、jsonDecoder だけが型アサーション経由のオプトインで対応しており、他のフォーマット別デコーダ(yaml/toml/hcl/dotenv)への波及は後続コミット(seq144 Support fsys for all decoders)に持ち越されている。",
+    "highlights": [
+      { "file": "utils.go", "note": "fsOrOS.Open が FileSystem==nil を os.Open にフォールバックする後方互換の要" },
+      { "file": "aconfig.go", "note": "init() でデコーダが Init(fs.FS) を実装していれば呼び出すダックタイピング的な型アサーション" },
+      { "file": "aconfig_test.go", "note": "TestFileEmbed が embed.FS を FileSystem に渡す使い方の実例" }
+    ],
+    "langNotes": [
+      { "topic": "io/fs.FS", "note": "Go 1.16 で追加された読み取り専用ファイルシステムの抽象インターフェース。Open(name) (fs.File, error) だけを要求する最小限の契約で、os.DirFS・embed.FS・testing/fstest.MapFS など複数の実装を同じ型として扱える。これにより設定ファイルの読み込み元を実ディスクからテスト用の埋め込みデータやモックに差し替えやすくなる。" },
+      { "topic": "embed.FS / //go:embed", "note": "//go:embed ディレクティブでビルド時にファイルをバイナリへ埋め込み、embed.FS 型の変数として実行時にアクセスできるようにする Go の機能。本コミットのテストでは testdata ディレクトリを埋め込み、外部ファイルなしで fs.FS 経由の読み込みを検証している。" },
+      { "topic": "型アサーションによるオプショナルインターフェース検出", "note": "`dec, ok := dec.(interface{ Init(fs.FS) })` のように、その場でインラインの匿名インターフェースを定義して型アサーションする書き方。特定のメソッドを実装している値だけを緩く判定でき、FileDecoder 全体には強制しないオプトイン機能を実現している。" }
+    ],
+    "diagram": {
+      "mermaid": "flowchart LR\n  A[\"Config.FileSystem (fs.FS, optional)\"] --> B[\"Loader.init(): fsOrOS{FileSystem}\"]\n  B --> C[\"Loader.fsys\"]\n  C --> D[\"jsonDecoder.Init(fsys)\"]\n  D --> E[\"DecodeFile: fsys.Open(filename)\"]\n  F[\"FileSystem == nil\"] -.->|\"fallback\"| G[\"os.Open(filename)\"]\n  B --> F",
+      "caption": "FileSystem 未指定時は os.Open にフォールバックしつつ、指定時は fs.FS 経由でファイルを読み込む流れ"
+    },
+    "evidence": "pr",
+    "refs": [{ "type": "pr", "number": 118, "url": "https://github.com/cristalhq/aconfig/pull/118" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

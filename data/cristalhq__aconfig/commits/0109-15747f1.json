@@ -1,0 +1,89 @@
+{
+  "seq": 109,
+  "sha": "15747f1572c5971af3c5a079ad333b4ced1585a0",
+  "parents": [
+    "e21901cd63f11ce194c41a90eedff32530fdb49c"
+  ],
+  "author": {
+    "name": "Yury Makarov",
+    "email": "mef4mail@gmail.com",
+    "date": "2021-04-08T19:50:16+03:00"
+  },
+  "message": "merge files with file from flag (#68)",
+  "pr": {
+    "number": 68,
+    "title": "merge files with file from flag",
+    "body": "Add file from flag to config.Files slice when config.MergeFiles is true",
+    "url": "https://github.com/cristalhq/aconfig/pull/68"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 5,
+    "deletions": 2
+  },
+  "files": [
+    {
+      "path": "aconfig.go",
+      "status": "M",
+      "additions": 5,
+      "deletions": 2,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/aconfig.go b/aconfig.go\nindex bbe2e51..3cd8d59 100644\n--- a/aconfig.go\n+++ b/aconfig.go\n@@ -259,8 +259,11 @@ func (l *Loader) loadFromFile() error {\n \t\tflag := l.flagSet.Lookup(l.config.FileFlag)\n \t\tif flag != nil {\n \t\t\tconfigFile := flag.Value.String()\n-\t\t\t// TODO: do not ignore l.config.Files ?\n-\t\t\tl.config.Files = []string{configFile}\n+\t\t\tif l.config.MergeFiles {\n+\t\t\t\tl.config.Files = append(l.config.Files, configFile)\n+\t\t\t} else {\n+\t\t\t\tl.config.Files = []string{configFile}\n+\t\t\t}\n \t\t}\n \t}\n \n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/build.yml",
+    "LICENSE",
+    "README.md",
+    "aconfig.go",
+    "aconfig_test.go",
+    "aconfigdotenv/dotenv.go",
+    "aconfigdotenv/dotenv_test.go",
+    "aconfigdotenv/go.mod",
+    "aconfigdotenv/go.sum",
+    "aconfighcl/go.mod",
+    "aconfighcl/go.sum",
+    "aconfighcl/hcl.go",
+    "aconfighcl/hcl_test.go",
+    "aconfigtoml/go.mod",
+    "aconfigtoml/go.sum",
+    "aconfigtoml/toml.go",
+    "aconfigtoml/toml_test.go",
+    "aconfigyaml/go.mod",
+    "aconfigyaml/go.sum",
+    "aconfigyaml/yaml.go",
+    "aconfigyaml/yaml_test.go",
+    "doc.go",
+    "example_test.go",
+    "go.mod",
+    "reflection.go",
+    "testdata/bad_config.json",
+    "testdata/config.json",
+    "testdata/config1.json",
+    "testdata/config2.json",
+    "testdata/config3.json",
+    "testdata/example_config.json",
+    "testdata/unknown.ext",
+    "testdata/unknown_fields.json",
+    "testfile.json",
+    "utils.go",
+    "utils_test.go"
+  ],
+  "explanation": {
+    "what": "loadFromFile() 内で FileFlag から取得した configFile の扱いを分岐させた。l.config.MergeFiles が true の場合は l.config.Files に configFile を append し(既存の Files 一覧とマージ)、false の場合は従来通り l.config.Files を configFile 1件で上書きする。",
+    "why": "PR body に明記されている通り、\"Add file from flag to config.Files slice when config.MergeFiles is true\" が目的。前コミット(#59)の実装では FileFlag が指定されると常に Files を1件で上書きしてしまい、MergeFiles=true で複数ファイルをマージする既存機能と組み合わせられなかったため、MergeFiles の設定を尊重するよう分岐を追加した。",
+    "highlights": [
+      { "file": "aconfig.go", "note": "MergeFiles の真偽による Files への append / 上書きの分岐" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [
+      { "type": "pr", "number": 68, "url": "https://github.com/cristalhq/aconfig/pull/68" }
+    ],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

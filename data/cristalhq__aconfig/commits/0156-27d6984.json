@@ -1,0 +1,112 @@
+{
+  "seq": 156,
+  "sha": "27d698449d85b4bad6b28f4cc7f6cbcfa1636c23",
+  "parents": [
+    "da04fc8a833013d09e78858ef3f1deefc18a9919"
+  ],
+  "author": {
+    "name": "Oleg Kovalov",
+    "email": "oleg@hey.com",
+    "date": "2023-04-28T16:54:01+02:00"
+  },
+  "message": "Fix linter suggestions (#142)",
+  "pr": {
+    "number": 142,
+    "title": "Fix linter suggestions",
+    "body": "",
+    "url": "https://github.com/cristalhq/aconfig/pull/142"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 3,
+    "additions": 33,
+    "deletions": 38
+  },
+  "files": [
+    {
+      "path": "aconfig.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "aconfig_test.go",
+      "status": "M",
+      "additions": 31,
+      "deletions": 36,
+      "binary": false
+    },
+    {
+      "path": "utils.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/aconfig.go b/aconfig.go\nindex 98f03c3..a039168 100644\n--- a/aconfig.go\n+++ b/aconfig.go\n@@ -433,7 +433,7 @@ func (l *Loader) postFlagCheck(values map[string]interface{}, dupls map[string]s\n \treturn nil\n }\n \n-// TODO(cristaloleg): revisit\n+// TODO(cristaloleg): revisit.\n func (l *Loader) setField(field *fieldData, name string, values map[string]interface{}, dupls map[string]struct{}) error {\n \tif !l.config.AllowDuplicates {\n \t\tif _, ok := dupls[name]; ok {\ndiff --git a/aconfig_test.go b/aconfig_test.go\nindex cc55625..68c6b2b 100644\n--- a/aconfig_test.go\n+++ b/aconfig_test.go\n@@ -358,13 +358,13 @@ func TestNoFileFlagValue(t *testing.T) {\n }\n \n func TestEnv(t *testing.T) {\n-\tsetEnv(t, \"TST_STR\", \"str-env\")\n-\tsetEnv(t, \"TST_BYTES\", \"bytes-env\")\n-\tsetEnv(t, \"TST_INT\", \"121\")\n-\tsetEnv(t, \"TST_HTTP_PORT\", \"3000\")\n-\tsetEnv(t, \"TST_SUB_FLOAT\", \"222.333\")\n-\tsetEnv(t, \"TST_ANON_IS_ANON\", \"true\")\n-\tsetEnv(t, \"TST_EM\", \"em-env\")\n+\tt.Setenv(\"TST_STR\", \"str-env\")\n+\tt.Setenv(\"TST_BYTES\", \"bytes-env\")\n+\tt.Setenv(\"TST_INT\", \"121\")\n+\tt.Setenv(\"TST_HTTP_PORT\", \"3000\")\n+\tt.Setenv(\"TST_SUB_FLOAT\", \"222.333\")\n+\tt.Setenv(\"TST_ANON_IS_ANON\", \"true\")\n+\tt.Setenv(\"TST_EM\", \"em-env\")\n \tdefer os.Clearenv()\n \n \tvar cfg TestConfig\n@@ -442,8 +442,8 @@ func TestFlag(t *testing.T) {\n }\n \n func TestExactName(t *testing.T) {\n-\tsetEnv(t, \"STR\", \"str-env\")\n-\tsetEnv(t, \"TST_STR\", \"bar-env\")\n+\tt.Setenv(\"STR\", \"str-env\")\n+\tt.Setenv(\"TST_STR\", \"bar-env\")\n \tdefer os.Clearenv()\n \n \ttype Foo struct {\n@@ -475,8 +475,8 @@ func TestExactName(t *testing.T) {\n }\n \n func TestSkipName(t *testing.T) {\n-\tsetEnv(t, \"STR\", \"str-env\")\n-\tsetEnv(t, \"BAR\", \"bar-env\")\n+\tt.Setenv(\"STR\", \"str-env\")\n+\tt.Setenv(\"BAR\", \"bar-env\")\n \tdefer os.Clearenv()\n \n \ttype Foo struct {\n@@ -505,7 +505,7 @@ func TestSkipName(t *testing.T) {\n }\n \n func TestDuplicatedName(t *testing.T) {\n-\tsetEnv(t, \"FOO_BAR\", \"str-env\")\n+\tt.Setenv(\"FOO_BAR\", \"str-env\")\n \tdefer os.Clearenv()\n \n \ttype Foo struct {\n@@ -719,7 +719,7 @@ func TestFailOnFileNotFound(t *testing.T) {\n }\n \n func TestBadEnvs(t *testing.T) {\n-\tsetEnv(t, \"TST_HTTP_PORT\", \"30a00\")\n+\tt.Setenv(\"TST_HTTP_PORT\", \"30a00\")\n \tdefer os.Clearenv()\n \n \tloader := LoaderFor(&TestConfig{}, Config{\n@@ -766,9 +766,9 @@ func TestUnknownFields(t *testing.T) {\n }\n \n func TestUnknownEnvs(t *testing.T) {\n-\tsetEnv(t, \"TST_STR\", \"defined\")\n-\tsetEnv(t, \"TST_UNKNOWN\", \"42\")\n-\tsetEnv(t, \"JUST_ENV\", \"JUST_VALUE\")\n+\tt.Setenv(\"TST_STR\", \"defined\")\n+\tt.Setenv(\"TST_UNKNOWN\", \"42\")\n+\tt.Setenv(\"JUST_ENV\", \"JUST_VALUE\")\n \tdefer os.Clearenv()\n \n \tvar cfg TestConfig\n@@ -788,8 +788,8 @@ func TestUnknownEnvs(t *testing.T) {\n }\n \n func TestUnknownEnvsWithEmptyPrefix(t *testing.T) {\n-\tsetEnv(t, \"STR\", \"defined\")\n-\tsetEnv(t, \"UNKNOWN\", \"42\")\n+\tt.Setenv(\"STR\", \"defined\")\n+\tt.Setenv(\"UNKNOWN\", \"42\")\n \tdefer os.Clearenv()\n \n \tvar cfg TestConfig\n@@ -857,7 +857,7 @@ func TestUnknownFlagsWithEmptyPrefix(t *testing.T) {\n \tfailIfErr(t, loader.Load())\n }\n \n-// flag.FlagSet already fails on undefined flag\n+// flag.FlagSet already fails on undefined flag.\n func TestUnknownFlagsStdlib(t *testing.T) {\n \tloader := LoaderFor(&TestConfig{}, Config{\n \t\tSkipDefaults: true,\n@@ -902,8 +902,8 @@ func TestCustomNames(t *testing.T) {\n \t\tC int `default:\"-1\" env:\"three\" flag:\"four\"`\n \t}\n \n-\tsetEnv(t, \"ONE\", \"1\")\n-\tsetEnv(t, \"three\", \"3\")\n+\tt.Setenv(\"ONE\", \"1\")\n+\tt.Setenv(\"three\", \"3\")\n \tdefer os.Clearenv()\n \n \tvar cfg TestConfig\n@@ -1087,10 +1087,6 @@ func TestBadRequiredTag(t *testing.T) {\n \tf(&TestConfig{})\n }\n \n-func setEnv(t *testing.T, key, value string) {\n-\tfailIfErr(t, os.Setenv(key, value))\n-}\n-\n func int32Ptr(a int32) *int32 {\n \treturn &a\n }\n@@ -1336,8 +1332,7 @@ func TestBad(t *testing.T) {\n \t\tParams url.Values\n \t}\n \tvar cfg TestConfig\n-\tos.Setenv(\"PARAMS\", \"foo:bar\")\n-\tdefer os.Unsetenv(\"PARAMS\")\n+\tt.Setenv(\"PARAMS\", \"foo:bar\")\n \n \tloader := LoaderFor(&cfg, Config{\n \t\tSkipFlags: true,\n@@ -1417,23 +1412,23 @@ func TestSliceOfStructsWithSliceOfPrimitives(t *testing.T) {\n \tmustEqual(t, cfg, want)\n }\n \n-func failIfOk(t testing.TB, err error) {\n-\tt.Helper()\n+func failIfOk(tb testing.TB, err error) {\n+\ttb.Helper()\n \tif err == nil {\n-\t\tt.Fatal(\"must be non-nil\")\n+\t\ttb.Fatal(\"must be non-nil\")\n \t}\n }\n \n-func failIfErr(t testing.TB, err error) {\n-\tt.Helper()\n+func failIfErr(tb testing.TB, err error) {\n+\ttb.Helper()\n \tif err != nil {\n-\t\tt.Fatal(err)\n+\t\ttb.Fatal(err)\n \t}\n }\n \n-func mustEqual(t testing.TB, got, want interface{}) {\n-\tt.Helper()\n+func mustEqual(tb testing.TB, got, want interface{}) {\n+\ttb.Helper()\n \tif !reflect.DeepEqual(got, want) {\n-\t\tt.Fatalf(\"\\nhave %+v\\nwant %+v\", got, want)\n+\t\ttb.Fatalf(\"\\nhave %+v\\nwant %+v\", got, want)\n \t}\n }\ndiff --git a/utils.go b/utils.go\nindex 9608c90..3152a89 100644\n--- a/utils.go\n+++ b/utils.go\n@@ -187,7 +187,7 @@ func sliceToString(curr interface{}) string {\n \t\t\tif i > 0 {\n \t\t\t\tb.WriteByte(',')\n \t\t\t}\n-\t\t\tb.WriteString(fmt.Sprint(v))\n+\t\t\tfmt.Fprint(b, v)\n \t\t}\n \t\treturn b.String()\n \tcase string:\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/dependabot.yml",
+    ".github/workflows/build.yml",
+    "LICENSE",
+    "README.md",
+    "aconfig.go",
+    "aconfig_test.go",
+    "aconfigdotenv/dotenv.go",
+    "aconfigdotenv/dotenv_test.go",
+    "aconfigdotenv/go.mod",
+    "aconfigdotenv/go.sum",
+    "aconfigdotenv/testdata/config.env",
+    "aconfighcl/go.mod",
+    "aconfighcl/go.sum",
+    "aconfighcl/hcl.go",
+    "aconfighcl/hcl_test.go",
+    "aconfighcl/testdata/config.hcl",
+    "aconfigtoml/go.mod",
+    "aconfigtoml/go.sum",
+    "aconfigtoml/testdata/config.toml",
+    "aconfigtoml/toml.go",
+    "aconfigtoml/toml_test.go",
+    "aconfigyaml/go.mod",
+    "aconfigyaml/go.sum",
+    "aconfigyaml/res.yaml",
+    "aconfigyaml/testdata/config.yaml",
+    "aconfigyaml/yaml.go",
+    "aconfigyaml/yaml_test.go",
+    "doc.go",
+    "example_test.go",
+    "go.mod",
+    "reflection.go",
+    "testdata/bad_config.json",
+    "testdata/complex.json",
+    "testdata/config.json",
+    "testdata/config1.json",
+    "testdata/config2.json",
+    "testdata/config3.json",
+    "testdata/example_config.json",
+    "testdata/slice-struct-primitive-slice.json",
+    "testdata/toy.json",
+    "testdata/unknown_fields.json",
+    "utils.go",
+    "utils_test.go"
+  ],
+  "explanation": {
+    "what": "aconfig.go のコメント末尾にピリオドを追加、utils.go の b.WriteString(fmt.Sprint(v)) を fmt.Fprint(b, v) に置き換え、aconfig_test.go では自作の setEnv(t, key, value) ヘルパーを標準の t.Setenv に置き換えて全呼び出し箇所を書き換え、テストヘルパー関数 failIfOk/failIfErr/mustEqual の引数名を t から tb にリネームした(いずれも testing.TB を受け取る関数のため)。",
+    "why": "コミットメッセージ\"Fix linter suggestions\"の通り、golangci-lint が指摘した項目への対応。setEnv ヘルパーの置き換えは、以前(#137のさらに前)に見送られていた t.Setenv への移行を linter 指摘を機に実施したものと考えられる。",
+    "highlights": [
+      { "file": "aconfig_test.go", "note": "setEnv(t, ...) を t.Setenv(...) に一括置換し、自作ヘルパーとその定義を削除" },
+      { "file": "utils.go", "note": "b.WriteString(fmt.Sprint(v)) → fmt.Fprint(b, v) はアロケーションを避けるための linter 推奨の書き方" }
+    ],
+    "langNotes": [
+      { "topic": "t.Setenv", "note": "Go 1.17 で追加された testing.T のメソッド。環境変数を設定し、テスト終了時に自動で元の値に復元してくれるため、defer os.Clearenv() のような手動クリーンアップが不要になる。" },
+      { "topic": "testing.TB", "note": "*testing.T と *testing.B の両方が満たすインターフェース。ヘルパー関数をテストとベンチマークの両方で使い回せるようにするための型で、引数名を t から tb にするのは T 専用でないことを明示する慣習。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [{ "type": "pr", "number": 142, "url": "https://github.com/cristalhq/aconfig/pull/142" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

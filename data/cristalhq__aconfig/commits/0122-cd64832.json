@@ -1,0 +1,85 @@
+{
+  "seq": 122,
+  "sha": "cd64832094c79b67a2dbbb11763d858ce3e53129",
+  "parents": [
+    "69d209aa4611239a6eaf8524876b6b9060a92377"
+  ],
+  "author": {
+    "name": "Oleg Kovalov",
+    "email": "oleg@hey.com",
+    "date": "2021-05-26T23:40:25+02:00"
+  },
+  "message": "add release notes (#88)",
+  "pr": {
+    "number": 88,
+    "title": "add release notes",
+    "body": "Signed-off-by: Oleg Kovalov <oleg@hey.com>",
+    "url": "https://github.com/cristalhq/aconfig/pull/88"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 24,
+    "deletions": 1
+  },
+  "files": [
+    {
+      "path": ".github/workflows/build.yml",
+      "status": "M",
+      "additions": 24,
+      "deletions": 1,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/.github/workflows/build.yml b/.github/workflows/build.yml\nindex 3e811ff..e458483 100644\n--- a/.github/workflows/build.yml\n+++ b/.github/workflows/build.yml\n@@ -5,14 +5,20 @@ on:\n     branches: [ main ]\n   pull_request:\n     branches: [ main ]\n+  workflow_dispatch:\n+    inputs:\n+      tag:\n+        description: 'Tag to create'\n+        required: true\n+        default: 'v0.0.0'\n \n jobs:\n \n   build:\n     name: Build & Test\n     runs-on: ubuntu-latest\n-    steps:\n \n+    steps:\n     - name: Set up Go 1.x\n       uses: actions/setup-go@v2\n       with:\n@@ -48,3 +54,20 @@ jobs:\n         token: ${{secrets.CODECOV_TOKEN}}\n         file: ./coverage.txt\n         fail_ci_if_error: false\n+\n+  release:\n+    if: github.event_name == 'workflow_dispatch'\n+\n+    name: Release\n+    runs-on: ubuntu-latest\n+    steps:\n+      - uses: actions/checkout@v2\n+\n+      - name: Checkout with tags\n+        run: git fetch --prune --unshallow --tags\n+\n+      - name: Create release\n+        run: |\n+          git log --format=\"%C(auto) %H %s\" `git tag --sort=-committerdate | head -1`...HEAD > changelog.txt\n+          echo ${{ secrets.GITHUB_TOKEN }} | gh auth login --with-token\n+          gh release create ${{ github.event.inputs.tag }} -F changelog.txt\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/build.yml",
+    "LICENSE",
+    "README.md",
+    "aconfig.go",
+    "aconfig_test.go",
+    "aconfigdotenv/dotenv.go",
+    "aconfigdotenv/dotenv_test.go",
+    "aconfigdotenv/go.mod",
+    "aconfigdotenv/go.sum",
+    "aconfighcl/go.mod",
+    "aconfighcl/go.sum",
+    "aconfighcl/hcl.go",
+    "aconfighcl/hcl_test.go",
+    "aconfigtoml/go.mod",
+    "aconfigtoml/go.sum",
+    "aconfigtoml/toml.go",
+    "aconfigtoml/toml_test.go",
+    "aconfigyaml/go.mod",
+    "aconfigyaml/go.sum",
+    "aconfigyaml/yaml.go",
+    "aconfigyaml/yaml_test.go",
+    "doc.go",
+    "example_test.go",
+    "go.mod",
+    "reflection.go",
+    "testdata/bad_config.json",
+    "testdata/config.json",
+    "testdata/config1.json",
+    "testdata/config2.json",
+    "testdata/config3.json",
+    "testdata/example_config.json",
+    "testdata/unknown_fields.json",
+    "utils.go",
+    "utils_test.go"
+  ],
+  "explanation": {
+    "what": "GitHub Actions の build.yml に workflow_dispatch トリガーと release ジョブを追加した。手動実行時にタグ名を入力すると、直近タグから HEAD までの git log を changelog.txt にまとめ、gh release create でリリースを作成する。",
+    "why": "リリース作業(タグ切り+リリースノート作成)を手動 CLI 操作から CI 経由のワンクリックに変えるための追加。PR タイトルは \"add release notes\" で、実体は変更履歴の自動生成とリリース作成の自動化。",
+    "highlights": [
+      { "file": ".github/workflows/build.yml", "note": "release ジョブは if: github.event_name == 'workflow_dispatch' で通常の push/PR では走らない" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [{ "type": "pr", "number": 88, "url": "https://github.com/cristalhq/aconfig/pull/88" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

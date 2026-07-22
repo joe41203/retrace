@@ -1,0 +1,88 @@
+{
+  "seq": 4,
+  "sha": "b236a5c94bf3d3f4ac21dafc0783819a2fec2e07",
+  "parents": [
+    "39c2fcb9af669134e1aec8bbc61a3b6c2a9eaf0f"
+  ],
+  "author": {
+    "name": "Oleg Kovalov",
+    "email": "iamolegkovalov@gmail.com",
+    "date": "2020-07-21T22:25:31+02:00"
+  },
+  "message": "add golden files",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 5,
+    "additions": 56,
+    "deletions": 0
+  },
+  "files": [
+    {
+      "path": "testdata/all_types_config.json",
+      "status": "A",
+      "additions": 21,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "testdata/config1.json",
+      "status": "A",
+      "additions": 8,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "testdata/my_duration_config.json",
+      "status": "A",
+      "additions": 3,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "testdata/test_config_env.json",
+      "status": "A",
+      "additions": 12,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "testdata/test_config_flag.json",
+      "status": "A",
+      "additions": 12,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/testdata/all_types_config.json b/testdata/all_types_config.json\nnew file mode 100644\nindex 0000000..7f1f595\n--- /dev/null\n+++ b/testdata/all_types_config.json\n@@ -0,0 +1,21 @@\n+{\n+  \"bool\": true,\n+  \"string\": \"str\",\n+\n+  \"int\": 1,\n+  \"int8\": 12,\n+  \"int16\": 123,\n+  \"int32\": 13,\n+  \"int64\": 23,\n+\n+  \"uint\": 1234,\n+  \"uint8\": 124,\n+  \"uint16\": 134,\n+  \"uint32\": 234,\n+  \"uint64\": 24,\n+\n+  \"float32\": 1234.213,\n+  \"float64\": 1234.234,\n+\n+  \"dur\": 3723000000000\n+}\n\\ No newline at end of file\ndiff --git a/testdata/config1.json b/testdata/config1.json\nnew file mode 100644\nindex 0000000..8d8dd11\n--- /dev/null\n+++ b/testdata/config1.json\n@@ -0,0 +1,8 @@\n+{\n+  \"Str\": \"str-json\",\n+  \"Int\": 101,\n+  \"HTTPPort\": 65000,\n+  \"Sub\": {\n+    \"Float\": 999.111\n+  }\n+}\n\\ No newline at end of file\ndiff --git a/testdata/my_duration_config.json b/testdata/my_duration_config.json\nnew file mode 100644\nindex 0000000..cfc7048\n--- /dev/null\n+++ b/testdata/my_duration_config.json\n@@ -0,0 +1,3 @@\n+{\n+  \"my_dur\": \"1h2m3s\"\n+}\n\\ No newline at end of file\ndiff --git a/testdata/test_config_env.json b/testdata/test_config_env.json\nnew file mode 100644\nindex 0000000..45abb76\n--- /dev/null\n+++ b/testdata/test_config_env.json\n@@ -0,0 +1,12 @@\n+{\n+  \"Str\": \"str-env\",\n+  \"Int\": 121,\n+  \"HTTPPort\": 3000,\n+  \"Sub\": {\n+    \"Float\": 222.333\n+  },\n+  \"PtrSub\": {\n+    \"Float\": 444.555\n+  },\n+  \"Em\": \"em-env\"\n+}\n\\ No newline at end of file\ndiff --git a/testdata/test_config_flag.json b/testdata/test_config_flag.json\nnew file mode 100644\nindex 0000000..16045e3\n--- /dev/null\n+++ b/testdata/test_config_flag.json\n@@ -0,0 +1,12 @@\n+{\n+  \"Str\": \"str-flag\",\n+  \"Int\": 1001,\n+  \"HTTPPort\": 30000,\n+  \"Sub\": {\n+    \"Float\": 123.321\n+  },\n+  \"PtrSub\": {\n+    \"Float\": 321.123\n+  },\n+  \"Em\": \"em-flag\"\n+}\n\\ No newline at end of file\n",
+  "diffTruncated": false,
+  "tree": [
+    "LICENSE",
+    "README.md",
+    "aconfig.go",
+    "aconfig_test.go",
+    "go.mod",
+    "go.sum",
+    "testdata/all_types_config.json",
+    "testdata/config1.json",
+    "testdata/my_duration_config.json",
+    "testdata/test_config_env.json",
+    "testdata/test_config_flag.json"
+  ],
+  "explanation": {
+    "what": "testdata/ 配下に all_types_config.json・config1.json・my_duration_config.json・test_config_env.json・test_config_flag.json の5つの JSON ファイルを追加した。いずれも直前のコミットで書かれたテスト(TestLoadDefault_AllTypesConfig, TestLoadFile, TestLoadEnv 等)が loadFile() 経由で「期待値」として読み込むファイル。",
+    "why": "テストコードは前のコミットで書かれていたが、参照する testdata ファイルがまだ無かったため追加した。おそらく期待値を Go の struct リテラルで書く代わりに、テスト対象と同じ仕組み(JSON デコード)で期待値も構築することで、期待値の書き方を統一する狙いだと考えられる。",
+    "highlights": [
+      { "file": "testdata/config1.json", "note": "TestLoadFile の期待値。ローダーが読み込む config1.json とは別ファイルで、期待値専用の JSON" }
+    ],
+    "langNotes": [
+      { "topic": "testdata ディレクトリ慣習", "note": "Go ツールチェインは `testdata` という名前のディレクトリを特別扱いし、ビルド・vet の対象から除外する。テスト用の入力ファイルや期待値ファイルを置く場所として広く使われる慣習。" },
+      { "topic": "golden file テスト", "note": "期待される出力をコードに書く代わりに別ファイル(ここでは JSON)として持ち、テスト時にそれを読み込んで比較する手法。この JSON 群は「ローダーで読み込んだ結果」と「期待する構造体の値」の両方の役割を兼ねている。" }
+    ],
+    "diagram": null,
+    "evidence": "inferred",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

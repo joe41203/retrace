@@ -1,0 +1,66 @@
+{
+  "seq": 39,
+  "sha": "0d66b76049b7ba262fa2f9eb72a488aa0aa2f8b2",
+  "parents": [
+    "961df44d4a64023bfdd29a2fa808667425c5ae94"
+  ],
+  "author": {
+    "name": "Oleg Kovalov",
+    "email": "iamolegkovalov@gmail.com",
+    "date": "2020-07-26T17:28:19+02:00"
+  },
+  "message": "panic on not built loader",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 11,
+    "deletions": 0
+  },
+  "files": [
+    {
+      "path": "aconfig.go",
+      "status": "M",
+      "additions": 11,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/aconfig.go b/aconfig.go\nindex 9fdb328..abc5e17 100644\n--- a/aconfig.go\n+++ b/aconfig.go\n@@ -26,6 +26,7 @@ type Loader struct {\n \tsrc     interface{}\n \tfields  []*fieldData\n \tflagSet *flag.FlagSet\n+\tisBuilt bool\n }\n \n // loaderConfig to configure configuration loader.\n@@ -90,6 +91,7 @@ func (l *Loader) WithFlagPrefix(prefix string) *Loader {\n \n func (l *Loader) Build() *Loader {\n \tl.preLoad(l.src)\n+\tl.isBuilt = true\n \treturn l\n }\n \n@@ -104,11 +106,17 @@ func (l *Loader) preLoad(cfg interface{}) {\n }\n \n func (l *Loader) Flags() *flag.FlagSet {\n+\tif !l.isBuilt {\n+\t\tpanic(\"aconfig: before using loader you must run Build method\")\n+\t}\n \treturn l.flagSet\n }\n \n // Load configuration into a given param.\n func (l *Loader) Load(into interface{}) error {\n+\tif !l.isBuilt {\n+\t\tpanic(\"aconfig: before using loader you must run Build method\")\n+\t}\n \tl.fields = getFields(into)\n \n \tif err := l.loadSources(into); err != nil {\n@@ -119,6 +127,9 @@ func (l *Loader) Load(into interface{}) error {\n \n // LoadWithFiles configuration into a given param.\n func (l *Loader) LoadWithFiles(into interface{}, files []string) error {\n+\tif !l.isBuilt {\n+\t\tpanic(\"aconfig: before using loader you must run Build method\")\n+\t}\n \tl.fields = getFields(into)\n \tl.config.Files = files\n \n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/build.yml",
+    "LICENSE",
+    "README.md",
+    "aconfig.go",
+    "aconfig_test.go",
+    "example_test.go",
+    "go.mod",
+    "go.sum",
+    "testdata/all_types_config.json",
+    "testdata/bad_config.json",
+    "testdata/config1.json",
+    "testdata/config1.toml",
+    "testdata/config1.yaml",
+    "testdata/example_config.json",
+    "testdata/my_duration_config.json",
+    "testdata/other_numbers_config.json",
+    "testdata/test_config_def.json",
+    "testdata/test_config_env.json",
+    "testdata/test_config_flag.json",
+    "testdata/unknown.ext"
+  ],
+  "explanation": {
+    "what": "Loaderに`isBuilt`フラグを追加し、`Build()`実行時にtrueをセットする。`Flags()`/`Load()`/`LoadWithFiles()`の冒頭で`isBuilt`が立っていなければ`panic(\"aconfig: before using loader you must run Build method\")`するガードを追加した。",
+    "why": "seq37/38で導入したメソッドチェーンAPIは`LoaderFor(cfg)`だけ呼んで`Build()`を呼び忘れても`*Loader`型としてはコンパイルが通ってしまう。`preLoad`未実行のままflagSetがnilの状態で`Load`等を呼ぶと分かりにくい実行時エラーになるため、誤用を早期かつ明示的なpanicで検知できるようにしたと考えられる。",
+    "highlights": [
+      { "file": "aconfig.go", "note": "isBuilt未セット時にFlags()/Load()/LoadWithFiles()がpanicする自己防御的チェック" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

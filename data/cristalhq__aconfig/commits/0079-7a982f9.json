@@ -1,0 +1,103 @@
+{
+  "seq": 79,
+  "sha": "7a982f9772750beb712fda063152766df70632e0",
+  "parents": [
+    "23e5579ec352bb23ea4b30bbb0e4287e93bd3ddd"
+  ],
+  "author": {
+    "name": "Oleg Kovalov",
+    "email": "oleg@hey.com",
+    "date": "2020-12-18T17:54:55+01:00"
+  },
+  "message": "error on unknown entries (#34)",
+  "pr": {
+    "number": 34,
+    "title": "error on unknown entries",
+    "body": "",
+    "url": "https://github.com/cristalhq/aconfig/pull/34"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 5,
+    "additions": 202,
+    "deletions": 11
+  },
+  "files": [
+    {
+      "path": "aconfig.go",
+      "status": "M",
+      "additions": 34,
+      "deletions": 3,
+      "binary": false
+    },
+    {
+      "path": "aconfig_test.go",
+      "status": "M",
+      "additions": 147,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "testdata/config1.json",
+      "status": "M",
+      "additions": 0,
+      "deletions": 8,
+      "binary": false
+    },
+    {
+      "path": "testdata/with_additional_fields.json",
+      "status": "A",
+      "additions": 4,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "utils.go",
+      "status": "M",
+      "additions": 17,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/aconfig.go b/aconfig.go\nindex 22ec6b7..b16b83c 100644\n--- a/aconfig.go\n+++ b/aconfig.go\n@@ -36,6 +36,10 @@ type Config struct {\n \tEnvPrefix  string\n \tFlagPrefix string\n \n+\tAllowUnknownFields bool\n+\tAllowUnknownFlags  bool\n+\tAllowUnknownEnvs   bool\n+\n \tStopOnFileError bool\n \tFiles           []string\n \tFileDecoders    map[string]FileDecoder\n@@ -178,7 +182,7 @@ func (l *Loader) loadFromFile() error {\n \t\t\treturn fmt.Errorf(\"file format '%q' isn't supported\", ext)\n \t\t}\n \n-\t\tmappedFields, err := decoder.DecodeFile(file)\n+\t\tactualFields, err := decoder.DecodeFile(file)\n \t\tif err != nil {\n \t\t\treturn err\n \t\t}\n@@ -187,7 +191,7 @@ func (l *Loader) loadFromFile() error {\n \n \t\tfor _, field := range l.fields {\n \t\t\tname := field.fullTag(tag)\n-\t\t\tvalue, ok := mappedFields[name]\n+\t\t\tvalue, ok := actualFields[name]\n \t\t\tif !ok {\n \t\t\t\tcontinue\n \t\t\t}\n@@ -195,6 +199,13 @@ func (l *Loader) loadFromFile() error {\n \t\t\tif err := setFieldData(field, fmt.Sprint(value)); err != nil {\n \t\t\t\treturn err\n \t\t\t}\n+\t\t\tdelete(actualFields, name)\n+\t\t}\n+\n+\t\tif !l.config.AllowUnknownFields && len(actualFields) != 0 {\n+\t\t\tfor env, value := range actualFields {\n+\t\t\t\treturn fmt.Errorf(\"unknown field in file %s: %s:%s\", file, env, value)\n+\t\t\t}\n \t\t}\n \t\treturn nil\n \t}\n@@ -202,15 +213,26 @@ func (l *Loader) loadFromFile() error {\n }\n \n func (l *Loader) loadEnvironment() error {\n+\tactualEnv := getEnv()\n+\n \tfor _, field := range l.fields {\n \t\tenvName := l.config.EnvPrefix + field.fullTag(envNameTag)\n-\t\tv, ok := os.LookupEnv(envName)\n+\t\tv, ok := actualEnv[envName]\n \t\tif !ok {\n \t\t\tcontinue\n \t\t}\n \t\tif err := setFieldData(field, v); err != nil {\n \t\t\treturn err\n \t\t}\n+\t\tdelete(actualEnv, envName)\n+\t}\n+\n+\tif !l.config.AllowUnknownEnvs && l.config.EnvPrefix != \"\" && len(actualEnv) != 0 {\n+\t\tfor env, value := range actualEnv {\n+\t\t\tif strings.HasPrefix(env, l.config.EnvPrefix) {\n+\t\t\t\treturn fmt.Errorf(\"unknown environment var %s : %s\", env, value)\n+\t\t\t}\n+\t\t}\n \t}\n \treturn nil\n }\n@@ -236,6 +258,15 @@ func (l *Loader) loadFlags() error {\n \t\tif err := setFieldData(field, flg.Value.String()); err != nil {\n \t\t\treturn err\n \t\t}\n+\t\tdelete(actualFlags, flagName)\n+\t}\n+\n+\tif !l.config.AllowUnknownFlags && l.config.FlagPrefix != \"\" && len(actualFlags) != 0 {\n+\t\tfor flag, value := range actualFlags {\n+\t\t\tif strings.HasPrefix(flag, l.config.FlagPrefix) {\n+\t\t\t\treturn fmt.Errorf(\"unknown flag %s : %s\", flag, value)\n+\t\t\t}\n+\t\t}\n \t}\n \treturn nil\n }\ndiff --git a/aconfig_test.go b/aconfig_test.go\nindex eb9322b..3383f80 100644\n--- a/aconfig_test.go\n+++ b/aconfig_test.go\n@@ -2,6 +2,7 @@ package aconfig\n \n import (\n \t\"encoding/json\"\n+\t\"io/ioutil\"\n \t\"os\"\n \t\"path/filepath\"\n \t\"reflect\"\n@@ -518,6 +519,152 @@ func TestBadFlags(t *testing.T) {\n \t}\n }\n \n+func TestUnknownFields(t *testing.T) {\n+\tfilepath := \"testdata/with_additional_fields.json\"\n+\n+\tvar cfg TestConfig\n+\tloader := LoaderFor(&cfg, Config{\n+\t\tSkipDefaults:    true,\n+\t\tSkipEnvironment: true,\n+\t\tSkipFlags:       true,\n+\t\tFiles:           []string{filepath},\n+\t})\n+\n+\terr := loader.Load()\n+\tif err == nil {\n+\t\tt.Fatal(\"must not be nil\")\n+\t}\n+\tif !strings.Contains(err.Error(), \"unknown field in file\") {\n+\t\tt.Fatalf(\"got %s\", err.Error())\n+\t}\n+}\n+\n+func TestUnknownEnvs(t *testing.T) {\n+\tsetEnv(t, \"TST_STR\", \"defined\")\n+\tsetEnv(t, \"TST_UNKNOWN\", \"42\")\n+\tsetEnv(t, \"JUST_ENV\", \"JUST_VALUE\")\n+\tdefer os.Clearenv()\n+\n+\tvar cfg TestConfig\n+\tloader := LoaderFor(&cfg, Config{\n+\t\tSkipDefaults: true,\n+\t\tSkipFiles:    true,\n+\t\tSkipFlags:    true,\n+\t\tEnvPrefix:    \"TST\",\n+\t})\n+\n+\terr := loader.Load()\n+\tif err == nil {\n+\t\tt.Fatal(\"must not be nil\")\n+\t}\n+\tif !strings.Contains(err.Error(), \"unknown environment var\") {\n+\t\tt.Fatalf(\"got %s\", err.Error())\n+\t}\n+}\n+\n+func TestUnknownEnvsWithEmptyPrefix(t *testing.T) {\n+\tsetEnv(t, \"STR\", \"defined\")\n+\tsetEnv(t, \"UNKNOWN\", \"42\")\n+\tdefer os.Clearenv()\n+\n+\tvar cfg TestConfig\n+\tloader := LoaderFor(&cfg, Config{\n+\t\tSkipDefaults: true,\n+\t\tSkipFiles:    true,\n+\t\tSkipFlags:    true,\n+\t})\n+\n+\tif err := loader.Load(); err != nil {\n+\t\tt.Fatal(err)\n+\t}\n+}\n+\n+func TestUnknownFlags(t *testing.T) {\n+\tloader := LoaderFor(&TestConfig{}, Config{\n+\t\tSkipDefaults:    true,\n+\t\tSkipFiles:       true,\n+\t\tSkipEnvironment: true,\n+\t\tFlagPrefix:      \"tst\",\n+\t})\n+\n+\tflags := []string{\n+\t\t\"-tst.str=str-flag\",\n+\t\t\"-tst.unknown=1001\",\n+\t\t\"-just_env=just_value\",\n+\t}\n+\n+\t// just for tests\n+\tflagSet := loader.Flags()\n+\tflagSet.SetOutput(ioutil.Discard)\n+\n+\t// define flag with a loader's prefix which is unknown\n+\tflagSet.Int(\"tst.unknown\", 42, \"\")\n+\tflagSet.String(\"just_env\", \"just_def\", \"\")\n+\n+\tif err := flagSet.Parse(flags); err != nil {\n+\t\tt.Fatal(err)\n+\t}\n+\n+\terr := loader.Load()\n+\tif err == nil {\n+\t\tt.Fatal(\"must not be nil\")\n+\t}\n+\tif !strings.Contains(err.Error(), \"unknown flag\") {\n+\t\tt.Fatalf(\"got %s\", err.Error())\n+\t}\n+}\n+\n+func TestUnknownFlagsWithEmptyPrefix(t *testing.T) {\n+\tloader := LoaderFor(&TestConfig{}, Config{\n+\t\tSkipDefaults:    true,\n+\t\tSkipFiles:       true,\n+\t\tSkipEnvironment: true,\n+\t})\n+\n+\tflags := []string{\n+\t\t\"-str=str-flag\",\n+\t\t\"-unknown=1001\",\n+\t}\n+\n+\t// just for tests\n+\tflagSet := loader.Flags()\n+\tflagSet.SetOutput(ioutil.Discard)\n+\n+\t// define flag with a loader's prefix which is unknown\n+\tflagSet.Int(\"unknown\", 42, \"\")\n+\n+\tif err := flagSet.Parse(flags); err != nil {\n+\t\tt.Fatal(err)\n+\t}\n+\n+\tif err := loader.Load(); err != nil {\n+\t\tt.Fatal(err)\n+\t}\n+}\n+\n+// flag.FlagSet already fails on undefined flag\n+func TestUnknownFlagsStdlib(t *testing.T) {\n+\tloader := LoaderFor(&TestConfig{}, Config{\n+\t\tSkipDefaults:    true,\n+\t\tSkipFiles:       true,\n+\t\tSkipEnvironment: true,\n+\t\tFlagPrefix:      \"tst\",\n+\t})\n+\n+\tflags := []string{\n+\t\t\"-tst.str=str-flag\",\n+\t\t\"-tst.unknown=1001\",\n+\t}\n+\n+\t// just for tests\n+\tflagSet := loader.Flags()\n+\tflagSet.SetOutput(ioutil.Discard)\n+\n+\tif err := flagSet.Parse(flags); err == nil {\n+\t\tt.Fatal(\"must not be nil\")\n+\t}\n+}\n+\n func TestCustomNames(t *testing.T) {\n \ttype TestConfig struct {\n \t\tA int `default:\"-1\" env:\"ONE\"`\ndiff --git a/testdata/config1.json b/testdata/config1.json\nindex 0689852..7cc0f0c 100644\n--- a/testdata/config1.json\n+++ b/testdata/config1.json\n@@ -1,12 +1,4 @@\n {\n-  \"Str\": \"str-json\",\n-  \"Bytes\": \"Ynl0ZXMtanNvbg==\",\n-  \"Int\": 101,\n-  \"HTTPPort\": 65000,\n-  \"Sub\": {\n-    \"Float\": 999.111\n-  },\n-  \n   \"str\": \"str-json\",\n   \"bytes\": \"Ynl0ZXMtanNvbg==\",\n   \"int\": 101,\ndiff --git a/testdata/with_additional_fields.json b/testdata/with_additional_fields.json\nnew file mode 100644\nindex 0000000..d5dca98\n--- /dev/null\n+++ b/testdata/with_additional_fields.json\n@@ -0,0 +1,4 @@\n+{\n+    \"str\": \"defined\",\n+    \"unknown\": 42\n+}\n\\ No newline at end of file\ndiff --git a/utils.go b/utils.go\nindex a555544..43b043b 100644\n--- a/utils.go\n+++ b/utils.go\n@@ -9,6 +9,23 @@ import (\n \t\"unicode\"\n )\n \n+func getEnv() map[string]string {\n+\tenv := os.Environ()\n+\tres := make(map[string]string, len(env))\n+\n+\tfor _, s := range env {\n+\t\tfor j := 0; j < len(s); j++ {\n+\t\t\tif s[j] != '=' {\n+\t\t\t\tcontinue\n+\t\t\t}\n+\n+\t\t\tkey, value := s[:j], s[j+1:]\n+\t\t\tres[key] = value\n+\t\t}\n+\t}\n+\treturn res\n+}\n+\n func makeName(name string, parent *fieldData) string {\n \tif parent == nil {\n \t\treturn name\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/build.yml",
+    "LICENSE",
+    "README.md",
+    "aconfig.go",
+    "aconfig_test.go",
+    "aconfigtoml/go.mod",
+    "aconfigtoml/go.sum",
+    "aconfigtoml/toml.go",
+    "aconfigtoml/toml_test.go",
+    "aconfigyaml/go.mod",
+    "aconfigyaml/go.sum",
+    "aconfigyaml/yaml.go",
+    "aconfigyaml/yaml_test.go",
+    "example_test.go",
+    "go.mod",
+    "reflection.go",
+    "testdata/bad_config.json",
+    "testdata/config1.json",
+    "testdata/example_config.json",
+    "testdata/unknown.ext",
+    "testdata/with_additional_fields.json",
+    "testfile.json",
+    "utils.go",
+    "utils_test.go"
+  ],
+  "explanation": {
+    "what": "Config に AllowUnknownFields・AllowUnknownFlags・AllowUnknownEnvs の3オプションを追加し、デフォルト(false)ではファイル・環境変数・コマンドラインフラグに構造体側で定義されていない未知のキーがあった場合にエラーを返すようにした。ファイル読み込みではマッチしたフィールドを actualFields から delete し、余ったキーがあればエラーにする。環境変数・フラグについても、EnvPrefix/FlagPrefix が設定されている場合に限り、そのプレフィックスを持つ未消費のキーがあればエラーとする(プレフィックス無指定時は他プロセス由来の環境変数と衝突するため対象外)。",
+    "why": "PR タイトルは \"error on unknown entries\" で本文は空。diff の実装から、設定ファイルやフラグ名のタイプミス・存在しないキーの指定に気付けないまま無視されてしまう問題を防ぐための機能追加と読める。プレフィックスが空の場合はチェック対象から外しているのは、他アプリ由来の無関係な環境変数まで誤検知しないための配慮と考えられる。",
+    "highlights": [
+      { "file": "aconfig.go", "note": "loadFromFile/loadEnvironment/loadFlags で消費済みキーを delete し、残りを未知エントリとしてエラーにするロジック" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [{ "type": "pr", "number": 34, "url": "https://github.com/cristalhq/aconfig/pull/34" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

@@ -1,0 +1,78 @@
+{
+  "seq": 42,
+  "sha": "33c0748c97d27cb11404eddb731ef7ffbe2ae015",
+  "parents": [
+    "520432de49ee0ba45db0978d56942588e41095e0"
+  ],
+  "author": {
+    "name": "Jakub Dyszkiewicz",
+    "email": "jakub.dyszkiewicz@gmail.com",
+    "date": "2020-07-26T20:26:31+02:00"
+  },
+  "message": "add Cobra example to README (#8)",
+  "pr": {
+    "number": 8,
+    "title": "add Cobra example to README",
+    "body": "Fixes #6 ",
+    "url": "https://github.com/cristalhq/aconfig/pull/8"
+  },
+  "linkedIssues": [
+    {
+      "number": 6,
+      "title": "Add Cobra example",
+      "body": "Cobra seems to be a default way to do CLI in Go. The first thing I checked is whether I can integrate it with Cobra while adding some other flags outside of the config.\r\n\r\nIt turned out it works really well! \r\n\r\n```\r\ntype MyConfig struct {\r\n\tPort int\r\n}\r\n\r\nfunc main() {\r\n\tloader := aconfig.LoaderFor(&MyConfig{}).\r\n\t\tWithEnvPrefix(\"app\").\r\n\t\tWithFiles([]string{\"ouch.yaml\"}).\r\n\t\tBuild()\r\n\targs := struct {\r\n\t\tlogLevel string\r\n\t}{}\r\n\tcmd := &cobra.Command{\r\n\t\tUse:   \"hello\",\r\n\t\tRunE: func(cmd *cobra.Command, _ []string) error {\r\n\t\t\tvar cfg MyConfig\r\n\t\t\tif err := loader.Load(&cfg); err != nil {\r\n\t\t\t\treturn err\r\n\t\t\t}\r\n\r\n\t\t\tcmd.Printf(\"Hello World!\")\r\n\t\t\treturn nil\r\n\t\t},\r\n\t}\r\n\tcmd.PersistentFlags().AddGoFlagSet(loader.Flags())\r\n\tcmd.PersistentFlags().StringVar(&args.logLevel, \"log-level\", \"info\", \"log level: debug, info, warning\")\r\n\r\n\tif err := cmd.Execute(); err != nil {\r\n\t\tos.Exit(1)\r\n\t}\r\n}\r\n```\r\n\r\nI would create a PR, but I'm not sure how (or if 😄) would you like to add it, I don't want to put Cobra in `go.mod` and this example might be too big for `README.md`.",
+      "url": "https://github.com/cristalhq/aconfig/issues/6"
+    }
+  ],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 4,
+    "deletions": 0
+  },
+  "files": [
+    {
+      "path": "README.md",
+      "status": "M",
+      "additions": 4,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/README.md b/README.md\nindex 34c6fbf..32da986 100644\n--- a/README.md\n+++ b/README.md\n@@ -71,6 +71,10 @@ if err := loader.Load(&cfg); err != nil {\n \n Also see examples: [this above](https://github.com/cristalhq/aconfig/blob/master/example_test.go)\n \n+### Cobra integration\n+\n+aconfig integrates seamlessly with [Cobra](https://github.com/spf13/cobra) using `AddGoFlagSet`. See the full example [here](https://play.golang.org/p/5dqN3EIOqCA).\n+\n ## Documentation\n \n See here: [pkg.go.dev][pkg-url].\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/build.yml",
+    "LICENSE",
+    "README.md",
+    "aconfig.go",
+    "aconfig_test.go",
+    "example_test.go",
+    "go.mod",
+    "go.sum",
+    "testdata/all_types_config.json",
+    "testdata/bad_config.json",
+    "testdata/config1.json",
+    "testdata/config1.toml",
+    "testdata/config1.yaml",
+    "testdata/example_config.json",
+    "testdata/my_duration_config.json",
+    "testdata/other_numbers_config.json",
+    "testdata/test_config_def.json",
+    "testdata/test_config_env.json",
+    "testdata/test_config_flag.json",
+    "testdata/unknown.ext"
+  ],
+  "explanation": {
+    "what": "README に \"Cobra integration\" という見出しを追加し、`AddGoFlagSet` を使って aconfig の `Loader.Flags()` を spf13/cobra の PersistentFlags に統合する例へのリンクを載せた。",
+    "why": "リンクされた issue #6 で、外部コントリビュータが Cobra との統合を試したところ問題なく動作したと報告し、PR化を持ちかけていた。issue 本文では Cobra を go.mod の依存に加えたくない・README に載せるには例が長すぎるという懸念が書かれており、その代替として Go Playground へのリンク形式でREADMEに追記する対応になった。",
+    "highlights": [
+      { "file": "README.md", "note": "Cobra integration の見出しと Playground リンクを追加しただけの軽量な変更" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [{ "type": "pr", "number": 8, "url": "https://github.com/cristalhq/aconfig/pull/8" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

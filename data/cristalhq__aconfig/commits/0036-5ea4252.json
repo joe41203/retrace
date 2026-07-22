@@ -1,0 +1,76 @@
+{
+  "seq": 36,
+  "sha": "5ea4252e164fb9d7963e7320f2f1a808a15d4809",
+  "parents": [
+    "8aaeb5e7ad4460127cd62afd0b7e2adbd0e4aea6"
+  ],
+  "author": {
+    "name": "Oleg Kovalov",
+    "email": "iamolegkovalov@gmail.com",
+    "date": "2020-07-24T09:51:56+02:00"
+  },
+  "message": "add defaults",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 27,
+    "deletions": 12
+  },
+  "files": [
+    {
+      "path": "aconfig.go",
+      "status": "M",
+      "additions": 7,
+      "deletions": 10,
+      "binary": false
+    },
+    {
+      "path": "aconfig_test.go",
+      "status": "M",
+      "additions": 20,
+      "deletions": 2,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/aconfig.go b/aconfig.go\nindex d6912c8..3b7a7c7 100644\n--- a/aconfig.go\n+++ b/aconfig.go\n@@ -15,7 +15,10 @@ import (\n \t\"gopkg.in/yaml.v2\"\n )\n \n-const defaultValueTag = \"default\"\n+const (\n+\tdefaultValueTag = \"default\"\n+\tusageTag        = \"usage\"\n+)\n \n // Loader of user configuration.\n type Loader struct {\n@@ -58,14 +61,7 @@ func (l *Loader) preLoad(cfg interface{}) {\n \n \tfor _, field := range fields {\n \t\tflagName := l.getFlagName(field.Name)\n-\t\tenvName := l.getEnvName(field.Name)\n-\t\tv, ok := os.LookupEnv(envName)\n-\n-\t\tdefaultValue := field.DefaultValue\n-\t\tif ok {\n-\t\t\tdefaultValue = v\n-\t\t}\n-\t\tl.flagSet.String(flagName, defaultValue, \"\")\n+\t\tl.flagSet.String(flagName, field.DefaultValue, field.Usage)\n \t}\n }\n \n@@ -249,7 +245,7 @@ type fieldData struct {\n \tField        reflect.StructField\n \tValue        reflect.Value\n \tDefaultValue string\n-\tIsSet        bool\n+\tUsage        string\n }\n \n func newFieldData(field reflect.StructField, value reflect.Value, parent *fieldData) *fieldData {\n@@ -258,6 +254,7 @@ func newFieldData(field reflect.StructField, value reflect.Value, parent *fieldD\n \t\tValue:        value,\n \t\tField:        field,\n \t\tDefaultValue: field.Tag.Get(defaultValueTag),\n+\t\tUsage:        field.Tag.Get(usageTag),\n \t}\n }\n \ndiff --git a/aconfig_test.go b/aconfig_test.go\nindex 92629fc..e68bd75 100644\n--- a/aconfig_test.go\n+++ b/aconfig_test.go\n@@ -20,7 +20,7 @@ type TestConfig struct {\n \tParam    int    // no default tag, so default value\n \tSub      SubConfig\n \n-\tSlice []int          `default:\"1,2,3\"`\n+\tSlice []int          `default:\"1,2,3\" usage:\"just pass elements\"`\n \tMap1  map[string]int `default:\"a:1,b:2,c:3\"`\n \tMap2  map[int]string `default:\"1:a,2:b,3:c\"`\n \n@@ -28,7 +28,7 @@ type TestConfig struct {\n }\n \n type EmbeddedConfig struct {\n-\tEm string `default:\"em-def\"`\n+\tEm string `default:\"em-def\" usage:\"use... em...field.\"`\n }\n \n type SubConfig struct {\n@@ -273,6 +273,24 @@ func TestLoadFlag(t *testing.T) {\n \t}\n }\n \n+func TestUsage(t *testing.T) {\n+\tloader := NewLoaderFor(&EmbeddedConfig{}, LoaderConfig{})\n+\n+\tvar builder strings.Builder\n+\tflags := loader.Flags()\n+\tflags.SetOutput(&builder)\n+\tflags.PrintDefaults()\n+\n+\tgot := builder.String()\n+\twant := `  -em string\n+    \tuse... em...field. (default \"em-def\")\n+`\n+\n+\tif got != want {\n+\t\tt.Fatalf(\"want %v, got %v\", want, got)\n+\t}\n+}\n+\n func TestBadDefauts(t *testing.T) {\n \tf := func(cfg interface{}) {\n \t\tt.Helper()\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/build.yml",
+    "LICENSE",
+    "README.md",
+    "aconfig.go",
+    "aconfig_test.go",
+    "example_test.go",
+    "go.mod",
+    "go.sum",
+    "testdata/all_types_config.json",
+    "testdata/bad_config.json",
+    "testdata/config1.json",
+    "testdata/config1.toml",
+    "testdata/config1.yaml",
+    "testdata/example_config.json",
+    "testdata/my_duration_config.json",
+    "testdata/other_numbers_config.json",
+    "testdata/test_config_def.json",
+    "testdata/test_config_env.json",
+    "testdata/test_config_flag.json",
+    "testdata/unknown.ext"
+  ],
+  "explanation": {
+    "what": "新しい`usage`構造体タグを追加し、fieldDataに`Usage`フィールドを持たせて`flagSet.String`の第三引数(usage文字列)に渡すようにした。あわせて、直前のコミットで導入されていた未使用の`IsSet`フィールドを`Usage`に置き換え、環境変数の値をpreLoad時点でflagのデフォルト値に反映するロジック(env優先の暫定処理)を削除している。テストにも`TestUsage`を追加し、`flags.PrintDefaults()`の出力形式を検証している。",
+    "why": "flag.FlagSetを介した`-h`/`--help`表示などで各フラグの説明文を出せるようにするため、struct tagとして`usage`をサポートしたと考えられる。preLoad内でのenv値によるデフォルト上書きを削除しているのは、flag自体の役割(defaultタグの値をそのままFlagSetのデフォルトにする)とenvのロード処理(loadEnvironment側)の責務を分離する整理の一環と見られる。",
+    "highlights": [
+      { "file": "aconfig.go", "note": "fieldDataにUsageフィールドを追加し`usage`タグから読み込む" },
+      { "file": "aconfig_test.go", "note": "TestUsageでflags.PrintDefaults()の出力文字列を直接比較" }
+    ],
+    "langNotes": [
+      { "topic": "struct tag", "note": "Goでは構造体フィールドに`` `default:\"...\" usage:\"...\"` ``のようにスペース区切りで複数のタグキーを併記でき、`reflect.StructField.Tag.Get(key)`でキーごとに取り出せる。aconfigはこの仕組みでdefault値・env名・flag usageなどをまとめて1つのタグ文字列に埋め込んでいる。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

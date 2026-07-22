@@ -1,0 +1,105 @@
+{
+  "seq": 129,
+  "sha": "4599e9843ad438f3bac16fbec23d1e70b7e83ed1",
+  "parents": [
+    "32ffc950c1ed5f0de288b13ff9fb69c102e26d9a"
+  ],
+  "author": {
+    "name": "Oleg Kovalov",
+    "email": "oleg@hey.com",
+    "date": "2021-08-15T10:49:07+02:00"
+  },
+  "message": "Fix map of slices (#102)\n\nSigned-off-by: Oleg Kovalov <oleg@hey.com>",
+  "pr": {
+    "number": 102,
+    "title": "Fix map of slices",
+    "body": "Fixes #100 ",
+    "url": "https://github.com/cristalhq/aconfig/pull/102"
+  },
+  "linkedIssues": [
+    {
+      "number": 100,
+      "title": "Panic on map of slices",
+      "body": "Given the following code:\r\n```\r\nvar cfg struct {\r\n\tParams url.Values\r\n}\r\nos.Setenv(\"PARAMS\", \"foo:bar\")\r\nerr := aconfig.LoaderFor(&cfg, aconfig.Config{}).Load()\r\n```\r\nI would expect:\r\n* either `cfg.Params = url.Values{\"foo\": {\"bar\"}}`\r\n* or `err != nil`\r\n\r\nInstead, the program panics with the following traceback:\r\n<details><summary>panic: runtime error: invalid memory address or nil pointer dereference</summary>\r\n\r\n```\r\n[signal SIGSEGV: segmentation violation code=0x1 addr=0x48 pc=0x4e0fe7]\r\n\r\ngoroutine 1 [running]:\r\ngithub.com/cristalhq/aconfig.(*Loader).setFieldData(0xc0000a2f70, 0xc0000ca160, 0x4f38c0, 0xc00009e710, 0x0, 0x0)\r\n\t/home/vasiliy/.cache/gopath/pkg/mod/github.com/cristalhq/aconfig@v0.16.2/reflection.go:178 +0x847\r\ngithub.com/cristalhq/aconfig.(*Loader).setMap(0xc0000a2f70, 0xc0000ca000, 0xc0000b60b0, 0x7, 0x7, 0xc0000b607a)\r\n\t/home/vasiliy/.cache/gopath/pkg/mod/github.com/cristalhq/aconfig@v0.16.2/reflection.go:304 +0x439\r\ngithub.com/cristalhq/aconfig.(*Loader).setFieldData(0xc0000a2f70, 0xc0000ca000, 0x4f38c0, 0xc00009e6b0, 0xc0000cc098, 0x539b01)\r\n\t/home/vasiliy/.cache/gopath/pkg/mod/github.com/cristalhq/aconfig@v0.16.2/reflection.go:199 +0xbfe\r\ngithub.com/cristalhq/aconfig.(*Loader).setField(0xc0000a2f70, 0xc0000ca000, 0xc0000b607a, 0x6, 0xc0000a0240, 0xc00009ace0, 0xc0000b607a, 0x6)\r\n\t/home/vasiliy/.cache/gopath/pkg/mod/github.com/cristalhq/aconfig@v0.16.2/aconfig.go:433 +0x97\r\ngithub.com/cristalhq/aconfig.(*Loader).loadEnvironment(0xc0000a2f70, 0x0, 0x0)\r\n\t/home/vasiliy/.cache/gopath/pkg/mod/github.com/cristalhq/aconfig@v0.16.2/aconfig.go:364 +0x165\r\ngithub.com/cristalhq/aconfig.(*Loader).loadSources(0xc0000a2f70, 0xc00009e1f0, 0x0)\r\n\t/home/vasiliy/.cache/gopath/pkg/mod/github.com/cristalhq/aconfig@v0.16.2/aconfig.go:230 +0xf0\r\ngithub.com/cristalhq/aconfig.(*Loader).loadConfig(0xc0000a2f70, 0x0, 0xc0000ba020)\r\n\t/home/vasiliy/.cache/gopath/pkg/mod/github.com/cristalhq/aconfig@v0.16.2/aconfig.go:201 +0x4e\r\ngithub.com/cristalhq/aconfig.(*Loader).Load(0xc0000a2f70, 0xc0000ba018, 0x0)\r\n\t/home/vasiliy/.cache/gopath/pkg/mod/github.com/cristalhq/aconfig@v0.16.2/aconfig.go:191 +0x2f\r\nmain.main()\r\n\t/home/vasiliy/tmp/toy/toy.go:16 +0xc9\r\nexit status 2\r\n```\r\n\r\n</details>\r\n\r\nIf the panic is intended behavior, it should be documented.",
+      "url": "https://github.com/cristalhq/aconfig/issues/100"
+    }
+  ],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 30,
+    "deletions": 0
+  },
+  "files": [
+    {
+      "path": "aconfig_test.go",
+      "status": "M",
+      "additions": 29,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "reflection.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/aconfig_test.go b/aconfig_test.go\nindex e9a350d..e86a04f 100644\n--- a/aconfig_test.go\n+++ b/aconfig_test.go\n@@ -2,6 +2,7 @@ package aconfig\n \n import (\n \t\"io/ioutil\"\n+\t\"net/url\"\n \t\"os\"\n \t\"reflect\"\n \t\"strings\"\n@@ -1389,3 +1390,31 @@ func TestMapOfMap(t *testing.T) {\n \t\tt.Fatalf(\"want %v, got %v\", want, got)\n \t}\n }\n+\n+func TestBad(t *testing.T) {\n+\ttype TestConfig struct {\n+\t\tParams url.Values\n+\t}\n+\tvar cfg TestConfig\n+\tos.Setenv(\"PARAMS\", \"foo:bar\")\n+\tdefer os.Unsetenv(\"PARAMS\")\n+\n+\tloader := LoaderFor(&cfg, Config{\n+\t\tSkipFlags: true,\n+\t})\n+\tif err := loader.Load(); err != nil {\n+\t\tt.Fatal(err)\n+\t}\n+\n+\tp, err := url.ParseQuery(\"foo=bar\")\n+\tif err != nil {\n+\t\tt.Fatal(err)\n+\t}\n+\tvar want = TestConfig{\n+\t\tParams: p,\n+\t}\n+\n+\tif got := cfg; !reflect.DeepEqual(want, got) {\n+\t\tt.Fatalf(\"want %v, got %v\", want, got)\n+\t}\n+}\ndiff --git a/reflection.go b/reflection.go\nindex 653ccf8..891a207 100644\n--- a/reflection.go\n+++ b/reflection.go\n@@ -320,6 +320,7 @@ func (l *Loader) setMap(field *fieldData, value string) error {\n \t\t}\n \n \t\tfdv := l.newSimpleFieldData(reflect.New(field.field.Type.Elem()).Elem())\n+\t\tfdv.field.Type = field.field.Type.Elem()\n \t\tif err := l.setFieldData(fdv, val); err != nil {\n \t\t\treturn fmt.Errorf(\"incorrect map value %q: %w\", val, err)\n \t\t}\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/build.yml",
+    "LICENSE",
+    "README.md",
+    "aconfig.go",
+    "aconfig_test.go",
+    "aconfigdotenv/dotenv.go",
+    "aconfigdotenv/dotenv_test.go",
+    "aconfigdotenv/go.mod",
+    "aconfigdotenv/go.sum",
+    "aconfighcl/go.mod",
+    "aconfighcl/go.sum",
+    "aconfighcl/hcl.go",
+    "aconfighcl/hcl_test.go",
+    "aconfigtoml/go.mod",
+    "aconfigtoml/go.sum",
+    "aconfigtoml/toml.go",
+    "aconfigtoml/toml_test.go",
+    "aconfigyaml/go.mod",
+    "aconfigyaml/go.sum",
+    "aconfigyaml/yaml.go",
+    "aconfigyaml/yaml_test.go",
+    "doc.go",
+    "example_test.go",
+    "go.mod",
+    "reflection.go",
+    "testdata/bad_config.json",
+    "testdata/complex.json",
+    "testdata/config.json",
+    "testdata/config1.json",
+    "testdata/config2.json",
+    "testdata/config3.json",
+    "testdata/example_config.json",
+    "testdata/toy.json",
+    "testdata/unknown_fields.json",
+    "utils.go",
+    "utils_test.go"
+  ],
+  "explanation": {
+    "what": "setMap 内でマップの値用フィールドを newSimpleFieldData で新規作成した直後に、fdv.field.Type = field.field.Type.Elem() を明示的に設定する1行を追加した。これにより値の型が url.Values(= map[string][]string)のようにマップの要素自体が slice であるケースでも setFieldData が正しい型を参照できるようになる。",
+    "why": "linkedIssues #100 の通り、url.Values 型フィールドに環境変数から値を設定しようとすると nil pointer dereference で panic していた。newSimpleFieldData が作る fieldData の field.Type が未設定(ゼロ値)のままだったため、setFieldData が slice 要素の型情報を正しく引けずクラッシュしていたことが原因とみられる。",
+    "highlights": [
+      { "file": "reflection.go", "note": "fdv.field.Type = field.field.Type.Elem() の1行追加が修正の本体。setMap が値側の型情報を正しく伝播していなかった" },
+      { "file": "aconfig_test.go", "note": "TestBad で url.Values(map[string][]string)へのマッピングを検証。issue のスタックトレースにある setMap → setFieldData の呼び出し経路と対応する" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "issue",
+    "refs": [
+      { "type": "pr", "number": 102, "url": "https://github.com/cristalhq/aconfig/pull/102" },
+      { "type": "issue", "number": 100, "url": "https://github.com/cristalhq/aconfig/issues/100" }
+    ],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

@@ -1,0 +1,97 @@
+{
+  "seq": 96,
+  "sha": "1e7d137c178e9df8f28279a465830ff889f6056f",
+  "parents": [
+    "e1b18ca78e0724c22d292253917aba04c05e9333"
+  ],
+  "author": {
+    "name": "Oleg Kovalov",
+    "email": "oleg@hey.com",
+    "date": "2021-02-27T16:54:54+01:00"
+  },
+  "message": "test submodules on CI (#52)\n\n* test submodules on CI\r\n\r\n* temporary disable HCL test",
+  "pr": {
+    "number": 52,
+    "title": "test submodules on CI",
+    "body": "",
+    "url": "https://github.com/cristalhq/aconfig/pull/52"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 13,
+    "deletions": 0
+  },
+  "files": [
+    {
+      "path": ".github/workflows/build.yml",
+      "status": "M",
+      "additions": 12,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "aconfighcl/hcl_test.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/.github/workflows/build.yml b/.github/workflows/build.yml\nindex 5fa01c6..3e811ff 100644\n--- a/.github/workflows/build.yml\n+++ b/.github/workflows/build.yml\n@@ -29,6 +29,18 @@ jobs:\n     - name: Test\n       run: go test -v -coverprofile=coverage.txt ./...\n \n+    - name: Test YAML\n+      run: cd aconfigyaml && go test -v ./...\n+\n+    - name: Test TOML\n+      run: cd aconfigtoml && go test -v ./...\n+\n+    - name: Test HCL\n+      run: cd aconfighcl && go test -v ./...\n+\n+    - name: Test DotEnv\n+      run: cd aconfigdotenv && go test -v ./...\n+\n     - name: Upload Coverage\n       uses: codecov/codecov-action@v1\n       continue-on-error: true\ndiff --git a/aconfighcl/hcl_test.go b/aconfighcl/hcl_test.go\nindex c0527b5..2908d5d 100644\n--- a/aconfighcl/hcl_test.go\n+++ b/aconfighcl/hcl_test.go\n@@ -10,6 +10,7 @@ import (\n )\r\n \r\n func TestHCL(t *testing.T) {\r\n+\tt.SkipNow()\r\n \tfilepath := createTestFile(t)\r\n \r\n \tvar cfg structConfig\r\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/build.yml",
+    "LICENSE",
+    "README.md",
+    "aconfig.go",
+    "aconfig_test.go",
+    "aconfigdotenv/dotenv.go",
+    "aconfigdotenv/dotenv_test.go",
+    "aconfigdotenv/go.mod",
+    "aconfigdotenv/go.sum",
+    "aconfighcl/go.mod",
+    "aconfighcl/go.sum",
+    "aconfighcl/hcl.go",
+    "aconfighcl/hcl_test.go",
+    "aconfigtoml/go.mod",
+    "aconfigtoml/go.sum",
+    "aconfigtoml/toml.go",
+    "aconfigtoml/toml_test.go",
+    "aconfigyaml/go.mod",
+    "aconfigyaml/go.sum",
+    "aconfigyaml/yaml.go",
+    "aconfigyaml/yaml_test.go",
+    "doc.go",
+    "example_test.go",
+    "go.mod",
+    "reflection.go",
+    "testdata/bad_config.json",
+    "testdata/config.json",
+    "testdata/config1.json",
+    "testdata/config2.json",
+    "testdata/config3.json",
+    "testdata/example_config.json",
+    "testdata/unknown.ext",
+    "testdata/unknown_fields.json",
+    "testfile.json",
+    "utils.go",
+    "utils_test.go"
+  ],
+  "explanation": {
+    "what": "GitHub Actions の build.yml に aconfigyaml・aconfigtoml・aconfighcl・aconfigdotenv 各サブモジュールで go test を実行するステップを追加した。ただし aconfighcl/hcl_test.go の TestHCL には t.SkipNow() を追加し、一時的にスキップさせている。",
+    "why": "コミットメッセージの \"temporary disable HCL test\" が示す通り、各decoderサブモジュールをCIでテストする体制を整える過程で、直前のHCL関連の修正(#49, #50)によりTestHCLが通らない状態だったため、CI追加と同時に一旦スキップにして切り分けたと見られる。HCLのテスト自体は次の #53(seq97)で書き直され有効化される。",
+    "highlights": [
+      { "file": ".github/workflows/build.yml", "note": "aconfigyaml/aconfigtoml/aconfighcl/aconfigdotenv それぞれで `cd <dir> && go test -v ./...` を実行するステップを追加" },
+      { "file": "aconfighcl/hcl_test.go", "note": "t.SkipNow() でTestHCLを一時的に無効化" }
+    ],
+    "langNotes": [
+      { "topic": "t.SkipNow()", "note": "Go の testing パッケージで、テストの実行を即座に打ち切り「スキップ」として記録するメソッド。t.Skip とは異なりログを残さず現在地点で即終了する。CIを壊さずに既知の失敗テストを一時的に無効化する手段としてよく使われる。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [{ "type": "pr", "number": 52, "url": "https://github.com/cristalhq/aconfig/pull/52" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

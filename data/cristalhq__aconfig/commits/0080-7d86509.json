@@ -1,0 +1,102 @@
+{
+  "seq": 80,
+  "sha": "7d865091f5b192d7f7a19f6e62fc0b7d369cc467",
+  "parents": [
+    "7a982f9772750beb712fda063152766df70632e0"
+  ],
+  "author": {
+    "name": "Oleg Kovalov",
+    "email": "oleg@hey.com",
+    "date": "2020-12-18T19:39:09+01:00"
+  },
+  "message": "add dotenv (#33)",
+  "pr": {
+    "number": 33,
+    "title": "add dotenv",
+    "body": "",
+    "url": "https://github.com/cristalhq/aconfig/pull/33"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 4,
+    "additions": 177,
+    "deletions": 0
+  },
+  "files": [
+    {
+      "path": "aconfigdotenv/dotenv.go",
+      "status": "A",
+      "additions": 26,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "aconfigdotenv/dotenv_test.go",
+      "status": "A",
+      "additions": 139,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "aconfigdotenv/go.mod",
+      "status": "A",
+      "additions": 8,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "aconfigdotenv/go.sum",
+      "status": "A",
+      "additions": 4,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/aconfigdotenv/dotenv.go b/aconfigdotenv/dotenv.go\nnew file mode 100644\nindex 0000000..f39b2ba\n--- /dev/null\n+++ b/aconfigdotenv/dotenv.go\n@@ -0,0 +1,26 @@\n+package aconfigdotenv\r\n+\r\n+import (\r\n+\t\"github.com/joho/godotenv\"\r\n+)\r\n+\r\n+// Decoder of DotENV files for aconfig.\r\n+type Decoder struct{}\r\n+\r\n+// New .ENV decoder for aconfig.\r\n+func New() *Decoder { return &Decoder{} }\r\n+\r\n+// DecodeFile implements aconfig.FileDecoder.\r\n+func (d *Decoder) DecodeFile(filename string) (map[string]interface{}, error) {\r\n+\traw, err := godotenv.Read(filename)\r\n+\tif err != nil {\r\n+\t\treturn nil, err\r\n+\t}\r\n+\r\n+\tres := map[string]interface{}{}\r\n+\r\n+\tfor key, value := range raw {\r\n+\t\tres[key] = value\r\n+\t}\r\n+\treturn res, nil\r\n+}\r\ndiff --git a/aconfigdotenv/dotenv_test.go b/aconfigdotenv/dotenv_test.go\nnew file mode 100644\nindex 0000000..6039016\n--- /dev/null\n+++ b/aconfigdotenv/dotenv_test.go\n@@ -0,0 +1,139 @@\n+package aconfigdotenv_test\r\n+\r\n+import (\r\n+\t\"os\"\r\n+\t\"reflect\"\r\n+\t\"testing\"\r\n+\r\n+\t\"github.com/cristalhq/aconfig\"\r\n+\t\"github.com/cristalhq/aconfig/aconfigdotenv\"\r\n+)\r\n+\r\n+func TestDotEnv(t *testing.T) {\r\n+\tfilepath := createTestFile(t)\r\n+\r\n+\tvar cfg structConfig\r\n+\tloader := aconfig.LoaderFor(&cfg, aconfig.Config{\r\n+\t\tSkipDefaults:    true,\r\n+\t\tSkipEnvironment: true,\r\n+\t\tSkipFlags:       true,\r\n+\t\tFileDecoders: map[string]aconfig.FileDecoder{\r\n+\t\t\t\".env\": aconfigdotenv.New(),\r\n+\t\t},\r\n+\t\tFiles: []string{filepath},\r\n+\t})\r\n+\r\n+\tif err := loader.Load(); err != nil {\r\n+\t\tt.Fatal(err)\r\n+\t}\r\n+\r\n+\ti := int32(42)\r\n+\tj := int64(420)\r\n+\twant := structConfig{\r\n+\t\tA: \"b\",\r\n+\t\tC: 10,\r\n+\t\tE: 123.456,\r\n+\t\tB: []byte(\"abc\"),\r\n+\t\tI: &i,\r\n+\t\tJ: &j,\r\n+\t\tY: structY{\r\n+\t\t\tX: \"y\",\r\n+\t\t\tZ: []string{\"1\", \"2\", \"3\"},\r\n+\t\t},\r\n+\t\tAA: structA{\r\n+\t\t\tX: \"y\",\r\n+\t\t\tBB: structB{\r\n+\t\t\t\tCC: structC{\r\n+\t\t\t\t\tMM: \"n\",\r\n+\t\t\t\t\tBB: []byte(\"boo\"),\r\n+\t\t\t\t},\r\n+\t\t\t\tDD: []string{\"x\", \"y\", \"z\"},\r\n+\t\t\t},\r\n+\t\t},\r\n+\t\tStructM: StructM{\r\n+\t\t\tM: \"n\",\r\n+\t\t},\r\n+\t}\r\n+\r\n+\tif got := cfg; !reflect.DeepEqual(want, got) {\r\n+\t\tt.Fatalf(\"want %v, got %v\", want, got)\r\n+\t}\r\n+}\r\n+\r\n+func createTestFile(t *testing.T) string {\r\n+\tt.Helper()\r\n+\tdir := t.TempDir()\r\n+\tt.Cleanup(func() {\r\n+\t\tos.RemoveAll(dir)\r\n+\t})\r\n+\r\n+\tfilepath := dir + \"/testfile.env\"\r\n+\r\n+\tf, err := os.Create(filepath)\r\n+\tif err != nil {\r\n+\t\tt.Fatal(err)\r\n+\t}\r\n+\t_, err = f.WriteString(testfileContent)\r\n+\tif err != nil {\r\n+\t\tt.Fatal(err)\r\n+\t}\r\n+\treturn filepath\r\n+}\r\n+\r\n+type structConfig struct {\r\n+\tA string\r\n+\tC int\r\n+\tE float64\r\n+\tB []byte\r\n+\tI *int32\r\n+\tJ *int64\r\n+\tY structY\r\n+\r\n+\tAA structA `env:\"A\"`\r\n+\tStructM\r\n+}\r\n+\r\n+type structY struct {\r\n+\tX string\r\n+\tZ []string\r\n+\tA struct {\r\n+\t\tI bool\r\n+\t}\r\n+}\r\n+\r\n+type structA struct {\r\n+\tX  string  `env:\"x\"`\r\n+\tBB structB `env:\"B\"`\r\n+}\r\n+\r\n+type structB struct {\r\n+\tCC structC  `env:\"C\"`\r\n+\tDD []string `env:\"D\"`\r\n+}\r\n+\r\n+type structC struct {\r\n+\tMM string `env:\"m\"`\r\n+\tBB []byte `env:\"b\"`\r\n+}\r\n+\r\n+type StructM struct {\r\n+\tM string\r\n+}\r\n+\r\n+const testfileContent = `\r\n+A=b\r\n+C=10\r\n+E=123.456\r\n+B=abc\r\n+I=42\r\n+J=420\r\n+M=n\r\n+\r\n+Y_X=y\r\n+Y_Z=1,2,3\r\n+\r\n+A_x=y\r\n+A_B_C_m=n\r\n+A_B_C_b=boo\r\n+A_B_D=x,y,z\r\n+`\r\ndiff --git a/aconfigdotenv/go.mod b/aconfigdotenv/go.mod\nnew file mode 100644\nindex 0000000..0d8821e\n--- /dev/null\n+++ b/aconfigdotenv/go.mod\n@@ -0,0 +1,8 @@\n+module github.com/cristalhq/aconfig/aconfigdotenv\n+\n+go 1.15\n+\n+require (\n+\tgithub.com/cristalhq/aconfig v0.10.0-beta\n+\tgithub.com/joho/godotenv v1.3.0\n+)\ndiff --git a/aconfigdotenv/go.sum b/aconfigdotenv/go.sum\nnew file mode 100644\nindex 0000000..eb092e1\n--- /dev/null\n+++ b/aconfigdotenv/go.sum\n@@ -0,0 +1,4 @@\n+github.com/cristalhq/aconfig v0.10.0-beta h1:LrMGPySGkxVkAbc+Utim7f8dndUGXCQ00h2VS7L6lEw=\n+github.com/cristalhq/aconfig v0.10.0-beta/go.mod h1:0ZBp7dUf0F2Jr7YbLjw8OVlAD0eeV2bU3NwmVgeUReo=\n+github.com/joho/godotenv v1.3.0 h1:Zjp+RcGpHhGlrMbJzXTrZZPrWj+1vfm90La1wgB6Bhc=\n+github.com/joho/godotenv v1.3.0/go.mod h1:7hK45KPybAkOC6peb+G5yklZfMxEjkZhHbwpqxOKXbg=\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/build.yml",
+    "LICENSE",
+    "README.md",
+    "aconfig.go",
+    "aconfig_test.go",
+    "aconfigdotenv/dotenv.go",
+    "aconfigdotenv/dotenv_test.go",
+    "aconfigdotenv/go.mod",
+    "aconfigdotenv/go.sum",
+    "aconfigtoml/go.mod",
+    "aconfigtoml/go.sum",
+    "aconfigtoml/toml.go",
+    "aconfigtoml/toml_test.go",
+    "aconfigyaml/go.mod",
+    "aconfigyaml/go.sum",
+    "aconfigyaml/yaml.go",
+    "aconfigyaml/yaml_test.go",
+    "example_test.go",
+    "go.mod",
+    "reflection.go",
+    "testdata/bad_config.json",
+    "testdata/config1.json",
+    "testdata/example_config.json",
+    "testdata/unknown.ext",
+    "testdata/with_additional_fields.json",
+    "testfile.json",
+    "utils.go",
+    "utils_test.go"
+  ],
+  "explanation": {
+    "what": "aconfigdotenv という新しいサブモジュールを追加し、joho/godotenv を使って .env 形式ファイルを FileDecoder として読み込めるようにした。DecodeFile は godotenv.Read で得たキー・値をそのまま map[string]interface{} として返す実装で、他の submodule(toml/yaml)と同じ「フラット map を返す」契約(#29 auto-tags)に沿っている。",
+    "why": "PR タイトルは \"add dotenv\" で本文は空。章文脈からも auto-tags(#29)でデコーダの契約を統一した直後に、dotenv 形式という新フォーマットのサポートをその契約に沿って追加したコミットと読める。",
+    "highlights": [
+      { "file": "aconfigdotenv/dotenv.go", "note": "godotenv.Read の結果をそのまま res map に詰めるだけの薄い実装" }
+    ],
+    "langNotes": [
+      { "topic": "サブモジュール構成(aconfigdotenv/go.mod)", "note": "aconfig は依存フリー方針のため、外部ライブラリを要するフォーマット対応(dotenv/yaml/toml)はそれぞれ独立した go.mod を持つ別モジュールとして切り出されている。利用者は必要なフォーマットのサブモジュールだけを import すればよく、コア部分に依存が波及しない。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [{ "type": "pr", "number": 33, "url": "https://github.com/cristalhq/aconfig/pull/33" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

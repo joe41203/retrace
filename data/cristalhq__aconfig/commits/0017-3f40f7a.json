@@ -1,0 +1,63 @@
+{
+  "seq": 17,
+  "sha": "3f40f7ad5b5704780c8a650c342036c5340cb514",
+  "parents": [
+    "9c5b469293112aaad412189c8f3140015a09821f"
+  ],
+  "author": {
+    "name": "Oleg Kovalov",
+    "email": "iamolegkovalov@gmail.com",
+    "date": "2020-07-22T23:42:13+02:00"
+  },
+  "message": "reorganize fieldData creation",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 17,
+    "deletions": 17
+  },
+  "files": [
+    {
+      "path": "aconfig.go",
+      "status": "M",
+      "additions": 17,
+      "deletions": 17,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/aconfig.go b/aconfig.go\nindex 9f62dd4..ce65a7d 100644\n--- a/aconfig.go\n+++ b/aconfig.go\n@@ -115,7 +115,7 @@ func (l *Loader) loadFromFile(dst interface{}) error {\n \n func (l *Loader) loadEnvironment() error {\n \tfor _, field := range l.fields {\n-\t\tenvName := l.getEnvName(field.FullName())\n+\t\tenvName := l.getEnvName(field.Name)\n \t\tv, ok := os.LookupEnv(envName)\n \t\tif !ok {\n \t\t\tcontinue\n@@ -133,7 +133,7 @@ func (l *Loader) loadFlags() error {\n \t}\n \n \tfor _, field := range l.fields {\n-\t\tflagName := l.getFlagName(field.FullName())\n+\t\tflagName := l.getFlagName(field.Name)\n \t\tflg := flag.Lookup(flagName)\n \t\tif flg == nil {\n \t\t\tcontinue\n@@ -178,13 +178,7 @@ func getFieldsHelper(valueObject reflect.Value, parent *fieldData) []*fieldData\n \n \t\t// TODO: pointers\n \n-\t\tfd := &fieldData{\n-\t\t\tName:         field.Name,\n-\t\t\tParent:       parent,\n-\t\t\tValue:        value,\n-\t\t\tField:        field,\n-\t\t\tDefaultValue: field.Tag.Get(defaultValueTag),\n-\t\t}\n+\t\tfd := newFieldData(field, value, parent)\n \n \t\t// if just a field - add and process next, else expand struct\n \t\tif field.Type.Kind() != reflect.Struct {\n@@ -209,15 +203,21 @@ type fieldData struct {\n \tDefaultValue string\n }\n \n-func (f *fieldData) FullName() string {\n-\tswitch {\n-\tcase f == nil:\n-\t\treturn \"\"\n-\tcase f.Parent == nil:\n-\t\treturn f.Name\n-\tdefault:\n-\t\treturn f.Parent.FullName() + \".\" + f.Name\n+func newFieldData(field reflect.StructField, value reflect.Value, parent *fieldData) *fieldData {\n+\treturn &fieldData{\n+\t\tName:         makaName(field.Name, parent),\n+\t\tParent:       parent,\n+\t\tValue:        value,\n+\t\tField:        field,\n+\t\tDefaultValue: field.Tag.Get(defaultValueTag),\n+\t}\n+}\n+\n+func makaName(name string, parent *fieldData) string {\n+\tif parent == nil {\n+\t\treturn name\n \t}\n+\treturn parent.Name + \".\" + name\n }\n \n func setFieldDataHelper(field *fieldData, value string) error {\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/build.yml",
+    "LICENSE",
+    "README.md",
+    "aconfig.go",
+    "aconfig_test.go",
+    "go.mod",
+    "go.sum",
+    "testdata/all_types_config.json",
+    "testdata/bad_config.json",
+    "testdata/config1.json",
+    "testdata/config1.toml",
+    "testdata/config1.yaml",
+    "testdata/my_duration_config.json",
+    "testdata/test_config_def.json",
+    "testdata/test_config_env.json",
+    "testdata/test_config_flag.json",
+    "testdata/unknown.ext"
+  ],
+  "explanation": {
+    "what": "env名・flag名の解決で毎回呼んでいた `field.FullName()`(親をたどって `.` 連結するメソッド)の呼び出しを `field.Name` の直接参照に置き換えた。あわせて `fieldData` の生成箇所を `newFieldData` というコンストラクタ関数に集約し、フルネームの組み立ては新設した `makaName` ヘルパー(親の `Name` に `.` + 自身のフィールド名を連結)がフィールド生成時に一度だけ行うように変更した。",
+    "why": "コミットメッセージ「reorganize fieldData creation」の通り、フィールド走査のたびに親をたどって名前を再計算していた `FullName()` を、生成時に一度だけ解決して `Name` に確定させる方式に整理する意図と読める。生成ロジックを `newFieldData` に一本化することで、フィールド構築の責務をまとめている。",
+    "highlights": [
+      { "file": "aconfig.go", "note": "FullName() メソッドが削除され、生成時に確定した Name を使う設計に変わった" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

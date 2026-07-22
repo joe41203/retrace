@@ -1,0 +1,89 @@
+{
+  "seq": 110,
+  "sha": "1148d1bd72f6ac6845783ee8ef9f256d4843554c",
+  "parents": [
+    "15747f1572c5971af3c5a079ad333b4ced1585a0"
+  ],
+  "author": {
+    "name": "Oleg Kovalov",
+    "email": "oleg@hey.com",
+    "date": "2021-04-23T11:06:43+02:00"
+  },
+  "message": "revert if with FileFlag check (#69)",
+  "pr": {
+    "number": 69,
+    "title": "revert if with FileFlag check",
+    "body": "Based on a discussion https://github.com/cristalhq/aconfig/commit/e21901cd63f11ce194c41a90eedff32530fdb49c#r49896711\r\n\r\n@wweir @Tasssadar\r\n\r\nHorribly sorry for this bug :(",
+    "url": "https://github.com/cristalhq/aconfig/pull/69"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 1,
+    "deletions": 1
+  },
+  "files": [
+    {
+      "path": "aconfig.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/aconfig.go b/aconfig.go\nindex 3cd8d59..42d70cf 100644\n--- a/aconfig.go\n+++ b/aconfig.go\n@@ -201,7 +201,7 @@ func (l *Loader) loadConfig() error {\n \n func (l *Loader) parseFlags() error {\n \t// TODO: too simple?\n-\tif l.flagSet.Parsed() || l.config.SkipFlags || l.config.FileFlag == \"\" {\n+\tif l.flagSet.Parsed() || l.config.SkipFlags {\n \t\treturn nil\n \t}\n \treturn l.flagSet.Parse(l.config.Args)\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/build.yml",
+    "LICENSE",
+    "README.md",
+    "aconfig.go",
+    "aconfig_test.go",
+    "aconfigdotenv/dotenv.go",
+    "aconfigdotenv/dotenv_test.go",
+    "aconfigdotenv/go.mod",
+    "aconfigdotenv/go.sum",
+    "aconfighcl/go.mod",
+    "aconfighcl/go.sum",
+    "aconfighcl/hcl.go",
+    "aconfighcl/hcl_test.go",
+    "aconfigtoml/go.mod",
+    "aconfigtoml/go.sum",
+    "aconfigtoml/toml.go",
+    "aconfigtoml/toml_test.go",
+    "aconfigyaml/go.mod",
+    "aconfigyaml/go.sum",
+    "aconfigyaml/yaml.go",
+    "aconfigyaml/yaml_test.go",
+    "doc.go",
+    "example_test.go",
+    "go.mod",
+    "reflection.go",
+    "testdata/bad_config.json",
+    "testdata/config.json",
+    "testdata/config1.json",
+    "testdata/config2.json",
+    "testdata/config3.json",
+    "testdata/example_config.json",
+    "testdata/unknown.ext",
+    "testdata/unknown_fields.json",
+    "testfile.json",
+    "utils.go",
+    "utils_test.go"
+  ],
+  "explanation": {
+    "what": "parseFlags() の早期リターン条件から l.config.FileFlag == \"\" を取り除き、l.flagSet.Parsed() || l.config.SkipFlags のみに戻した。seq108(#59)で追加されていた条件を1コミットで取り消す変更。",
+    "why": "PR body が commit e21901c(#59)へのディスカッションを直接参照しており、FileFlag が空のときだけ flagSet.Parse をスキップする条件がバグを生んでいたことを示している。作者自身が \"Horribly sorry for this bug\" とコメントしており、#59 で加えた分岐が意図せず通常の(FileFlag を使わない)flag 解析まで止めてしまうケースがあったための revert とみられる。",
+    "highlights": [
+      { "file": "aconfig.go", "note": "parseFlags の早期リターン条件から FileFlag == \"\" を除去" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [
+      { "type": "pr", "number": 69, "url": "https://github.com/cristalhq/aconfig/pull/69" }
+    ],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

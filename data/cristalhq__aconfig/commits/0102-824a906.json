@@ -1,0 +1,98 @@
+{
+  "seq": 102,
+  "sha": "824a906fbef29b5956f8a9b6bfe38e0ad651692a",
+  "parents": [
+    "ed97f9e9d8aa7185408483d7d88d62de18f28ffe"
+  ],
+  "author": {
+    "name": "Oleg Kovalov",
+    "email": "oleg@hey.com",
+    "date": "2021-03-04T22:24:41+01:00"
+  },
+  "message": "flag args param (#58)",
+  "pr": {
+    "number": 58,
+    "title": "flag args param",
+    "body": "",
+    "url": "https://github.com/cristalhq/aconfig/pull/58"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 30,
+    "deletions": 12
+  },
+  "files": [
+    {
+      "path": "aconfig.go",
+      "status": "M",
+      "additions": 29,
+      "deletions": 12,
+      "binary": false
+    },
+    {
+      "path": "example_test.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/aconfig.go b/aconfig.go\nindex 9765d41..656d06d 100644\n--- a/aconfig.go\n+++ b/aconfig.go\n@@ -69,6 +69,11 @@ type Config struct {\n \t// Files from which config should be loaded.\n \tFiles []string\n \n+\t// Args hold the command-line arguments from which flags will be parsed.\n+\t// By default is nil and then os.Args will be used.\n+\t// Unless loader.Flags() will be explicitly parsed by the user.\n+\tArgs []string\n+\n \t// FileDecoders to enable other than JSON file formats and prevent additional dependencies.\n \t// Add required submodules to the go.mod and register them in this field.\n \t// Example:\n@@ -133,13 +138,13 @@ func (l *Loader) init() {\n \t\tl.config.FileDecoders[\".json\"] = &jsonDecoder{}\n \t}\n \n-\tl.flagSet = flag.NewFlagSet(l.config.FlagPrefix, flag.ContinueOnError)\n-\tl.parseFields()\n-}\n+\tif l.config.Args == nil {\n+\t\tl.config.Args = os.Args[1:]\n+\t}\n \n-func (l *Loader) parseFields() {\n \tl.fields = l.getFields(l.dst)\n \n+\tl.flagSet = flag.NewFlagSet(l.config.FlagPrefix, flag.ContinueOnError)\n \tif !l.config.SkipFlags {\n \t\tfor _, field := range l.fields {\n \t\t\tflagName := l.config.FlagPrefix + l.fullTag(field, flagNameTag)\n@@ -166,15 +171,33 @@ func (l *Loader) WalkFields(fn func(f Field) bool) {\n \n // Load configuration into a given param.\n func (l *Loader) Load() error {\n-\tif err := l.loadSources(); err != nil {\n+\tif err := l.loadConfig(); err != nil {\n \t\treturn fmt.Errorf(\"aconfig: cannot load config: %w\", err)\n \t}\n+\treturn nil\n+}\n+\n+func (l *Loader) loadConfig() error {\n+\tif err := l.parseFlags(); err != nil {\n+\t\treturn err\n+\t}\n+\tif err := l.loadSources(); err != nil {\n+\t\treturn err\n+\t}\n \tif err := l.checkRequired(); err != nil {\n-\t\treturn fmt.Errorf(\"aconfig: missing required field: %w\", err)\n+\t\treturn err\n \t}\n \treturn nil\n }\n \n+func (l *Loader) parseFlags() error {\n+\t// TODO: too simple?\n+\tif l.flagSet.Parsed() || l.config.SkipFlags {\n+\t\treturn nil\n+\t}\n+\treturn l.flagSet.Parse(l.config.Args)\n+}\n+\n // LoadWithFile configuration into a given param.\n func (l *Loader) LoadWithFile(file string) error {\n \tl.config.Files = []string{file}\n@@ -347,12 +370,6 @@ func (l *Loader) loadEnvironment() error {\n }\n \n func (l *Loader) loadFlags() error {\n-\tif !l.flagSet.Parsed() {\n-\t\tif err := l.flagSet.Parse(os.Args[1:]); err != nil {\n-\t\t\treturn err\n-\t\t}\n-\t}\n-\n \tactualFlags := getFlags(l.flagSet)\n \n \tfor _, field := range l.fields {\ndiff --git a/example_test.go b/example_test.go\nindex 634eff5..a2818b4 100644\n--- a/example_test.go\n+++ b/example_test.go\n@@ -160,6 +160,7 @@ func Example_Flag() {\n \t\t\"-ex.auth.user=flag-user\",\n \t\t\"-ex.auth.pass=flag-pass\",\n \t)\n+\tflags.Parse(os.Args[1:])\n \n \tif err := loader.Load(); err != nil {\n \t\tlog.Panic(err)\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/build.yml",
+    "LICENSE",
+    "README.md",
+    "aconfig.go",
+    "aconfig_test.go",
+    "aconfigdotenv/dotenv.go",
+    "aconfigdotenv/dotenv_test.go",
+    "aconfigdotenv/go.mod",
+    "aconfigdotenv/go.sum",
+    "aconfighcl/go.mod",
+    "aconfighcl/go.sum",
+    "aconfighcl/hcl.go",
+    "aconfighcl/hcl_test.go",
+    "aconfigtoml/go.mod",
+    "aconfigtoml/go.sum",
+    "aconfigtoml/toml.go",
+    "aconfigtoml/toml_test.go",
+    "aconfigyaml/go.mod",
+    "aconfigyaml/go.sum",
+    "aconfigyaml/yaml.go",
+    "aconfigyaml/yaml_test.go",
+    "doc.go",
+    "example_test.go",
+    "go.mod",
+    "reflection.go",
+    "testdata/bad_config.json",
+    "testdata/config.json",
+    "testdata/config1.json",
+    "testdata/config2.json",
+    "testdata/config3.json",
+    "testdata/example_config.json",
+    "testdata/unknown.ext",
+    "testdata/unknown_fields.json",
+    "testfile.json",
+    "utils.go",
+    "utils_test.go"
+  ],
+  "explanation": {
+    "what": "Config に Args []string フィールドを追加し、flagSet.Parse を loader 初期化直後の parseFlags() という専用メソッドに切り出した。従来は loadFlags() の中で flagSet.Parsed() を見て初回だけ os.Args[1:] を解析していたが、Args が nil の場合のみ init() で os.Args[1:] を代入するよう変更し、ユーザーが独自の引数配列を渡せるようにした。example_test.go にも flags.Parse(os.Args[1:]) の明示呼び出しを追加している。",
+    "why": "従来は解析対象の引数が os.Args 固定で、テストや埋め込み用途で任意の引数配列を注入できなかった。Args フィールドをコメントで明示している通り、ユーザーが loader.Flags() で取得した flag.FlagSet を先に自分で Parse していた場合はそれを尊重し(l.flagSet.Parsed() で判定)、まだなら loadConfig の中で自動的に Parse する、という2通りの利用パターンを両立させる設計に寄せている。",
+    "highlights": [
+      { "file": "aconfig.go", "note": "Config.Args の追加と parseFlags() への切り出し" }
+    ],
+    "langNotes": [
+      { "topic": "flag.FlagSet.Parsed", "note": "Go 標準の flag パッケージは FlagSet.Parsed() で「既に Parse 済みか」を判定できる。ユーザーが Flags() で FlagSet を取り出して自分で Parse した後に loader.Load() を呼んでも二重解析にならないよう、この判定でガードしている。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [
+      { "type": "pr", "number": 58, "url": "https://github.com/cristalhq/aconfig/pull/58" }
+    ],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

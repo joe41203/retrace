@@ -1,0 +1,192 @@
+{
+  "seq": 67,
+  "sha": "33bbc10f5657cb4afa1c1dd476daa8ca058088aa",
+  "parents": [
+    "8a3107180316fa22fbdc05710881b06ed4f5fbf6"
+  ],
+  "author": {
+    "name": "Oleg Kovalov",
+    "email": "oleg@hey.com",
+    "date": "2020-11-12T10:42:07+01:00"
+  },
+  "message": "from now - dependency free (#26)",
+  "pr": {
+    "number": 26,
+    "title": "from now - dependency free",
+    "body": "",
+    "url": "https://github.com/cristalhq/aconfig/pull/26"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 16,
+    "additions": 214,
+    "deletions": 121
+  },
+  "files": [
+    {
+      "path": "aconfig.go",
+      "status": "M",
+      "additions": 34,
+      "deletions": 15,
+      "binary": false
+    },
+    {
+      "path": "aconfig_test.go",
+      "status": "M",
+      "additions": 10,
+      "deletions": 26,
+      "binary": false
+    },
+    {
+      "path": "aconfighcl/go.mod",
+      "status": "A",
+      "additions": 8,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "aconfighcl/go.sum",
+      "status": "A",
+      "additions": 57,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "aconfighcl/hcl.go",
+      "status": "A",
+      "additions": 20,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "aconfigtoml/go.mod",
+      "status": "A",
+      "additions": 8,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "aconfigtoml/go.sum",
+      "status": "A",
+      "additions": 8,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "aconfigtoml/toml.go",
+      "status": "A",
+      "additions": 27,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "aconfigyaml/go.mod",
+      "status": "A",
+      "additions": 8,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "aconfigyaml/go.sum",
+      "status": "A",
+      "additions": 8,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "aconfigyaml/yaml.go",
+      "status": "A",
+      "additions": 26,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "go.mod",
+      "status": "M",
+      "additions": 0,
+      "deletions": 6,
+      "binary": false
+    },
+    {
+      "path": "go.sum",
+      "status": "M",
+      "additions": 0,
+      "deletions": 56,
+      "binary": false
+    },
+    {
+      "path": "testdata/config1.hcl",
+      "status": "D",
+      "additions": 0,
+      "deletions": 7,
+      "binary": false
+    },
+    {
+      "path": "testdata/config1.toml",
+      "status": "D",
+      "additions": 0,
+      "deletions": 5,
+      "binary": false
+    },
+    {
+      "path": "testdata/config1.yaml",
+      "status": "D",
+      "additions": 0,
+      "deletions": 6,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/aconfig.go b/aconfig.go\nindex 1225258..c7ad54e 100644\n--- a/aconfig.go\n+++ b/aconfig.go\n@@ -7,10 +7,6 @@ import (\n \t\"os\"\n \t\"path/filepath\"\n \t\"strings\"\n-\n-\t\"github.com/BurntSushi/toml\"\n-\t\"github.com/hashicorp/hcl/v2/hclsimple\"\n-\t\"gopkg.in/yaml.v2\"\n )\n \n const (\n@@ -41,6 +37,12 @@ type loaderConfig struct {\n \n \tShouldStopOnFileError bool\n \tFiles                 []string\n+\tFileDecoders          map[string]FileDecoder\n+}\n+\n+// FileDecoder is used to read config from files. See aconfig submodules.\n+type FileDecoder interface {\n+\tDecodeFile(filename string, dst interface{}) error\n }\n \n // Field of the user configuration structure.\n@@ -64,7 +66,14 @@ type Field interface {\n \n // LoaderFor creates a new Loader based on a given configuration structure.\n func LoaderFor(dst interface{}) *Loader {\n-\treturn &Loader{dst: dst}\n+\treturn &Loader{\n+\t\tdst: dst,\n+\t\tconfig: loaderConfig{\n+\t\t\tFileDecoders: map[string]FileDecoder{\n+\t\t\t\t\".json\": &jsonDecoder{},\n+\t\t\t},\n+\t\t},\n+\t}\n }\n \n // SkipDefaults if you don't want to use them.\n@@ -91,6 +100,12 @@ func (l *Loader) SkipFlags() *Loader {\n \treturn l\n }\n \n+// WithFileDecoder to decode files with a given extension (\".json\" is already added).\n+func (l *Loader) WithFileDecoder(ext string, decoder FileDecoder) *Loader {\n+\tl.config.FileDecoders[ext] = decoder\n+\treturn l\n+}\n+\n // WithFiles for a configuration.\n func (l *Loader) WithFiles(files []string) *Loader {\n \tl.config.Files = files\n@@ -224,19 +239,12 @@ func (l *Loader) loadFromFile(dst interface{}) error {\n \t\tdefer func() { _ = f.Close() }()\n \n \t\text := strings.ToLower(filepath.Ext(file))\n-\t\tswitch ext {\n-\t\tcase \".yaml\", \".yml\":\n-\t\t\terr = yaml.NewDecoder(f).Decode(dst)\n-\t\tcase \".json\":\n-\t\t\terr = json.NewDecoder(f).Decode(dst)\n-\t\tcase \".toml\":\n-\t\t\t_, err = toml.DecodeReader(f, dst)\n-\t\tcase \".hcl\":\n-\t\t\terr = hclsimple.DecodeFile(file, nil, dst)\n-\t\tdefault:\n+\t\td, ok := l.config.FileDecoders[ext]\n+\t\tif !ok {\n \t\t\treturn fmt.Errorf(\"file format '%q' isn't supported\", ext)\n \t\t}\n \n+\t\terr = d.DecodeFile(file, dst)\n \t\tif err == nil {\n \t\t\treturn nil\n \t\t}\n@@ -285,3 +293,14 @@ func (l *Loader) loadFlags() error {\n \t}\n \treturn nil\n }\n+\n+type jsonDecoder struct{}\n+\n+// DecodeFile implements FileDecoder.\n+func (d *jsonDecoder) DecodeFile(filename string, dst interface{}) error {\n+\tf, err := os.Open(filename)\n+\tif err != nil {\n+\t\treturn err\n+\t}\n+\treturn json.NewDecoder(f).Decode(dst)\n+}\ndiff --git a/aconfig_test.go b/aconfig_test.go\nindex 5392dfd..e1585fb 100644\n--- a/aconfig_test.go\n+++ b/aconfig_test.go\n@@ -8,19 +8,15 @@ import (\n \t\"strings\"\n \t\"testing\"\n \t\"time\"\n-\n-\t\"github.com/BurntSushi/toml\"\n-\t\"github.com/hashicorp/hcl/v2/hclsimple\"\n-\t\"gopkg.in/yaml.v2\"\n )\n \n type TestConfig struct {\n-\tStr      string `default:\"str-def\" hcl:\"Str\"`\n-\tBytes    []byte `default:\"bytes-def\" hcl:\"Bytes\"`\n-\tInt      *int32 `default:\"123\" hcl:\"Int\"`\n-\tHTTPPort int    `default:\"8080\" hcl:\"HTTPPort\"`\n-\tParam    int     // no default tag, so default value\n-\tSub      SubConfig `hcl:\"Sub,block\"`\n+\tStr      string `default:\"str-def\"`\n+\tBytes    []byte `default:\"bytes-def\"`\n+\tInt      *int32 `default:\"123\"`\n+\tHTTPPort int    `default:\"8080\"`\n+\tParam    int    // no default tag, so default value\n+\tSub      SubConfig\n \tAnon     struct {\n \t\tIsAnon bool `default:\"true\"`\n \t}\n@@ -37,7 +33,7 @@ type EmbeddedConfig struct {\n }\n \n type SubConfig struct {\n-\tFloat float64 `default:\"123.123\" hcl:\"Float\"`\n+\tFloat float64 `default:\"123.123\"`\n }\n \n type MyDuration string\n@@ -189,9 +185,6 @@ func TestLoadFile(t *testing.T) {\n \t}\n \n \tf(\"testdata/config1.json\")\n-\tf(\"testdata/config1.yaml\")\n-\tf(\"testdata/config1.toml\")\n-\tf(\"testdata/config1.hcl\")\n }\n \n func TestLoadFile_WithFiles(t *testing.T) {\n@@ -217,9 +210,6 @@ func TestLoadFile_WithFiles(t *testing.T) {\n \t}\n \n \tf(\"testdata/config1.json\")\n-\tf(\"testdata/config1.yaml\")\n-\tf(\"testdata/config1.toml\")\n-\tf(\"testdata/config1.hcl\")\n }\n \n func TestLoadEnv(t *testing.T) {\n@@ -650,16 +640,10 @@ func loadFile(t *testing.T, file string, dst interface{}) {\n \t\tt.Fatal(err)\n \t}\n \text := strings.ToLower(filepath.Ext(file))\n-\tswitch ext {\n-\tcase \".yaml\", \".yml\":\n-\t\terr = yaml.NewDecoder(f).Decode(dst)\n-\tcase \".json\":\n-\t\terr = json.NewDecoder(f).Decode(dst)\n-\tcase \".toml\":\n-\t\t_, err = toml.DecodeReader(f, dst)\n-\tcase \".hcl\":\n-\t\terr = hclsimple.DecodeFile(file, nil, dst)\n+\tif ext != \".json\" {\n+\t\tt.Fatal()\n \t}\n+\terr = json.NewDecoder(f).Decode(dst)\n \tif err != nil {\n \t\tt.Fatal(err)\n \t}\ndiff --git a/aconfighcl/go.mod b/aconfighcl/go.mod\nnew file mode 100644\nindex 0000000..9a601fd\n--- /dev/null\n+++ b/aconfighcl/go.mod\n@@ -0,0 +1,8 @@\n+module github.com/cristalhq/aconfig/aconfighcl\n+\n+go 1.15\n+\n+require (\n+\tgithub.com/cristalhq/aconfig v0.7.1\n+\tgithub.com/hashicorp/hcl/v2 v2.7.0\n+)\ndiff --git a/aconfighcl/go.sum b/aconfighcl/go.sum\nnew file mode 100644\nindex 0000000..8533be1\n--- /dev/null\n+++ b/aconfighcl/go.sum\n@@ -0,0 +1,57 @@\n+github.com/BurntSushi/toml v0.3.1 h1:WXkYYl6Yr3qBf1K79EBnL4mak0OimBfB0XUf9Vl28OQ=\n+github.com/BurntSushi/toml v0.3.1/go.mod h1:xHWCNGjB5oqiDr8zfno3MHue2Ht5sIBksp03qcyfWMU=\n+github.com/agext/levenshtein v1.2.1 h1:QmvMAjj2aEICytGiWzmxoE0x2KZvE0fvmqMOfy2tjT8=\n+github.com/agext/levenshtein v1.2.1/go.mod h1:JEDfjyjHDjOF/1e4FlBE/PkbqA9OfWu2ki2W0IB5558=\n+github.com/apparentlymart/go-dump v0.0.0-20180507223929-23540a00eaa3/go.mod h1:oL81AME2rN47vu18xqj1S1jPIPuN7afo62yKTNn3XMM=\n+github.com/apparentlymart/go-textseg v1.0.0 h1:rRmlIsPEEhUTIKQb7T++Nz/A5Q6C9IuX2wFoYVvnCs0=\n+github.com/apparentlymart/go-textseg v1.0.0/go.mod h1:z96Txxhf3xSFMPmb5X/1W05FF/Nj9VFpLOpjS5yuumk=\n+github.com/apparentlymart/go-textseg/v12 v12.0.0 h1:bNEQyAGak9tojivJNkoqWErVCQbjdL7GzRt3F8NvfJ0=\n+github.com/apparentlymart/go-textseg/v12 v12.0.0/go.mod h1:S/4uRK2UtaQttw1GenVJEynmyUenKwP++x/+DdGV/Ec=\n+github.com/cristalhq/aconfig v0.7.1 h1:+1wHckHeVh5bW+Bi1L7jamYQZo1HUNYKsDOULMVCvSI=\n+github.com/cristalhq/aconfig v0.7.1/go.mod h1:sX/3/oh1xcmCVh844Y+uHrCBDcPrckMrIoKf49QlIE4=\n+github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=\n+github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=\n+github.com/go-test/deep v1.0.3 h1:ZrJSEWsXzPOxaZnFteGEfooLba+ju3FYIbOrS+rQd68=\n+github.com/go-test/deep v1.0.3/go.mod h1:wGDj63lr65AM2AQyKZd/NYHGb0R+1RLqB8NKt3aSFNA=\n+github.com/golang/protobuf v1.1.0/go.mod h1:6lQm79b+lXiMfvg/cZm0SGofjICqVBUtrP5yJMmIC1U=\n+github.com/google/go-cmp v0.3.1 h1:Xye71clBPdm5HgqGwUkwhbynsUJZhDbS20FvLhQ2izg=\n+github.com/google/go-cmp v0.3.1/go.mod h1:8QqcDgzrUqlUb/G2PQTWiueGozuR1884gddMywk6iLU=\n+github.com/hashicorp/hcl/v2 v2.7.0 h1:IU8qz5UzZ1po3M1D9/Kq6S5zbDGVfI9bnzmC1ogKKmI=\n+github.com/hashicorp/hcl/v2 v2.7.0/go.mod h1:bQTN5mpo+jewjJgh8jr0JUguIi7qPHUF6yIfAEN3jqY=\n+github.com/kr/pretty v0.1.0 h1:L/CwN0zerZDmRFUapSPitk6f+Q3+0za1rQkzVuMiMFI=\n+github.com/kr/pretty v0.1.0/go.mod h1:dAy3ld7l9f0ibDNOQOHHMYYIIbhfbHSm3C4ZsoJORNo=\n+github.com/kr/pty v1.1.1/go.mod h1:pFQYn66WHrOpPYNljwOMqo10TkYh1fy3cYio2l3bCsQ=\n+github.com/kr/text v0.1.0 h1:45sCR5RtlFHMR4UwH9sdQ5TC8v0qDQCHnXt+kaKSTVE=\n+github.com/kr/text v0.1.0/go.mod h1:4Jbv+DJW3UT/LiOwJeYQe1efqtUx/iVham/4vfdArNI=\n+github.com/kylelemons/godebug v0.0.0-20170820004349-d65d576e9348 h1:MtvEpTB6LX3vkb4ax0b5D2DHbNAUsen0Gx5wZoq3lV4=\n+github.com/kylelemons/godebug v0.0.0-20170820004349-d65d576e9348/go.mod h1:B69LEHPfb2qLo0BaaOLcbitczOKLWTsrBG9LczfCD4k=\n+github.com/mitchellh/go-wordwrap v0.0.0-20150314170334-ad45545899c7 h1:DpOJ2HYzCv8LZP15IdmG+YdwD2luVPHITV96TkirNBM=\n+github.com/mitchellh/go-wordwrap v0.0.0-20150314170334-ad45545899c7/go.mod h1:ZXFpozHsX6DPmq2I0TCekCxypsnAUbP2oI0UX1GXzOo=\n+github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZbAQM=\n+github.com/pmezard/go-difflib v1.0.0/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=\n+github.com/sergi/go-diff v1.0.0 h1:Kpca3qRNrduNnOQeazBd0ysaKrUJiIuISHxogkT9RPQ=\n+github.com/sergi/go-diff v1.0.0/go.mod h1:0CfEIISq7TuYL3j771MWULgwwjU+GofnZX9QAmXWZgo=\n+github.com/spf13/pflag v1.0.2/go.mod h1:DYY7MBk1bdzusC3SYhjObp+wFpr4gzcvqqNjLnInEg4=\n+github.com/stretchr/testify v1.2.2 h1:bSDNvY7ZPG5RlJ8otE/7V6gMiyenm9RtJ7IUVIAoJ1w=\n+github.com/stretchr/testify v1.2.2/go.mod h1:a8OnRcib4nhh0OaRAV+Yts87kKdq0PP7pXfy6kDkUVs=\n+github.com/vmihailenco/msgpack v3.3.3+incompatible/go.mod h1:fy3FlTQTDXWkZ7Bh6AcGMlsjHatGryHQYUTf1ShIgkk=\n+github.com/zclconf/go-cty v1.2.0 h1:sPHsy7ADcIZQP3vILvTjrh74ZA175TFP5vqiNK1UmlI=\n+github.com/zclconf/go-cty v1.2.0/go.mod h1:hOPWgoHbaTUnI5k4D2ld+GRpFJSCe6bCM7m1q/N4PQ8=\n+golang.org/x/crypto v0.0.0-20190308221718-c2843e01d9a2/go.mod h1:djNgcEr1/C05ACkg1iLfiJU5Ep61QUkGW8qpdssI0+w=\n+golang.org/x/crypto v0.0.0-20190426145343-a29dc8fdc734/go.mod h1:yigFU9vqHzYiE8UmvKecakEJjdnWj3jj499lnFckfCI=\n+golang.org/x/net v0.0.0-20180811021610-c39426892332/go.mod h1:mL1N/T3taQHkDXs73rZJwtUhF3w3ftmwwsq0BUmARs4=\n+golang.org/x/net v0.0.0-20190404232315-eb5bcb51f2a3/go.mod h1:t9HGtf8HONx5eT2rtn7q6eTqICYqUVnKs3thJo3Qplg=\n+golang.org/x/sync v0.0.0-20180314180146-1d60e4601c6f/go.mod h1:RxMgew5VJxzue5/jJTE5uejpjVlOe/izrB70Jof72aM=\n+golang.org/x/sys v0.0.0-20190215142949-d0b11bdaac8a/go.mod h1:STP8DvDyc/dI5b8T5hshtkjS+E42TnysNCUPdjciGhY=\n+golang.org/x/sys v0.0.0-20190412213103-97732733099d/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=\n+golang.org/x/sys v0.0.0-20190502175342-a43fa875dd82/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=\n+golang.org/x/text v0.3.0/go.mod h1:NqM8EUOU14njkJ3fqMW+pc6Ldnwhi/IjpwHt7yyuwOQ=\n+golang.org/x/text v0.3.2 h1:tW2bmiBqwgJj/UpqtC8EpXEZVYOwU0yG4iWbprSVAcs=\n+golang.org/x/text v0.3.2/go.mod h1:bEr9sfX3Q8Zfm5fL9x+3itogRgK3+ptLWKqgva+5dAk=\n+golang.org/x/tools v0.0.0-20180917221912-90fa682c2a6e/go.mod h1:n7NCudcB/nEzxVGmLbDWY5pfWTLqBcC2KZ6jyYvM4mQ=\n+google.golang.org/appengine v1.1.0/go.mod h1:EbEs0AVv82hx2wNQdGPgUI5lhzA/G0D9YwlJXL52JkM=\n+gopkg.in/check.v1 v0.0.0-20161208181325-20d25e280405/go.mod h1:Co6ibVJAznAaIkqp8huTwlJQCZ016jof/cbN4VW5Yz0=\n+gopkg.in/check.v1 v1.0.0-20180628173108-788fd7840127 h1:qIbj1fsPNlZgppZ+VLlY7N33q108Sa+fhmuc+sWQYwY=\n+gopkg.in/check.v1 v1.0.0-20180628173108-788fd7840127/go.mod h1:Co6ibVJAznAaIkqp8huTwlJQCZ016jof/cbN4VW5Yz0=\n+gopkg.in/yaml.v2 v2.3.0 h1:clyUAQHOM3G0M3f5vQj7LuJrETvjVot3Z5el9nffUtU=\n+gopkg.in/yaml.v2 v2.3.0/go.mod h1:hI93XBmqTisBFMUTm0b8Fm+jr3Dg1NNxqwp+5A1VGuI=\ndiff --git a/aconfighcl/hcl.go b/aconfighcl/hcl.go\nnew file mode 100644\nindex 0000000..42a2d70\n--- /dev/null\n+++ b/aconfighcl/hcl.go\n@@ -0,0 +1,20 @@\n+package aconfighcl\n+\n+import (\n+\t\"github.com/cristalhq/aconfig\"\n+\n+\t\"github.com/hashicorp/hcl/v2/hclsimple\"\n+)\n+\n+var _ aconfig.FileDecoder = &Decoder{}\n+\n+// Decoder of HCL files for aconfig.\n+type Decoder struct{}\n+\n+// New HCL decoder for aconfig.\n+func New() *Decoder { return &Decoder{} }\n+\n+// DecodeFile implements aconfig.FileDecoder.\n+func (d *Decoder) DecodeFile(filename string, dst interface{}) error {\n+\treturn hclsimple.DecodeFile(filename, nil, dst)\n+}\ndiff --git a/aconfigtoml/go.mod b/aconfigtoml/go.mod\nnew file mode 100644\nindex 0000000..b3995ba\n--- /dev/null\n+++ b/aconfigtoml/go.mod\n@@ -0,0 +1,8 @@\n+module github.com/cristalhq/aconfig/aconfigtoml\n+\n+go 1.15\n+\n+require (\n+\tgithub.com/BurntSushi/toml v0.3.1\n+\tgithub.com/cristalhq/aconfig v0.7.1\n+)\ndiff --git a/aconfigtoml/go.sum b/aconfigtoml/go.sum\nnew file mode 100644\nindex 0000000..cce0dd6\n--- /dev/null\n+++ b/aconfigtoml/go.sum\n@@ -0,0 +1,8 @@\n+github.com/BurntSushi/toml v0.3.1 h1:WXkYYl6Yr3qBf1K79EBnL4mak0OimBfB0XUf9Vl28OQ=\n+github.com/BurntSushi/toml v0.3.1/go.mod h1:xHWCNGjB5oqiDr8zfno3MHue2Ht5sIBksp03qcyfWMU=\n+github.com/cristalhq/aconfig v0.7.1 h1:+1wHckHeVh5bW+Bi1L7jamYQZo1HUNYKsDOULMVCvSI=\n+github.com/cristalhq/aconfig v0.7.1/go.mod h1:sX/3/oh1xcmCVh844Y+uHrCBDcPrckMrIoKf49QlIE4=\n+gopkg.in/check.v1 v0.0.0-20161208181325-20d25e280405 h1:yhCVgyC4o1eVCa2tZl7eS0r+SDo693bJlVdllGtEeKM=\n+gopkg.in/check.v1 v0.0.0-20161208181325-20d25e280405/go.mod h1:Co6ibVJAznAaIkqp8huTwlJQCZ016jof/cbN4VW5Yz0=\n+gopkg.in/yaml.v2 v2.3.0 h1:clyUAQHOM3G0M3f5vQj7LuJrETvjVot3Z5el9nffUtU=\n+gopkg.in/yaml.v2 v2.3.0/go.mod h1:hI93XBmqTisBFMUTm0b8Fm+jr3Dg1NNxqwp+5A1VGuI=\ndiff --git a/aconfigtoml/toml.go b/aconfigtoml/toml.go\nnew file mode 100644\nindex 0000000..20981bc\n--- /dev/null\n+++ b/aconfigtoml/toml.go\n@@ -0,0 +1,27 @@\n+package aconfigtoml\n+\n+import (\n+\t\"os\"\n+\n+\t\"github.com/cristalhq/aconfig\"\n+\n+\t\"github.com/BurntSushi/toml\"\n+)\n+\n+var _ aconfig.FileDecoder = &Decoder{}\n+\n+// Decoder of TOML files for aconfig.\n+type Decoder struct{}\n+\n+// New TOML decoder for aconfig.\n+func New() *Decoder { return &Decoder{} }\n+\n+// DecodeFile implements aconfig.FileDecoder.\n+func (d *Decoder) DecodeFile(filename string, dst interface{}) error {\n+\tf, err := os.Open(filename)\n+\tif err != nil {\n+\t\treturn err\n+\t}\n+\t_, err = toml.DecodeReader(f, dst)\n+\treturn err\n+}\ndiff --git a/aconfigyaml/go.mod b/aconfigyaml/go.mod\nnew file mode 100644\nindex 0000000..9418b0c\n--- /dev/null\n+++ b/aconfigyaml/go.mod\n@@ -0,0 +1,8 @@\n+module github.com/cristalhq/aconfig/aconfigyaml\n+\n+go 1.15\n+\n+require (\n+\tgithub.com/cristalhq/aconfig v0.7.1\n+\tgopkg.in/yaml.v2 v2.3.0\n+)\ndiff --git a/aconfigyaml/go.sum b/aconfigyaml/go.sum\nnew file mode 100644\nindex 0000000..cce0dd6\n--- /dev/null\n+++ b/aconfigyaml/go.sum\n@@ -0,0 +1,8 @@\n+github.com/BurntSushi/toml v0.3.1 h1:WXkYYl6Yr3qBf1K79EBnL4mak0OimBfB0XUf9Vl28OQ=\n+github.com/BurntSushi/toml v0.3.1/go.mod h1:xHWCNGjB5oqiDr8zfno3MHue2Ht5sIBksp03qcyfWMU=\n+github.com/cristalhq/aconfig v0.7.1 h1:+1wHckHeVh5bW+Bi1L7jamYQZo1HUNYKsDOULMVCvSI=\n+github.com/cristalhq/aconfig v0.7.1/go.mod h1:sX/3/oh1xcmCVh844Y+uHrCBDcPrckMrIoKf49QlIE4=\n+gopkg.in/check.v1 v0.0.0-20161208181325-20d25e280405 h1:yhCVgyC4o1eVCa2tZl7eS0r+SDo693bJlVdllGtEeKM=\n+gopkg.in/check.v1 v0.0.0-20161208181325-20d25e280405/go.mod h1:Co6ibVJAznAaIkqp8huTwlJQCZ016jof/cbN4VW5Yz0=\n+gopkg.in/yaml.v2 v2.3.0 h1:clyUAQHOM3G0M3f5vQj7LuJrETvjVot3Z5el9nffUtU=\n+gopkg.in/yaml.v2 v2.3.0/go.mod h1:hI93XBmqTisBFMUTm0b8Fm+jr3Dg1NNxqwp+5A1VGuI=\ndiff --git a/aconfigyaml/yaml.go b/aconfigyaml/yaml.go\nnew file mode 100644\nindex 0000000..fd1d932\n--- /dev/null\n+++ b/aconfigyaml/yaml.go\n@@ -0,0 +1,26 @@\n+package aconfigyaml\n+\n+import (\n+\t\"os\"\n+\n+\t\"github.com/cristalhq/aconfig\"\n+\n+\t\"gopkg.in/yaml.v2\"\n+)\n+\n+var _ aconfig.FileDecoder = &Decoder{}\n+\n+// Decoder of YAML files for aconfig.\n+type Decoder struct{}\n+\n+// New YAML decoder for aconfig.\n+func New() *Decoder { return &Decoder{} }\n+\n+// DecodeFile implements aconfig.FileDecoder.\n+func (d *Decoder) DecodeFile(filename string, dst interface{}) error {\n+\tf, err := os.Open(filename)\n+\tif err != nil {\n+\t\treturn err\n+\t}\n+\treturn yaml.NewDecoder(f).Decode(dst)\n+}\ndiff --git a/go.mod b/go.mod\nindex 898ecb2..28b121c 100644\n--- a/go.mod\n+++ b/go.mod\n@@ -1,9 +1,3 @@\n module github.com/cristalhq/aconfig\n \n go 1.14\n-\n-require (\n-\tgithub.com/BurntSushi/toml v0.3.1\n-\tgithub.com/hashicorp/hcl/v2 v2.7.0\n-\tgopkg.in/yaml.v2 v2.3.0\n-)\ndiff --git a/go.sum b/go.sum\nindex 48e47f4..e69de29 100644\n--- a/go.sum\n+++ b/go.sum\n@@ -1,56 +0,0 @@\n-github.com/BurntSushi/toml v0.3.1 h1:WXkYYl6Yr3qBf1K79EBnL4mak0OimBfB0XUf9Vl28OQ=\n-github.com/BurntSushi/toml v0.3.1/go.mod h1:xHWCNGjB5oqiDr8zfno3MHue2Ht5sIBksp03qcyfWMU=\n-github.com/agext/levenshtein v1.2.1 h1:QmvMAjj2aEICytGiWzmxoE0x2KZvE0fvmqMOfy2tjT8=\n-github.com/agext/levenshtein v1.2.1/go.mod h1:JEDfjyjHDjOF/1e4FlBE/PkbqA9OfWu2ki2W0IB5558=\n-github.com/apparentlymart/go-dump v0.0.0-20180507223929-23540a00eaa3/go.mod h1:oL81AME2rN47vu18xqj1S1jPIPuN7afo62yKTNn3XMM=\n-github.com/apparentlymart/go-textseg v1.0.0 h1:rRmlIsPEEhUTIKQb7T++Nz/A5Q6C9IuX2wFoYVvnCs0=\n-github.com/apparentlymart/go-textseg v1.0.0/go.mod h1:z96Txxhf3xSFMPmb5X/1W05FF/Nj9VFpLOpjS5yuumk=\n-github.com/apparentlymart/go-textseg/v12 v12.0.0 h1:bNEQyAGak9tojivJNkoqWErVCQbjdL7GzRt3F8NvfJ0=\n-github.com/apparentlymart/go-textseg/v12 v12.0.0/go.mod h1:S/4uRK2UtaQttw1GenVJEynmyUenKwP++x/+DdGV/Ec=\n-github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=\n-github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=\n-github.com/go-test/deep v1.0.3 h1:ZrJSEWsXzPOxaZnFteGEfooLba+ju3FYIbOrS+rQd68=\n-github.com/go-test/deep v1.0.3/go.mod h1:wGDj63lr65AM2AQyKZd/NYHGb0R+1RLqB8NKt3aSFNA=\n-github.com/golang/protobuf v1.1.0/go.mod h1:6lQm79b+lXiMfvg/cZm0SGofjICqVBUtrP5yJMmIC1U=\n-github.com/google/go-cmp v0.3.1 h1:Xye71clBPdm5HgqGwUkwhbynsUJZhDbS20FvLhQ2izg=\n-github.com/google/go-cmp v0.3.1/go.mod h1:8QqcDgzrUqlUb/G2PQTWiueGozuR1884gddMywk6iLU=\n-github.com/hashicorp/hcl/v2 v2.7.0 h1:IU8qz5UzZ1po3M1D9/Kq6S5zbDGVfI9bnzmC1ogKKmI=\n-github.com/hashicorp/hcl/v2 v2.7.0/go.mod h1:bQTN5mpo+jewjJgh8jr0JUguIi7qPHUF6yIfAEN3jqY=\n-github.com/kr/pretty v0.1.0 h1:L/CwN0zerZDmRFUapSPitk6f+Q3+0za1rQkzVuMiMFI=\n-github.com/kr/pretty v0.1.0/go.mod h1:dAy3ld7l9f0ibDNOQOHHMYYIIbhfbHSm3C4ZsoJORNo=\n-github.com/kr/pty v1.1.1/go.mod h1:pFQYn66WHrOpPYNljwOMqo10TkYh1fy3cYio2l3bCsQ=\n-github.com/kr/text v0.1.0 h1:45sCR5RtlFHMR4UwH9sdQ5TC8v0qDQCHnXt+kaKSTVE=\n-github.com/kr/text v0.1.0/go.mod h1:4Jbv+DJW3UT/LiOwJeYQe1efqtUx/iVham/4vfdArNI=\n-github.com/kylelemons/godebug v0.0.0-20170820004349-d65d576e9348 h1:MtvEpTB6LX3vkb4ax0b5D2DHbNAUsen0Gx5wZoq3lV4=\n-github.com/kylelemons/godebug v0.0.0-20170820004349-d65d576e9348/go.mod h1:B69LEHPfb2qLo0BaaOLcbitczOKLWTsrBG9LczfCD4k=\n-github.com/mitchellh/go-wordwrap v0.0.0-20150314170334-ad45545899c7 h1:DpOJ2HYzCv8LZP15IdmG+YdwD2luVPHITV96TkirNBM=\n-github.com/mitchellh/go-wordwrap v0.0.0-20150314170334-ad45545899c7/go.mod h1:ZXFpozHsX6DPmq2I0TCekCxypsnAUbP2oI0UX1GXzOo=\n-github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZbAQM=\n-github.com/pmezard/go-difflib v1.0.0/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=\n-github.com/sergi/go-diff v1.0.0 h1:Kpca3qRNrduNnOQeazBd0ysaKrUJiIuISHxogkT9RPQ=\n-github.com/sergi/go-diff v1.0.0/go.mod h1:0CfEIISq7TuYL3j771MWULgwwjU+GofnZX9QAmXWZgo=\n-github.com/spf13/pflag v1.0.2/go.mod h1:DYY7MBk1bdzusC3SYhjObp+wFpr4gzcvqqNjLnInEg4=\n-github.com/stretchr/testify v1.2.2 h1:bSDNvY7ZPG5RlJ8otE/7V6gMiyenm9RtJ7IUVIAoJ1w=\n-github.com/stretchr/testify v1.2.2/go.mod h1:a8OnRcib4nhh0OaRAV+Yts87kKdq0PP7pXfy6kDkUVs=\n-github.com/vmihailenco/msgpack v3.3.3+incompatible/go.mod h1:fy3FlTQTDXWkZ7Bh6AcGMlsjHatGryHQYUTf1ShIgkk=\n-github.com/zclconf/go-cty v1.2.0 h1:sPHsy7ADcIZQP3vILvTjrh74ZA175TFP5vqiNK1UmlI=\n-github.com/zclconf/go-cty v1.2.0/go.mod h1:hOPWgoHbaTUnI5k4D2ld+GRpFJSCe6bCM7m1q/N4PQ8=\n-golang.org/x/crypto v0.0.0-20190308221718-c2843e01d9a2/go.mod h1:djNgcEr1/C05ACkg1iLfiJU5Ep61QUkGW8qpdssI0+w=\n-golang.org/x/crypto v0.0.0-20190426145343-a29dc8fdc734/go.mod h1:yigFU9vqHzYiE8UmvKecakEJjdnWj3jj499lnFckfCI=\n-golang.org/x/net v0.0.0-20180811021610-c39426892332/go.mod h1:mL1N/T3taQHkDXs73rZJwtUhF3w3ftmwwsq0BUmARs4=\n-golang.org/x/net v0.0.0-20190404232315-eb5bcb51f2a3/go.mod h1:t9HGtf8HONx5eT2rtn7q6eTqICYqUVnKs3thJo3Qplg=\n-golang.org/x/sync v0.0.0-20180314180146-1d60e4601c6f/go.mod h1:RxMgew5VJxzue5/jJTE5uejpjVlOe/izrB70Jof72aM=\n-golang.org/x/sys v0.0.0-20190215142949-d0b11bdaac8a/go.mod h1:STP8DvDyc/dI5b8T5hshtkjS+E42TnysNCUPdjciGhY=\n-golang.org/x/sys v0.0.0-20190412213103-97732733099d/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=\n-golang.org/x/sys v0.0.0-20190502175342-a43fa875dd82/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=\n-golang.org/x/text v0.3.0/go.mod h1:NqM8EUOU14njkJ3fqMW+pc6Ldnwhi/IjpwHt7yyuwOQ=\n-golang.org/x/text v0.3.2 h1:tW2bmiBqwgJj/UpqtC8EpXEZVYOwU0yG4iWbprSVAcs=\n-golang.org/x/text v0.3.2/go.mod h1:bEr9sfX3Q8Zfm5fL9x+3itogRgK3+ptLWKqgva+5dAk=\n-golang.org/x/tools v0.0.0-20180917221912-90fa682c2a6e/go.mod h1:n7NCudcB/nEzxVGmLbDWY5pfWTLqBcC2KZ6jyYvM4mQ=\n-google.golang.org/appengine v1.1.0/go.mod h1:EbEs0AVv82hx2wNQdGPgUI5lhzA/G0D9YwlJXL52JkM=\n-gopkg.in/check.v1 v0.0.0-20161208181325-20d25e280405 h1:yhCVgyC4o1eVCa2tZl7eS0r+SDo693bJlVdllGtEeKM=\n-gopkg.in/check.v1 v0.0.0-20161208181325-20d25e280405/go.mod h1:Co6ibVJAznAaIkqp8huTwlJQCZ016jof/cbN4VW5Yz0=\n-gopkg.in/check.v1 v1.0.0-20180628173108-788fd7840127 h1:qIbj1fsPNlZgppZ+VLlY7N33q108Sa+fhmuc+sWQYwY=\n-gopkg.in/check.v1 v1.0.0-20180628173108-788fd7840127/go.mod h1:Co6ibVJAznAaIkqp8huTwlJQCZ016jof/cbN4VW5Yz0=\n-gopkg.in/yaml.v2 v2.3.0 h1:clyUAQHOM3G0M3f5vQj7LuJrETvjVot3Z5el9nffUtU=\n-gopkg.in/yaml.v2 v2.3.0/go.mod h1:hI93XBmqTisBFMUTm0b8Fm+jr3Dg1NNxqwp+5A1VGuI=\ndiff --git a/testdata/config1.hcl b/testdata/config1.hcl\ndeleted file mode 100644\nindex 9d055d3..0000000\n--- a/testdata/config1.hcl\n+++ /dev/null\n@@ -1,7 +0,0 @@\n-Str      = \"str-hcl\"\n-Bytes    = [89,110,108,48,90,88,77,116,90,87,53,50]\n-Int      = 101\n-HTTPPort = 65000\n-Sub {\n-  Float = 999.111\n-}\n\\ No newline at end of file\ndiff --git a/testdata/config1.toml b/testdata/config1.toml\ndeleted file mode 100644\nindex 99060c3..0000000\n--- a/testdata/config1.toml\n+++ /dev/null\n@@ -1,5 +0,0 @@\n-Str = \"str-json\"\n-Int = 101\n-HTTPPort = 65000\n-[Sub]\n-Float = 999.111\n\\ No newline at end of file\ndiff --git a/testdata/config1.yaml b/testdata/config1.yaml\ndeleted file mode 100644\nindex a59f37d..0000000\n--- a/testdata/config1.yaml\n+++ /dev/null\n@@ -1,6 +0,0 @@\n-Str: \"str-yaml\"\n-Bytes: \"Ynl0ZXMteWFtbA==\"\n-Int: 101\n-HTTPPort\": 65000\n-Sub:\n-  Float: 999.111\n\\ No newline at end of file\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/build.yml",
+    "LICENSE",
+    "README.md",
+    "aconfig.go",
+    "aconfig_test.go",
+    "aconfighcl/go.mod",
+    "aconfighcl/go.sum",
+    "aconfighcl/hcl.go",
+    "aconfigtoml/go.mod",
+    "aconfigtoml/go.sum",
+    "aconfigtoml/toml.go",
+    "aconfigyaml/go.mod",
+    "aconfigyaml/go.sum",
+    "aconfigyaml/yaml.go",
+    "example_test.go",
+    "go.mod",
+    "go.sum",
+    "reflection.go",
+    "testdata/all_types_config.json",
+    "testdata/bad_config.json",
+    "testdata/config1.json",
+    "testdata/example_config.json",
+    "testdata/my_duration_config.json",
+    "testdata/other_numbers_config.json",
+    "testdata/test_config_def.json",
+    "testdata/test_config_env.json",
+    "testdata/test_config_flag.json",
+    "testdata/unknown.ext",
+    "utils.go"
+  ],
+  "explanation": {
+    "what": "aconfig.go から BurntSushi/toml・hashicorp/hcl・gopkg.in/yaml.v2 への直接依存を全て削除し、新しい `FileDecoder` インターフェース(DecodeFile(filename string, dst interface{}) error)を導入した。JSONデコーダだけは組み込みの jsonDecoder としてコア側に残し、YAML/TOML/HCLはそれぞれ aconfigyaml/aconfigtoml/aconfighcl という独自 go.mod を持つ別サブモジュールへ切り出して FileDecoder を実装させた。Loader には WithFileDecoder(ext, decoder) を追加し、拡張子ごとにデコーダを差し込めるようにしている。あわせて go.mod からrequireブロックを削除し、testdata の config1.hcl/toml/yaml と対応するテストコードもコアから削除した。",
+    "why": "PR #26 のタイトルは「from now - dependency free」で、本文は空だが動機はタイトルに明確に表れている。直前のコミット(#19 split into files → #25 HCL support)でJSON以外のファイル形式対応が積み重なるにつれ、コアライブラリが toml/hcl/yaml という3つの外部パッケージに直接依存する状態になっていた。設定ローダという性質上、利用者がJSONしか使わなくても不要な依存が付いてくるのは望ましくないため、インターフェースを介した差し替え式に変更し、コア(github.com/cristalhq/aconfig)自体の依存はゼロに近づけたと考えられる。",
+    "highlights": [
+      { "file": "aconfig.go", "note": "FileDecoderインターフェース定義とWithFileDecoder追加、loadFromFileがconfig.FileDecodersマップ経由になった箇所" },
+      { "file": "aconfigyaml/yaml.go", "note": "YAML用Decoderを独自go.mod付きサブモジュールとして切り出した例" }
+    ],
+    "langNotes": [
+      { "topic": "Go submodule (独立したgo.mod)", "note": "同一リポジトリ内でも aconfigyaml/go.mod のように別のgo.modを置くと、そのディレクトリ配下は独立したGoモジュール(サブモジュール)になり、依存関係もモジュール単位で分離できる。これにより本体(github.com/cristalhq/aconfig)を導入しても yaml.v2 や hcl/v2 が芋づる式に付いてこなくなる。" },
+      { "topic": "FileDecoder interface", "note": "DecodeFile(filename string, dst interface{}) error という1メソッドだけの小さなインターフェースを定義し、拡張子ごとにmapへ登録する設計。Goでは『大きな抽象を先に作らず、呼び出し側が要求する最小のインターフェースを定義する』small-interfaceの慣習がよく使われる。" }
+    ],
+    "diagram": {
+      "mermaid": "flowchart LR\n  Core[\"aconfig (core, deps-free)\"] -->|\"defines\"| FD[\"FileDecoder interface\"]\n  YAML[\"aconfigyaml (own go.mod)\"] -->|\"implements\"| FD\n  TOML[\"aconfigtoml (own go.mod)\"] -->|\"implements\"| FD\n  HCL[\"aconfighcl (own go.mod)\"] -->|\"implements\"| FD\n  Core -->|\"WithFileDecoder(ext, decoder)\"| YAML\n  Core -->|\"WithFileDecoder(ext, decoder)\"| TOML\n  Core -->|\"WithFileDecoder(ext, decoder)\"| HCL",
+      "caption": "コアはFileDecoderインターフェースだけを持ち、YAML/TOML/HCLの実装は独自go.modを持つ別サブモジュールに分離される"
+    },
+    "evidence": "pr",
+    "refs": [{ "type": "pr", "number": 26, "url": "https://github.com/cristalhq/aconfig/pull/26" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

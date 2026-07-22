@@ -1,0 +1,57 @@
+{
+  "seq": 5,
+  "sha": "6a252bf9d8f57d8327a54eec4058e52672570e00",
+  "parents": [
+    "b236a5c94bf3d3f4ac21dafc0783819a2fec2e07"
+  ],
+  "author": {
+    "name": "Oleg Kovalov",
+    "email": "iamolegkovalov@gmail.com",
+    "date": "2020-07-21T22:36:46+02:00"
+  },
+  "message": "add README",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 81,
+    "deletions": 1
+  },
+  "files": [
+    {
+      "path": "README.md",
+      "status": "M",
+      "additions": 81,
+      "deletions": 1,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/README.md b/README.md\nindex 23f361f..0e621f8 100644\n--- a/README.md\n+++ b/README.md\n@@ -1 +1,81 @@\n-# aconfig\n\\ No newline at end of file\n+# aconfig\n+\n+[![Build Status][build-img]][build-url]\n+[![GoDoc][doc-img]][doc-url]\n+[![Go Report Card][reportcard-img]][reportcard-url]\n+[![Coverage][coverage-img]][coverage-url]\n+\n+Simple, opinionated and helpful config loader. Defaults, files, environemnt, flags - doesn't matter. Everything will be scanned.\n+\n+## Features\n+\n+* Simple API.\n+* Automates a lot of things.\n+* Opinionated.\n+* Supports different sources:\n+  * defaults in code\n+  * files (JSON, YAML, TOML)\n+  * environemtn variables\n+  * command flags  \n+* Dependency-free (except file parsers)\n+\n+## Install\n+\n+Go version 1.13+\n+\n+```\n+go get github.com/cristalhq/aconfig\n+```\n+\n+## Example\n+\n+```go\n+type MyConfig struct {\n+  Port int `default:\"port\"`\n+  Auth struct {\n+    User string `default:\"admin\"`\n+    Pass stirng `default:\"github\"`\n+  }\n+}\n+\n+loader := aconfig.NewLoader(aconfig.Config{\n+\tUseDefaults: true,\n+\tUseFile:     true,\n+\tUseEnv:      true,\n+\tUseFlag:     true,\n+  Files:       []string{\"file.json\", \"ouch.yaml\"},\n+  FlagPrefix:  \"app\",\n+\tEnvPrefix:   \"APP\",\n+})\n+\n+var cfg MyConfig\n+if err := loader.Load(&cfg); err != nil {\n+  panic(err)\n+}\n+\n+// configuration fields will be loaded from:\n+//\n+// 1. defaults set in structure tags (see structure defenition)\n+// 2. loaded from files `file.json` if not `ouch.yaml`\n+// 3. than corresponding environment variables with prefix `APP`\n+// 4. and command-line flags if they are\n+```\n+\n+Also see examples: TODO\n+\n+## Documentation\n+\n+See [these docs][doc-url].\n+\n+## License\n+\n+[MIT License](LICENSE).\n+\n+[build-img]: https://github.com/cristalhq/aconfig/workflows/build/badge.svg\n+[build-url]: https://github.com/cristalhq/aconfig/actions\n+[doc-img]: https://godoc.org/github.com/cristalhq/aconfig?status.svg\n+[doc-url]: https://pkg.go.dev/github.com/cristalhq/aconfig\n+[reportcard-img]: https://goreportcard.com/badge/cristalhq/aconfig\n+[reportcard-url]: https://goreportcard.com/report/cristalhq/aconfig\n+[coverage-img]: https://codecov.io/gh/cristalhq/aconfig/branch/master/graph/badge.svg\n+[coverage-url]: https://codecov.io/gh/cristalhq/aconfig\n",
+  "diffTruncated": false,
+  "tree": [
+    "LICENSE",
+    "README.md",
+    "aconfig.go",
+    "aconfig_test.go",
+    "go.mod",
+    "go.sum",
+    "testdata/all_types_config.json",
+    "testdata/config1.json",
+    "testdata/my_duration_config.json",
+    "testdata/test_config_env.json",
+    "testdata/test_config_flag.json"
+  ],
+  "explanation": {
+    "what": "README.md を1行の見出しから、バッジ・Features・Install・使用例・License セクションを含む本格的な内容に書き換えた。使用例では LoaderConfig の UseDefaults/UseFile/UseEnv/UseFlag と Files/FlagPrefix/EnvPrefix を設定して loader.Load(&cfg) を呼ぶ一連の流れを示している。",
+    "why": "おそらく実装(aconfig.go)とテストが揃った段階で、利用者向けに API の使い方と設計思想(Simple, opinionated, dependency-free)を説明するドキュメントを整備する意図だったと考えられる。",
+    "highlights": [
+      { "file": "README.md", "note": "コード例中の `aconfig.Config` は当時の実際の型名 LoaderConfig と食い違っており、ドキュメントがまだ実装と完全には同期していない" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "inferred",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

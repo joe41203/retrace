@@ -1,0 +1,135 @@
+{
+  "seq": 115,
+  "sha": "7b7dfeb771272d687cf8a3eda11943e0e7a7437b",
+  "parents": [
+    "ae11180194e8e9166b5176e9bf807c95d802ea27"
+  ],
+  "author": {
+    "name": "Oleg Kovalov",
+    "email": "oleg@hey.com",
+    "date": "2021-05-22T19:00:52+02:00"
+  },
+  "message": "add Format method to decoders (#79)",
+  "pr": {
+    "number": 79,
+    "title": "add Format method to decoders",
+    "body": "Fixes #78 \r\n\r\nCC: @Tasssadar @asv7c2 ",
+    "url": "https://github.com/cristalhq/aconfig/pull/79"
+  },
+  "linkedIssues": [
+    {
+      "number": 78,
+      "title": "FileDecoders is limited only to standard extensions",
+      "body": "If register non standard extension for file decoder - than it cannot found any field during load. Is this by design?",
+      "url": "https://github.com/cristalhq/aconfig/issues/78"
+    }
+  ],
+  "stats": {
+    "filesChanged": 6,
+    "additions": 27,
+    "deletions": 12
+  },
+  "files": [
+    {
+      "path": "aconfig.go",
+      "status": "M",
+      "additions": 2,
+      "deletions": 4,
+      "binary": false
+    },
+    {
+      "path": "aconfigdotenv/dotenv.go",
+      "status": "M",
+      "additions": 5,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "aconfighcl/hcl.go",
+      "status": "M",
+      "additions": 5,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "aconfigtoml/toml.go",
+      "status": "M",
+      "additions": 5,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "aconfigyaml/yaml.go",
+      "status": "M",
+      "additions": 5,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "utils.go",
+      "status": "M",
+      "additions": 5,
+      "deletions": 8,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/aconfig.go b/aconfig.go\nindex 43f4ade..0f4e064 100644\n--- a/aconfig.go\n+++ b/aconfig.go\n@@ -93,6 +93,7 @@ type Config struct {\n \n // FileDecoder is used to read config from files. See aconfig submodules.\n type FileDecoder interface {\n+\tFormat() string\n \tDecodeFile(filename string) (map[string]interface{}, error)\n }\n \n@@ -142,9 +143,6 @@ func (l *Loader) init() {\n \t\t}\n \t\tl.config.FileDecoders[\".json\"] = &jsonDecoder{}\n \t}\n-\tif dec, ok := l.config.FileDecoders[\".yaml\"]; ok {\n-\t\tl.config.FileDecoders[\".yml\"] = dec\n-\t}\n \n \tif l.config.Args == nil {\n \t\tl.config.Args = os.Args[1:]\n@@ -292,7 +290,7 @@ func (l *Loader) loadFromFile() error {\n \t\t\treturn err\n \t\t}\n \n-\t\ttag := getTagForExt(ext)\n+\t\ttag := decoder.Format()\n \n \t\tfor _, field := range l.fields {\n \t\t\tname := l.fullTag(field, tag)\ndiff --git a/aconfigdotenv/dotenv.go b/aconfigdotenv/dotenv.go\nindex b0891f1..2ac9f6f 100644\n--- a/aconfigdotenv/dotenv.go\n+++ b/aconfigdotenv/dotenv.go\n@@ -10,6 +10,11 @@ type Decoder struct{}\n // New .ENV decoder for aconfig.\n func New() *Decoder { return &Decoder{} }\n \n+// Format of the decoder.\n+func (d *Decoder) Format() string {\n+\treturn \"env\"\n+}\n+\n // DecodeFile implements aconfig.FileDecoder.\n func (d *Decoder) DecodeFile(filename string) (map[string]interface{}, error) {\n \traw, err := godotenv.Read(filename)\ndiff --git a/aconfighcl/hcl.go b/aconfighcl/hcl.go\nindex 052562e..d1f71be 100644\n--- a/aconfighcl/hcl.go\n+++ b/aconfighcl/hcl.go\n@@ -12,6 +12,11 @@ type Decoder struct{}\n // New HCL decoder for aconfig.\n func New() *Decoder { return &Decoder{} }\n \n+// Format of the decoder.\n+func (d *Decoder) Format() string {\n+\treturn \"hcl\"\n+}\n+\n // DecodeFile implements aconfig.FileDecoder.\n func (d *Decoder) DecodeFile(filename string) (map[string]interface{}, error) {\n \tb, err := ioutil.ReadFile(filename)\ndiff --git a/aconfigtoml/toml.go b/aconfigtoml/toml.go\nindex 5a6a631..84dfc34 100644\n--- a/aconfigtoml/toml.go\n+++ b/aconfigtoml/toml.go\n@@ -12,6 +12,11 @@ type Decoder struct{}\n // New TOML decoder for aconfig.\n func New() *Decoder { return &Decoder{} }\n \n+// Format of the decoder.\n+func (d *Decoder) Format() string {\n+\treturn \"toml\"\n+}\n+\n // DecodeFile implements aconfig.FileDecoder.\n func (d *Decoder) DecodeFile(filename string) (map[string]interface{}, error) {\n \tf, err := os.Open(filename)\ndiff --git a/aconfigyaml/yaml.go b/aconfigyaml/yaml.go\nindex 37ed1f7..9f4b761 100644\n--- a/aconfigyaml/yaml.go\n+++ b/aconfigyaml/yaml.go\n@@ -12,6 +12,11 @@ type Decoder struct{}\n // New YAML decoder for aconfig.\n func New() *Decoder { return &Decoder{} }\n \n+// Format of the decoder.\n+func (d *Decoder) Format() string {\n+\treturn \"yaml\"\n+}\n+\n // DecodeFile implements aconfig.FileDecoder.\n func (d *Decoder) DecodeFile(filename string) (map[string]interface{}, error) {\n \tf, err := os.Open(filename)\ndiff --git a/utils.go b/utils.go\nindex a7aeeca..f2e76cf 100644\n--- a/utils.go\n+++ b/utils.go\n@@ -23,14 +23,6 @@ func assertStruct(x interface{}) {\n \t}\n }\n \n-func getTagForExt(ext string) string {\n-\ttag := ext[1:]\n-\tif tag == \"yml\" {\n-\t\ttag = \"yaml\"\n-\t}\n-\treturn tag\n-}\n-\n func getEnv() map[string]interface{} {\n \tenv := os.Environ()\n \tres := make(map[string]interface{}, len(env))\n@@ -137,6 +129,11 @@ func splitNameByWords(src string) []string {\n \n type jsonDecoder struct{}\n \n+// Format of the decoder.\n+func (d *jsonDecoder) Format() string {\n+\treturn \"json\"\n+}\n+\n // DecodeFile implements FileDecoder.\n func (d *jsonDecoder) DecodeFile(filename string) (map[string]interface{}, error) {\n \tf, err := os.Open(filename)\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/build.yml",
+    "LICENSE",
+    "README.md",
+    "aconfig.go",
+    "aconfig_test.go",
+    "aconfigdotenv/dotenv.go",
+    "aconfigdotenv/dotenv_test.go",
+    "aconfigdotenv/go.mod",
+    "aconfigdotenv/go.sum",
+    "aconfighcl/go.mod",
+    "aconfighcl/go.sum",
+    "aconfighcl/hcl.go",
+    "aconfighcl/hcl_test.go",
+    "aconfigtoml/go.mod",
+    "aconfigtoml/go.sum",
+    "aconfigtoml/toml.go",
+    "aconfigtoml/toml_test.go",
+    "aconfigyaml/go.mod",
+    "aconfigyaml/go.sum",
+    "aconfigyaml/yaml.go",
+    "aconfigyaml/yaml_test.go",
+    "doc.go",
+    "example_test.go",
+    "go.mod",
+    "reflection.go",
+    "testdata/bad_config.json",
+    "testdata/config.json",
+    "testdata/config1.json",
+    "testdata/config2.json",
+    "testdata/config3.json",
+    "testdata/example_config.json",
+    "testdata/unknown.ext",
+    "testdata/unknown_fields.json",
+    "testfile.json",
+    "utils.go",
+    "utils_test.go"
+  ],
+  "explanation": {
+    "what": "FileDecoder インターフェースに `Format() string` メソッドを追加し、dotenv/hcl/toml/yaml/json の各デコーダ実装にそれぞれ `\"env\"` `\"hcl\"` `\"toml\"` `\"yaml\"` `\"json\"` を返す実装を追加した。前コミットで追加した拡張子ベースの `getTagForExt`(`.yml`→`yaml` の読み替え)は削除し、タグ名の決定を `decoder.Format()` の呼び出しに一本化した。",
+    "why": "issue #78 が指摘する通り、FileDecoders に非標準の拡張子(例: `.config` 等)を登録しても、タグ名の決定が `filepath.Ext` による拡張子文字列に依存していたため対応するフィールドを見つけられなかった。デコーダ自身が「自分がどのフォーマット名で読み込むか」を返す設計にすることで、拡張子とタグ名の対応をライブラリ利用者が自由に決められるようにした。issue のコメントで示唆されていた「FileDecoder のインターフェースにフォーマットを返すメソッドを足す」という方向性がそのまま採用されている。",
+    "highlights": [
+      { "file": "aconfig.go", "note": "FileDecoder interface に Format() string を追加し、tag := decoder.Format() に置き換え" },
+      { "file": "utils.go", "note": "拡張子から yaml/yml を読み替える getTagForExt を削除(不要になったため)" }
+    ],
+    "langNotes": [
+      { "topic": "インターフェースへのメソッド追加", "note": "Go のインターフェースは構造的部分型(structural typing)のため、FileDecoder に Format() を足すと、これを実装する全ての具象型(jsonDecoder やサブモジュールの Decoder)に同名メソッドの実装が必須になる。このコミットでは影響を受ける5つの実装すべてに同時にメソッドを追加している。" }
+    ],
+    "diagram": null,
+    "evidence": "issue",
+    "refs": [
+      { "type": "pr", "number": 79, "url": "https://github.com/cristalhq/aconfig/pull/79" },
+      { "type": "issue", "number": 78, "url": "https://github.com/cristalhq/aconfig/issues/78" }
+    ],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

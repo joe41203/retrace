@@ -1,0 +1,101 @@
+{
+  "seq": 60,
+  "sha": "6399e4aef7b27f7be31c45f8cfafc05667b772af",
+  "parents": [
+    "e7dfd860922270acac751dc9d3ecd9cec897a357"
+  ],
+  "author": {
+    "name": "Oleg Kovalov",
+    "email": "oleg@hey.com",
+    "date": "2020-09-17T12:28:22+02:00"
+  },
+  "message": "add autonaming (#16)",
+  "pr": {
+    "number": 16,
+    "title": "add autonaming",
+    "body": "",
+    "url": "https://github.com/cristalhq/aconfig/pull/16"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 4,
+    "additions": 104,
+    "deletions": 33
+  },
+  "files": [
+    {
+      "path": "aconfig.go",
+      "status": "M",
+      "additions": 83,
+      "deletions": 12,
+      "binary": false
+    },
+    {
+      "path": "aconfig_test.go",
+      "status": "M",
+      "additions": 7,
+      "deletions": 7,
+      "binary": false
+    },
+    {
+      "path": "example_test.go",
+      "status": "M",
+      "additions": 13,
+      "deletions": 13,
+      "binary": false
+    },
+    {
+      "path": "testdata/example_config.json",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/aconfig.go b/aconfig.go\nindex 3d671c2..5748ac7 100644\n--- a/aconfig.go\n+++ b/aconfig.go\n@@ -11,6 +11,7 @@ import (\n \t\"strconv\"\n \t\"strings\"\n \t\"time\"\n+\t\"unicode\"\n \n \t\"github.com/BurntSushi/toml\"\n \t\"gopkg.in/yaml.v2\"\n@@ -305,19 +306,11 @@ func (l *Loader) assertBuilt() {\n }\n \n func (l *Loader) getEnvName(field *fieldData) string {\n-\tname := field.name\n-\tif field.envName != \"\" {\n-\t\tname = field.envName\n-\t}\n-\treturn strings.ToUpper(l.config.EnvPrefix + strings.ReplaceAll(name, \".\", \"_\"))\n+\treturn l.config.EnvPrefix + field.envName\n }\n \n func (l *Loader) getFlagName(field *fieldData) string {\n-\tname := field.name\n-\tif field.flagName != \"\" {\n-\t\tname = field.flagName\n-\t}\n-\treturn strings.ToLower(l.config.FlagPrefix + name)\n+\treturn l.config.FlagPrefix + field.flagName\n }\n \n func (l *Loader) setFieldData(field *fieldData, value string) error {\n@@ -380,14 +373,16 @@ type fieldData struct {\n }\n \n func newFieldData(field reflect.StructField, value reflect.Value, parent *fieldData) *fieldData {\n+\twords := splitNameByWords(field.Name)\n+\n \treturn &fieldData{\n \t\tname:         makeName(field.Name, parent),\n \t\tparent:       parent,\n \t\tvalue:        value,\n \t\tfield:        field,\n \t\tdefaultValue: field.Tag.Get(defaultValueTag),\n-\t\tenvName:      field.Tag.Get(envNameTag),\n-\t\tflagName:     field.Tag.Get(flagNameTag),\n+\t\tenvName:      makeEnvName(field, parent, words),\n+\t\tflagName:     makeFlagName(field, parent, words),\n \t\tusage:        field.Tag.Get(usageTag),\n \t}\n }\n@@ -403,6 +398,39 @@ func makeName(name string, parent *fieldData) string {\n \treturn parent.name + \".\" + name\n }\n \n+func makeEnvName(field reflect.StructField, parent *fieldData, words []string) string {\n+\tenvName := field.Tag.Get(envNameTag)\n+\tif envName == \"\" {\n+\t\tenvName = makeParsingName(words)\n+\t}\n+\tif parent != nil {\n+\t\tenvName = parent.envName + \"_\" + envName\n+\t}\n+\treturn strings.ToUpper(envName)\n+}\n+\n+func makeFlagName(field reflect.StructField, parent *fieldData, words []string) string {\n+\tflagName := field.Tag.Get(flagNameTag)\n+\tif flagName == \"\" {\n+\t\tflagName = makeParsingName(words)\n+\t}\n+\tif parent != nil {\n+\t\tflagName = parent.flagName + \".\" + flagName\n+\t}\n+\treturn strings.ToLower(flagName)\n+}\n+\n+func makeParsingName(words []string) string {\n+\tname := \"\"\n+\tfor i, w := range words {\n+\t\tif i > 0 {\n+\t\t\tname += \"_\"\n+\t\t}\n+\t\tname += strings.ToLower(w)\n+\t}\n+\treturn name\n+}\n+\n func (f *fieldData) Name() string {\n \treturn f.name\n }\n@@ -560,3 +588,46 @@ func setMap(field *fieldData, value string) error {\n \tfield.value.Set(mapField)\n \treturn nil\n }\n+\n+// based on https://github.com/fatih/camelcase\n+func splitNameByWords(src string) []string {\n+\tvar runes [][]rune\n+\tlastClass, class := 0, 0\n+\n+\t// split into fields based on class of unicode character\n+\tfor _, r := range src {\n+\t\tswitch true {\n+\t\tcase unicode.IsLower(r):\n+\t\t\tclass = 1\n+\t\tcase unicode.IsUpper(r):\n+\t\t\tclass = 2\n+\t\tcase unicode.IsDigit(r):\n+\t\t\tclass = 3\n+\t\tdefault:\n+\t\t\tclass = 4\n+\t\t}\n+\t\tif class == lastClass {\n+\t\t\trunes[len(runes)-1] = append(runes[len(runes)-1], r)\n+\t\t} else {\n+\t\t\trunes = append(runes, []rune{r})\n+\t\t}\n+\t\tlastClass = class\n+\t}\n+\n+\t// handle upper case -> lower case sequences, e.g.\n+\t// \"PDFL\", \"oader\" -> \"PDF\", \"Loader\"\n+\tfor i := 0; i < len(runes)-1; i++ {\n+\t\tif unicode.IsUpper(runes[i][0]) && unicode.IsLower(runes[i+1][0]) {\n+\t\t\trunes[i+1] = append([]rune{runes[i][len(runes[i])-1]}, runes[i+1]...)\n+\t\t\trunes[i] = runes[i][:len(runes[i])-1]\n+\t\t}\n+\t}\n+\n+\twords := []string{}\n+\tfor _, s := range runes {\n+\t\tif len(s) > 0 {\n+\t\t\twords = append(words, string(s))\n+\t\t}\n+\t}\n+\treturn words\n+}\ndiff --git a/aconfig_test.go b/aconfig_test.go\nindex f558947..192a71c 100644\n--- a/aconfig_test.go\n+++ b/aconfig_test.go\n@@ -221,9 +221,9 @@ func TestLoadFile_WithFiles(t *testing.T) {\n func TestLoadEnv(t *testing.T) {\n \tsetEnv(t, \"TST_STR\", \"str-env\")\n \tsetEnv(t, \"TST_INT\", \"121\")\n-\tsetEnv(t, \"TST_HTTPPORT\", \"3000\")\n+\tsetEnv(t, \"TST_HTTP_PORT\", \"3000\")\n \tsetEnv(t, \"TST_SUB_FLOAT\", \"222.333\")\n-\tsetEnv(t, \"TST_ANON_ISANON\", \"true\")\n+\tsetEnv(t, \"TST_ANON_IS_ANON\", \"true\")\n \tsetEnv(t, \"TST_EM\", \"em-env\")\n \tdefer os.Clearenv()\n \n@@ -231,7 +231,7 @@ func TestLoadEnv(t *testing.T) {\n \t\tSkipDefaults().\n \t\tSkipFiles().\n \t\tSkipFlags().\n-\t\tWithEnvPrefix(\"tst\").\n+\t\tWithEnvPrefix(\"TST\").\n \t\tBuild()\n \n \tvar cfg TestConfig\n@@ -259,9 +259,9 @@ func TestLoadFlag(t *testing.T) {\n \t\t\"-tst.str=str-flag\",\n \t\t\"-tst.int=1001\",\n \t\t\"-tst.int=1001\",\n-\t\t\"-tst.httpport=30000\",\n+\t\t\"-tst.http_port=30000\",\n \t\t\"-tst.sub.float=123.321\",\n-\t\t\"-tst.anon.isanon=true\",\n+\t\t\"-tst.anon.is_anon=true\",\n \t\t\"-tst.em=em-flag\",\n \t}\n \n@@ -448,14 +448,14 @@ func TestBadFiles(t *testing.T) {\n }\n \n func TestBadEnvs(t *testing.T) {\n-\tsetEnv(t, \"TST_HTTPPORT\", \"30a00\")\n+\tsetEnv(t, \"TST_HTTP_PORT\", \"30a00\")\n \tdefer os.Clearenv()\n \n \tloader := LoaderFor(&TestConfig{}).\n \t\tSkipDefaults().\n \t\tSkipFiles().\n \t\tSkipFlags().\n-\t\tWithEnvPrefix(\"tst\").\n+\t\tWithEnvPrefix(\"TST\").\n \t\tBuild()\n \n \tvar cfg TestConfig\ndiff --git a/example_test.go b/example_test.go\nindex 1ab751d..a9b2ef2 100644\n--- a/example_test.go\n+++ b/example_test.go\n@@ -9,8 +9,8 @@ import (\n )\n \n type MyConfig struct {\n-\tPort int `default:\"1111\"`\n-\tAuth struct {\n+\tHTTPPort int `default:\"1111\"`\n+\tAuth     struct {\n \t\tUser string `default:\"def-user\"`\n \t\tPass string `default:\"def-pass\"`\n \t}\n@@ -29,13 +29,13 @@ func Example_NewApi() {\n \t\tlog.Panic(err)\n \t}\n \n-\tfmt.Printf(\"Port:      %v\\n\", cfg.Port)\n+\tfmt.Printf(\"HTTPPort:  %v\\n\", cfg.HTTPPort)\n \tfmt.Printf(\"Auth.User: %q\\n\", cfg.Auth.User)\n \tfmt.Printf(\"Auth.Pass: %q\\n\", cfg.Auth.Pass)\n \n \t// Output:\n \t//\n-\t// Port:      0\n+\t// HTTPPort:  0\n \t// Auth.User: \"\"\n \t// Auth.Pass: \"\"\n }\n@@ -54,13 +54,13 @@ func Example_Defaults() {\n \t\tlog.Panic(err)\n \t}\n \n-\tfmt.Printf(\"Port:      %v\\n\", cfg.Port)\n+\tfmt.Printf(\"HTTPPort:  %v\\n\", cfg.HTTPPort)\n \tfmt.Printf(\"Auth.User: %v\\n\", cfg.Auth.User)\n \tfmt.Printf(\"Auth.Pass: %v\\n\", cfg.Auth.Pass)\n \n \t// Output:\n \t//\n-\t// Port:      1111\n+\t// HTTPPort:  1111\n \t// Auth.User: def-user\n \t// Auth.Pass: def-pass\n }\n@@ -79,13 +79,13 @@ func Example_File() {\n \t\tlog.Panic(err)\n \t}\n \n-\tfmt.Printf(\"Port:      %v\\n\", cfg.Port)\n+\tfmt.Printf(\"HTTPPort:  %v\\n\", cfg.HTTPPort)\n \tfmt.Printf(\"Auth.User: %v\\n\", cfg.Auth.User)\n \tfmt.Printf(\"Auth.Pass: %v\\n\", cfg.Auth.Pass)\n \n \t// Output:\n \t//\n-\t// Port:      2222\n+\t// HTTPPort:  2222\n \t// Auth.User: json-user\n \t// Auth.Pass: json-pass\n }\n@@ -94,7 +94,7 @@ func Example_File() {\n // And then overwrite with environment variables.\n //\n func Example_Env() {\n-\tos.Setenv(\"EXAMPLE_PORT\", \"3333\")\n+\tos.Setenv(\"EXAMPLE_HTTP_PORT\", \"3333\")\n \tos.Setenv(\"EXAMPLE_AUTH_USER\", \"env-user\")\n \tos.Setenv(\"EXAMPLE_AUTH_PASS\", \"env-pass\")\n \tdefer os.Clearenv()\n@@ -110,13 +110,13 @@ func Example_Env() {\n \t\tlog.Panic(err)\n \t}\n \n-\tfmt.Printf(\"Port:      %v\\n\", cfg.Port)\n+\tfmt.Printf(\"HTTPPort:  %v\\n\", cfg.HTTPPort)\n \tfmt.Printf(\"Auth.User: %v\\n\", cfg.Auth.User)\n \tfmt.Printf(\"Auth.Pass: %v\\n\", cfg.Auth.Pass)\n \n \t// Output:\n \t//\n-\t// Port:      3333\n+\t// HTTPPort:  3333\n \t// Auth.User: env-user\n \t// Auth.Pass: env-pass\n }\n@@ -140,7 +140,7 @@ func Example_Flag() {\n \t\tlog.Panic(err)\n \t}\n \n-\tfmt.Printf(\"Port:      %v\\n\", cfg.Port)\n+\tfmt.Printf(\"HTTPPort:  %v\\n\", cfg.HTTPPort)\n \tfmt.Printf(\"Auth.User: %v\\n\", cfg.Auth.User)\n \tfmt.Printf(\"Auth.Pass: %v\\n\", cfg.Auth.Pass)\n \n@@ -150,7 +150,7 @@ func Example_Flag() {\n \n \t// Output\n \t//\n-\t// Port:      4444\n+\t// HTTPPort:  4444\n \t// Auth.User: flag-user\n \t// Auth.Pass: flag-pass\n }\ndiff --git a/testdata/example_config.json b/testdata/example_config.json\nindex dd8086a..94d3412 100644\n--- a/testdata/example_config.json\n+++ b/testdata/example_config.json\n@@ -1,5 +1,5 @@\n {\n-  \"Port\": 2222,\n+  \"HTTPPort\": 2222,\n   \"Auth\": {\n     \"User\": \"json-user\",\n     \"Pass\": \"json-pass\"\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/build.yml",
+    "LICENSE",
+    "README.md",
+    "aconfig.go",
+    "aconfig_test.go",
+    "example_test.go",
+    "go.mod",
+    "go.sum",
+    "testdata/all_types_config.json",
+    "testdata/bad_config.json",
+    "testdata/config1.json",
+    "testdata/config1.toml",
+    "testdata/config1.yaml",
+    "testdata/example_config.json",
+    "testdata/my_duration_config.json",
+    "testdata/other_numbers_config.json",
+    "testdata/test_config_def.json",
+    "testdata/test_config_env.json",
+    "testdata/test_config_flag.json",
+    "testdata/unknown.ext"
+  ],
+  "explanation": {
+    "what": "フィールド名から env 変数名・flag 名を自動生成する autonaming を導入した。newFieldData で splitNameByWords(field.Name) を呼んで構造体フィールド名を単語単位に分割し、makeEnvName/makeFlagName がタグ指定がなければその単語列から SNAKE_CASE(env)・ドット区切り小文字(flag)の名前を組み立てる。親フィールドがあれば親の envName/flagName に自身の名前を連結してネストを表現する。あわせて getEnvName/getFlagName は事前計算済みの envName/flagName をそのまま返すだけの単純な形に変わり、HTTPPort のような複合語フィールドは HTTP_PORT / http_port のように分割された名前になった(旧実装では HTTPPORT / httpport という単純な大文字・小文字化だった)。",
+    "why": "PR タイトルの通り「自動命名」の追加。それまでは env/flag タグを付けない限り、構造体フィールド名をそのまま大文字化・小文字化しただけの名前(例: HTTPPort → HTTPPORT)になり、複合語が読みにくい名前になっていた。fatih/camelcase を参考にした splitNameByWords で単語境界(小文字→大文字、大文字の連続からの復帰など)を認識して分割することで、タグを書かなくても人間が読みやすい命名(HTTP_PORT、http_port)を自動生成できるようにしている。",
+    "highlights": [
+      { "file": "aconfig.go", "note": "splitNameByWords はユニコードの文字クラス(小文字/大文字/数字/その他)の遷移を見て単語境界を検出する、fatih/camelcase 由来のアルゴリズム" },
+      { "file": "aconfig.go", "note": "makeEnvName/makeFlagName は親の envName/flagName に自身の名前を連結することで、ネストしたフィールドの階層をアンダースコア・ドットで表現する" },
+      { "file": "example_test.go", "note": "Port を HTTPPort にリネームし、自動生成される名前が HTTP_PORT/http_port に変わったことをサンプル出力で示している" }
+    ],
+    "langNotes": [
+      { "topic": "unicode.IsLower/IsUpper によるcamelCase分割", "note": "Go の unicode パッケージは各ルーンの文字クラス判定関数を提供する。splitNameByWords はこれを使い、直前の文字と文字クラスが変わった箇所を単語の区切りとみなして HTTPPort のような表記を HTTP・Port に分割している。大文字の連続から小文字への遷移(例: PDFLoader → PDF/Loader)も特別に補正している。" }
+    ],
+    "diagram": {
+      "mermaid": "flowchart LR\n  A[\"struct field name (e.g. HTTPPort)\"] --> B[\"splitNameByWords\"]\n  B --> C[\"words: HTTP, Port\"]\n  C --> D[\"makeEnvName / makeFlagName\"]\n  D --> E[\"parent envName/flagName と連結\"]\n  E --> F[\"ENV: HTTP_PORT / flag: http.port\"]",
+      "caption": "フィールド名から env/flag 名を自動生成する autonaming の流れ"
+    },
+    "evidence": "pr",
+    "refs": [
+      { "type": "pr", "number": 16, "url": "https://github.com/cristalhq/aconfig/pull/16" }
+    ],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

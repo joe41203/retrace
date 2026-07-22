@@ -1,0 +1,104 @@
+{
+  "seq": 92,
+  "sha": "8508d15669c841e46bde44a4997b3eb7b72fa632",
+  "parents": [
+    "3e15487917ed1f538eac946c63b056084722e0fc"
+  ],
+  "author": {
+    "name": "Oleg Kovalov",
+    "email": "oleg@hey.com",
+    "date": "2021-02-25T22:54:47+01:00"
+  },
+  "message": "required tag (#48)",
+  "pr": {
+    "number": 48,
+    "title": "required tag",
+    "body": "",
+    "url": "https://github.com/cristalhq/aconfig/pull/48"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 3,
+    "additions": 58,
+    "deletions": 4
+  },
+  "files": [
+    {
+      "path": "aconfig.go",
+      "status": "M",
+      "additions": 24,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "aconfig_test.go",
+      "status": "M",
+      "additions": 21,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "reflection.go",
+      "status": "M",
+      "additions": 13,
+      "deletions": 4,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/aconfig.go b/aconfig.go\nindex 138cf3f..43b4ba1 100644\n--- a/aconfig.go\n+++ b/aconfig.go\n@@ -37,6 +37,11 @@ type Config struct {\n \tEnvPrefix  string // EnvPrefix for environment variables.\n \tFlagPrefix string // FlagPrefix for flag parameters.\n \n+\t// AllFieldsRequired set to true will fail config loading if one of the fields was not set.\n+\t// File, environment, flag must provide a value for the field.\n+\t// If default is set and this option is enabled (or required tag is set) there will be an error.\n+\tAllFieldRequired bool\n+\n \t// AllowUnknownFields set to true will not fail on unknown fields in files.\n \tAllowUnknownFields bool\n \n@@ -155,6 +160,9 @@ func (l *Loader) Load() error {\n \tif err := l.loadSources(); err != nil {\n \t\treturn fmt.Errorf(\"aconfig: cannot load config: %w\", err)\n \t}\n+\tif err := l.checkRequired(); err != nil {\n+\t\treturn fmt.Errorf(\"aconfig: missing required field: %w\", err)\n+\t}\n \treturn nil\n }\n \n@@ -188,11 +196,24 @@ func (l *Loader) loadSources() error {\n \treturn nil\n }\n \n+func (l *Loader) checkRequired() error {\n+\tfor _, field := range l.fields {\n+\t\tif field.isSet {\n+\t\t\tcontinue\n+\t\t}\n+\t\tif field.isRequired || l.config.AllFieldRequired {\n+\t\t\treturn fmt.Errorf(\"field %s was not set but it is required\", field.name)\n+\t\t}\n+\t}\n+\treturn nil\n+}\n+\n func (l *Loader) loadDefaults() error {\n \tfor _, fd := range l.fields {\n \t\tif err := l.setFieldData(fd, fd.defaultValue); err != nil {\n \t\t\treturn err\n \t\t}\n+\t\tfd.isSet = true\n \t}\n \treturn nil\n }\n@@ -229,6 +250,7 @@ func (l *Loader) loadFromFile() error {\n \t\t\tif err := l.setFieldData(field, fmt.Sprint(value)); err != nil {\n \t\t\t\treturn err\n \t\t\t}\n+\t\t\tfield.isSet = true\n \t\t\tdelete(actualFields, name)\n \t\t}\n \n@@ -258,6 +280,7 @@ func (l *Loader) loadEnvironment() error {\n \t\tif err := l.setFieldData(field, v); err != nil {\n \t\t\treturn err\n \t\t}\n+\t\tfield.isSet = true\n \t\tdelete(actualEnv, envName)\n \t}\n \n@@ -292,6 +315,7 @@ func (l *Loader) loadFlags() error {\n \t\tif err := l.setFieldData(field, flg.Value.String()); err != nil {\n \t\t\treturn err\n \t\t}\n+\t\tfield.isSet = true\n \t\tdelete(actualFlags, flagName)\n \t}\n \ndiff --git a/aconfig_test.go b/aconfig_test.go\nindex cf75a1a..d8b6aea 100644\n--- a/aconfig_test.go\n+++ b/aconfig_test.go\n@@ -906,6 +906,27 @@ func TestPassNonStructs(t *testing.T) {\n \tf(func() {})\n }\n \n+func TestBadRequiredTag(t *testing.T) {\n+\ttype TestConfig struct {\n+\t\tField string `required:\"boom\"`\n+\t}\n+\n+\tf := func(cfg interface{}) {\n+\t\tt.Helper()\n+\n+\t\tdefer func() {\n+\t\t\tt.Helper()\n+\t\t\tif err := recover(); err == nil {\n+\t\t\t\tt.Fatal()\n+\t\t\t}\n+\t\t}()\n+\n+\t\t_ = LoaderFor(cfg, Config{})\n+\t}\n+\n+\tf(&TestConfig{})\n+}\n+\n func setEnv(t *testing.T, key, value string) {\n \tif err := os.Setenv(key, value); err != nil {\n \t\tt.Fatal(err)\ndiff --git a/reflection.go b/reflection.go\nindex 04094a1..c99e898 100644\n--- a/reflection.go\n+++ b/reflection.go\n@@ -13,6 +13,8 @@ type fieldData struct {\n \tparent       *fieldData\n \tfield        reflect.StructField\n \tvalue        reflect.Value\n+\tisSet        bool\n+\tisRequired   bool\n \tdefaultValue string\n \tusage        string\n \tjsonName     string\n@@ -30,11 +32,18 @@ func (l *Loader) newSimpleFieldData(value reflect.Value) *fieldData {\n func (l *Loader) newFieldData(field reflect.StructField, value reflect.Value, parent *fieldData) *fieldData {\n \twords := splitNameByWords(field.Name)\n \n+\trequiredTag := field.Tag.Get(\"required\")\n+\tif requiredTag != \"\" && requiredTag != \"true\" {\n+\t\tpanic(fmt.Sprintf(\"aconfig: incorrect value for 'required' tag: %v\", requiredTag))\n+\t}\n+\n \tfd := &fieldData{\n-\t\tname:   makeName(field.Name, parent),\n-\t\tparent: parent,\n-\t\tvalue:  value,\n-\t\tfield:  field,\n+\t\tname:       makeName(field.Name, parent),\n+\t\tparent:     parent,\n+\t\tvalue:      value,\n+\t\tfield:      field,\n+\t\tisSet:      false,\n+\t\tisRequired: requiredTag == \"true\",\n \n \t\tdefaultValue: field.Tag.Get(defaultValueTag),\n \t\tusage:        field.Tag.Get(usageTag),\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/build.yml",
+    "LICENSE",
+    "README.md",
+    "aconfig.go",
+    "aconfig_test.go",
+    "aconfigdotenv/dotenv.go",
+    "aconfigdotenv/dotenv_test.go",
+    "aconfigdotenv/go.mod",
+    "aconfigdotenv/go.sum",
+    "aconfighcl/go.mod",
+    "aconfighcl/go.sum",
+    "aconfighcl/hcl.go",
+    "aconfighcl/hcl_test.go",
+    "aconfigtoml/go.mod",
+    "aconfigtoml/go.sum",
+    "aconfigtoml/toml.go",
+    "aconfigtoml/toml_test.go",
+    "aconfigyaml/go.mod",
+    "aconfigyaml/go.sum",
+    "aconfigyaml/yaml.go",
+    "aconfigyaml/yaml_test.go",
+    "doc.go",
+    "example_test.go",
+    "go.mod",
+    "reflection.go",
+    "testdata/bad_config.json",
+    "testdata/config.json",
+    "testdata/config1.json",
+    "testdata/config2.json",
+    "testdata/config3.json",
+    "testdata/example_config.json",
+    "testdata/unknown.ext",
+    "testdata/unknown_fields.json",
+    "testfile.json",
+    "utils.go",
+    "utils_test.go"
+  ],
+  "explanation": {
+    "what": "Config に AllFieldRequired フラグを追加し、struct タグ required:\"true\" を各フィールドに付けられるようにした。fieldData に isSet / isRequired を持たせ、defaults/file/env/flag のいずれかの読み込みで値がセットされるたびに isSet=true を立て、全ソース読み込み後の checkRequired() で isSet=false かつ(isRequired または AllFieldRequired)なフィールドがあればエラーを返すようにした。",
+    "why": "PR タイトルの通り「required tag」の導入が主目的。required タグの値が \"true\" 以外(例: \"boom\")の場合は設定ミスとして panic させ、TestBadRequiredTag でその挙動を検証している。defaults の読み込みでも isSet=true にしているため、デフォルト値だけで埋まったフィールドは required 扱いにならない(コメントにある通り、defaultとrequiredの併用は設計上エラーになる想定)。",
+    "highlights": [
+      { "file": "aconfig.go", "note": "checkRequired() が Load() の最後に呼ばれ、未設定必須フィールドをまとめて検出する" },
+      { "file": "reflection.go", "note": "required タグの値を \"true\" 以外は panic で弾くバリデーション" }
+    ],
+    "langNotes": [
+      { "topic": "struct タグによるオプトイン検証", "note": "Go では `required:\"true\"` のような struct タグを reflect.StructField.Tag.Get(\"required\") で読み取り、フィールドごとの振る舞いを制御する。aconfig のような設定ローダでは default/env/flag 名だけでなく、こうした挙動フラグもタグで表現するのが一般的なイディオム。" }
+    ],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [{ "type": "pr", "number": 48, "url": "https://github.com/cristalhq/aconfig/pull/48" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

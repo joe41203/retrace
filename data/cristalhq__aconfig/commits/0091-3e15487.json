@@ -1,0 +1,92 @@
+{
+  "seq": 91,
+  "sha": "3e15487917ed1f538eac946c63b056084722e0fc",
+  "parents": [
+    "acd7bd5a6ff65705dc1fcd0e04e956074a9f76a6"
+  ],
+  "author": {
+    "name": "Oleg Kovalov",
+    "email": "oleg@hey.com",
+    "date": "2021-02-23T22:45:46+01:00"
+  },
+  "message": "defer file close",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 2,
+    "deletions": 1
+  },
+  "files": [
+    {
+      "path": "aconfigtoml/toml.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "aconfigyaml/yaml.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/aconfigtoml/toml.go b/aconfigtoml/toml.go\nindex 57c919f..e244435 100644\n--- a/aconfigtoml/toml.go\n+++ b/aconfigtoml/toml.go\n@@ -20,6 +20,7 @@ func (d *Decoder) DecodeFile(filename string) (map[string]interface{}, error) {\n \tif err != nil {\n \t\treturn nil, err\n \t}\n+\tdefer f.Close()\n \n \tvar raw map[string]interface{}\n \tif _, err := toml.DecodeReader(f, &raw); err != nil {\ndiff --git a/aconfigyaml/yaml.go b/aconfigyaml/yaml.go\nindex 0fadef0..0101699 100644\n--- a/aconfigyaml/yaml.go\n+++ b/aconfigyaml/yaml.go\n@@ -17,10 +17,10 @@ func New() *Decoder { return &Decoder{} }\n // DecodeFile implements aconfig.FileDecoder.\n func (d *Decoder) DecodeFile(filename string) (map[string]interface{}, error) {\n \tf, err := os.Open(filename)\n-\tdefer f.Close()\n \tif err != nil {\n \t\treturn nil, err\n \t}\n+\tdefer f.Close()\n \n \tvar raw map[string]interface{}\n \tif err := yaml.NewDecoder(f).Decode(&raw); err != nil {\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/build.yml",
+    "LICENSE",
+    "README.md",
+    "aconfig.go",
+    "aconfig_test.go",
+    "aconfigdotenv/dotenv.go",
+    "aconfigdotenv/dotenv_test.go",
+    "aconfigdotenv/go.mod",
+    "aconfigdotenv/go.sum",
+    "aconfighcl/go.mod",
+    "aconfighcl/go.sum",
+    "aconfighcl/hcl.go",
+    "aconfighcl/hcl_test.go",
+    "aconfigtoml/go.mod",
+    "aconfigtoml/go.sum",
+    "aconfigtoml/toml.go",
+    "aconfigtoml/toml_test.go",
+    "aconfigyaml/go.mod",
+    "aconfigyaml/go.sum",
+    "aconfigyaml/yaml.go",
+    "aconfigyaml/yaml_test.go",
+    "doc.go",
+    "example_test.go",
+    "go.mod",
+    "reflection.go",
+    "testdata/bad_config.json",
+    "testdata/config.json",
+    "testdata/config1.json",
+    "testdata/config2.json",
+    "testdata/config3.json",
+    "testdata/example_config.json",
+    "testdata/unknown.ext",
+    "testdata/unknown_fields.json",
+    "testfile.json",
+    "utils.go",
+    "utils_test.go"
+  ],
+  "explanation": {
+    "what": "aconfigtoml/toml.go と aconfigyaml/yaml.go の DecodeFile で、os.Open のエラーチェックより前に defer f.Close() を呼んでいた(yaml側)、または defer 自体が抜けていた(toml側)不備を修正し、両方とも「エラーチェック後に defer f.Close()」の順序へ揃えた。",
+    "why": "yaml.go は os.Open が失敗して f が nil のときにも defer f.Close() が登録されてしまい、関数終了時に nil ポインタの Close 呼び出しでパニックする経路があった。toml.go には元々 defer によるクローズ処理自体がなく、ファイルディスクリプタがリークしていた。直前の #46(seq90)で aconfigyaml 側の Close忘れが修正された流れを受け、同種の問題を横の decoder パッケージ全体で点検し倒した修正と見られる。",
+    "highlights": [
+      { "file": "aconfigyaml/yaml.go", "note": "defer f.Close() を err チェックの後に移動。open失敗時のnilパニックを防ぐ" },
+      { "file": "aconfigtoml/toml.go", "note": "defer f.Close() を新規追加(元は無かった)" }
+    ],
+    "langNotes": [
+      { "topic": "defer と早期リターンの順序", "note": "Go の defer は呼び出し時点で登録されるため、os.Open のエラーチェックより前に defer f.Close() を書くと、エラー時に f が nil のままクローズを試みてパニックしうる。エラーチェックの後に defer を置くのが定石。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

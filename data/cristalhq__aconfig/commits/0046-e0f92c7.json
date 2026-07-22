@@ -1,0 +1,75 @@
+{
+  "seq": 46,
+  "sha": "e0f92c78ebc1bcf08919d72a8007d6b90d3440cb",
+  "parents": [
+    "03f25ffa16f4b5c739cd07791003d9acb73a1426"
+  ],
+  "author": {
+    "name": "Oleg Kovalov",
+    "email": "iamolegkovalov@gmail.com",
+    "date": "2020-07-26T21:58:03+02:00"
+  },
+  "message": "add return type for WalkField fn",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 12,
+    "deletions": 5
+  },
+  "files": [
+    {
+      "path": "aconfig.go",
+      "status": "M",
+      "additions": 4,
+      "deletions": 2,
+      "binary": false
+    },
+    {
+      "path": "aconfig_test.go",
+      "status": "M",
+      "additions": 8,
+      "deletions": 3,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/aconfig.go b/aconfig.go\nindex 85300c3..8e77121 100644\n--- a/aconfig.go\n+++ b/aconfig.go\n@@ -132,12 +132,14 @@ func (l *Loader) Flags() *flag.FlagSet {\n \n // WalkFields iterates over configuration fields.\n // Easy way to create documentation or other stuff.\n-func (l *Loader) WalkFields(fn func(f Field)) {\n+func (l *Loader) WalkFields(fn func(f Field) bool) {\n \tif !l.isBuilt {\n \t\tpanic(\"aconfig: you must run Build method before using the loader\")\n \t}\n \tfor _, f := range l.fields {\n-\t\tfn(f)\n+\t\tif !fn(f) {\n+\t\t\treturn\n+\t\t}\n \t}\n }\n \ndiff --git a/aconfig_test.go b/aconfig_test.go\nindex e1f6ea7..b5da4a0 100644\n--- a/aconfig_test.go\n+++ b/aconfig_test.go\n@@ -519,7 +519,7 @@ func TestWalkFields(t *testing.T) {\n \n \ti := 0\n \n-\tLoaderFor(&Config{}).Build().WalkFields(func(f Field) {\n+\tLoaderFor(&Config{}).Build().WalkFields(func(f Field) bool {\n \t\twantFields := fields[i]\n \t\tif f.Name() != wantFields.Name() {\n \t\t\tt.Fatalf(\"got name %v, want %v\", f.Name(), wantFields.Name())\n@@ -531,6 +531,7 @@ func TestWalkFields(t *testing.T) {\n \t\t\tt.Fatalf(\"got usage %#v, want %#v\", f.Usage(), wantFields.Usage())\n \t\t}\n \t\ti++\n+\t\treturn true\n \t})\n \n \tif want := 3; i != want {\n@@ -538,15 +539,19 @@ func TestWalkFields(t *testing.T) {\n \t}\n \n \ti = 0\n-\tLoaderFor(&Config{}).Build().WalkFields(func(f Field) {\n+\tLoaderFor(&Config{}).Build().WalkFields(func(f Field) bool {\n \t\tif i > 0 {\n-\t\t\treturn\n+\t\t\treturn false\n \t\t}\n \t\tif got := f.Tag(\"marco\"); got != \"polo\" {\n \t\t\tt.Fatalf(\"got %v, want %v\", got, \"polo\")\n \t\t}\n \t\ti++\n+\t\treturn true\n \t})\n+\tif i != 1 {\n+\t\tt.Fatal()\n+\t}\n }\n \n func TestPanicWhenNotBuilt(t *testing.T) {\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/build.yml",
+    "LICENSE",
+    "README.md",
+    "aconfig.go",
+    "aconfig_test.go",
+    "example_test.go",
+    "go.mod",
+    "go.sum",
+    "testdata/all_types_config.json",
+    "testdata/bad_config.json",
+    "testdata/config1.json",
+    "testdata/config1.toml",
+    "testdata/config1.yaml",
+    "testdata/example_config.json",
+    "testdata/my_duration_config.json",
+    "testdata/other_numbers_config.json",
+    "testdata/test_config_def.json",
+    "testdata/test_config_env.json",
+    "testdata/test_config_flag.json",
+    "testdata/unknown.ext"
+  ],
+  "explanation": {
+    "what": "`WalkFields` のコールバック型を `func(f Field)` から `func(f Field) bool` に変更し、コールバックが `false` を返した時点で走査を打ち切れるようにした。テストの `TestWalkFields` も、2つ目のケースで1件処理したら `false` を返して早期終了することを検証するよう更新した。",
+    "why": "PRには紐付かないコミットで、コミットメッセージ \"add return type for WalkField fn\" が示す通りの変更。前のコミットで追加したばかりの WalkFields には全件を無条件に舐める設計しかなく、利用者が特定のフィールドを見つけた時点で走査を止めたい場合に対応できなかったため、bool 戻り値による早期終了(break)の仕組みをおそらく追加で足したと考えられる。",
+    "highlights": [
+      { "file": "aconfig.go", "note": "for ループ内で `if !fn(f) { return }` として早期終了を実現している" }
+    ],
+    "langNotes": [
+      { "topic": "コールバックの bool 戻り値による早期終了", "note": "Go には break/continue をコールバック関数から直接呼ぶ手段がないため、コールバックに bool を返させて呼び出し側の for ループで判定するのが慣用的なパターン(sync.Map.Range や bufio.Scanner に近い発想)。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

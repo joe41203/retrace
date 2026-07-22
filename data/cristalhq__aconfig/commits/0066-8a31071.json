@@ -1,0 +1,122 @@
+{
+  "seq": 66,
+  "sha": "8a3107180316fa22fbdc05710881b06ed4f5fbf6",
+  "parents": [
+    "c74590eea6f1df649e405d7629dc2d3b6cc6bd92"
+  ],
+  "author": {
+    "name": "Eric Greene",
+    "email": "ericgreene@users.noreply.github.com",
+    "date": "2020-10-28T01:00:24-07:00"
+  },
+  "message": "HCL support (#25)",
+  "pr": {
+    "number": 25,
+    "title": "HCL support",
+    "body": "Close #24 ",
+    "url": "https://github.com/cristalhq/aconfig/pull/25"
+  },
+  "linkedIssues": [
+    {
+      "number": 24,
+      "title": "Add HCL file support",
+      "body": "It would be great to have support for HCL. If there are no objections, I will submit a PR. ",
+      "url": "https://github.com/cristalhq/aconfig/issues/24"
+    }
+  ],
+  "stats": {
+    "filesChanged": 6,
+    "additions": 75,
+    "deletions": 8
+  },
+  "files": [
+    {
+      "path": "README.md",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "aconfig.go",
+      "status": "M",
+      "additions": 3,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "aconfig_test.go",
+      "status": "M",
+      "additions": 12,
+      "deletions": 7,
+      "binary": false
+    },
+    {
+      "path": "go.mod",
+      "status": "M",
+      "additions": 1,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "go.sum",
+      "status": "M",
+      "additions": 51,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "testdata/config1.hcl",
+      "status": "A",
+      "additions": 7,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/README.md b/README.md\nindex 6f2e1b6..e0c96ba 100644\n--- a/README.md\n+++ b/README.md\n@@ -21,7 +21,7 @@ There are more than 2000 repositories on Github regarding configuration in Go. I\n * Opinionated.\n * Supports different sources:\n   * defaults in code\n-  * files (JSON, YAML, TOML)\n+  * files (JSON, YAML, TOML, HCL)\n   * environment variables\n   * command-line flags\n * Dependency-free (except file parsers).\ndiff --git a/aconfig.go b/aconfig.go\nindex b1f3b11..1225258 100644\n--- a/aconfig.go\n+++ b/aconfig.go\n@@ -9,6 +9,7 @@ import (\n \t\"strings\"\n \n \t\"github.com/BurntSushi/toml\"\n+\t\"github.com/hashicorp/hcl/v2/hclsimple\"\n \t\"gopkg.in/yaml.v2\"\n )\n \n@@ -230,6 +231,8 @@ func (l *Loader) loadFromFile(dst interface{}) error {\n \t\t\terr = json.NewDecoder(f).Decode(dst)\n \t\tcase \".toml\":\n \t\t\t_, err = toml.DecodeReader(f, dst)\n+\t\tcase \".hcl\":\n+\t\t\terr = hclsimple.DecodeFile(file, nil, dst)\n \t\tdefault:\n \t\t\treturn fmt.Errorf(\"file format '%q' isn't supported\", ext)\n \t\t}\ndiff --git a/aconfig_test.go b/aconfig_test.go\nindex 774466d..5392dfd 100644\n--- a/aconfig_test.go\n+++ b/aconfig_test.go\n@@ -10,16 +10,17 @@ import (\n \t\"time\"\n \n \t\"github.com/BurntSushi/toml\"\n+\t\"github.com/hashicorp/hcl/v2/hclsimple\"\n \t\"gopkg.in/yaml.v2\"\n )\n \n type TestConfig struct {\n-\tStr      string `default:\"str-def\"`\n-\tBytes    []byte `default:\"bytes-def\"`\n-\tInt      *int32 `default:\"123\"`\n-\tHTTPPort int    `default:\"8080\"`\n-\tParam    int    // no default tag, so default value\n-\tSub      SubConfig\n+\tStr      string `default:\"str-def\" hcl:\"Str\"`\n+\tBytes    []byte `default:\"bytes-def\" hcl:\"Bytes\"`\n+\tInt      *int32 `default:\"123\" hcl:\"Int\"`\n+\tHTTPPort int    `default:\"8080\" hcl:\"HTTPPort\"`\n+\tParam    int     // no default tag, so default value\n+\tSub      SubConfig `hcl:\"Sub,block\"`\n \tAnon     struct {\n \t\tIsAnon bool `default:\"true\"`\n \t}\n@@ -36,7 +37,7 @@ type EmbeddedConfig struct {\n }\n \n type SubConfig struct {\n-\tFloat float64 `default:\"123.123\"`\n+\tFloat float64 `default:\"123.123\" hcl:\"Float\"`\n }\n \n type MyDuration string\n@@ -190,6 +191,7 @@ func TestLoadFile(t *testing.T) {\n \tf(\"testdata/config1.json\")\n \tf(\"testdata/config1.yaml\")\n \tf(\"testdata/config1.toml\")\n+\tf(\"testdata/config1.hcl\")\n }\n \n func TestLoadFile_WithFiles(t *testing.T) {\n@@ -217,6 +219,7 @@ func TestLoadFile_WithFiles(t *testing.T) {\n \tf(\"testdata/config1.json\")\n \tf(\"testdata/config1.yaml\")\n \tf(\"testdata/config1.toml\")\n+\tf(\"testdata/config1.hcl\")\n }\n \n func TestLoadEnv(t *testing.T) {\n@@ -654,6 +657,8 @@ func loadFile(t *testing.T, file string, dst interface{}) {\n \t\terr = json.NewDecoder(f).Decode(dst)\n \tcase \".toml\":\n \t\t_, err = toml.DecodeReader(f, dst)\n+\tcase \".hcl\":\n+\t\terr = hclsimple.DecodeFile(file, nil, dst)\n \t}\n \tif err != nil {\n \t\tt.Fatal(err)\ndiff --git a/go.mod b/go.mod\nindex fd7193b..898ecb2 100644\n--- a/go.mod\n+++ b/go.mod\n@@ -4,5 +4,6 @@ go 1.14\n \n require (\n \tgithub.com/BurntSushi/toml v0.3.1\n+\tgithub.com/hashicorp/hcl/v2 v2.7.0\n \tgopkg.in/yaml.v2 v2.3.0\n )\ndiff --git a/go.sum b/go.sum\nindex 8b8df92..48e47f4 100644\n--- a/go.sum\n+++ b/go.sum\n@@ -1,5 +1,56 @@\n github.com/BurntSushi/toml v0.3.1 h1:WXkYYl6Yr3qBf1K79EBnL4mak0OimBfB0XUf9Vl28OQ=\n github.com/BurntSushi/toml v0.3.1/go.mod h1:xHWCNGjB5oqiDr8zfno3MHue2Ht5sIBksp03qcyfWMU=\n+github.com/agext/levenshtein v1.2.1 h1:QmvMAjj2aEICytGiWzmxoE0x2KZvE0fvmqMOfy2tjT8=\n+github.com/agext/levenshtein v1.2.1/go.mod h1:JEDfjyjHDjOF/1e4FlBE/PkbqA9OfWu2ki2W0IB5558=\n+github.com/apparentlymart/go-dump v0.0.0-20180507223929-23540a00eaa3/go.mod h1:oL81AME2rN47vu18xqj1S1jPIPuN7afo62yKTNn3XMM=\n+github.com/apparentlymart/go-textseg v1.0.0 h1:rRmlIsPEEhUTIKQb7T++Nz/A5Q6C9IuX2wFoYVvnCs0=\n+github.com/apparentlymart/go-textseg v1.0.0/go.mod h1:z96Txxhf3xSFMPmb5X/1W05FF/Nj9VFpLOpjS5yuumk=\n+github.com/apparentlymart/go-textseg/v12 v12.0.0 h1:bNEQyAGak9tojivJNkoqWErVCQbjdL7GzRt3F8NvfJ0=\n+github.com/apparentlymart/go-textseg/v12 v12.0.0/go.mod h1:S/4uRK2UtaQttw1GenVJEynmyUenKwP++x/+DdGV/Ec=\n+github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=\n+github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=\n+github.com/go-test/deep v1.0.3 h1:ZrJSEWsXzPOxaZnFteGEfooLba+ju3FYIbOrS+rQd68=\n+github.com/go-test/deep v1.0.3/go.mod h1:wGDj63lr65AM2AQyKZd/NYHGb0R+1RLqB8NKt3aSFNA=\n+github.com/golang/protobuf v1.1.0/go.mod h1:6lQm79b+lXiMfvg/cZm0SGofjICqVBUtrP5yJMmIC1U=\n+github.com/google/go-cmp v0.3.1 h1:Xye71clBPdm5HgqGwUkwhbynsUJZhDbS20FvLhQ2izg=\n+github.com/google/go-cmp v0.3.1/go.mod h1:8QqcDgzrUqlUb/G2PQTWiueGozuR1884gddMywk6iLU=\n+github.com/hashicorp/hcl/v2 v2.7.0 h1:IU8qz5UzZ1po3M1D9/Kq6S5zbDGVfI9bnzmC1ogKKmI=\n+github.com/hashicorp/hcl/v2 v2.7.0/go.mod h1:bQTN5mpo+jewjJgh8jr0JUguIi7qPHUF6yIfAEN3jqY=\n+github.com/kr/pretty v0.1.0 h1:L/CwN0zerZDmRFUapSPitk6f+Q3+0za1rQkzVuMiMFI=\n+github.com/kr/pretty v0.1.0/go.mod h1:dAy3ld7l9f0ibDNOQOHHMYYIIbhfbHSm3C4ZsoJORNo=\n+github.com/kr/pty v1.1.1/go.mod h1:pFQYn66WHrOpPYNljwOMqo10TkYh1fy3cYio2l3bCsQ=\n+github.com/kr/text v0.1.0 h1:45sCR5RtlFHMR4UwH9sdQ5TC8v0qDQCHnXt+kaKSTVE=\n+github.com/kr/text v0.1.0/go.mod h1:4Jbv+DJW3UT/LiOwJeYQe1efqtUx/iVham/4vfdArNI=\n+github.com/kylelemons/godebug v0.0.0-20170820004349-d65d576e9348 h1:MtvEpTB6LX3vkb4ax0b5D2DHbNAUsen0Gx5wZoq3lV4=\n+github.com/kylelemons/godebug v0.0.0-20170820004349-d65d576e9348/go.mod h1:B69LEHPfb2qLo0BaaOLcbitczOKLWTsrBG9LczfCD4k=\n+github.com/mitchellh/go-wordwrap v0.0.0-20150314170334-ad45545899c7 h1:DpOJ2HYzCv8LZP15IdmG+YdwD2luVPHITV96TkirNBM=\n+github.com/mitchellh/go-wordwrap v0.0.0-20150314170334-ad45545899c7/go.mod h1:ZXFpozHsX6DPmq2I0TCekCxypsnAUbP2oI0UX1GXzOo=\n+github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZbAQM=\n+github.com/pmezard/go-difflib v1.0.0/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=\n+github.com/sergi/go-diff v1.0.0 h1:Kpca3qRNrduNnOQeazBd0ysaKrUJiIuISHxogkT9RPQ=\n+github.com/sergi/go-diff v1.0.0/go.mod h1:0CfEIISq7TuYL3j771MWULgwwjU+GofnZX9QAmXWZgo=\n+github.com/spf13/pflag v1.0.2/go.mod h1:DYY7MBk1bdzusC3SYhjObp+wFpr4gzcvqqNjLnInEg4=\n+github.com/stretchr/testify v1.2.2 h1:bSDNvY7ZPG5RlJ8otE/7V6gMiyenm9RtJ7IUVIAoJ1w=\n+github.com/stretchr/testify v1.2.2/go.mod h1:a8OnRcib4nhh0OaRAV+Yts87kKdq0PP7pXfy6kDkUVs=\n+github.com/vmihailenco/msgpack v3.3.3+incompatible/go.mod h1:fy3FlTQTDXWkZ7Bh6AcGMlsjHatGryHQYUTf1ShIgkk=\n+github.com/zclconf/go-cty v1.2.0 h1:sPHsy7ADcIZQP3vILvTjrh74ZA175TFP5vqiNK1UmlI=\n+github.com/zclconf/go-cty v1.2.0/go.mod h1:hOPWgoHbaTUnI5k4D2ld+GRpFJSCe6bCM7m1q/N4PQ8=\n+golang.org/x/crypto v0.0.0-20190308221718-c2843e01d9a2/go.mod h1:djNgcEr1/C05ACkg1iLfiJU5Ep61QUkGW8qpdssI0+w=\n+golang.org/x/crypto v0.0.0-20190426145343-a29dc8fdc734/go.mod h1:yigFU9vqHzYiE8UmvKecakEJjdnWj3jj499lnFckfCI=\n+golang.org/x/net v0.0.0-20180811021610-c39426892332/go.mod h1:mL1N/T3taQHkDXs73rZJwtUhF3w3ftmwwsq0BUmARs4=\n+golang.org/x/net v0.0.0-20190404232315-eb5bcb51f2a3/go.mod h1:t9HGtf8HONx5eT2rtn7q6eTqICYqUVnKs3thJo3Qplg=\n+golang.org/x/sync v0.0.0-20180314180146-1d60e4601c6f/go.mod h1:RxMgew5VJxzue5/jJTE5uejpjVlOe/izrB70Jof72aM=\n+golang.org/x/sys v0.0.0-20190215142949-d0b11bdaac8a/go.mod h1:STP8DvDyc/dI5b8T5hshtkjS+E42TnysNCUPdjciGhY=\n+golang.org/x/sys v0.0.0-20190412213103-97732733099d/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=\n+golang.org/x/sys v0.0.0-20190502175342-a43fa875dd82/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=\n+golang.org/x/text v0.3.0/go.mod h1:NqM8EUOU14njkJ3fqMW+pc6Ldnwhi/IjpwHt7yyuwOQ=\n+golang.org/x/text v0.3.2 h1:tW2bmiBqwgJj/UpqtC8EpXEZVYOwU0yG4iWbprSVAcs=\n+golang.org/x/text v0.3.2/go.mod h1:bEr9sfX3Q8Zfm5fL9x+3itogRgK3+ptLWKqgva+5dAk=\n+golang.org/x/tools v0.0.0-20180917221912-90fa682c2a6e/go.mod h1:n7NCudcB/nEzxVGmLbDWY5pfWTLqBcC2KZ6jyYvM4mQ=\n+google.golang.org/appengine v1.1.0/go.mod h1:EbEs0AVv82hx2wNQdGPgUI5lhzA/G0D9YwlJXL52JkM=\n+gopkg.in/check.v1 v0.0.0-20161208181325-20d25e280405 h1:yhCVgyC4o1eVCa2tZl7eS0r+SDo693bJlVdllGtEeKM=\n gopkg.in/check.v1 v0.0.0-20161208181325-20d25e280405/go.mod h1:Co6ibVJAznAaIkqp8huTwlJQCZ016jof/cbN4VW5Yz0=\n+gopkg.in/check.v1 v1.0.0-20180628173108-788fd7840127 h1:qIbj1fsPNlZgppZ+VLlY7N33q108Sa+fhmuc+sWQYwY=\n+gopkg.in/check.v1 v1.0.0-20180628173108-788fd7840127/go.mod h1:Co6ibVJAznAaIkqp8huTwlJQCZ016jof/cbN4VW5Yz0=\n gopkg.in/yaml.v2 v2.3.0 h1:clyUAQHOM3G0M3f5vQj7LuJrETvjVot3Z5el9nffUtU=\n gopkg.in/yaml.v2 v2.3.0/go.mod h1:hI93XBmqTisBFMUTm0b8Fm+jr3Dg1NNxqwp+5A1VGuI=\ndiff --git a/testdata/config1.hcl b/testdata/config1.hcl\nnew file mode 100644\nindex 0000000..9d055d3\n--- /dev/null\n+++ b/testdata/config1.hcl\n@@ -0,0 +1,7 @@\n+Str      = \"str-hcl\"\n+Bytes    = [89,110,108,48,90,88,77,116,90,87,53,50]\n+Int      = 101\n+HTTPPort = 65000\n+Sub {\n+  Float = 999.111\n+}\n\\ No newline at end of file\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/build.yml",
+    "LICENSE",
+    "README.md",
+    "aconfig.go",
+    "aconfig_test.go",
+    "example_test.go",
+    "go.mod",
+    "go.sum",
+    "reflection.go",
+    "testdata/all_types_config.json",
+    "testdata/bad_config.json",
+    "testdata/config1.hcl",
+    "testdata/config1.json",
+    "testdata/config1.toml",
+    "testdata/config1.yaml",
+    "testdata/example_config.json",
+    "testdata/my_duration_config.json",
+    "testdata/other_numbers_config.json",
+    "testdata/test_config_def.json",
+    "testdata/test_config_env.json",
+    "testdata/test_config_flag.json",
+    "testdata/unknown.ext",
+    "utils.go"
+  ],
+  "explanation": {
+    "what": "loadFromFile の拡張子switchに \".hcl\" ケースを追加し、hashicorp/hcl/v2/hclsimple.DecodeFile を使ってHCL形式の設定ファイルを読み込めるようにした。go.mod/go.sum に github.com/hashicorp/hcl/v2 を追加し、testdata/config1.hcl とTestConfig/SubConfigへの `hcl:\"...\"` タグを追加してテストも拡張している。",
+    "why": "issue #24「Add HCL file support」で外部コントリビュータから『HCLサポートが欲しい、反対がなければ自分でPRを出す』という要望が出され、それに応える形でPR #25(本文は「Close #24」)としてEric Greeneが実装した。JSON/YAML/TOMLに続く4つ目のファイル形式サポートとなる。",
+    "highlights": [
+      { "file": "aconfig.go", "note": "loadFromFileのswitchに\\\".hcl\\\"ケースが追加された箇所" },
+      { "file": "testdata/config1.hcl", "note": "新規追加されたHCL形式のテスト設定ファイル" }
+    ],
+    "langNotes": [
+      { "topic": "HCL (HashiCorp Configuration Language)", "note": "Terraform等で使われる設定記述言語。hclsimple.DecodeFileは構造体タグ `hcl:\"name\"` を見て値を埋め込む点でJSON/YAMLデコーダと似たAPIだが、ネストしたブロック(このコミットのSub{...})は `hcl:\"Sub,block\"` のように block 指定が必要になる。" }
+    ],
+    "diagram": null,
+    "evidence": "issue",
+    "refs": [
+      { "type": "pr", "number": 25, "url": "https://github.com/cristalhq/aconfig/pull/25" },
+      { "type": "issue", "number": 24, "url": "https://github.com/cristalhq/aconfig/issues/24" }
+    ],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

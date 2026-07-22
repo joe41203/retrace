@@ -1,0 +1,106 @@
+{
+  "seq": 101,
+  "sha": "ed97f9e9d8aa7185408483d7d88d62de18f28ffe",
+  "parents": [
+    "619764696fd941d8640c12802ee8f949893cfe6f"
+  ],
+  "author": {
+    "name": "Oleg Kovalov",
+    "email": "oleg@hey.com",
+    "date": "2021-02-27T23:45:42+01:00"
+  },
+  "message": "better tags (#57)",
+  "pr": {
+    "number": 57,
+    "title": "better tags",
+    "body": "",
+    "url": "https://github.com/cristalhq/aconfig/pull/57"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 3,
+    "additions": 47,
+    "deletions": 78
+  },
+  "files": [
+    {
+      "path": "aconfig.go",
+      "status": "M",
+      "additions": 4,
+      "deletions": 4,
+      "binary": false
+    },
+    {
+      "path": "reflection.go",
+      "status": "M",
+      "additions": 38,
+      "deletions": 54,
+      "binary": false
+    },
+    {
+      "path": "utils.go",
+      "status": "M",
+      "additions": 5,
+      "deletions": 20,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/aconfig.go b/aconfig.go\nindex 7e55154..9765d41 100644\n--- a/aconfig.go\n+++ b/aconfig.go\n@@ -143,7 +143,7 @@ func (l *Loader) parseFields() {\n \tif !l.config.SkipFlags {\n \t\tfor _, field := range l.fields {\n \t\t\tflagName := l.config.FlagPrefix + l.fullTag(field, flagNameTag)\n-\t\t\tl.flagSet.String(flagName, field.defaultValue, field.usage)\n+\t\t\tl.flagSet.String(flagName, field.Tag(defaultValueTag), field.Tag(usageTag))\n \t\t}\n \t}\n }\n@@ -218,11 +218,11 @@ func (l *Loader) checkRequired() error {\n }\n \n func (l *Loader) loadDefaults() error {\n-\tfor _, fd := range l.fields {\n-\t\tif err := l.setFieldData(fd, fd.defaultValue); err != nil {\n+\tfor _, field := range l.fields {\n+\t\tif err := l.setFieldData(field, field.Tag(defaultValueTag)); err != nil {\n \t\t\treturn err\n \t\t}\n-\t\tfd.isSet = true\n+\t\tfield.isSet = true\n \t}\n \treturn nil\n }\ndiff --git a/reflection.go b/reflection.go\nindex 87bb360..f13345b 100644\n--- a/reflection.go\n+++ b/reflection.go\n@@ -9,20 +9,28 @@ import (\n )\n \n type fieldData struct {\n-\tname         string\n-\tparent       *fieldData\n-\tfield        reflect.StructField\n-\tvalue        reflect.Value\n-\tisSet        bool\n-\tisRequired   bool\n-\tdefaultValue string\n-\tusage        string\n-\tjsonName     string\n-\tyamlName     string\n-\ttomlName     string\n-\thclName      string\n-\tenvName      string\n-\tflagName     string\n+\tname       string\n+\tparent     *fieldData\n+\tfield      reflect.StructField\n+\tvalue      reflect.Value\n+\tisSet      bool\n+\tisRequired bool\n+\ttags       map[string]string\n+}\n+\n+func (f *fieldData) Name() string {\n+\treturn f.name\n+}\n+\n+func (f *fieldData) Tag(tag string) string {\n+\tif t, ok := f.tags[tag]; ok {\n+\t\treturn t\n+\t}\n+\treturn f.field.Tag.Get(tag)\n+}\n+\n+func (f *fieldData) Parent() (Field, bool) {\n+\treturn f.parent, f.parent != nil\n }\n \n func (l *Loader) newSimpleFieldData(value reflect.Value) *fieldData {\n@@ -30,8 +38,6 @@ func (l *Loader) newSimpleFieldData(value reflect.Value) *fieldData {\n }\n \n func (l *Loader) newFieldData(field reflect.StructField, value reflect.Value, parent *fieldData) *fieldData {\n-\twords := splitNameByWords(field.Name)\n-\n \trequiredTag := field.Tag.Get(\"required\")\n \tif requiredTag != \"\" && requiredTag != \"true\" {\n \t\tpanic(fmt.Sprintf(\"aconfig: incorrect value for 'required' tag: %v\", requiredTag))\n@@ -44,21 +50,26 @@ func (l *Loader) newFieldData(field reflect.StructField, value reflect.Value, pa\n \t\tfield:      field,\n \t\tisSet:      false,\n \t\tisRequired: requiredTag == \"true\",\n-\n-\t\tdefaultValue: field.Tag.Get(defaultValueTag),\n-\t\tusage:        field.Tag.Get(usageTag),\n-\t\tjsonName:     l.makeTagValue(field, jsonNameTag, words),\n-\t\tyamlName:     l.makeTagValue(field, yamlNameTag, words),\n-\t\ttomlName:     l.makeTagValue(field, tomlNameTag, words),\n-\t\thclName:      l.makeTagValue(field, hclNameTag, words),\n-\t\tenvName:      l.makeEnvName(field, words),\n-\t\tflagName:     l.makeTagValue(field, flagNameTag, words),\n+\t\ttags:       l.tagsForField(field),\n \t}\n \treturn fd\n }\n \n-func (f *fieldData) Name() string {\n-\treturn f.name\n+func (l *Loader) tagsForField(field reflect.StructField) map[string]string {\n+\twords := splitNameByWords(field.Name)\n+\n+\ttags := map[string]string{\n+\t\tdefaultValueTag: field.Tag.Get(defaultValueTag),\n+\t\tusageTag:        field.Tag.Get(usageTag),\n+\n+\t\tenvNameTag:  l.makeTagValue(field, envNameTag, words),\n+\t\tflagNameTag: l.makeTagValue(field, flagNameTag, words),\n+\t}\n+\n+\tfor _, tag := range []string{jsonNameTag, yamlNameTag, tomlNameTag, hclNameTag} {\n+\t\ttags[tag] = l.makeTagValue(field, tag, words)\n+\t}\n+\treturn tags\n }\n \n func (l *Loader) fullTag(f *fieldData, tag string) string {\n@@ -73,33 +84,6 @@ func (l *Loader) fullTag(f *fieldData, tag string) string {\n \treturn res\n }\n \n-func (f *fieldData) Tag(tag string) string {\n-\tswitch tag {\n-\tcase defaultValueTag:\n-\t\treturn f.defaultValue\n-\tcase usageTag:\n-\t\treturn f.usage\n-\tcase jsonNameTag:\n-\t\treturn f.jsonName\n-\tcase yamlNameTag:\n-\t\treturn f.yamlName\n-\tcase tomlNameTag:\n-\t\treturn f.tomlName\n-\tcase hclNameTag:\n-\t\treturn f.hclName\n-\tcase envNameTag:\n-\t\treturn f.envName\n-\tcase flagNameTag:\n-\t\treturn f.flagName\n-\tdefault:\n-\t\treturn f.field.Tag.Get(tag)\n-\t}\n-}\n-\n-func (f *fieldData) Parent() (Field, bool) {\n-\treturn f.parent, f.parent != nil\n-}\n-\n func (l *Loader) getFields(x interface{}) []*fieldData {\n \tvalue := reflect.ValueOf(x)\n \tfor value.Type().Kind() == reflect.Ptr {\ndiff --git a/utils.go b/utils.go\nindex bb887ba..7c80259 100644\n--- a/utils.go\n+++ b/utils.go\n@@ -58,34 +58,19 @@ func (l *Loader) makeTagValue(field reflect.StructField, tag string, words []str\n \tif v := field.Tag.Get(tag); v != \"\" {\n \t\treturn v\n \t}\n+\n \tswitch tag {\n \tcase jsonNameTag, yamlNameTag, tomlNameTag, hclNameTag:\n \t\tif l.config.DontGenerateTags {\n \t\t\treturn field.Name\n \t\t}\n \t}\n-\treturn strings.ToLower(makeParsingName(words))\n-}\n-\n-func (l *Loader) makeEnvName(field reflect.StructField, words []string) string {\n-\tif v := field.Tag.Get(envNameTag); v != \"\" {\n-\t\treturn v\n-\t}\n-\tif l.config.DontGenerateTags {\n-\t\treturn \"\"\n-\t}\n-\treturn strings.ToUpper(makeParsingName(words))\n-}\n \n-func makeParsingName(words []string) string {\n-\tvar name strings.Builder\n-\tfor i, w := range words {\n-\t\tif i > 0 {\n-\t\t\tname.WriteByte('_')\n-\t\t}\n-\t\tname.WriteString(strings.ToLower(w))\n+\tname := strings.Join(words, \"_\")\n+\tif tag == envNameTag {\n+\t\treturn strings.ToUpper(name)\n \t}\n-\treturn name.String()\n+\treturn strings.ToLower(name)\n }\n \n // based on https://github.com/fatih/camelcase\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/build.yml",
+    "LICENSE",
+    "README.md",
+    "aconfig.go",
+    "aconfig_test.go",
+    "aconfigdotenv/dotenv.go",
+    "aconfigdotenv/dotenv_test.go",
+    "aconfigdotenv/go.mod",
+    "aconfigdotenv/go.sum",
+    "aconfighcl/go.mod",
+    "aconfighcl/go.sum",
+    "aconfighcl/hcl.go",
+    "aconfighcl/hcl_test.go",
+    "aconfigtoml/go.mod",
+    "aconfigtoml/go.sum",
+    "aconfigtoml/toml.go",
+    "aconfigtoml/toml_test.go",
+    "aconfigyaml/go.mod",
+    "aconfigyaml/go.sum",
+    "aconfigyaml/yaml.go",
+    "aconfigyaml/yaml_test.go",
+    "doc.go",
+    "example_test.go",
+    "go.mod",
+    "reflection.go",
+    "testdata/bad_config.json",
+    "testdata/config.json",
+    "testdata/config1.json",
+    "testdata/config2.json",
+    "testdata/config3.json",
+    "testdata/example_config.json",
+    "testdata/unknown.ext",
+    "testdata/unknown_fields.json",
+    "testfile.json",
+    "utils.go",
+    "utils_test.go"
+  ],
+  "explanation": {
+    "what": "fieldData 構造体が持っていた defaultValue/usage/jsonName/yamlName/tomlName/hclName/envName/flagName という個別フィールドを、単一の tags map[string]string に統合した。Tag(tag string) メソッドは switch 文での分岐をやめ、まず tags map を引き、無ければ reflect.StructField.Tag.Get(tag) にフォールバックする実装に置き換わっている。あわせて makeEnvName/makeParsingName を廃止し、makeTagValue と tagsForField に処理を集約した。",
+    "why": "個別フィールド＋長い switch 文では、タグの種類(json/yaml/toml/hcl/env/flag)が増えるたびに fieldData の定義・Tag() の分岐・生成コードの3箇所を同時に直す必要があり保守コストが高かった。map に統合することで新しいタグ種別の追加が tagsForField 内のループやキー追加だけで完結するようにしたとみられる。",
+    "highlights": [
+      { "file": "reflection.go", "note": "fieldData.tags map への統合と Tag() のフォールバック実装" },
+      { "file": "utils.go", "note": "makeEnvName/makeParsingName を廃した makeTagValue への一本化" }
+    ],
+    "langNotes": [
+      { "topic": "reflect.StructField.Tag.Get", "note": "Go の構造体タグ(`json:\"x\"` のような文字列)は reflect.StructField.Tag.Get(key) で取得する。このコミットでは明示的に設定した値が tags map に無いときの最終フォールバックとして使われている。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [
+      { "type": "pr", "number": 57, "url": "https://github.com/cristalhq/aconfig/pull/57" }
+    ],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

@@ -1,0 +1,111 @@
+{
+  "seq": 104,
+  "sha": "5ba546e2070dbdde4478e5d15b3a265fdc32425f",
+  "parents": [
+    "61abbd7cf65129e625b4387d7ddd002030119174"
+  ],
+  "author": {
+    "name": "Oleg Kovalov",
+    "email": "oleg@hey.com",
+    "date": "2021-03-09T13:08:41+01:00"
+  },
+  "message": "fix envDelimiter (#62)",
+  "pr": {
+    "number": 62,
+    "title": "fix envDelimiter",
+    "body": "",
+    "url": "https://github.com/cristalhq/aconfig/pull/62"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 4,
+    "additions": 21,
+    "deletions": 19
+  },
+  "files": [
+    {
+      "path": "aconfig.go",
+      "status": "M",
+      "additions": 7,
+      "deletions": 5,
+      "binary": false
+    },
+    {
+      "path": "aconfig_test.go",
+      "status": "M",
+      "additions": 10,
+      "deletions": 10,
+      "binary": false
+    },
+    {
+      "path": "example_test.go",
+      "status": "M",
+      "additions": 3,
+      "deletions": 3,
+      "binary": false
+    },
+    {
+      "path": "reflection.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/aconfig.go b/aconfig.go\nindex 3be3bb2..bacfc88 100644\n--- a/aconfig.go\n+++ b/aconfig.go\n@@ -37,7 +37,10 @@ type Config struct {\n \tEnvPrefix  string // EnvPrefix for environment variables.\n \tFlagPrefix string // FlagPrefix for flag parameters.\n \n-\tEnvDelimiter  string // EnvDelimiter for environment variables. If not set - default is \".\".\n+\t// envDelimiter for environment variables. Is always \"_\" due to env-var format.\n+\t// Also unexported cause there is no sense to change it.\n+\tenvDelimiter string\n+\n \tFlagDelimiter string // FlagDelimiter for flag parameters. If not set - default is \".\".\n \n \t// AllFieldsRequired set to true will fail config loading if one of the fields was not set.\n@@ -117,15 +120,14 @@ func LoaderFor(dst interface{}, cfg Config) *Loader {\n }\n \n func (l *Loader) init() {\n-\tif l.config.EnvDelimiter == \"\" {\n-\t\tl.config.EnvDelimiter = \".\"\n-\t}\n+\tl.config.envDelimiter = \"_\"\n+\n \tif l.config.FlagDelimiter == \"\" {\n \t\tl.config.FlagDelimiter = \".\"\n \t}\n \n \tif l.config.EnvPrefix != \"\" {\n-\t\tl.config.EnvPrefix += l.config.EnvDelimiter\n+\t\tl.config.EnvPrefix += l.config.envDelimiter\n \t}\n \tif l.config.FlagPrefix != \"\" {\n \t\tl.config.FlagPrefix += l.config.FlagDelimiter\ndiff --git a/aconfig_test.go b/aconfig_test.go\nindex 9aa3f8d..397d210 100644\n--- a/aconfig_test.go\n+++ b/aconfig_test.go\n@@ -297,13 +297,13 @@ func TestFileMerging(t *testing.T) {\n }\n \n func TestEnv(t *testing.T) {\n-\tsetEnv(t, \"TST.STR\", \"str-env\")\n-\tsetEnv(t, \"TST.BYTES\", \"bytes-env\")\n-\tsetEnv(t, \"TST.INT\", \"121\")\n-\tsetEnv(t, \"TST.HTTP_PORT\", \"3000\")\n-\tsetEnv(t, \"TST.SUB.FLOAT\", \"222.333\")\n-\tsetEnv(t, \"TST.ANON.IS_ANON\", \"true\")\n-\tsetEnv(t, \"TST.EM\", \"em-env\")\n+\tsetEnv(t, \"TST_STR\", \"str-env\")\n+\tsetEnv(t, \"TST_BYTES\", \"bytes-env\")\n+\tsetEnv(t, \"TST_INT\", \"121\")\n+\tsetEnv(t, \"TST_HTTP_PORT\", \"3000\")\n+\tsetEnv(t, \"TST_SUB_FLOAT\", \"222.333\")\n+\tsetEnv(t, \"TST_ANON_IS_ANON\", \"true\")\n+\tsetEnv(t, \"TST_EM\", \"em-env\")\n \tdefer os.Clearenv()\n \n \tvar cfg TestConfig\n@@ -548,7 +548,7 @@ func TestFileNotFound(t *testing.T) {\n }\n \n func TestBadEnvs(t *testing.T) {\n-\tsetEnv(t, \"TST.HTTP_PORT\", \"30a00\")\n+\tsetEnv(t, \"TST_HTTP_PORT\", \"30a00\")\n \tdefer os.Clearenv()\n \n \tloader := LoaderFor(&TestConfig{}, Config{\n@@ -600,8 +600,8 @@ func TestUnknownFields(t *testing.T) {\n }\n \n func TestUnknownEnvs(t *testing.T) {\n-\tsetEnv(t, \"TST.STR\", \"defined\")\n-\tsetEnv(t, \"TST.UNKNOWN\", \"42\")\n+\tsetEnv(t, \"TST_STR\", \"defined\")\n+\tsetEnv(t, \"TST_UNKNOWN\", \"42\")\n \tsetEnv(t, \"JUST_ENV\", \"JUST_VALUE\")\n \tdefer os.Clearenv()\n \ndiff --git a/example_test.go b/example_test.go\nindex a2818b4..4caa464 100644\n--- a/example_test.go\n+++ b/example_test.go\n@@ -112,9 +112,9 @@ func Example_File() {\n // And then overwrite with environment variables.\n //\n func Example_Env() {\n-\tos.Setenv(\"EXAMPLE.HTTP_PORT\", \"3333\")\n-\tos.Setenv(\"EXAMPLE.AUTH.USER\", \"env-user\")\n-\tos.Setenv(\"EXAMPLE.AUTH.PASS\", \"env-pass\")\n+\tos.Setenv(\"EXAMPLE_HTTP_PORT\", \"3333\")\n+\tos.Setenv(\"EXAMPLE_AUTH_USER\", \"env-user\")\n+\tos.Setenv(\"EXAMPLE_AUTH_PASS\", \"env-pass\")\n \tdefer os.Clearenv()\n \n \tvar cfg MyConfig\ndiff --git a/reflection.go b/reflection.go\nindex b8ea946..a893b01 100644\n--- a/reflection.go\n+++ b/reflection.go\n@@ -75,7 +75,7 @@ func (l *Loader) tagsForField(field reflect.StructField) map[string]string {\n func (l *Loader) fullTag(f *fieldData, tag string) string {\n \tsep := l.config.FlagDelimiter\n \tif tag == envNameTag {\n-\t\tsep = l.config.EnvDelimiter\n+\t\tsep = l.config.envDelimiter\n \t}\n \tres := f.Tag(tag)\n \tfor p := f.parent; p != nil; p = p.parent {\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/build.yml",
+    "LICENSE",
+    "README.md",
+    "aconfig.go",
+    "aconfig_test.go",
+    "aconfigdotenv/dotenv.go",
+    "aconfigdotenv/dotenv_test.go",
+    "aconfigdotenv/go.mod",
+    "aconfigdotenv/go.sum",
+    "aconfighcl/go.mod",
+    "aconfighcl/go.sum",
+    "aconfighcl/hcl.go",
+    "aconfighcl/hcl_test.go",
+    "aconfigtoml/go.mod",
+    "aconfigtoml/go.sum",
+    "aconfigtoml/toml.go",
+    "aconfigtoml/toml_test.go",
+    "aconfigyaml/go.mod",
+    "aconfigyaml/go.sum",
+    "aconfigyaml/yaml.go",
+    "aconfigyaml/yaml_test.go",
+    "doc.go",
+    "example_test.go",
+    "go.mod",
+    "reflection.go",
+    "testdata/bad_config.json",
+    "testdata/config.json",
+    "testdata/config1.json",
+    "testdata/config2.json",
+    "testdata/config3.json",
+    "testdata/example_config.json",
+    "testdata/unknown.ext",
+    "testdata/unknown_fields.json",
+    "testfile.json",
+    "utils.go",
+    "utils_test.go"
+  ],
+  "explanation": {
+    "what": "公開フィールドだった Config.EnvDelimiter を削除し、非公開の envDelimiter フィールドとして常に \"_\" に固定した。従来はデフォルト \".\" でユーザーが変更可能だったが、変更不可にし、テストとサンプルの環境変数名も TST.STR のようなドット区切りから TST_STR のようなアンダースコア区切りに一括修正している。",
+    "why": "コメントに『envDelimiter for environment variables. Is always \"_\" due to env-var format. Also unexported cause there is no sense to change it.』と明記されている通り、環境変数名にはシェルやOSの制約でドットを使えない(または扱いが不安定な)ため、区切り文字を可変にする設計自体が誤りだったと判断し、アンダースコア固定・非公開化した。PR タイトルの \"fix\" もこの設計上の欠陥修正であることを示している。",
+    "highlights": [
+      { "file": "aconfig.go", "note": "EnvDelimiter の非公開化と \"_\" 固定" },
+      { "file": "aconfig_test.go", "note": "テスト内の環境変数名がドット区切りからアンダースコア区切りへ" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [
+      { "type": "pr", "number": 62, "url": "https://github.com/cristalhq/aconfig/pull/62" }
+    ],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

@@ -1,0 +1,67 @@
+{
+  "seq": 24,
+  "sha": "f73edb9b16fc889ce6b19fa3d43f06ec2e2fc92c",
+  "parents": [
+    "662de4066534eef4810bd28b32a4b6638749adcc"
+  ],
+  "author": {
+    "name": "Oleg Kovalov",
+    "email": "iamolegkovalov@gmail.com",
+    "date": "2020-07-23T00:15:14+02:00"
+  },
+  "message": "add docs",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 5,
+    "deletions": 0
+  },
+  "files": [
+    {
+      "path": "aconfig.go",
+      "status": "M",
+      "additions": 5,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/aconfig.go b/aconfig.go\nindex fac1444..edf7980 100644\n--- a/aconfig.go\n+++ b/aconfig.go\n@@ -17,11 +17,13 @@ import (\n \n const defaultValueTag = \"default\"\n \n+// Loader of user configuration.\n type Loader struct {\n \tconfig LoaderConfig\n \tfields []*fieldData\n }\n \n+// LoaderConfig to configure configuration loader.\n type LoaderConfig struct {\n \tSkipDefaults bool\n \tSkipFile     bool\n@@ -34,6 +36,8 @@ type LoaderConfig struct {\n \tFiles []string\n }\n \n+// NewLoader creates a new Loader based on a config.\n+// Zero-value config is acceptable.\n func NewLoader(config LoaderConfig) *Loader {\n \tif config.EnvPrefix != \"\" {\n \t\tconfig.EnvPrefix += \"_\"\n@@ -44,6 +48,7 @@ func NewLoader(config LoaderConfig) *Loader {\n \treturn &Loader{config: config}\n }\n \n+// Load configuration into a given param.\n func (l *Loader) Load(into interface{}) error {\n \tl.fields = getFields(into)\n \n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/build.yml",
+    "LICENSE",
+    "README.md",
+    "aconfig.go",
+    "aconfig_test.go",
+    "example_test.go",
+    "go.mod",
+    "go.sum",
+    "testdata/all_types_config.json",
+    "testdata/bad_config.json",
+    "testdata/config1.json",
+    "testdata/config1.toml",
+    "testdata/config1.yaml",
+    "testdata/example_config.json",
+    "testdata/my_duration_config.json",
+    "testdata/test_config_def.json",
+    "testdata/test_config_env.json",
+    "testdata/test_config_flag.json",
+    "testdata/unknown.ext"
+  ],
+  "explanation": {
+    "what": "Loader 型、LoaderConfig 型、NewLoader 関数、Load メソッドに godoc コメント(//で始まるエクスポート識別子の説明)を追加した。コードの挙動は変更していない。",
+    "why": "メッセージ通り、外部公開 API に対する doc コメントの整備。コミットメッセージ「add docs」がそのまま示す通り。",
+    "highlights": [
+      { "file": "aconfig.go", "note": "Loader / LoaderConfig / NewLoader / Load という主要な公開APIすべてにコメントが付いた" }
+    ],
+    "langNotes": [
+      { "topic": "godoc コメント", "note": "Go では公開識別子(大文字始まり)の直前に `//` で始まるコメントを書くと、そのままpkg.go.devなどのドキュメントに反映される。gofmt/golint はこの慣習を前提にした警告(exported ... should have comment)を出す。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

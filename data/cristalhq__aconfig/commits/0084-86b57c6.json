@@ -1,0 +1,113 @@
+{
+  "seq": 84,
+  "sha": "86b57c6042dc93221703f02dbf6cc4d52066ae66",
+  "parents": [
+    "aafee5d46786c6d826071e0bac1f6a567c9afc46"
+  ],
+  "author": {
+    "name": "Oleg Kovalov",
+    "email": "oleg@hey.com",
+    "date": "2020-12-20T08:00:29+01:00"
+  },
+  "message": "some fixes (#39)",
+  "pr": {
+    "number": 39,
+    "title": "some fixes",
+    "body": "",
+    "url": "https://github.com/cristalhq/aconfig/pull/39"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 5,
+    "additions": 17,
+    "deletions": 24
+  },
+  "files": [
+    {
+      "path": "aconfig.go",
+      "status": "M",
+      "additions": 0,
+      "deletions": 6,
+      "binary": false
+    },
+    {
+      "path": "aconfig_test.go",
+      "status": "M",
+      "additions": 4,
+      "deletions": 4,
+      "binary": false
+    },
+    {
+      "path": "doc.go",
+      "status": "A",
+      "additions": 13,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "reflection.go",
+      "status": "M",
+      "additions": 0,
+      "deletions": 8,
+      "binary": false
+    },
+    {
+      "path": "utils.go",
+      "status": "M",
+      "additions": 0,
+      "deletions": 6,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/aconfig.go b/aconfig.go\nindex 205edcf..140e43c 100644\n--- a/aconfig.go\n+++ b/aconfig.go\n@@ -58,12 +58,6 @@ type Field interface {\n \t// Name of the field.\n \tName() string\n \n-\t// DefaultValue of the field.\n-\tDefaultValue() string\n-\n-\t// Usage of the field (set in `usage` tag).\n-\tUsage() string\n-\n \t// Tag returns a given tag for a field.\n \tTag(tag string) string\n \ndiff --git a/aconfig_test.go b/aconfig_test.go\nindex 8d3e6cb..b9355b6 100644\n--- a/aconfig_test.go\n+++ b/aconfig_test.go\n@@ -802,11 +802,11 @@ func TestWalkFields(t *testing.T) {\n \t\tif parent, ok := f.Parent(); ok && parent.Name() != wantFields.ParentName {\n \t\t\tt.Fatalf(\"got name %v, want %v\", parent.Name(), wantFields.ParentName)\n \t\t}\n-\t\tif f.DefaultValue() != wantFields.DefaultValue {\n-\t\t\tt.Fatalf(\"got default %#v, want %#v\", f.DefaultValue(), wantFields.DefaultValue)\n+\t\tif f.Tag(\"default\") != wantFields.DefaultValue {\n+\t\t\tt.Fatalf(\"got default %#v, want %#v\", f.Tag(\"default\"), wantFields.DefaultValue)\n \t\t}\n-\t\tif f.Usage() != wantFields.Usage {\n-\t\t\tt.Fatalf(\"got usage %#v, want %#v\", f.Usage(), wantFields.Usage)\n+\t\tif f.Tag(\"usage\") != wantFields.Usage {\n+\t\t\tt.Fatalf(\"got usage %#v, want %#v\", f.Tag(\"usage\"), wantFields.Usage)\n \t\t}\n \t\ti++\n \t\treturn true\ndiff --git a/doc.go b/doc.go\nnew file mode 100644\nindex 0000000..728e20b\n--- /dev/null\n+++ b/doc.go\n@@ -0,0 +1,13 @@\n+// Package aconfig provides simple but still powerful config loader.\n+//\n+// It can read configuration from different sources, like defaults, files, environment variables, console flag parameters.\n+//\n+// Defaults are defined in structure tags (`default` tag). For files JSON, YAML, TOML and .Env are supported.\n+//\n+// Environment variables and flag parameters can have an optional prefix to separate them from other entries.\n+//\n+// Also, aconfig is dependency-free, file decoders are used as separate modules (submodules to be exact) and are added to your go.mod only when used.\n+//\n+// Loader configuration (`Config` type) has different ways to configure loader, to skip some sources, define prefixes, fail on unknown params.\n+//\n+package aconfig\ndiff --git a/reflection.go b/reflection.go\nindex 2575f9e..7305a42 100644\n--- a/reflection.go\n+++ b/reflection.go\n@@ -102,14 +102,6 @@ func (f *fieldData) Name() string {\n \treturn f.name\n }\n \n-func (f *fieldData) DefaultValue() string {\n-\treturn f.defaultValue\n-}\n-\n-func (f *fieldData) Usage() string {\n-\treturn f.usage\n-}\n-\n func (f *fieldData) fullTag(tag string) string {\n \tsep := \".\"\n \tif tag == envNameTag {\ndiff --git a/utils.go b/utils.go\nindex 7c93633..7094723 100644\n--- a/utils.go\n+++ b/utils.go\n@@ -38,9 +38,6 @@ func makeEnvName(field reflect.StructField, parent *fieldData, words []string) s\n \tif envName == \"\" {\n \t\tenvName = makeParsingName(words)\n \t}\n-\tif parent != nil {\n-\t\t// envName = parent.envName + \"_\" + envName\n-\t}\n \treturn strings.ToUpper(envName)\n }\n \n@@ -49,9 +46,6 @@ func makeFlagName(field reflect.StructField, parent *fieldData, words []string)\n \tif flagName == \"\" {\n \t\tflagName = makeParsingName(words)\n \t}\n-\tif parent != nil {\n-\t\t// flagName = parent.flagName + \".\" + flagName\n-\t}\n \treturn strings.ToLower(flagName)\n }\n \n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/build.yml",
+    "LICENSE",
+    "README.md",
+    "aconfig.go",
+    "aconfig_test.go",
+    "aconfigdotenv/dotenv.go",
+    "aconfigdotenv/dotenv_test.go",
+    "aconfigdotenv/go.mod",
+    "aconfigdotenv/go.sum",
+    "aconfigtoml/go.mod",
+    "aconfigtoml/go.sum",
+    "aconfigtoml/toml.go",
+    "aconfigtoml/toml_test.go",
+    "aconfigyaml/go.mod",
+    "aconfigyaml/go.sum",
+    "aconfigyaml/yaml.go",
+    "aconfigyaml/yaml_test.go",
+    "doc.go",
+    "example_test.go",
+    "go.mod",
+    "reflection.go",
+    "testdata/bad_config.json",
+    "testdata/config.json",
+    "testdata/config1.json",
+    "testdata/config2.json",
+    "testdata/config3.json",
+    "testdata/example_config.json",
+    "testdata/unknown.ext",
+    "testdata/unknown_fields.json",
+    "testfile.json",
+    "utils.go",
+    "utils_test.go"
+  ],
+  "explanation": {
+    "what": "Field インターフェースから DefaultValue()/Usage() メソッドを削除し、テストコードも f.Tag(\"default\")/f.Tag(\"usage\") 経由で値を取得するよう書き換えた。あわせて doc.go を新設してパッケージ全体の godoc コメントを追加し、reflection.go の makeEnvName/makeFlagName に残っていたコメントアウト済みの未使用コード(parent 連結の試作)を削除した。",
+    "why": "PR タイトルは「some fixes」のみで body の記載はない。おそらく Field.Tag(tag string) という汎用アクセサが既にあり、DefaultValue()/Usage() は default/usage という特定タグ向けの薄いラッパーに過ぎなかったため、専用メソッドを廃止して Tag() に一本化し Field インターフェースを小さく保つ意図と考えられる。パッケージ doc コメントの追加もおそらく pkg.go.dev 等でのドキュメント表示を充実させる目的と見られる。",
+    "highlights": [
+      { "file": "doc.go", "note": "パッケージ全体の説明を書く Go の慣習(package doc comment)に沿った新規ファイル。" }
+    ],
+    "langNotes": [
+      { "topic": "doc.go / package comment", "note": "Go では package 宣言の直前に置いた // コメントが `go doc` や pkg.go.dev に表示されるパッケージ説明になる。専用の doc.go ファイルにまとめるのはよくある慣習。" }
+    ],
+    "diagram": null,
+    "evidence": "inferred",
+    "refs": [{ "type": "pr", "number": 39, "url": "https://github.com/cristalhq/aconfig/pull/39" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

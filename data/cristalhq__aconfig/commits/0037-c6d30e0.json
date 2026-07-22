@@ -1,0 +1,84 @@
+{
+  "seq": 37,
+  "sha": "c6d30e0cfab9f5311f2d3cf05a51eb43c9bab517",
+  "parents": [
+    "5ea4252e164fb9d7963e7320f2f1a808a15d4809"
+  ],
+  "author": {
+    "name": "Oleg Kovalov",
+    "email": "iamolegkovalov@gmail.com",
+    "date": "2020-07-25T09:08:19+02:00"
+  },
+  "message": "new api (#2)",
+  "pr": {
+    "number": 2,
+    "title": "new api",
+    "body": "",
+    "url": "https://github.com/cristalhq/aconfig/pull/2"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 71,
+    "deletions": 0
+  },
+  "files": [
+    {
+      "path": "aconfig.go",
+      "status": "M",
+      "additions": 47,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "example_test.go",
+      "status": "M",
+      "additions": 24,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/aconfig.go b/aconfig.go\nindex 3b7a7c7..ec3a109 100644\n--- a/aconfig.go\n+++ b/aconfig.go\n@@ -23,6 +23,7 @@ const (\n // Loader of user configuration.\n type Loader struct {\n \tconfig  LoaderConfig\n+\tsrc     interface{}\n \tfields  []*fieldData\n \tflagSet *flag.FlagSet\n }\n@@ -54,6 +55,52 @@ func NewLoaderFor(cfg interface{}, config LoaderConfig) *Loader {\n \treturn l\n }\n \n+// Loader creates a new Loader based on a config.\n+// Zero-value config is acceptable.\n+func LoaderFor(src interface{}) *Loader {\n+\treturn &Loader{src: src}\n+}\n+\n+func (l *Loader) SkipDefaults() *Loader {\n+\tl.config.SkipDefaults = true\n+\treturn l\n+}\n+\n+func (l *Loader) SkipFiles() *Loader {\n+\tl.config.SkipFile = true\n+\treturn l\n+}\n+\n+func (l *Loader) SkipEnvironment() *Loader {\n+\tl.config.SkipEnv = true\n+\treturn l\n+}\n+\n+func (l *Loader) SkipFlags() *Loader {\n+\tl.config.SkipFlag = true\n+\treturn l\n+}\n+\n+func (l *Loader) WithFiles(files []string) *Loader {\n+\tl.config.Files = files\n+\treturn l\n+}\n+\n+func (l *Loader) WithEnvPrefix(prefix string) *Loader {\n+\tl.config.EnvPrefix = prefix\n+\treturn l\n+}\n+\n+func (l *Loader) WithFlagPrefix(prefix string) *Loader {\n+\tl.config.FlagPrefix = prefix\n+\treturn l\n+}\n+\n+func (l *Loader) Build() *Loader {\n+\tl.preLoad(l.src)\n+\treturn l\n+}\n+\n func (l *Loader) preLoad(cfg interface{}) {\n \tfields := getFields(cfg)\n \ndiff --git a/example_test.go b/example_test.go\nindex 7ea9c84..c0dbfb3 100644\n--- a/example_test.go\n+++ b/example_test.go\n@@ -16,6 +16,30 @@ type MyConfig struct {\n \t}\n }\n \n+func Example_NewApi() {\n+\tloader := aconfig.LoaderFor(&MyConfig{}).\n+\t\tSkipDefaults().SkipFiles().SkipEnvironment().SkipFlags().\n+\t\tWithFiles([]string{\"/var/opt/myapp/config.json\"}).\n+\t\tWithEnvPrefix(\"APP\").\n+\t\tWithFlagPrefix(\"app\").\n+\t\tBuild()\n+\n+\tvar cfg MyConfig\n+\tif err := loader.Load(&cfg); err != nil {\n+\t\tlog.Panic(err)\n+\t}\n+\n+\tfmt.Printf(\"Port:      %v\\n\", cfg.Port)\n+\tfmt.Printf(\"Auth.User: %q\\n\", cfg.Auth.User)\n+\tfmt.Printf(\"Auth.Pass: %q\\n\", cfg.Auth.Pass)\n+\n+\t// Output:\n+\t//\n+\t// Port:      0\n+\t// Auth.User: \"\"\n+\t// Auth.Pass: \"\"\n+}\n+\n // Just load defaults from struct defenition.\n //\n func Example_Defaults() {\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/build.yml",
+    "LICENSE",
+    "README.md",
+    "aconfig.go",
+    "aconfig_test.go",
+    "example_test.go",
+    "go.mod",
+    "go.sum",
+    "testdata/all_types_config.json",
+    "testdata/bad_config.json",
+    "testdata/config1.json",
+    "testdata/config1.toml",
+    "testdata/config1.yaml",
+    "testdata/example_config.json",
+    "testdata/my_duration_config.json",
+    "testdata/other_numbers_config.json",
+    "testdata/test_config_def.json",
+    "testdata/test_config_env.json",
+    "testdata/test_config_flag.json",
+    "testdata/unknown.ext"
+  ],
+  "explanation": {
+    "what": "既存の`NewLoaderFor(cfg, config)`と並存する形で、`LoaderFor(src)`から始まりメソッドチェーンで設定する新API(`SkipDefaults()`/`SkipFiles()`/`SkipEnvironment()`/`SkipFlags()`/`WithFiles()`/`WithEnvPrefix()`/`WithFlagPrefix()`/`Build()`)を追加した。各メソッドはLoader自身のconfigフィールドを書き換えて`*Loader`を返し、最後の`Build()`で`preLoad`を実行して初期化を確定する。example_test.goに`Example_NewApi`を追加してこの書き方を示している。",
+    "why": "PRタイトルが「new api」であり、従来の構造体リテラル(`LoaderConfig{...}`)を1つのフィールドにまとめて渡すスタイルに代えて、Go文化でよく使われるメソッドチェーン(fluent builder)形式のオプション指定を提供する狙いがあったと考えられる。この段階では旧APIを残したまま新APIを追加し、並存させている。",
+    "highlights": [
+      { "file": "aconfig.go", "note": "LoaderFor→Skip*/With*→Buildのメソッドチェーンで*Loaderを返す設計" },
+      { "file": "example_test.go", "note": "Example_NewApiが新旧2つのAPIスタイルの比較材料になる" }
+    ],
+    "langNotes": [
+      { "topic": "メソッドチェーン(fluent builder)", "note": "各設定メソッドがレシーバの`*Loader`をそのままreturnすることで`obj.A().B().C()`のように連続呼び出しできる。Goには名前付き引数がないため、多数のオプションを持つ構築処理でこのパターンがよく使われる。" }
+    ],
+    "diagram": {
+      "mermaid": "flowchart LR\n  A[\"LoaderFor(src)\"] --> B[\"SkipDefaults() / SkipFiles() / SkipEnvironment() / SkipFlags()\"]\n  B --> C[\"WithFiles() / WithEnvPrefix() / WithFlagPrefix()\"]\n  C --> D[\"Build()\"]\n  D --> E[\"*Loader (preLoad済み)\"]",
+      "caption": "新設されたメソッドチェーンAPIの呼び出し順序"
+    },
+    "evidence": "pr",
+    "refs": [{ "type": "pr", "number": 2, "url": "https://github.com/cristalhq/aconfig/pull/2" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

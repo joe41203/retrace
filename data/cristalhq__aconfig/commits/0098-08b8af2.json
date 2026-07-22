@@ -1,0 +1,137 @@
+{
+  "seq": 98,
+  "sha": "08b8af2679c28d358f7f6503fa011e57ab7a78b1",
+  "parents": [
+    "1765c4630132820a14d43994323139361acd8aa5"
+  ],
+  "author": {
+    "name": "Yury Makarov",
+    "email": "mef4mail@gmail.com",
+    "date": "2021-02-27T20:27:25+03:00"
+  },
+  "message": "Testing interface implementation. (#54)",
+  "pr": {
+    "number": 54,
+    "title": "Testing interface implementation.",
+    "body": "",
+    "url": "https://github.com/cristalhq/aconfig/pull/54"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 8,
+    "additions": 196,
+    "deletions": 173
+  },
+  "files": [
+    {
+      "path": "aconfigdotenv/dotenv_test.go",
+      "status": "M",
+      "additions": 144,
+      "deletions": 140,
+      "binary": false
+    },
+    {
+      "path": "aconfigdotenv/go.mod",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "aconfigdotenv/go.sum",
+      "status": "M",
+      "additions": 2,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "aconfighcl/go.mod",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "aconfighcl/go.sum",
+      "status": "M",
+      "additions": 2,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "aconfighcl/hcl_test.go",
+      "status": "M",
+      "additions": 7,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "aconfigtoml/toml_test.go",
+      "status": "M",
+      "additions": 8,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "aconfigyaml/yaml_test.go",
+      "status": "M",
+      "additions": 31,
+      "deletions": 30,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/aconfigdotenv/dotenv_test.go b/aconfigdotenv/dotenv_test.go\nindex 53acf4b..314df66 100644\n--- a/aconfigdotenv/dotenv_test.go\n+++ b/aconfigdotenv/dotenv_test.go\n@@ -1,140 +1,144 @@\n-package aconfigdotenv_test\r\n-\r\n-import (\r\n-\t\"os\"\r\n-\t\"reflect\"\r\n-\t\"testing\"\r\n-\r\n-\t\"github.com/cristalhq/aconfig\"\r\n-\t\"github.com/cristalhq/aconfig/aconfigdotenv\"\r\n-)\r\n-\r\n-func TestDotEnv(t *testing.T) {\r\n-\tfilepath := createTestFile(t)\r\n-\r\n-\tvar cfg structConfig\r\n-\tloader := aconfig.LoaderFor(&cfg, aconfig.Config{\r\n-\t\tSkipDefaults: true,\r\n-\t\tSkipEnv:      true,\r\n-\t\tSkipFlags:    true,\r\n-\t\tFileDecoders: map[string]aconfig.FileDecoder{\r\n-\t\t\t\".env\": aconfigdotenv.New(),\r\n-\t\t},\r\n-\t\tFiles: []string{filepath},\r\n-\t})\r\n-\r\n-\tif err := loader.Load(); err != nil {\r\n-\t\tt.Fatal(err)\r\n-\t}\r\n-\r\n-\ti := int32(42)\r\n-\tj := int64(420)\r\n-\twant := structConfig{\r\n-\t\tA: \"b\",\r\n-\t\tC: 10,\r\n-\t\tE: 123.456,\r\n-\t\tB: []byte(\"abc\"),\r\n-\t\tI: &i,\r\n-\t\tJ: &j,\r\n-\t\tY: structY{\r\n-\t\t\tX: \"y\",\r\n-\t\t\tZ: []string{\"1\", \"2\", \"3\"},\r\n-\t\t},\r\n-\t\tAA: structA{\r\n-\t\t\tX: \"y\",\r\n-\t\t\tBB: structB{\r\n-\t\t\t\tCC: structC{\r\n-\t\t\t\t\tMM: \"n\",\r\n-\t\t\t\t\tBB: []byte(\"boo\"),\r\n-\t\t\t\t},\r\n-\t\t\t\tDD: []string{\"x\", \"y\", \"z\"},\r\n-\t\t\t},\r\n-\t\t},\r\n-\t\tStructM: StructM{\r\n-\t\t\tM: \"n\",\r\n-\t\t},\r\n-\t}\r\n-\r\n-\tif got := cfg; !reflect.DeepEqual(want, got) {\r\n-\t\tt.Fatalf(\"want %v, got %v\", want, got)\r\n-\t}\r\n-}\r\n-\r\n-func createTestFile(t *testing.T) string {\r\n-\tt.Helper()\r\n-\tdir := t.TempDir()\r\n-\tt.Cleanup(func() {\r\n-\t\tos.RemoveAll(dir)\r\n-\t})\r\n-\r\n-\tfilepath := dir + \"/testfile.env\"\r\n-\r\n-\tf, err := os.Create(filepath)\r\n-\tif err != nil {\r\n-\t\tt.Fatal(err)\r\n-\t}\r\n-\t_, err = f.WriteString(testfileContent)\r\n-\tif err != nil {\r\n-\t\tt.Fatal(err)\r\n-\t}\r\n-\treturn filepath\r\n-}\r\n-\r\n-type structConfig struct {\r\n-\tA string\r\n-\tC int\r\n-\tE float64\r\n-\tB []byte\r\n-\tI *int32\r\n-\tJ *int64\r\n-\tY structY\r\n-\r\n-\tAA structA `env:\"A\"`\r\n-\tStructM\r\n-}\r\n-\r\n-type structY struct {\r\n-\tX string\r\n-\tZ []string\r\n-\tA struct {\r\n-\t\tI bool\r\n-\t}\r\n-}\r\n-\r\n-type structA struct {\r\n-\tX  string  `env:\"x\"`\r\n-\tBB structB `env:\"B\"`\r\n-}\r\n-\r\n-type structB struct {\r\n-\tCC structC  `env:\"C\"`\r\n-\tDD []string `env:\"D\"`\r\n-}\r\n-\r\n-type structC struct {\r\n-\tMM string `env:\"m\"`\r\n-\tBB []byte `env:\"b\"`\r\n-}\r\n-\r\n-type StructM struct {\r\n-\tM string\r\n-}\r\n-\r\n-const testfileContent = `\r\n-A=b\r\n-C=10\r\n-E=123.456\r\n-B=abc\r\n-I=42\r\n-J=420\r\n-\r\n-Y_X=y\r\n-Y_Z=1,2,3\r\n-\r\n-A_x=y\r\n-A_B_C_m=n\r\n-A_B_C_b=boo\r\n-A_B_D=x,y,z\r\n-\r\n-M=n\r\n-`\r\n+package aconfigdotenv_test\n+\n+import (\n+\t\"os\"\n+\t\"reflect\"\n+\t\"testing\"\n+\n+\t\"github.com/cristalhq/aconfig\"\n+\t\"github.com/cristalhq/aconfig/aconfigdotenv\"\n+)\n+\n+func TestDotEnv(t *testing.T) {\n+\tfilepath := createTestFile(t)\n+\n+\tvar cfg structConfig\n+\tloader := aconfig.LoaderFor(&cfg, aconfig.Config{\n+\t\tSkipDefaults: true,\n+\t\tSkipEnv:      true,\n+\t\tSkipFlags:    true,\n+\t\tFileDecoders: map[string]aconfig.FileDecoder{\n+\t\t\t\".env\": aconfigdotenv.New(),\n+\t\t},\n+\t\tFiles: []string{filepath},\n+\t})\n+\n+\tif err := loader.Load(); err != nil {\n+\t\tt.Fatal(err)\n+\t}\n+\n+\ti := int32(42)\n+\tj := int64(420)\n+\twant := structConfig{\n+\t\tA: \"b\",\n+\t\tC: 10,\n+\t\tE: 123.456,\n+\t\tB: []byte(\"abc\"),\n+\t\tI: &i,\n+\t\tJ: &j,\n+\t\tY: structY{\n+\t\t\tX: \"y\",\n+\t\t\tZ: []string{\"1\", \"2\", \"3\"},\n+\t\t},\n+\t\tAA: structA{\n+\t\t\tX: \"y\",\n+\t\t\tBB: structB{\n+\t\t\t\tCC: structC{\n+\t\t\t\t\tMM: \"n\",\n+\t\t\t\t\tBB: []byte(\"boo\"),\n+\t\t\t\t},\n+\t\t\t\tDD: []string{\"x\", \"y\", \"z\"},\n+\t\t\t},\n+\t\t},\n+\t\tStructM: StructM{\n+\t\t\tM: \"n\",\n+\t\t},\n+\t\tMI: \"q,w\",\n+\t}\n+\n+\tif got := cfg; !reflect.DeepEqual(want, got) {\n+\t\tt.Fatalf(\"want %v, got %v\", want, got)\n+\t}\n+}\n+\n+func createTestFile(t *testing.T) string {\n+\tt.Helper()\n+\tdir := t.TempDir()\n+\tt.Cleanup(func() {\n+\t\tos.RemoveAll(dir)\n+\t})\n+\n+\tfilepath := dir + \"/testfile.env\"\n+\n+\tf, err := os.Create(filepath)\n+\tif err != nil {\n+\t\tt.Fatal(err)\n+\t}\n+\tdefer f.Close()\n+\t_, err = f.WriteString(testfileContent)\n+\tif err != nil {\n+\t\tt.Fatal(err)\n+\t}\n+\treturn filepath\n+}\n+\n+type structConfig struct {\n+\tA string\n+\tC int\n+\tE float64\n+\tB []byte\n+\tI *int32\n+\tJ *int64\n+\tY structY\n+\n+\tAA structA `env:\"A\"`\n+\tStructM\n+\tMI interface{} `env:\"MI\"`\n+}\n+\n+type structY struct {\n+\tX string\n+\tZ []string\n+\tA struct {\n+\t\tI bool\n+\t}\n+}\n+\n+type structA struct {\n+\tX  string  `env:\"x\"`\n+\tBB structB `env:\"B\"`\n+}\n+\n+type structB struct {\n+\tCC structC  `env:\"C\"`\n+\tDD []string `env:\"D\"`\n+}\n+\n+type structC struct {\n+\tMM string `env:\"m\"`\n+\tBB []byte `env:\"b\"`\n+}\n+\n+type StructM struct {\n+\tM string\n+}\n+\n+const testfileContent = `\n+A=b\n+C=10\n+E=123.456\n+B=abc\n+I=42\n+J=420\n+\n+Y_X=y\n+Y_Z=1,2,3\n+\n+A_x=y\n+A_B_C_m=n\n+A_B_C_b=boo\n+A_B_D=x,y,z\n+\n+M=n\n+MI=q,w\n+`\ndiff --git a/aconfigdotenv/go.mod b/aconfigdotenv/go.mod\nindex f1f55e4..23db1a4 100644\n--- a/aconfigdotenv/go.mod\n+++ b/aconfigdotenv/go.mod\n@@ -3,6 +3,6 @@ module github.com/cristalhq/aconfig/aconfigdotenv\n go 1.15\n \n require (\n-\tgithub.com/cristalhq/aconfig v0.10.0\n+\tgithub.com/cristalhq/aconfig v0.11.4\n \tgithub.com/joho/godotenv v1.3.0\n )\ndiff --git a/aconfigdotenv/go.sum b/aconfigdotenv/go.sum\nindex 1f952e8..45031f8 100644\n--- a/aconfigdotenv/go.sum\n+++ b/aconfigdotenv/go.sum\n@@ -1,4 +1,6 @@\n github.com/cristalhq/aconfig v0.10.0 h1:5dyXjRkUBDuueSHFYxlLdxpZrnzGHwlffhL16NiT+XQ=\n github.com/cristalhq/aconfig v0.10.0/go.mod h1:0ZBp7dUf0F2Jr7YbLjw8OVlAD0eeV2bU3NwmVgeUReo=\n+github.com/cristalhq/aconfig v0.11.4 h1:DARtSacbcHdMEPen1xFkiHQ3UaJwkipWj/AeKP1ufNA=\n+github.com/cristalhq/aconfig v0.11.4/go.mod h1:0ZBp7dUf0F2Jr7YbLjw8OVlAD0eeV2bU3NwmVgeUReo=\n github.com/joho/godotenv v1.3.0 h1:Zjp+RcGpHhGlrMbJzXTrZZPrWj+1vfm90La1wgB6Bhc=\n github.com/joho/godotenv v1.3.0/go.mod h1:7hK45KPybAkOC6peb+G5yklZfMxEjkZhHbwpqxOKXbg=\ndiff --git a/aconfighcl/go.mod b/aconfighcl/go.mod\nindex 4f673f2..f147c95 100644\n--- a/aconfighcl/go.mod\n+++ b/aconfighcl/go.mod\n@@ -3,6 +3,6 @@ module github.com/cristalhq/aconfig/aconfighcl\n go 1.15\n \n require (\n-\tgithub.com/cristalhq/aconfig v0.11.2\n+\tgithub.com/cristalhq/aconfig v0.11.4\n \tgithub.com/hashicorp/hcl v1.0.0\n )\ndiff --git a/aconfighcl/go.sum b/aconfighcl/go.sum\nindex b4f4c24..421c7d6 100644\n--- a/aconfighcl/go.sum\n+++ b/aconfighcl/go.sum\n@@ -1,3 +1,5 @@\n+github.com/cristalhq/aconfig v0.11.4 h1:DARtSacbcHdMEPen1xFkiHQ3UaJwkipWj/AeKP1ufNA=\n+github.com/cristalhq/aconfig v0.11.4/go.mod h1:0ZBp7dUf0F2Jr7YbLjw8OVlAD0eeV2bU3NwmVgeUReo=\n github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=\n github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=\n github.com/hashicorp/hcl v1.0.0 h1:0Anlzjpi4vEasTeNFn2mLJgTSwt0+6sfsiTG8qcWGx4=\ndiff --git a/aconfighcl/hcl_test.go b/aconfighcl/hcl_test.go\nindex 5600b47..4dd5659 100644\n--- a/aconfighcl/hcl_test.go\n+++ b/aconfighcl/hcl_test.go\n@@ -10,7 +10,6 @@ import (\n )\n \n func TestHCL(t *testing.T) {\n-\tt.SkipNow()\n \tfilepath := createTestFile(t)\n \n \tvar cfg structConfig\n@@ -30,6 +29,10 @@ func TestHCL(t *testing.T) {\n \n \ti := int32(42)\n \tj := int64(420)\n+\tmInterface := make([]interface{}, 2)\n+\tfor iI, vI := range []string{\"q\", \"w\"} {\n+\t\tmInterface[iI] = vI\n+\t}\n \twant := structConfig{\n \t\tA: \"b\",\n \t\tC: 10,\n@@ -57,6 +60,7 @@ func TestHCL(t *testing.T) {\n \t\tStructM: StructM{\n \t\t\tM: \"n\",\n \t\t},\n+\t\tMI: mInterface,\n \t}\n \n \tif got := cfg; !reflect.DeepEqual(want, got) {\n@@ -96,6 +100,7 @@ type structConfig struct {\n \n \tAA structA `hcl:\"A\"`\n \tStructM\n+\tMI interface{} `hcl:\"MI\"`\n }\n \n type structY struct {\n@@ -154,4 +159,5 @@ const testfileContent = `\n }\n \n \"M\" = \"n\"\n+\"MI\" = [\"q\", \"w\"]\n `\ndiff --git a/aconfigtoml/toml_test.go b/aconfigtoml/toml_test.go\nindex 360308f..af6ccbe 100644\n--- a/aconfigtoml/toml_test.go\n+++ b/aconfigtoml/toml_test.go\n@@ -29,6 +29,10 @@ func TestTOML(t *testing.T) {\n \n \ti := int32(42)\n \tj := int64(420)\n+\tmInterface := make([]interface{}, 2)\n+\tfor iI, vI := range []string{\"q\", \"w\"} {\n+\t\tmInterface[iI] = vI\n+\t}\n \twant := structConfig{\n \t\tA: \"b\",\n \t\tC: 10,\n@@ -56,6 +60,7 @@ func TestTOML(t *testing.T) {\n \t\tStructM: StructM{\n \t\t\tM: \"n\",\n \t\t},\n+\t\tMI: mInterface,\n \t}\n \n \tif got := cfg; !reflect.DeepEqual(want, got) {\n@@ -76,6 +81,7 @@ func createTestFile(t *testing.T) string {\n \tif err != nil {\n \t\tt.Fatal(err)\n \t}\n+\tdefer f.Close()\n \t_, err = f.WriteString(testfileContent)\n \tif err != nil {\n \t\tt.Fatal(err)\n@@ -94,6 +100,7 @@ type structConfig struct {\n \n \tAA structA `toml:\"A\"`\n \tStructM\n+\tMI interface{} `toml:\"MI\"`\n }\n \n type structY struct {\n@@ -133,6 +140,7 @@ b = \"abc\"\n i = 42\n j = 420\n m = \"n\"\n+MI = [\"q\", \"w\"]\n \n [y]\n x = \"y\"\ndiff --git a/aconfigyaml/yaml_test.go b/aconfigyaml/yaml_test.go\nindex 69171ed..7bed2bb 100644\n--- a/aconfigyaml/yaml_test.go\n+++ b/aconfigyaml/yaml_test.go\n@@ -29,6 +29,10 @@ func TestYAML(t *testing.T) {\n \n \ti := int32(42)\n \tj := int64(420)\n+\tmInterface := make([]interface{}, 2)\n+\tfor iI, vI := range []string{\"q\", \"w\"} {\n+\t\tmInterface[iI] = vI\n+\t}\n \twant := structConfig{\n \t\tA: \"b\",\n \t\tC: 10,\n@@ -56,6 +60,7 @@ func TestYAML(t *testing.T) {\n \t\tStructM: StructM{\n \t\t\tM: \"n\",\n \t\t},\n+\t\tMI: mInterface,\n \t}\n \n \tif got := cfg; !reflect.DeepEqual(want, got) {\n@@ -73,10 +78,10 @@ func createTestFile(t *testing.T) string {\n \tfilepath := dir + \"/testfile.yaml\"\n \n \tf, err := os.Create(filepath)\n-\tdefer f.Close()\n \tif err != nil {\n \t\tt.Fatal(err)\n \t}\n+\tdefer f.Close()\n \t_, err = f.WriteString(testfileContent)\n \tif err != nil {\n \t\tt.Fatal(err)\n@@ -95,6 +100,7 @@ type structConfig struct {\n \n \tAA structA `yaml:\"A\"`\n \tStructM\n+\tMI interface{} `yaml:\"MI\"`\n }\n \n type structY struct {\n@@ -127,33 +133,28 @@ type StructM struct {\n }\n \n const testfileContent = `\n-{\n-    \"a\": \"b\",\n-    \"c\": 10,\n-    \"e\": 123.456,\n-    \"b\": \"abc\",\n-    \"i\": 42,\n-\t\"j\": 420,\n-\n-    \"y\": {\n-\t\t\"x\": \"y\",\n-\t\t\"z\": [\"1\", \"2\", \"3\"],\n-\t\t\"a\": {\n-\t\t\t\"i\": true\n-\t\t}\n-\t},\n-\n-    \"A\": {\n-\t\t\"x\": \"y\",\n-        \"B\": {\n-\t\t\t\"C\": {\n-\t\t\t\t\"m\": \"n\",\n-                \"b\": \"boo\",\n-            },\n-            \"D\": [\"x\", \"y\", \"z\"]\n-        }\n-\t},\n-\n-\t\"m\": \"n\"\n-}\n+a: \"b\"\n+c: 10\n+e: 123.456\n+b: \"abc\"\n+i: 42\n+j: 420\n+\n+y:\n+    x: \"y\"\n+    z: [\"1\", \"2\", \"3\"]\n+    a:\n+        \"i\": true\n+\n+A:\n+    x: \"y\"\n+    B: \n+        C:\n+            m: \"n\"\n+            b: \"boo\"\n+        D: [\"x\", \"y\", \"z\"]\n+\n+m: \"n\"\n+\n+MI: [\"q\", \"w\"]\n `\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/build.yml",
+    "LICENSE",
+    "README.md",
+    "aconfig.go",
+    "aconfig_test.go",
+    "aconfigdotenv/dotenv.go",
+    "aconfigdotenv/dotenv_test.go",
+    "aconfigdotenv/go.mod",
+    "aconfigdotenv/go.sum",
+    "aconfighcl/go.mod",
+    "aconfighcl/go.sum",
+    "aconfighcl/hcl.go",
+    "aconfighcl/hcl_test.go",
+    "aconfigtoml/go.mod",
+    "aconfigtoml/go.sum",
+    "aconfigtoml/toml.go",
+    "aconfigtoml/toml_test.go",
+    "aconfigyaml/go.mod",
+    "aconfigyaml/go.sum",
+    "aconfigyaml/yaml.go",
+    "aconfigyaml/yaml_test.go",
+    "doc.go",
+    "example_test.go",
+    "go.mod",
+    "reflection.go",
+    "testdata/bad_config.json",
+    "testdata/config.json",
+    "testdata/config1.json",
+    "testdata/config2.json",
+    "testdata/config3.json",
+    "testdata/example_config.json",
+    "testdata/unknown.ext",
+    "testdata/unknown_fields.json",
+    "testfile.json",
+    "utils.go",
+    "utils_test.go"
+  ],
+  "explanation": {
+    "what": "aconfigdotenv・aconfighcl・aconfigtoml・aconfigyaml の各テストに MI interface{} フィールドを持つ構造体を追加し、それぞれのフォーマット(dotenv/HCL/TOML/YAML)で interface{} 型フィールドへ値が正しく設定されることを検証した。aconfigyaml/yaml_test.go はテストデータをJSON形式からYAML形式のリテラルに書き換え、内容を実際のYAML構文に合わせている。あわせて各サブモジュールのgo.mod/go.sumを aconfig v0.11.4 に更新した。",
+    "why": "PR タイトルの「Testing interface implementation」の通り、#49(seq93)で導入した interface{} 型サポートを各フォーマットのdecoderテストで横展開して検証する回。YAMLのテストファイルがそれまでJSON文字列をYAMLとして読ませていた(YAMLはJSONのスーパーセットのため通っていた)不自然な状態だったのを、本来のYAML構文に書き直したのは、interface{}フィールドの配列表現(MI: [\"q\", \"w\"])を自然な形でテストするための副次的な整理と見られる。",
+    "highlights": [
+      { "file": "aconfigyaml/yaml_test.go", "note": "テストデータをJSON形式からYAML本来の構文(インデントベース)に書き換え" },
+      { "file": "aconfighcl/hcl_test.go", "note": "structConfig に MI interface{} `hcl:\"MI\"` を追加し配列値の設定を検証" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [{ "type": "pr", "number": 54, "url": "https://github.com/cristalhq/aconfig/pull/54" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

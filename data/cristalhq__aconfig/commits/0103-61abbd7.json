@@ -1,0 +1,105 @@
+{
+  "seq": 103,
+  "sha": "61abbd7cf65129e625b4387d7ddd002030119174",
+  "parents": [
+    "824a906fbef29b5956f8a9b6bfe38e0ad651692a"
+  ],
+  "author": {
+    "name": "Oleg Kovalov",
+    "email": "oleg@hey.com",
+    "date": "2021-03-04T23:04:46+01:00"
+  },
+  "message": "small cleanups (#60)",
+  "pr": {
+    "number": 60,
+    "title": "small cleanups",
+    "body": "",
+    "url": "https://github.com/cristalhq/aconfig/pull/60"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 3,
+    "additions": 51,
+    "deletions": 51
+  },
+  "files": [
+    {
+      "path": "aconfig.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 45,
+      "binary": false
+    },
+    {
+      "path": "reflection.go",
+      "status": "M",
+      "additions": 6,
+      "deletions": 6,
+      "binary": false
+    },
+    {
+      "path": "utils.go",
+      "status": "M",
+      "additions": 44,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/aconfig.go b/aconfig.go\nindex 656d06d..3be3bb2 100644\n--- a/aconfig.go\n+++ b/aconfig.go\n@@ -276,7 +276,7 @@ func (l *Loader) loadFromFile() error {\n \t\t\tname := l.fullTag(field, tag)\n \t\t\tvalue, ok := actualFields[name]\n \t\t\tif !ok {\n-\t\t\t\tactualFields, _ = l.find(actualFields, name)\n+\t\t\t\tactualFields, _ = find(actualFields, name)\n \t\t\t\tvalue, ok = actualFields[name]\n \t\t\t\tif !ok {\n \t\t\t\t\tcontinue\n@@ -304,50 +304,6 @@ func (l *Loader) loadFromFile() error {\n \treturn nil\n }\n \n-func (l *Loader) find(actualFields map[string]interface{}, name string) (map[string]interface{}, bool) {\n-\tif strings.LastIndex(name, \".\") == -1 {\n-\t\treturn actualFields, false\n-\t}\n-\n-\tsubName := name[:strings.LastIndex(name, \".\")]\n-\tvalue, ok := actualFields[subName]\n-\tif !ok {\n-\t\tactualFields, ok = l.find(actualFields, subName)\n-\t\tvalue, ok = actualFields[subName]\n-\t\tif !ok {\n-\t\t\treturn actualFields, false\n-\t\t}\n-\t}\n-\n-\tswitch val := value.(type) {\n-\tcase map[string]interface{}:\n-\t\tfor k, v := range val {\n-\t\t\tactualFields[subName+\".\"+k] = v\n-\t\t}\n-\t\tdelete(actualFields, subName)\n-\tcase map[interface{}]interface{}:\n-\t\tfor k, v := range val {\n-\t\t\tactualFields[subName+\".\"+fmt.Sprint(k)] = v\n-\t\t}\n-\t\tdelete(actualFields, subName)\n-\tcase []map[string]interface{}:\n-\t\tfor _, m := range val {\n-\t\t\tfor k, v := range m {\n-\t\t\t\tactualFields[subName+\".\"+k] = v\n-\t\t\t}\n-\t\t}\n-\t\tdelete(actualFields, subName)\n-\tcase []map[interface{}]interface{}:\n-\t\tfor _, m := range val {\n-\t\t\tfor k, v := range m {\n-\t\t\t\tactualFields[subName+\".\"+fmt.Sprint(k)] = v\n-\t\t\t}\n-\t\t}\n-\t\tdelete(actualFields, subName)\n-\t}\n-\treturn actualFields, true\n-}\n-\n func (l *Loader) loadEnvironment() error {\n \tactualEnvs := getEnv()\n \ndiff --git a/reflection.go b/reflection.go\nindex f13345b..b8ea946 100644\n--- a/reflection.go\n+++ b/reflection.go\n@@ -169,7 +169,7 @@ func (l *Loader) setFieldData(field *fieldData, value interface{}) error {\n \t}\n }\n \n-func (l *Loader) setBool(field *fieldData, value string) error {\n+func (*Loader) setBool(field *fieldData, value string) error {\n \tval, err := strconv.ParseBool(value)\n \tif err != nil {\n \t\treturn err\n@@ -178,7 +178,7 @@ func (l *Loader) setBool(field *fieldData, value string) error {\n \treturn nil\n }\n \n-func (l *Loader) setInt(field *fieldData, value string) error {\n+func (*Loader) setInt(field *fieldData, value string) error {\n \tval, err := strconv.ParseInt(value, 0, field.value.Type().Bits())\n \tif err != nil {\n \t\treturn err\n@@ -199,7 +199,7 @@ func (l *Loader) setInt64(field *fieldData, value string) error {\n \treturn l.setInt(field, value)\n }\n \n-func (l *Loader) setUint(field *fieldData, value string) error {\n+func (*Loader) setUint(field *fieldData, value string) error {\n \tval, err := strconv.ParseUint(value, 0, field.value.Type().Bits())\n \tif err != nil {\n \t\treturn err\n@@ -208,7 +208,7 @@ func (l *Loader) setUint(field *fieldData, value string) error {\n \treturn nil\n }\n \n-func (l *Loader) setFloat(field *fieldData, value string) error {\n+func (*Loader) setFloat(field *fieldData, value string) error {\n \tval, err := strconv.ParseFloat(value, field.value.Type().Bits())\n \tif err != nil {\n \t\treturn err\n@@ -217,12 +217,12 @@ func (l *Loader) setFloat(field *fieldData, value string) error {\n \treturn nil\n }\n \n-func (l *Loader) setString(field *fieldData, value string) error {\n+func (*Loader) setString(field *fieldData, value string) error {\n \tfield.value.SetString(value)\n \treturn nil\n }\n \n-func (l *Loader) setInterface(field *fieldData, value interface{}) error {\n+func (*Loader) setInterface(field *fieldData, value interface{}) error {\n \tfield.value.Set(reflect.ValueOf(value))\n \treturn nil\n }\ndiff --git a/utils.go b/utils.go\nindex 7c80259..286974a 100644\n--- a/utils.go\n+++ b/utils.go\n@@ -155,3 +155,47 @@ func normalize(curr interface{}) interface{} {\n \t\tpanic(fmt.Sprintf(\"Can't normalize %T %v\", curr, curr))\n \t}\n }\n+\n+func find(actualFields map[string]interface{}, name string) (map[string]interface{}, bool) {\n+\tif strings.LastIndex(name, \".\") == -1 {\n+\t\treturn actualFields, false\n+\t}\n+\n+\tsubName := name[:strings.LastIndex(name, \".\")]\n+\tvalue, ok := actualFields[subName]\n+\tif !ok {\n+\t\tactualFields, ok = find(actualFields, subName)\n+\t\tvalue, ok = actualFields[subName]\n+\t\tif !ok {\n+\t\t\treturn actualFields, false\n+\t\t}\n+\t}\n+\n+\tswitch val := value.(type) {\n+\tcase map[string]interface{}:\n+\t\tfor k, v := range val {\n+\t\t\tactualFields[subName+\".\"+k] = v\n+\t\t}\n+\t\tdelete(actualFields, subName)\n+\tcase map[interface{}]interface{}:\n+\t\tfor k, v := range val {\n+\t\t\tactualFields[subName+\".\"+fmt.Sprint(k)] = v\n+\t\t}\n+\t\tdelete(actualFields, subName)\n+\tcase []map[string]interface{}:\n+\t\tfor _, m := range val {\n+\t\t\tfor k, v := range m {\n+\t\t\t\tactualFields[subName+\".\"+k] = v\n+\t\t\t}\n+\t\t}\n+\t\tdelete(actualFields, subName)\n+\tcase []map[interface{}]interface{}:\n+\t\tfor _, m := range val {\n+\t\t\tfor k, v := range m {\n+\t\t\t\tactualFields[subName+\".\"+fmt.Sprint(k)] = v\n+\t\t\t}\n+\t\t}\n+\t\tdelete(actualFields, subName)\n+\t}\n+\treturn actualFields, true\n+}\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/build.yml",
+    "LICENSE",
+    "README.md",
+    "aconfig.go",
+    "aconfig_test.go",
+    "aconfigdotenv/dotenv.go",
+    "aconfigdotenv/dotenv_test.go",
+    "aconfigdotenv/go.mod",
+    "aconfigdotenv/go.sum",
+    "aconfighcl/go.mod",
+    "aconfighcl/go.sum",
+    "aconfighcl/hcl.go",
+    "aconfighcl/hcl_test.go",
+    "aconfigtoml/go.mod",
+    "aconfigtoml/go.sum",
+    "aconfigtoml/toml.go",
+    "aconfigtoml/toml_test.go",
+    "aconfigyaml/go.mod",
+    "aconfigyaml/go.sum",
+    "aconfigyaml/yaml.go",
+    "aconfigyaml/yaml_test.go",
+    "doc.go",
+    "example_test.go",
+    "go.mod",
+    "reflection.go",
+    "testdata/bad_config.json",
+    "testdata/config.json",
+    "testdata/config1.json",
+    "testdata/config2.json",
+    "testdata/config3.json",
+    "testdata/example_config.json",
+    "testdata/unknown.ext",
+    "testdata/unknown_fields.json",
+    "testfile.json",
+    "utils.go",
+    "utils_test.go"
+  ],
+  "explanation": {
+    "what": "aconfig.go に定義されていた find メソッド(Loader のレシーバ付き)を、レシーバを持たない純粋関数として utils.go に移動した。あわせて reflection.go の setBool/setInt/setUint/setFloat/setString/setInterface のレシーバ名を l から無名の *Loader に変更している。処理内容自体(map の入れ子キーをドット区切りにフラット化するロジック)は変わっていない。",
+    "why": "PR タイトルの通り、動作を変えないコードの整理(cleanup)が目的。find は Loader の状態(l.config など)を一切使っていないため、レシーバ不要な独立関数として切り出すことでコードの意図を明確にし、setXxx 系メソッドも同様に「レシーバの値を使わない」ことを型のみのレシーバで表現したとみられる。",
+    "highlights": [
+      { "file": "utils.go", "note": "find 関数を Loader メソッドから独立関数へ移動" }
+    ],
+    "langNotes": [
+      { "topic": "unnamed receiver (*Loader)", "note": "Go ではメソッドのレシーバ変数名を省略して型だけ書ける(`func (*Loader) setBool(...)`)。レシーバの値を本体で一切使わないことを示す慣用的な書き方で、golangci-lint 等の \"unused receiver\" 系チェックにも沿う。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [
+      { "type": "pr", "number": 60, "url": "https://github.com/cristalhq/aconfig/pull/60" }
+    ],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

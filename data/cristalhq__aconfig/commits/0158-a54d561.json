@@ -1,0 +1,103 @@
+{
+  "seq": 158,
+  "sha": "a54d561079c30f86b52f9b4cc501aaaa5a880864",
+  "parents": [
+    "3b3b803e9e1422f4f4aa177a8a8328279ea84362"
+  ],
+  "author": {
+    "name": "Oleg Kovalov",
+    "email": "oleg@hey.com",
+    "date": "2023-09-03T20:00:02+02:00"
+  },
+  "message": "Update required error message (#144)",
+  "pr": {
+    "number": 144,
+    "title": "Update required error message",
+    "body": "Updates #143 ",
+    "url": "https://github.com/cristalhq/aconfig/pull/144"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 7,
+    "deletions": 8
+  },
+  "files": [
+    {
+      "path": "aconfig.go",
+      "status": "M",
+      "additions": 2,
+      "deletions": 4,
+      "binary": false
+    },
+    {
+      "path": "aconfig_test.go",
+      "status": "M",
+      "additions": 5,
+      "deletions": 4,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/aconfig.go b/aconfig.go\nindex e9f36e9..2baf014 100644\n--- a/aconfig.go\n+++ b/aconfig.go\n@@ -270,13 +270,11 @@ func (l *Loader) checkRequired() error {\n \t\t\tmissedFields = append(missedFields, field.name)\n \t\t}\n \t}\n+\n \tif len(missedFields) == 0 {\n \t\treturn nil\n \t}\n-\tif len(missedFields) == 1 {\n-\t\treturn fmt.Errorf(\"field %s is required but not set\", missedFields[0])\n-\t}\n-\treturn fmt.Errorf(\"fields %s are required but not set\", strings.Join(missedFields, \",\"))\n+\treturn fmt.Errorf(\"fields required but not set: %s\", strings.Join(missedFields, \",\"))\n }\n \n func (l *Loader) loadDefaults() error {\ndiff --git a/aconfig_test.go b/aconfig_test.go\nindex 33dc53f..48a5815 100644\n--- a/aconfig_test.go\n+++ b/aconfig_test.go\n@@ -1096,12 +1096,13 @@ func TestMissingFieldWithRequiredTag(t *testing.T) {\n \t})\n \n \terr := loader.Load()\n+\twant := \"load config: fields required but not set: Field1\"\n \n-\twant := \"load config: field Field1 is required but not set\"\n-\tif err.Error() != want {\n+\tif have := err.Error(); have != want {\n \t\tt.Fatalf(\"got %v, want %v\", err, want)\n \t}\n }\n+\n func TestMissingFieldsWithRequiredTag(t *testing.T) {\n \tcfg := struct {\n \t\tField1 string `required:\"true\"`\n@@ -1112,9 +1113,9 @@ func TestMissingFieldsWithRequiredTag(t *testing.T) {\n \t})\n \n \terr := loader.Load()\n+\twant := \"load config: fields required but not set: Field1,Field2\"\n \n-\twant := \"load config: fields Field1,Field2 are required but not set\"\n-\tif err.Error() != want {\n+\tif have := err.Error(); have != want {\n \t\tt.Fatalf(\"got %v, want %v\", err, want)\n \t}\n }\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/dependabot.yml",
+    ".github/workflows/build.yml",
+    "LICENSE",
+    "README.md",
+    "aconfig.go",
+    "aconfig_test.go",
+    "aconfigdotenv/dotenv.go",
+    "aconfigdotenv/dotenv_test.go",
+    "aconfigdotenv/go.mod",
+    "aconfigdotenv/go.sum",
+    "aconfigdotenv/testdata/config.env",
+    "aconfighcl/go.mod",
+    "aconfighcl/go.sum",
+    "aconfighcl/hcl.go",
+    "aconfighcl/hcl_test.go",
+    "aconfighcl/testdata/config.hcl",
+    "aconfigtoml/go.mod",
+    "aconfigtoml/go.sum",
+    "aconfigtoml/testdata/config.toml",
+    "aconfigtoml/toml.go",
+    "aconfigtoml/toml_test.go",
+    "aconfigyaml/go.mod",
+    "aconfigyaml/go.sum",
+    "aconfigyaml/res.yaml",
+    "aconfigyaml/testdata/config.yaml",
+    "aconfigyaml/yaml.go",
+    "aconfigyaml/yaml_test.go",
+    "doc.go",
+    "example_test.go",
+    "go.mod",
+    "reflection.go",
+    "testdata/bad_config.json",
+    "testdata/complex.json",
+    "testdata/config.json",
+    "testdata/config1.json",
+    "testdata/config2.json",
+    "testdata/config3.json",
+    "testdata/example_config.json",
+    "testdata/slice-struct-primitive-slice.json",
+    "testdata/toy.json",
+    "testdata/unknown_fields.json",
+    "utils.go",
+    "utils_test.go"
+  ],
+  "explanation": {
+    "what": "直前のコミット(#143)で導入した required フィールドのエラーメッセージを、単数/複数で文言を出し分ける実装(\"field %s is required but not set\" / \"fields %s are required but not set\")から、常に単一の文言\"fields required but not set: %s\"に統一した。対応するテストの期待値も書き換えている。",
+    "why": "PR本文の\"Updates #143\"が示す通り、直前のPR #143 で導入したエラーメッセージ形式に対する追いフォロー修正。単数形/複数形で文言を分岐させる実装を廃し、件数によらず一貫したフォーマットに簡素化した。",
+    "highlights": [
+      { "file": "aconfig.go", "note": "if len(missedFields) == 1 の分岐を削除し、常に \"fields required but not set: %s\" 形式に統一" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [
+      { "type": "pr", "number": 144, "url": "https://github.com/cristalhq/aconfig/pull/144" }
+    ],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

@@ -1,0 +1,69 @@
+{
+  "seq": 28,
+  "sha": "5ed7ad3c4121ae73472a54a3f58ceaa1fe56b735",
+  "parents": [
+    "1c9facc27f4a08295af1bb53d1f6e488e9d25792"
+  ],
+  "author": {
+    "name": "Oleg Kovalov",
+    "email": "iamolegkovalov@gmail.com",
+    "date": "2020-07-23T10:51:21+02:00"
+  },
+  "message": "simplify embedded fields a bit",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 17,
+    "deletions": 12
+  },
+  "files": [
+    {
+      "path": "aconfig.go",
+      "status": "M",
+      "additions": 17,
+      "deletions": 12,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/aconfig.go b/aconfig.go\nindex 5c0eee7..c4f67cf 100644\n--- a/aconfig.go\n+++ b/aconfig.go\n@@ -108,10 +108,10 @@ func (l *Loader) loadFromFile(dst interface{}) error {\n \t\tcase \".toml\":\n \t\t\t_, err = toml.DecodeReader(f, dst)\n \t\tdefault:\n-\t\t\treturn fmt.Errorf(\"aconfig: file format '%q' isn't supported\", ext)\n+\t\t\treturn fmt.Errorf(\"file format '%q' isn't supported\", ext)\n \t\t}\n \t\tif err != nil {\n-\t\t\treturn fmt.Errorf(\"aconfig: file parsing error: %s\", err.Error())\n+\t\t\treturn fmt.Errorf(\"file parsing error: %w\", err)\n \t\t}\n \t\tbreak\n \t}\n@@ -186,16 +186,17 @@ func getFieldsHelper(valueObject reflect.Value, parent *fieldData) []*fieldData\n \t\tfd := newFieldData(field, value, parent)\n \n \t\t// if just a field - add and process next, else expand struct\n-\t\tif field.Type.Kind() != reflect.Struct {\n-\t\t\tfields = append(fields, fd)\n-\t\t} else {\n-\t\t\tfieldParent := parent\n-\t\t\t// remove prefix for embedded struct\n-\t\t\tif !field.Anonymous {\n-\t\t\t\tfieldParent = fd\n+\t\tif field.Type.Kind() == reflect.Struct {\n+\t\t\tvar subFieldParent *fieldData\n+\t\t\tif field.Anonymous {\n+\t\t\t\tsubFieldParent = parent\n+\t\t\t} else {\n+\t\t\t\tsubFieldParent = fd\n \t\t\t}\n-\t\t\tfields = append(fields, getFieldsHelper(value, fieldParent)...)\n+\t\t\tfields = append(fields, getFieldsHelper(value, subFieldParent)...)\n+\t\t\tcontinue\n \t\t}\n+\t\tfields = append(fields, fd)\n \t}\n \treturn fields\n }\n@@ -216,6 +217,10 @@ func newFieldData(field reflect.StructField, value reflect.Value, parent *fieldD\n \t}\n }\n \n+func newSimpleFieldData(value reflect.Value) *fieldData {\n+\treturn newFieldData(reflect.StructField{}, value, nil)\n+}\n+\n func makaName(name string, parent *fieldData) string {\n \tif parent == nil {\n \t\treturn name\n@@ -334,12 +339,12 @@ func setMap(field *fieldData, value string) error {\n \t\tkey := strings.TrimSpace(entry[0])\n \t\tval := strings.TrimSpace(entry[1])\n \n-\t\tfdk := newFieldData(reflect.StructField{}, reflect.New(field.Field.Type.Key()).Elem(), nil)\n+\t\tfdk := newSimpleFieldData(reflect.New(field.Field.Type.Key()).Elem())\n \t\tif err := setFieldDataHelper(fdk, key); err != nil {\n \t\t\treturn fmt.Errorf(\"incorrect map key %q: %w\", key, err)\n \t\t}\n \n-\t\tfdv := newFieldData(reflect.StructField{}, reflect.New(field.Field.Type.Elem()).Elem(), nil)\n+\t\tfdv := newSimpleFieldData(reflect.New(field.Field.Type.Elem()).Elem())\n \t\tif err := setFieldDataHelper(fdv, val); err != nil {\n \t\t\treturn fmt.Errorf(\"incorrect map value %q: %w\", val, err)\n \t\t}\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/build.yml",
+    "LICENSE",
+    "README.md",
+    "aconfig.go",
+    "aconfig_test.go",
+    "example_test.go",
+    "go.mod",
+    "go.sum",
+    "testdata/all_types_config.json",
+    "testdata/bad_config.json",
+    "testdata/config1.json",
+    "testdata/config1.toml",
+    "testdata/config1.yaml",
+    "testdata/example_config.json",
+    "testdata/my_duration_config.json",
+    "testdata/other_numbers_config.json",
+    "testdata/test_config_def.json",
+    "testdata/test_config_env.json",
+    "testdata/test_config_flag.json",
+    "testdata/unknown.ext"
+  ],
+  "explanation": {
+    "what": "getFieldsHelper 内の「構造体でなければ追加、構造体なら展開する」という if/else を反転し、構造体ケースを先に処理して continue で抜ける形に整理した。埋め込み構造体(Anonymous)かどうかで親 fieldData を切り替えるロジックはそのままだが変数名を fieldParent→subFieldParent に変更している。また、マップのキー・値用に fieldData を作る際の `newFieldData(reflect.StructField{}, value, nil)` という定型呼び出しを newSimpleFieldData というヘルパー関数に括り出した。エラーメッセージからも冗長な「aconfig:」プレフィックスを外し、fmt.Errorf の書式指定子 %w で元エラーをラップするよう変更している。",
+    "why": "メッセージの通り「埋め込みフィールドまわりの単純化」。制御フローを反転させ continue で早期に抜けることで、構造体でない通常フィールドの追加処理をネストの外に出し読みやすくしている。newSimpleFieldData への括り出しは setMap 内でマップのキー・値それぞれに繰り返し登場していた同一パターンの重複除去とみられる。",
+    "highlights": [
+      { "file": "aconfig.go", "note": "getFieldsHelper の if/else 反転と newSimpleFieldData ヘルパーの導入" }
+    ],
+    "langNotes": [
+      { "topic": "struct embedding (Anonymous フィールド)", "note": "Go の struct では型名だけを書いて埋め込んだフィールド(reflect.StructField.Anonymous == true)は、外側の構造体のフィールドであるかのように扱われる。ここでは埋め込み構造体は親のプレフィックスを引き継ぎ(fieldParent=parent)、名前付きのネスト構造体は自身の名前をプレフィックスにする(fieldParent=fd)という分岐に使われている。" },
+      { "topic": "fmt.Errorf の %w", "note": "%w を使うと元のエラーをラップしたまま新しいエラーを作れ、errors.Is/errors.As で元のエラーを後から判定できる。旧コードの %s(文字列化のみ)より情報の欠落が少ない。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

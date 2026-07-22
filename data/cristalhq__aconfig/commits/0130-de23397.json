@@ -1,0 +1,95 @@
+{
+  "seq": 130,
+  "sha": "de23397e03c0b9c4072082fa4f2a050abafc1011",
+  "parents": [
+    "4599e9843ad438f3bac16fbec23d1e70b7e83ed1"
+  ],
+  "author": {
+    "name": "Oleg Kovalov",
+    "email": "oleg@hey.com",
+    "date": "2021-08-15T13:12:32+02:00"
+  },
+  "message": "Check duplicate flag (#98)\n\nSigned-off-by: Oleg Kovalov <oleg@hey.com>",
+  "pr": {
+    "number": 98,
+    "title": "Check duplicate flag",
+    "body": "Signed-off-by: Oleg Kovalov <oleg@hey.com>",
+    "url": "https://github.com/cristalhq/aconfig/pull/98"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 30,
+    "deletions": 6
+  },
+  "files": [
+    {
+      "path": "aconfig.go",
+      "status": "M",
+      "additions": 16,
+      "deletions": 6,
+      "binary": false
+    },
+    {
+      "path": "aconfig_test.go",
+      "status": "M",
+      "additions": 14,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/aconfig.go b/aconfig.go\nindex 3eef7eb..d6c4fbd 100644\n--- a/aconfig.go\n+++ b/aconfig.go\n@@ -25,6 +25,7 @@ type Loader struct {\n \tdst     interface{}\n \tfields  []*fieldData\n \tflagSet *flag.FlagSet\n+\terrInit error\n }\n \n // Config to configure configuration loader.\n@@ -156,11 +157,17 @@ func (l *Loader) init() {\n \n \tl.flagSet = flag.NewFlagSet(l.config.FlagPrefix, flag.ContinueOnError)\n \tif !l.config.SkipFlags {\n+\t\tnames := make(map[string]bool, len(l.fields))\n \t\tfor _, field := range l.fields {\n \t\t\tflagName := l.fullTag(l.config.FlagPrefix, field, flagNameTag)\n \t\t\tif flagName == \"\" {\n \t\t\t\tcontinue\n \t\t\t}\n+\t\t\tif names[flagName] && !l.config.AllowDuplicates {\n+\t\t\t\tl.errInit = fmt.Errorf(\"duplicate flag %q\", flagName)\n+\t\t\t\treturn\n+\t\t\t}\n+\t\t\tnames[flagName] = true\n \t\t\tl.flagSet.String(flagName, field.Tag(defaultValueTag), field.Tag(usageTag))\n \t\t}\n \t}\n@@ -188,6 +195,9 @@ func (l *Loader) WalkFields(fn func(f Field) bool) {\n \n // Load configuration into a given param.\n func (l *Loader) Load() error {\n+\tif l.errInit != nil {\n+\t\treturn fmt.Errorf(\"aconfig: cannot init loader: %w\", l.errInit)\n+\t}\n \tif err := l.loadConfig(); err != nil {\n \t\treturn fmt.Errorf(\"aconfig: cannot load config: %w\", err)\n \t}\n@@ -370,12 +380,12 @@ func (l *Loader) loadEnvironment() error {\n }\n \n func (l *Loader) postEnvCheck(values map[string]interface{}, dupls map[string]struct{}) error {\n-\tfor name := range dupls {\n-\t\tdelete(values, name)\n-\t}\n \tif l.config.AllowUnknownEnvs || l.config.EnvPrefix == \"\" {\n \t\treturn nil\n \t}\n+\tfor name := range dupls {\n+\t\tdelete(values, name)\n+\t}\n \tfor env, value := range values {\n \t\tif strings.HasPrefix(env, l.config.EnvPrefix) {\n \t\t\treturn fmt.Errorf(\"unknown environment var %s=%v (see AllowUnknownEnvs config param)\", env, value)\n@@ -402,12 +412,12 @@ func (l *Loader) loadFlags() error {\n }\n \n func (l *Loader) postFlagCheck(values map[string]interface{}, dupls map[string]struct{}) error {\n-\tfor name := range dupls {\n-\t\tdelete(values, name)\n-\t}\n \tif l.config.AllowUnknownFlags || l.config.FlagPrefix == \"\" {\n \t\treturn nil\n \t}\n+\tfor name := range dupls {\n+\t\tdelete(values, name)\n+\t}\n \tfor flag, value := range values {\n \t\tif strings.HasPrefix(flag, l.config.EnvPrefix) {\n \t\t\treturn fmt.Errorf(\"unknown flag %s=%v (see AllowUnknownFlags config param)\", flag, value)\ndiff --git a/aconfig_test.go b/aconfig_test.go\nindex e86a04f..e22d413 100644\n--- a/aconfig_test.go\n+++ b/aconfig_test.go\n@@ -544,6 +544,20 @@ func TestFailOnDuplicatedName(t *testing.T) {\n \t}\n }\n \n+func TestFailOnDuplicatedFlag(t *testing.T) {\n+\ttype Foo struct {\n+\t\tBar string `flag:\"yes\"`\n+\t\tBaz string `flag:\"yes\"`\n+\t}\n+\n+\terr := LoaderFor(&Foo{}, Config{}).Load()\n+\n+\twant := `aconfig: cannot init loader: duplicate flag \"yes\"`\n+\tif got := err.Error(); got != want {\n+\t\tt.Fatalf(\"got %s want %s\", got, want)\n+\t}\n+}\n+\n func TestUsage(t *testing.T) {\n \tloader := LoaderFor(&EmbeddedConfig{}, Config{})\n \n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/build.yml",
+    "LICENSE",
+    "README.md",
+    "aconfig.go",
+    "aconfig_test.go",
+    "aconfigdotenv/dotenv.go",
+    "aconfigdotenv/dotenv_test.go",
+    "aconfigdotenv/go.mod",
+    "aconfigdotenv/go.sum",
+    "aconfighcl/go.mod",
+    "aconfighcl/go.sum",
+    "aconfighcl/hcl.go",
+    "aconfighcl/hcl_test.go",
+    "aconfigtoml/go.mod",
+    "aconfigtoml/go.sum",
+    "aconfigtoml/toml.go",
+    "aconfigtoml/toml_test.go",
+    "aconfigyaml/go.mod",
+    "aconfigyaml/go.sum",
+    "aconfigyaml/yaml.go",
+    "aconfigyaml/yaml_test.go",
+    "doc.go",
+    "example_test.go",
+    "go.mod",
+    "reflection.go",
+    "testdata/bad_config.json",
+    "testdata/complex.json",
+    "testdata/config.json",
+    "testdata/config1.json",
+    "testdata/config2.json",
+    "testdata/config3.json",
+    "testdata/example_config.json",
+    "testdata/toy.json",
+    "testdata/unknown_fields.json",
+    "utils.go",
+    "utils_test.go"
+  ],
+  "explanation": {
+    "what": "Loader に errInit フィールドを追加し、init() 内で flag 名を names という map[string]bool で追跡して、同じ flag 名が AllowDuplicates=false のまま複数フィールドに現れた場合は errInit にエラーをセットして初期化を打ち切るようにした。Load() の先頭で errInit をチェックして返す。あわせて postEnvCheck / postFlagCheck 内の dupls 削除処理を AllowUnknownEnvs/Flags のチェック手前から後ろに移動し、順序を入れ替えている。",
+    "why": "seq121(#87)で env/flag 名の重複自体は setField 側で検出できるようになっていたが、flag は Go の flag.FlagSet.String を複数回同名で呼ぶと登録時点でパニックする可能性があるなど、setField に到達する前の init() 段階での検出が必要だった。本コミットで flag 名の重複を init 時点の早い段階でチェックし、Load() 呼び出し時にエラーとして返せるようにしている。",
+    "highlights": [
+      { "file": "aconfig.go", "note": "errInit は init() で検出したエラーを Load() まで持ち越すためのフィールド。init() 自体はエラーを返さないシグネチャなので、この形で遅延伝播させている" },
+      { "file": "aconfig_test.go", "note": "TestFailOnDuplicatedFlag が期待するエラー文字列 \"aconfig: cannot init loader: duplicate flag ...\" でラップの形が確認できる" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [{ "type": "pr", "number": 98, "url": "https://github.com/cristalhq/aconfig/pull/98" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

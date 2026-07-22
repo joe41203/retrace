@@ -1,0 +1,82 @@
+{
+  "seq": 56,
+  "sha": "86f00e05fd068cbdd29f4870f594f680e6fc92bc",
+  "parents": [
+    "73f663761ec17fd4ae18250932835f906d9b227d"
+  ],
+  "author": {
+    "name": "Oleg Kovalov",
+    "email": "oleg@hey.com",
+    "date": "2020-08-18T18:36:42+02:00"
+  },
+  "message": "prevent unparsed flags (#15)",
+  "pr": {
+    "number": 15,
+    "title": "prevent unparsed flags",
+    "body": "",
+    "url": "https://github.com/cristalhq/aconfig/pull/15"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 24,
+    "deletions": 2
+  },
+  "files": [
+    {
+      "path": "aconfig.go",
+      "status": "M",
+      "additions": 13,
+      "deletions": 2,
+      "binary": false
+    },
+    {
+      "path": "aconfig_test.go",
+      "status": "M",
+      "additions": 11,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/aconfig.go b/aconfig.go\nindex a366153..7a92a3e 100644\n--- a/aconfig.go\n+++ b/aconfig.go\n@@ -2,6 +2,7 @@ package aconfig\n \n import (\n \t\"encoding/json\"\n+\t\"errors\"\n \t\"flag\"\n \t\"fmt\"\n \t\"os\"\n@@ -41,6 +42,7 @@ type loaderConfig struct {\n \tEnvPrefix  string\n \tFlagPrefix string\n \n+\tFailOnNotParsedFlags  bool\n \tShouldStopOnFileError bool\n \tFiles                 []string\n }\n@@ -108,6 +110,14 @@ func (l *Loader) WithEnvPrefix(prefix string) *Loader {\n \treturn l\n }\n \n+// FailOnNotParsedFlags to not forget parse flags explicitly.\n+// Use `l.FlagSet().Parse(os.Args[1:])` in your code for this.\n+//\n+func (l *Loader) FailOnNotParsedFlags() *Loader {\n+\tl.config.FailOnNotParsedFlags = true\n+\treturn l\n+}\n+\n // StopOnFileError to stop configuration loading on file error.\n func (l *Loader) StopOnFileError() *Loader {\n \tl.config.ShouldStopOnFileError = true\n@@ -267,9 +277,10 @@ func (l *Loader) loadEnvironment() error {\n \n func (l *Loader) loadFlags() error {\n \tif !l.flagSet.Parsed() {\n-\t\tif err := l.flagSet.Parse(os.Args[1:]); err != nil {\n-\t\t\treturn err\n+\t\tif l.config.FailOnNotParsedFlags {\n+\t\t\treturn errors.New(\"aconfig: flags must be parsed\")\n \t\t}\n+\t\treturn nil\n \t}\n \n \tactualFlags := map[string]*flag.Flag{}\ndiff --git a/aconfig_test.go b/aconfig_test.go\nindex 02805cd..d27b0f8 100644\n--- a/aconfig_test.go\n+++ b/aconfig_test.go\n@@ -397,6 +397,17 @@ func TestBadDefauts(t *testing.T) {\n \t}{})\n }\n \n+func TestNotParsedFlags(t *testing.T) {\n+\tloader := LoaderFor(&TestConfig{}).\n+\t\tFailOnNotParsedFlags().\n+\t\tBuild()\n+\n+\tvar cfg TestConfig\n+\tif err := loader.Load(&cfg); err == nil {\n+\t\tt.Fatal(err)\n+\t}\n+}\n+\n func TestBadFiles(t *testing.T) {\n \tf := func(filepath string) {\n \t\tt.Helper()\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/build.yml",
+    "LICENSE",
+    "README.md",
+    "aconfig.go",
+    "aconfig_test.go",
+    "example_test.go",
+    "go.mod",
+    "go.sum",
+    "testdata/all_types_config.json",
+    "testdata/bad_config.json",
+    "testdata/config1.json",
+    "testdata/config1.toml",
+    "testdata/config1.yaml",
+    "testdata/example_config.json",
+    "testdata/my_duration_config.json",
+    "testdata/other_numbers_config.json",
+    "testdata/test_config_def.json",
+    "testdata/test_config_env.json",
+    "testdata/test_config_flag.json",
+    "testdata/unknown.ext"
+  ],
+  "explanation": {
+    "what": "loadFlags の挙動を変更し、flagSet がまだ Parse されていない場合に自動で flagSet.Parse(os.Args[1:]) を呼んでいた処理を削除した。代わりに新設の FailOnNotParsedFlags() オプションが有効なときだけ「flags must be parsed」エラーを返し、無効なら何もせず nil を返すようにした。テスト TestNotParsedFlags で、このオプションを付けて未 Parse のまま Load するとエラーになることを確認している。",
+    "why": "PR タイトルの通り「未パースの flag を防ぐ」ための変更。以前は Loader 自身が os.Args を勝手に Parse していたため、呼び出し側が明示的に flag.Parse を呼んでいなくても気づかないまま動いてしまう(または呼び出し側の独自 Parse と重複する)余地があった。FailOnNotParsedFlags を導入することで、flag のパース漏れを呼び出し側の意図で検出できるようにし、暗黙の自動 Parse には頼らない設計に寄せている。",
+    "highlights": [
+      { "file": "aconfig.go", "note": "loadFlags から flagSet.Parse(os.Args[1:]) の自動呼び出しを削除し、FailOnNotParsedFlags フラグの有無でエラーを返すかどうかを切り替えるようにした" }
+    ],
+    "langNotes": [
+      { "topic": "flag.FlagSet.Parsed()", "note": "標準ライブラリ flag パッケージの FlagSet は Parse() を呼ぶまで値が確定しない。Parsed() でパース済みかどうかを判定でき、aconfig はこれを使って呼び出し側が flag.Parse 相当を済ませているかを確認している。" }
+    ],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [
+      { "type": "pr", "number": 15, "url": "https://github.com/cristalhq/aconfig/pull/15" }
+    ],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

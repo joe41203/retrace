@@ -1,0 +1,62 @@
+{
+  "seq": 12,
+  "sha": "82908e49d7f59e335097d27bc8da9af6100f4dd2",
+  "parents": [
+    "8a0ddc3ae4c4a6c38626c7a3c34f4c6d844eb997"
+  ],
+  "author": {
+    "name": "Oleg Kovalov",
+    "email": "iamolegkovalov@gmail.com",
+    "date": "2020-07-22T14:24:16+02:00"
+  },
+  "message": "simplify bad defaults tests",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 49,
+    "deletions": 72
+  },
+  "files": [
+    {
+      "path": "aconfig_test.go",
+      "status": "M",
+      "additions": 49,
+      "deletions": 72,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/aconfig_test.go b/aconfig_test.go\nindex 00010d6..4f97f16 100644\n--- a/aconfig_test.go\n+++ b/aconfig_test.go\n@@ -184,101 +184,78 @@ func TestLoadFlag(t *testing.T) {\n }\n \n func TestBadDefauts(t *testing.T) {\n-\tf := func(testCase func(*Loader) error) {\n+\tf := func(cfg interface{}) {\n \t\tt.Helper()\n+\n \t\tloader := NewLoader(LoaderConfig{\n \t\t\tSkipFile: true,\n \t\t\tSkipEnv:  true,\n \t\t\tSkipFlag: true,\n \t\t})\n-\t\tif err := testCase(loader); err == nil {\n+\t\tif err := loader.Load(cfg); err == nil {\n \t\t\tt.Fatal(err)\n \t\t}\n \t}\n \n-\tf(func(loader *Loader) error {\n-\t\treturn loader.Load(&struct {\n-\t\t\tBool bool `default:\"omg\"`\n-\t\t}{})\n-\t})\n+\tf(&struct {\n+\t\tBool bool `default:\"omg\"`\n+\t}{})\n \n-\tf(func(loader *Loader) error {\n-\t\treturn loader.Load(&struct {\n-\t\t\tInt int `default:\"1a\"`\n-\t\t}{})\n-\t})\n+\tf(&struct {\n+\t\tBool bool `default:\"omg\"`\n+\t}{})\n \n-\tf(func(loader *Loader) error {\n-\t\treturn loader.Load(&struct {\n-\t\t\tInt8 int8 `default:\"12a\"`\n-\t\t}{})\n-\t})\n+\tf(&struct {\n+\t\tInt int `default:\"1a\"`\n+\t}{})\n \n-\tf(func(loader *Loader) error {\n-\t\treturn loader.Load(&struct {\n-\t\t\tInt16 int16 `default:\"123a\"`\n-\t\t}{})\n-\t})\n+\tf(&struct {\n+\t\tInt8 int8 `default:\"12a\"`\n+\t}{})\n \n-\tf(func(loader *Loader) error {\n-\t\treturn loader.Load(&struct {\n-\t\t\tInt32 int32 `default:\"13a\"`\n-\t\t}{})\n-\t})\n+\tf(&struct {\n+\t\tInt16 int16 `default:\"123a\"`\n+\t}{})\n \n-\tf(func(loader *Loader) error {\n-\t\treturn loader.Load(&struct {\n-\t\t\tInt64 int64 `default:\"23a\"`\n-\t\t}{})\n-\t})\n+\tf(&struct {\n+\t\tInt32 int32 `default:\"13a\"`\n+\t}{})\n \n-\tf(func(loader *Loader) error {\n-\t\treturn loader.Load(&struct {\n-\t\t\tUint uint `default:\"1234a\"`\n-\t\t}{})\n-\t})\n+\tf(&struct {\n+\t\tInt64 int64 `default:\"23a\"`\n+\t}{})\n \n-\tf(func(loader *Loader) error {\n-\t\treturn loader.Load(&struct {\n-\t\t\tUint8 uint8 `default:\"124a\"`\n-\t\t}{})\n-\t})\n+\tf(&struct {\n+\t\tUint uint `default:\"1234a\"`\n+\t}{})\n \n-\tf(func(loader *Loader) error {\n-\t\treturn loader.Load(&struct {\n-\t\t\tUint16 uint16 `default:\"134a\"`\n-\t\t}{})\n-\t})\n+\tf(&struct {\n+\t\tUint8 uint8 `default:\"124a\"`\n+\t}{})\n \n-\tf(func(loader *Loader) error {\n-\t\treturn loader.Load(&struct {\n-\t\t\tUint32 uint32 `default:\"234a\"`\n-\t\t}{})\n-\t})\n+\tf(&struct {\n+\t\tUint16 uint16 `default:\"134a\"`\n+\t}{})\n \n-\tf(func(loader *Loader) error {\n-\t\treturn loader.Load(&struct {\n-\t\t\tUint64 uint64 `default:\"24a\"`\n-\t\t}{})\n-\t})\n+\tf(&struct {\n+\t\tUint32 uint32 `default:\"234a\"`\n+\t}{})\n \n-\tf(func(loader *Loader) error {\n-\t\treturn loader.Load(&struct {\n-\t\t\tFloat32 float32 `default:\"1234x213\"`\n-\t\t}{})\n-\t})\n+\tf(&struct {\n+\t\tUint64 uint64 `default:\"24a\"`\n+\t}{})\n \n-\tf(func(loader *Loader) error {\n-\t\treturn loader.Load(&struct {\n-\t\t\tFloat64 float64 `default:\"1234x234\"`\n-\t\t}{})\n-\t})\n+\tf(&struct {\n+\t\tFloat32 float32 `default:\"1234x213\"`\n+\t}{})\n \n-\tf(func(loader *Loader) error {\n-\t\treturn loader.Load(&struct {\n-\t\t\tDur time.Duration `default:\"1h_2m3s\"`\n-\t\t}{})\n-\t})\n+\tf(&struct {\n+\t\tFloat64 float64 `default:\"1234x234\"`\n+\t}{})\n+\n+\tf(&struct {\n+\t\tDur time.Duration `default:\"1h_2m3s\"`\n+\t}{})\n }\n \n func TestBadFiles(t *testing.T) {\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/build.yml",
+    "LICENSE",
+    "README.md",
+    "aconfig.go",
+    "aconfig_test.go",
+    "go.mod",
+    "go.sum",
+    "testdata/all_types_config.json",
+    "testdata/bad_config.json",
+    "testdata/config1.json",
+    "testdata/config1.toml",
+    "testdata/config1.yaml",
+    "testdata/my_duration_config.json",
+    "testdata/test_config_env.json",
+    "testdata/test_config_flag.json",
+    "testdata/unknown.ext"
+  ],
+  "explanation": {
+    "what": "`TestBadDefauts` のテストヘルパーを、テストケースごとに `func(*Loader) error` のクロージャを書く形式から、テスト対象の struct(`interface{}`)だけを渡す形式に書き換えた。ヘルパー関数 `f` の内部で `loader.Load(cfg)` を呼ぶ処理に一本化し、各ケースの記述量を大きく減らしている。",
+    "why": "コミットメッセージ「simplify bad defaults tests」の通り、各テストケースで `Load` 呼び出しのボイラープレートを繰り返し書く必要をなくす簡略化が目的と読める。",
+    "highlights": [
+      { "file": "aconfig_test.go", "note": "`f(func(loader *Loader) error {...})` から `f(&struct{...}{})` への書き換えでケース追加のコストが下がっている" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

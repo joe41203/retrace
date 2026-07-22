@@ -1,0 +1,64 @@
+{
+  "seq": 45,
+  "sha": "03f25ffa16f4b5c739cd07791003d9acb73a1426",
+  "parents": [
+    "800f8cab3b9d7b62bd81e6f47855c79ba2064177"
+  ],
+  "author": {
+    "name": "Oleg Kovalov",
+    "email": "iamolegkovalov@gmail.com",
+    "date": "2020-07-26T21:57:34+02:00"
+  },
+  "message": "update panic message",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 4,
+    "deletions": 4
+  },
+  "files": [
+    {
+      "path": "aconfig.go",
+      "status": "M",
+      "additions": 4,
+      "deletions": 4,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/aconfig.go b/aconfig.go\nindex ca844b2..85300c3 100644\n--- a/aconfig.go\n+++ b/aconfig.go\n@@ -125,7 +125,7 @@ func (l *Loader) parseFields(cfg interface{}) {\n \n func (l *Loader) Flags() *flag.FlagSet {\n \tif !l.isBuilt {\n-\t\tpanic(\"aconfig: before using loader you must run Build method\")\n+\t\tpanic(\"aconfig: you must run Build method before using the loader\")\n \t}\n \treturn l.flagSet\n }\n@@ -134,7 +134,7 @@ func (l *Loader) Flags() *flag.FlagSet {\n // Easy way to create documentation or other stuff.\n func (l *Loader) WalkFields(fn func(f Field)) {\n \tif !l.isBuilt {\n-\t\tpanic(\"aconfig: before using loader you must run Build method\")\n+\t\tpanic(\"aconfig: you must run Build method before using the loader\")\n \t}\n \tfor _, f := range l.fields {\n \t\tfn(f)\n@@ -144,7 +144,7 @@ func (l *Loader) WalkFields(fn func(f Field)) {\n // Load configuration into a given param.\n func (l *Loader) Load(into interface{}) error {\n \tif !l.isBuilt {\n-\t\tpanic(\"aconfig: before using loader you must run Build method\")\n+\t\tpanic(\"aconfig: you must run Build method before using the loader\")\n \t}\n \t// we need to get fields once more, 'cause `into` is new for us\n \tl.fields = getFields(into)\n@@ -158,7 +158,7 @@ func (l *Loader) Load(into interface{}) error {\n // LoadWithFiles configuration into a given param.\n func (l *Loader) LoadWithFiles(into interface{}, files []string) error {\n \tif !l.isBuilt {\n-\t\tpanic(\"aconfig: before using loader you must run Build method\")\n+\t\tpanic(\"aconfig: you must run Build method before using the loader\")\n \t}\n \t// we need to get fields once more, 'cause `into` is new for us\n \tl.fields = getFields(into)\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/build.yml",
+    "LICENSE",
+    "README.md",
+    "aconfig.go",
+    "aconfig_test.go",
+    "example_test.go",
+    "go.mod",
+    "go.sum",
+    "testdata/all_types_config.json",
+    "testdata/bad_config.json",
+    "testdata/config1.json",
+    "testdata/config1.toml",
+    "testdata/config1.yaml",
+    "testdata/example_config.json",
+    "testdata/my_duration_config.json",
+    "testdata/other_numbers_config.json",
+    "testdata/test_config_def.json",
+    "testdata/test_config_env.json",
+    "testdata/test_config_flag.json",
+    "testdata/unknown.ext"
+  ],
+  "explanation": {
+    "what": "未Build時のpanicメッセージを \"aconfig: before using loader you must run Build method\" から \"aconfig: you must run Build method before using the loader\" に、4箇所(Flags/WalkFields/Load/LoadWithFiles)まとめて統一的に変更した。",
+    "why": "PRに紐付かないコミットで、コミットメッセージ \"update panic message\" 以上の説明はない。直前のコミットでこのpanicメッセージに対するテストを追加したばかりであり、文言をより自然な語順に整えた表現上の修正とみられる。",
+    "highlights": [],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

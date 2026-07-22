@@ -1,0 +1,83 @@
+{
+  "seq": 75,
+  "sha": "8c087db54dbf9acbef52534d98396af5ede29a65",
+  "parents": [
+    "7a69378db6b80718e7983659ed6a81c2537d081b"
+  ],
+  "author": {
+    "name": "Oleg Kovalov",
+    "email": "oleg@hey.com",
+    "date": "2020-11-29T16:34:17+01:00"
+  },
+  "message": "Update build.yml (#32)",
+  "pr": {
+    "number": 32,
+    "title": "Update build.yml",
+    "body": "",
+    "url": "https://github.com/cristalhq/aconfig/pull/32"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 12,
+    "deletions": 13
+  },
+  "files": [
+    {
+      "path": ".github/workflows/build.yml",
+      "status": "M",
+      "additions": 12,
+      "deletions": 13,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/.github/workflows/build.yml b/.github/workflows/build.yml\nindex 55cc5ea..5fa01c6 100644\n--- a/.github/workflows/build.yml\n+++ b/.github/workflows/build.yml\n@@ -1,5 +1,11 @@\n name: build\n-on: [push, pull_request]\n+\n+on:\n+  push:\n+    branches: [ main ]\n+  pull_request:\n+    branches: [ main ]\n+\n jobs:\n \n   build:\n@@ -7,28 +13,21 @@ jobs:\n     runs-on: ubuntu-latest\n     steps:\n \n-    - name: Set up Go 1.14\n-      uses: actions/setup-go@v1\n+    - name: Set up Go 1.x\n+      uses: actions/setup-go@v2\n       with:\n-        go-version: 1.14\n-      id: go\n+        go-version: ^1.15\n \n     - name: Check out code\n-      uses: actions/checkout@v1\n+      uses: actions/checkout@v2\n \n     - name: Download module dependencies\n       env: \n          GOPROXY: \"https://proxy.golang.org\"\n       run: go mod download\n \n-    - name: Build\n-      run: go build .\n-\n     - name: Test\n-      run: go test -v ./...\n-\n-    - name: Generate Coverage\n-      run: go test -coverprofile=coverage.txt\n+      run: go test -v -coverprofile=coverage.txt ./...\n \n     - name: Upload Coverage\n       uses: codecov/codecov-action@v1\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/build.yml",
+    "LICENSE",
+    "README.md",
+    "aconfig.go",
+    "aconfig_test.go",
+    "aconfighcl/go.mod",
+    "aconfighcl/go.sum",
+    "aconfighcl/hcl.go",
+    "aconfighcl/hcl_test.go",
+    "aconfigtoml/go.mod",
+    "aconfigtoml/go.sum",
+    "aconfigtoml/toml.go",
+    "aconfigtoml/toml_test.go",
+    "aconfigyaml/go.mod",
+    "aconfigyaml/go.sum",
+    "aconfigyaml/yaml.go",
+    "aconfigyaml/yaml_test.go",
+    "example_test.go",
+    "go.mod",
+    "go.sum",
+    "reflection.go",
+    "testdata/all_types_config.json",
+    "testdata/bad_config.json",
+    "testdata/config1.json",
+    "testdata/example_config.json",
+    "testdata/my_duration_config.json",
+    "testdata/other_numbers_config.json",
+    "testdata/test_config_def.json",
+    "testdata/test_config_env.json",
+    "testdata/test_config_flag.json",
+    "testdata/unknown.ext",
+    "utils.go"
+  ],
+  "explanation": {
+    "what": "GitHub Actions build.yml を更新。トリガーを push/pull_request の無条件実行から main ブランチ限定に変更し、setup-go/checkout アクションを v1 系から v2 系へ、Go バージョン指定を固定の 1.14 からレンジ指定の ^1.15 に更新。個別だった Build・Test・Generate Coverage の3ステップを `go test -v -coverprofile=coverage.txt ./...` の1ステップに統合した。",
+    "why": "PR タイトルは \"Update build.yml\" で本文は空。diff から見る限り CI の保守的なアップデートで、機能追加ではなくワークフロー定義の近代化・簡素化が目的と読める。",
+    "highlights": [
+      { "file": ".github/workflows/build.yml", "note": "Build/Test/Generate Coverage の3ステップが1つの go test コマンドに集約されている" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [{ "type": "pr", "number": 32, "url": "https://github.com/cristalhq/aconfig/pull/32" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

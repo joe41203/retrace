@@ -1,0 +1,94 @@
+{
+  "seq": 153,
+  "sha": "fdfa106755dce85e6b684dca6c89a3d8381e2169",
+  "parents": [
+    "68ef706b9be71e4fa09b7b45fabeebc7b048f696"
+  ],
+  "author": {
+    "name": "Oleg Kovalov",
+    "email": "oleg@hey.com",
+    "date": "2023-04-28T16:35:10+02:00"
+  },
+  "message": "Fix example names (#140)",
+  "pr": {
+    "number": 140,
+    "title": "Fix example names",
+    "body": "",
+    "url": "https://github.com/cristalhq/aconfig/pull/140"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 6,
+    "deletions": 6
+  },
+  "files": [
+    {
+      "path": "example_test.go",
+      "status": "M",
+      "additions": 6,
+      "deletions": 6,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/example_test.go b/example_test.go\nindex 31559c0..f40cd85 100644\n--- a/example_test.go\n+++ b/example_test.go\n@@ -16,7 +16,7 @@ type MyConfig struct {\n \t}\n }\n \n-func Example_SimpleUsage() {\n+func Example_simpleUsage() {\n \tvar cfg MyConfig\n \tloader := aconfig.LoaderFor(&cfg, aconfig.Config{\n \t\tSkipDefaults: true,\n@@ -42,7 +42,7 @@ func Example_SimpleUsage() {\n \t// Auth.Pass: \"\"\n }\n \n-func Example_WalkFields() {\n+func Example_walkFields() {\n \tvar cfg MyConfig\n \tloader := aconfig.LoaderFor(&cfg, aconfig.Config{\n \t\tSkipFiles: true,\n@@ -61,7 +61,7 @@ func Example_WalkFields() {\n }\n \n // Just load defaults from struct definition.\n-func Example_Defaults() {\n+func Example_defaults() {\n \tvar cfg MyConfig\n \tloader := aconfig.LoaderFor(&cfg, aconfig.Config{\n \t\tSkipFiles: true,\n@@ -84,7 +84,7 @@ func Example_Defaults() {\n }\n \n // Load defaults from struct defunition and overwrite with a file.\n-func Example_File() {\n+func Example_file() {\n \tvar cfg MyConfig\n \tloader := aconfig.LoaderFor(&cfg, aconfig.Config{\n \t\tSkipEnv:   true,\n@@ -108,7 +108,7 @@ func Example_File() {\n \n // Load defaults from struct definition and overwrite with a file.\n // And then overwrite with environment variables.\n-func Example_Env() {\n+func Example_env() {\n \tos.Setenv(\"EXAMPLE_HTTP_PORT\", \"3333\")\n \tos.Setenv(\"EXAMPLE_AUTH_USER\", \"env-user\")\n \tos.Setenv(\"EXAMPLE_AUTH_PASS\", \"env-pass\")\n@@ -138,7 +138,7 @@ func Example_Env() {\n // Load defaults from struct definition and overwrite with a file.\n // And then overwrite with environment variables.\n // Finally read command line flags.\n-func Example_Flag() {\n+func Example_flag() {\n \tvar cfg MyConfig\n \tloader := aconfig.LoaderFor(&cfg, aconfig.Config{\n \t\tFlagPrefix: \"ex\",\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/dependabot.yml",
+    ".github/workflows/build.yml",
+    "LICENSE",
+    "README.md",
+    "aconfig.go",
+    "aconfig_test.go",
+    "aconfigdotenv/dotenv.go",
+    "aconfigdotenv/dotenv_test.go",
+    "aconfigdotenv/go.mod",
+    "aconfigdotenv/go.sum",
+    "aconfigdotenv/testdata/config.env",
+    "aconfighcl/go.mod",
+    "aconfighcl/go.sum",
+    "aconfighcl/hcl.go",
+    "aconfighcl/hcl_test.go",
+    "aconfighcl/testdata/config.hcl",
+    "aconfigtoml/go.mod",
+    "aconfigtoml/go.sum",
+    "aconfigtoml/testdata/config.toml",
+    "aconfigtoml/toml.go",
+    "aconfigtoml/toml_test.go",
+    "aconfigyaml/go.mod",
+    "aconfigyaml/go.sum",
+    "aconfigyaml/res.yaml",
+    "aconfigyaml/testdata/config.yaml",
+    "aconfigyaml/yaml.go",
+    "aconfigyaml/yaml_test.go",
+    "doc.go",
+    "example_test.go",
+    "go.mod",
+    "reflection.go",
+    "testdata/bad_config.json",
+    "testdata/complex.json",
+    "testdata/config.json",
+    "testdata/config1.json",
+    "testdata/config2.json",
+    "testdata/config3.json",
+    "testdata/example_config.json",
+    "testdata/slice-struct-primitive-slice.json",
+    "testdata/toy.json",
+    "testdata/unknown_fields.json",
+    "utils.go",
+    "utils_test.go"
+  ],
+  "explanation": {
+    "what": "example_test.go の Example_SimpleUsage / Example_WalkFields / Example_Defaults / Example_File / Example_Env / Example_Flag という関数名を、それぞれ先頭を小文字化した Example_simpleUsage / Example_walkFields / Example_defaults / Example_file / Example_env / Example_flag に一括リネームした。",
+    "why": "PR本文には説明がないが、コミットメッセージ・PRタイトルの\"Fix example names\"が示す通り命名の修正。Go の testable example では Example_<Suffix> の Suffix 部分は非公開識別子扱いが慣例で、先頭を大文字にすると go doc 上でパッケージ内の型やエクスポートされた識別子と関連付けられているかのような誤解を招くため、小文字に揃えたと考えられる。",
+    "highlights": [],
+    "langNotes": [
+      { "topic": "Example関数の命名規則", "note": "Go の testable example は Example, Example_suffix, ExampleF, ExampleF_suffix の形式を取る。suffix は go doc のグループ化に使われるだけで、大文字始まりにすると意図せず別の意味(型やメソッドに紐付く例)と誤認されるため、単なる説明用の suffix は小文字にするのが慣例。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [{ "type": "pr", "number": 140, "url": "https://github.com/cristalhq/aconfig/pull/140" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

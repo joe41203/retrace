@@ -1,0 +1,74 @@
+{
+  "seq": 21,
+  "sha": "d8ca6e93c011031cb533db240ecc42753e8a5cd6",
+  "parents": [
+    "c010d82e7fa343718c0c4cb194330a63d1c07e5b"
+  ],
+  "author": {
+    "name": "Oleg Kovalov",
+    "email": "iamolegkovalov@gmail.com",
+    "date": "2020-07-23T00:08:42+02:00"
+  },
+  "message": "add examples",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 137,
+    "deletions": 0
+  },
+  "files": [
+    {
+      "path": "example_test.go",
+      "status": "A",
+      "additions": 130,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "testdata/example_config.json",
+      "status": "A",
+      "additions": 7,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/example_test.go b/example_test.go\nnew file mode 100644\nindex 0000000..74f2847\n--- /dev/null\n+++ b/example_test.go\n@@ -0,0 +1,130 @@\n+package aconfig_test\n+\n+import (\n+\t\"flag\"\n+\t\"fmt\"\n+\t\"log\"\n+\t\"os\"\n+\n+\t\"github.com/cristalhq/aconfig\"\n+)\n+\n+type MyConfig struct {\n+\tPort int `default:\"1111\"`\n+\tAuth struct {\n+\t\tUser string `default:\"def-user\"`\n+\t\tPass string `default:\"def-pass\"`\n+\t}\n+}\n+\n+// Just load defaults from struct defenition.\n+//\n+func Example_Defaults() {\n+\tloader := aconfig.NewLoader(aconfig.LoaderConfig{\n+\t\tSkipFile: true,\n+\t\tSkipEnv:  true,\n+\t\tSkipFlag: true,\n+\t})\n+\n+\tvar cfg MyConfig\n+\tif err := loader.Load(&cfg); err != nil {\n+\t\tlog.Panic(err)\n+\t}\n+\n+\tfmt.Printf(\"Port:      %v\\n\", cfg.Port)\n+\tfmt.Printf(\"Auth.User: %v\\n\", cfg.Auth.User)\n+\tfmt.Printf(\"Auth.Pass: %v\\n\", cfg.Auth.Pass)\n+\n+\t// Output:\n+\t//\n+\t// Port:      1111\n+\t// Auth.User: def-user\n+\t// Auth.Pass: def-pass\n+}\n+\n+// Load defaults from struct defenition and overwrite with a file.\n+//\n+func Example_File() {\n+\tloader := aconfig.NewLoader(aconfig.LoaderConfig{\n+\t\tSkipEnv:  true,\n+\t\tSkipFlag: true,\n+\t\tFiles:    []string{\"testdata/example_config.json\"},\n+\t})\n+\n+\tvar cfg MyConfig\n+\tif err := loader.Load(&cfg); err != nil {\n+\t\tlog.Panic(err)\n+\t}\n+\n+\tfmt.Printf(\"Port:      %v\\n\", cfg.Port)\n+\tfmt.Printf(\"Auth.User: %v\\n\", cfg.Auth.User)\n+\tfmt.Printf(\"Auth.Pass: %v\\n\", cfg.Auth.Pass)\n+\n+\t// Output:\n+\t//\n+\t// Port:      2222\n+\t// Auth.User: json-user\n+\t// Auth.Pass: json-pass\n+}\n+\n+// Load defaults from struct defenition and overwrite with a file.\n+// And then overwrite with environment variables.\n+//\n+func Example_Env() {\n+\tos.Setenv(\"EXAMPLE_PORT\", \"3333\")\n+\tos.Setenv(\"EXAMPLE_AUTH_USER\", \"env-user\")\n+\tos.Setenv(\"EXAMPLE_AUTH_PASS\", \"env-pass\")\n+\tdefer os.Clearenv()\n+\n+\tloader := aconfig.NewLoader(aconfig.LoaderConfig{\n+\t\tSkipFlag:  true,\n+\t\tEnvPrefix: \"EXAMPLE\",\n+\t\tFiles:     []string{\"testdata/example_config.json\"},\n+\t})\n+\n+\tvar cfg MyConfig\n+\tif err := loader.Load(&cfg); err != nil {\n+\t\tlog.Panic(err)\n+\t}\n+\n+\tfmt.Printf(\"Port:      %v\\n\", cfg.Port)\n+\tfmt.Printf(\"Auth.User: %v\\n\", cfg.Auth.User)\n+\tfmt.Printf(\"Auth.Pass: %v\\n\", cfg.Auth.Pass)\n+\n+\t// Output:\n+\t//\n+\t// Port:      3333\n+\t// Auth.User: env-user\n+\t// Auth.Pass: env-pass\n+}\n+\n+// Load defaults from struct defenition and overwrite with a file.\n+// And then overwrite with environment variables.\n+// Finally read command line flags.\n+//\n+func Example_Flag() {\n+\tflag.String(\"ex.port\", \"4444\", \"app port\")\n+\tflag.String(\"ex.auth.user\", \"flag-user\", \"app user\")\n+\tflag.String(\"ex.auth.pass\", \"flag-pass\", \"app pass\")\n+\n+\tloader := aconfig.NewLoader(aconfig.LoaderConfig{\n+\t\tEnvPrefix:  \"EXAMPLE\",\n+\t\tFlagPrefix: \"ex\",\n+\t\tFiles:      []string{\"testdata/example_config.json\"},\n+\t})\n+\n+\tvar cfg MyConfig\n+\tif err := loader.Load(&cfg); err != nil {\n+\t\tlog.Panic(err)\n+\t}\n+\n+\tfmt.Printf(\"Port:      %v\\n\", cfg.Port)\n+\tfmt.Printf(\"Auth.User: %v\\n\", cfg.Auth.User)\n+\tfmt.Printf(\"Auth.Pass: %v\\n\", cfg.Auth.Pass)\n+\n+\t// Output:\n+\t//\n+\t// Port:      4444\n+\t// Auth.User: flag-user\n+\t// Auth.Pass: flag-pass\n+}\ndiff --git a/testdata/example_config.json b/testdata/example_config.json\nnew file mode 100644\nindex 0000000..dd8086a\n--- /dev/null\n+++ b/testdata/example_config.json\n@@ -0,0 +1,7 @@\n+{\n+  \"Port\": 2222,\n+  \"Auth\": {\n+    \"User\": \"json-user\",\n+    \"Pass\": \"json-pass\"\n+  }\n+}\n\\ No newline at end of file\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/build.yml",
+    "LICENSE",
+    "README.md",
+    "aconfig.go",
+    "aconfig_test.go",
+    "example_test.go",
+    "go.mod",
+    "go.sum",
+    "testdata/all_types_config.json",
+    "testdata/bad_config.json",
+    "testdata/config1.json",
+    "testdata/config1.toml",
+    "testdata/config1.yaml",
+    "testdata/example_config.json",
+    "testdata/my_duration_config.json",
+    "testdata/test_config_def.json",
+    "testdata/test_config_env.json",
+    "testdata/test_config_flag.json",
+    "testdata/unknown.ext"
+  ],
+  "explanation": {
+    "what": "example_test.go を新規追加し、Go の Example テスト形式で4通りの読み込みシナリオ(デフォルトのみ・ファイル併用・環境変数併用・フラグ併用)を示した。あわせて testdata/example_config.json をサンプル設定ファイルとして追加している。",
+    "why": "おそらく LoaderConfig の Skip* フラグを組み合わせることで defaults→file→env→flag の順に設定が上書きされていく挙動を、README の説明文だけでなく実行可能なコードで示す狙いだと考えられる。各 Example 関数は `// Output:` コメントで期待出力を書いており、go test 実行時にそのまま出力照合されるドキュメント兼テストとして機能する。",
+    "highlights": [
+      { "file": "example_test.go", "note": "Example_Defaults→Example_File→Example_Env→Example_Flag の順で Skip 系フラグを段階的に外し、優先順位の上書きを実演している" }
+    ],
+    "langNotes": [
+      { "topic": "Example関数(go test)", "note": "関数名が `Example` で始まり末尾に `// Output:` コメントを持つ関数は、Go の testing パッケージが自動的に実行し標準出力を期待値と比較する。README に埋め込める実行可能なドキュメントとして使われる。" }
+    ],
+    "diagram": null,
+    "evidence": "inferred",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

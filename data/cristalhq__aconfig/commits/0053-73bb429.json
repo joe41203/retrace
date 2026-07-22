@@ -1,0 +1,68 @@
+{
+  "seq": 53,
+  "sha": "73bb42992d16f39066b2659ca4d911e32329585a",
+  "parents": [
+    "35ee09775b049ce533b1823d64154f1ce94735f6"
+  ],
+  "author": {
+    "name": "Oleg Kovalov",
+    "email": "iamolegkovalov@gmail.com",
+    "date": "2020-07-30T22:50:11+02:00"
+  },
+  "message": "move test types closer to the tests",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 39,
+    "deletions": 39
+  },
+  "files": [
+    {
+      "path": "aconfig_test.go",
+      "status": "M",
+      "additions": 39,
+      "deletions": 39,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/aconfig_test.go b/aconfig_test.go\nindex 17e37a3..b2caec5 100644\n--- a/aconfig_test.go\n+++ b/aconfig_test.go\n@@ -38,45 +38,6 @@ type SubConfig struct {\n \tFloat float64 `default:\"123.123\"`\n }\n \n-type AllTypesConfig struct {\n-\tBool   bool   `default:\"true\"`\n-\tString string `default:\"str\"`\n-\n-\tInt   int   `default:\"1\"`\n-\tInt8  int8  `default:\"12\"`\n-\tInt16 int16 `default:\"123\"`\n-\tInt32 int32 `default:\"13\"`\n-\tInt64 int64 `default:\"23\"`\n-\n-\tUint   uint   `default:\"1234\"`\n-\tUint8  uint8  `default:\"124\"`\n-\tUint16 uint16 `default:\"134\"`\n-\tUint32 uint32 `default:\"234\"`\n-\tUint64 uint64 `default:\"24\"`\n-\n-\tFloat32 float32 `default:\"1234.213\"`\n-\tFloat64 float64 `default:\"1234.234\"`\n-\n-\tDur  time.Duration `default:\"1h2m3s\"`\n-\tTime time.Time     `default:\"2000-04-05 10:20:30 +0000 UTC\"`\n-}\n-\n-type OtherNumbersConfig struct {\n-\tInt    int   `default:\"0b111\"`\n-\tInt8   int8  `default:\"0o123\"`\n-\tInt8x2 int8  `default:\"0123\"`\n-\tInt16  int16 `default:\"0x123\"`\n-\n-\tUint   uint   `default:\"0b111\"`\n-\tUint8  uint8  `default:\"0o123\"`\n-\tUint16 uint16 `default:\"0123\"`\n-\tUint32 uint32 `default:\"0x123\"`\n-}\n-\n-type DurationConfig struct {\n-\tMyDur MyDuration `default:\"1h2m3s\" json:\"my_dur\"`\n-}\n-\n type MyDuration string\n \n func (m MyDuration) Duration() (time.Duration, error) {\n@@ -104,6 +65,29 @@ func TestLoadDefaults(t *testing.T) {\n }\n \n func TestLoadDefault_AllTypesConfig(t *testing.T) {\n+\ttype AllTypesConfig struct {\n+\t\tBool   bool   `default:\"true\"`\n+\t\tString string `default:\"str\"`\n+\n+\t\tInt   int   `default:\"1\"`\n+\t\tInt8  int8  `default:\"12\"`\n+\t\tInt16 int16 `default:\"123\"`\n+\t\tInt32 int32 `default:\"13\"`\n+\t\tInt64 int64 `default:\"23\"`\n+\n+\t\tUint   uint   `default:\"1234\"`\n+\t\tUint8  uint8  `default:\"124\"`\n+\t\tUint16 uint16 `default:\"134\"`\n+\t\tUint32 uint32 `default:\"234\"`\n+\t\tUint64 uint64 `default:\"24\"`\n+\n+\t\tFloat32 float32 `default:\"1234.213\"`\n+\t\tFloat64 float64 `default:\"1234.234\"`\n+\n+\t\tDur  time.Duration `default:\"1h2m3s\"`\n+\t\tTime time.Time     `default:\"2000-04-05 10:20:30 +0000 UTC\"`\n+\t}\n+\n \tloader := LoaderFor(&AllTypesConfig{}).\n \t\tSkipFiles().\n \t\tSkipEnvironment().\n@@ -124,6 +108,10 @@ func TestLoadDefault_AllTypesConfig(t *testing.T) {\n }\n \n func TestLoadDefault_DurationConfig(t *testing.T) {\n+\ttype DurationConfig struct {\n+\t\tMyDur MyDuration `default:\"1h2m3s\" json:\"my_dur\"`\n+\t}\n+\n \tloader := LoaderFor(&DurationConfig{}).\n \t\tSkipFiles().\n \t\tSkipEnvironment().\n@@ -144,6 +132,18 @@ func TestLoadDefault_DurationConfig(t *testing.T) {\n }\n \n func TestLoadDefault_OtherNumbersConfig(t *testing.T) {\n+\ttype OtherNumbersConfig struct {\n+\t\tInt    int   `default:\"0b111\"`\n+\t\tInt8   int8  `default:\"0o123\"`\n+\t\tInt8x2 int8  `default:\"0123\"`\n+\t\tInt16  int16 `default:\"0x123\"`\n+\n+\t\tUint   uint   `default:\"0b111\"`\n+\t\tUint8  uint8  `default:\"0o123\"`\n+\t\tUint16 uint16 `default:\"0123\"`\n+\t\tUint32 uint32 `default:\"0x123\"`\n+\t}\n+\n \tloader := LoaderFor(&OtherNumbersConfig{}).\n \t\tSkipFiles().\n \t\tSkipEnvironment().\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/build.yml",
+    "LICENSE",
+    "README.md",
+    "aconfig.go",
+    "aconfig_test.go",
+    "example_test.go",
+    "go.mod",
+    "go.sum",
+    "testdata/all_types_config.json",
+    "testdata/bad_config.json",
+    "testdata/config1.json",
+    "testdata/config1.toml",
+    "testdata/config1.yaml",
+    "testdata/example_config.json",
+    "testdata/my_duration_config.json",
+    "testdata/other_numbers_config.json",
+    "testdata/test_config_def.json",
+    "testdata/test_config_env.json",
+    "testdata/test_config_flag.json",
+    "testdata/unknown.ext"
+  ],
+  "explanation": {
+    "what": "aconfig_test.go のトップレベルに定義されていた AllTypesConfig・OtherNumbersConfig・DurationConfig の型定義を、それぞれを使うテスト関数(TestLoadDefault_AllTypesConfig 等)の内部にローカル型として移動した。行数としては39行削除・39行追加で、正味の挙動は変わらない。",
+    "why": "コミットメッセージの通り、テストで使う型をそれを使うテスト関数のすぐ近くに置くことでテストファイルの見通しを良くする整理。ファイル冒頭に無関係な型宣言が並んでいると、どのテストがどの型を使うかが読み手にとって分かりにくくなるための可読性改善とみられる。",
+    "highlights": [
+      { "file": "aconfig_test.go", "note": "型定義をトップレベルから各 Test 関数内のローカル型宣言へ移動しただけで、フィールドやタグの内容は変更していない" }
+    ],
+    "langNotes": [
+      { "topic": "関数内ローカル型宣言", "note": "Go では type 宣言を関数の中に書くことができ、その型はその関数スコープでのみ使える。テスト専用の使い捨て型をテスト関数内に閉じ込めることで、他のテストとの名前衝突や無関係な型の混入を防げる。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

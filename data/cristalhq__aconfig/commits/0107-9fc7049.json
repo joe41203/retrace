@@ -1,0 +1,111 @@
+{
+  "seq": 107,
+  "sha": "9fc7049df8b394921aea930c62775819d53c0425",
+  "parents": [
+    "531db3d6c724c5dd3c48fde8ce07cfa1987b53df"
+  ],
+  "author": {
+    "name": "Oleg Kovalov",
+    "email": "oleg@hey.com",
+    "date": "2021-03-22T09:14:00+01:00"
+  },
+  "message": "linter fixes (#67)",
+  "pr": {
+    "number": 67,
+    "title": "linter fixes",
+    "body": "",
+    "url": "https://github.com/cristalhq/aconfig/pull/67"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 4,
+    "additions": 34,
+    "deletions": 32
+  },
+  "files": [
+    {
+      "path": "aconfig.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "aconfigdotenv/dotenv.go",
+      "status": "M",
+      "additions": 25,
+      "deletions": 25,
+      "binary": false
+    },
+    {
+      "path": "example_test.go",
+      "status": "M",
+      "additions": 3,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "utils.go",
+      "status": "M",
+      "additions": 5,
+      "deletions": 5,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/aconfig.go b/aconfig.go\nindex a6628cf..b5a583b 100644\n--- a/aconfig.go\n+++ b/aconfig.go\n@@ -279,7 +279,7 @@ func (l *Loader) loadFromFile() error {\n \t\t\tname := l.fullTag(field, tag)\n \t\t\tvalue, ok := actualFields[name]\n \t\t\tif !ok {\n-\t\t\t\tactualFields, _ = find(actualFields, name)\n+\t\t\t\tactualFields = find(actualFields, name)\n \t\t\t\tvalue, ok = actualFields[name]\n \t\t\t\tif !ok {\n \t\t\t\t\tcontinue\ndiff --git a/aconfigdotenv/dotenv.go b/aconfigdotenv/dotenv.go\nindex 0dc3bc4..b0891f1 100644\n--- a/aconfigdotenv/dotenv.go\n+++ b/aconfigdotenv/dotenv.go\n@@ -1,25 +1,25 @@\n-package aconfigdotenv\r\n-\r\n-import (\r\n-\t\"github.com/joho/godotenv\"\r\n-)\r\n-\r\n-// Decoder of DotENV files for aconfig.\r\n-type Decoder struct{}\r\n-\r\n-// New .ENV decoder for aconfig.\r\n-func New() *Decoder { return &Decoder{} }\r\n-\r\n-// DecodeFile implements aconfig.FileDecoder.\r\n-func (d *Decoder) DecodeFile(filename string) (map[string]interface{}, error) {\r\n-\traw, err := godotenv.Read(filename)\r\n-\tif err != nil {\r\n-\t\treturn nil, err\r\n-\t}\r\n-\r\n-\tres := make(map[string]interface{}, len(raw))\r\n-\tfor key, value := range raw {\r\n-\t\tres[key] = value\r\n-\t}\r\n-\treturn res, nil\r\n-}\r\n+package aconfigdotenv\n+\n+import (\n+\t\"github.com/joho/godotenv\"\n+)\n+\n+// Decoder of DotENV files for aconfig.\n+type Decoder struct{}\n+\n+// New .ENV decoder for aconfig.\n+func New() *Decoder { return &Decoder{} }\n+\n+// DecodeFile implements aconfig.FileDecoder.\n+func (d *Decoder) DecodeFile(filename string) (map[string]interface{}, error) {\n+\traw, err := godotenv.Read(filename)\n+\tif err != nil {\n+\t\treturn nil, err\n+\t}\n+\n+\tres := make(map[string]interface{}, len(raw))\n+\tfor key, value := range raw {\n+\t\tres[key] = value\n+\t}\n+\treturn res, nil\n+}\ndiff --git a/example_test.go b/example_test.go\nindex 4caa464..fa2bd9e 100644\n--- a/example_test.go\n+++ b/example_test.go\n@@ -160,7 +160,9 @@ func Example_Flag() {\n \t\t\"-ex.auth.user=flag-user\",\n \t\t\"-ex.auth.pass=flag-pass\",\n \t)\n-\tflags.Parse(os.Args[1:])\n+\tif err := flags.Parse(os.Args[1:]); err != nil {\n+\t\tlog.Panic(err)\n+\t}\n \n \tif err := loader.Load(); err != nil {\n \t\tlog.Panic(err)\ndiff --git a/utils.go b/utils.go\nindex 286974a..f1100c6 100644\n--- a/utils.go\n+++ b/utils.go\n@@ -156,18 +156,18 @@ func normalize(curr interface{}) interface{} {\n \t}\n }\n \n-func find(actualFields map[string]interface{}, name string) (map[string]interface{}, bool) {\n+func find(actualFields map[string]interface{}, name string) map[string]interface{} {\n \tif strings.LastIndex(name, \".\") == -1 {\n-\t\treturn actualFields, false\n+\t\treturn actualFields\n \t}\n \n \tsubName := name[:strings.LastIndex(name, \".\")]\n \tvalue, ok := actualFields[subName]\n \tif !ok {\n-\t\tactualFields, ok = find(actualFields, subName)\n+\t\tactualFields = find(actualFields, subName)\n \t\tvalue, ok = actualFields[subName]\n \t\tif !ok {\n-\t\t\treturn actualFields, false\n+\t\t\treturn actualFields\n \t\t}\n \t}\n \n@@ -197,5 +197,5 @@ func find(actualFields map[string]interface{}, name string) (map[string]interfac\n \t\t}\n \t\tdelete(actualFields, subName)\n \t}\n-\treturn actualFields, true\n+\treturn actualFields\n }\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/build.yml",
+    "LICENSE",
+    "README.md",
+    "aconfig.go",
+    "aconfig_test.go",
+    "aconfigdotenv/dotenv.go",
+    "aconfigdotenv/dotenv_test.go",
+    "aconfigdotenv/go.mod",
+    "aconfigdotenv/go.sum",
+    "aconfighcl/go.mod",
+    "aconfighcl/go.sum",
+    "aconfighcl/hcl.go",
+    "aconfighcl/hcl_test.go",
+    "aconfigtoml/go.mod",
+    "aconfigtoml/go.sum",
+    "aconfigtoml/toml.go",
+    "aconfigtoml/toml_test.go",
+    "aconfigyaml/go.mod",
+    "aconfigyaml/go.sum",
+    "aconfigyaml/yaml.go",
+    "aconfigyaml/yaml_test.go",
+    "doc.go",
+    "example_test.go",
+    "go.mod",
+    "reflection.go",
+    "testdata/bad_config.json",
+    "testdata/config.json",
+    "testdata/config1.json",
+    "testdata/config2.json",
+    "testdata/config3.json",
+    "testdata/example_config.json",
+    "testdata/unknown.ext",
+    "testdata/unknown_fields.json",
+    "testfile.json",
+    "utils.go",
+    "utils_test.go"
+  ],
+  "explanation": {
+    "what": "find 関数のシグネチャを (map[string]interface{}, bool) の2値返却から map[string]interface{} 単独の返却に単純化し、呼び出し側 aconfig.go の受け取りも合わせて変更した。aconfigdotenv/dotenv.go は改行コードを CRLF(\\r\\n) から LF(\\n) に一括変換している。example_test.go では flags.Parse の戻り値エラーを無視せず log.Panic するように修正した。",
+    "why": "PR タイトル通り、golangci-lint 等の静的解析(errcheck でエラー戻り値の握りつぶしを検出するなど)が指摘した項目への対応。find の bool 戻り値は呼び出し側で使われておらず不要だったため削除し、flags.Parse のエラー未処理は errcheck 系リンタの典型的な指摘のため修正、dotenv.go の改行コード混在も lint/フォーマッタが指摘しやすい箇所。",
+    "highlights": [
+      { "file": "utils.go", "note": "find の戻り値を単純化(不要な bool を削除)" },
+      { "file": "example_test.go", "note": "flags.Parse のエラーを無視せず log.Panic するよう修正" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [
+      { "type": "pr", "number": 67, "url": "https://github.com/cristalhq/aconfig/pull/67" }
+    ],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

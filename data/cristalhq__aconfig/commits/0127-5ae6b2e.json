@@ -1,0 +1,93 @@
+{
+  "seq": 127,
+  "sha": "5ae6b2e987975aa3fa8a084d5a8fe2c9e70d61af",
+  "parents": [
+    "0d4c5d97ad9e24bd4b1e3cc08916278e6ca30d39"
+  ],
+  "author": {
+    "name": "Oleg Kovalov",
+    "email": "oleg@hey.com",
+    "date": "2021-07-17T11:08:35+02:00"
+  },
+  "message": "Better struct assert (#97)\n\nSigned-off-by: Oleg Kovalov <oleg@hey.com>",
+  "pr": {
+    "number": 97,
+    "title": "Better struct assert",
+    "body": "Signed-off-by: Oleg Kovalov <oleg@hey.com>",
+    "url": "https://github.com/cristalhq/aconfig/pull/97"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 9,
+    "deletions": 1
+  },
+  "files": [
+    {
+      "path": "aconfig_test.go",
+      "status": "M",
+      "additions": 6,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "utils.go",
+      "status": "M",
+      "additions": 3,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/aconfig_test.go b/aconfig_test.go\nindex efb2cbf..2a91132 100644\n--- a/aconfig_test.go\n+++ b/aconfig_test.go\n@@ -1061,7 +1061,7 @@ func TestDontFillFlagsIfDisabled(t *testing.T) {\n \t}\n }\n \n-func TestPassNonStructs(t *testing.T) {\n+func TestPassBadStructs(t *testing.T) {\n \tf := func(cfg interface{}) {\n \t\tt.Helper()\n \n@@ -1080,6 +1080,11 @@ func TestPassNonStructs(t *testing.T) {\n \tf([]string{})\n \tf([4]string{})\n \tf(func() {})\n+\n+\ttype S struct {\n+\t\tFoo int\n+\t}\n+\tf(S{})\n }\n \n func TestBadRequiredTag(t *testing.T) {\ndiff --git a/utils.go b/utils.go\nindex 1e88eb1..c58fb41 100644\n--- a/utils.go\n+++ b/utils.go\n@@ -15,6 +15,9 @@ func assertStruct(x interface{}) {\n \t\tpanic(\"aconfig: nil should not be passed to the Loader\")\n \t}\n \tvalue := reflect.ValueOf(x)\n+\tif value.Type().Kind() != reflect.Ptr {\n+\t\tpanic(\"aconfig: destination must be a pointer\")\n+\t}\n \tfor value.Type().Kind() == reflect.Ptr {\n \t\tvalue = value.Elem()\n \t}\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/build.yml",
+    "LICENSE",
+    "README.md",
+    "aconfig.go",
+    "aconfig_test.go",
+    "aconfigdotenv/dotenv.go",
+    "aconfigdotenv/dotenv_test.go",
+    "aconfigdotenv/go.mod",
+    "aconfigdotenv/go.sum",
+    "aconfighcl/go.mod",
+    "aconfighcl/go.sum",
+    "aconfighcl/hcl.go",
+    "aconfighcl/hcl_test.go",
+    "aconfigtoml/go.mod",
+    "aconfigtoml/go.sum",
+    "aconfigtoml/toml.go",
+    "aconfigtoml/toml_test.go",
+    "aconfigyaml/go.mod",
+    "aconfigyaml/go.sum",
+    "aconfigyaml/yaml.go",
+    "aconfigyaml/yaml_test.go",
+    "doc.go",
+    "example_test.go",
+    "go.mod",
+    "reflection.go",
+    "testdata/bad_config.json",
+    "testdata/complex.json",
+    "testdata/config.json",
+    "testdata/config1.json",
+    "testdata/config2.json",
+    "testdata/config3.json",
+    "testdata/example_config.json",
+    "testdata/unknown_fields.json",
+    "utils.go",
+    "utils_test.go"
+  ],
+  "explanation": {
+    "what": "utils.go の assertStruct に、渡された値がそもそも reflect.Ptr でない場合に panic(\"aconfig: destination must be a pointer\") する早期チェックを追加した。あわせてテストを TestPassNonStructs から TestPassBadStructs に改名し、ポインタでない struct 値(S{})を渡すケースを追加した。",
+    "why": "PR タイトルは \"Better struct assert\" で、LoaderFor に渡す値がポインタでなければならないという制約を、より明確なエラーメッセージで守らせるための強化。従来は for value.Type().Kind() == reflect.Ptr でポインタを剥がす処理はあったが、非ポインタが渡された場合の専用チェックが無かった。",
+    "highlights": [
+      { "file": "utils.go", "note": "value.Type().Kind() != reflect.Ptr の判定を Elem() で剥がすループの手前に追加している" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [{ "type": "pr", "number": 97, "url": "https://github.com/cristalhq/aconfig/pull/97" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

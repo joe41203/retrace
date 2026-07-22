@@ -1,0 +1,104 @@
+{
+  "seq": 143,
+  "sha": "e7fea81176121954eef8326a9c1e14a0cb5f9525",
+  "parents": [
+    "1e9c6549cd1561d3cd31785ddad99de9d7339921"
+  ],
+  "author": {
+    "name": "Oleg Kovalov",
+    "email": "oleg@hey.com",
+    "date": "2022-06-25T08:42:50+02:00"
+  },
+  "message": "Tiny cleanups (#124)",
+  "pr": {
+    "number": 124,
+    "title": "Tiny cleanups",
+    "body": "",
+    "url": "https://github.com/cristalhq/aconfig/pull/124"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 3,
+    "additions": 13,
+    "deletions": 17
+  },
+  "files": [
+    {
+      "path": "aconfig.go",
+      "status": "M",
+      "additions": 9,
+      "deletions": 13,
+      "binary": false
+    },
+    {
+      "path": "aconfig_test.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "utils.go",
+      "status": "M",
+      "additions": 3,
+      "deletions": 3,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/aconfig.go b/aconfig.go\nindex 384e3fe..2570b2a 100644\n--- a/aconfig.go\n+++ b/aconfig.go\n@@ -211,10 +211,10 @@ func (l *Loader) WalkFields(fn func(f Field) bool) {\n // Load configuration into a given param.\n func (l *Loader) Load() error {\n \tif l.errInit != nil {\n-\t\treturn fmt.Errorf(\"aconfig: cannot init loader: %w\", l.errInit)\n+\t\treturn fmt.Errorf(\"init loader: %w\", l.errInit)\n \t}\n \tif err := l.loadConfig(); err != nil {\n-\t\treturn fmt.Errorf(\"aconfig: cannot load config: %w\", err)\n+\t\treturn fmt.Errorf(\"load config: %w\", err)\n \t}\n \treturn nil\n }\n@@ -243,22 +243,22 @@ func (l *Loader) parseFlags() error {\n func (l *Loader) loadSources() error {\n \tif !l.config.SkipDefaults {\n \t\tif err := l.loadDefaults(); err != nil {\n-\t\t\treturn fmt.Errorf(\"loading defaults: %w\", err)\n+\t\t\treturn fmt.Errorf(\"load defaults: %w\", err)\n \t\t}\n \t}\n \tif !l.config.SkipFiles {\n \t\tif err := l.loadFiles(); err != nil {\n-\t\t\treturn fmt.Errorf(\"loading files: %w\", err)\n+\t\t\treturn fmt.Errorf(\"load files: %w\", err)\n \t\t}\n \t}\n \tif !l.config.SkipEnv {\n \t\tif err := l.loadEnvironment(); err != nil {\n-\t\t\treturn fmt.Errorf(\"loading environment: %w\", err)\n+\t\t\treturn fmt.Errorf(\"load environment: %w\", err)\n \t\t}\n \t}\n \tif !l.config.SkipFlags {\n \t\tif err := l.loadFlags(); err != nil {\n-\t\t\treturn fmt.Errorf(\"loading flags: %w\", err)\n+\t\t\treturn fmt.Errorf(\"load flags: %w\", err)\n \t\t}\n \t}\n \treturn nil\n@@ -270,7 +270,7 @@ func (l *Loader) checkRequired() error {\n \t\t\tcontinue\n \t\t}\n \t\tif field.isRequired || l.config.AllFieldRequired {\n-\t\t\treturn fmt.Errorf(\"field %s was not set but it is required\", field.name)\n+\t\t\treturn fmt.Errorf(\"field %s is required but not set\", field.name)\n \t\t}\n \t}\n \treturn nil\n@@ -306,10 +306,9 @@ func (l *Loader) loadFiles() error {\n \t\t\treturn err\n \t\t}\n \n-\t\tif l.config.MergeFiles {\n-\t\t\tcontinue\n+\t\tif !l.config.MergeFiles {\n+\t\t\tbreak\n \t\t}\n-\t\tbreak\n \t}\n \treturn nil\n }\n@@ -385,12 +384,10 @@ func (l *Loader) loadEnvironment() error {\n \t\tif envName == \"\" {\n \t\t\tcontinue\n \t\t}\n-\n \t\tif err := l.setField(field, envName, actualEnvs, dupls); err != nil {\n \t\t\treturn err\n \t\t}\n \t}\n-\n \treturn l.postEnvCheck(actualEnvs, dupls)\n }\n \n@@ -418,7 +415,6 @@ func (l *Loader) loadFlags() error {\n \t\tif flagName == \"\" {\n \t\t\tcontinue\n \t\t}\n-\n \t\tif err := l.setField(field, flagName, actualFlags, dupls); err != nil {\n \t\t\treturn err\n \t\t}\ndiff --git a/aconfig_test.go b/aconfig_test.go\nindex e6d921b..2e658e2 100644\n--- a/aconfig_test.go\n+++ b/aconfig_test.go\n@@ -609,7 +609,7 @@ func TestFailOnDuplicatedFlag(t *testing.T) {\n \n \terr := LoaderFor(&Foo{}, Config{}).Load()\n \n-\twant := `aconfig: cannot init loader: duplicate flag \"yes\"`\n+\twant := `init loader: duplicate flag \"yes\"`\n \tif got := err.Error(); got != want {\n \t\tt.Fatalf(\"got %s want %s\", got, want)\n \t}\ndiff --git a/utils.go b/utils.go\nindex 2c9cc94..b15f248 100644\n--- a/utils.go\n+++ b/utils.go\n@@ -13,17 +13,17 @@ import (\n \n func assertStruct(x interface{}) {\n \tif x == nil {\n-\t\tpanic(\"aconfig: nil should not be passed to the Loader\")\n+\t\tpanic(\"aconfig: destination cannot be nil\")\n \t}\n \tvalue := reflect.ValueOf(x)\n \tif value.Type().Kind() != reflect.Ptr {\n \t\tpanic(\"aconfig: destination must be a pointer\")\n \t}\n-\tfor value.Type().Kind() == reflect.Ptr {\n+\tif value.Type().Kind() == reflect.Ptr {\n \t\tvalue = value.Elem()\n \t}\n \tif value.Kind() != reflect.Struct {\n-\t\tpanic(\"aconfig: only struct can be passed to the Loader\")\n+\t\tpanic(\"aconfig: destination must be struct\")\n \t}\n }\n \n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/dependabot.yml",
+    ".github/workflows/build.yml",
+    "LICENSE",
+    "README.md",
+    "aconfig.go",
+    "aconfig_test.go",
+    "aconfigdotenv/dotenv.go",
+    "aconfigdotenv/dotenv_test.go",
+    "aconfigdotenv/go.mod",
+    "aconfigdotenv/go.sum",
+    "aconfighcl/go.mod",
+    "aconfighcl/go.sum",
+    "aconfighcl/hcl.go",
+    "aconfighcl/hcl_test.go",
+    "aconfigtoml/go.mod",
+    "aconfigtoml/go.sum",
+    "aconfigtoml/toml.go",
+    "aconfigtoml/toml_test.go",
+    "aconfigyaml/go.mod",
+    "aconfigyaml/go.sum",
+    "aconfigyaml/res.yaml",
+    "aconfigyaml/yaml.go",
+    "aconfigyaml/yaml_test.go",
+    "doc.go",
+    "example_test.go",
+    "go.mod",
+    "reflection.go",
+    "testdata/bad_config.json",
+    "testdata/complex.json",
+    "testdata/config.json",
+    "testdata/config1.json",
+    "testdata/config2.json",
+    "testdata/config3.json",
+    "testdata/example_config.json",
+    "testdata/toy.json",
+    "testdata/unknown_fields.json",
+    "utils.go",
+    "utils_test.go"
+  ],
+  "explanation": {
+    "what": "エラーメッセージから冗長な \"aconfig: cannot ...\" 接頭辞を削り「init loader: %w」のような簡潔な文言に統一し、panic メッセージも短くした。あわせて aconfig_test.go の期待値文字列を追従させ、utils.go の余分な空行を削除している。また loadFiles 内の MergeFiles 判定を `if l.config.MergeFiles { continue } break` から `if !l.config.MergeFiles { break }` へ書き換えている(continue を挟まない分岐の単純化)。",
+    "why": "PR タイトルが \"Tiny cleanups\" で body は空のため、コミットメッセージ以上の詳細な動機は読み取れない。エラー文言の整理とコードの見た目の整頓が主目的と見られる。",
+    "highlights": [
+      { "file": "aconfig.go", "note": "loadFiles の MergeFiles 判定を continue/break から if-break へ単純化" },
+      { "file": "utils.go", "note": "assertStruct のポインタ解決を for から if に変更(元は多重ポインタを想定したループだったが実質1回で足りる)" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [{ "type": "pr", "number": 124, "url": "https://github.com/cristalhq/aconfig/pull/124" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

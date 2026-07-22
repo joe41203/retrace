@@ -1,0 +1,97 @@
+{
+  "seq": 151,
+  "sha": "7672f5b40e7da86361c431ec3c2dbb6d2f04b8bc",
+  "parents": [
+    "80e06caacb6304a9a408e58b41a96bc4e5186712"
+  ],
+  "author": {
+    "name": "Tom",
+    "email": "github@junk1tm.me",
+    "date": "2022-10-15T11:08:39+04:00"
+  },
+  "message": "test: prefer fs.MapFS to os.File (#136)",
+  "pr": {
+    "number": 136,
+    "title": "test: prefer fs.MapFS to os.File",
+    "body": "This change utilize Loader's ability to read from any `fs.FS`: we can use the in-memory implementation to minimize interacting with OS. \r\n\r\nWe could also use `t.Setenv` instead of `os.Setenv` but this would require bumping Go version to 1.17",
+    "url": "https://github.com/cristalhq/aconfig/pull/136"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 31,
+    "deletions": 62
+  },
+  "files": [
+    {
+      "path": "aconfig_test.go",
+      "status": "M",
+      "additions": 31,
+      "deletions": 62,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/aconfig_test.go b/aconfig_test.go\nindex 10e80d5..cc55625 100644\n--- a/aconfig_test.go\n+++ b/aconfig_test.go\n@@ -9,6 +9,7 @@ import (\n \t\"reflect\"\n \t\"strings\"\n \t\"testing\"\n+\t\"testing/fstest\"\n \t\"time\"\n )\n \n@@ -156,7 +157,7 @@ func TestDefaults_OtherNumberFormats(t *testing.T) {\n }\n \n func TestJSON(t *testing.T) {\n-\tfilepath := createTestFile(t)\n+\tconst filepath = \"testfile.json\"\n \n \tvar cfg structConfig\n \tloader := LoaderFor(&cfg, Config{\n@@ -164,6 +165,7 @@ func TestJSON(t *testing.T) {\n \t\tSkipEnv:      true,\n \t\tSkipFlags:    true,\n \t\tFiles:        []string{filepath},\n+\t\tFileSystem:   fstest.MapFS{filepath: testfile},\n \t})\n \tfailIfErr(t, loader.Load())\n \n@@ -172,23 +174,24 @@ func TestJSON(t *testing.T) {\n }\n \n func TestJSONWithOmitempty(t *testing.T) {\n-\ttype TestConfig struct {\n+\tconst filepath = \"testfile.json\"\n+\n+\tvar cfg struct {\n \t\tAPIKey string `json:\"b,omitempty\"`\n \t}\n-\n-\tvar cfg TestConfig\n \tloader := LoaderFor(&cfg, Config{\n \t\tSkipDefaults:       true,\n \t\tSkipEnv:            true,\n \t\tSkipFlags:          true,\n \t\tAllowUnknownFields: true,\n-\t\tFiles:              []string{createTestFile(t)},\n+\t\tFiles:              []string{filepath},\n+\t\tFileSystem:         fstest.MapFS{filepath: testfile},\n \t})\n \tfailIfErr(t, loader.Load())\n }\n \n func TestCustomFile(t *testing.T) {\n-\tfilepath := createTestFile(t, \"custom.config\")\n+\tconst filepath = \"custom.config\"\n \n \tvar cfg structConfig\n \tloader := LoaderFor(&cfg, Config{\n@@ -196,6 +199,7 @@ func TestCustomFile(t *testing.T) {\n \t\tSkipEnv:      true,\n \t\tSkipFlags:    true,\n \t\tFiles:        []string{filepath},\n+\t\tFileSystem:   fstest.MapFS{filepath: testfile},\n \t\tFileDecoders: map[string]FileDecoder{\n \t\t\t\".config\": &jsonDecoder{},\n \t\t},\n@@ -671,41 +675,28 @@ func TestBadDefauts(t *testing.T) {\n \n func TestBadFiles(t *testing.T) {\n \tf := func(filepath string) {\n-\t\tvar cfg TestConfig\n-\t\tloader := LoaderFor(&cfg, Config{\n-\t\t\tSkipDefaults:       true,\n-\t\t\tSkipEnv:            true,\n-\t\t\tSkipFlags:          true,\n-\t\t\tFailOnFileNotFound: true,\n-\t\t\tFiles:              []string{filepath},\n+\t\tt.Helper()\n+\t\tt.Run(filepath, func(t *testing.T) {\n+\t\t\tt.Helper()\n+\t\t\tvar cfg TestConfig\n+\t\t\tloader := LoaderFor(&cfg, Config{\n+\t\t\t\tSkipDefaults:       true,\n+\t\t\t\tSkipEnv:            true,\n+\t\t\t\tSkipFlags:          true,\n+\t\t\t\tFailOnFileNotFound: true,\n+\t\t\t\tFiles:              []string{filepath},\n+\t\t\t\tFileSystem: fstest.MapFS{\n+\t\t\t\t\t\"bad_config.json\": &fstest.MapFile{Data: []byte(`{almost\": \"json`)},\n+\t\t\t\t\t\"unknown.ext\":     &fstest.MapFile{},\n+\t\t\t\t},\n+\t\t\t})\n+\t\t\tfailIfOk(t, loader.Load())\n \t\t})\n-\t\tfailIfOk(t, loader.Load())\n \t}\n \n-\tt.Run(\"no_such_file.json\", func(*testing.T) {\n-\t\tf(\"no_such_file.json\")\n-\t})\n-\n-\tt.Run(\"bad_config.json\", func(t *testing.T) {\n-\t\tfilepath := t.TempDir() + \"unknown.ext\"\n-\t\tfile, err := os.Create(filepath)\n-\t\tfailIfErr(t, err)\n-\t\tdefer file.Close()\n-\n-\t\t_, err = file.WriteString(`{almost\": \"json`)\n-\t\tfailIfErr(t, err)\n-\n-\t\tf(filepath)\n-\t})\n-\n-\tt.Run(\"unknown.ext\", func(t *testing.T) {\n-\t\tfilepath := t.TempDir() + \"unknown.ext\"\n-\t\tfile, err := os.Create(filepath)\n-\t\tfailIfErr(t, err)\n-\t\tdefer file.Close()\n-\n-\t\tf(filepath)\n-\t})\n+\tf(\"no_such_file.json\")\n+\tf(\"bad_config.json\")\n+\tf(\"unknown.ext\")\n }\n \n func TestFailOnFileNotFound(t *testing.T) {\n@@ -1104,28 +1095,6 @@ func int32Ptr(a int32) *int32 {\n \treturn &a\n }\n \n-func createTestFile(t *testing.T, name ...string) string {\n-\tt.Helper()\n-\tmustEqual(t, len(name) < 2, true)\n-\n-\tdir := t.TempDir()\n-\tt.Cleanup(func() {\n-\t\tos.RemoveAll(dir)\n-\t})\n-\n-\tfilepath := dir + \"/testfile.json\"\n-\tif len(name) == 1 {\n-\t\tfilepath = dir + name[0]\n-\t}\n-\n-\tf, err := os.Create(filepath)\n-\tfailIfErr(t, err)\n-\tdefer f.Close()\n-\t_, err = f.WriteString(testfileContent)\n-\tfailIfErr(t, err)\n-\treturn filepath\n-}\n-\n type TestConfig struct {\n \tStr      string `default:\"str-def\"`\n \tBytes    []byte `default:\"bytes-def\"`\n@@ -1203,7 +1172,7 @@ type structP struct {\n \tP string `json:\"P\"`\n }\n \n-const testfileContent = `{\n+var testfile = &fstest.MapFile{Data: []byte(`{\n     \"a\": \"b\",\n     \"c\": 10,\n     \"e\": 123.456,\n@@ -1238,7 +1207,7 @@ const testfileContent = `{\n \t\t\"P\": \"r\"\n \t}\n }\n-`\n+`)}\n \n var wantConfig = func() structConfig {\n \ti := int32(42)\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/dependabot.yml",
+    ".github/workflows/build.yml",
+    "LICENSE",
+    "README.md",
+    "aconfig.go",
+    "aconfig_test.go",
+    "aconfigdotenv/dotenv.go",
+    "aconfigdotenv/dotenv_test.go",
+    "aconfigdotenv/go.mod",
+    "aconfigdotenv/go.sum",
+    "aconfigdotenv/testdata/config.env",
+    "aconfighcl/go.mod",
+    "aconfighcl/go.sum",
+    "aconfighcl/hcl.go",
+    "aconfighcl/hcl_test.go",
+    "aconfighcl/testdata/config.hcl",
+    "aconfigtoml/go.mod",
+    "aconfigtoml/go.sum",
+    "aconfigtoml/testdata/config.toml",
+    "aconfigtoml/toml.go",
+    "aconfigtoml/toml_test.go",
+    "aconfigyaml/go.mod",
+    "aconfigyaml/go.sum",
+    "aconfigyaml/res.yaml",
+    "aconfigyaml/testdata/config.yaml",
+    "aconfigyaml/yaml.go",
+    "aconfigyaml/yaml_test.go",
+    "doc.go",
+    "example_test.go",
+    "go.mod",
+    "reflection.go",
+    "testdata/bad_config.json",
+    "testdata/complex.json",
+    "testdata/config.json",
+    "testdata/config1.json",
+    "testdata/config2.json",
+    "testdata/config3.json",
+    "testdata/example_config.json",
+    "testdata/slice-struct-primitive-slice.json",
+    "testdata/toy.json",
+    "testdata/unknown_fields.json",
+    "utils.go",
+    "utils_test.go"
+  ],
+  "explanation": {
+    "what": "aconfig_test.go のファイル系テスト(TestJSON, TestJSONWithOmitempty, TestCustomFile, TestBadFiles)を、os.Create でテンポラリファイルを作る createTestFile ヘルパーから、testing/fstest.MapFS を使ったインメモリファイルシステムに置き換えた。テストファイル生成用の createTestFile 関数自体も削除している。",
+    "why": "PR本文の通り、Loader が任意の fs.FS から読み込める(FileSystem フィールド)ことを利用し、テストで実ファイル・実ディスクI/Oへの依存を減らすための変更。t.Setenv を使う案も検討されたが、それには Go 1.17 へのバージョン上げが必要になるため見送られたと PR 本文に明記されている。",
+    "highlights": [
+      { "file": "aconfig_test.go", "note": "fstest.MapFS{filepath: testfile} を Config.FileSystem に渡すことで、os.Create せずにテスト用ファイル内容を注入している" }
+    ],
+    "langNotes": [
+      { "topic": "testing/fstest.MapFS", "note": "標準ライブラリ testing/fstest が提供する、メモリ上でパス文字列をファイル内容にマッピングする fs.FS 実装。ディスクI/Oなしでファイル読み込みロジックをテストできる。" },
+      { "topic": "io/fs.FS", "note": "Go 1.16 で導入された読み取り専用ファイルシステムの抽象インターフェース。os.DirFS や embed.FS、テスト用の fstest.MapFS など複数の実装を同じ型として扱える。" }
+    ],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [{ "type": "pr", "number": 136, "url": "https://github.com/cristalhq/aconfig/pull/136" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

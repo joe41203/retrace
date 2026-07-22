@@ -1,0 +1,65 @@
+{
+  "seq": 13,
+  "sha": "3fcbd0a5a1cb6fba631cb49f6254a2ace2387c8b",
+  "parents": [
+    "82908e49d7f59e335097d27bc8da9af6100f4dd2"
+  ],
+  "author": {
+    "name": "Oleg Kovalov",
+    "email": "iamolegkovalov@gmail.com",
+    "date": "2020-07-22T23:21:04+02:00"
+  },
+  "message": "add slice and map support",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 50,
+    "deletions": 0
+  },
+  "files": [
+    {
+      "path": "aconfig.go",
+      "status": "M",
+      "additions": 50,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/aconfig.go b/aconfig.go\nindex 9ddbe96..ec52e6e 100644\n--- a/aconfig.go\n+++ b/aconfig.go\n@@ -293,3 +293,53 @@ func setString(field *fieldData, value string) error {\n \tfield.Value.SetString(value)\n \treturn nil\n }\n+\n+func setSlice(field *fieldData, value string) error {\n+\tvals := strings.Split(value, \",\")\n+\tslice := reflect.MakeSlice(field.Field.Type, len(vals), len(vals))\n+\tfor i, val := range vals {\n+\t\tval = strings.TrimSpace(val)\n+\t\tfd := &fieldData{\n+\t\t\tParent: field,\n+\t\t\tValue:  slice.Index(i),\n+\t\t}\n+\t\tif err := setFieldDataHelper(fd, val); err != nil {\n+\t\t\treturn fmt.Errorf(\"incorrect slice item %q: %w\", val, err)\n+\t\t}\n+\t}\n+\tfield.Value.Set(slice)\n+\treturn nil\n+}\n+\n+func setMap(field *fieldData, value string) error {\n+\tvals := strings.Split(value, \",\")\n+\tmapField := reflect.MakeMapWithSize(field.Field.Type, len(vals))\n+\n+\tfor _, val := range vals {\n+\t\tentry := strings.SplitN(val, \":\", 2)\n+\t\tif len(entry) != 2 {\n+\t\t\treturn fmt.Errorf(\"incorrect map item: %s\", val)\n+\t\t}\n+\t\tkey := strings.TrimSpace(entry[0])\n+\t\tval := strings.TrimSpace(entry[1])\n+\n+\t\tfdk := &fieldData{\n+\t\t\tParent: field,\n+\t\t\tValue:  reflect.New(field.Field.Type.Key()).Elem(),\n+\t\t}\n+\t\tif err := setFieldDataHelper(fdk, key); err != nil {\n+\t\t\treturn fmt.Errorf(\"incorrect map key %q: %w\", key, err)\n+\t\t}\n+\n+\t\tfdv := &fieldData{\n+\t\t\tParent: field,\n+\t\t\tValue:  reflect.New(field.Field.Type.Elem()).Elem(),\n+\t\t}\n+\t\tif err := setFieldDataHelper(fdv, val); err != nil {\n+\t\t\treturn fmt.Errorf(\"incorrect map value %q: %w\", val, err)\n+\t\t}\n+\t\tmapField.SetMapIndex(fdk.Value, fdv.Value)\n+\t}\n+\tfield.Value.Set(mapField)\n+\treturn nil\n+}\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/build.yml",
+    "LICENSE",
+    "README.md",
+    "aconfig.go",
+    "aconfig_test.go",
+    "go.mod",
+    "go.sum",
+    "testdata/all_types_config.json",
+    "testdata/bad_config.json",
+    "testdata/config1.json",
+    "testdata/config1.toml",
+    "testdata/config1.yaml",
+    "testdata/my_duration_config.json",
+    "testdata/test_config_env.json",
+    "testdata/test_config_flag.json",
+    "testdata/unknown.ext"
+  ],
+  "explanation": {
+    "what": "`setSlice` と `setMap` を新設し、struct フィールドが slice や map の場合にデフォルト値文字列(`\"1,2,3\"` や `\"a:1,b:2,c:3\"` のようなカンマ・コロン区切り)を分解して各要素へ設定できるようにした。要素ごとに一時的な `fieldData` を組み立て、既存の `setFieldDataHelper` に再帰的に委譲することで、要素の型(int・stringなど)に応じた変換を使い回している。",
+    "why": "コミットメッセージ「add slice and map support」の通り、それまで対応していなかったslice/map型のフィールドにdefaultタグ経由で値を設定できるようにする機能追加と読める。",
+    "highlights": [
+      { "file": "aconfig.go", "note": "setSlice/setMap は reflect.MakeSlice・MakeMapWithSize で新しい値を作り、要素ごとに fieldData を作って再帰的にsetFieldDataHelperへ渡している" }
+    ],
+    "langNotes": [
+      { "topic": "reflect.MakeSlice / MakeMapWithSize", "note": "Go の reflect パッケージで、型情報(reflect.Type)だけから実行時にslice/mapの実体を新規生成する関数。struct タグから読んだ文字列を、フィールドの実際の型に合わせて動的に組み立てる際に使う。" },
+      { "topic": "reflect.Value.SetMapIndex", "note": "reflect 経由でmapにキーと値を設定するメソッド。通常の `m[k] = v` に相当する操作をreflect.Value越しに行う。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

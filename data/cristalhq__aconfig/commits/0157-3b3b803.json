@@ -1,0 +1,101 @@
+{
+  "seq": 157,
+  "sha": "3b3b803e9e1422f4f4aa177a8a8328279ea84362",
+  "parents": [
+    "27d698449d85b4bad6b28f4cc7f6cbcfa1636c23"
+  ],
+  "author": {
+    "name": "Andrii Zhezhel",
+    "email": "21112019+zhezhel@users.noreply.github.com",
+    "date": "2023-09-03T19:36:53+02:00"
+  },
+  "message": "Mention all missed but required fields in the error (#143)",
+  "pr": {
+    "number": 143,
+    "title": "Add to error all missed fields with required tag",
+    "body": "",
+    "url": "https://github.com/cristalhq/aconfig/pull/143"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 41,
+    "deletions": 2
+  },
+  "files": [
+    {
+      "path": "aconfig.go",
+      "status": "M",
+      "additions": 9,
+      "deletions": 2,
+      "binary": false
+    },
+    {
+      "path": "aconfig_test.go",
+      "status": "M",
+      "additions": 32,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/aconfig.go b/aconfig.go\nindex a039168..e9f36e9 100644\n--- a/aconfig.go\n+++ b/aconfig.go\n@@ -261,15 +261,22 @@ func (l *Loader) loadSources() error {\n }\n \n func (l *Loader) checkRequired() error {\n+\tmissedFields := []string{}\n \tfor _, field := range l.fields {\n \t\tif field.isSet {\n \t\t\tcontinue\n \t\t}\n \t\tif field.isRequired || l.config.AllFieldRequired {\n-\t\t\treturn fmt.Errorf(\"field %s is required but not set\", field.name)\n+\t\t\tmissedFields = append(missedFields, field.name)\n \t\t}\n \t}\n-\treturn nil\n+\tif len(missedFields) == 0 {\n+\t\treturn nil\n+\t}\n+\tif len(missedFields) == 1 {\n+\t\treturn fmt.Errorf(\"field %s is required but not set\", missedFields[0])\n+\t}\n+\treturn fmt.Errorf(\"fields %s are required but not set\", strings.Join(missedFields, \",\"))\n }\n \n func (l *Loader) loadDefaults() error {\ndiff --git a/aconfig_test.go b/aconfig_test.go\nindex 68c6b2b..33dc53f 100644\n--- a/aconfig_test.go\n+++ b/aconfig_test.go\n@@ -1087,6 +1087,38 @@ func TestBadRequiredTag(t *testing.T) {\n \tf(&TestConfig{})\n }\n \n+func TestMissingFieldWithRequiredTag(t *testing.T) {\n+\tcfg := struct {\n+\t\tField1 string `required:\"true\"`\n+\t}{}\n+\tloader := LoaderFor(&cfg, Config{\n+\t\tSkipFlags: true,\n+\t})\n+\n+\terr := loader.Load()\n+\n+\twant := \"load config: field Field1 is required but not set\"\n+\tif err.Error() != want {\n+\t\tt.Fatalf(\"got %v, want %v\", err, want)\n+\t}\n+}\n+func TestMissingFieldsWithRequiredTag(t *testing.T) {\n+\tcfg := struct {\n+\t\tField1 string `required:\"true\"`\n+\t\tField2 string `required:\"true\"`\n+\t}{}\n+\tloader := LoaderFor(&cfg, Config{\n+\t\tSkipFlags: true,\n+\t})\n+\n+\terr := loader.Load()\n+\n+\twant := \"load config: fields Field1,Field2 are required but not set\"\n+\tif err.Error() != want {\n+\t\tt.Fatalf(\"got %v, want %v\", err, want)\n+\t}\n+}\n+\n func int32Ptr(a int32) *int32 {\n \treturn &a\n }\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/dependabot.yml",
+    ".github/workflows/build.yml",
+    "LICENSE",
+    "README.md",
+    "aconfig.go",
+    "aconfig_test.go",
+    "aconfigdotenv/dotenv.go",
+    "aconfigdotenv/dotenv_test.go",
+    "aconfigdotenv/go.mod",
+    "aconfigdotenv/go.sum",
+    "aconfigdotenv/testdata/config.env",
+    "aconfighcl/go.mod",
+    "aconfighcl/go.sum",
+    "aconfighcl/hcl.go",
+    "aconfighcl/hcl_test.go",
+    "aconfighcl/testdata/config.hcl",
+    "aconfigtoml/go.mod",
+    "aconfigtoml/go.sum",
+    "aconfigtoml/testdata/config.toml",
+    "aconfigtoml/toml.go",
+    "aconfigtoml/toml_test.go",
+    "aconfigyaml/go.mod",
+    "aconfigyaml/go.sum",
+    "aconfigyaml/res.yaml",
+    "aconfigyaml/testdata/config.yaml",
+    "aconfigyaml/yaml.go",
+    "aconfigyaml/yaml_test.go",
+    "doc.go",
+    "example_test.go",
+    "go.mod",
+    "reflection.go",
+    "testdata/bad_config.json",
+    "testdata/complex.json",
+    "testdata/config.json",
+    "testdata/config1.json",
+    "testdata/config2.json",
+    "testdata/config3.json",
+    "testdata/example_config.json",
+    "testdata/slice-struct-primitive-slice.json",
+    "testdata/toy.json",
+    "testdata/unknown_fields.json",
+    "utils.go",
+    "utils_test.go"
+  ],
+  "explanation": {
+    "what": "Loader.checkRequired を、required タグ未設定のフィールドを見つけた時点で即座にエラーを返す実装から、まず missedFields スライスに全ての未設定フィールド名を集約し、1件なら\"field %s is required but not set\"、複数件なら\"fields %s are required but not set\"というエラーを返す実装に変更した。TestMissingFieldWithRequiredTag / TestMissingFieldsWithRequiredTag のテストを追加している。",
+    "why": "PR本文タイトルの通り\"Add to error all missed fields with required tag\"。従来は required フィールドが複数未設定でも最初の1件しかエラーに含まれず、利用者は1つ直してもまた次のエラーに遭遇する手戻りが発生していた。これを1回のエラーで全て報告するように改善した。",
+    "highlights": [
+      { "file": "aconfig.go", "note": "checkRequired が早期returnをやめ、missedFields に集約してから単数/複数でメッセージを出し分ける" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [{ "type": "pr", "number": 143, "url": "https://github.com/cristalhq/aconfig/pull/143" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

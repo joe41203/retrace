@@ -1,0 +1,113 @@
+{
+  "seq": 166,
+  "sha": "89f28599cd6f1676f6b4285f4e4e1d0b53884541",
+  "parents": [
+    "08a69481e584a1f75b603bc3f29d85e1ff29105c"
+  ],
+  "author": {
+    "name": "d-enk",
+    "email": "d-enk@ya.ru",
+    "date": "2025-04-15T19:20:36+03:00"
+  },
+  "message": "support pointers in slices, simplify/fix Slice case in Loader.setFieldData",
+  "pr": {
+    "number": 159,
+    "title": "Fix: correctly support nested structs",
+    "body": "Close https://github.com/cristalhq/aconfig/issues/157",
+    "url": "https://github.com/cristalhq/aconfig/pull/159"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 3,
+    "additions": 25,
+    "deletions": 37
+  },
+  "files": [
+    {
+      "path": "aconfig_test.go",
+      "status": "M",
+      "additions": 6,
+      "deletions": 4,
+      "binary": false
+    },
+    {
+      "path": "reflection.go",
+      "status": "M",
+      "additions": 16,
+      "deletions": 31,
+      "binary": false
+    },
+    {
+      "path": "testdata/slice-deep-structs.json",
+      "status": "M",
+      "additions": 3,
+      "deletions": 2,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/aconfig_test.go b/aconfig_test.go\nindex a9d1308..bf50fae 100644\n--- a/aconfig_test.go\n+++ b/aconfig_test.go\n@@ -1579,11 +1579,11 @@ func TestSliceOfDeepStructs(t *testing.T) {\n \t\tIntegers []int\n \t\tNullable *struct{}\n \t\tBooleans []bool\n-\t\tStructs  []NestedStruct\n+\t\tStructs  []*NestedStruct\n \t}\n \n \ttype TestConfig struct {\n-\t\tServices []struct{ Nested TestService }\n+\t\tServices []*struct{ Nested TestService }\n \t}\n \tvar cfg TestConfig\n \tloader := LoaderFor(&cfg, Config{\n@@ -1596,7 +1596,7 @@ func TestSliceOfDeepStructs(t *testing.T) {\n \tfailIfErr(t, loader.Load())\n \n \twant := TestConfig{\n-\t\tServices: []struct{ Nested TestService }{\n+\t\tServices: []*struct{ Nested TestService }{\n \t\t\t{\n \t\t\t\tNested: TestService{\n \t\t\t\t\tName:     \"service1\",\n@@ -1604,13 +1604,15 @@ func TestSliceOfDeepStructs(t *testing.T) {\n \t\t\t\t\tIntegers: []int{1, 2},\n \t\t\t\t\tNullable: nil,\n \t\t\t\t\tBooleans: []bool{true, false},\n-\t\t\t\t\tStructs: []NestedStruct{\n+\t\t\t\t\tStructs: []*NestedStruct{\n \t\t\t\t\t\t{1},\n \t\t\t\t\t\t{2},\n+\t\t\t\t\t\tnil,\n \t\t\t\t\t\t{3},\n \t\t\t\t\t},\n \t\t\t\t},\n \t\t\t},\n+\t\t\tnil,\n \t\t},\n \t}\n \tmustEqual(t, cfg, want)\ndiff --git a/reflection.go b/reflection.go\nindex 3d05e62..36991d8 100644\n--- a/reflection.go\n+++ b/reflection.go\n@@ -197,42 +197,27 @@ func (l *Loader) setFieldData(field *fieldData, value interface{}) error {\n \t\treturn l.m2s(mii(value), fd.value)\n \n \tcase reflect.Slice:\n-\t\tif field.field.Type.Elem().Kind() == reflect.Struct {\n-\t\t\tif value == nil {\n-\t\t\t\treturn nil\n-\t\t\t}\n+\t\tif isPrimitive(field.field.Type.Elem()) {\n+\t\t\treturn l.setSlice(field, sliceToString(value))\n+\t\t}\n \n-\t\t\tif v, ok := value.([]interface{}); ok {\n-\t\t\t\tslice := reflect.MakeSlice(field.field.Type, len(v), len(v))\n-\t\t\t\tfor i, val := range v {\n-\t\t\t\t\tvv := mii(val)\n-\n-\t\t\t\t\tfd := l.newFieldData(reflect.StructField{}, slice.Index(i), nil)\n-\t\t\t\t\tif err := l.m2s(vv, fd.value); err != nil {\n-\t\t\t\t\t\treturn err\n-\t\t\t\t\t}\n-\t\t\t\t}\n-\t\t\t\tfield.value.Set(slice)\n-\t\t\t\treturn nil\n-\t\t\t}\n+\t\tin := reflect.ValueOf(value)\n+\t\tif in.Kind() != reflect.Slice {\n+\t\t\tpanic(fmt.Errorf(\"%T %v\", value, value))\n+\t\t}\n \n-\t\t\tv, ok := value.([]map[string]interface{})\n-\t\t\tif !ok {\n-\t\t\t\tpanic(fmt.Errorf(\"%T %v\", value, value))\n-\t\t\t}\n+\t\tout := reflect.MakeSlice(field.field.Type, in.Len(), in.Len())\n+\t\tfield.value.Set(out)\n \n-\t\t\tslice := reflect.MakeSlice(field.field.Type, len(v), len(v))\n-\t\t\tfor i, val := range v {\n-\t\t\t\tfd := l.newFieldData(reflect.StructField{}, slice.Index(i), nil)\n-\t\t\t\tif err := l.m2s(val, fd.value); err != nil {\n-\t\t\t\t\treturn err\n-\t\t\t\t}\n-\t\t\t}\n-\t\t\tfield.value.Set(slice)\n+\t\tfor i := 0; i < in.Len(); i++ {\n+\t\t\tfd := l.newFieldData(reflect.StructField{}, out.Index(i), nil)\n \n-\t\t\treturn nil\n+\t\t\tif err := l.setFieldData(fd, in.Index(i).Interface()); err != nil {\n+\t\t\t\treturn err\n+\t\t\t}\n \t\t}\n-\t\treturn l.setSlice(field, sliceToString(value))\n+\n+\t\treturn nil\n \n \tcase reflect.Map:\n \t\tv, ok := value.(map[string]interface{})\ndiff --git a/testdata/slice-deep-structs.json b/testdata/slice-deep-structs.json\nindex e35a191..05d8bb3 100644\n--- a/testdata/slice-deep-structs.json\n+++ b/testdata/slice-deep-structs.json\n@@ -7,8 +7,9 @@\n         \"integers\": [1, 2],\n         \"nullable\": null,\n         \"booleans\": [true, false],\n-        \"structs\": [{ \"key\": 1 }, { \"key\": 2 }, { \"key\": 3 }]\n+        \"structs\": [{ \"key\": 1 }, { \"key\": 2 }, null, { \"key\": 3 }]\n       }\n-    }\n+    },\n+    null\n   ]\n }\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/dependabot.yml",
+    ".github/workflows/build.yml",
+    "LICENSE",
+    "README.md",
+    "aconfig.go",
+    "aconfig_test.go",
+    "aconfigdotenv/dotenv.go",
+    "aconfigdotenv/dotenv_test.go",
+    "aconfigdotenv/go.mod",
+    "aconfigdotenv/go.sum",
+    "aconfigdotenv/testdata/config.env",
+    "aconfighcl/go.mod",
+    "aconfighcl/go.sum",
+    "aconfighcl/hcl.go",
+    "aconfighcl/hcl_test.go",
+    "aconfighcl/testdata/config.hcl",
+    "aconfigtoml/go.mod",
+    "aconfigtoml/go.sum",
+    "aconfigtoml/testdata/config.toml",
+    "aconfigtoml/toml.go",
+    "aconfigtoml/toml_test.go",
+    "aconfigyaml/go.mod",
+    "aconfigyaml/go.sum",
+    "aconfigyaml/res.yaml",
+    "aconfigyaml/testdata/config.yaml",
+    "aconfigyaml/yaml.go",
+    "aconfigyaml/yaml_test.go",
+    "doc.go",
+    "example_test.go",
+    "go.mod",
+    "go.sum",
+    "parser.go",
+    "reflection.go",
+    "testdata/bad_config.json",
+    "testdata/complex.json",
+    "testdata/config.json",
+    "testdata/config1.json",
+    "testdata/config2.json",
+    "testdata/config3.json",
+    "testdata/example_config.json",
+    "testdata/slice-deep-structs.json",
+    "testdata/slice-struct-primitive-slice.json",
+    "testdata/toy.json",
+    "testdata/unknown_fields.json",
+    "utils.go",
+    "utils_test.go"
+  ],
+  "explanation": {
+    "what": "reflection.go の setFieldData における reflect.Slice の分岐を全面的に書き直した。旧実装は「要素が struct かどうか」で分岐し、struct の場合は value の実際の型([]interface{} か []map[string]interface{} か)ごとに個別処理する場当たり的なコードだったが、新実装は「要素が primitive かどうか」だけで分岐し、primitive でなければ reflect.ValueOf(value) から reflect.MakeSlice でスライスを作り、各要素に対して setFieldData を再帰呼び出しする汎用的な形にした。これにより要素が struct へのポインタ(`[]*NestedStruct`)であっても、setFieldData 側のポインタ unwrap 処理(既存ロジック)がそのまま効くようになる。テストの Structs フィールドを `[]NestedStruct` から `[]*NestedStruct` に変え、要素に nil を含むケース、および Services 自体を `[]*struct{...}` にしてスライス要素がポインタかつ nil を含むケースを追加検証している。",
+    "why": "PR は Issue #157 のクローズを目的とすると述べている。旧実装の「struct要素のスライス」分岐は非ポインタのstructしか想定しておらず、要素がポインタ型(`*NestedStruct`)のスライスや、スライス自体がポインタ要素を持つ場合(nilを含む)を扱えなかった。コミットメッセージの \"support pointers in slices, simplify/fix Slice case\" が示す通り、要素の型による特殊分岐をやめてsetFieldDataへの再帰呼び出しに統一することで、ポインタ・nil要素・任意の入れ子構造を単一のコードパスで処理できるようにしている。",
+    "highlights": [
+      { "file": "reflection.go", "note": "case reflect.Slice の全面書き換え。struct/非structの分岐をやめ、primitiveでなければ全てsetFieldDataへの再帰に統一" }
+    ],
+    "langNotes": [
+      { "topic": "スライス内のポインタ要素と再帰的なsetFieldData", "note": "Go では []*T のようにポインタを要素に持つスライスも自然に扱える。このコミットはスライス要素の型で分岐する代わりに setFieldData を再帰的に呼び出すことで、要素がポインタでも非ポインタでも、nilでもstructでも同じロジックで処理できるようにしている。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [{ "type": "pr", "number": 159, "url": "https://github.com/cristalhq/aconfig/pull/159" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

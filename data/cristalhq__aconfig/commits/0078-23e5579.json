@@ -1,0 +1,140 @@
+{
+  "seq": 78,
+  "sha": "23e5579ec352bb23ea4b30bbb0e4287e93bd3ddd",
+  "parents": [
+    "f57019ede8c790a05382c1cd29dad52ef3ea2532"
+  ],
+  "author": {
+    "name": "Oleg Kovalov",
+    "email": "oleg@hey.com",
+    "date": "2020-12-18T17:54:39+01:00"
+  },
+  "message": "better tests for submodules (#36)",
+  "pr": {
+    "number": 36,
+    "title": "better tests for submodules",
+    "body": "",
+    "url": "https://github.com/cristalhq/aconfig/pull/36"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 10,
+    "additions": 250,
+    "deletions": 145
+  },
+  "files": [
+    {
+      "path": "aconfigtoml/go.mod",
+      "status": "M",
+      "additions": 1,
+      "deletions": 3,
+      "binary": false
+    },
+    {
+      "path": "aconfigtoml/go.sum",
+      "status": "M",
+      "additions": 2,
+      "deletions": 4,
+      "binary": false
+    },
+    {
+      "path": "aconfigtoml/testfile.toml",
+      "status": "D",
+      "additions": 0,
+      "deletions": 46,
+      "binary": false
+    },
+    {
+      "path": "aconfigtoml/toml.go",
+      "status": "M",
+      "additions": 4,
+      "deletions": 14,
+      "binary": false
+    },
+    {
+      "path": "aconfigtoml/toml_test.go",
+      "status": "M",
+      "additions": 166,
+      "deletions": 18,
+      "binary": false
+    },
+    {
+      "path": "aconfigyaml/go.mod",
+      "status": "M",
+      "additions": 1,
+      "deletions": 3,
+      "binary": false
+    },
+    {
+      "path": "aconfigyaml/go.sum",
+      "status": "M",
+      "additions": 2,
+      "deletions": 3,
+      "binary": false
+    },
+    {
+      "path": "aconfigyaml/testfile.yaml",
+      "status": "D",
+      "additions": 0,
+      "deletions": 21,
+      "binary": false
+    },
+    {
+      "path": "aconfigyaml/yaml.go",
+      "status": "M",
+      "additions": 4,
+      "deletions": 17,
+      "binary": false
+    },
+    {
+      "path": "aconfigyaml/yaml_test.go",
+      "status": "M",
+      "additions": 70,
+      "deletions": 16,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/aconfigtoml/go.mod b/aconfigtoml/go.mod\nindex b20f2c5..b0e42e4 100644\n--- a/aconfigtoml/go.mod\n+++ b/aconfigtoml/go.mod\n@@ -4,7 +4,5 @@ go 1.15\n \n require (\n \tgithub.com/BurntSushi/toml v0.3.1\n-\tgithub.com/cristalhq/aconfig v0.9.1\n+\tgithub.com/cristalhq/aconfig v0.10.0-beta\n )\n-\n-replace github.com/cristalhq/aconfig => ../\n\\ No newline at end of file\ndiff --git a/aconfigtoml/go.sum b/aconfigtoml/go.sum\nindex 7dfd876..181de28 100644\n--- a/aconfigtoml/go.sum\n+++ b/aconfigtoml/go.sum\n@@ -1,6 +1,4 @@\n github.com/BurntSushi/toml v0.3.1 h1:WXkYYl6Yr3qBf1K79EBnL4mak0OimBfB0XUf9Vl28OQ=\n github.com/BurntSushi/toml v0.3.1/go.mod h1:xHWCNGjB5oqiDr8zfno3MHue2Ht5sIBksp03qcyfWMU=\n-github.com/cristalhq/aconfig v0.8.0 h1:qr3ZnmG3jwnRueN9fHUKR6Y2eaYPNicbYlWnzQa9aBY=\n-github.com/cristalhq/aconfig v0.8.0/go.mod h1:0ZBp7dUf0F2Jr7YbLjw8OVlAD0eeV2bU3NwmVgeUReo=\n-gopkg.in/check.v1 v0.0.0-20161208181325-20d25e280405/go.mod h1:Co6ibVJAznAaIkqp8huTwlJQCZ016jof/cbN4VW5Yz0=\n-gopkg.in/yaml.v2 v2.3.0/go.mod h1:hI93XBmqTisBFMUTm0b8Fm+jr3Dg1NNxqwp+5A1VGuI=\n+github.com/cristalhq/aconfig v0.10.0-beta h1:LrMGPySGkxVkAbc+Utim7f8dndUGXCQ00h2VS7L6lEw=\n+github.com/cristalhq/aconfig v0.10.0-beta/go.mod h1:0ZBp7dUf0F2Jr7YbLjw8OVlAD0eeV2bU3NwmVgeUReo=\ndiff --git a/aconfigtoml/testfile.toml b/aconfigtoml/testfile.toml\ndeleted file mode 100644\nindex e4e2768..0000000\n--- a/aconfigtoml/testfile.toml\n+++ /dev/null\n@@ -1,46 +0,0 @@\n-a = \"b\"\n-c = 10\n-e = 123.456\n-b = \"abc\"\n-p = 42\n-m = \"n\"\n-\n-[y]\n-x = \"y\"\n-z = [ 1, 2, 3 ]\n-\n-[A]\n-    x = \"y\"\n-\n-    [A.B.C]\n-    m = \"n\"\n-\n-    [A.B]\n-    D = [\"x\", \"y\", \"z\"]\n-        # [C]\n-        # [A.B.C]\n-\n-# str = \"str-toml\"\n-# int = 101\n-# http_port = 65000\n-# [sub]\n-# float = 999.111\n-\n-# {\n-#     \"a\": \"b\",\n-#     \"c\": 10,\n-#     \"e\": 123.456,\n-#     \"y\": {\n-#         \"x\": \"y\",\n-#         \"z\": [\"1\", \"2\", \"3\"]\n-#     },\n-#     \"A\": {\n-#         \"x\": \"y\",\n-#         \"B\": {\n-#             \"C\": {\n-#                 \"m\": \"n\"\n-#             },\n-#             \"D\": [\"x\", \"y\", \"z\"]\n-#         }\n-#     }\n-# }\n\\ No newline at end of file\ndiff --git a/aconfigtoml/toml.go b/aconfigtoml/toml.go\nindex 8ac43c1..6c0c0db 100644\n--- a/aconfigtoml/toml.go\n+++ b/aconfigtoml/toml.go\n@@ -29,29 +29,19 @@ func (d *Decoder) DecodeFile(filename string) (map[string]interface{}, error) {\n \tres := map[string]interface{}{}\n \n \tfor key, value := range raw {\n-\t\t// fmt.Printf(\"k: %s, v: %v %[2]T\\n\", key, value)\n \t\tflatten(\"\", key, value, res)\n \t}\n-\t// fmt.Printf(\"map: %#v\\n\\n\", res)\n \treturn res, nil\n }\n \n // copied from aconfig/utils.go\n //\n func flatten(prefix, key string, curr interface{}, res map[string]interface{}) {\n-\t// log.Printf(\"%s::%s got %T %v\", prefix, key, curr, curr)\n \tswitch curr := curr.(type) {\n \tcase map[string]interface{}:\n \t\tfor k, v := range curr {\n \t\t\tflatten(prefix+key+\".\", k, v, res)\n \t\t}\n-\n-\tcase map[interface{}]interface{}:\n-\t\tfor k, v := range curr {\n-\t\t\tif k, ok := k.(string); ok {\n-\t\t\t\tflatten(prefix+key+\".\", k, v, res)\n-\t\t\t}\n-\t\t}\n \tcase []interface{}:\n \t\tb := &strings.Builder{}\n \t\tfor i, v := range curr {\n@@ -60,13 +50,13 @@ func flatten(prefix, key string, curr interface{}, res map[string]interface{}) {\n \t\t\t}\n \t\t\tb.WriteString(fmt.Sprint(v))\n \t\t}\n-\t\tres[prefix+key] = curr\n+\t\tres[prefix+key] = b.String()\n \tcase string:\n \t\tres[prefix+key] = curr\n \tcase float64:\n-\t\tres[prefix+key] = fmt.Sprintf(\"%v\", curr)\n-\tcase int, int8, int16, int32, int64:\n-\t\tres[prefix+key] = fmt.Sprintf(\"%v\", curr)\n+\t\tres[prefix+key] = fmt.Sprint(curr)\n+\tcase int64:\n+\t\tres[prefix+key] = fmt.Sprint(curr)\n \tdefault:\n \t\tpanic(fmt.Sprintf(\"%s::%s got %T %v\", prefix, key, curr, curr))\n \t}\ndiff --git a/aconfigtoml/toml_test.go b/aconfigtoml/toml_test.go\nindex a7036e5..33fdda3 100644\n--- a/aconfigtoml/toml_test.go\n+++ b/aconfigtoml/toml_test.go\n@@ -1,6 +1,7 @@\n package aconfigtoml_test\n \n import (\n+\t\"os\"\n \t\"reflect\"\n \t\"testing\"\n \n@@ -9,26 +10,44 @@ import (\n )\n \n func TestTOML(t *testing.T) {\n-\tvar cfg, want TestConfig\n+\tfilepath := createTestFile(t)\n+\n+\tvar cfg structConfig\n+\tloader := aconfig.LoaderFor(&cfg, aconfig.Config{\n+\t\tSkipDefaults:    true,\n+\t\tSkipEnvironment: true,\n+\t\tSkipFlags:       true,\n+\t\tFileDecoders: map[string]aconfig.FileDecoder{\n+\t\t\t\".toml\": aconfigtoml.New(),\n+\t\t},\n+\t\tFiles: []string{filepath},\n+\t})\n+\n+\tif err := loader.Load(); err != nil {\n+\t\tt.Fatal(err)\n+\t}\n \n \ti := int32(42)\n-\twant = TestConfig{\n+\tj := int64(420)\n+\twant := structConfig{\n \t\tA: \"b\",\n \t\tC: 10,\n \t\tE: 123.456,\n \t\tB: []byte(\"abc\"),\n-\t\tP: &i,\n+\t\tI: &i,\n+\t\tJ: &j,\n \t\tY: structY{\n \t\t\tX: \"y\",\n-\t\t\t// TODO: Z: []string{\"1\", \"2\", \"3\"},\n+\t\t\tZ: []string{\"1\", \"2\", \"3\"},\n \t\t},\n \t\tAA: structA{\n \t\t\tX: \"y\",\n \t\t\tBB: structB{\n \t\t\t\tCC: structC{\n \t\t\t\t\tMM: \"n\",\n+\t\t\t\t\tBB: []byte(\"boo\"),\n \t\t\t\t},\n-\t\t\t\t// TODO: DD: []string{\"x\", \"y\", \"z\"},\n+\t\t\t\tDD: []string{\"x\", \"y\", \"z\"},\n \t\t\t},\n \t\t},\n \t\tStructM: StructM{\n@@ -36,30 +55,38 @@ func TestTOML(t *testing.T) {\n \t\t},\n \t}\n \n-\tloader := aconfig.LoaderFor(&cfg, aconfig.Config{\n-\t\tSkipDefaults:    true,\n-\t\tSkipEnvironment: true,\n-\t\tSkipFlags:       true,\n-\t\tFileDecoders: map[string]aconfig.FileDecoder{\n-\t\t\t\".toml\": aconfigtoml.New(),\n-\t\t},\n-\t\tFiles: []string{\"testfile.toml\"},\n+\tif got := cfg; !reflect.DeepEqual(want, got) {\n+\t\tt.Fatalf(\"want %v, got %v\", want, got)\n+\t}\n+}\n+\n+func createTestFile(t *testing.T) string {\n+\tt.Helper()\n+\tdir := t.TempDir()\n+\tt.Cleanup(func() {\n+\t\tos.RemoveAll(dir)\n \t})\n \n-\tif err := loader.Load(); err != nil {\n+\tfilepath := dir + \"/testfile.toml\"\n+\n+\tf, err := os.Create(filepath)\n+\tif err != nil {\n \t\tt.Fatal(err)\n \t}\n-\tif got := cfg; !reflect.DeepEqual(got, want) {\n-\t\tt.Fatalf(\"want %v, got %v\", want, got)\n+\t_, err = f.WriteString(testfileContent)\n+\tif err != nil {\n+\t\tt.Fatal(err)\n \t}\n+\treturn filepath\n }\n \n-type TestConfig struct {\n+type structConfig struct {\n \tA string\n \tC int\n \tE float64\n \tB []byte\n-\tP *int32\n+\tI *int32\n+\tJ *int64\n \tY structY\n \n \tAA structA `toml:\"A\"`\n@@ -86,8 +113,129 @@ type structB struct {\n \n type structC struct {\n \tMM string `toml:\"m\"`\n+\tBB []byte `toml:\"b\"`\n }\n \n type StructM struct {\n \tM string\n }\n+\n+const testfileContent = `\n+a = \"b\"\n+c = 10\n+e = 123.456\n+b = \"abc\"\n+i = 42\n+j = 420\n+m = \"n\"\n+\n+[y]\n+x = \"y\"\n+z = [ 1, 2, 3 ]\n+\n+[A]\n+    x = \"y\"\n+\n+    [A.B.C]\n+\tm = \"n\"\n+\tb = \"boo\"\n+\n+    [A.B]\n+    D = [\"x\", \"y\", \"z\"]\n+        # [C]\n+        # [A.B.C]\n+`\n+\n+// package aconfigtoml_test\n+\n+// import (\n+// \t\"reflect\"\n+// \t\"testing\"\n+\n+// \t\"github.com/cristalhq/aconfig\"\n+// \t\"github.com/cristalhq/aconfig/aconfigtoml\"\n+// )\n+\n+// func TestTOML(t *testing.T) {\n+// \tvar cfg, want TestConfig\n+\n+// \ti := int32(42)\n+// \twant = TestConfig{\n+// \t\tA: \"b\",\n+// \t\tC: 10,\n+// \t\tE: 123.456,\n+// \t\tB: []byte(\"abc\"),\n+// \t\tP: &i,\n+// \t\tY: structY{\n+// \t\t\tX: \"y\",\n+// \t\t\t// TODO: Z: []string{\"1\", \"2\", \"3\"},\n+// \t\t},\n+// \t\tAA: structA{\n+// \t\t\tX: \"y\",\n+// \t\t\tBB: structB{\n+// \t\t\t\tCC: structC{\n+// \t\t\t\t\tMM: \"n\",\n+// \t\t\t\t},\n+// \t\t\t\t// TODO: DD: []string{\"x\", \"y\", \"z\"},\n+// \t\t\t},\n+// \t\t},\n+// \t\tStructM: StructM{\n+// \t\t\tM: \"n\",\n+// \t\t},\n+// \t}\n+\n+// \tloader := aconfig.LoaderFor(&cfg, aconfig.Config{\n+// \t\tSkipDefaults:    true,\n+// \t\tSkipEnvironment: true,\n+// \t\tSkipFlags:       true,\n+// \t\tFileDecoders: map[string]aconfig.FileDecoder{\n+// \t\t\t\".toml\": aconfigtoml.New(),\n+// \t\t},\n+// \t\tFiles: []string{\"testfile.toml\"},\n+// \t})\n+\n+// \tif err := loader.Load(); err != nil {\n+// \t\tt.Fatal(err)\n+// \t}\n+// \tif got := cfg; !reflect.DeepEqual(got, want) {\n+// \t\tt.Fatalf(\"want %v, got %v\", want, got)\n+// \t}\n+// }\n+\n+// type TestConfig struct {\n+// \tA string\n+// \tC int\n+// \tE float64\n+// \tB []byte\n+// \tP *int32\n+// \tY structY\n+\n+// \tAA structA `toml:\"A\"`\n+// \tStructM\n+// }\n+\n+// type structY struct {\n+// \tX string\n+// \tZ []string\n+// \tA struct {\n+// \t\tI bool\n+// \t}\n+// }\n+\n+// type structA struct {\n+// \tX  string  `toml:\"x\"`\n+// \tBB structB `toml:\"B\"`\n+// }\n+\n+// type structB struct {\n+// \tCC structC  `toml:\"C\"`\n+// \tDD []string `toml:\"D\"`\n+// }\n+\n+// type structC struct {\n+// \tMM string `toml:\"m\"`\n+// }\n+\n+// type StructM struct {\n+// \tM string\n+// }\ndiff --git a/aconfigyaml/go.mod b/aconfigyaml/go.mod\nindex 2e61c57..882cf9a 100644\n--- a/aconfigyaml/go.mod\n+++ b/aconfigyaml/go.mod\n@@ -3,8 +3,6 @@ module github.com/cristalhq/aconfig/aconfigyaml\n go 1.15\n \n require (\n-\tgithub.com/cristalhq/aconfig v0.9.1\n+\tgithub.com/cristalhq/aconfig v0.10.0-beta\n \tgopkg.in/yaml.v2 v2.3.0\n )\n-\n-replace github.com/cristalhq/aconfig => ../\n\\ No newline at end of file\ndiff --git a/aconfigyaml/go.sum b/aconfigyaml/go.sum\nindex a98cbab..0000298 100644\n--- a/aconfigyaml/go.sum\n+++ b/aconfigyaml/go.sum\n@@ -1,6 +1,5 @@\n-github.com/BurntSushi/toml v0.3.1/go.mod h1:xHWCNGjB5oqiDr8zfno3MHue2Ht5sIBksp03qcyfWMU=\n-github.com/cristalhq/aconfig v0.8.0 h1:qr3ZnmG3jwnRueN9fHUKR6Y2eaYPNicbYlWnzQa9aBY=\n-github.com/cristalhq/aconfig v0.8.0/go.mod h1:0ZBp7dUf0F2Jr7YbLjw8OVlAD0eeV2bU3NwmVgeUReo=\n+github.com/cristalhq/aconfig v0.10.0-beta h1:LrMGPySGkxVkAbc+Utim7f8dndUGXCQ00h2VS7L6lEw=\n+github.com/cristalhq/aconfig v0.10.0-beta/go.mod h1:0ZBp7dUf0F2Jr7YbLjw8OVlAD0eeV2bU3NwmVgeUReo=\n gopkg.in/check.v1 v0.0.0-20161208181325-20d25e280405 h1:yhCVgyC4o1eVCa2tZl7eS0r+SDo693bJlVdllGtEeKM=\n gopkg.in/check.v1 v0.0.0-20161208181325-20d25e280405/go.mod h1:Co6ibVJAznAaIkqp8huTwlJQCZ016jof/cbN4VW5Yz0=\n gopkg.in/yaml.v2 v2.3.0 h1:clyUAQHOM3G0M3f5vQj7LuJrETvjVot3Z5el9nffUtU=\ndiff --git a/aconfigyaml/testfile.yaml b/aconfigyaml/testfile.yaml\ndeleted file mode 100644\nindex 014569f..0000000\n--- a/aconfigyaml/testfile.yaml\n+++ /dev/null\n@@ -1,21 +0,0 @@\n-{\n-    \"a\": \"b\",\n-    \"c\": 10,\n-    \"e\": 123.456,\n-    \"b\": \"abc\",\n-    \"p\": 42,\n-    \"m\": \"n\",\n-    \"y\": {\n-        \"x\": \"y\",\n-        \"z\": [\"1\", \"2\", \"3\"]\n-    },\n-    \"A\": {\n-        \"x\": \"y\",\n-        \"B\": {\n-            \"C\": {\n-                \"m\": \"n\"\n-            },\n-            \"D\": [\"x\", \"y\", \"z\"]\n-        }\n-    }\n-}\n\\ No newline at end of file\ndiff --git a/aconfigyaml/yaml.go b/aconfigyaml/yaml.go\nindex 8003a24..0c4b8a4 100644\n--- a/aconfigyaml/yaml.go\n+++ b/aconfigyaml/yaml.go\n@@ -29,23 +29,15 @@ func (d *Decoder) DecodeFile(filename string) (map[string]interface{}, error) {\n \tres := map[string]interface{}{}\n \n \tfor key, value := range raw {\n-\t\t// fmt.Printf(\"k: %s, v: %v %[2]T\\n\", key, value)\n \t\tflatten(\"\", key, value, res)\n \t}\n-\t// fmt.Printf(\"map: %#v\\n\\n\", res)\n \treturn res, nil\n }\n \n-// copied from aconfig/utils.go\n+// copied and adapted from aconfig/utils.go\n //\n func flatten(prefix, key string, curr interface{}, res map[string]interface{}) {\n-\t// log.Printf(\"%s::%s got %T %v\", prefix, key, curr, curr)\n \tswitch curr := curr.(type) {\n-\tcase map[string]interface{}:\n-\t\tfor k, v := range curr {\n-\t\t\tflatten(prefix+key+\".\", k, v, res)\n-\t\t}\n-\n \tcase map[interface{}]interface{}:\n \t\tfor k, v := range curr {\n \t\t\tif k, ok := k.(string); ok {\n@@ -53,7 +45,6 @@ func flatten(prefix, key string, curr interface{}, res map[string]interface{}) {\n \t\t\t}\n \t\t}\n \tcase []interface{}:\n-\t\t// fmt.Printf(\"wow %v\\n\", curr)\n \t\tb := &strings.Builder{}\n \t\tfor i, v := range curr {\n \t\t\tif i > 0 {\n@@ -62,16 +53,12 @@ func flatten(prefix, key string, curr interface{}, res map[string]interface{}) {\n \t\t\tb.WriteString(fmt.Sprint(v))\n \t\t}\n \t\tres[prefix+key] = b.String()\n-\tcase []string:\n-\t\tres[prefix+key] = curr\n \tcase string:\n \t\tres[prefix+key] = curr\n-\tcase float32:\n-\t\tres[prefix+key] = fmt.Sprintf(\"%v\", curr)\n \tcase float64:\n-\t\tres[prefix+key] = fmt.Sprintf(\"%v\", curr)\n-\tcase int, int8, int16, int32, int64:\n-\t\tres[prefix+key] = fmt.Sprintf(\"%v\", curr)\n+\t\tres[prefix+key] = fmt.Sprint(curr)\n+\tcase int, int8, int16, int32:\n+\t\tres[prefix+key] = fmt.Sprint(curr)\n \tdefault:\n \t\tpanic(fmt.Sprintf(\"%s::%s got %T %v\", prefix, key, curr, curr))\n \t}\ndiff --git a/aconfigyaml/yaml_test.go b/aconfigyaml/yaml_test.go\nindex 4bf0d73..fd7d798 100644\n--- a/aconfigyaml/yaml_test.go\n+++ b/aconfigyaml/yaml_test.go\n@@ -1,6 +1,7 @@\n package aconfigyaml_test\n \n import (\n+\t\"os\"\n \t\"reflect\"\n \t\"testing\"\n \n@@ -9,15 +10,32 @@ import (\n )\n \n func TestYAML(t *testing.T) {\n-\tvar cfg, want TestConfig\n+\tfilepath := createTestFile(t)\n+\n+\tvar cfg structConfig\n+\tloader := aconfig.LoaderFor(&cfg, aconfig.Config{\n+\t\tSkipDefaults:    true,\n+\t\tSkipEnvironment: true,\n+\t\tSkipFlags:       true,\n+\t\tFileDecoders: map[string]aconfig.FileDecoder{\n+\t\t\t\".yaml\": aconfigyaml.New(),\n+\t\t},\n+\t\tFiles: []string{filepath},\n+\t})\n+\n+\tif err := loader.Load(); err != nil {\n+\t\tt.Fatal(err)\n+\t}\n \n \ti := int32(42)\n-\twant = TestConfig{\n+\tj := int64(420)\n+\twant := structConfig{\n \t\tA: \"b\",\n \t\tC: 10,\n \t\tE: 123.456,\n \t\tB: []byte(\"abc\"),\n-\t\tP: &i,\n+\t\tI: &i,\n+\t\tJ: &j,\n \t\tY: structY{\n \t\t\tX: \"y\",\n \t\t\tZ: []string{\"1\", \"2\", \"3\"},\n@@ -27,6 +45,7 @@ func TestYAML(t *testing.T) {\n \t\t\tBB: structB{\n \t\t\t\tCC: structC{\n \t\t\t\t\tMM: \"n\",\n+\t\t\t\t\tBB: []byte(\"boo\"),\n \t\t\t\t},\n \t\t\t\tDD: []string{\"x\", \"y\", \"z\"},\n \t\t\t},\n@@ -36,30 +55,38 @@ func TestYAML(t *testing.T) {\n \t\t},\n \t}\n \n-\tloader := aconfig.LoaderFor(&cfg, aconfig.Config{\n-\t\tSkipDefaults:    true,\n-\t\tSkipEnvironment: true,\n-\t\tSkipFlags:       true,\n-\t\tFileDecoders: map[string]aconfig.FileDecoder{\n-\t\t\t\".yaml\": aconfigyaml.New(),\n-\t\t},\n-\t\tFiles: []string{\"testfile.yaml\"},\n+\tif got := cfg; !reflect.DeepEqual(want, got) {\n+\t\tt.Fatalf(\"want %v, got %v\", want, got)\n+\t}\n+}\n+\n+func createTestFile(t *testing.T) string {\n+\tt.Helper()\n+\tdir := t.TempDir()\n+\tt.Cleanup(func() {\n+\t\tos.RemoveAll(dir)\n \t})\n \n-\tif err := loader.Load(); err != nil {\n+\tfilepath := dir + \"/testfile.yaml\"\n+\n+\tf, err := os.Create(filepath)\n+\tif err != nil {\n \t\tt.Fatal(err)\n \t}\n-\tif got := cfg; !reflect.DeepEqual(got, want) {\n-\t\tt.Fatalf(\"want %v, got %v\", want, got)\n+\t_, err = f.WriteString(testfileContent)\n+\tif err != nil {\n+\t\tt.Fatal(err)\n \t}\n+\treturn filepath\n }\n \n-type TestConfig struct {\n+type structConfig struct {\n \tA string\n \tC int\n \tE float64\n \tB []byte\n-\tP *int32\n+\tI *int32\n+\tJ *int64\n \tY structY\n \n \tAA structA `yaml:\"A\"`\n@@ -86,8 +113,35 @@ type structB struct {\n \n type structC struct {\n \tMM string `yaml:\"m\"`\n+\tBB []byte `yaml:\"b\"`\n }\n \n type StructM struct {\n \tM string\n }\n+\n+const testfileContent = `\n+{\n+    \"a\": \"b\",\n+    \"c\": 10,\n+    \"e\": 123.456,\n+    \"b\": \"abc\",\n+    \"i\": 42,\n+    \"j\": 420,\n+    \"m\": \"n\",\n+    \"y\": {\n+        \"x\": \"y\",\n+        \"z\": [\"1\", \"2\", \"3\"]\n+    },\n+    \"A\": {\n+        \"x\": \"y\",\n+        \"B\": {\n+            \"C\": {\n+                \"m\": \"n\",\n+                \"b\": \"boo\",\n+            },\n+            \"D\": [\"x\", \"y\", \"z\"]\n+        }\n+    }\n+}\n+`\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/build.yml",
+    "LICENSE",
+    "README.md",
+    "aconfig.go",
+    "aconfig_test.go",
+    "aconfigtoml/go.mod",
+    "aconfigtoml/go.sum",
+    "aconfigtoml/toml.go",
+    "aconfigtoml/toml_test.go",
+    "aconfigyaml/go.mod",
+    "aconfigyaml/go.sum",
+    "aconfigyaml/yaml.go",
+    "aconfigyaml/yaml_test.go",
+    "example_test.go",
+    "go.mod",
+    "reflection.go",
+    "testdata/bad_config.json",
+    "testdata/config1.json",
+    "testdata/example_config.json",
+    "testdata/unknown.ext",
+    "testfile.json",
+    "utils.go",
+    "utils_test.go"
+  ],
+  "explanation": {
+    "what": "aconfigtoml・aconfigyaml サブモジュールのテストを、リポジトリに固定の testfile.toml/testfile.yaml を置く方式から、t.TempDir() に一時ファイルを生成する createTestFile ヘルパー方式に変更した。flatten 関数で int64/float64 の扱いを整理し、TOML 側では map[interface{}]interface{} の分岐を削除するなど decoder 実装をシンプル化。go.mod の replace ディレクティブを外し、aconfig 本体を v0.10.0-beta に固定する形にした。",
+    "why": "PR タイトルは \"better tests for submodules\" で本文は空。diff からは、テストごとに使い捨てのファイルをその場で生成することでテスト間の依存やリポジトリへのファイル汚染を減らす狙いが読める。auto-tags(#29)で flatten の型分岐が増えていたのを整理し直した後始末的な側面もある。",
+    "highlights": [
+      { "file": "aconfigtoml/toml_test.go", "note": "createTestFile が t.TempDir() 配下にテスト用 TOML を書き出す" },
+      { "file": "aconfigyaml/yaml.go", "note": "flatten の型 switch が整理され int64/float64 の扱いが明確になった" }
+    ],
+    "langNotes": [
+      { "topic": "t.TempDir()", "note": "Go 1.15 で追加されたテストヘルパーで、テストごとに自動クリーンアップされる一時ディレクトリを返す。テストが外部ファイルに依存せず自己完結するようになる。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [{ "type": "pr", "number": 36, "url": "https://github.com/cristalhq/aconfig/pull/36" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

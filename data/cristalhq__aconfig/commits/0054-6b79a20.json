@@ -1,0 +1,68 @@
+{
+  "seq": 54,
+  "sha": "6b79a207da46dec53da94b56d70159dfb9f895d9",
+  "parents": [
+    "73bb42992d16f39066b2659ca4d911e32329585a"
+  ],
+  "author": {
+    "name": "Oleg Kovalov",
+    "email": "iamolegkovalov@gmail.com",
+    "date": "2020-08-02T22:16:17+02:00"
+  },
+  "message": "add and update godoc comments",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 11,
+    "deletions": 2
+  },
+  "files": [
+    {
+      "path": "aconfig.go",
+      "status": "M",
+      "additions": 11,
+      "deletions": 2,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/aconfig.go b/aconfig.go\nindex 8634110..212c47b 100644\n--- a/aconfig.go\n+++ b/aconfig.go\n@@ -61,37 +61,42 @@ type Field interface {\n \tTag(tag string) string\n }\n \n-// Loader creates a new Loader based on a config.\n-// Zero-value config is acceptable.\n+// LoaderFor creates a new Loader based on a given configuration structure.\n func LoaderFor(src interface{}) *Loader {\n \treturn &Loader{src: src}\n }\n \n+// SkipDefaults if you don't want to use them.\n func (l *Loader) SkipDefaults() *Loader {\n \tl.config.SkipDefaults = true\n \treturn l\n }\n \n+// SkipFiles if you don't want to use them.\n func (l *Loader) SkipFiles() *Loader {\n \tl.config.SkipFile = true\n \treturn l\n }\n \n+// SkipEnvironment if you don't want to use it.\n func (l *Loader) SkipEnvironment() *Loader {\n \tl.config.SkipEnv = true\n \treturn l\n }\n \n+// SkipFlags if you don't want to use them.\n func (l *Loader) SkipFlags() *Loader {\n \tl.config.SkipFlag = true\n \treturn l\n }\n \n+// WithFiles for a configuration.\n func (l *Loader) WithFiles(files []string) *Loader {\n \tl.config.Files = files\n \treturn l\n }\n \n+// WithEnvPrefix to specify environment prefix.\n func (l *Loader) WithEnvPrefix(prefix string) *Loader {\n \tl.config.EnvPrefix = prefix\n \tif l.config.EnvPrefix != \"\" {\n@@ -100,11 +105,13 @@ func (l *Loader) WithEnvPrefix(prefix string) *Loader {\n \treturn l\n }\n \n+// StopOnFileError to stop configuration loading on file error.\n func (l *Loader) StopOnFileError() *Loader {\n \tl.config.ShouldStopOnFileError = true\n \treturn l\n }\n \n+// WithFlagPrefix to specify command-line flags prefix.\n func (l *Loader) WithFlagPrefix(prefix string) *Loader {\n \tl.config.FlagPrefix = prefix\n \tif l.config.FlagPrefix != \"\" {\n@@ -113,6 +120,7 @@ func (l *Loader) WithFlagPrefix(prefix string) *Loader {\n \treturn l\n }\n \n+// Build to initialize flags for a given configuration.\n func (l *Loader) Build() *Loader {\n \tl.parseFields(l.src)\n \tl.isBuilt = true\n@@ -132,6 +140,7 @@ func (l *Loader) parseFields(cfg interface{}) {\n \t}\n }\n \n+// Flags returngs flag.FlagSet to create your own flags.\n func (l *Loader) Flags() *flag.FlagSet {\n \tif !l.isBuilt {\n \t\tpanic(\"aconfig: you must run Build method before using the loader\")\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/build.yml",
+    "LICENSE",
+    "README.md",
+    "aconfig.go",
+    "aconfig_test.go",
+    "example_test.go",
+    "go.mod",
+    "go.sum",
+    "testdata/all_types_config.json",
+    "testdata/bad_config.json",
+    "testdata/config1.json",
+    "testdata/config1.toml",
+    "testdata/config1.yaml",
+    "testdata/example_config.json",
+    "testdata/my_duration_config.json",
+    "testdata/other_numbers_config.json",
+    "testdata/test_config_def.json",
+    "testdata/test_config_env.json",
+    "testdata/test_config_flag.json",
+    "testdata/unknown.ext"
+  ],
+  "explanation": {
+    "what": "Loader の公開メソッド群(LoaderFor, SkipDefaults, SkipFiles, SkipEnvironment, SkipFlags, WithFiles, WithEnvPrefix, StopOnFileError, WithFlagPrefix, Build, Flags)に godoc コメントを新規追加・更新した。LoaderFor の既存コメントも「Zero-value config is acceptable」という記述を削り、より簡潔な説明に書き換えている。",
+    "why": "コミットメッセージの通り godoc コメントの追加・更新が目的。公開 API のドキュメントコメントを整備することで、pkg.go.dev などで生成される godoc の説明を利用者にとって分かりやすくする意図とみられる。",
+    "highlights": [
+      { "file": "aconfig.go", "note": "Skip系・With系メソッドすべてに1行の用途説明コメントが付き、godoc として表示される内容が揃った" }
+    ],
+    "langNotes": [
+      { "topic": "godoc コメント規約", "note": "Go では公開識別子の直前に // で始まるコメントを書くと、それが godoc に自動的に取り込まれる。慣習として1文目は対象の識別子名から始める(例: \"LoaderFor creates a new Loader...\")。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

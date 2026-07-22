@@ -1,0 +1,66 @@
+{
+  "seq": 49,
+  "sha": "9b2c83eac5267f76828015ca53e36cbcdc6f410f",
+  "parents": [
+    "5c8cfe1811f6f6a05abfcae9f2a6ff0819a21f8d"
+  ],
+  "author": {
+    "name": "Oleg Kovalov",
+    "email": "iamolegkovalov@gmail.com",
+    "date": "2020-07-29T20:13:39+02:00"
+  },
+  "message": "git remove duplicated code",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 1,
+    "deletions": 9
+  },
+  "files": [
+    {
+      "path": "aconfig.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 9,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/aconfig.go b/aconfig.go\nindex 71c40e3..95d0bca 100644\n--- a/aconfig.go\n+++ b/aconfig.go\n@@ -168,17 +168,9 @@ func (l *Loader) Load(into interface{}) error {\n \n // LoadWithFile configuration into a given param.\n func (l *Loader) LoadWithFile(into interface{}, file string) error {\n-\tif !l.isBuilt {\n-\t\tpanic(\"aconfig: you must run Build method before using the loader\")\n-\t}\n-\t// we need to get fields once more, 'cause `into` is new for us\n-\tl.fields = getFields(into)\n \tl.config.Files = []string{file}\n \n-\tif err := l.loadSources(into); err != nil {\n-\t\treturn fmt.Errorf(\"aconfig: cannot load config: %w\", err)\n-\t}\n-\treturn nil\n+\treturn l.Load(into)\n }\n \n func (l *Loader) loadSources(into interface{}) error {\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/build.yml",
+    "LICENSE",
+    "README.md",
+    "aconfig.go",
+    "aconfig_test.go",
+    "example_test.go",
+    "go.mod",
+    "go.sum",
+    "testdata/all_types_config.json",
+    "testdata/bad_config.json",
+    "testdata/config1.json",
+    "testdata/config1.toml",
+    "testdata/config1.yaml",
+    "testdata/example_config.json",
+    "testdata/my_duration_config.json",
+    "testdata/other_numbers_config.json",
+    "testdata/test_config_def.json",
+    "testdata/test_config_env.json",
+    "testdata/test_config_flag.json",
+    "testdata/unknown.ext"
+  ],
+  "explanation": {
+    "what": "`LoadWithFile` の実装を、`Load` と重複していたBuildチェック・getFields呼び出し・loadSources呼び出しのコードを削除し、`l.config.Files` をセットしたあとに `l.Load(into)` を呼ぶだけの薄いラッパーに書き換えた。",
+    "why": "PRに紐付かないコミットで、コミットメッセージ \"git remove duplicated code\" がそのまま意図を表している。直前のコミットで LoadWithFile を新設した際に Load とほぼ同じ処理を再実装してしまっていたため、単純委譲に整理して重複を解消したもの。",
+    "highlights": [
+      { "file": "aconfig.go", "note": "LoadWithFile が Files をセットしてから Load(into) に処理を委譲する形に簡略化" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

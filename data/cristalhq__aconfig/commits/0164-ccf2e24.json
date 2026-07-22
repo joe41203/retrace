@@ -1,0 +1,112 @@
+{
+  "seq": 164,
+  "sha": "ccf2e24cf260e134dac9673e579ff3668d45b38e",
+  "parents": [
+    "7111e04773005c1271da579d77dceccd4a5f3651"
+  ],
+  "author": {
+    "name": "d-enk",
+    "email": "d-enk@ya.ru",
+    "date": "2025-04-15T15:55:03+03:00"
+  },
+  "message": "fix: correctly support nested structs",
+  "pr": {
+    "number": 159,
+    "title": "Fix: correctly support nested structs",
+    "body": "Close https://github.com/cristalhq/aconfig/issues/157",
+    "url": "https://github.com/cristalhq/aconfig/pull/159"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 3,
+    "additions": 64,
+    "deletions": 28
+  },
+  "files": [
+    {
+      "path": "aconfig_test.go",
+      "status": "M",
+      "additions": 46,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "reflection.go",
+      "status": "M",
+      "additions": 5,
+      "deletions": 28,
+      "binary": false
+    },
+    {
+      "path": "testdata/slice-deep-structs.json",
+      "status": "A",
+      "additions": 13,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/aconfig_test.go b/aconfig_test.go\nindex ca5969e..fc84c63 100644\n--- a/aconfig_test.go\n+++ b/aconfig_test.go\n@@ -1568,6 +1568,52 @@ func TestSliceOfStructsWithSliceOfPrimitives(t *testing.T) {\n \tmustEqual(t, cfg, want)\n }\n \n+func TestSliceOfDeepStructs(t *testing.T) {\n+\ttype String string\n+\n+\ttype NestedStruct struct{ Key int }\n+\n+\ttype TestService struct {\n+\t\tName     String\n+\t\tStrings  []String\n+\t\tIntegers []int\n+\t\tBooleans []bool\n+\t\tStructs  []NestedStruct\n+\t}\n+\n+\ttype TestConfig struct {\n+\t\tServices []struct{ Nested TestService }\n+\t}\n+\tvar cfg TestConfig\n+\tloader := LoaderFor(&cfg, Config{\n+\t\tSkipDefaults: true,\n+\t\tSkipEnv:      true,\n+\t\tSkipFlags:    true,\n+\t\tFiles:        []string{\"testdata/slice-deep-structs.json\"},\n+\t})\n+\n+\tfailIfErr(t, loader.Load())\n+\n+\twant := TestConfig{\n+\t\tServices: []struct{ Nested TestService }{\n+\t\t\t{\n+\t\t\t\tNested: TestService{\n+\t\t\t\t\tName:     \"service1\",\n+\t\t\t\t\tStrings:  []String{\"string1\", \"string2\"},\n+\t\t\t\t\tIntegers: []int{1, 2},\n+\t\t\t\t\tBooleans: []bool{true, false},\n+\t\t\t\t\tStructs: []NestedStruct{\n+\t\t\t\t\t\t{1},\n+\t\t\t\t\t\t{2},\n+\t\t\t\t\t\t{3},\n+\t\t\t\t\t},\n+\t\t\t\t},\n+\t\t\t},\n+\t\t},\n+\t}\n+\tmustEqual(t, cfg, want)\n+}\n+\n func failIfOk(tb testing.TB, err error) {\n \ttb.Helper()\n \tif err == nil {\ndiff --git a/reflection.go b/reflection.go\nindex cfcf9b3..940ba2c 100644\n--- a/reflection.go\n+++ b/reflection.go\n@@ -380,35 +380,12 @@ func (l *Loader) m2s(m map[string]interface{}, structValue reflect.Value) error\n \t\t\treturn fmt.Errorf(\"cannot set %q field value\", name)\n \t\t}\n \n-\t\tval := reflect.ValueOf(value)\n-\t\tif structFieldValue.Type() != val.Type() {\n-\t\t\tif structFieldValue.Kind() == reflect.Slice && val.Kind() == reflect.Slice {\n-\t\t\t\tvals := value.([]interface{})\n-\t\t\t\tslice := reflect.MakeSlice(structFieldValue.Type(), len(vals), len(vals))\n-\t\t\t\tif isPrimitive(structFieldValue.Type().Elem()) {\n-\t\t\t\t\tfor i := 0; i < len(vals); i++ {\n-\t\t\t\t\t\tfd := l.newFieldData(reflect.StructField{}, slice.Index(i), nil)\n-\t\t\t\t\t\tif err := l.setFieldData(fd, vals[i]); err != nil {\n-\t\t\t\t\t\t\treturn fmt.Errorf(\"incorrect slice item %q: %w\", vals[i], err)\n-\t\t\t\t\t\t}\n-\t\t\t\t\t}\n-\t\t\t\t} else {\n-\t\t\t\t\tfor i := 0; i < len(vals); i++ {\n-\t\t\t\t\t\ta := mii(vals[i])\n-\t\t\t\t\t\tb := slice.Index(i)\n-\t\t\t\t\t\tif err := l.m2s(a, b); err != nil {\n-\t\t\t\t\t\t\treturn err\n-\t\t\t\t\t\t}\n-\t\t\t\t\t}\n-\t\t\t\t}\n-\t\t\t\tstructFieldValue.Set(slice)\n-\t\t\t\tcontinue\n-\t\t\t} else {\n-\t\t\t\treturn fmt.Errorf(\"provided value type do not match struct field type (%v and %v)\", structFieldValue.Type(), val.Type())\n-\t\t\t}\n-\t\t}\n+\t\tfield, _ := structValue.Type().FieldByName(name)\n \n-\t\tstructFieldValue.Set(val)\n+\t\tfd := l.newFieldData(field, structFieldValue, nil)\n+\t\tif err := l.setFieldData(fd, value); err != nil {\n+\t\t\treturn err\n+\t\t}\n \t}\n \treturn nil\n }\ndiff --git a/testdata/slice-deep-structs.json b/testdata/slice-deep-structs.json\nnew file mode 100644\nindex 0000000..7668e4f\n--- /dev/null\n+++ b/testdata/slice-deep-structs.json\n@@ -0,0 +1,13 @@\n+{\n+  \"services\": [\n+    {\n+      \"nested\": {\n+        \"name\": \"service1\",\n+        \"strings\": [\"string1\", \"string2\"],\n+        \"integers\": [1, 2],\n+        \"booleans\": [true, false],\n+        \"structs\": [{ \"key\": 1 }, { \"key\": 2 }, { \"key\": 3 }]\n+      }\n+    }\n+  ]\n+}\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/dependabot.yml",
+    ".github/workflows/build.yml",
+    "LICENSE",
+    "README.md",
+    "aconfig.go",
+    "aconfig_test.go",
+    "aconfigdotenv/dotenv.go",
+    "aconfigdotenv/dotenv_test.go",
+    "aconfigdotenv/go.mod",
+    "aconfigdotenv/go.sum",
+    "aconfigdotenv/testdata/config.env",
+    "aconfighcl/go.mod",
+    "aconfighcl/go.sum",
+    "aconfighcl/hcl.go",
+    "aconfighcl/hcl_test.go",
+    "aconfighcl/testdata/config.hcl",
+    "aconfigtoml/go.mod",
+    "aconfigtoml/go.sum",
+    "aconfigtoml/testdata/config.toml",
+    "aconfigtoml/toml.go",
+    "aconfigtoml/toml_test.go",
+    "aconfigyaml/go.mod",
+    "aconfigyaml/go.sum",
+    "aconfigyaml/res.yaml",
+    "aconfigyaml/testdata/config.yaml",
+    "aconfigyaml/yaml.go",
+    "aconfigyaml/yaml_test.go",
+    "doc.go",
+    "example_test.go",
+    "go.mod",
+    "go.sum",
+    "parser.go",
+    "reflection.go",
+    "testdata/bad_config.json",
+    "testdata/complex.json",
+    "testdata/config.json",
+    "testdata/config1.json",
+    "testdata/config2.json",
+    "testdata/config3.json",
+    "testdata/example_config.json",
+    "testdata/slice-deep-structs.json",
+    "testdata/slice-struct-primitive-slice.json",
+    "testdata/toy.json",
+    "testdata/unknown_fields.json",
+    "utils.go",
+    "utils_test.go"
+  ],
+  "explanation": {
+    "what": "reflection.go の m2s(map[string]interface{} を struct へ変換する関数)を簡素化し、フィールド型の分岐(スライスかどうかの手書き変換ロジック)を丸ごと削除して、代わりに newFieldData で fieldData を組み立て直し setFieldData に処理を委譲するようにした。これにより m2s 自身は型ごとの特殊対応を持たず、setFieldData が持つ既存の分岐(struct/slice/mapなど)を再利用する形になる。新規テスト TestSliceOfDeepStructs と testdata/slice-deep-structs.json で、struct のスライスの中にさらに struct/スライスがネストする構成を検証している。",
+    "why": "PR本文は Issue #157 のクローズを目的とすると述べているのみで詳細は書かれていないが、直前のseq163で m2s に case reflect.Struct を場当たり的に追加したのと同様、型ごとの分岐をm2s内に個別実装すると組み合わせが増えるたびに対応漏れが発生する。このコミットは m2s の役割を「フィールドを見つけて setFieldData に渡す」ことに限定し、値の型ごとの変換ロジックは setFieldData 側の既存分岐に一本化することで、ネストしたstructのスライスのような深い入れ子構造も自然に再帰処理できるようにしている。",
+    "highlights": [
+      { "file": "reflection.go", "note": "m2s の手書きスライス変換(reflect.MakeSlice以下の分岐)を削除し、newFieldData→setFieldData への委譲に統一" },
+      { "file": "testdata/slice-deep-structs.json", "note": "struct スライスの中に文字列スライス・struct スライスがネストする検証データ" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [{ "type": "pr", "number": 159, "url": "https://github.com/cristalhq/aconfig/pull/159" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

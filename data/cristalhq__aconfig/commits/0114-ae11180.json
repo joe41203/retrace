@@ -1,0 +1,105 @@
+{
+  "seq": 114,
+  "sha": "ae11180194e8e9166b5176e9bf807c95d802ea27",
+  "parents": [
+    "82efc9210694bea93d8045e05ff7cf12c7a2dfdb"
+  ],
+  "author": {
+    "name": "Oleg Kovalov",
+    "email": "oleg@hey.com",
+    "date": "2021-05-18T15:02:04+02:00"
+  },
+  "message": "add .yml format (#74)",
+  "pr": {
+    "number": 74,
+    "title": "add .yml format",
+    "body": "Fixes #71 ",
+    "url": "https://github.com/cristalhq/aconfig/pull/74"
+  },
+  "linkedIssues": [
+    {
+      "number": 71,
+      "title": "Only pre-set file extensions are supported",
+      "body": "This does not work:\r\n\r\n```go\r\naconfig.LoaderFor(dest, aconfig.Config{\r\n\tFiles:            files,\r\n\tFileDecoders: map[string]aconfig.FileDecoder{\r\n\t\t\".yaml\": aconfigyaml.New(),\r\n\t\t\".yml\":  aconfigyaml.New(),\r\n\t},\r\n})\r\n```\r\n\r\n\r\n`.yml` files cannot be loaded and fail with `cannot load config: unknown field in file` error, because the struct tags are only [auto-generated for the pre-set formats](https://github.com/cristalhq/aconfig/blob/main/reflection.go#L69-L71). The file format is then recognized via `filepath.Ext`, which is `yml` and not `yaml`.\r\n\r\nIMHO the \"format\" should be returned by the file decoder, maybe as another interface method. I can try to prepare a PR if you'd like to go that way.\r\n\r\nEDIT: example of how it might look like without breaking backwards compatibility: https://github.com/avast/aconfig/commit/fbab7665e54111e1cc90a431de747afdbcf7bbff",
+      "url": "https://github.com/cristalhq/aconfig/issues/71"
+    }
+  ],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 12,
+    "deletions": 1
+  },
+  "files": [
+    {
+      "path": "aconfig.go",
+      "status": "M",
+      "additions": 4,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "utils.go",
+      "status": "M",
+      "additions": 8,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/aconfig.go b/aconfig.go\nindex f63f895..43f4ade 100644\n--- a/aconfig.go\n+++ b/aconfig.go\n@@ -142,6 +142,9 @@ func (l *Loader) init() {\n \t\t}\n \t\tl.config.FileDecoders[\".json\"] = &jsonDecoder{}\n \t}\n+\tif dec, ok := l.config.FileDecoders[\".yaml\"]; ok {\n+\t\tl.config.FileDecoders[\".yml\"] = dec\n+\t}\n \n \tif l.config.Args == nil {\n \t\tl.config.Args = os.Args[1:]\n@@ -289,7 +292,7 @@ func (l *Loader) loadFromFile() error {\n \t\t\treturn err\n \t\t}\n \n-\t\ttag := ext[1:]\n+\t\ttag := getTagForExt(ext)\n \n \t\tfor _, field := range l.fields {\n \t\t\tname := l.fullTag(field, tag)\ndiff --git a/utils.go b/utils.go\nindex 5f7e8b7..a7aeeca 100644\n--- a/utils.go\n+++ b/utils.go\n@@ -23,6 +23,14 @@ func assertStruct(x interface{}) {\n \t}\n }\n \n+func getTagForExt(ext string) string {\n+\ttag := ext[1:]\n+\tif tag == \"yml\" {\n+\t\ttag = \"yaml\"\n+\t}\n+\treturn tag\n+}\n+\n func getEnv() map[string]interface{} {\n \tenv := os.Environ()\n \tres := make(map[string]interface{}, len(env))\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/build.yml",
+    "LICENSE",
+    "README.md",
+    "aconfig.go",
+    "aconfig_test.go",
+    "aconfigdotenv/dotenv.go",
+    "aconfigdotenv/dotenv_test.go",
+    "aconfigdotenv/go.mod",
+    "aconfigdotenv/go.sum",
+    "aconfighcl/go.mod",
+    "aconfighcl/go.sum",
+    "aconfighcl/hcl.go",
+    "aconfighcl/hcl_test.go",
+    "aconfigtoml/go.mod",
+    "aconfigtoml/go.sum",
+    "aconfigtoml/toml.go",
+    "aconfigtoml/toml_test.go",
+    "aconfigyaml/go.mod",
+    "aconfigyaml/go.sum",
+    "aconfigyaml/yaml.go",
+    "aconfigyaml/yaml_test.go",
+    "doc.go",
+    "example_test.go",
+    "go.mod",
+    "reflection.go",
+    "testdata/bad_config.json",
+    "testdata/config.json",
+    "testdata/config1.json",
+    "testdata/config2.json",
+    "testdata/config3.json",
+    "testdata/example_config.json",
+    "testdata/unknown.ext",
+    "testdata/unknown_fields.json",
+    "testfile.json",
+    "utils.go",
+    "utils_test.go"
+  ],
+  "explanation": {
+    "what": "`.yml` 拡張子のファイルを `.yaml` デコーダに割り当てるようにした。init() で FileDecoders に `.yaml` が登録されていれば同じデコーダを `.yml` にも登録し、utils.go に新設した `getTagForExt` でタグ名としては常に `yaml` を使うようにした。",
+    "why": "リンクされた issue #71 が報告する通り、struct タグは `.yaml`/`.json` など決め打ちの拡張子ごとにしか自動生成されず、`.yml` を使うと `unknown field in file` エラーになっていた。フォーマットは `filepath.Ext` でそのまま拡張子を見ていたため、`yml` と `yaml` の表記ゆれがタグ名の不一致を招いていた。issue のコメントで挙げられた「デコーダ自身が形式名を返すべき」という案の前段階として、まずは `.yml` を `.yaml` にマップする最小修正で対応した。",
+    "highlights": [
+      { "file": "aconfig.go", "note": "init() で FileDecoders[\".yaml\"] があれば FileDecoders[\".yml\"] にも同じデコーダを登録" },
+      { "file": "utils.go", "note": "getTagForExt: 拡張子が yml なら yaml に読み替えてタグ名を決定" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "issue",
+    "refs": [
+      { "type": "pr", "number": 74, "url": "https://github.com/cristalhq/aconfig/pull/74" },
+      { "type": "issue", "number": 71, "url": "https://github.com/cristalhq/aconfig/issues/71" }
+    ],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

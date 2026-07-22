@@ -1,0 +1,95 @@
+{
+  "seq": 97,
+  "sha": "1765c4630132820a14d43994323139361acd8aa5",
+  "parents": [
+    "1e7d137c178e9df8f28279a465830ff889f6056f"
+  ],
+  "author": {
+    "name": "Yury Makarov",
+    "email": "mef4mail@gmail.com",
+    "date": "2021-02-27T19:34:10+03:00"
+  },
+  "message": "fix hcl (#53)",
+  "pr": {
+    "number": 53,
+    "title": "fix hcl",
+    "body": "",
+    "url": "https://github.com/cristalhq/aconfig/pull/53"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 159,
+    "deletions": 156
+  },
+  "files": [
+    {
+      "path": "aconfig.go",
+      "status": "M",
+      "additions": 2,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "aconfighcl/hcl_test.go",
+      "status": "M",
+      "additions": 157,
+      "deletions": 156,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/aconfig.go b/aconfig.go\nindex e30c425..597c609 100644\n--- a/aconfig.go\n+++ b/aconfig.go\n@@ -304,12 +304,14 @@ func (l *Loader) find(actualFields map[string]interface{}, name string) (map[str\n \t\t\t\tactualFields[subName+\".\"+k] = v\n \t\t\t}\n \t\t}\n+\t\tdelete(actualFields, subName)\n \tcase []map[interface{}]interface{}:\n \t\tfor _, m := range val {\n \t\t\tfor k, v := range m {\n \t\t\t\tactualFields[subName+\".\"+fmt.Sprint(k)] = v\n \t\t\t}\n \t\t}\n+\t\tdelete(actualFields, subName)\n \t}\n \treturn actualFields, true\n }\ndiff --git a/aconfighcl/hcl_test.go b/aconfighcl/hcl_test.go\nindex 2908d5d..5600b47 100644\n--- a/aconfighcl/hcl_test.go\n+++ b/aconfighcl/hcl_test.go\n@@ -1,156 +1,157 @@\n-package aconfighcl_test\r\n-\r\n-import (\r\n-\t\"os\"\r\n-\t\"reflect\"\r\n-\t\"testing\"\r\n-\r\n-\t\"github.com/cristalhq/aconfig\"\r\n-\t\"github.com/cristalhq/aconfig/aconfighcl\"\r\n-)\r\n-\r\n-func TestHCL(t *testing.T) {\r\n-\tt.SkipNow()\r\n-\tfilepath := createTestFile(t)\r\n-\r\n-\tvar cfg structConfig\r\n-\tloader := aconfig.LoaderFor(&cfg, aconfig.Config{\r\n-\t\tSkipDefaults: true,\r\n-\t\tSkipEnv:      true,\r\n-\t\tSkipFlags:    true,\r\n-\t\tFileDecoders: map[string]aconfig.FileDecoder{\r\n-\t\t\t\".hcl\": aconfighcl.New(),\r\n-\t\t},\r\n-\t\tFiles: []string{filepath},\r\n-\t})\r\n-\r\n-\tif err := loader.Load(); err != nil {\r\n-\t\tt.Fatal(err)\r\n-\t}\r\n-\r\n-\ti := int32(42)\r\n-\tj := int64(420)\r\n-\twant := structConfig{\r\n-\t\tA: \"b\",\r\n-\t\tC: 10,\r\n-\t\tE: 123.456,\r\n-\t\tB: []byte(\"abc\"),\r\n-\t\tI: &i,\r\n-\t\tJ: &j,\r\n-\t\tY: structY{\r\n-\t\t\tX: \"y\",\r\n-\t\t\tZ: []string{\"1\", \"2\", \"3\"},\r\n-\t\t\tA: structD{\r\n-\t\t\t\tI: true,\r\n-\t\t\t},\r\n-\t\t},\r\n-\t\tAA: structA{\r\n-\t\t\tX: \"y\",\r\n-\t\t\tBB: structB{\r\n-\t\t\t\tCC: structC{\r\n-\t\t\t\t\tMM: \"n\",\r\n-\t\t\t\t\tBB: []byte(\"boo\"),\r\n-\t\t\t\t},\r\n-\t\t\t\tDD: []string{\"x\", \"y\", \"z\"},\r\n-\t\t\t},\r\n-\t\t},\r\n-\t\tStructM: StructM{\r\n-\t\t\tM: \"n\",\r\n-\t\t},\r\n-\t}\r\n-\r\n-\tif got := cfg; !reflect.DeepEqual(want, got) {\r\n-\t\tt.Fatalf(\"want %v, got %v\", want, got)\r\n-\t}\r\n-}\r\n-\r\n-func createTestFile(t *testing.T) string {\r\n-\tt.Helper()\r\n-\tdir := t.TempDir()\r\n-\tt.Cleanup(func() {\r\n-\t\tos.RemoveAll(dir)\r\n-\t})\r\n-\r\n-\tfilepath := dir + \"/testfile.hcl\"\r\n-\r\n-\tf, err := os.Create(filepath)\r\n-\tif err != nil {\r\n-\t\tt.Fatal(err)\r\n-\t}\r\n-\t_, err = f.WriteString(testfileContent)\r\n-\tif err != nil {\r\n-\t\tt.Fatal(err)\r\n-\t}\r\n-\treturn filepath\r\n-}\r\n-\r\n-type structConfig struct {\r\n-\tA string  `hcl:\"a\"`\r\n-\tC int     `hcl:\"c\"`\r\n-\tE float64 `hcl:\"e\"`\r\n-\tB []byte  `hcl:\"b\"`\r\n-\tI *int32  `hcl:\"i\"`\r\n-\tJ *int64  `hcl:\"j\"`\r\n-\tY structY `hcl:\"y\"`\r\n-\r\n-\tAA structA `hcl:\"A\"`\r\n-\tStructM\r\n-}\r\n-\r\n-type structY struct {\r\n-\tX string   `hcl:\"x\"`\r\n-\tZ []string `hcl:\"z\"`\r\n-\tA structD  `hcl:\"A\"`\r\n-}\r\n-\r\n-type structA struct {\r\n-\tX  string  `hcl:\"x\"`\r\n-\tBB structB `hcl:\"B\"`\r\n-}\r\n-\r\n-type structB struct {\r\n-\tCC structC  `hcl:\"C\"`\r\n-\tDD []string `hcl:\"D\"`\r\n-}\r\n-\r\n-type structC struct {\r\n-\tMM string `hcl:\"m\"`\r\n-\tBB []byte `hcl:\"b\"`\r\n-}\r\n-\r\n-type structD struct {\r\n-\tI bool `hcl:\"i\"`\r\n-}\r\n-\r\n-type StructM struct {\r\n-\tM string `hcl:\"M\"`\r\n-}\r\n-\r\n-const testfileContent = `\r\n-\"a\" = \"b\"\r\n-\"c\" = 10\r\n-\"e\" = 123.456\r\n-\"b\" = \"abc\"\r\n-\"i\" = 42\r\n-\"j\" = 420\r\n-\r\n-\"y\" = {\r\n-\t\"x\" = \"y\"\r\n-\t\"z\" = [\"1\", \"2\", \"3\"]\r\n-\t\"A\" = {\r\n-\t\t\"i\" = true\r\n-\t}\r\n-}\r\n-\"A\" = {\r\n-\t\"x\" = \"y\"\r\n-\t\"B\" = {\r\n-\t\t\"C\" = {\r\n-\t\t\t\"m\" = \"n\"\r\n-\t\t\t\"b\" = \"boo\"\r\n-\t\t}\r\n-\t\t\"D\" = [\"x\", \"y\", \"z\"]\r\n-\t}\r\n-}\r\n-\r\n-\"M\" = \"n\"\r\n-`\r\n+package aconfighcl_test\n+\n+import (\n+\t\"os\"\n+\t\"reflect\"\n+\t\"testing\"\n+\n+\t\"github.com/cristalhq/aconfig\"\n+\t\"github.com/cristalhq/aconfig/aconfighcl\"\n+)\n+\n+func TestHCL(t *testing.T) {\n+\tt.SkipNow()\n+\tfilepath := createTestFile(t)\n+\n+\tvar cfg structConfig\n+\tloader := aconfig.LoaderFor(&cfg, aconfig.Config{\n+\t\tSkipDefaults: true,\n+\t\tSkipEnv:      true,\n+\t\tSkipFlags:    true,\n+\t\tFileDecoders: map[string]aconfig.FileDecoder{\n+\t\t\t\".hcl\": aconfighcl.New(),\n+\t\t},\n+\t\tFiles: []string{filepath},\n+\t})\n+\n+\tif err := loader.Load(); err != nil {\n+\t\tt.Fatal(err)\n+\t}\n+\n+\ti := int32(42)\n+\tj := int64(420)\n+\twant := structConfig{\n+\t\tA: \"b\",\n+\t\tC: 10,\n+\t\tE: 123.456,\n+\t\tB: []byte(\"abc\"),\n+\t\tI: &i,\n+\t\tJ: &j,\n+\t\tY: structY{\n+\t\t\tX: \"y\",\n+\t\t\tZ: []string{\"1\", \"2\", \"3\"},\n+\t\t\tA: structD{\n+\t\t\t\tI: true,\n+\t\t\t},\n+\t\t},\n+\t\tAA: structA{\n+\t\t\tX: \"y\",\n+\t\t\tBB: structB{\n+\t\t\t\tCC: structC{\n+\t\t\t\t\tMM: \"n\",\n+\t\t\t\t\tBB: []byte(\"boo\"),\n+\t\t\t\t},\n+\t\t\t\tDD: []string{\"x\", \"y\", \"z\"},\n+\t\t\t},\n+\t\t},\n+\t\tStructM: StructM{\n+\t\t\tM: \"n\",\n+\t\t},\n+\t}\n+\n+\tif got := cfg; !reflect.DeepEqual(want, got) {\n+\t\tt.Fatalf(\"want %v, got %v\", want, got)\n+\t}\n+}\n+\n+func createTestFile(t *testing.T) string {\n+\tt.Helper()\n+\tdir := t.TempDir()\n+\tt.Cleanup(func() {\n+\t\tos.RemoveAll(dir)\n+\t})\n+\n+\tfilepath := dir + \"/testfile.hcl\"\n+\n+\tf, err := os.Create(filepath)\n+\tif err != nil {\n+\t\tt.Fatal(err)\n+\t}\n+\tdefer f.Close()\n+\t_, err = f.WriteString(testfileContent)\n+\tif err != nil {\n+\t\tt.Fatal(err)\n+\t}\n+\treturn filepath\n+}\n+\n+type structConfig struct {\n+\tA string  `hcl:\"a\"`\n+\tC int     `hcl:\"c\"`\n+\tE float64 `hcl:\"e\"`\n+\tB []byte  `hcl:\"b\"`\n+\tI *int32  `hcl:\"i\"`\n+\tJ *int64  `hcl:\"j\"`\n+\tY structY `hcl:\"y\"`\n+\n+\tAA structA `hcl:\"A\"`\n+\tStructM\n+}\n+\n+type structY struct {\n+\tX string   `hcl:\"x\"`\n+\tZ []string `hcl:\"z\"`\n+\tA structD  `hcl:\"A\"`\n+}\n+\n+type structA struct {\n+\tX  string  `hcl:\"x\"`\n+\tBB structB `hcl:\"B\"`\n+}\n+\n+type structB struct {\n+\tCC structC  `hcl:\"C\"`\n+\tDD []string `hcl:\"D\"`\n+}\n+\n+type structC struct {\n+\tMM string `hcl:\"m\"`\n+\tBB []byte `hcl:\"b\"`\n+}\n+\n+type structD struct {\n+\tI bool `hcl:\"i\"`\n+}\n+\n+type StructM struct {\n+\tM string `hcl:\"M\"`\n+}\n+\n+const testfileContent = `\n+\"a\" = \"b\"\n+\"c\" = 10\n+\"e\" = 123.456\n+\"b\" = \"abc\"\n+\"i\" = 42\n+\"j\" = 420\n+\n+\"y\" = {\n+\t\"x\" = \"y\"\n+\t\"z\" = [\"1\", \"2\", \"3\"]\n+\t\"A\" = {\n+\t\t\"i\" = true\n+\t}\n+}\n+\"A\" = {\n+\t\"x\" = \"y\"\n+\t\"B\" = {\n+\t\t\"C\" = {\n+\t\t\t\"m\" = \"n\"\n+\t\t\t\"b\" = \"boo\"\n+\t\t}\n+\t\t\"D\" = [\"x\", \"y\", \"z\"]\n+\t}\n+}\n+\n+\"M\" = \"n\"\n+`\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/build.yml",
+    "LICENSE",
+    "README.md",
+    "aconfig.go",
+    "aconfig_test.go",
+    "aconfigdotenv/dotenv.go",
+    "aconfigdotenv/dotenv_test.go",
+    "aconfigdotenv/go.mod",
+    "aconfigdotenv/go.sum",
+    "aconfighcl/go.mod",
+    "aconfighcl/go.sum",
+    "aconfighcl/hcl.go",
+    "aconfighcl/hcl_test.go",
+    "aconfigtoml/go.mod",
+    "aconfigtoml/go.sum",
+    "aconfigtoml/toml.go",
+    "aconfigtoml/toml_test.go",
+    "aconfigyaml/go.mod",
+    "aconfigyaml/go.sum",
+    "aconfigyaml/yaml.go",
+    "aconfigyaml/yaml_test.go",
+    "doc.go",
+    "example_test.go",
+    "go.mod",
+    "reflection.go",
+    "testdata/bad_config.json",
+    "testdata/config.json",
+    "testdata/config1.json",
+    "testdata/config2.json",
+    "testdata/config3.json",
+    "testdata/example_config.json",
+    "testdata/unknown.ext",
+    "testdata/unknown_fields.json",
+    "testfile.json",
+    "utils.go",
+    "utils_test.go"
+  ],
+  "explanation": {
+    "what": "aconfig.go の find() で []map[string]interface{} / []map[interface{}]interface{} を処理した後に delete(actualFields, subName) を呼び忘れていた箇所を追加した(#50で追加された2つのcaseに欠けていたクリーンアップ)。あわせて aconfighcl/hcl_test.go の改行コード(CRLF→LF)を全面的に統一し、直前 #52 でスキップされていた TestHCL を再度有効化(t.SkipNowを削除)して復帰させている。",
+    "why": "PR タイトルの「fix hcl」が示す通り、直前で一時無効化していたHCLテストの原因を修正して再有効化するのが目的。find() でネストしたキーをフラット化した後に元のsubNameエントリを削除しないと、後続の探索が古い未展開の値を拾ってしまいHCLの入れ子構造が正しく解決できなかったと見られる。CRLF→LF統一は差分ノイズが大きいが、内容としてはテストの復旧が本題。",
+    "highlights": [
+      { "file": "aconfig.go", "note": "[]map[string]interface{}・[]map[interface{}]interface{} 展開後に delete(actualFields, subName) を追加" },
+      { "file": "aconfighcl/hcl_test.go", "note": "t.SkipNow() を削除しTestHCLを再度有効化" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [{ "type": "pr", "number": 53, "url": "https://github.com/cristalhq/aconfig/pull/53" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

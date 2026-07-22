@@ -1,0 +1,102 @@
+{
+  "seq": 120,
+  "sha": "877f87e5b26340704b107f057e78aea46f62f532",
+  "parents": [
+    "3c6d2c0037dbe150e5df94662a4c2344b3bccdad"
+  ],
+  "author": {
+    "name": "Oleg Kovalov",
+    "email": "oleg@hey.com",
+    "date": "2021-05-26T18:54:48+02:00"
+  },
+  "message": "cleanups (#86)\n\nSigned-off-by: Oleg Kovalov <oleg@hey.com>",
+  "pr": {
+    "number": 86,
+    "title": "cleanups",
+    "body": "Signed-off-by: Oleg Kovalov <oleg@hey.com>",
+    "url": "https://github.com/cristalhq/aconfig/pull/86"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 3,
+    "additions": 22,
+    "deletions": 30
+  },
+  "files": [
+    {
+      "path": "aconfig_test.go",
+      "status": "M",
+      "additions": 18,
+      "deletions": 22,
+      "binary": false
+    },
+    {
+      "path": "reflection.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "utils.go",
+      "status": "M",
+      "additions": 3,
+      "deletions": 7,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/aconfig_test.go b/aconfig_test.go\nindex b107128..19f8cbc 100644\n--- a/aconfig_test.go\n+++ b/aconfig_test.go\n@@ -33,9 +33,10 @@ func TestDefaults(t *testing.T) {\n \t\t}{\n \t\t\tIsAnon: true,\n \t\t},\n-\t\tSlice: []int{1, 2, 3},\n-\t\tMap1:  map[string]int{\"a\": 1, \"b\": 2, \"c\": 3},\n-\t\tMap2:  map[int]string{1: \"a\", 2: \"b\", 3: \"c\"},\n+\t\tStrSlice: []string{\"1\", \"2\", \"3\"},\n+\t\tSlice:    []int{1, 2, 3},\n+\t\tMap1:     map[string]int{\"a\": 1, \"b\": 2, \"c\": 3},\n+\t\tMap2:     map[int]string{1: \"a\", 2: \"b\", 3: \"c\"},\n \t\tEmbeddedConfig: EmbeddedConfig{\n \t\t\tEm: \"em-def\",\n \t\t},\n@@ -379,8 +380,7 @@ func TestFlag(t *testing.T) {\n \n \tflags := []string{\n \t\t\"-tst.str=str-flag\",\n-\t\t// TODO\n-\t\t// \"-tst.bytes=bytes-flag\",\n+\t\t\"-tst.bytes=Ynl0ZXMtZmxhZw==\",\n \t\t\"-tst.int=1001\",\n \t\t\"-tst.http_port=30000\",\n \t\t\"-tst.sub.float=123.321\",\n@@ -398,6 +398,7 @@ func TestFlag(t *testing.T) {\n \n \twant := TestConfig{\n \t\tStr:      \"str-flag\",\n+\t\tBytes:    []byte(\"Ynl0ZXMtZmxhZw==\"),\n \t\tInt:      int32Ptr(1001),\n \t\tHTTPPort: 30000,\n \t\tSub: SubConfig{\n@@ -525,10 +526,6 @@ func TestBadDefauts(t *testing.T) {\n \t\tBool bool `default:\"omg\"`\n \t}{})\n \n-\tf(&struct {\n-\t\tBool bool `default:\"omg\"`\n-\t}{})\n-\n \tf(&struct {\n \t\tInt int `default:\"1a\"`\n \t}{})\n@@ -649,7 +646,7 @@ func TestBadFiles(t *testing.T) {\n \t})\n }\n \n-func TestFileNotFound(t *testing.T) {\n+func TestFailOnFileNotFound(t *testing.T) {\n \tf := func(filepath string) {\n \t\tt.Helper()\n \n@@ -856,16 +853,14 @@ func TestCustomNames(t *testing.T) {\n \t}\n \n \tvar cfg TestConfig\n-\tloader := LoaderFor(&cfg, Config{})\n+\tloader := LoaderFor(&cfg, Config{\n+\t\tArgs: []string{\"-two=2\", \"-four=4\"},\n+\t})\n \n \tsetEnv(t, \"ONE\", \"1\")\n \tsetEnv(t, \"three\", \"3\")\n \tdefer os.Clearenv()\n \n-\tif err := loader.Flags().Parse([]string{\"-two=2\", \"-four=4\"}); err != nil {\n-\t\tt.Fatal(err)\n-\t}\n-\n \tif err := loader.Load(); err != nil {\n \t\tt.Fatal(err)\n \t}\n@@ -1000,13 +995,13 @@ func TestWalkFields(t *testing.T) {\n }\n \n func TestDontFillFlagsIfDisabled(t *testing.T) {\n-\ttype TestConfig struct {\n-\t\tA int `default:\"1\"`\n-\t}\n-\n \tloader := LoaderFor(&TestConfig{}, Config{\n \t\tSkipFlags: true,\n+\t\tArgs:      []string{},\n \t})\n+\tif err := loader.Load(); err != nil {\n+\t\tt.Error(err)\n+\t}\n \n \tif flags := loader.Flags().NFlag(); flags != 0 {\n \t\tt.Errorf(\"want empty, got %v\", flags)\n@@ -1104,9 +1099,10 @@ type TestConfig struct {\n \t\tIsAnon bool `default:\"true\"`\n \t}\n \n-\tSlice []int          `default:\"1,2,3\" usage:\"just pass elements\"`\n-\tMap1  map[string]int `default:\"a:1,b:2,c:3\"`\n-\tMap2  map[int]string `default:\"1:a,2:b,3:c\"`\n+\tStrSlice []string       `default:\"1,2,3\" usage:\"just pass strings\"`\n+\tSlice    []int          `default:\"1,2,3\" usage:\"just pass elements\"`\n+\tMap1     map[string]int `default:\"a:1,b:2,c:3\"`\n+\tMap2     map[int]string `default:\"1:a,2:b,3:c\"`\n \n \tEmbeddedConfig\n }\ndiff --git a/reflection.go b/reflection.go\nindex 2aede46..e93a803 100644\n--- a/reflection.go\n+++ b/reflection.go\n@@ -175,7 +175,7 @@ func (l *Loader) setFieldData(field *fieldData, value interface{}) error {\n \t\treturn l.setInterface(field, value)\n \n \tcase reflect.Slice:\n-\t\treturn l.setSlice(field, fmt.Sprint(normalize(value)))\n+\t\treturn l.setSlice(field, sliceToString(value))\n \n \tcase reflect.Map:\n \t\treturn l.setMap(field, fmt.Sprint(value))\ndiff --git a/utils.go b/utils.go\nindex ed573dd..1e88eb1 100644\n--- a/utils.go\n+++ b/utils.go\n@@ -42,7 +42,7 @@ func getEnv() map[string]interface{} {\n func getFlags(flagSet *flag.FlagSet) map[string]interface{} {\n \tres := map[string]interface{}{}\n \tflagSet.Visit(func(f *flag.Flag) {\n-\t\tres[f.Name] = f.Value\n+\t\tres[f.Name] = f.Value.String()\n \t})\n \treturn res\n }\n@@ -157,7 +157,7 @@ func (d *jsonDecoder) DecodeFile(filename string) (map[string]interface{}, error\n \treturn raw, nil\n }\n \n-func normalize(curr interface{}) interface{} {\n+func sliceToString(curr interface{}) string {\n \tswitch curr := curr.(type) {\n \tcase []interface{}:\n \t\tb := &strings.Builder{}\n@@ -170,12 +170,8 @@ func normalize(curr interface{}) interface{} {\n \t\treturn b.String()\n \tcase string:\n \t\treturn curr\n-\tcase float64:\n-\t\treturn fmt.Sprint(curr)\n-\tcase bool:\n-\t\treturn fmt.Sprint(curr)\n \tdefault:\n-\t\tpanic(fmt.Sprintf(\"Can't normalize %T %v\", curr, curr))\n+\t\tpanic(fmt.Sprintf(\"can't normalize %T %v\", curr, curr))\n \t}\n }\n \n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/build.yml",
+    "LICENSE",
+    "README.md",
+    "aconfig.go",
+    "aconfig_test.go",
+    "aconfigdotenv/dotenv.go",
+    "aconfigdotenv/dotenv_test.go",
+    "aconfigdotenv/go.mod",
+    "aconfigdotenv/go.sum",
+    "aconfighcl/go.mod",
+    "aconfighcl/go.sum",
+    "aconfighcl/hcl.go",
+    "aconfighcl/hcl_test.go",
+    "aconfigtoml/go.mod",
+    "aconfigtoml/go.sum",
+    "aconfigtoml/toml.go",
+    "aconfigtoml/toml_test.go",
+    "aconfigyaml/go.mod",
+    "aconfigyaml/go.sum",
+    "aconfigyaml/yaml.go",
+    "aconfigyaml/yaml_test.go",
+    "doc.go",
+    "example_test.go",
+    "go.mod",
+    "reflection.go",
+    "testdata/bad_config.json",
+    "testdata/config.json",
+    "testdata/config1.json",
+    "testdata/config2.json",
+    "testdata/config3.json",
+    "testdata/example_config.json",
+    "testdata/unknown_fields.json",
+    "utils.go",
+    "utils_test.go"
+  ],
+  "explanation": {
+    "what": "細かな整理をまとめて行った。TestConfig に `StrSlice []string` を追加してデフォルト値からの文字列スライス設定を検証、TODO化されていた bytes フラグのテストを有効化、`normalize` を `sliceToString` に改名して string/float64/bool の分岐を削って責務を「スライスを文字列化する」ことに絞り、`getFlags` が `f.Value`(flag.Value インターフェース)ではなく `f.Value.String()` で文字列そのものを返すよう修正、テスト名を `TestFileNotFound`→`TestFailOnFileNotFound` に変更するなど複数箇所を整理した。",
+    "why": "PR body は Signed-off-by のみで、タイトルも「cleanups」とだけあり具体的な動機の説明はない。diff を見る限り、おそらく直前の `,exact`/`-` タグ対応で発生した副次的な後片付け(未使用コードの削減・テスト名の実態への合わせ込み・重複していた bad defaults テストケースの削除)をまとめて行ったコミットと考えられる。",
+    "highlights": [
+      { "file": "utils.go", "note": "normalize → sliceToString に改名し、スライス以外の型分岐を削除" },
+      { "file": "utils.go", "note": "getFlags: res[f.Name] = f.Value(flag.Value型)ではなく f.Value.String()(string型)を格納するよう修正" }
+    ],
+    "langNotes": [
+      { "topic": "flag.Value インターフェース", "note": "Go の flag パッケージでは各フラグの値は String()/Set(string) error を持つ flag.Value インターフェースとして保持される。map に生の flag.Value を入れると呼び出し側で型アサーションや String() 呼び出しが別途必要になるため、ここでは文字列化した結果を格納するよう修正している。" }
+    ],
+    "diagram": null,
+    "evidence": "inferred",
+    "refs": [{ "type": "pr", "number": 86, "url": "https://github.com/cristalhq/aconfig/pull/86" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

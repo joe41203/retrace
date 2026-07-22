@@ -1,0 +1,83 @@
+{
+  "seq": 51,
+  "sha": "0cdb12df1f8f16f5ecc5668cf08ea88f83b33d6d",
+  "parents": [
+    "2f5ececf55264a1ea5f03d85eda910c57412992f"
+  ],
+  "author": {
+    "name": "Oleg Kovalov",
+    "email": "oleg@hey.com",
+    "date": "2020-07-29T20:32:44+02:00"
+  },
+  "message": "check input type (#11)",
+  "pr": {
+    "number": 11,
+    "title": "check input type",
+    "body": "",
+    "url": "https://github.com/cristalhq/aconfig/pull/11"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 31,
+    "deletions": 3
+  },
+  "files": [
+    {
+      "path": "aconfig.go",
+      "status": "M",
+      "additions": 8,
+      "deletions": 3,
+      "binary": false
+    },
+    {
+      "path": "aconfig_test.go",
+      "status": "M",
+      "additions": 23,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/aconfig.go b/aconfig.go\nindex 95d0bca..8634110 100644\n--- a/aconfig.go\n+++ b/aconfig.go\n@@ -299,9 +299,14 @@ func (l *Loader) setFieldData(field *fieldData, value string) error {\n }\n \n func getFields(x interface{}) []*fieldData {\n-\t// TODO: check not struct\n-\tvalueObject := reflect.ValueOf(x).Elem()\n-\treturn getFieldsHelper(valueObject, nil)\n+\tvalue := reflect.ValueOf(x)\n+\tfor value.Type().Kind() == reflect.Ptr {\n+\t\tvalue = value.Elem()\n+\t}\n+\tif value.Kind() != reflect.Struct {\n+\t\tpanic(\"aconfig: only struct can be passed to the loader\")\n+\t}\n+\treturn getFieldsHelper(value, nil)\n }\n \n func getFieldsHelper(valueObject reflect.Value, parent *fieldData) []*fieldData {\ndiff --git a/aconfig_test.go b/aconfig_test.go\nindex 921a59f..6116122 100644\n--- a/aconfig_test.go\n+++ b/aconfig_test.go\n@@ -569,6 +569,29 @@ func TestDontFillFlagsIfDisabled(t *testing.T) {\n \t}\n }\n \n+func TestPassNonStructs(t *testing.T) {\n+\tf := func(cfg interface{}) {\n+\t\tt.Helper()\n+\n+\t\tdefer func() {\n+\t\t\tt.Helper()\n+\t\t\tif err := recover(); err == nil {\n+\t\t\t\tt.Fatal()\n+\t\t\t}\n+\t\t}()\n+\n+\t\tif err := LoaderFor(nil).Build().Load(cfg); err != nil {\n+\t\t\tt.Fatal(err)\n+\t\t}\n+\t}\n+\n+\tf(nil)\n+\tf(map[string]string{})\n+\tf([]string{})\n+\tf([4]string{})\n+\tf(func() {})\n+}\n+\n func TestPanicWhenNotBuilt(t *testing.T) {\n \tf := func(fn func()) {\n \t\tt.Helper()\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/build.yml",
+    "LICENSE",
+    "README.md",
+    "aconfig.go",
+    "aconfig_test.go",
+    "example_test.go",
+    "go.mod",
+    "go.sum",
+    "testdata/all_types_config.json",
+    "testdata/bad_config.json",
+    "testdata/config1.json",
+    "testdata/config1.toml",
+    "testdata/config1.yaml",
+    "testdata/example_config.json",
+    "testdata/my_duration_config.json",
+    "testdata/other_numbers_config.json",
+    "testdata/test_config_def.json",
+    "testdata/test_config_env.json",
+    "testdata/test_config_flag.json",
+    "testdata/unknown.ext"
+  ],
+  "explanation": {
+    "what": "getFields が受け取った値の型をチェックするようにした。ポインタは reflect.Value.Elem() で辿って剥がし、最終的に struct でなければ panic するようにし、これまで TODO コメントだった未実装チェックを実装した。テストとして TestPassNonStructs を追加し、nil・map・slice・array・func を渡した場合に panic することを確認している。",
+    "why": "PR タイトルの通り「入力型のチェック」が目的。旧実装は reflect.ValueOf(x).Elem() を無条件に呼んでおり、struct 以外(map や slice など)を渡すと分かりにくい panic やゼロ値の誤動作を起こしうる状態だった。ポインタの多重ラップにも対応しつつ、最終的に構造体以外なら明示的で分かりやすいメッセージの panic に倒すことで、誤用時の失敗を早期化・明確化している。",
+    "highlights": [
+      { "file": "aconfig.go", "note": "for value.Type().Kind() == reflect.Ptr でポインタを再帰的に剥がし、最後に struct かどうかを検査してから panic する" },
+      { "file": "aconfig_test.go", "note": "TestPassNonStructs で nil/map/slice/array/func を渡すケースを一括検証している" }
+    ],
+    "langNotes": [
+      { "topic": "reflect.Value / Kind", "note": "Go の reflect パッケージでは reflect.ValueOf(x) で得た値の実体の種類(Kind)を調べて分岐する。Ptr なら Elem() で参照先を取り出せるが、多重ポインタの可能性があるため for ループで剥がし切る必要がある。" }
+    ],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [
+      { "type": "pr", "number": 11, "url": "https://github.com/cristalhq/aconfig/pull/11" }
+    ],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

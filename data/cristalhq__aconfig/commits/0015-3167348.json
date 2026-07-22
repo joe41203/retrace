@@ -1,0 +1,88 @@
+{
+  "seq": 15,
+  "sha": "316734830dd30d4e754cc41b22266d30ac419cb4",
+  "parents": [
+    "7948d7b92a4395c45723e5a14fa1ae5fc237919c"
+  ],
+  "author": {
+    "name": "Oleg Kovalov",
+    "email": "iamolegkovalov@gmail.com",
+    "date": "2020-07-22T23:22:15+02:00"
+  },
+  "message": "switch to recursive func instead of map",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 4,
+    "additions": 91,
+    "deletions": 29
+  },
+  "files": [
+    {
+      "path": "aconfig.go",
+      "status": "M",
+      "additions": 26,
+      "deletions": 22,
+      "binary": false
+    },
+    {
+      "path": "aconfig_test.go",
+      "status": "M",
+      "additions": 30,
+      "deletions": 6,
+      "binary": false
+    },
+    {
+      "path": "testdata/all_types_config.json",
+      "status": "M",
+      "additions": 7,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "testdata/test_config_def.json",
+      "status": "A",
+      "additions": 28,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/aconfig.go b/aconfig.go\nindex 1fb3c06..607b2c5 100644\n--- a/aconfig.go\n+++ b/aconfig.go\n@@ -154,12 +154,7 @@ func (l *Loader) getFlagName(name string) string {\n }\n \n func (l *Loader) setFieldData(field *fieldData, value string) error {\n-\tsetter, ok := settersByKind[field.Value.Kind()]\n-\tif ok {\n-\t\treturn setter(field, value)\n-\t}\n-\tpanic(fmt.Sprintf(\"unknown kind: %#v %#v\", field.Value.Kind(), field))\n-\treturn nil\n+\treturn setFieldDataHelper(field, value)\n }\n \n func getFields(x interface{}) []*fieldData {\n@@ -225,26 +220,35 @@ func (f *fieldData) FullName() string {\n \t}\n }\n \n-type setterKindFn func(field *fieldData, value string) error\n+func setFieldDataHelper(field *fieldData, value string) error {\n+\tswitch kind := field.Value.Type().Kind(); kind {\n+\tcase reflect.Bool:\n+\t\treturn setBool(field, value)\n+\n+\tcase reflect.String:\n+\t\treturn setString(field, value)\n+\n+\tcase reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32:\n+\t\treturn setInt(field, value)\n \n-var settersByKind = map[reflect.Kind]setterKindFn{\n-\treflect.Bool:   setBool,\n-\treflect.String: setString,\n+\tcase reflect.Int64:\n+\t\treturn setInt64(field, value)\n \n-\treflect.Int:   setInt,\n-\treflect.Int8:  setInt,\n-\treflect.Int16: setInt,\n-\treflect.Int32: setInt,\n-\treflect.Int64: setInt64,\n+\tcase reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr:\n+\t\treturn setUint(field, value)\n \n-\treflect.Uint:   setUint,\n-\treflect.Uint8:  setUint,\n-\treflect.Uint16: setUint,\n-\treflect.Uint32: setUint,\n-\treflect.Uint64: setUint,\n+\tcase reflect.Float32, reflect.Float64:\n+\t\treturn setFloat(field, value)\n \n-\treflect.Float32: setFloat,\n-\treflect.Float64: setFloat,\n+\tcase reflect.Slice:\n+\t\treturn setSlice(field, value)\n+\n+\tcase reflect.Map:\n+\t\treturn setMap(field, value)\n+\n+\tdefault:\n+\t\treturn fmt.Errorf(\"aconfig: type %q isn't supported\", kind)\n+\t}\n }\n \n func setBool(field *fieldData, value string) error {\ndiff --git a/aconfig_test.go b/aconfig_test.go\nindex 4f97f16..81f6a8d 100644\n--- a/aconfig_test.go\n+++ b/aconfig_test.go\n@@ -5,6 +5,7 @@ import (\n \t\"flag\"\n \t\"os\"\n \t\"path/filepath\"\n+\t\"reflect\"\n \t\"strings\"\n \t\"testing\"\n \t\"time\"\n@@ -14,17 +15,20 @@ import (\n )\n \n type TestConfig struct {\n-\tStr      string `default:\"str\"`\n+\tStr      string `default:\"str-def\"`\n \tInt      int32  `default:\"123\"`\n \tHTTPPort int    `default:\"8080\"`\n \tSub      SubConfig\n-\t//PtrSub   *SubConfig\n+\n+\tSlice []int          `default:\"1,2,3\"`\n+\tMap1  map[string]int `default:\"a:1,b:2,c:3\"`\n+\tMap2  map[int]string `default:\"1:a,2:b,3:c\"`\n \n \tEmbeddedConfig\n }\n \n type EmbeddedConfig struct {\n-\tEm string `default:\"xxx\"`\n+\tEm string `default:\"em-def\"`\n }\n \n type SubConfig struct {\n@@ -64,6 +68,26 @@ func (m MyDuration) Duration() (time.Duration, error) {\n \treturn time.ParseDuration(string(m))\n }\n \n+func TestLoadDefaults(t *testing.T) {\n+\tloader := NewLoader(LoaderConfig{\n+\t\tSkipFile: true,\n+\t\tSkipEnv:  true,\n+\t\tSkipFlag: true,\n+\t})\n+\n+\tvar cfg TestConfig\n+\tif err := loader.Load(&cfg); err != nil {\n+\t\tt.Fatal(err)\n+\t}\n+\n+\tvar want TestConfig\n+\tloadFile(t, \"testdata/test_config_def.json\", &want)\n+\n+\tif got := cfg; !reflect.DeepEqual(got, want) {\n+\t\tt.Fatalf(\"want %v, got %v\", want, got)\n+\t}\n+}\n+\n func TestLoadDefault_AllTypesConfig(t *testing.T) {\n \tloader := NewLoader(LoaderConfig{\n \t\tSkipFile: true,\n@@ -117,7 +141,7 @@ func TestLoadFile(t *testing.T) {\n \n \t\tloadFile(t, filepath, &want)\n \n-\t\tif got := cfg; got != want {\n+\t\tif got := cfg; !reflect.DeepEqual(got, want) {\n \t\t\tt.Fatalf(\"want %v, got %v\", want, got)\n \t\t}\n \t}\n@@ -150,7 +174,7 @@ func TestLoadEnv(t *testing.T) {\n \tvar want TestConfig\n \tloadFile(t, \"testdata/test_config_env.json\", &want)\n \n-\tif got := cfg; got != want {\n+\tif got := cfg; !reflect.DeepEqual(got, want) {\n \t\tt.Fatalf(\"want %v, got %v\", want, got)\n \t}\n }\n@@ -178,7 +202,7 @@ func TestLoadFlag(t *testing.T) {\n \tvar want TestConfig\n \tloadFile(t, \"testdata/test_config_flag.json\", &want)\n \n-\tif got := cfg; got != want {\n+\tif got := cfg; !reflect.DeepEqual(got, want) {\n \t\tt.Fatalf(\"want %v, got %v\", want, got)\n \t}\n }\ndiff --git a/testdata/all_types_config.json b/testdata/all_types_config.json\nindex 7f1f595..46bccd4 100644\n--- a/testdata/all_types_config.json\n+++ b/testdata/all_types_config.json\n@@ -17,5 +17,11 @@\n   \"float32\": 1234.213,\n   \"float64\": 1234.234,\n \n-  \"dur\": 3723000000000\n+  \"dur\": 3723000000000,\n+\n+  \"IDs\": [\n+    1,\n+    2,\n+    3\n+  ]\n }\n\\ No newline at end of file\ndiff --git a/testdata/test_config_def.json b/testdata/test_config_def.json\nnew file mode 100644\nindex 0000000..638fee6\n--- /dev/null\n+++ b/testdata/test_config_def.json\n@@ -0,0 +1,28 @@\n+{\n+  \"Str\": \"str-def\",\n+  \"Int\": 123,\n+  \"HTTPPort\": 8080,\n+  \"Sub\": {\n+    \"Float\": 123.123\n+  },\n+  \"Slice\": [\n+    1,\n+    2,\n+    3\n+  ],\n+  \"Array\": [\n+    1,\n+    2\n+  ],\n+  \"Map1\": {\n+    \"a\": 1,\n+    \"b\": 2,\n+    \"c\": 3\n+  },\n+  \"Map2\": {\n+    \"1\": \"a\",\n+    \"2\": \"b\",\n+    \"3\": \"c\"\n+  },\n+  \"Em\": \"em-def\"\n+}\n\\ No newline at end of file\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/build.yml",
+    "LICENSE",
+    "README.md",
+    "aconfig.go",
+    "aconfig_test.go",
+    "go.mod",
+    "go.sum",
+    "testdata/all_types_config.json",
+    "testdata/bad_config.json",
+    "testdata/config1.json",
+    "testdata/config1.toml",
+    "testdata/config1.yaml",
+    "testdata/my_duration_config.json",
+    "testdata/test_config_def.json",
+    "testdata/test_config_env.json",
+    "testdata/test_config_flag.json",
+    "testdata/unknown.ext"
+  ],
+  "explanation": {
+    "what": "フィールドの型ごとの設定処理を、`reflect.Kind` をキーにした `settersByKind` というmap変数からのディスパッチではなく、`setFieldDataHelper` という switch文ベースの再帰関数に切り替えた。あわせて `Int`/`Int8`/`Int16`/`Int32` を1ケースにまとめる、`Slice`/`Map` のケースを追加する、未対応の型は `panic` ではなく `fmt.Errorf` でエラーを返すようにするなど、ディスパッチの整理も行っている。テスト側では `TestLoadDefaults` を新設し、slice/mapを含む `TestConfig` のデフォルト値読み込みを `testdata/test_config_def.json` と突き合わせて検証し、既存の比較も `==` から `reflect.DeepEqual` に変更してslice/mapを含む構造体を正しく比較できるようにしている。",
+    "why": "コミットメッセージ「switch to recursive func instead of map」の通り、setterを保持するグローバルmapの代わりに素直なswitch文へ切り替えるのが直接の目的。おそらく直前のコミットでslice/map対応を追加した際に、要素の型変換で再帰的に同じディスパッチを呼ぶ必要が生じており、mapベースの登録方式よりswitch文の再帰関数の方が見通しがよいと判断したためと考えられる。",
+    "highlights": [
+      { "file": "aconfig.go", "note": "settersByKind map と setterKindFn 型が削除され、setFieldDataHelper の switch 文に置き換わっている" },
+      { "file": "aconfig_test.go", "note": "reflect.DeepEqual への切り替えは、slice/mapフィールドを含む struct を == で比較できない(比較不能型)ため必須の対応" }
+    ],
+    "langNotes": [
+      { "topic": "reflect.Value.Kind() による分岐", "note": "Go の reflect では型の種別(Bool/Int/Slice/Mapなど)を Kind() で取得し、switch で分岐して処理を振り分けるのが定石。このコミットはmap経由の関数テーブルよりもswitch文の方が可読性が高いという判断で書き換えている。" },
+      { "topic": "reflect.DeepEqual", "note": "Go の == 演算子はslice・mapを含む struct には使えない(コンパイルエラーになる比較不能型)。reflect.DeepEqual は再帰的に値を比較できるため、テストでのstruct同士の比較に使われる。" }
+    ],
+    "diagram": null,
+    "evidence": "inferred",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

@@ -1,0 +1,84 @@
+{
+  "seq": 26,
+  "sha": "b6dd55b0def86ebdae9f3b23e0535e5dc4f34a9e",
+  "parents": [
+    "3c96f102f97e404379efbd31de7209b77acd7bde"
+  ],
+  "author": {
+    "name": "Oleg Kovalov",
+    "email": "iamolegkovalov@gmail.com",
+    "date": "2020-07-23T09:27:54+02:00"
+  },
+  "message": "support other number formats",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 3,
+    "additions": 43,
+    "deletions": 3
+  },
+  "files": [
+    {
+      "path": "aconfig.go",
+      "status": "M",
+      "additions": 3,
+      "deletions": 3,
+      "binary": false
+    },
+    {
+      "path": "aconfig_test.go",
+      "status": "M",
+      "additions": 30,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "testdata/other_numbers_config.json",
+      "status": "A",
+      "additions": 10,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/aconfig.go b/aconfig.go\nindex 85350b8..5c0eee7 100644\n--- a/aconfig.go\n+++ b/aconfig.go\n@@ -264,7 +264,7 @@ func setBool(field *fieldData, value string) error {\n }\n \n func setInt(field *fieldData, value string) error {\n-\tval, err := strconv.ParseInt(value, 10, 64)\n+\tval, err := strconv.ParseInt(value, 0, field.Value.Type().Bits())\n \tif err != nil {\n \t\treturn err\n \t}\n@@ -285,7 +285,7 @@ func setInt64(field *fieldData, value string) error {\n }\n \n func setUint(field *fieldData, value string) error {\n-\tval, err := strconv.ParseUint(value, 10, 64)\n+\tval, err := strconv.ParseUint(value, 0, field.Value.Type().Bits())\n \tif err != nil {\n \t\treturn err\n \t}\n@@ -294,7 +294,7 @@ func setUint(field *fieldData, value string) error {\n }\n \n func setFloat(field *fieldData, value string) error {\n-\tval, err := strconv.ParseFloat(value, 64)\n+\tval, err := strconv.ParseFloat(value, field.Value.Type().Bits())\n \tif err != nil {\n \t\treturn err\n \t}\ndiff --git a/aconfig_test.go b/aconfig_test.go\nindex 04aa6b6..fc08fc0 100644\n--- a/aconfig_test.go\n+++ b/aconfig_test.go\n@@ -58,6 +58,18 @@ type AllTypesConfig struct {\n \tTime time.Time     `default:\"2000-04-05 10:20:30 +0000 UTC\"`\n }\n \n+type OtherNumbersConfig struct {\n+\tInt    int   `default:\"0b111\"`\n+\tInt8   int8  `default:\"0o123\"`\n+\tInt8x2 int8  `default:\"0123\"`\n+\tInt16  int16 `default:\"0x123\"`\n+\n+\tUint   uint   `default:\"0b111\"`\n+\tUint8  uint8  `default:\"0o123\"`\n+\tUint16 uint16 `default:\"0123\"`\n+\tUint32 uint32 `default:\"0x123\"`\n+}\n+\n type DurationConfig struct {\n \tMyDur MyDuration `default:\"1h2m3s\" json:\"my_dur\"`\n }\n@@ -124,6 +136,24 @@ func TestLoadDefault_DurationConfig(t *testing.T) {\n \t}\n }\n \n+func TestLoadDefault_OtherNumbersConfig(t *testing.T) {\n+\tloader := NewLoader(LoaderConfig{\n+\t\tSkipFile: true,\n+\t\tSkipEnv:  true,\n+\t\tSkipFlag: true,\n+\t})\n+\tvar cfg, want OtherNumbersConfig\n+\tif err := loader.Load(&cfg); err != nil {\n+\t\tt.Fatal(err)\n+\t}\n+\n+\tloadFile(t, \"testdata/other_numbers_config.json\", &want)\n+\n+\tif got := cfg; got != want {\n+\t\tt.Fatalf(\"want %v, got %v\", want, got)\n+\t}\n+}\n+\n func TestLoadFile(t *testing.T) {\n \tf := func(filepath string) {\n \t\tt.Helper()\ndiff --git a/testdata/other_numbers_config.json b/testdata/other_numbers_config.json\nnew file mode 100644\nindex 0000000..625bfb4\n--- /dev/null\n+++ b/testdata/other_numbers_config.json\n@@ -0,0 +1,10 @@\n+{\n+  \"Int\": 7,\n+  \"Int8\": 83,\n+  \"Int8x2\": 83,\n+  \"Int16\": 291,\n+  \"Uint\": 7,\n+  \"Uint8\": 83,\n+  \"Uint16\": 83,\n+  \"Uint32\": 291\n+}\n\\ No newline at end of file\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/build.yml",
+    "LICENSE",
+    "README.md",
+    "aconfig.go",
+    "aconfig_test.go",
+    "example_test.go",
+    "go.mod",
+    "go.sum",
+    "testdata/all_types_config.json",
+    "testdata/bad_config.json",
+    "testdata/config1.json",
+    "testdata/config1.toml",
+    "testdata/config1.yaml",
+    "testdata/example_config.json",
+    "testdata/my_duration_config.json",
+    "testdata/other_numbers_config.json",
+    "testdata/test_config_def.json",
+    "testdata/test_config_env.json",
+    "testdata/test_config_flag.json",
+    "testdata/unknown.ext"
+  ],
+  "explanation": {
+    "what": "setInt/setUint/setFloat で使う strconv のパース基数・ビット幅指定を変更した。ParseInt/ParseUint は固定の base 10・64bit から base 0(進数プレフィックスを自動判定)・field.Value.Type().Bits()(実際のフィールドの型サイズ)に変更し、ParseFloat も64bit固定からフィールドの型サイズに変更した。テストとして OtherNumbersConfig(0b/0o/0xプレフィックス付きや先頭0の8進表記を含む int8/int16/uint8/uint16/uint32 のdefaultタグ)とゴールデンファイル testdata/other_numbers_config.json を追加している。",
+    "why": "メッセージの通り「他の数値フォーマットをサポートする」ための変更。base 0 にすることで `0b111`(2進)・`0o123`(8進)・`0123`(旧式8進)・`0x123`(16進)といったGoのリテラル風プレフィックスをdefaultタグの値としてそのまま書けるようになる。ビット幅もフィールドの実型に合わせることで、int8やuint16など64bitより狭い型でも正しい範囲チェックでパースできる。",
+    "highlights": [
+      { "file": "aconfig.go", "note": "strconv.ParseInt/ParseUint/ParseFloat の base/bitSize 引数を固定値から field.Value.Type().Bits() に変更" },
+      { "file": "aconfig_test.go", "note": "OtherNumbersConfig で 0b/0o/0x/先頭0 の4種類の数値表記を全数値型でテスト" }
+    ],
+    "langNotes": [
+      { "topic": "strconv.ParseInt の base=0", "note": "Go の strconv.ParseInt/ParseUint は base に0を渡すと、文字列先頭の0b/0o/0x(または先頭0のみ)から進数を自動判定する。base指定なしより柔軟にリテラルを解釈できる。" },
+      { "topic": "reflect.Value.Type().Bits()", "note": "reflect 経由で取得した値の型が int8/int16/uint32 のような具体的な幅を持つ場合、Bits() でそのビット幅を取得できる。strconv のパース時に範囲オーバーフローを正しく検出するために使われている。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

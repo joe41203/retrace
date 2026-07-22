@@ -1,0 +1,101 @@
+{
+  "seq": 155,
+  "sha": "da04fc8a833013d09e78858ef3f1deefc18a9919",
+  "parents": [
+    "35c6d95a869b9d8d03f5ec8fdee123bc0f7e5f69"
+  ],
+  "author": {
+    "name": "Oleg Kovalov",
+    "email": "oleg@hey.com",
+    "date": "2023-04-28T16:40:30+02:00"
+  },
+  "message": "Update CI (#141)",
+  "pr": {
+    "number": 141,
+    "title": "Update CI",
+    "body": "",
+    "url": "https://github.com/cristalhq/aconfig/pull/141"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 6,
+    "deletions": 18
+  },
+  "files": [
+    {
+      "path": ".github/workflows/build.yml",
+      "status": "M",
+      "additions": 6,
+      "deletions": 12,
+      "binary": false
+    },
+    {
+      "path": "README.md",
+      "status": "M",
+      "additions": 0,
+      "deletions": 6,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/.github/workflows/build.yml b/.github/workflows/build.yml\nindex 93c6c18..49e2b0e 100644\n--- a/.github/workflows/build.yml\n+++ b/.github/workflows/build.yml\n@@ -4,20 +4,14 @@ on:\n   push:\n     branches: [main]\n   pull_request:\n-  workflow_dispatch:\n-    inputs:\n-      tag:\n-        description: 'Tag to create'\n-        required: true\n-        default: 'v0.0.0'\n+    branches: [main]\n+  schedule:\n+    - cron: '0 0 * * 0' # run \"At 00:00 on Sunday\"\n \n # See https://github.com/cristalhq/.github/.github/workflows\n jobs:\n   build:\n-    uses: cristalhq/.github/.github/workflows/build.yml@main\n+    uses: cristalhq/.github/.github/workflows/build.yml@v0.5.0\n \n-  release:\n-    if: github.event_name == 'workflow_dispatch'\n-    uses: cristalhq/.github/.github/workflows/release.yml@main\n-    with:\n-      tag: ${{ github.event.input.tag }}\n+  vuln:\n+    uses: cristalhq/.github/.github/workflows/vuln.yml@v0.5.0\ndiff --git a/README.md b/README.md\nindex 51c3466..1770329 100644\n--- a/README.md\n+++ b/README.md\n@@ -2,8 +2,6 @@\n \r\n [![build-img]][build-url]\r\n [![pkg-img]][pkg-url]\r\n-[![reportcard-img]][reportcard-url]\r\n-[![coverage-img]][coverage-url]\r\n [![version-img]][version-url]\r\n \r\n Simple, useful and opinionated config loader.\r\n@@ -93,9 +91,5 @@ See [these docs][pkg-url].\n [build-url]: https://github.com/cristalhq/aconfig/actions\r\n [pkg-img]: https://pkg.go.dev/badge/cristalhq/aconfig\r\n [pkg-url]: https://pkg.go.dev/github.com/cristalhq/aconfig\r\n-[reportcard-img]: https://goreportcard.com/badge/cristalhq/aconfig\r\n-[reportcard-url]: https://goreportcard.com/report/cristalhq/aconfig\r\n-[coverage-img]: https://codecov.io/gh/cristalhq/aconfig/branch/master/graph/badge.svg\r\n-[coverage-url]: https://codecov.io/gh/cristalhq/aconfig\r\n [version-img]: https://img.shields.io/github/v/release/cristalhq/aconfig\r\n [version-url]: https://github.com/cristalhq/aconfig/releases\r\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/dependabot.yml",
+    ".github/workflows/build.yml",
+    "LICENSE",
+    "README.md",
+    "aconfig.go",
+    "aconfig_test.go",
+    "aconfigdotenv/dotenv.go",
+    "aconfigdotenv/dotenv_test.go",
+    "aconfigdotenv/go.mod",
+    "aconfigdotenv/go.sum",
+    "aconfigdotenv/testdata/config.env",
+    "aconfighcl/go.mod",
+    "aconfighcl/go.sum",
+    "aconfighcl/hcl.go",
+    "aconfighcl/hcl_test.go",
+    "aconfighcl/testdata/config.hcl",
+    "aconfigtoml/go.mod",
+    "aconfigtoml/go.sum",
+    "aconfigtoml/testdata/config.toml",
+    "aconfigtoml/toml.go",
+    "aconfigtoml/toml_test.go",
+    "aconfigyaml/go.mod",
+    "aconfigyaml/go.sum",
+    "aconfigyaml/res.yaml",
+    "aconfigyaml/testdata/config.yaml",
+    "aconfigyaml/yaml.go",
+    "aconfigyaml/yaml_test.go",
+    "doc.go",
+    "example_test.go",
+    "go.mod",
+    "reflection.go",
+    "testdata/bad_config.json",
+    "testdata/complex.json",
+    "testdata/config.json",
+    "testdata/config1.json",
+    "testdata/config2.json",
+    "testdata/config3.json",
+    "testdata/example_config.json",
+    "testdata/slice-struct-primitive-slice.json",
+    "testdata/toy.json",
+    "testdata/unknown_fields.json",
+    "utils.go",
+    "utils_test.go"
+  ],
+  "explanation": {
+    "what": ".github/workflows/build.yml から workflow_dispatch によるタグ指定リリースジョブを削除し、代わりに毎週日曜0時実行の schedule トリガーと、共有ワークフロー cristalhq/.github の build.yml/vuln.yml を固定バージョン v0.5.0 で呼び出す構成に変更した。README.md からは goreportcard・codecov のバッジとリンクを削除した。",
+    "why": "PR本文の記載はないが、タイトル\"Update CI\"の通りCI構成の刷新。共有ワークフローの参照をタグ固定(@main → @v0.5.0)にし、脆弱性スキャン用の vuln ジョブを追加、リリース用の手動ジョブを撤去してスケジュール実行に切り替えている。README のバッジ削除もこのCI構成変更に合わせたおそらく整理と考えられる。",
+    "highlights": [
+      { "file": ".github/workflows/build.yml", "note": "release ジョブの削除と vuln ジョブの追加、共有ワークフローの参照をタグ固定" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [{ "type": "pr", "number": 141, "url": "https://github.com/cristalhq/aconfig/pull/141" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

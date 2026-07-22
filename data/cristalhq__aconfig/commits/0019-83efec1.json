@@ -1,0 +1,63 @@
+{
+  "seq": 19,
+  "sha": "83efec1eee6b606adebc6824867f4eb2fc00e1ef",
+  "parents": [
+    "d261b445e14bf7f656e059b8d5f81260caea14fa"
+  ],
+  "author": {
+    "name": "Oleg Kovalov",
+    "email": "iamolegkovalov@gmail.com",
+    "date": "2020-07-22T23:48:14+02:00"
+  },
+  "message": "user fieldData builder",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 4,
+    "deletions": 9
+  },
+  "files": [
+    {
+      "path": "aconfig.go",
+      "status": "M",
+      "additions": 4,
+      "deletions": 9,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/aconfig.go b/aconfig.go\nindex da736f1..fac1444 100644\n--- a/aconfig.go\n+++ b/aconfig.go\n@@ -308,9 +308,8 @@ func setSlice(field *fieldData, value string) error {\n \tslice := reflect.MakeSlice(field.Field.Type, len(vals), len(vals))\n \tfor i, val := range vals {\n \t\tval = strings.TrimSpace(val)\n-\t\tfd := &fieldData{\n-\t\t\tValue: slice.Index(i),\n-\t\t}\n+\n+\t\tfd := newFieldData(reflect.StructField{}, slice.Index(i), nil)\n \t\tif err := setFieldDataHelper(fd, val); err != nil {\n \t\t\treturn fmt.Errorf(\"incorrect slice item %q: %w\", val, err)\n \t\t}\n@@ -331,16 +330,12 @@ func setMap(field *fieldData, value string) error {\n \t\tkey := strings.TrimSpace(entry[0])\n \t\tval := strings.TrimSpace(entry[1])\n \n-\t\tfdk := &fieldData{\n-\t\t\tValue: reflect.New(field.Field.Type.Key()).Elem(),\n-\t\t}\n+\t\tfdk := newFieldData(reflect.StructField{}, reflect.New(field.Field.Type.Key()).Elem(), nil)\n \t\tif err := setFieldDataHelper(fdk, key); err != nil {\n \t\t\treturn fmt.Errorf(\"incorrect map key %q: %w\", key, err)\n \t\t}\n \n-\t\tfdv := &fieldData{\n-\t\t\tValue: reflect.New(field.Field.Type.Elem()).Elem(),\n-\t\t}\n+\t\tfdv := newFieldData(reflect.StructField{}, reflect.New(field.Field.Type.Elem()).Elem(), nil)\n \t\tif err := setFieldDataHelper(fdv, val); err != nil {\n \t\t\treturn fmt.Errorf(\"incorrect map value %q: %w\", val, err)\n \t\t}\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/build.yml",
+    "LICENSE",
+    "README.md",
+    "aconfig.go",
+    "aconfig_test.go",
+    "go.mod",
+    "go.sum",
+    "testdata/all_types_config.json",
+    "testdata/bad_config.json",
+    "testdata/config1.json",
+    "testdata/config1.toml",
+    "testdata/config1.yaml",
+    "testdata/my_duration_config.json",
+    "testdata/test_config_def.json",
+    "testdata/test_config_env.json",
+    "testdata/test_config_flag.json",
+    "testdata/unknown.ext"
+  ],
+  "explanation": {
+    "what": "setSlice/setMap 内でslice要素・mapのキー/値それぞれ用に `&fieldData{Value: ...}` と直接struct リテラルを組み立てていた箇所を、`newFieldData(reflect.StructField{}, value, nil)` というビルダー関数の呼び出しに置き換えた。",
+    "why": "コミットメッセージ「user fieldData builder」(builderのタイポと見られる)の通り、fieldDataの生成経路をnewFieldDataに統一するのが直接の目的。おそらく直前のコミット群(seq17, 18)でfieldDataの生成ロジックをnewFieldDataに集約する方針が進んでおり、その仕上げとして残っていた直接リテラル生成箇所を置き換えたのだと考えられる。",
+    "highlights": [
+      { "file": "aconfig.go", "note": "setSlice/setMap 内の3箇所すべてが newFieldData 呼び出しに統一された" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "inferred",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

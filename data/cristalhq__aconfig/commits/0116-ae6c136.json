@@ -1,0 +1,87 @@
+{
+  "seq": 116,
+  "sha": "ae6c136585d906927ded032b3a9cf4dc1afabde2",
+  "parents": [
+    "7b7dfeb771272d687cf8a3eda11943e0e7a7437b"
+  ],
+  "author": {
+    "name": "Oleg Kovalov",
+    "email": "oleg@hey.com",
+    "date": "2021-05-22T19:04:48+02:00"
+  },
+  "message": "refactor LoadFromFile (#80)",
+  "pr": {
+    "number": 80,
+    "title": "refactor LoadFromFile",
+    "body": "",
+    "url": "https://github.com/cristalhq/aconfig/pull/80"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 58,
+    "deletions": 41
+  },
+  "files": [
+    {
+      "path": "aconfig.go",
+      "status": "M",
+      "additions": 58,
+      "deletions": 41,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/aconfig.go b/aconfig.go\nindex 0f4e064..584d26f 100644\n--- a/aconfig.go\n+++ b/aconfig.go\n@@ -215,7 +215,7 @@ func (l *Loader) loadSources() error {\n \t\t}\n \t}\n \tif !l.config.SkipFiles {\n-\t\tif err := l.loadFromFile(); err != nil {\n+\t\tif err := l.loadFiles(); err != nil {\n \t\t\treturn err\n \t\t}\n \t}\n@@ -255,19 +255,10 @@ func (l *Loader) loadDefaults() error {\n \treturn nil\n }\n \n-func (l *Loader) loadFromFile() error {\n+func (l *Loader) loadFiles() error {\n \tif l.config.FileFlag != \"\" {\n-\t\tfileFlag := getActualFlag(l.config.FileFlag, l.flagSet)\n-\t\tif fileFlag != nil {\n-\t\t\tconfigFile := fileFlag.Value.String()\n-\t\t\tif configFile == \"\" {\n-\t\t\t\treturn fmt.Errorf(\"%s should not be empty\", l.config.FileFlag)\n-\t\t\t}\n-\t\t\tif l.config.MergeFiles {\n-\t\t\t\tl.config.Files = append(l.config.Files, configFile)\n-\t\t\t} else {\n-\t\t\t\tl.config.Files = []string{configFile}\n-\t\t\t}\n+\t\tif err := l.loadFileFlag(); err != nil {\n+\t\t\treturn err\n \t\t}\n \t}\n \n@@ -279,48 +270,74 @@ func (l *Loader) loadFromFile() error {\n \t\t\tcontinue\n \t\t}\n \n-\t\text := strings.ToLower(filepath.Ext(file))\n-\t\tdecoder, ok := l.config.FileDecoders[ext]\n-\t\tif !ok {\n-\t\t\treturn fmt.Errorf(\"file format %q isn't supported\", ext)\n+\t\tif err := l.loadFile(file); err != nil {\n+\t\t\treturn err\n \t\t}\n \n-\t\tactualFields, err := decoder.DecodeFile(file)\n-\t\tif err != nil {\n-\t\t\treturn err\n+\t\tif l.config.MergeFiles {\n+\t\t\tcontinue\n \t\t}\n+\t\tbreak\n+\t}\n+\treturn nil\n+}\n \n-\t\ttag := decoder.Format()\n+func (l *Loader) loadFile(file string) error {\n+\text := strings.ToLower(filepath.Ext(file))\n+\tdecoder, ok := l.config.FileDecoders[ext]\n+\tif !ok {\n+\t\treturn fmt.Errorf(\"file format %q is not supported\", ext)\n+\t}\n \n-\t\tfor _, field := range l.fields {\n-\t\t\tname := l.fullTag(field, tag)\n-\t\t\tvalue, ok := actualFields[name]\n-\t\t\tif !ok {\n-\t\t\t\tactualFields = find(actualFields, name)\n-\t\t\t\tvalue, ok = actualFields[name]\n-\t\t\t\tif !ok {\n-\t\t\t\t\tcontinue\n-\t\t\t\t}\n-\t\t\t}\n+\tactualFields, err := decoder.DecodeFile(file)\n+\tif err != nil {\n+\t\treturn err\n+\t}\n \n-\t\t\tif err := l.setFieldData(field, value); err != nil {\n-\t\t\t\treturn err\n+\ttag := decoder.Format()\n+\n+\tfor _, field := range l.fields {\n+\t\tname := l.fullTag(field, tag)\n+\t\tvalue, ok := actualFields[name]\n+\t\tif !ok {\n+\t\t\tactualFields = find(actualFields, name)\n+\t\t\tvalue, ok = actualFields[name]\n+\t\t\tif !ok {\n+\t\t\t\tcontinue\n \t\t\t}\n-\t\t\tfield.isSet = true\n-\t\t\tdelete(actualFields, name)\n \t\t}\n \n-\t\tif !l.config.AllowUnknownFields {\n-\t\t\tfor env, value := range actualFields {\n-\t\t\t\treturn fmt.Errorf(\"unknown field in file %q: %s=%v (see AllowUnknownFields config param)\", file, env, value)\n-\t\t\t}\n+\t\tif err := l.setFieldData(field, value); err != nil {\n+\t\t\treturn err\n \t\t}\n+\t\tfield.isSet = true\n+\t\tdelete(actualFields, name)\n+\t}\n \n-\t\tif l.config.MergeFiles {\n-\t\t\tcontinue\n+\tif !l.config.AllowUnknownFields {\n+\t\tfor env, value := range actualFields {\n+\t\t\treturn fmt.Errorf(\"unknown field in file %q: %s=%v (see AllowUnknownFields config param)\", file, env, value)\n \t\t}\n+\t}\n+\treturn nil\n+}\n+\n+func (l *Loader) loadFileFlag() error {\n+\tfileFlag := getActualFlag(l.config.FileFlag, l.flagSet)\n+\tif fileFlag == nil {\n \t\treturn nil\n \t}\n+\n+\tconfigFile := fileFlag.Value.String()\n+\tif configFile == \"\" {\n+\t\treturn fmt.Errorf(\"%s should not be empty\", l.config.FileFlag)\n+\t}\n+\n+\tif l.config.MergeFiles {\n+\t\tl.config.Files = append(l.config.Files, configFile)\n+\t} else {\n+\t\tl.config.Files = []string{configFile}\n+\t}\n \treturn nil\n }\n \n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/build.yml",
+    "LICENSE",
+    "README.md",
+    "aconfig.go",
+    "aconfig_test.go",
+    "aconfigdotenv/dotenv.go",
+    "aconfigdotenv/dotenv_test.go",
+    "aconfigdotenv/go.mod",
+    "aconfigdotenv/go.sum",
+    "aconfighcl/go.mod",
+    "aconfighcl/go.sum",
+    "aconfighcl/hcl.go",
+    "aconfighcl/hcl_test.go",
+    "aconfigtoml/go.mod",
+    "aconfigtoml/go.sum",
+    "aconfigtoml/toml.go",
+    "aconfigtoml/toml_test.go",
+    "aconfigyaml/go.mod",
+    "aconfigyaml/go.sum",
+    "aconfigyaml/yaml.go",
+    "aconfigyaml/yaml_test.go",
+    "doc.go",
+    "example_test.go",
+    "go.mod",
+    "reflection.go",
+    "testdata/bad_config.json",
+    "testdata/config.json",
+    "testdata/config1.json",
+    "testdata/config2.json",
+    "testdata/config3.json",
+    "testdata/example_config.json",
+    "testdata/unknown.ext",
+    "testdata/unknown_fields.json",
+    "testfile.json",
+    "utils.go",
+    "utils_test.go"
+  ],
+  "explanation": {
+    "what": "肥大化していた `loadFromFile` メソッドを `loadFiles`(ファイル一覧のループ制御)・`loadFile`(1ファイルのデコードとフィールド割り当て)・`loadFileFlag`(FileFlag からのファイルパス解決)の3メソッドに分割した。ロジック自体は変更していない。",
+    "why": "PR タイトル「refactor LoadFromFile」の通り、直前2コミット(Format メソッド導入、.yml対応)で複雑化していた1メソッドの責務を分離し、可読性を上げる目的の純粋なリファクタリング。",
+    "highlights": [
+      { "file": "aconfig.go", "note": "loadFromFile → loadFiles / loadFile / loadFileFlag への分割。MergeFiles による continue/break のループ制御は loadFiles 側に残る" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [{ "type": "pr", "number": 80, "url": "https://github.com/cristalhq/aconfig/pull/80" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

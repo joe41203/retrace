@@ -1,0 +1,233 @@
+{
+  "seq": 144,
+  "sha": "2999b2a228d79dd8620b7284d41637ee0f39185b",
+  "parents": [
+    "e7fea81176121954eef8326a9c1e14a0cb5f9525"
+  ],
+  "author": {
+    "name": "Oleg Kovalov",
+    "email": "oleg@hey.com",
+    "date": "2022-07-01T18:17:35+02:00"
+  },
+  "message": "Support fsys for all decoders (#126)",
+  "pr": {
+    "number": 126,
+    "title": "Support fsys for all decoders",
+    "body": "Fixes #125 ",
+    "url": "https://github.com/cristalhq/aconfig/pull/126"
+  },
+  "linkedIssues": [
+    {
+      "number": 125,
+      "title": "yaml decorder can't open file in embed file system",
+      "body": "in the aconfigyaml package, [DecodeFile](https://github.com/cristalhq/aconfig/blob/e7fea81176121954eef8326a9c1e14a0cb5f9525/aconfigyaml/yaml.go#L21) func use os.Open to open file, when in embed file system, it can't find file then throw an err: \"no such file or directory\"。\r\nbut when using default json decorder, [jsonDecoder](https://github.com/cristalhq/aconfig/blob/e7fea81176121954eef8326a9c1e14a0cb5f9525/utils.go#L153) has a fsys field, which can open file in embed file system.\r\n\r\nhope you can fix this bug in aconfigyaml package.",
+      "url": "https://github.com/cristalhq/aconfig/issues/125"
+    }
+  ],
+  "stats": {
+    "filesChanged": 19,
+    "additions": 203,
+    "deletions": 26
+  },
+  "files": [
+    {
+      "path": "aconfigdotenv/dotenv.go",
+      "status": "M",
+      "additions": 16,
+      "deletions": 2,
+      "binary": false
+    },
+    {
+      "path": "aconfigdotenv/dotenv_test.go",
+      "status": "M",
+      "additions": 33,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "aconfigdotenv/go.mod",
+      "status": "M",
+      "additions": 3,
+      "deletions": 3,
+      "binary": false
+    },
+    {
+      "path": "aconfigdotenv/go.sum",
+      "status": "M",
+      "additions": 4,
+      "deletions": 4,
+      "binary": false
+    },
+    {
+      "path": "aconfigdotenv/testdata/config.env",
+      "status": "A",
+      "additions": 2,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "aconfighcl/go.mod",
+      "status": "M",
+      "additions": 2,
+      "deletions": 2,
+      "binary": false
+    },
+    {
+      "path": "aconfighcl/go.sum",
+      "status": "M",
+      "additions": 2,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "aconfighcl/hcl.go",
+      "status": "M",
+      "additions": 9,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "aconfighcl/hcl_test.go",
+      "status": "M",
+      "additions": 32,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "aconfighcl/testdata/config.hcl",
+      "status": "A",
+      "additions": 2,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "aconfigtoml/go.mod",
+      "status": "M",
+      "additions": 3,
+      "deletions": 3,
+      "binary": false
+    },
+    {
+      "path": "aconfigtoml/go.sum",
+      "status": "M",
+      "additions": 4,
+      "deletions": 4,
+      "binary": false
+    },
+    {
+      "path": "aconfigtoml/testdata/config.toml",
+      "status": "A",
+      "additions": 2,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "aconfigtoml/toml.go",
+      "status": "M",
+      "additions": 10,
+      "deletions": 3,
+      "binary": false
+    },
+    {
+      "path": "aconfigtoml/toml_test.go",
+      "status": "M",
+      "additions": 33,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "aconfigyaml/go.mod",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "aconfigyaml/testdata/config.yaml",
+      "status": "A",
+      "additions": 2,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "aconfigyaml/yaml.go",
+      "status": "M",
+      "additions": 10,
+      "deletions": 3,
+      "binary": false
+    },
+    {
+      "path": "aconfigyaml/yaml_test.go",
+      "status": "M",
+      "additions": 33,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/aconfigdotenv/dotenv.go b/aconfigdotenv/dotenv.go\nindex 2ac9f6f..fb6b7ff 100644\n--- a/aconfigdotenv/dotenv.go\n+++ b/aconfigdotenv/dotenv.go\n@@ -1,11 +1,15 @@\n package aconfigdotenv\n \n import (\n+\t\"io/fs\"\n+\n \t\"github.com/joho/godotenv\"\n )\n \n // Decoder of DotENV files for aconfig.\n-type Decoder struct{}\n+type Decoder struct {\n+\tfsys fs.FS\n+}\n \n // New .ENV decoder for aconfig.\n func New() *Decoder { return &Decoder{} }\n@@ -17,7 +21,12 @@ func (d *Decoder) Format() string {\n \n // DecodeFile implements aconfig.FileDecoder.\n func (d *Decoder) DecodeFile(filename string) (map[string]interface{}, error) {\n-\traw, err := godotenv.Read(filename)\n+\tfile, err := d.fsys.Open(filename)\n+\tif err != nil {\n+\t\treturn nil, err\n+\t}\n+\n+\traw, err := godotenv.Parse(file)\n \tif err != nil {\n \t\treturn nil, err\n \t}\n@@ -28,3 +37,8 @@ func (d *Decoder) DecodeFile(filename string) (map[string]interface{}, error) {\n \t}\n \treturn res, nil\n }\n+\n+// DecodeFile implements aconfig.FileDecoder.\n+func (d *Decoder) Init(fsys fs.FS) {\n+\td.fsys = fsys\n+}\ndiff --git a/aconfigdotenv/dotenv_test.go b/aconfigdotenv/dotenv_test.go\nindex 314df66..5d99017 100644\n--- a/aconfigdotenv/dotenv_test.go\n+++ b/aconfigdotenv/dotenv_test.go\n@@ -1,6 +1,7 @@\n package aconfigdotenv_test\n \n import (\n+\t\"embed\"\n \t\"os\"\n \t\"reflect\"\n \t\"testing\"\n@@ -9,6 +10,38 @@ import (\n \t\"github.com/cristalhq/aconfig/aconfigdotenv\"\n )\n \n+//go:embed testdata\n+var configEmbed embed.FS\n+\n+func TestDotEnvEmbed(t *testing.T) {\n+\tvar cfg struct {\n+\t\tFoo string\n+\t\tBar string\n+\t}\n+\tloader := aconfig.LoaderFor(&cfg, aconfig.Config{\n+\t\tSkipDefaults:       true,\n+\t\tSkipEnv:            true,\n+\t\tSkipFlags:          true,\n+\t\tFailOnFileNotFound: true,\n+\t\tFileDecoders: map[string]aconfig.FileDecoder{\n+\t\t\t\".env\": aconfigdotenv.New(),\n+\t\t},\n+\t\tFiles:      []string{\"testdata/config.env\"},\n+\t\tFileSystem: configEmbed,\n+\t})\n+\n+\tif err := loader.Load(); err != nil {\n+\t\tt.Fatal(err)\n+\t}\n+\n+\tif cfg.Foo != \"value1\" {\n+\t\tt.Fatalf(\"have: %v\", cfg.Foo)\n+\t}\n+\tif cfg.Bar != \"value2\" {\n+\t\tt.Fatalf(\"have: %v\", cfg.Bar)\n+\t}\n+}\n+\n func TestDotEnv(t *testing.T) {\n \tfilepath := createTestFile(t)\n \ndiff --git a/aconfigdotenv/go.mod b/aconfigdotenv/go.mod\nindex ee4db62..85bacba 100644\n--- a/aconfigdotenv/go.mod\n+++ b/aconfigdotenv/go.mod\n@@ -1,8 +1,8 @@\n module github.com/cristalhq/aconfig/aconfigdotenv\n \n-go 1.15\n+go 1.16\n \n require (\n-\tgithub.com/cristalhq/aconfig v0.16.8\n-\tgithub.com/joho/godotenv v1.3.0\n+\tgithub.com/cristalhq/aconfig v0.17.0\n+\tgithub.com/joho/godotenv v1.4.0\n )\ndiff --git a/aconfigdotenv/go.sum b/aconfigdotenv/go.sum\nindex ba0b7f7..b56b5ab 100644\n--- a/aconfigdotenv/go.sum\n+++ b/aconfigdotenv/go.sum\n@@ -1,4 +1,4 @@\n-github.com/cristalhq/aconfig v0.16.8 h1:lg8i0XHgfhvsnjNM5q/ou6jIHDRXlbBybjRP9t2fWuw=\n-github.com/cristalhq/aconfig v0.16.8/go.mod h1:NXaRp+1e6bkO4dJn+wZ71xyaihMDYPtCSvEhMTm/H3E=\n-github.com/joho/godotenv v1.3.0 h1:Zjp+RcGpHhGlrMbJzXTrZZPrWj+1vfm90La1wgB6Bhc=\n-github.com/joho/godotenv v1.3.0/go.mod h1:7hK45KPybAkOC6peb+G5yklZfMxEjkZhHbwpqxOKXbg=\n+github.com/cristalhq/aconfig v0.17.0 h1:VYqg0YOM5yUEx0KH/VwUYF2e/PNI7dcUE66y+xEx73s=\n+github.com/cristalhq/aconfig v0.17.0/go.mod h1:NXaRp+1e6bkO4dJn+wZ71xyaihMDYPtCSvEhMTm/H3E=\n+github.com/joho/godotenv v1.4.0 h1:3l4+N6zfMWnkbPEXKng2o2/MR5mSwTrBih4ZEkkz1lg=\n+github.com/joho/godotenv v1.4.0/go.mod h1:f4LDr5Voq0i2e/R5DDNOoa2zzDfwtkZa6DnEwAbqwq4=\ndiff --git a/aconfigdotenv/testdata/config.env b/aconfigdotenv/testdata/config.env\nnew file mode 100644\nindex 0000000..b969669\n--- /dev/null\n+++ b/aconfigdotenv/testdata/config.env\n@@ -0,0 +1,2 @@\n+FOO=value1\n+BAR=value2\ndiff --git a/aconfighcl/go.mod b/aconfighcl/go.mod\nindex 110617c..fb6d39e 100644\n--- a/aconfighcl/go.mod\n+++ b/aconfighcl/go.mod\n@@ -1,8 +1,8 @@\n module github.com/cristalhq/aconfig/aconfighcl\n \n-go 1.15\n+go 1.16\n \n require (\n-\tgithub.com/cristalhq/aconfig v0.16.8\n+\tgithub.com/cristalhq/aconfig v0.17.0\n \tgithub.com/hashicorp/hcl v1.0.0\n )\ndiff --git a/aconfighcl/go.sum b/aconfighcl/go.sum\nindex 8fa9c92..edabd89 100644\n--- a/aconfighcl/go.sum\n+++ b/aconfighcl/go.sum\n@@ -1,5 +1,7 @@\n github.com/cristalhq/aconfig v0.16.8 h1:lg8i0XHgfhvsnjNM5q/ou6jIHDRXlbBybjRP9t2fWuw=\n github.com/cristalhq/aconfig v0.16.8/go.mod h1:NXaRp+1e6bkO4dJn+wZ71xyaihMDYPtCSvEhMTm/H3E=\n+github.com/cristalhq/aconfig v0.17.0 h1:VYqg0YOM5yUEx0KH/VwUYF2e/PNI7dcUE66y+xEx73s=\n+github.com/cristalhq/aconfig v0.17.0/go.mod h1:NXaRp+1e6bkO4dJn+wZ71xyaihMDYPtCSvEhMTm/H3E=\n github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=\n github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=\n github.com/hashicorp/hcl v1.0.0 h1:0Anlzjpi4vEasTeNFn2mLJgTSwt0+6sfsiTG8qcWGx4=\ndiff --git a/aconfighcl/hcl.go b/aconfighcl/hcl.go\nindex d1f71be..79aa92d 100644\n--- a/aconfighcl/hcl.go\n+++ b/aconfighcl/hcl.go\n@@ -1,13 +1,16 @@\n package aconfighcl\n \n import (\n+\t\"io/fs\"\n \t\"io/ioutil\"\n \n \t\"github.com/hashicorp/hcl\"\n )\n \n // Decoder of HCL files for aconfig.\n-type Decoder struct{}\n+type Decoder struct {\n+\tfsys fs.FS\n+}\n \n // New HCL decoder for aconfig.\n func New() *Decoder { return &Decoder{} }\n@@ -35,3 +38,8 @@ func (d *Decoder) DecodeFile(filename string) (map[string]interface{}, error) {\n \t}\n \treturn raw, nil\n }\n+\n+// DecodeFile implements aconfig.FileDecoder.\n+func (d *Decoder) Init(fsys fs.FS) {\n+\td.fsys = fsys\n+}\ndiff --git a/aconfighcl/hcl_test.go b/aconfighcl/hcl_test.go\nindex 4dd5659..9bd4044 100644\n--- a/aconfighcl/hcl_test.go\n+++ b/aconfighcl/hcl_test.go\n@@ -1,6 +1,7 @@\n package aconfighcl_test\n \n import (\n+\t\"embed\"\n \t\"os\"\n \t\"reflect\"\n \t\"testing\"\n@@ -9,6 +10,37 @@ import (\n \t\"github.com/cristalhq/aconfig/aconfighcl\"\n )\n \n+//go:embed testdata\n+var configEmbed embed.FS\n+\n+func TestHCLEmbed(t *testing.T) {\n+\tvar cfg struct {\n+\t\tFoo string\n+\t\tBar string\n+\t}\n+\tloader := aconfig.LoaderFor(&cfg, aconfig.Config{\n+\t\tSkipDefaults:       true,\n+\t\tSkipEnv:            true,\n+\t\tSkipFlags:          true,\n+\t\tFailOnFileNotFound: true,\n+\t\tFileDecoders: map[string]aconfig.FileDecoder{\n+\t\t\t\".hcl\": aconfighcl.New(),\n+\t\t},\n+\t\tFiles:      []string{\"testdata/config.hcl\"},\n+\t\tFileSystem: configEmbed,\n+\t})\n+\n+\tif err := loader.Load(); err != nil {\n+\t\tt.Fatal(err)\n+\t}\n+\n+\tif cfg.Foo != \"value1\" {\n+\t\tt.Fatalf(\"have: %v\", cfg.Foo)\n+\t}\n+\tif cfg.Bar != \"value2\" {\n+\t\tt.Fatalf(\"have: %v\", cfg.Bar)\n+\t}\n+}\n func TestHCL(t *testing.T) {\n \tfilepath := createTestFile(t)\n \ndiff --git a/aconfighcl/testdata/config.hcl b/aconfighcl/testdata/config.hcl\nnew file mode 100644\nindex 0000000..72bac3d\n--- /dev/null\n+++ b/aconfighcl/testdata/config.hcl\n@@ -0,0 +1,2 @@\n+\"foo\" = \"value1\"\n+\"bar\" = \"value2\"\ndiff --git a/aconfigtoml/go.mod b/aconfigtoml/go.mod\nindex fd5e262..877f82f 100644\n--- a/aconfigtoml/go.mod\n+++ b/aconfigtoml/go.mod\n@@ -1,8 +1,8 @@\n module github.com/cristalhq/aconfig/aconfigtoml\n \n-go 1.15\n+go 1.16\n \n require (\n-\tgithub.com/BurntSushi/toml v0.3.1\n-\tgithub.com/cristalhq/aconfig v0.16.8\n+\tgithub.com/BurntSushi/toml v1.1.0\n+\tgithub.com/cristalhq/aconfig v0.17.0\n )\ndiff --git a/aconfigtoml/go.sum b/aconfigtoml/go.sum\nindex 86f7808..8e5bdae 100644\n--- a/aconfigtoml/go.sum\n+++ b/aconfigtoml/go.sum\n@@ -1,4 +1,4 @@\n-github.com/BurntSushi/toml v0.3.1 h1:WXkYYl6Yr3qBf1K79EBnL4mak0OimBfB0XUf9Vl28OQ=\n-github.com/BurntSushi/toml v0.3.1/go.mod h1:xHWCNGjB5oqiDr8zfno3MHue2Ht5sIBksp03qcyfWMU=\n-github.com/cristalhq/aconfig v0.16.8 h1:lg8i0XHgfhvsnjNM5q/ou6jIHDRXlbBybjRP9t2fWuw=\n-github.com/cristalhq/aconfig v0.16.8/go.mod h1:NXaRp+1e6bkO4dJn+wZ71xyaihMDYPtCSvEhMTm/H3E=\n+github.com/BurntSushi/toml v1.1.0 h1:ksErzDEI1khOiGPgpwuI7x2ebx/uXQNw7xJpn9Eq1+I=\n+github.com/BurntSushi/toml v1.1.0/go.mod h1:CxXYINrC8qIiEnFrOxCa7Jy5BFHlXnUU2pbicEuybxQ=\n+github.com/cristalhq/aconfig v0.17.0 h1:VYqg0YOM5yUEx0KH/VwUYF2e/PNI7dcUE66y+xEx73s=\n+github.com/cristalhq/aconfig v0.17.0/go.mod h1:NXaRp+1e6bkO4dJn+wZ71xyaihMDYPtCSvEhMTm/H3E=\ndiff --git a/aconfigtoml/testdata/config.toml b/aconfigtoml/testdata/config.toml\nnew file mode 100644\nindex 0000000..c67786b\n--- /dev/null\n+++ b/aconfigtoml/testdata/config.toml\n@@ -0,0 +1,2 @@\n+foo = \"value1\"\n+bar = \"value2\"\ndiff --git a/aconfigtoml/toml.go b/aconfigtoml/toml.go\nindex 84dfc34..301d74c 100644\n--- a/aconfigtoml/toml.go\n+++ b/aconfigtoml/toml.go\n@@ -1,13 +1,15 @@\n package aconfigtoml\n \n import (\n-\t\"os\"\n+\t\"io/fs\"\n \n \t\"github.com/BurntSushi/toml\"\n )\n \n // Decoder of TOML files for aconfig.\n-type Decoder struct{}\n+type Decoder struct {\n+\tfsys fs.FS\n+}\n \n // New TOML decoder for aconfig.\n func New() *Decoder { return &Decoder{} }\n@@ -19,7 +21,7 @@ func (d *Decoder) Format() string {\n \n // DecodeFile implements aconfig.FileDecoder.\n func (d *Decoder) DecodeFile(filename string) (map[string]interface{}, error) {\n-\tf, err := os.Open(filename)\n+\tf, err := d.fsys.Open(filename)\n \tif err != nil {\n \t\treturn nil, err\n \t}\n@@ -31,3 +33,8 @@ func (d *Decoder) DecodeFile(filename string) (map[string]interface{}, error) {\n \t}\n \treturn raw, nil\n }\n+\n+// DecodeFile implements aconfig.FileDecoder.\n+func (d *Decoder) Init(fsys fs.FS) {\n+\td.fsys = fsys\n+}\ndiff --git a/aconfigtoml/toml_test.go b/aconfigtoml/toml_test.go\nindex af6ccbe..30164a1 100644\n--- a/aconfigtoml/toml_test.go\n+++ b/aconfigtoml/toml_test.go\n@@ -1,6 +1,7 @@\n package aconfigtoml_test\n \n import (\n+\t\"embed\"\n \t\"os\"\n \t\"reflect\"\n \t\"testing\"\n@@ -9,6 +10,38 @@ import (\n \t\"github.com/cristalhq/aconfig/aconfigtoml\"\n )\n \n+//go:embed testdata\n+var configEmbed embed.FS\n+\n+func TestTOMLEmbed(t *testing.T) {\n+\tvar cfg struct {\n+\t\tFoo string\n+\t\tBar string\n+\t}\n+\tloader := aconfig.LoaderFor(&cfg, aconfig.Config{\n+\t\tSkipDefaults:       true,\n+\t\tSkipEnv:            true,\n+\t\tSkipFlags:          true,\n+\t\tFailOnFileNotFound: true,\n+\t\tFileDecoders: map[string]aconfig.FileDecoder{\n+\t\t\t\".toml\": aconfigtoml.New(),\n+\t\t},\n+\t\tFiles:      []string{\"testdata/config.toml\"},\n+\t\tFileSystem: configEmbed,\n+\t})\n+\n+\tif err := loader.Load(); err != nil {\n+\t\tt.Fatal(err)\n+\t}\n+\n+\tif cfg.Foo != \"value1\" {\n+\t\tt.Fatalf(\"have: %v\", cfg.Foo)\n+\t}\n+\tif cfg.Bar != \"value2\" {\n+\t\tt.Fatalf(\"have: %v\", cfg.Bar)\n+\t}\n+}\n+\n func TestTOML(t *testing.T) {\n \tfilepath := createTestFile(t)\n \ndiff --git a/aconfigyaml/go.mod b/aconfigyaml/go.mod\nindex 08dbc53..f0375c1 100644\n--- a/aconfigyaml/go.mod\n+++ b/aconfigyaml/go.mod\n@@ -1,6 +1,6 @@\n module github.com/cristalhq/aconfig/aconfigyaml\n \n-go 1.15\n+go 1.16\n \n require (\n \tgithub.com/cristalhq/aconfig v0.17.0\ndiff --git a/aconfigyaml/testdata/config.yaml b/aconfigyaml/testdata/config.yaml\nnew file mode 100644\nindex 0000000..5148fa2\n--- /dev/null\n+++ b/aconfigyaml/testdata/config.yaml\n@@ -0,0 +1,2 @@\n+foo: value1\n+bar: value2\ndiff --git a/aconfigyaml/yaml.go b/aconfigyaml/yaml.go\nindex b919226..36d0037 100644\n--- a/aconfigyaml/yaml.go\n+++ b/aconfigyaml/yaml.go\n@@ -1,13 +1,15 @@\n package aconfigyaml\n \n import (\n-\t\"os\"\n+\t\"io/fs\"\n \n \t\"gopkg.in/yaml.v3\"\n )\n \n // Decoder of YAML files for aconfig.\n-type Decoder struct{}\n+type Decoder struct {\n+\tfsys fs.FS\n+}\n \n // New YAML decoder for aconfig.\n func New() *Decoder { return &Decoder{} }\n@@ -19,7 +21,7 @@ func (d *Decoder) Format() string {\n \n // DecodeFile implements aconfig.FileDecoder.\n func (d *Decoder) DecodeFile(filename string) (map[string]interface{}, error) {\n-\tf, err := os.Open(filename)\n+\tf, err := d.fsys.Open(filename)\n \tif err != nil {\n \t\treturn nil, err\n \t}\n@@ -31,3 +33,8 @@ func (d *Decoder) DecodeFile(filename string) (map[string]interface{}, error) {\n \t}\n \treturn raw, nil\n }\n+\n+// DecodeFile implements aconfig.FileDecoder.\n+func (d *Decoder) Init(fsys fs.FS) {\n+\td.fsys = fsys\n+}\ndiff --git a/aconfigyaml/yaml_test.go b/aconfigyaml/yaml_test.go\nindex bb21dec..0b7913b 100644\n--- a/aconfigyaml/yaml_test.go\n+++ b/aconfigyaml/yaml_test.go\n@@ -1,6 +1,7 @@\n package aconfigyaml_test\n \n import (\n+\t\"embed\"\n \t\"os\"\n \t\"reflect\"\n \t\"testing\"\n@@ -9,6 +10,38 @@ import (\n \t\"github.com/cristalhq/aconfig/aconfigyaml\"\n )\n \n+//go:embed testdata\n+var configEmbed embed.FS\n+\n+func TestYAMLEmbed(t *testing.T) {\n+\tvar cfg struct {\n+\t\tFoo string\n+\t\tBar string\n+\t}\n+\tloader := aconfig.LoaderFor(&cfg, aconfig.Config{\n+\t\tSkipDefaults:       true,\n+\t\tSkipEnv:            true,\n+\t\tSkipFlags:          true,\n+\t\tFailOnFileNotFound: true,\n+\t\tFileDecoders: map[string]aconfig.FileDecoder{\n+\t\t\t\".yaml\": aconfigyaml.New(),\n+\t\t},\n+\t\tFiles:      []string{\"testdata/config.yaml\"},\n+\t\tFileSystem: configEmbed,\n+\t})\n+\n+\tif err := loader.Load(); err != nil {\n+\t\tt.Fatal(err)\n+\t}\n+\n+\tif cfg.Foo != \"value1\" {\n+\t\tt.Fatalf(\"have: %v\", cfg.Foo)\n+\t}\n+\tif cfg.Bar != \"value2\" {\n+\t\tt.Fatalf(\"have: %v\", cfg.Bar)\n+\t}\n+}\n+\n func TestYAML(t *testing.T) {\n \tfilepath := createTestFile(t)\n \n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/dependabot.yml",
+    ".github/workflows/build.yml",
+    "LICENSE",
+    "README.md",
+    "aconfig.go",
+    "aconfig_test.go",
+    "aconfigdotenv/dotenv.go",
+    "aconfigdotenv/dotenv_test.go",
+    "aconfigdotenv/go.mod",
+    "aconfigdotenv/go.sum",
+    "aconfigdotenv/testdata/config.env",
+    "aconfighcl/go.mod",
+    "aconfighcl/go.sum",
+    "aconfighcl/hcl.go",
+    "aconfighcl/hcl_test.go",
+    "aconfighcl/testdata/config.hcl",
+    "aconfigtoml/go.mod",
+    "aconfigtoml/go.sum",
+    "aconfigtoml/testdata/config.toml",
+    "aconfigtoml/toml.go",
+    "aconfigtoml/toml_test.go",
+    "aconfigyaml/go.mod",
+    "aconfigyaml/go.sum",
+    "aconfigyaml/res.yaml",
+    "aconfigyaml/testdata/config.yaml",
+    "aconfigyaml/yaml.go",
+    "aconfigyaml/yaml_test.go",
+    "doc.go",
+    "example_test.go",
+    "go.mod",
+    "reflection.go",
+    "testdata/bad_config.json",
+    "testdata/complex.json",
+    "testdata/config.json",
+    "testdata/config1.json",
+    "testdata/config2.json",
+    "testdata/config3.json",
+    "testdata/example_config.json",
+    "testdata/toy.json",
+    "testdata/unknown_fields.json",
+    "utils.go",
+    "utils_test.go"
+  ],
+  "explanation": {
+    "what": "aconfigdotenv・aconfighcl・aconfigtoml・aconfigyaml の4つの外部デコーダすべてに `fsys fs.FS` フィールドと `Init(fsys fs.FS)` メソッドを追加し、ファイルの読み込みを `os.Open`/`godotenv.Read` から `d.fsys.Open`/`godotenv.Parse(file)` に切り替えた。各パッケージに `//go:embed testdata` を使ったテスト(TestDotEnvEmbed 等)を追加し、embed.FS 経由でも読み込めることを確認している。go.mod の go バージョンも 1.15→1.16、依存も aconfig v0.17.0 系に更新した。",
+    "why": "issue #125 で「aconfigyaml の DecodeFile が os.Open を直接使っているため、embed file system 内のファイルを開けずエラーになる。標準の json デコーダには fsys フィールドがあるのに yaml にはない」という指摘があった。この PR はその欠落を yaml だけでなく dotenv/hcl/toml も含めた全デコーダに横展開して解消している。",
+    "highlights": [
+      { "file": "aconfigyaml/yaml.go", "note": "os.Open から d.fsys.Open への置き換えが fsys 対応の核" },
+      { "file": "aconfigdotenv/dotenv.go", "note": "godotenv.Read(filename) から godotenv.Parse(file) へ変更し fsys 経由で開いた *os.File を渡す形に" },
+      { "file": "aconfigyaml/yaml_test.go", "note": "embed.FS を使った TestYAMLEmbed で fsys 経由の読み込みを検証" }
+    ],
+    "langNotes": [
+      { "topic": "io/fs.FS", "note": "Go 1.16 で導入されたファイルシステム抽象インタフェース。os.DirFS だけでなく embed.FS のようなインメモリ実装も同じ Open(name string) (fs.File, error) で扱えるため、デコーダ側を os.Open 直呼びから fsys.Open 経由に変えるだけで埋め込みファイルにも対応できる。" },
+      { "topic": "embed.FS / go:embed", "note": "`//go:embed testdata` ディレクティブでビルド時にディレクトリ内容をバイナリに埋め込み、embed.FS 型の変数として実行時にアクセスできる。テストではこれを fs.FS として Loader に渡し、実ファイルなしで読み込みを検証している。" }
+    ],
+    "diagram": null,
+    "evidence": "issue",
+    "refs": [
+      { "type": "pr", "number": 126, "url": "https://github.com/cristalhq/aconfig/pull/126" }
+    ],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

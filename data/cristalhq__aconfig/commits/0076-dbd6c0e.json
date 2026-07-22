@@ -1,0 +1,250 @@
+{
+  "seq": 76,
+  "sha": "dbd6c0e97443bd45954d205ec5f78517260c4e3c",
+  "parents": [
+    "8c087db54dbf9acbef52534d98396af5ede29a65"
+  ],
+  "author": {
+    "name": "Oleg Kovalov",
+    "email": "oleg@hey.com",
+    "date": "2020-12-01T19:12:04+01:00"
+  },
+  "message": "auto-tags (#29)",
+  "pr": {
+    "number": 29,
+    "title": "auto-tags",
+    "body": "",
+    "url": "https://github.com/cristalhq/aconfig/pull/29"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 24,
+    "additions": 642,
+    "deletions": 344
+  },
+  "files": [
+    {
+      "path": "aconfig.go",
+      "status": "M",
+      "additions": 29,
+      "deletions": 19,
+      "binary": false
+    },
+    {
+      "path": "aconfig_test.go",
+      "status": "M",
+      "additions": 92,
+      "deletions": 7,
+      "binary": false
+    },
+    {
+      "path": "aconfighcl/go.mod",
+      "status": "D",
+      "additions": 0,
+      "deletions": 8,
+      "binary": false
+    },
+    {
+      "path": "aconfighcl/go.sum",
+      "status": "D",
+      "additions": 0,
+      "deletions": 52,
+      "binary": false
+    },
+    {
+      "path": "aconfighcl/hcl.go",
+      "status": "D",
+      "additions": 0,
+      "deletions": 16,
+      "binary": false
+    },
+    {
+      "path": "aconfighcl/hcl_test.go",
+      "status": "D",
+      "additions": 0,
+      "deletions": 90,
+      "binary": false
+    },
+    {
+      "path": "aconfigtoml/go.mod",
+      "status": "M",
+      "additions": 3,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "aconfigtoml/go.sum",
+      "status": "M",
+      "additions": 2,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "aconfigtoml/testfile.toml",
+      "status": "A",
+      "additions": 46,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "aconfigtoml/toml.go",
+      "status": "M",
+      "additions": 54,
+      "deletions": 4,
+      "binary": false
+    },
+    {
+      "path": "aconfigtoml/toml_test.go",
+      "status": "M",
+      "additions": 63,
+      "deletions": 62,
+      "binary": false
+    },
+    {
+      "path": "aconfigyaml/go.mod",
+      "status": "M",
+      "additions": 3,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "aconfigyaml/go.sum",
+      "status": "M",
+      "additions": 1,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "aconfigyaml/testfile.yaml",
+      "status": "A",
+      "additions": 21,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "aconfigyaml/yaml.go",
+      "status": "M",
+      "additions": 59,
+      "deletions": 3,
+      "binary": false
+    },
+    {
+      "path": "aconfigyaml/yaml_test.go",
+      "status": "M",
+      "additions": 63,
+      "deletions": 63,
+      "binary": false
+    },
+    {
+      "path": "example_test.go",
+      "status": "M",
+      "additions": 2,
+      "deletions": 2,
+      "binary": false
+    },
+    {
+      "path": "go.sum",
+      "status": "D",
+      "additions": 0,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "reflection.go",
+      "status": "M",
+      "additions": 34,
+      "deletions": 7,
+      "binary": false
+    },
+    {
+      "path": "testdata/config1.json",
+      "status": "M",
+      "additions": 11,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "testdata/example_config.json",
+      "status": "M",
+      "additions": 4,
+      "deletions": 4,
+      "binary": false
+    },
+    {
+      "path": "testfile.json",
+      "status": "A",
+      "additions": 21,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "utils.go",
+      "status": "M",
+      "additions": 52,
+      "deletions": 5,
+      "binary": false
+    },
+    {
+      "path": "utils_test.go",
+      "status": "A",
+      "additions": 82,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/aconfig.go b/aconfig.go\nindex 458dc26..29bfd78 100644\n--- a/aconfig.go\n+++ b/aconfig.go\n@@ -11,6 +11,9 @@ import (\n const (\n \tdefaultValueTag = \"default\"\n \tusageTag        = \"usage\"\n+\tjsonNameTag     = \"json\"\n+\tyamlNameTag     = \"yaml\"\n+\ttomlNameTag     = \"toml\"\n \tenvNameTag      = \"env\"\n \tflagNameTag     = \"flag\"\n )\n@@ -40,7 +43,7 @@ type Config struct {\n \n // FileDecoder is used to read config from files. See aconfig submodules.\n type FileDecoder interface {\n-\tDecodeFile(filename string, dst interface{}) error\n+\tDecodeFile(filename string) (map[string]interface{}, error)\n }\n \n // Field of the user configuration structure.\n@@ -97,7 +100,7 @@ func (l *Loader) parseFields() {\n \n \tif !l.config.SkipFlags {\n \t\tfor _, field := range l.fields {\n-\t\t\tflagName := l.config.FlagPrefix + field.flagName\n+\t\t\tflagName := l.config.FlagPrefix + field.fullTag(flagNameTag)\n \t\t\tl.flagSet.String(flagName, field.defaultValue, field.usage)\n \t\t}\n \t}\n@@ -167,35 +170,42 @@ func (l *Loader) loadDefaults() error {\n \n func (l *Loader) loadFromFile() error {\n \tfor _, file := range l.config.Files {\n-\t\tf, err := os.Open(file)\n-\t\tif err != nil {\n-\t\t\tif l.config.StopOnFileError {\n-\t\t\t\treturn err\n-\t\t\t}\n-\t\t\tcontinue\n-\t\t}\n-\t\tdefer func() { _ = f.Close() }()\n-\n \t\text := strings.ToLower(filepath.Ext(file))\n-\t\td, ok := l.config.FileDecoders[ext]\n+\t\tdecoder, ok := l.config.FileDecoders[ext]\n \t\tif !ok {\n \t\t\treturn fmt.Errorf(\"file format '%q' isn't supported\", ext)\n \t\t}\n \n-\t\terr = d.DecodeFile(file, l.dst)\n-\t\tif err == nil {\n-\t\t\treturn nil\n+\t\tmappedFields, err := decoder.DecodeFile(file)\n+\t\tif err != nil {\n+\t\t\treturn err\n \t\t}\n-\t\tif l.config.StopOnFileError {\n-\t\t\treturn fmt.Errorf(\"file parsing error: %w\", err)\n+\n+\t\ttag := ext[1:]\n+\n+\t\tfor _, field := range l.fields {\n+\t\t\tname := field.fullTag(tag)\n+\t\t\t// fmt.Printf(\"search %#v\\n\", name)\n+\t\t\tvalue, ok := mappedFields[name]\n+\t\t\tif !ok {\n+\t\t\t\tcontinue\n+\t\t\t}\n+\n+\t\t\tif value, ok := value.(string); ok {\n+\t\t\t\tif err := setFieldData(field, value); err != nil {\n+\t\t\t\t\treturn err\n+\t\t\t\t}\n+\t\t\t}\n \t\t}\n+\t\treturn nil\n \t}\n \treturn nil\n }\n \n func (l *Loader) loadEnvironment() error {\n \tfor _, field := range l.fields {\n-\t\tenvName := l.config.EnvPrefix + field.envName\n+\t\tenvName := l.config.EnvPrefix + field.fullTag(envNameTag)\n+\t\t// println(envName)\n \t\tv, ok := os.LookupEnv(envName)\n \t\tif !ok {\n \t\t\tcontinue\n@@ -220,7 +230,7 @@ func (l *Loader) loadFlags() error {\n \t})\n \n \tfor _, field := range l.fields {\n-\t\tflagName := l.config.FlagPrefix + field.flagName\n+\t\tflagName := l.config.FlagPrefix + field.fullTag(flagNameTag)\n \t\tflg, ok := actualFlags[flagName]\n \t\tif !ok {\n \t\t\tcontinue\ndiff --git a/aconfig_test.go b/aconfig_test.go\nindex 66c8e62..efc3d95 100644\n--- a/aconfig_test.go\n+++ b/aconfig_test.go\n@@ -11,8 +11,8 @@ import (\n )\n \n type TestConfig struct {\n-\tStr      string `default:\"str-def\"`\n-\tBytes    []byte `default:\"bytes-def\"`\n+\tStr string `default:\"str-def\"`\n+\t// Bytes    []byte `default:\"bytes-def\"`\n \tInt      *int32 `default:\"123\"`\n \tHTTPPort int    `default:\"8080\"`\n \tParam    int    // no default tag, so default value\n@@ -161,6 +161,90 @@ func TestLoadDefault_OtherNumbersConfig(t *testing.T) {\n \t}\n }\n \n+type structY struct {\n+\tX string\n+\tZ []string\n+\tA struct {\n+\t\tI bool\n+\t}\n+}\n+\n+type structA struct {\n+\tX  string  `json:\"x\"`\n+\tBB structB `json:\"B\"`\n+}\n+\n+type structB struct {\n+\tCC structC  `json:\"C\"`\n+\tDD []string `json:\"D\"`\n+}\n+\n+type structC struct {\n+\tMM string `json:\"m\"`\n+}\n+\n+type StructM struct {\n+\tM string\n+}\n+\n+func TestJSON(t *testing.T) {\n+\ttype TestConfig struct {\n+\t\tA string\n+\t\tC int\n+\t\tE float64\n+\t\tB []byte\n+\t\tP *int32\n+\t\tY structY\n+\n+\t\tAA structA `json:\"A\"`\n+\t\tStructM\n+\t}\n+\n+\tvar cfg, want TestConfig\n+\n+\ti := int32(42)\n+\twant = TestConfig{\n+\t\tA: \"b\",\n+\t\tC: 10,\n+\t\tE: 123.456,\n+\t\tB: []byte(\"abc\"),\n+\t\tP: &i,\n+\t\tY: structY{\n+\t\t\tX: \"y\",\n+\t\t\t// TODO: Z: []string{\"1\", \"2\", \"3\"},\n+\t\t},\n+\t\tAA: structA{\n+\t\t\tX: \"y\",\n+\t\t\tBB: structB{\n+\t\t\t\tCC: structC{\n+\t\t\t\t\tMM: \"n\",\n+\t\t\t\t},\n+\t\t\t\t// TODO: DD: []string{\"x\", \"y\", \"z\"},\n+\t\t\t},\n+\t\t},\n+\t\tStructM: StructM{\n+\t\t\tM: \"n\",\n+\t\t},\n+\t}\n+\n+\tloader := LoaderFor(&cfg, Config{\n+\t\tSkipDefaults:    true,\n+\t\tSkipEnvironment: true,\n+\t\tSkipFlags:       true,\n+\t\tFileDecoders: map[string]FileDecoder{\n+\t\t\t\".json\": &jsonDecoder{},\n+\t\t},\n+\t\tFiles: []string{\"testfile.json\"},\n+\t})\n+\n+\tif err := loader.Load(); err != nil {\n+\t\tt.Fatal(err)\n+\t}\n+\tif got := cfg; !reflect.DeepEqual(got, want) {\n+\t\tt.Fatalf(\"want %v, got %v\", want, got)\n+\t}\n+}\n+\n func TestLoadFile(t *testing.T) {\n \tf := func(filepath string) {\n \t\tt.Helper()\n@@ -253,7 +337,7 @@ func TestLoadFlag(t *testing.T) {\n \n \tflags := []string{\n \t\t\"-tst.str=str-flag\",\n-\t\t\"-tst.bytes=bytes-flag\",\n+\t\t// \"-tst.bytes=bytes-flag\",\n \t\t\"-tst.int=1001\",\n \t\t\"-tst.int=1001\",\n \t\t\"-tst.http_port=30000\",\n@@ -456,7 +540,7 @@ func TestBadFlags(t *testing.T) {\n \n func TestCustomNames(t *testing.T) {\n \ttype TestConfig struct {\n-\t\tA int `default:\"-1\" env:\"one\"`\n+\t\tA int `default:\"-1\" env:\"ONE\"`\n \t\tB int `default:\"-1\" flag:\"two\"`\n \t\tC int `default:\"-1\" env:\"three\" flag:\"four\"`\n \t}\n@@ -491,11 +575,11 @@ func TestWalkFields(t *testing.T) {\n \ttype TestConfig struct {\n \t\tA int `default:\"-1\" env:\"one\" marco:\"polo\"`\n \t\tB struct {\n-\t\t\tC int `default:\"-1\" flag:\"two\" usage:\"pretty simple usage duh\"`\n+\t\t\tC int `default:\"-1\" flag:\"two\" usage:\"pretty simple usage duh\" json:\"kek\" yaml:\"lel\" toml:\"mde\"`\n \t\t\tD struct {\n-\t\t\t\tE int `default:\"-1\" env:\"three\"`\n+\t\t\t\tE int `default:\"-1\" env:\"three\" json:\"kek\" yaml:\"lel\" toml:\"mde\"`\n \t\t\t}\n-\t\t}\n+\t\t} ``\n \t}\n \n \tfields := []struct {\n@@ -533,6 +617,7 @@ func TestWalkFields(t *testing.T) {\n \t\tif f.Name() != wantFields.Name {\n \t\t\tt.Fatalf(\"got name %v, want %v\", f.Name(), wantFields.Name)\n \t\t}\n+\t\t// t.Logf(\"tags %v: %v %v %v\", f.Name(), f.Tag(\"json\"), f.Tag(\"yaml\"), f.Tag(\"toml\"))\n \n \t\tif parent, ok := f.Parent(); ok && parent.Name() != wantFields.ParentName {\n \t\t\tt.Fatalf(\"got name %v, want %v\", parent.Name(), wantFields.ParentName)\ndiff --git a/aconfighcl/go.mod b/aconfighcl/go.mod\ndeleted file mode 100644\nindex 530e2ac..0000000\n--- a/aconfighcl/go.mod\n+++ /dev/null\n@@ -1,8 +0,0 @@\n-module github.com/cristalhq/aconfig/aconfighcl\n-\n-go 1.15\n-\n-require (\n-\tgithub.com/cristalhq/aconfig v0.8.0\n-\tgithub.com/hashicorp/hcl/v2 v2.7.0\n-)\ndiff --git a/aconfighcl/go.sum b/aconfighcl/go.sum\ndeleted file mode 100644\nindex 6742d16..0000000\n--- a/aconfighcl/go.sum\n+++ /dev/null\n@@ -1,52 +0,0 @@\n-github.com/agext/levenshtein v1.2.1 h1:QmvMAjj2aEICytGiWzmxoE0x2KZvE0fvmqMOfy2tjT8=\n-github.com/agext/levenshtein v1.2.1/go.mod h1:JEDfjyjHDjOF/1e4FlBE/PkbqA9OfWu2ki2W0IB5558=\n-github.com/apparentlymart/go-dump v0.0.0-20180507223929-23540a00eaa3/go.mod h1:oL81AME2rN47vu18xqj1S1jPIPuN7afo62yKTNn3XMM=\n-github.com/apparentlymart/go-textseg v1.0.0 h1:rRmlIsPEEhUTIKQb7T++Nz/A5Q6C9IuX2wFoYVvnCs0=\n-github.com/apparentlymart/go-textseg v1.0.0/go.mod h1:z96Txxhf3xSFMPmb5X/1W05FF/Nj9VFpLOpjS5yuumk=\n-github.com/apparentlymart/go-textseg/v12 v12.0.0 h1:bNEQyAGak9tojivJNkoqWErVCQbjdL7GzRt3F8NvfJ0=\n-github.com/apparentlymart/go-textseg/v12 v12.0.0/go.mod h1:S/4uRK2UtaQttw1GenVJEynmyUenKwP++x/+DdGV/Ec=\n-github.com/cristalhq/aconfig v0.8.0 h1:qr3ZnmG3jwnRueN9fHUKR6Y2eaYPNicbYlWnzQa9aBY=\n-github.com/cristalhq/aconfig v0.8.0/go.mod h1:0ZBp7dUf0F2Jr7YbLjw8OVlAD0eeV2bU3NwmVgeUReo=\n-github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=\n-github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=\n-github.com/go-test/deep v1.0.3 h1:ZrJSEWsXzPOxaZnFteGEfooLba+ju3FYIbOrS+rQd68=\n-github.com/go-test/deep v1.0.3/go.mod h1:wGDj63lr65AM2AQyKZd/NYHGb0R+1RLqB8NKt3aSFNA=\n-github.com/golang/protobuf v1.1.0/go.mod h1:6lQm79b+lXiMfvg/cZm0SGofjICqVBUtrP5yJMmIC1U=\n-github.com/google/go-cmp v0.3.1 h1:Xye71clBPdm5HgqGwUkwhbynsUJZhDbS20FvLhQ2izg=\n-github.com/google/go-cmp v0.3.1/go.mod h1:8QqcDgzrUqlUb/G2PQTWiueGozuR1884gddMywk6iLU=\n-github.com/hashicorp/hcl/v2 v2.7.0 h1:IU8qz5UzZ1po3M1D9/Kq6S5zbDGVfI9bnzmC1ogKKmI=\n-github.com/hashicorp/hcl/v2 v2.7.0/go.mod h1:bQTN5mpo+jewjJgh8jr0JUguIi7qPHUF6yIfAEN3jqY=\n-github.com/kr/pretty v0.1.0 h1:L/CwN0zerZDmRFUapSPitk6f+Q3+0za1rQkzVuMiMFI=\n-github.com/kr/pretty v0.1.0/go.mod h1:dAy3ld7l9f0ibDNOQOHHMYYIIbhfbHSm3C4ZsoJORNo=\n-github.com/kr/pty v1.1.1/go.mod h1:pFQYn66WHrOpPYNljwOMqo10TkYh1fy3cYio2l3bCsQ=\n-github.com/kr/text v0.1.0 h1:45sCR5RtlFHMR4UwH9sdQ5TC8v0qDQCHnXt+kaKSTVE=\n-github.com/kr/text v0.1.0/go.mod h1:4Jbv+DJW3UT/LiOwJeYQe1efqtUx/iVham/4vfdArNI=\n-github.com/kylelemons/godebug v0.0.0-20170820004349-d65d576e9348 h1:MtvEpTB6LX3vkb4ax0b5D2DHbNAUsen0Gx5wZoq3lV4=\n-github.com/kylelemons/godebug v0.0.0-20170820004349-d65d576e9348/go.mod h1:B69LEHPfb2qLo0BaaOLcbitczOKLWTsrBG9LczfCD4k=\n-github.com/mitchellh/go-wordwrap v0.0.0-20150314170334-ad45545899c7 h1:DpOJ2HYzCv8LZP15IdmG+YdwD2luVPHITV96TkirNBM=\n-github.com/mitchellh/go-wordwrap v0.0.0-20150314170334-ad45545899c7/go.mod h1:ZXFpozHsX6DPmq2I0TCekCxypsnAUbP2oI0UX1GXzOo=\n-github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZbAQM=\n-github.com/pmezard/go-difflib v1.0.0/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=\n-github.com/sergi/go-diff v1.0.0 h1:Kpca3qRNrduNnOQeazBd0ysaKrUJiIuISHxogkT9RPQ=\n-github.com/sergi/go-diff v1.0.0/go.mod h1:0CfEIISq7TuYL3j771MWULgwwjU+GofnZX9QAmXWZgo=\n-github.com/spf13/pflag v1.0.2/go.mod h1:DYY7MBk1bdzusC3SYhjObp+wFpr4gzcvqqNjLnInEg4=\n-github.com/stretchr/testify v1.2.2 h1:bSDNvY7ZPG5RlJ8otE/7V6gMiyenm9RtJ7IUVIAoJ1w=\n-github.com/stretchr/testify v1.2.2/go.mod h1:a8OnRcib4nhh0OaRAV+Yts87kKdq0PP7pXfy6kDkUVs=\n-github.com/vmihailenco/msgpack v3.3.3+incompatible/go.mod h1:fy3FlTQTDXWkZ7Bh6AcGMlsjHatGryHQYUTf1ShIgkk=\n-github.com/zclconf/go-cty v1.2.0 h1:sPHsy7ADcIZQP3vILvTjrh74ZA175TFP5vqiNK1UmlI=\n-github.com/zclconf/go-cty v1.2.0/go.mod h1:hOPWgoHbaTUnI5k4D2ld+GRpFJSCe6bCM7m1q/N4PQ8=\n-golang.org/x/crypto v0.0.0-20190308221718-c2843e01d9a2/go.mod h1:djNgcEr1/C05ACkg1iLfiJU5Ep61QUkGW8qpdssI0+w=\n-golang.org/x/crypto v0.0.0-20190426145343-a29dc8fdc734/go.mod h1:yigFU9vqHzYiE8UmvKecakEJjdnWj3jj499lnFckfCI=\n-golang.org/x/net v0.0.0-20180811021610-c39426892332/go.mod h1:mL1N/T3taQHkDXs73rZJwtUhF3w3ftmwwsq0BUmARs4=\n-golang.org/x/net v0.0.0-20190404232315-eb5bcb51f2a3/go.mod h1:t9HGtf8HONx5eT2rtn7q6eTqICYqUVnKs3thJo3Qplg=\n-golang.org/x/sync v0.0.0-20180314180146-1d60e4601c6f/go.mod h1:RxMgew5VJxzue5/jJTE5uejpjVlOe/izrB70Jof72aM=\n-golang.org/x/sys v0.0.0-20190215142949-d0b11bdaac8a/go.mod h1:STP8DvDyc/dI5b8T5hshtkjS+E42TnysNCUPdjciGhY=\n-golang.org/x/sys v0.0.0-20190412213103-97732733099d/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=\n-golang.org/x/sys v0.0.0-20190502175342-a43fa875dd82/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=\n-golang.org/x/text v0.3.0/go.mod h1:NqM8EUOU14njkJ3fqMW+pc6Ldnwhi/IjpwHt7yyuwOQ=\n-golang.org/x/text v0.3.2 h1:tW2bmiBqwgJj/UpqtC8EpXEZVYOwU0yG4iWbprSVAcs=\n-golang.org/x/text v0.3.2/go.mod h1:bEr9sfX3Q8Zfm5fL9x+3itogRgK3+ptLWKqgva+5dAk=\n-golang.org/x/tools v0.0.0-20180917221912-90fa682c2a6e/go.mod h1:n7NCudcB/nEzxVGmLbDWY5pfWTLqBcC2KZ6jyYvM4mQ=\n-google.golang.org/appengine v1.1.0/go.mod h1:EbEs0AVv82hx2wNQdGPgUI5lhzA/G0D9YwlJXL52JkM=\n-gopkg.in/check.v1 v1.0.0-20180628173108-788fd7840127 h1:qIbj1fsPNlZgppZ+VLlY7N33q108Sa+fhmuc+sWQYwY=\n-gopkg.in/check.v1 v1.0.0-20180628173108-788fd7840127/go.mod h1:Co6ibVJAznAaIkqp8huTwlJQCZ016jof/cbN4VW5Yz0=\ndiff --git a/aconfighcl/hcl.go b/aconfighcl/hcl.go\ndeleted file mode 100644\nindex d308a81..0000000\n--- a/aconfighcl/hcl.go\n+++ /dev/null\n@@ -1,16 +0,0 @@\n-package aconfighcl\n-\n-import (\n-\t\"github.com/hashicorp/hcl/v2/hclsimple\"\n-)\n-\n-// Decoder of HCL files for aconfig.\n-type Decoder struct{}\n-\n-// New HCL decoder for aconfig.\n-func New() *Decoder { return &Decoder{} }\n-\n-// DecodeFile implements aconfig.FileDecoder.\n-func (d *Decoder) DecodeFile(filename string, dst interface{}) error {\n-\treturn hclsimple.DecodeFile(filename, nil, dst)\n-}\ndiff --git a/aconfighcl/hcl_test.go b/aconfighcl/hcl_test.go\ndeleted file mode 100644\nindex f2a4ec6..0000000\n--- a/aconfighcl/hcl_test.go\n+++ /dev/null\n@@ -1,90 +0,0 @@\n-package aconfighcl_test\n-\n-import (\n-\t\"os\"\n-\t\"reflect\"\n-\t\"testing\"\n-\n-\t\"github.com/cristalhq/aconfig\"\n-\t\"github.com/cristalhq/aconfig/aconfighcl\"\n-\n-\t\"github.com/hashicorp/hcl/v2/hclsimple\"\n-)\n-\n-func TestHCL(t *testing.T) {\n-\tvar want TestConfig\n-\n-\tfilename := createFile(t)\n-\tloadFile(t, filename, &want)\n-\n-\tvar cfg TestConfig\n-\tloader := aconfig.LoaderFor(&cfg).\n-\t\tSkipDefaults().\n-\t\tSkipEnvironment().\n-\t\tSkipFlags().\n-\t\tWithFileDecoder(\".hcl\", aconfighcl.New()).\n-\t\tBuild()\n-\n-\tif err := loader.LoadWithFile(filename); err != nil {\n-\t\tt.Fatal(err)\n-\t}\n-\n-\tif got := cfg; !reflect.DeepEqual(got, want) {\n-\t\tt.Fatalf(\"want %v, got %v\", want, got)\n-\t}\n-}\n-\n-func createFile(t *testing.T) string {\n-\tfilename := t.TempDir() + \"/config.hcl\"\n-\n-\tfile, err := os.Create(filename)\n-\tif err != nil {\n-\t\tt.Fatal(err)\n-\t}\n-\tdefer file.Close()\n-\n-\tfile.WriteString(`str      = \"str-hcl\"\n-bytes    = [89,110,108,48,90,88,77,116,90,87,53,50]\n-int      = 101\n-http_port = 65000\n-sub {\n-  float = 999.111\n-}`)\n-\n-\treturn filename\n-}\n-\n-func loadFile(t *testing.T, file string, dst interface{}) {\n-\tt.Helper()\n-\n-\terr := hclsimple.DecodeFile(file, nil, dst)\n-\tif err != nil {\n-\t\tt.Fatal(err)\n-\t}\n-}\n-\n-type TestConfig struct {\n-\tStr      string    `hcl:\"str\"`\n-\tBytes    []byte    `hcl:\"bytes\"`\n-\tInt      *int32    `hcl:\"int\"`\n-\tHTTPPort int       `hcl:\"http_port\"`\n-\tParam    int       // no default tag, so default value\n-\tSub      SubConfig `hcl:\"sub,block\"`\n-\tAnon     struct {\n-\t\tIsAnon bool `default:\"true\"`\n-\t}\n-\n-\tSlice []int          `usage:\"just pass elements\"`\n-\tMap1  map[string]int ``\n-\tMap2  map[int]string ``\n-\n-\tEmbeddedConfig\n-}\n-\n-type EmbeddedConfig struct {\n-\tEm string `usage:\"use... em...field.\" hcl:\"em\"`\n-}\n-\n-type SubConfig struct {\n-\tFloat float64 `hcl:\"float\"`\n-}\ndiff --git a/aconfigtoml/go.mod b/aconfigtoml/go.mod\nindex 3ca4ee2..b20f2c5 100644\n--- a/aconfigtoml/go.mod\n+++ b/aconfigtoml/go.mod\n@@ -4,5 +4,7 @@ go 1.15\n \n require (\n \tgithub.com/BurntSushi/toml v0.3.1\n-\tgithub.com/cristalhq/aconfig v0.8.0\n+\tgithub.com/cristalhq/aconfig v0.9.1\n )\n+\n+replace github.com/cristalhq/aconfig => ../\n\\ No newline at end of file\ndiff --git a/aconfigtoml/go.sum b/aconfigtoml/go.sum\nindex a2ff5cf..7dfd876 100644\n--- a/aconfigtoml/go.sum\n+++ b/aconfigtoml/go.sum\n@@ -2,3 +2,5 @@ github.com/BurntSushi/toml v0.3.1 h1:WXkYYl6Yr3qBf1K79EBnL4mak0OimBfB0XUf9Vl28OQ\n github.com/BurntSushi/toml v0.3.1/go.mod h1:xHWCNGjB5oqiDr8zfno3MHue2Ht5sIBksp03qcyfWMU=\n github.com/cristalhq/aconfig v0.8.0 h1:qr3ZnmG3jwnRueN9fHUKR6Y2eaYPNicbYlWnzQa9aBY=\n github.com/cristalhq/aconfig v0.8.0/go.mod h1:0ZBp7dUf0F2Jr7YbLjw8OVlAD0eeV2bU3NwmVgeUReo=\n+gopkg.in/check.v1 v0.0.0-20161208181325-20d25e280405/go.mod h1:Co6ibVJAznAaIkqp8huTwlJQCZ016jof/cbN4VW5Yz0=\n+gopkg.in/yaml.v2 v2.3.0/go.mod h1:hI93XBmqTisBFMUTm0b8Fm+jr3Dg1NNxqwp+5A1VGuI=\ndiff --git a/aconfigtoml/testfile.toml b/aconfigtoml/testfile.toml\nnew file mode 100644\nindex 0000000..e4e2768\n--- /dev/null\n+++ b/aconfigtoml/testfile.toml\n@@ -0,0 +1,46 @@\n+a = \"b\"\n+c = 10\n+e = 123.456\n+b = \"abc\"\n+p = 42\n+m = \"n\"\n+\n+[y]\n+x = \"y\"\n+z = [ 1, 2, 3 ]\n+\n+[A]\n+    x = \"y\"\n+\n+    [A.B.C]\n+    m = \"n\"\n+\n+    [A.B]\n+    D = [\"x\", \"y\", \"z\"]\n+        # [C]\n+        # [A.B.C]\n+\n+# str = \"str-toml\"\n+# int = 101\n+# http_port = 65000\n+# [sub]\n+# float = 999.111\n+\n+# {\n+#     \"a\": \"b\",\n+#     \"c\": 10,\n+#     \"e\": 123.456,\n+#     \"y\": {\n+#         \"x\": \"y\",\n+#         \"z\": [\"1\", \"2\", \"3\"]\n+#     },\n+#     \"A\": {\n+#         \"x\": \"y\",\n+#         \"B\": {\n+#             \"C\": {\n+#                 \"m\": \"n\"\n+#             },\n+#             \"D\": [\"x\", \"y\", \"z\"]\n+#         }\n+#     }\n+# }\n\\ No newline at end of file\ndiff --git a/aconfigtoml/toml.go b/aconfigtoml/toml.go\nindex acfef7d..8ac43c1 100644\n--- a/aconfigtoml/toml.go\n+++ b/aconfigtoml/toml.go\n@@ -1,7 +1,9 @@\n package aconfigtoml\n \n import (\n+\t\"fmt\"\n \t\"os\"\n+\t\"strings\"\n \n \t\"github.com/BurntSushi/toml\"\n )\n@@ -13,11 +15,59 @@ type Decoder struct{}\n func New() *Decoder { return &Decoder{} }\n \n // DecodeFile implements aconfig.FileDecoder.\n-func (d *Decoder) DecodeFile(filename string, dst interface{}) error {\n+func (d *Decoder) DecodeFile(filename string) (map[string]interface{}, error) {\n \tf, err := os.Open(filename)\n \tif err != nil {\n-\t\treturn err\n+\t\treturn nil, err\n+\t}\n+\n+\tvar raw map[string]interface{}\n+\tif _, err := toml.DecodeReader(f, &raw); err != nil {\n+\t\treturn nil, err\n+\t}\n+\n+\tres := map[string]interface{}{}\n+\n+\tfor key, value := range raw {\n+\t\t// fmt.Printf(\"k: %s, v: %v %[2]T\\n\", key, value)\n+\t\tflatten(\"\", key, value, res)\n+\t}\n+\t// fmt.Printf(\"map: %#v\\n\\n\", res)\n+\treturn res, nil\n+}\n+\n+// copied from aconfig/utils.go\n+//\n+func flatten(prefix, key string, curr interface{}, res map[string]interface{}) {\n+\t// log.Printf(\"%s::%s got %T %v\", prefix, key, curr, curr)\n+\tswitch curr := curr.(type) {\n+\tcase map[string]interface{}:\n+\t\tfor k, v := range curr {\n+\t\t\tflatten(prefix+key+\".\", k, v, res)\n+\t\t}\n+\n+\tcase map[interface{}]interface{}:\n+\t\tfor k, v := range curr {\n+\t\t\tif k, ok := k.(string); ok {\n+\t\t\t\tflatten(prefix+key+\".\", k, v, res)\n+\t\t\t}\n+\t\t}\n+\tcase []interface{}:\n+\t\tb := &strings.Builder{}\n+\t\tfor i, v := range curr {\n+\t\t\tif i > 0 {\n+\t\t\t\tb.WriteByte(',')\n+\t\t\t}\n+\t\t\tb.WriteString(fmt.Sprint(v))\n+\t\t}\n+\t\tres[prefix+key] = curr\n+\tcase string:\n+\t\tres[prefix+key] = curr\n+\tcase float64:\n+\t\tres[prefix+key] = fmt.Sprintf(\"%v\", curr)\n+\tcase int, int8, int16, int32, int64:\n+\t\tres[prefix+key] = fmt.Sprintf(\"%v\", curr)\n+\tdefault:\n+\t\tpanic(fmt.Sprintf(\"%s::%s got %T %v\", prefix, key, curr, curr))\n \t}\n-\t_, err = toml.DecodeReader(f, dst)\n-\treturn err\n }\ndiff --git a/aconfigtoml/toml_test.go b/aconfigtoml/toml_test.go\nindex e9b6a9c..a7036e5 100644\n--- a/aconfigtoml/toml_test.go\n+++ b/aconfigtoml/toml_test.go\n@@ -1,92 +1,93 @@\n package aconfigtoml_test\n \n import (\n-\t\"os\"\n \t\"reflect\"\n \t\"testing\"\n \n \t\"github.com/cristalhq/aconfig\"\n \t\"github.com/cristalhq/aconfig/aconfigtoml\"\n-\n-\t\"github.com/BurntSushi/toml\"\n )\n \n func TestTOML(t *testing.T) {\n-\tvar want TestConfig\n-\n-\tfilename := createFile(t)\n-\tloadFile(t, filename, &want)\n-\n-\tvar cfg TestConfig\n-\tloader := aconfig.LoaderFor(&cfg).\n-\t\tSkipDefaults().\n-\t\tSkipEnvironment().\n-\t\tSkipFlags().\n-\t\tWithFileDecoder(\".toml\", aconfigtoml.New()).\n-\t\tBuild()\n+\tvar cfg, want TestConfig\n+\n+\ti := int32(42)\n+\twant = TestConfig{\n+\t\tA: \"b\",\n+\t\tC: 10,\n+\t\tE: 123.456,\n+\t\tB: []byte(\"abc\"),\n+\t\tP: &i,\n+\t\tY: structY{\n+\t\t\tX: \"y\",\n+\t\t\t// TODO: Z: []string{\"1\", \"2\", \"3\"},\n+\t\t},\n+\t\tAA: structA{\n+\t\t\tX: \"y\",\n+\t\t\tBB: structB{\n+\t\t\t\tCC: structC{\n+\t\t\t\t\tMM: \"n\",\n+\t\t\t\t},\n+\t\t\t\t// TODO: DD: []string{\"x\", \"y\", \"z\"},\n+\t\t\t},\n+\t\t},\n+\t\tStructM: StructM{\n+\t\t\tM: \"n\",\n+\t\t},\n+\t}\n \n-\tif err := loader.LoadWithFile(filename); err != nil {\n+\tloader := aconfig.LoaderFor(&cfg, aconfig.Config{\n+\t\tSkipDefaults:    true,\n+\t\tSkipEnvironment: true,\n+\t\tSkipFlags:       true,\n+\t\tFileDecoders: map[string]aconfig.FileDecoder{\n+\t\t\t\".toml\": aconfigtoml.New(),\n+\t\t},\n+\t\tFiles: []string{\"testfile.toml\"},\n+\t})\n+\n+\tif err := loader.Load(); err != nil {\n \t\tt.Fatal(err)\n \t}\n-\n \tif got := cfg; !reflect.DeepEqual(got, want) {\n \t\tt.Fatalf(\"want %v, got %v\", want, got)\n \t}\n }\n \n-func createFile(t *testing.T) string {\n-\tfilename := t.TempDir() + \"/config.toml\"\n-\n-\tfile, err := os.Create(filename)\n-\tif err != nil {\n-\t\tt.Fatal(err)\n-\t}\n-\tdefer file.Close()\n-\n-\tfile.WriteString(`Str = \"str-json\"\n-Int = 101\n-HTTPPort = 65000\n-[Sub]\n-Float = 999.111 `)\n-\n-\treturn filename\n+type TestConfig struct {\n+\tA string\n+\tC int\n+\tE float64\n+\tB []byte\n+\tP *int32\n+\tY structY\n+\n+\tAA structA `toml:\"A\"`\n+\tStructM\n }\n \n-func loadFile(t *testing.T, file string, dst interface{}) {\n-\tt.Helper()\n-\n-\tf, err := os.Open(file)\n-\tif err != nil {\n-\t\tt.Fatal(err)\n-\t}\n-\t_, err = toml.DecodeReader(f, dst)\n-\tif err != nil {\n-\t\tt.Fatal(err)\n+type structY struct {\n+\tX string\n+\tZ []string\n+\tA struct {\n+\t\tI bool\n \t}\n }\n \n-type TestConfig struct {\n-\tStr      string    `toml:\"str\"`\n-\tBytes    []byte    `toml:\"bytes\"`\n-\tInt      *int32    `toml:\"int\"`\n-\tHTTPPort int       `toml:\"http_port\"`\n-\tParam    int       `toml:\"param\"` // no default tag, so default value\n-\tSub      SubConfig `toml:\"sub\"`\n-\tAnon     struct {\n-\t\tIsAnon bool `default:\"true\"`\n-\t}\n-\n-\tSlice []int          `usage:\"just pass elements\"`\n-\tMap1  map[string]int ``\n-\tMap2  map[int]string ``\n+type structA struct {\n+\tX  string  `toml:\"x\"`\n+\tBB structB `toml:\"B\"`\n+}\n \n-\tEmbeddedConfig\n+type structB struct {\n+\tCC structC  `toml:\"C\"`\n+\tDD []string `toml:\"D\"`\n }\n \n-type EmbeddedConfig struct {\n-\tEm string `usage:\"use... em...field.\" toml:\"em\"`\n+type structC struct {\n+\tMM string `toml:\"m\"`\n }\n \n-type SubConfig struct {\n-\tFloat float64 `toml:\"float\"`\n+type StructM struct {\n+\tM string\n }\ndiff --git a/aconfigyaml/go.mod b/aconfigyaml/go.mod\nindex 91800ac..2e61c57 100644\n--- a/aconfigyaml/go.mod\n+++ b/aconfigyaml/go.mod\n@@ -3,6 +3,8 @@ module github.com/cristalhq/aconfig/aconfigyaml\n go 1.15\n \n require (\n-\tgithub.com/cristalhq/aconfig v0.8.0\n+\tgithub.com/cristalhq/aconfig v0.9.1\n \tgopkg.in/yaml.v2 v2.3.0\n )\n+\n+replace github.com/cristalhq/aconfig => ../\n\\ No newline at end of file\ndiff --git a/aconfigyaml/go.sum b/aconfigyaml/go.sum\nindex e901834..a98cbab 100644\n--- a/aconfigyaml/go.sum\n+++ b/aconfigyaml/go.sum\n@@ -1,3 +1,4 @@\n+github.com/BurntSushi/toml v0.3.1/go.mod h1:xHWCNGjB5oqiDr8zfno3MHue2Ht5sIBksp03qcyfWMU=\n github.com/cristalhq/aconfig v0.8.0 h1:qr3ZnmG3jwnRueN9fHUKR6Y2eaYPNicbYlWnzQa9aBY=\n github.com/cristalhq/aconfig v0.8.0/go.mod h1:0ZBp7dUf0F2Jr7YbLjw8OVlAD0eeV2bU3NwmVgeUReo=\n gopkg.in/check.v1 v0.0.0-20161208181325-20d25e280405 h1:yhCVgyC4o1eVCa2tZl7eS0r+SDo693bJlVdllGtEeKM=\ndiff --git a/aconfigyaml/testfile.yaml b/aconfigyaml/testfile.yaml\nnew file mode 100644\nindex 0000000..014569f\n--- /dev/null\n+++ b/aconfigyaml/testfile.yaml\n@@ -0,0 +1,21 @@\n+{\n+    \"a\": \"b\",\n+    \"c\": 10,\n+    \"e\": 123.456,\n+    \"b\": \"abc\",\n+    \"p\": 42,\n+    \"m\": \"n\",\n+    \"y\": {\n+        \"x\": \"y\",\n+        \"z\": [\"1\", \"2\", \"3\"]\n+    },\n+    \"A\": {\n+        \"x\": \"y\",\n+        \"B\": {\n+            \"C\": {\n+                \"m\": \"n\"\n+            },\n+            \"D\": [\"x\", \"y\", \"z\"]\n+        }\n+    }\n+}\n\\ No newline at end of file\ndiff --git a/aconfigyaml/yaml.go b/aconfigyaml/yaml.go\nindex 0c7c4ee..8003a24 100644\n--- a/aconfigyaml/yaml.go\n+++ b/aconfigyaml/yaml.go\n@@ -1,7 +1,9 @@\n package aconfigyaml\n \n import (\n+\t\"fmt\"\n \t\"os\"\n+\t\"strings\"\n \n \t\"gopkg.in/yaml.v2\"\n )\n@@ -13,10 +15,64 @@ type Decoder struct{}\n func New() *Decoder { return &Decoder{} }\n \n // DecodeFile implements aconfig.FileDecoder.\n-func (d *Decoder) DecodeFile(filename string, dst interface{}) error {\n+func (d *Decoder) DecodeFile(filename string) (map[string]interface{}, error) {\n \tf, err := os.Open(filename)\n \tif err != nil {\n-\t\treturn err\n+\t\treturn nil, err\n+\t}\n+\n+\tvar raw map[string]interface{}\n+\tif err := yaml.NewDecoder(f).Decode(&raw); err != nil {\n+\t\treturn nil, err\n+\t}\n+\n+\tres := map[string]interface{}{}\n+\n+\tfor key, value := range raw {\n+\t\t// fmt.Printf(\"k: %s, v: %v %[2]T\\n\", key, value)\n+\t\tflatten(\"\", key, value, res)\n+\t}\n+\t// fmt.Printf(\"map: %#v\\n\\n\", res)\n+\treturn res, nil\n+}\n+\n+// copied from aconfig/utils.go\n+//\n+func flatten(prefix, key string, curr interface{}, res map[string]interface{}) {\n+\t// log.Printf(\"%s::%s got %T %v\", prefix, key, curr, curr)\n+\tswitch curr := curr.(type) {\n+\tcase map[string]interface{}:\n+\t\tfor k, v := range curr {\n+\t\t\tflatten(prefix+key+\".\", k, v, res)\n+\t\t}\n+\n+\tcase map[interface{}]interface{}:\n+\t\tfor k, v := range curr {\n+\t\t\tif k, ok := k.(string); ok {\n+\t\t\t\tflatten(prefix+key+\".\", k, v, res)\n+\t\t\t}\n+\t\t}\n+\tcase []interface{}:\n+\t\t// fmt.Printf(\"wow %v\\n\", curr)\n+\t\tb := &strings.Builder{}\n+\t\tfor i, v := range curr {\n+\t\t\tif i > 0 {\n+\t\t\t\tb.WriteByte(',')\n+\t\t\t}\n+\t\t\tb.WriteString(fmt.Sprint(v))\n+\t\t}\n+\t\tres[prefix+key] = b.String()\n+\tcase []string:\n+\t\tres[prefix+key] = curr\n+\tcase string:\n+\t\tres[prefix+key] = curr\n+\tcase float32:\n+\t\tres[prefix+key] = fmt.Sprintf(\"%v\", curr)\n+\tcase float64:\n+\t\tres[prefix+key] = fmt.Sprintf(\"%v\", curr)\n+\tcase int, int8, int16, int32, int64:\n+\t\tres[prefix+key] = fmt.Sprintf(\"%v\", curr)\n+\tdefault:\n+\t\tpanic(fmt.Sprintf(\"%s::%s got %T %v\", prefix, key, curr, curr))\n \t}\n-\treturn yaml.NewDecoder(f).Decode(dst)\n }\ndiff --git a/aconfigyaml/yaml_test.go b/aconfigyaml/yaml_test.go\nindex de58020..4bf0d73 100644\n--- a/aconfigyaml/yaml_test.go\n+++ b/aconfigyaml/yaml_test.go\n@@ -1,93 +1,93 @@\n package aconfigyaml_test\n \n import (\n-\t\"os\"\n \t\"reflect\"\n \t\"testing\"\n \n \t\"github.com/cristalhq/aconfig\"\n \t\"github.com/cristalhq/aconfig/aconfigyaml\"\n-\n-\t\"gopkg.in/yaml.v2\"\n )\n \n func TestYAML(t *testing.T) {\n-\tvar want TestConfig\n-\n-\tfilename := createFile(t)\n-\tloadFile(t, filename, &want)\n-\n-\tvar cfg TestConfig\n-\tloader := aconfig.LoaderFor(&cfg).\n-\t\tSkipDefaults().\n-\t\tSkipEnvironment().\n-\t\tSkipFlags().\n-\t\tWithFileDecoder(\".yaml\", aconfigyaml.New()).\n-\t\tBuild()\n+\tvar cfg, want TestConfig\n+\n+\ti := int32(42)\n+\twant = TestConfig{\n+\t\tA: \"b\",\n+\t\tC: 10,\n+\t\tE: 123.456,\n+\t\tB: []byte(\"abc\"),\n+\t\tP: &i,\n+\t\tY: structY{\n+\t\t\tX: \"y\",\n+\t\t\tZ: []string{\"1\", \"2\", \"3\"},\n+\t\t},\n+\t\tAA: structA{\n+\t\t\tX: \"y\",\n+\t\t\tBB: structB{\n+\t\t\t\tCC: structC{\n+\t\t\t\t\tMM: \"n\",\n+\t\t\t\t},\n+\t\t\t\tDD: []string{\"x\", \"y\", \"z\"},\n+\t\t\t},\n+\t\t},\n+\t\tStructM: StructM{\n+\t\t\tM: \"n\",\n+\t\t},\n+\t}\n \n-\tif err := loader.LoadWithFile(filename); err != nil {\n+\tloader := aconfig.LoaderFor(&cfg, aconfig.Config{\n+\t\tSkipDefaults:    true,\n+\t\tSkipEnvironment: true,\n+\t\tSkipFlags:       true,\n+\t\tFileDecoders: map[string]aconfig.FileDecoder{\n+\t\t\t\".yaml\": aconfigyaml.New(),\n+\t\t},\n+\t\tFiles: []string{\"testfile.yaml\"},\n+\t})\n+\n+\tif err := loader.Load(); err != nil {\n \t\tt.Fatal(err)\n \t}\n-\n \tif got := cfg; !reflect.DeepEqual(got, want) {\n \t\tt.Fatalf(\"want %v, got %v\", want, got)\n \t}\n }\n \n-func createFile(t *testing.T) string {\n-\tfilename := t.TempDir() + \"/config.yaml\"\n-\n-\tfile, err := os.Create(filename)\n-\tif err != nil {\n-\t\tt.Fatal(err)\n-\t}\n-\tdefer file.Close()\n-\n-\tfile.WriteString(`Str: \"str-yaml\"\n-Bytes: \"Ynl0ZXMteWFtbA==\"\n-Int: 101\n-HTTPPort\": 65000\n-Sub:\n-  Float: 999.111`)\n-\n-\treturn filename\n+type TestConfig struct {\n+\tA string\n+\tC int\n+\tE float64\n+\tB []byte\n+\tP *int32\n+\tY structY\n+\n+\tAA structA `yaml:\"A\"`\n+\tStructM\n }\n \n-func loadFile(t *testing.T, file string, dst interface{}) {\n-\tt.Helper()\n-\n-\tf, err := os.Open(file)\n-\tif err != nil {\n-\t\tt.Fatal(err)\n-\t}\n-\terr = yaml.NewDecoder(f).Decode(dst)\n-\tif err != nil {\n-\t\tt.Fatal(err)\n+type structY struct {\n+\tX string\n+\tZ []string\n+\tA struct {\n+\t\tI bool\n \t}\n }\n \n-type TestConfig struct {\n-\tStr      string    `yaml:\"str\"`\n-\tBytes    []byte    `yaml:\"bytes\"`\n-\tInt      *int32    `yaml:\"int\"`\n-\tHTTPPort int       `yaml:\"http_port\"`\n-\tParam    int       `yaml:\"param\"` // no default tag, so default value\n-\tSub      SubConfig `yaml:\"sub\"`\n-\tAnon     struct {\n-\t\tIsAnon bool `default:\"true\"`\n-\t}\n-\n-\tSlice []int          `usage:\"just pass elements\"`\n-\tMap1  map[string]int ``\n-\tMap2  map[int]string ``\n+type structA struct {\n+\tX  string  `yaml:\"x\"`\n+\tBB structB `yaml:\"B\"`\n+}\n \n-\tEmbeddedConfig\n+type structB struct {\n+\tCC structC  `yaml:\"C\"`\n+\tDD []string `yaml:\"D\"`\n }\n \n-type EmbeddedConfig struct {\n-\tEm string `usage:\"use... em...field.\" yaml:\"em\"`\n+type structC struct {\n+\tMM string `yaml:\"m\"`\n }\n \n-type SubConfig struct {\n-\tFloat float64 `yaml:\"float\"`\n+type StructM struct {\n+\tM string\n }\ndiff --git a/example_test.go b/example_test.go\nindex 30bc970..d2f3e31 100644\n--- a/example_test.go\n+++ b/example_test.go\n@@ -56,8 +56,8 @@ func Example_WalkFields() {\n \n \t// Output:\n \t// HTTPPort: \"HTTP_PORT\" \"http_port\" \"1111\" \"just a number\"\n-\t// Auth.User: \"AUTH_USER\" \"auth.user\" \"def-user\" \"your user\"\n-\t// Auth.Pass: \"AUTH_PASS\" \"auth.pass\" \"def-pass\" \"make it strong\"\n+\t// Auth.User: \"USER\" \"user\" \"def-user\" \"your user\"\n+\t// Auth.Pass: \"PASS\" \"pass\" \"def-pass\" \"make it strong\"\n }\n \n // Just load defaults from struct defenition.\ndiff --git a/go.sum b/go.sum\ndeleted file mode 100644\nindex e69de29..0000000\ndiff --git a/reflection.go b/reflection.go\nindex 7ab8418..f23704d 100644\n--- a/reflection.go\n+++ b/reflection.go\n@@ -56,23 +56,32 @@ type fieldData struct {\n \tfield        reflect.StructField\n \tvalue        reflect.Value\n \tdefaultValue string\n+\tusage        string\n+\tjsonName     string\n+\tyamlName     string\n+\ttomlName     string\n \tenvName      string\n \tflagName     string\n-\tusage        string\n }\n \n func newFieldData(field reflect.StructField, value reflect.Value, parent *fieldData) *fieldData {\n \twords := splitNameByWords(field.Name)\n+\tname := makeFlagName(field, parent, words) // it's ok to use flagName, fields have `_` and nesting is via `.`\n+\t// println(ifNotEmpty(field.Tag.Get(yamlNameTag), \"::\"+name))\n \n \treturn &fieldData{\n-\t\tname:         makeName(field.Name, parent),\n-\t\tparent:       parent,\n-\t\tvalue:        value,\n-\t\tfield:        field,\n+\t\tname:   makeName(field.Name, parent),\n+\t\tparent: parent,\n+\t\tvalue:  value,\n+\t\tfield:  field,\n+\n \t\tdefaultValue: field.Tag.Get(defaultValueTag),\n-\t\tenvName:      makeEnvName(field, parent, words),\n-\t\tflagName:     makeFlagName(field, parent, words),\n \t\tusage:        field.Tag.Get(usageTag),\n+\t\tjsonName:     ifNotEmpty(field.Tag.Get(jsonNameTag), name),\n+\t\tyamlName:     ifNotEmpty(field.Tag.Get(yamlNameTag), name),\n+\t\ttomlName:     ifNotEmpty(field.Tag.Get(tomlNameTag), name),\n+\t\tenvName:      ifNotEmpty(field.Tag.Get(envNameTag), makeEnvName(field, parent, words)),\n+\t\tflagName:     ifNotEmpty(field.Tag.Get(flagNameTag), name),\n \t}\n }\n \n@@ -92,12 +101,30 @@ func (f *fieldData) Usage() string {\n \treturn f.usage\n }\n \n+func (f *fieldData) fullTag(tag string) string {\n+\tsep := \".\"\n+\tif tag == envNameTag {\n+\t\tsep = \"_\"\n+\t}\n+\tres := f.Tag(tag)\n+\tfor p := f.parent; p != nil; p = p.parent {\n+\t\tres = p.Tag(tag) + sep + res\n+\t}\n+\treturn res\n+}\n+\n func (f *fieldData) Tag(tag string) string {\n \tswitch tag {\n \tcase defaultValueTag:\n \t\treturn f.defaultValue\n \tcase usageTag:\n \t\treturn f.usage\n+\tcase jsonNameTag:\n+\t\treturn f.jsonName\n+\tcase yamlNameTag:\n+\t\treturn f.yamlName\n+\tcase tomlNameTag:\n+\t\treturn f.tomlName\n \tcase envNameTag:\n \t\treturn f.envName\n \tcase flagNameTag:\ndiff --git a/testdata/config1.json b/testdata/config1.json\nindex 8442f24..6420b6d 100644\n--- a/testdata/config1.json\n+++ b/testdata/config1.json\n@@ -5,5 +5,16 @@\n   \"HTTPPort\": 65000,\n   \"Sub\": {\n     \"Float\": 999.111\n+  },\n+  \n+  \"str\": \"str-json\",\n+  \"bytes\": \"Ynl0ZXMtZW52\",\n+  \"int\": 101,\n+  \"http_port\": 65000,\n+  \"sub\": {\n+    \"float\": 999.111\n+  },\n+  \"anon\": {\n+    \"is_anon\": true\n   }\n }\n\\ No newline at end of file\ndiff --git a/testdata/example_config.json b/testdata/example_config.json\nindex 94d3412..fe6f2e8 100644\n--- a/testdata/example_config.json\n+++ b/testdata/example_config.json\n@@ -1,7 +1,7 @@\n {\n-  \"HTTPPort\": 2222,\n-  \"Auth\": {\n-    \"User\": \"json-user\",\n-    \"Pass\": \"json-pass\"\n+  \"http_port\": 2222,\n+  \"auth\": {\n+    \"user\": \"json-user\",\n+    \"pass\": \"json-pass\"\n   }\n }\n\\ No newline at end of file\ndiff --git a/testfile.json b/testfile.json\nnew file mode 100644\nindex 0000000..f4dd2d2\n--- /dev/null\n+++ b/testfile.json\n@@ -0,0 +1,21 @@\n+{\n+    \"a\": \"b\",\n+    \"c\": 10,\n+    \"e\": 123.456,\n+    \"b\": \"abc\",\n+    \"p\": 42,\n+    \"m\": \"n\",\n+    \"y\": {\n+        \"x\": \"y\",\n+        \"z\": [\"1\", \"2\", \"3\"]\n+    },\n+    \"A\": {\n+        \"x\": \"y\",\n+    \"B\": {\n+            \"C\": {\n+                \"m\": \"n\"\n+            },\n+            \"D\": [\"x\", \"y\", \"z\"]\n+        }\n+    }\n+}\n\\ No newline at end of file\ndiff --git a/utils.go b/utils.go\nindex 8a54c00..ab54a0e 100644\n--- a/utils.go\n+++ b/utils.go\n@@ -2,6 +2,7 @@ package aconfig\n \n import (\n \t\"encoding/json\"\n+\t\"fmt\"\n \t\"os\"\n \t\"reflect\"\n \t\"strings\"\n@@ -21,7 +22,7 @@ func makeEnvName(field reflect.StructField, parent *fieldData, words []string) s\n \t\tenvName = makeParsingName(words)\n \t}\n \tif parent != nil {\n-\t\tenvName = parent.envName + \"_\" + envName\n+\t\t// envName = parent.envName + \"_\" + envName\n \t}\n \treturn strings.ToUpper(envName)\n }\n@@ -32,7 +33,7 @@ func makeFlagName(field reflect.StructField, parent *fieldData, words []string)\n \t\tflagName = makeParsingName(words)\n \t}\n \tif parent != nil {\n-\t\tflagName = parent.flagName + \".\" + flagName\n+\t\t// flagName = parent.flagName + \".\" + flagName\n \t}\n \treturn strings.ToLower(flagName)\n }\n@@ -95,10 +96,56 @@ func splitNameByWords(src string) []string {\n type jsonDecoder struct{}\n \n // DecodeFile implements FileDecoder.\n-func (d *jsonDecoder) DecodeFile(filename string, dst interface{}) error {\n+func (d *jsonDecoder) DecodeFile(filename string) (map[string]interface{}, error) {\n \tf, err := os.Open(filename)\n \tif err != nil {\n-\t\treturn err\n+\t\treturn nil, err\n \t}\n-\treturn json.NewDecoder(f).Decode(dst)\n+\n+\tvar raw map[string]interface{}\n+\tif err := json.NewDecoder(f).Decode(&raw); err != nil {\n+\t\treturn nil, err\n+\t}\n+\n+\tres := map[string]interface{}{}\n+\n+\tfor key, value := range raw {\n+\t\t// fmt.Printf(\"k: %s, v: %v %[2]T\\n\", key, value)\n+\t\tflatten(\"\", key, value, res)\n+\t}\n+\t// fmt.Printf(\"map: %#v\\n\\n\", res)\n+\treturn res, nil\n+}\n+\n+func flatten(prefix, key string, curr interface{}, res map[string]interface{}) {\n+\tswitch curr := curr.(type) {\n+\tcase map[string]interface{}:\n+\t\tfor k, v := range curr {\n+\t\t\tflatten(prefix+key+\".\", k, v, res)\n+\t\t}\n+\tcase []interface{}:\n+\t\tb := &strings.Builder{}\n+\t\tfor i, v := range curr {\n+\t\t\tif i > 0 {\n+\t\t\t\tb.WriteByte(',')\n+\t\t\t}\n+\t\t\tb.WriteString(fmt.Sprint(v))\n+\t\t}\n+\t\tres[prefix+key] = curr\n+\tcase string:\n+\t\tres[prefix+key] = curr\n+\tcase float64:\n+\t\tres[prefix+key] = fmt.Sprintf(\"%v\", curr)\n+\tcase bool:\n+\t\tres[prefix+key] = curr\n+\tdefault:\n+\t\tpanic(fmt.Sprintf(\"%s::%s got %T %v\", prefix, key, curr, curr))\n+\t}\n+}\n+\n+func ifNotEmpty(a, b string) string {\n+\tif a == \"\" {\n+\t\treturn b\n+\t}\n+\treturn a\n }\ndiff --git a/utils_test.go b/utils_test.go\nnew file mode 100644\nindex 0000000..7ce69bd\n--- /dev/null\n+++ b/utils_test.go\n@@ -0,0 +1,82 @@\n+package aconfig\n+\n+import (\n+\t\"reflect\"\n+\t\"testing\"\n+)\n+\n+func TestFlatten(t *testing.T) {\n+\traw := map[string]interface{}{\n+\t\t\"a\": \"b\",\n+\t\t\"c\": 10.0,\n+\t\t\"d\": map[string]interface{}{\n+\t\t\t\"x\": \"y\",\n+\t\t\t\"z\": []interface{}{\"1\", \"2\", \"3\"},\n+\t\t},\n+\t\t\"A\": map[string]interface{}{\n+\t\t\t\"B\": map[string]interface{}{\n+\t\t\t\t\"C\": map[string]interface{}{\n+\t\t\t\t\t\"a\": \"b\", // TODO: empty\n+\t\t\t\t},\n+\t\t\t},\n+\t\t},\n+\t}\n+\tres := map[string]interface{}{}\n+\tfor key, value := range raw {\n+\t\tflatten(\"\", key, value, res)\n+\t}\n+\n+\t// t.Log(res)\n+}\n+\n+func Test_splitNameByWords(t *testing.T) {\n+\ttype args struct {\n+\t\tsrc string\n+\t}\n+\ttests := []struct {\n+\t\tname string\n+\t\targs args\n+\t\twant []string\n+\t}{\n+\t\t{\"\", args{\"\"}, []string{}},\n+\t\t{\"\", args{\"str\"}, []string{\"str\"}},\n+\t\t{\"\", args{\"apikey\"}, []string{\"apikey\"}},\n+\t\t{\"\", args{\"apiKey\"}, []string{\"api\", \"Key\"}},\n+\t\t{\"\", args{\"ApiKey\"}, []string{\"Api\", \"Key\"}},\n+\t\t{\"\", args{\"APIKey\"}, []string{\"API\", \"Key\"}},\n+\t\t{\"\", args{\"Type2\"}, []string{\"Type\", \"2\"}},\n+\t\t{\"\", args{\"MarshalJSONStruct\"}, []string{\"Marshal\", \"JSON\", \"Struct\"}},\n+\t}\n+\tfor _, tt := range tests {\n+\t\tt.Run(tt.name, func(t *testing.T) {\n+\t\t\tif got := splitNameByWords(tt.args.src); !reflect.DeepEqual(got, tt.want) {\n+\t\t\t\tt.Errorf(\"splitNameByWords() = %v, want %v\", got, tt.want)\n+\t\t\t}\n+\t\t})\n+\t}\n+}\n+\n+// func TestJSONDecoder(t *testing.T) {\n+// \tgot, err := (&jsonDecoder{}).DecodeFile(\"testfile.json\")\n+// \tif err != nil {\n+// \t\tt.Fatal(err)\n+// \t}\n+\n+// \twant := map[string]interface{}{\n+// \t\t\"A.B.C.a\": \"b\",\n+// \t\t\"A.B.D\":   []interface{}{\"x\", \"y\", \"z\"},\n+// \t\t\"a\":       \"b\",\n+// \t\t\"c\":       \"10\",\n+// \t\t\"d.x\":     \"y\",\n+// \t\t\"d.z\":     []interface{}{\"1\", \"2\", \"3\"},\n+// \t}\n+\n+// \tif len(want) != len(got) {\n+// \t\tt.Fatalf(\"got %v, want %v\", len(got), len(want))\n+// \t}\n+// \tfor k, v := range want {\n+// \t\tif kv, ok := got[k]; !ok || !reflect.DeepEqual(kv, v) {\n+// \t\t\tt.Errorf(\"for %v got %v, want %v %T %T\", k, kv, v, kv, v)\n+// \t\t}\n+// \t}\n+// }\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/build.yml",
+    "LICENSE",
+    "README.md",
+    "aconfig.go",
+    "aconfig_test.go",
+    "aconfigtoml/go.mod",
+    "aconfigtoml/go.sum",
+    "aconfigtoml/testfile.toml",
+    "aconfigtoml/toml.go",
+    "aconfigtoml/toml_test.go",
+    "aconfigyaml/go.mod",
+    "aconfigyaml/go.sum",
+    "aconfigyaml/testfile.yaml",
+    "aconfigyaml/yaml.go",
+    "aconfigyaml/yaml_test.go",
+    "example_test.go",
+    "go.mod",
+    "reflection.go",
+    "testdata/all_types_config.json",
+    "testdata/bad_config.json",
+    "testdata/config1.json",
+    "testdata/example_config.json",
+    "testdata/my_duration_config.json",
+    "testdata/other_numbers_config.json",
+    "testdata/test_config_def.json",
+    "testdata/test_config_env.json",
+    "testdata/test_config_flag.json",
+    "testdata/unknown.ext",
+    "testfile.json",
+    "utils.go",
+    "utils_test.go"
+  ],
+  "explanation": {
+    "what": "FileDecoder インターフェースを `DecodeFile(filename string, dst interface{}) error` から `DecodeFile(filename string) (map[string]interface{}, error)` に変更した。json/yaml/toml の各デコーダは構造体へ直接デコードするのをやめ、ネストしたキーをドット区切りのフラットな map に変換する flatten 関数を実装し、その map をキー名で fieldData と突き合わせる方式にした。fieldData には json/yaml/toml それぞれのタグ名(jsonName/yamlName/tomlName)と、親をたどってフルパスを組み立てる fullTag メソッドを追加。あわせて HCL サポート(aconfighcl サブモジュール一式と hashicorp/hcl 依存)を削除している。",
+    "why": "PR タイトルは \"auto-tags\" で本文は空。diff から読み取れるのは、フィールドに json/yaml/toml タグを明示的に書かなくても構造体のフィールド名から自動でキー名を導出し、ファイルの各フォーマットの生データを一度共通のフラット map に正規化してからマッチングする設計への転換。これにより各デコーダは「ファイルを読んでフラットな map を返す」だけの薄い実装で済むようになり、フォーマットごとの命名規則(タグ)の解決は aconfig 本体に一元化される。HCL の削除は、この新しい DecodeFile 契約への追従コストに見合わなかったためと推測されるが、根拠となる記述はない(おそらく)。",
+    "highlights": [
+      { "file": "reflection.go", "note": "fieldData に jsonName/yamlName/tomlName と fullTag(tag) が追加され、タグの自動導出ロジックが集約されている" },
+      { "file": "utils.go", "note": "flatten 関数がネスト構造をドット区切りキーの map に変換する中核処理" }
+    ],
+    "langNotes": [
+      { "topic": "struct タグと auto-tags", "note": "Go の struct タグ(例 `json:\"name\"`)はリフレクションで読み取れるメタデータだが、書き忘れると意図しない挙動になりやすい。このコミットの auto-tags はタグが無い場合にフィールド名から機械的に名前を導出し、タグは上書き用のオプションとして扱う設計にしている。" },
+      { "topic": "FileDecoder インターフェース", "note": "Go の interface は複数の実装(json/yaml/toml/将来の dotenv 等)を共通の契約で扱うための仕組み。ここでは「dst に直接書き込む」から「フラットな map を返す」へ契約自体を変更しており、実装側の責務を小さく保つ設計判断が見える。" }
+    ],
+    "diagram": {
+      "mermaid": "sequenceDiagram\n  participant L as \"Loader\"\n  participant D as \"FileDecoder (json/yaml/toml)\"\n  L->>D: \"DecodeFile(filename)\"\n  D-->>L: \"map[string]interface{} (flatten済み)\"\n  L->>L: \"fieldのfullTag(ext)でmapを検索\"\n  L->>L: \"一致したらsetFieldDataで構造体へ反映\"",
+      "caption": "auto-tags 後の FileDecoder とのやり取り: デコーダはフラットな map を返すだけになった"
+    },
+    "evidence": "message",
+    "refs": [{ "type": "pr", "number": 29, "url": "https://github.com/cristalhq/aconfig/pull/29" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}
