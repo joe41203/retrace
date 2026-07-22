@@ -151,7 +151,8 @@ flowchart LR
   - 上段「コミットログ」: 章のアコーディオン + コミット一覧。既読チェック、章ごとの進捗バー、全体進捗%
   - 下段「ファイルツリー」: 選択中コミット時点の全ツリー表示。変更ファイルをハイライト、クリックで中央ペインの該当 diff へスクロール
   - **上下段の高さ比率も、左ペイン全体の幅も境界ドラッグで可変**。localStorage(`retrace:ui:sidebarSplit` / `retrace:ui:sidebarWidth`)に保存して次回復元
-- **中央ペイン**: 上部にコミットメタ(subject / author / date / PR リンク)、その下は diff 専用(react-diff-view、unified/split 切替、巨大ファイルは折りたたみ)。**言語別シンタックスハイライト必須**(拡張子から言語判定し refractor/prism 系で tokenize。Go / TS / JS / JSON / YAML / Markdown / shell / CSS / HTML を最低限カバー、未知言語はハイライトなしで表示)
+- **中央ペイン**: 上部にコミットメタ(subject / author / date / PR リンク / **checkout コマンドのコピー**)、その下は diff 専用
+  - checkout コピー: 「この時点のコードを手元で開く」ためのコマンドをワンクリックでクリップボードへ。フル版 `git clone <repo.url>.git && cd <repo> && git checkout <sha>` と、クローン済みの人向けの `git checkout <sha>` の2種(2026-07-22 ユーザー要望)(react-diff-view、unified/split 切替、巨大ファイルは折りたたみ)。**言語別シンタックスハイライト必須**(拡張子から言語判定し refractor/prism 系で tokenize。Go / TS / JS / JSON / YAML / Markdown / shell / CSS / HTML を最低限カバー、未知言語はハイライトなしで表示)
 - **右ペイン**: 解説カード(何を/なぜ/読みどころ)+ **evidence バッジ**(「PR根拠」緑 /「issue根拠」/「メッセージ根拠」/「推測」黄)。`explanation: null` なら「解説未生成 — /retrace-generate を実行」表示
 - キーボード: `j`/`k` で次/前のコミット
 - localStorage キー:

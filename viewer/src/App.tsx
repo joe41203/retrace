@@ -268,7 +268,7 @@ export default function App() {
 				/>
 
 				{commit ? (
-					<CommitDetail ref={detailRef} commit={commit} />
+					<CommitDetail ref={detailRef} commit={commit} repo={repo} />
 				) : (
 					<div className="pane pane-center">
 						<div className="center-status">

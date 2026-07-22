@@ -2,8 +2,9 @@
 // ファイルツリーは左サイドバーへ移動したためここには無い。
 import { forwardRef, useImperativeHandle, useRef, useState } from "react";
 import type { ViewType } from "react-diff-view";
+import CheckoutCopy from "./CheckoutCopy";
 import DiffView, { type DiffViewHandle } from "./DiffView";
-import type { Commit } from "./types";
+import type { Commit, Repo } from "./types";
 
 // 左のファイルツリーや右の読みどころクリックから、該当ファイルの diff へ
 // スクロールさせるために公開するハンドル。
@@ -13,10 +14,11 @@ export interface CommitDetailHandle {
 
 interface CommitDetailProps {
 	commit: Commit;
+	repo: Repo | null;
 }
 
 const CommitDetail = forwardRef<CommitDetailHandle, CommitDetailProps>(
-	function CommitDetail({ commit }, ref) {
+	function CommitDetail({ commit, repo }, ref) {
 		const [viewType, setViewType] = useState<ViewType>("unified");
 		const diffRef = useRef<DiffViewHandle | null>(null);
 
@@ -62,6 +64,7 @@ const CommitDetail = forwardRef<CommitDetailHandle, CommitDetailProps>(
 							</span>
 						</span>
 					</div>
+					<CheckoutCopy sha={commit.sha} repo={repo} />
 					{commit.message.includes("\n") && (
 						<div className="commit-message-full">{commit.message}</div>
 					)}
