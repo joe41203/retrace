@@ -1,9 +1,17 @@
-// 左ペイン: 「コミットログ」/「ファイルツリー」の2タブ切替。
-// - コミットログ: 章アコーディオン + コミット一覧(chapters が無ければ「全コミット」1グループ)
-// - ファイルツリー: 選択中コミット時点の全ツリー。変更ファイルをクリックで中央 diff へスクロール
-import { useMemo, useState } from "react";
+// 左ペイン: 上下2段の常時表示(タブではない)。
+// - 上段 コミットログ: 章アコーディオン + コミット一覧(chapters が無ければ「全コミット」1グループ)
+// - 下段 ファイルツリー: 選択中コミット時点の全ツリー。変更ファイルをクリックで中央 diff へスクロール
+// - 上下段の高さ比率はドラッグで可変(localStorage 保存)
+import { useCallback, useMemo, useRef, useState } from "react";
 import FileTree from "./FileTree";
+import ResizeHandle from "./ResizeHandle";
 import type { Chapter, Commit, IndexEntry } from "./types";
+import { usePersistedNumber } from "./useUiSettings";
+
+// 上段が占める高さの割合(0〜1)。最小段高さを確保するため両端を clamp する。
+const SPLIT_MIN = 0.2;
+const SPLIT_MAX = 0.85;
+const clampSplit = (n: number) => Math.min(SPLIT_MAX, Math.max(SPLIT_MIN, n));
 
 interface Group {
 	key: string;
@@ -151,8 +159,6 @@ function CommitLog({
 	);
 }
 
-type LeftTab = "log" | "tree";
-
 interface SidebarProps {
 	entries: IndexEntry[];
 	chapters: Chapter[] | null;
@@ -172,51 +178,72 @@ export default function Sidebar({
 	onSelect,
 	onSelectFile,
 }: SidebarProps) {
-	const [tab, setTab] = useState<LeftTab>("log");
+	const containerRef = useRef<HTMLDivElement>(null);
+	const [split, setSplit] = usePersistedNumber(
+		"retrace:ui:sidebarSplit",
+		0.55,
+		clampSplit,
+	);
 
 	const changedPaths = useMemo(
 		() => new Set((commit?.files ?? []).map((f) => f.path)),
 		[commit],
 	);
 
-	return (
-		<div>
-			<div className="left-tabs">
-				<button
-					className={`left-tab${tab === "log" ? " active" : ""}`}
-					onClick={() => setTab("log")}
-				>
-					コミットログ
-				</button>
-				<button
-					className={`left-tab${tab === "tree" ? " active" : ""}`}
-					onClick={() => setTab("tree")}
-				>
-					ファイルツリー
-				</button>
-			</div>
+	// 横ハンドルのドラッグ: コンテナ矩形に対するポインタ Y から上段比率を求める。
+	const onSplitDrag = useCallback(
+		(_clientX: number, clientY: number) => {
+			const el = containerRef.current;
+			if (!el) return;
+			const rect = el.getBoundingClientRect();
+			if (rect.height <= 0) return;
+			setSplit((clientY - rect.top) / rect.height);
+		},
+		[setSplit],
+	);
 
-			{tab === "log" ? (
-				<CommitLog
-					entries={entries}
-					chapters={chapters}
-					activeSha={activeSha}
-					isRead={isRead}
-					onSelect={onSelect}
-				/>
-			) : commit ? (
-				<div className="left-tree-wrap">
-					<FileTree
-						tree={commit.tree}
-						changedPaths={changedPaths}
-						onSelectFile={onSelectFile}
+	return (
+		<div className="sidebar-stack" ref={containerRef}>
+			<section
+				className="sidebar-section"
+				style={{ flexBasis: `${split * 100}%` }}
+			>
+				<div className="sidebar-section-title">コミットログ</div>
+				<div className="sidebar-section-body">
+					<CommitLog
+						entries={entries}
+						chapters={chapters}
+						activeSha={activeSha}
+						isRead={isRead}
+						onSelect={onSelect}
 					/>
 				</div>
-			) : (
-				<div className="left-tree-hint">
-					コミットを選択するとツリーを表示します。
+			</section>
+
+			<ResizeHandle
+				orientation="horizontal"
+				onResize={onSplitDrag}
+				ariaLabel="上段と下段の高さ比率を変更"
+			/>
+
+			<section className="sidebar-section sidebar-section-grow">
+				<div className="sidebar-section-title">ファイルツリー</div>
+				<div className="sidebar-section-body">
+					{commit ? (
+						<div className="left-tree-wrap">
+							<FileTree
+								tree={commit.tree}
+								changedPaths={changedPaths}
+								onSelectFile={onSelectFile}
+							/>
+						</div>
+					) : (
+						<div className="left-tree-hint">
+							コミットを選択するとツリーを表示します。
+						</div>
+					)}
 				</div>
-			)}
+			</section>
 		</div>
 	);
 }

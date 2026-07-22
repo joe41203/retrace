@@ -170,7 +170,8 @@ a:hover {
 
 .panes {
   display: grid;
-  grid-template-columns: 320px minmax(0, 1fr) 360px;
+  /* 左カラム(可変) / 縦リサイズハンドル / 中央 / 右 */
+  grid-template-columns: var(--sidebar-width, 320px) auto minmax(0, 1fr) 360px;
   flex: 1 1 auto;
   min-height: 0;
 }
@@ -182,8 +183,11 @@ a:hover {
 .pane:last-child {
   border-right: none;
 }
+/* 左ペインは自身ではスクロールせず、内部の2段がそれぞれスクロールする */
 .pane-left {
   background: var(--bg-subtle);
+  overflow: hidden;
+  border-right: none;
 }
 .pane-right {
   background: var(--bg-subtle);
@@ -777,33 +781,38 @@ kbd {
   overflow-x: auto;
 }
 
-/* ---------- 左ペインのタブ切替 ---------- */
-.left-tabs {
+/* ---------- 左ペイン: 上下2段の常時表示 ---------- */
+.sidebar-stack {
   display: flex;
-  border-bottom: 1px solid var(--border);
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+.sidebar-section {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+/* 上段は flexBasis(=比率)で高さを持ち、下段(grow)が残りを埋める */
+.sidebar-section-grow {
+  flex: 1 1 0;
+}
+.sidebar-section-title {
+  flex: 0 0 auto;
+  padding: 6px 12px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--fg-subtle);
   background: var(--bg-subtle);
-  position: sticky;
-  top: 0;
-  z-index: 1;
+  border-bottom: 1px solid var(--border-muted);
+  text-transform: uppercase;
 }
-.left-tab {
-  flex: 1;
-  padding: 8px 12px;
-  border: none;
-  background: transparent;
-  cursor: pointer;
-  font: inherit;
-  font-size: 13px;
-  color: var(--fg-muted);
-  border-bottom: 2px solid transparent;
-}
-.left-tab.active {
-  color: var(--fg);
-  font-weight: 600;
-  border-bottom-color: var(--accent);
-}
-.left-tab:hover {
-  background: var(--bg-inset);
+.sidebar-section-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
 }
 .left-tree-wrap {
   padding: 10px 6px;
@@ -812,4 +821,33 @@ kbd {
   padding: 8px 12px;
   font-size: 12px;
   color: var(--fg-subtle);
+}
+
+/* ---------- リサイズハンドル ---------- */
+.resize-handle {
+  background: var(--border);
+  transition: background 0.12s ease;
+  touch-action: none;
+}
+.resize-handle:hover,
+body.is-resizing .resize-handle {
+  background: var(--accent);
+}
+/* 左カラムと中央の境界(縦線・左右にドラッグ) */
+.resize-handle-vertical {
+  width: 5px;
+  cursor: col-resize;
+  align-self: stretch;
+}
+/* 上段と下段の境界(横線・上下にドラッグ) */
+.resize-handle-horizontal {
+  flex: 0 0 auto;
+  height: 5px;
+  cursor: row-resize;
+}
+
+/* ドラッグ中は選択とカーソルのちらつきを止める */
+body.is-resizing {
+  user-select: none;
+  cursor: col-resize;
 }

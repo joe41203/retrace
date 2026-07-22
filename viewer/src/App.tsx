@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import CommitDetail, { type CommitDetailHandle } from "./CommitDetail";
 import ExplanationCard from "./ExplanationCard";
+import ResizeHandle from "./ResizeHandle";
 import Sidebar from "./Sidebar";
 import {
 	fetchChapters,
@@ -11,6 +12,13 @@ import {
 } from "./data";
 import type { Chapter, Commit, DatasetEntry, IndexEntry, Repo } from "./types";
 import { loadLastSha, saveLastSha, useReadState } from "./useReadState";
+import { usePersistedNumber } from "./useUiSettings";
+
+// 左カラム幅(px)。最小 200px、最大 640px でレイアウト崩壊を防ぐ。
+const SIDEBAR_MIN = 200;
+const SIDEBAR_MAX = 640;
+const clampSidebar = (n: number) =>
+	Math.min(SIDEBAR_MAX, Math.max(SIDEBAR_MIN, n));
 
 // 入力欄にフォーカスがあるときはキーボードショートカットを無効化する
 function isTypingTarget(el: EventTarget | null): boolean {
@@ -40,6 +48,24 @@ export default function App() {
 	const [commitLoading, setCommitLoading] = useState(false);
 
 	const detailRef = useRef<CommitDetailHandle | null>(null);
+	const panesRef = useRef<HTMLDivElement>(null);
+
+	const [sidebarWidth, setSidebarWidth] = usePersistedNumber(
+		"retrace:ui:sidebarWidth",
+		320,
+		clampSidebar,
+	);
+
+	// 縦ハンドルのドラッグ: panes 左端からのポインタ X を左カラム幅にする。
+	const onSidebarDrag = useCallback(
+		(clientX: number) => {
+			const el = panesRef.current;
+			if (!el) return;
+			const rect = el.getBoundingClientRect();
+			setSidebarWidth(clientX - rect.left);
+		},
+		[setSidebarWidth],
+	);
 
 	const { isRead, markRead, toggleRead } = useReadState(
 		datasetId ?? "__none__",
@@ -212,7 +238,13 @@ export default function App() {
 
 			{loadError && <div className="error-box">{loadError}</div>}
 
-			<div className="panes">
+			<div
+				className="panes"
+				ref={panesRef}
+				style={
+					{ "--sidebar-width": `${sidebarWidth}px` } as React.CSSProperties
+				}
+			>
 				<aside className="pane pane-left">
 					{entries.length > 0 ? (
 						<Sidebar
@@ -228,6 +260,12 @@ export default function App() {
 						<div className="pane-status">{loadError ? "" : "読み込み中…"}</div>
 					)}
 				</aside>
+
+				<ResizeHandle
+					orientation="vertical"
+					onResize={onSidebarDrag}
+					ariaLabel="左カラムの幅を変更"
+				/>
 
 				{commit ? (
 					<CommitDetail ref={detailRef} commit={commit} />
