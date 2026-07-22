@@ -1,0 +1,51 @@
+{
+  "seq": 4,
+  "sha": "4ae0eb7aa3e5b910e5f34b5d434d2d42d5aab047",
+  "parents": [
+    "2daff8e37ec5829ced49a66d385f1574aedcaa93"
+  ],
+  "author": {
+    "name": "Julien Schmidt",
+    "email": "github@julienschmidt.com",
+    "date": "2013-12-05T15:56:30+01:00"
+  },
+  "message": "Small refactoring",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 5,
+    "deletions": 4
+  },
+  "files": [
+    {
+      "path": "tree.go",
+      "status": "M",
+      "additions": 5,
+      "deletions": 4,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/tree.go b/tree.go\nindex a01bc5c..181066a 100644\n--- a/tree.go\n+++ b/tree.go\n@@ -204,7 +204,8 @@ OUTER:\n \t\t\t// trailing slash exists for TSR recommendation\n \t\t\tfor i, index := range n.indices {\n \t\t\t\tif index == '/' {\n-\t\t\t\t\ttsr = n.children[i].key == \"/\" && n.children[i].value != nil\n+\t\t\t\t\tn = n.children[i]\n+\t\t\t\t\ttsr = (n.key == \"/\" && n.value != nil)\n \t\t\t\t\treturn\n \t\t\t\t}\n \t\t\t}\n@@ -240,7 +241,7 @@ OUTER:\n \t\t\t\t\t\tn = n.children[0]\n \t\t\t\t\t\tcontinue\n \t\t\t\t\t} else { // ... but we can't\n-\t\t\t\t\t\ttsr = l == k+1\n+\t\t\t\t\t\ttsr = (l == k+1)\n \t\t\t\t\t\treturn\n \t\t\t\t\t}\n \t\t\t\t}\n@@ -251,7 +252,7 @@ OUTER:\n \t\t\t\t\t// No handler found. Check if a handler for this path + a\n \t\t\t\t\t// trailing slash exists for TSR recommendation\n \t\t\t\t\tn = n.children[0]\n-\t\t\t\t\ttsr = n.key == \"/\" && n.value != nil\n+\t\t\t\t\ttsr = (n.key == \"/\" && n.value != nil)\n \t\t\t\t}\n \t\t\t\treturn\n \n@@ -282,7 +283,7 @@ OUTER:\n \n \t\t\t// Nothing found. We can recommend to redirect to the same URL without\n \t\t\t// a trailing slash if a leaf exists for that path\n-\t\t\ttsr = key == \"/\" && n.value != nil\n+\t\t\ttsr = (key == \"/\" && n.value != nil)\n \t\t\treturn\n \t\t}\n \t}\n",
+  "diffTruncated": false,
+  "tree": [
+    "LICENSE",
+    "path.go",
+    "path_test.go",
+    "router.go",
+    "router_test.go",
+    "tree.go",
+    "tree_test.go"
+  ],
+  "explanation": {
+    "what": "tree.go の getValue 内で、TSR(trailing slash redirect)候補の兄弟ノードを見つけたときに `n.children[i]` へ実際に `n` を進めてから tsr を判定するよう変更し、以降のコード上で `n.children[i]` を再度参照しなくて済むようにした。加えて3箇所の tsr 代入式に括弧を付けて `tsr = (条件式)` という表記に統一している。",
+    "why": "おそらく、代入前に一度だけノードへ移動しておけば同じ子ノードへの参照を繰り返し書かずに済み、コードが読みやすくなるための整理と考えられる。括弧の追加も可読性(演算子の優先順位を明示する)目的の見た目の統一と推測できる。振る舞いを変える意図の記述はコミットメッセージに無い。",
+    "highlights": [],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "inferred",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

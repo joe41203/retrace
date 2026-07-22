@@ -1,0 +1,90 @@
+{
+  "seq": 174,
+  "sha": "d767e5908949fd4ad5ada98690d44c86d5b1a893",
+  "parents": [
+    "e1b9828bc9e5904baec057a154c09ca40fe7fae0"
+  ],
+  "author": {
+    "name": "Travis Parker",
+    "email": "travis.parker@gmail.com",
+    "date": "2018-02-22T06:26:55-08:00"
+  },
+  "message": "Params via Go 1.7 Contexts (#147)\n\n* Supports Params in net/http Handlers with go1.7+\r\n\r\nGo 1.7 introduces request-scoped context, providing a place to hang\r\nParams even in net/http standard Handlers attached with Router.Handler\r\nor Router.HandlerFunc.\r\n\r\nThis provides an alternative implementation of Router.Handler which\r\nattaches the params to the request context. It also includes a bit of\r\nnew public API: ParamsKey is the context key used, and\r\nParamsFromContext uses ParamsKey to get Params from a context.Context.\r\n\r\nAll of this is guarded by a \"go1.7\" build tag. With go 1.6 and older\r\nnone of the new API is available and Params continue to be thrown away\r\nin Handler/HandlerFunc-attached endpoints.\r\n\r\n* WithValue is the 'context' function\r\n\r\n* use an un-exported struct{} alias to collision-proof the key\r\n\r\n* no longer a const\r\n\r\n* update README.md to reflect additional allocations with the stdlib-compatible api\r",
+  "pr": {
+    "number": 147,
+    "title": "Params via Go 1.7 Contexts",
+    "body": "With request-scoped contexts coming to `net/http` in go 1.7 there's no need for `Handler` and `HandlerFunc` to continue throwing away `Params`.\n\nIt may be a little early for this change, but I wanted to get your eyes on it and start the discussion.\n",
+    "url": "https://github.com/julienschmidt/httprouter/pull/147"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 4,
+    "additions": 55,
+    "deletions": 11
+  },
+  "files": [
+    {
+      "path": "README.md",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "nonstdparams.go",
+      "status": "A",
+      "additions": 16,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "router.go",
+      "status": "M",
+      "additions": 0,
+      "deletions": 10,
+      "binary": false
+    },
+    {
+      "path": "stdparams.go",
+      "status": "A",
+      "additions": 38,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/README.md b/README.md\nindex a2657d4..eb717f1 100644\n--- a/README.md\n+++ b/README.md\n@@ -16,7 +16,7 @@ The router is optimized for high performance and a small memory footprint. It sc\n \n **Parameters in your routing pattern:** Stop parsing the requested URL path, just give the path segment a name and the router delivers the dynamic value to you. Because of the design of the router, path parameters are very cheap.\n \n-**Zero Garbage:** The matching and dispatching process generates zero bytes of garbage. In fact, the only heap allocations that are made, is by building the slice of the key-value pairs for path parameters. If the request path contains no parameters, not a single heap allocation is necessary.\n+**Zero Garbage:** The matching and dispatching process generates zero bytes of garbage. The only heap allocations that are made are building the slice of the key-value pairs for path parameters, and building new context and request objects (the latter only in the standard `Handler`/`HandlerFunc` api). In the 3-argument API, if the request path contains no parameters not a single heap allocation is necessary.\n \n **Best Performance:** [Benchmarks speak for themselves](https://github.com/julienschmidt/go-http-routing-benchmark). See below for technical details of the implementation.\n \ndiff --git a/nonstdparams.go b/nonstdparams.go\nnew file mode 100644\nindex 0000000..0278a44\n--- /dev/null\n+++ b/nonstdparams.go\n@@ -0,0 +1,16 @@\n+// +build !go1.7\n+\n+package httprouter\n+\n+import \"net/http\"\n+\n+// Handler is an adapter which allows the usage of an http.Handler as a\n+// request handle. With go 1.7+, the Params will be available in the\n+// request context under ParamsKey.\n+func (r *Router) Handler(method, path string, handler http.Handler) {\n+\tr.Handle(method, path,\n+\t\tfunc(w http.ResponseWriter, req *http.Request, _ Params) {\n+\t\t\thandler.ServeHTTP(w, req)\n+\t\t},\n+\t)\n+}\ndiff --git a/router.go b/router.go\nindex bb17330..bfd4db0 100644\n--- a/router.go\n+++ b/router.go\n@@ -236,16 +236,6 @@ func (r *Router) Handle(method, path string, handle Handle) {\n \troot.addRoute(path, handle)\n }\n \n-// Handler is an adapter which allows the usage of an http.Handler as a\n-// request handle.\n-func (r *Router) Handler(method, path string, handler http.Handler) {\n-\tr.Handle(method, path,\n-\t\tfunc(w http.ResponseWriter, req *http.Request, _ Params) {\n-\t\t\thandler.ServeHTTP(w, req)\n-\t\t},\n-\t)\n-}\n-\n // HandlerFunc is an adapter which allows the usage of an http.HandlerFunc as a\n // request handle.\n func (r *Router) HandlerFunc(method, path string, handler http.HandlerFunc) {\ndiff --git a/stdparams.go b/stdparams.go\nnew file mode 100644\nindex 0000000..abb4209\n--- /dev/null\n+++ b/stdparams.go\n@@ -0,0 +1,38 @@\n+// +build go1.7\n+\n+package httprouter\n+\n+import (\n+\t\"context\"\n+\t\"net/http\"\n+)\n+\n+type paramsKey struct{}\n+\n+// ParamsKey is the request context key under which URL params are stored.\n+//\n+// This is only present from go 1.7.\n+var ParamsKey = paramsKey{}\n+\n+// Handler is an adapter which allows the usage of an http.Handler as a\n+// request handle. With go 1.7+, the Params will be available in the\n+// request context under ParamsKey.\n+func (r *Router) Handler(method, path string, handler http.Handler) {\n+\tr.Handle(method, path,\n+\t\tfunc(w http.ResponseWriter, req *http.Request, p Params) {\n+\t\t\tctx := req.Context()\n+\t\t\tctx = context.WithValue(ctx, ParamsKey, p)\n+\t\t\treq = req.WithContext(ctx)\n+\t\t\thandler.ServeHTTP(w, req)\n+\t\t},\n+\t)\n+}\n+\n+// ParamsFromContext pulls the URL parameters from a request context,\n+// or returns nil if none are present.\n+//\n+// This is only present from go 1.7.\n+func ParamsFromContext(ctx context.Context) Params {\n+\tp, _ := ctx.Value(ParamsKey).(Params)\n+\treturn p\n+}\n",
+  "diffTruncated": false,
+  "tree": [
+    ".travis.yml",
+    "LICENSE",
+    "README.md",
+    "nonstdparams.go",
+    "path.go",
+    "path_test.go",
+    "router.go",
+    "router_test.go",
+    "stdparams.go",
+    "tree.go",
+    "tree_test.go"
+  ],
+  "explanation": {
+    "what": "標準の http.Handler / http.HandlerFunc アダプタ経由でも Params にアクセスできるようにした。go1.7 ビルドタグ付きの stdparams.go を新設し、Router.Handler の実装を「Params を context.WithValue で request context に載せてから handler.ServeHTTP を呼ぶ」形に置き換え、context から取り出すための ParamsKey と ParamsFromContext を公開した。go1.6 以前向けには、Params を単に捨てる従来実装を nonstdparams.go(!go1.7 ビルドタグ)に退避して router.go から削除した。",
+    "why": "PR本文にある通り、Go 1.7 で net/http にリクエストスコープの context が入ったことで、Handler/HandlerFunc に登録したハンドラでも Params を捨てずに渡せるようになったため。これまで3引数の独自 Handle シグネチャ(w, req, Params)を使わない標準 http.Handler ルートでは Params が失われていたが、この変更でその制約を解消した。ビルドタグで新旧2実装を切り替えることで、Go 1.6 以前のユーザーへの後方互換を保っている。",
+    "highlights": [
+      { "file": "stdparams.go", "note": "context.WithValue → req.WithContext → handler.ServeHTTP という Params 引き渡しの核心部分" },
+      { "file": "router.go", "note": "旧 Router.Handler 実装を削除し、ビルドタグ別ファイルに委譲した箇所" }
+    ],
+    "langNotes": [
+      { "topic": "context.Context / go1.7 ビルドタグ", "note": "Go 1.7 で net/http にリクエストスコープの context.Context が標準搭載された。context.WithValue(ctx, key, value) で値を持つ新しい Context を作り、req.WithContext(ctx) で Request に付け替えるのが定石。ここでは衝突を避けるため、空 struct 型 paramsKey{} を非公開のキー型として使っている(文字列キーだと他パッケージの同名キーと衝突しうるため)。" },
+      { "topic": "// +build go1.7 / !go1.7", "note": "ファイル先頭のビルドタグコメントで、コンパイル対象の Go バージョンによって参照するファイルを切り替えている。stdparams.go は go1.7 以上でのみ、nonstdparams.go はそれ未満でのみビルドされ、同名関数 Router.Handler の実装がバージョンごとに1つだけ解決される。" }
+    ],
+    "diagram": {
+      "mermaid": "sequenceDiagram\n  participant R as \"Router.Handler adapter\"\n  participant Ctx as \"context.Context\"\n  participant H as \"http.Handler\"\n  R->>Ctx: \"context.WithValue(ParamsKey, Params)\"\n  R->>R: \"req.WithContext(ctx)\"\n  R->>H: \"handler.ServeHTTP(w, req)\"\n  H->>Ctx: \"ParamsFromContext(req.Context())\"\n  Ctx-->>H: \"Params\"",
+      "caption": "標準 http.Handler アダプタが Params を context 経由で受け渡す流れ"
+    },
+    "evidence": "pr",
+    "refs": [{ "type": "pr", "number": 147, "url": "https://github.com/julienschmidt/httprouter/pull/147" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

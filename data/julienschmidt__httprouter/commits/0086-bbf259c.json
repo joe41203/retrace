@@ -1,0 +1,65 @@
+{
+  "seq": 86,
+  "sha": "bbf259c39542256d5d8d696df5f0afbe3518f3c4",
+  "parents": [
+    "46807412fe50aaceb73bb57061c2230fd26a1640",
+    "62d716ed322cb2bb1845b8e63a6a0c8d1d4c6909"
+  ],
+  "author": {
+    "name": "Julien Schmidt",
+    "email": "github@julienschmidt.com",
+    "date": "2014-12-06T17:48:40+08:00"
+  },
+  "message": "Merge branch 'master' of https://github.com/dahankzter/httprouter into dahankzter-master\n\nConflicts:\n\trouter_test.go",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 15,
+    "deletions": 1
+  },
+  "files": [
+    {
+      "path": "router.go",
+      "status": "M",
+      "additions": 5,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "router_test.go",
+      "status": "M",
+      "additions": 10,
+      "deletions": 1,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/router.go b/router.go\nindex 3f3d163..a6be43c 100644\n--- a/router.go\n+++ b/router.go\n@@ -159,6 +159,11 @@ func (r *Router) GET(path string, handle Handle) {\n \tr.Handle(\"GET\", path, handle)\n }\n \n+// HEAD is a shortcut for router.Handle(\"HEAD\", path, handle)\n+func (r *Router) HEAD(path string, handle Handle) {\n+\tr.Handle(\"HEAD\", path, handle)\n+}\n+\n // POST is a shortcut for router.Handle(\"POST\", path, handle)\n func (r *Router) POST(path string, handle Handle) {\n \tr.Handle(\"POST\", path, handle)\ndiff --git a/router_test.go b/router_test.go\nindex ca59066..08dab29 100644\n--- a/router_test.go\n+++ b/router_test.go\n@@ -76,7 +76,7 @@ func (h handlerStruct) ServeHTTP(w http.ResponseWriter, r *http.Request) {\n }\n \n func TestRouterAPI(t *testing.T) {\n-\tvar get, post, put, patch, delete, handler, handlerFunc bool\n+\tvar get, head, post, put, patch, delete, handler, handlerFunc bool\n \n \thttpHandler := handlerStruct{&handler}\n \n@@ -84,6 +84,9 @@ func TestRouterAPI(t *testing.T) {\n \trouter.GET(\"/GET\", func(w http.ResponseWriter, r *http.Request, _ Params) {\n \t\tget = true\n \t})\n+\trouter.HEAD(\"/GET\", func(w http.ResponseWriter, r *http.Request, _ Params) {\n+\t\thead = true\n+\t})\n \trouter.POST(\"/POST\", func(w http.ResponseWriter, r *http.Request, _ Params) {\n \t\tpost = true\n \t})\n@@ -109,6 +112,12 @@ func TestRouterAPI(t *testing.T) {\n \t\tt.Error(\"routing GET failed\")\n \t}\n \n+\tr, _ = http.NewRequest(\"HEAD\", \"/GET\", nil)\n+\trouter.ServeHTTP(w, r)\n+\tif !head {\n+\t\tt.Error(\"routing HEAD failed\")\n+\t}\n+\n \tr, _ = http.NewRequest(\"POST\", \"/POST\", nil)\n \trouter.ServeHTTP(w, r)\n \tif !post {\n",
+  "diffTruncated": false,
+  "tree": [
+    ".travis.yml",
+    "LICENSE",
+    "README.md",
+    "path.go",
+    "path_test.go",
+    "router.go",
+    "router_test.go",
+    "tree.go",
+    "tree_test.go"
+  ],
+  "explanation": {
+    "what": "外部コントリビューター dahankzter のブランチをマージし、Router に HEAD メソッド用のショートカット関数 router.HEAD(path, handle) を追加した。既存の GET/POST/PUT/PATCH/DELETE と同様の登録用ヘルパーで、対応するテストも追加された。",
+    "why": "コミットメッセージ通り dahankzter/httprouter の master ブランチを取り込んだマージ(router_test.go でコンフリクトあり)。HTTP メソッドごとのショートカット関数群に、それまで抜けていた HEAD を揃える変更。",
+    "highlights": [
+      { "file": "router.go", "note": "既存の GET などと同じパターンで HEAD(path string, handle Handle) を追加している" }
+    ],
+    "langNotes": [
+      { "topic": "git merge (コンフリクト解消を伴う外部取り込み)", "note": "メッセージの \"Conflicts: router_test.go\" は、fork 元と本流の両方でテストファイルが変更されており、マージ時に手動で競合解消したことを示す。git merge の典型的な記録の残し方。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

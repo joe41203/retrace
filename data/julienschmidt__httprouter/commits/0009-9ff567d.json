@@ -1,0 +1,54 @@
+{
+  "seq": 9,
+  "sha": "9ff567db080c9902f8358f6dbfde946cc1318aee",
+  "parents": [
+    "09da47072f7f939fdafb1d1b3cd77fe9bbd00258"
+  ],
+  "author": {
+    "name": "Julien Schmidt",
+    "email": "github@julienschmidt.com",
+    "date": "2013-12-11T13:36:14+01:00"
+  },
+  "message": "Replace deferred recover lambda func",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 7,
+    "deletions": 5
+  },
+  "files": [
+    {
+      "path": "router.go",
+      "status": "M",
+      "additions": 7,
+      "deletions": 5,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/router.go b/router.go\nindex 632a448..6e5187c 100644\n--- a/router.go\n+++ b/router.go\n@@ -93,14 +93,16 @@ func (r *Router) Handle(method, path string, handle Handle) error {\n \treturn r.addRoute(method, path, handle)\n }\n \n+func (r *Router) recv(rw http.ResponseWriter, req *http.Request) {\n+\tif rcv := recover(); rcv != nil {\n+\t\tr.PanicHandler(rw, req, rcv)\n+\t}\n+}\n+\n // Make the router implement the http.Handler interface.\n func (r *Router) ServeHTTP(rw http.ResponseWriter, req *http.Request) {\n \tif r.PanicHandler != nil {\n-\t\tdefer func() {\n-\t\t\tif rcv := recover(); rcv != nil {\n-\t\t\t\tr.PanicHandler(rw, req, rcv)\n-\t\t\t}\n-\t\t}()\n+\t\tdefer r.recv(rw, req)\n \t}\n \n \tpath := req.URL.Path\n",
+  "diffTruncated": false,
+  "tree": [
+    ".travis.yml",
+    "LICENSE",
+    "path.go",
+    "path_test.go",
+    "router.go",
+    "router_test.go",
+    "tree.go",
+    "tree_test.go"
+  ],
+  "explanation": {
+    "what": "ServeHTTP 内で defer に渡していた無名関数(recover して PanicHandler を呼ぶラムダ)を、Router のメソッド recv(rw, req) として切り出し、`defer r.recv(rw, req)` の形に置き換えた。挙動は変えていない。",
+    "why": "コミットメッセージ \"Replace deferred recover lambda func\" の通り、ServeHTTP 内にインラインで書いていたクロージャを名前付きメソッドに切り出す整理。おそらく、defer のたびにクロージャを生成するより名前付きメソッドを defer する方が読みやすい、あるいは軽量という判断だったと考えられるが、性能上の理由の明記はない。",
+    "highlights": [
+      { "file": "router.go", "note": "recv メソッドは recover() を呼び、非 nil ならその場で r.PanicHandler を呼ぶ。defer r.recv(rw, req) はメソッド呼び出しをそのまま defer に渡す書き方" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

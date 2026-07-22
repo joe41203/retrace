@@ -1,0 +1,55 @@
+{
+  "seq": 112,
+  "sha": "6ddbd2b5d497c621534b3e6a8c0f38a13d5e796d",
+  "parents": [
+    "23bfd775669e45fdea288fa0ba62aed1a19e2bff"
+  ],
+  "author": {
+    "name": "Julien Schmidt",
+    "email": "github@julienschmidt.com",
+    "date": "2015-02-15T00:46:11+08:00"
+  },
+  "message": "tree: fix typos + code style",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 10,
+    "deletions": 8
+  },
+  "files": [
+    {
+      "path": "tree.go",
+      "status": "M",
+      "additions": 10,
+      "deletions": 8,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/tree.go b/tree.go\nindex f697008..af91966 100644\n--- a/tree.go\n+++ b/tree.go\n@@ -83,7 +83,7 @@ func (n *node) addRoute(path string, handle Handle) {\n \n \t// non-empty tree\n \tif len(n.path) > 0 || len(n.children) > 0 {\n-\tWALK:\n+\twalk:\n \t\tfor {\n \t\t\t// Update maxParams of the current node\n \t\t\tif numParams > n.maxParams {\n@@ -91,10 +91,12 @@ func (n *node) addRoute(path string, handle Handle) {\n \t\t\t}\n \n \t\t\t// Find the longest common prefix.\n-\t\t\t// This also implies that the commom prefix contains no ':' or '*'\n-\t\t\t// since the existing key can't contain this chars.\n+\t\t\t// This also implies that the common prefix contains no ':' or '*'\n+\t\t\t// since the existing key can't contain those chars.\n \t\t\ti := 0\n-\t\t\tfor max := min(len(path), len(n.path)); i < max && path[i] == n.path[i]; i++ {\n+\t\t\tmax := min(len(path), len(n.path))\n+\t\t\tfor i < max && path[i] == n.path[i] {\n+\t\t\t\ti++\n \t\t\t}\n \n \t\t\t// Split edge\n@@ -140,7 +142,7 @@ func (n *node) addRoute(path string, handle Handle) {\n \t\t\t\t\tif len(path) >= len(n.path) && n.path == path[:len(n.path)] {\n \t\t\t\t\t\t// check for longer wildcard, e.g. :name and :names\n \t\t\t\t\t\tif len(n.path) >= len(path) || path[len(n.path)] == '/' {\n-\t\t\t\t\t\t\tcontinue WALK\n+\t\t\t\t\t\t\tcontinue walk\n \t\t\t\t\t\t}\n \t\t\t\t\t}\n \n@@ -153,7 +155,7 @@ func (n *node) addRoute(path string, handle Handle) {\n \t\t\t\tif n.nType == param && c == '/' && len(n.children) == 1 {\n \t\t\t\t\tn = n.children[0]\n \t\t\t\t\tn.priority++\n-\t\t\t\t\tcontinue WALK\n+\t\t\t\t\tcontinue walk\n \t\t\t\t}\n \n \t\t\t\t// Check if a child with the next path byte exists\n@@ -161,7 +163,7 @@ func (n *node) addRoute(path string, handle Handle) {\n \t\t\t\t\tif c == n.indices[i] {\n \t\t\t\t\t\ti = n.incrementChildPrio(i)\n \t\t\t\t\t\tn = n.children[i]\n-\t\t\t\t\t\tcontinue WALK\n+\t\t\t\t\t\tcontinue walk\n \t\t\t\t\t}\n \t\t\t\t}\n \n@@ -427,7 +429,7 @@ walk: // Outer loop for walking the tree\n \n // Makes a case-insensitive lookup of the given path and tries to find a handler.\n // It can optionally also fix trailing slashes.\n-// It returns the case-corrected path and a bool indicating wether the lookup\n+// It returns the case-corrected path and a bool indicating whether the lookup\n // was successful.\n func (n *node) findCaseInsensitivePath(path string, fixTrailingSlash bool) (ciPath []byte, found bool) {\n \tciPath = make([]byte, 0, len(path)+1) // preallocate enough memory\n",
+  "diffTruncated": false,
+  "tree": [
+    ".travis.yml",
+    "LICENSE",
+    "README.md",
+    "path.go",
+    "path_test.go",
+    "router.go",
+    "router_test.go",
+    "tree.go",
+    "tree_test.go"
+  ],
+  "explanation": {
+    "what": "addRoute 内のラベル WALK を小文字の walk にリネームし(godoc に露出する Lookup 側の walk ラベルとの表記統一)、共通接頭辞を求めるループを1行の for から通常のブロック形式に書き直した。あわせてコメントの typo(\"commom\"→\"common\"、\"this chars\"→\"those chars\"、\"wether\"→\"whether\")を修正した。",
+    "why": "コミットメッセージ通り、typo 修正とコードスタイルの統一が目的。ラベルを WALK から walk に変えたのは、直後の getValue 側で既に小文字の walk ラベルが使われており(前段の 0111 の diff コンテキストにも \"walk:\" が見える)、addRoute 側だけ大文字だった不統一を揃えたためとみられる。",
+    "highlights": [],
+    "langNotes": [
+      { "topic": "labeled continue (goto label)", "note": "Go にはラベル付きの break/continue がある。ネストしたループの外側ループを直接継続したいとき、for 文にラベル(ここでは walk:)を付けて continue walk と書く。Go の慣習ではラベルは小文字が一般的で、このコミットはそこに合わせている。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

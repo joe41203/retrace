@@ -1,0 +1,65 @@
+{
+  "seq": 108,
+  "sha": "a647d3a4f47bf164b6b2f0a7f563defa8321007c",
+  "parents": [
+    "b855addf42820c4e5e596b07788a4db8f4d703d8"
+  ],
+  "author": {
+    "name": "Julien Schmidt",
+    "email": "github@julienschmidt.com",
+    "date": "2015-02-12T01:47:54+08:00"
+  },
+  "message": "Check for multiple wildcards per path segment\n\nFixes #56",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 31,
+    "deletions": 3
+  },
+  "files": [
+    {
+      "path": "tree.go",
+      "status": "M",
+      "additions": 10,
+      "deletions": 3,
+      "binary": false
+    },
+    {
+      "path": "tree_test.go",
+      "status": "M",
+      "additions": 21,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/tree.go b/tree.go\nindex c84a489..e96d361 100644\n--- a/tree.go\n+++ b/tree.go\n@@ -186,7 +186,7 @@ func (n *node) addRoute(path string, handle Handle) {\n }\n \n func (n *node) insertChild(numParams uint8, path string, handle Handle) {\n-\tvar offset int\n+\tvar offset int // already handled bytes of the path\n \n \t// find prefix until first wildcard (beginning with ':'' or '*'')\n \tfor i, max := 0, len(path); numParams > 0; i++ {\n@@ -195,7 +195,7 @@ func (n *node) insertChild(numParams uint8, path string, handle Handle) {\n \t\t\tcontinue\n \t\t}\n \n-\t\t// Check if this Node existing children which would be\n+\t\t// check if this Node existing children which would be\n \t\t// unreachable if we insert the wildcard here\n \t\tif len(n.children) > 0 {\n \t\t\tpanic(\"wildcard route conflicts with existing children\")\n@@ -204,9 +204,16 @@ func (n *node) insertChild(numParams uint8, path string, handle Handle) {\n \t\t// find wildcard end (either '/' or path end)\n \t\tend := i + 1\n \t\tfor end < max && path[end] != '/' {\n-\t\t\tend++\n+\t\t\tswitch path[end] {\n+\t\t\t// the wildcard name must not contain ':' and '*'\n+\t\t\tcase ':', '*':\n+\t\t\t\tpanic(\"only one wildcard per path segment is allowed\")\n+\t\t\tdefault:\n+\t\t\t\tend++\n+\t\t\t}\n \t\t}\n \n+\t\t// check if the wildcard has a name\n \t\tif end-i < 2 {\n \t\t\tpanic(\"wildcards must be named with a non-empty name\")\n \t\t}\ndiff --git a/tree_test.go b/tree_test.go\nindex ed1f9a8..484621e 100644\n--- a/tree_test.go\n+++ b/tree_test.go\n@@ -339,6 +339,27 @@ func TestTreeCatchAllConflictRoot(t *testing.T) {\n \ttestRoutes(t, routes)\n }\n \n+func TestTreeDoubleWildcard(t *testing.T) {\n+\tconst panicMsg = \"only one wildcard per path segment is allowed\"\n+\n+\troutes := [...]string{\n+\t\t\"/:foo:bar\",\n+\t\t\"/:foo:bar/\",\n+\t\t\"/:foo*bar\",\n+\t}\n+\n+\tfor _, route := range routes {\n+\t\ttree := &node{}\n+\t\trecv := catchPanic(func() {\n+\t\t\ttree.addRoute(route, nil)\n+\t\t})\n+\n+\t\tif rs, ok := recv.(string); !ok || rs != panicMsg {\n+\t\t\tt.Fatalf(`\"Expected panic \"%s\" for route '%s', got \"%v\"`, panicMsg, route, recv)\n+\t\t}\n+\t}\n+}\n+\n /*func TestTreeDuplicateWildcard(t *testing.T) {\n \ttree := &node{}\n \n",
+  "diffTruncated": false,
+  "tree": [
+    ".travis.yml",
+    "LICENSE",
+    "README.md",
+    "path.go",
+    "path_test.go",
+    "router.go",
+    "router_test.go",
+    "tree.go",
+    "tree_test.go"
+  ],
+  "explanation": {
+    "what": "tree.go の insertChild 内、ワイルドカード(':' または '*' で始まる)の終端位置を探すループに検証を追加した。従来はワイルドカード名の終端を単に次の '/' まで走査していたが、途中に ':' や '*' が現れた場合は panic(\"only one wildcard per path segment is allowed\") で中断するようにした。tree_test.go には \"/:foo:bar\" のような1セグメントに複数ワイルドカードを含むルートを addRoute した際にこの panic が発生することを確認する TestTreeDoubleWildcard を追加している。",
+    "why": "コミットメッセージの \"Fixes #56\" が示す通り、1つのパスセグメントに \":foo:bar\" や \":foo*bar\" のような複数ワイルドカードを登録できてしまう不具合への対処。このライブラリはルート登録時の不正な入力を実行時 panic で即座に通知する設計方針を取っており、曖昧なワイルドカード名を後段のマッチング処理まで持ち越さずに早期に弾いている。",
+    "highlights": [
+      { "file": "tree.go", "note": "wildcard終端探索ループの switch 内で ':' '*' の再出現を panic として検出する箇所" },
+      { "file": "tree_test.go", "note": "TestTreeDoubleWildcard が \"/:foo:bar\" 等の不正ルートで期待する panic メッセージを検証している" }
+    ],
+    "langNotes": [
+      { "topic": "panic によるルート登録時の入力検証", "note": "httprouter はルーティングツリー構築(addRoute/insertChild)時の不正なパターンを error 値ではなく panic で通知する設計。サーバ起動時のルート登録はプログラムの初期化コードなので、回復不能な設定ミスは即座に落として気づかせる、という Go でよく見る使い分け。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

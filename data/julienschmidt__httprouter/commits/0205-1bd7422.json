@@ -1,0 +1,63 @@
+{
+  "seq": 205,
+  "sha": "1bd7422872601c5c56d6990c7f1716b7833f014d",
+  "parents": [
+    "a18f2230c76ebb8b63403b078371f529ea570acf"
+  ],
+  "author": {
+    "name": "Julien Schmidt",
+    "email": "git@julienschmidt.com",
+    "date": "2019-09-25T23:44:53+02:00"
+  },
+  "message": "README: Update ParamsFromContext documentation",
+  "pr": {
+    "number": 262,
+    "title": "add notes on accessing named params from request.Context",
+    "body": "Thanks for making an awesome router!\r\n\r\nI though I should contribute this small pr since I had to rummage through the old pr:s (like #147) to find the option to read named params from request.Context.\r\n\r\nLet me know if it works or if it needs some changes.",
+    "url": "https://github.com/julienschmidt/httprouter/pull/262"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 9,
+    "deletions": 7
+  },
+  "files": [
+    {
+      "path": "README.md",
+      "status": "M",
+      "additions": 9,
+      "deletions": 7,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/README.md b/README.md\nindex 79bd33b..e366b15 100644\n--- a/README.md\n+++ b/README.md\n@@ -64,7 +64,7 @@ func main() {\n \n As you can see, `:name` is a *named parameter*. The values are accessible via `httprouter.Params`, which is just a slice of `httprouter.Param`s. You can get the value of a parameter either by its index in the slice, or by using the `ByName(name)` method: `:name` can be retrieved by `ByName(\"name\")`.\n \n-**Note:** Since go 1.7 you may also access named parameters from `request.Context` if you're using the `http.Handler` api. See more below under `Why doesn't this work with http.Handler?`.\n+When using a `http.Handler` (using `router.Handler` or `http.HandlerFunc`) instead of HttpRouter's handle API using a 3rd function parameter, the named parameters are stored in the `request.Context`. See more below under [Why doesn't this work with http.Handler?](#why-doesnt-this-work-with-httphandler).\n \n Named parameters only match a single path segment:\n \n@@ -132,16 +132,18 @@ For even better scalability, the child nodes on each tree level are ordered by p\n \n **It does!** The router itself implements the `http.Handler` interface. Moreover the router provides convenient [adapters for `http.Handler`](https://godoc.org/github.com/julienschmidt/httprouter#Router.Handler)s and [`http.HandlerFunc`](https://godoc.org/github.com/julienschmidt/httprouter#Router.HandlerFunc)s which allows them to be used as a [`httprouter.Handle`](https://godoc.org/github.com/julienschmidt/httprouter#Router.Handle) when registering a route.\n \n-~~The only disadvantage is, that no parameter values can be retrieved when a `http.Handler` or `http.HandlerFunc` is used, since there is no efficient way to pass the values with the existing function parameters. Therefore [`httprouter.Handle`](https://godoc.org/github.com/julienschmidt/httprouter#Router.Handle) has a third function parameter.~~\n-\n-Since go 1.7 you can access named params from `request.Context`.\n+Named parameters can be accessed `request.Context`:\n \n ```go\n-params := r.Context().Value(httprouter.ParamsKey)\n-// or use the helper\n-params := httprouter.ParamsFromContext(r.Context())\n+func Hello(w http.ResponseWriter, r *http.Request) {\n+\tparams := httprouter.ParamsFromContext(r.Context())\n+\n+    fmt.Fprintf(w, \"hello, %s!\\n\", params.ByName(\"name\"))\n+}\n ```\n \n+Alternatively, one can also use `params := r.Context().Value(httprouter.ParamsKey)` instead of the helper function.\n+\n Just try it out for yourself, the usage of HttpRouter is very straightforward. The package is compact and minimalistic, but also probably one of the easiest routers to set up.\n \n ## Where can I find Middleware *X*?\n",
+  "diffTruncated": false,
+  "tree": [
+    ".travis.yml",
+    "LICENSE",
+    "README.md",
+    "go.mod",
+    "path.go",
+    "path_test.go",
+    "router.go",
+    "router_test.go",
+    "tree.go",
+    "tree_test.go"
+  ],
+  "explanation": {
+    "what": "前コミットで追加された ParamsFromContext の README 説明を書き直した。「http.Handler api」への言及や取り消し線を除去し、リンクをアンカー形式に変え、コード例を実際の Hello ハンドラ形式(func(w, r) { params := httprouter.ParamsFromContext(r.Context()) ... }）に置き換えた。ParamsKey を直接使う代替方法の説明も1文にまとめている。",
+    "why": "コミットメッセージ「README: Update ParamsFromContext documentation」の通り、直前の PR #262 で追加された説明文とコード例を、メンテナ自身がより実践的で読みやすい形に整えたもの。",
+    "highlights": [
+      { "file": "README.md", "note": "打ち消し線での旧説明の残存をやめ、Hello ハンドラの実例に差し替えている" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [
+      { "type": "pr", "number": 262, "url": "https://github.com/julienschmidt/httprouter/pull/262" }
+    ],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

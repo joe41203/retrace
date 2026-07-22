@@ -1,0 +1,56 @@
+{
+  "seq": 218,
+  "sha": "bb64ef0474aabe033ecac48a0cd88e04e9878242",
+  "parents": [
+    "19b98be7737c102a3b78ca81c8d0e81040c4ad36"
+  ],
+  "author": {
+    "name": "Julien Schmidt",
+    "email": "git@julienschmidt.com",
+    "date": "2019-09-30T18:16:10+02:00"
+  },
+  "message": "tree: simplify path segmentation code",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 3,
+    "deletions": 5
+  },
+  "files": [
+    {
+      "path": "tree.go",
+      "status": "M",
+      "additions": 3,
+      "deletions": 5,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/tree.go b/tree.go\nindex df86a68..597d7d1 100644\n--- a/tree.go\n+++ b/tree.go\n@@ -127,11 +127,9 @@ func (n *node) addRoute(path string, handle Handle) {\n \t\t\t\t\t\tcontinue walk\n \t\t\t\t\t} else {\n \t\t\t\t\t\t// Wildcard conflict\n-\t\t\t\t\t\tvar pathSeg string\n-\t\t\t\t\t\tif n.nType == catchAll {\n-\t\t\t\t\t\t\tpathSeg = path\n-\t\t\t\t\t\t} else {\n-\t\t\t\t\t\t\tpathSeg = strings.SplitN(path, \"/\", 2)[0]\n+\t\t\t\t\t\tpathSeg := path\n+\t\t\t\t\t\tif n.nType != catchAll {\n+\t\t\t\t\t\t\tpathSeg = strings.SplitN(pathSeg, \"/\", 2)[0]\n \t\t\t\t\t\t}\n \t\t\t\t\t\tprefix := fullPath[:strings.Index(fullPath, pathSeg)] + n.path\n \t\t\t\t\t\tpanic(\"'\" + pathSeg +\n",
+  "diffTruncated": false,
+  "tree": [
+    ".travis.yml",
+    "LICENSE",
+    "README.md",
+    "go.mod",
+    "path.go",
+    "path_test.go",
+    "router.go",
+    "router_test.go",
+    "tree.go",
+    "tree_test.go"
+  ],
+  "explanation": {
+    "what": "addRoute のワイルドカード衝突時のパニックメッセージ生成部で、`if n.nType == catchAll { pathSeg = path } else { pathSeg = strings.SplitN(path, \"/\", 2)[0] }` という if-else を、`pathSeg := path` に初期化してから `if n.nType != catchAll` の場合だけ再代入する形に書き換えた。",
+    "why": "コミットメッセージ「simplify path segmentation code」の通り、同じ結果を得るための分岐を減らして可読性を上げる意図と考えられる。動作は変わらない純粋なリファクタリング。",
+    "highlights": [
+      { "file": "tree.go", "note": "if-else の両方の枝で書いていた代入を、デフォルト値+条件付き上書きの形に整理" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

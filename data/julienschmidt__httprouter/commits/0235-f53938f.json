@@ -1,0 +1,56 @@
+{
+  "seq": 235,
+  "sha": "f53938f8d3c7f4bb35e8b574ac60145097bd96b9",
+  "parents": [
+    "586a1d39750582cc7f7386629b12005b5309700a"
+  ],
+  "author": {
+    "name": "Julien Schmidt",
+    "email": "git@julienschmidt.com",
+    "date": "2020-01-06T13:31:26+01:00"
+  },
+  "message": "path: add CleanPath Benchmark",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 8,
+    "deletions": 5
+  },
+  "files": [
+    {
+      "path": "path_test.go",
+      "status": "M",
+      "additions": 8,
+      "deletions": 5,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/path_test.go b/path_test.go\nindex 75fde32..5eaf026 100644\n--- a/path_test.go\n+++ b/path_test.go\n@@ -6,7 +6,6 @@\n package httprouter\n \n import (\n-\t\"runtime\"\n \t\"testing\"\n )\n \n@@ -79,10 +78,6 @@ func TestPathCleanMallocs(t *testing.T) {\n \tif testing.Short() {\n \t\tt.Skip(\"skipping malloc count in short mode\")\n \t}\n-\tif runtime.GOMAXPROCS(0) > 1 {\n-\t\tt.Log(\"skipping AllocsPerRun checks; GOMAXPROCS>1\")\n-\t\treturn\n-\t}\n \n \tfor _, test := range cleanTests {\n \t\tallocs := testing.AllocsPerRun(100, func() { CleanPath(test.result) })\n@@ -91,3 +86,11 @@ func TestPathCleanMallocs(t *testing.T) {\n \t\t}\n \t}\n }\n+\n+func BenchmarkPathClean(b *testing.B) {\n+\tfor i := 0; i < b.N; i++ {\n+\t\tfor _, test := range cleanTests {\n+\t\t\tCleanPath(test.path)\n+\t\t}\n+\t}\n+}\n",
+  "diffTruncated": false,
+  "tree": [
+    ".travis.yml",
+    "LICENSE",
+    "README.md",
+    "go.mod",
+    "path.go",
+    "path_test.go",
+    "router.go",
+    "router_test.go",
+    "tree.go",
+    "tree_test.go"
+  ],
+  "explanation": {
+    "what": "path_test.go に BenchmarkPathClean を追加し、CleanPath をcleanTests全件に対して繰り返し実行するベンチマークを新設した。あわせて、既存のTestPathCleanMallocsからGOMAXPROCS>1時にアロケーション計測をスキップしていた分岐(runtime.GOMAXPROCSのチェック)を削除した。",
+    "why": "件名の通り、これ以降の一連のCleanPath最適化(seq236のスタックバッファ導入など)の効果を測定するための土台としてベンチマークを用意したとみられる。GOMAXPROCS分岐の削除は、テスト実行環境依存でアロケーション計測をスキップする条件が不要になった、あるいは邪魔になったための整理と考えられる。",
+    "highlights": [
+      { "file": "path_test.go", "note": "新設のBenchmarkPathClean。以降のCleanPath最適化コミットの効果測定に使われる" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

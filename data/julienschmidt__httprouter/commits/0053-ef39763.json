@@ -1,0 +1,53 @@
+{
+  "seq": 53,
+  "sha": "ef39763ac068148839ef8b083855fedfd26baddb",
+  "parents": [
+    "fee54e5b23ce274bbfa8fcde64cfd822d926ef52"
+  ],
+  "author": {
+    "name": "Julien Schmidt",
+    "email": "github@julienschmidt.com",
+    "date": "2014-03-07T12:37:48+01:00"
+  },
+  "message": "small code cleanup",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 1,
+    "deletions": 1
+  },
+  "files": [
+    {
+      "path": "tree.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/tree.go b/tree.go\nindex 00ba564..3509038 100644\n--- a/tree.go\n+++ b/tree.go\n@@ -33,6 +33,7 @@ type node struct {\n func (n *node) incrementChildPrio(i int) int {\n \tn.children[i].priority++\n \tprio := n.children[i].priority\n+\n \t// adjust position (move to front)\n \tfor j := i - 1; j >= 0 && n.children[j].priority < prio; j-- {\n \t\t// swap node positions\n@@ -83,7 +84,6 @@ func (n *node) addRoute(method, path string, handle Handle) {\n \t\t\tif i < len(path) {\n \t\t\t\tpath = path[i:]\n \n-\t\t\t\t// catchAll\n \t\t\t\tif n.wildChild {\n \t\t\t\t\tn = n.children[0]\n \t\t\t\t\tn.priority++\n",
+  "diffTruncated": false,
+  "tree": [
+    ".travis.yml",
+    "LICENSE",
+    "README.md",
+    "path.go",
+    "path_test.go",
+    "router.go",
+    "router_test.go",
+    "tree.go",
+    "tree_test.go"
+  ],
+  "explanation": {
+    "what": "tree.go の incrementChildPrio に空行を1つ追加し、addRoute 内の「// catchAll」というコメントを削除した些細な整形コミット。ロジックの変更はない。",
+    "why": "削除されたコメントの直後のコード(n.wildChild の判定ブロック)は catchAll に限らず named param のワイルドカードも扱っており、コメントが実態と合っていなかったため取り除いたと考えられる。コミットメッセージ通りの小さなコード整理。",
+    "highlights": [],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

@@ -1,0 +1,68 @@
+{
+  "seq": 11,
+  "sha": "0009e536a677446d388ec88903c9bf3615d894ed",
+  "parents": [
+    "a001a0ef8cb9a18f0dc03b2022aec7880e333965"
+  ],
+  "author": {
+    "name": "Julien Schmidt",
+    "email": "github@julienschmidt.com",
+    "date": "2013-12-11T15:52:33+01:00"
+  },
+  "message": "reformat test error messages",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 3,
+    "additions": 28,
+    "deletions": 28
+  },
+  "files": [
+    {
+      "path": "path_test.go",
+      "status": "M",
+      "additions": 3,
+      "deletions": 3,
+      "binary": false
+    },
+    {
+      "path": "router_test.go",
+      "status": "M",
+      "additions": 2,
+      "deletions": 2,
+      "binary": false
+    },
+    {
+      "path": "tree_test.go",
+      "status": "M",
+      "additions": 23,
+      "deletions": 23,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/path_test.go b/path_test.go\nindex ed7e82b..5c018e8 100644\n--- a/path_test.go\n+++ b/path_test.go\n@@ -60,10 +60,10 @@ var cleanTests = []struct {\n func TestPathClean(t *testing.T) {\n \tfor _, test := range cleanTests {\n \t\tif s := CleanPath(test.path); s != test.result {\n-\t\t\tt.Errorf(\"Clean(%q) = %q, want %q\", test.path, s, test.result)\n+\t\t\tt.Errorf(\"CleanPath(%q) = %q, want %q\", test.path, s, test.result)\n \t\t}\n \t\tif s := CleanPath(test.result); s != test.result {\n-\t\t\tt.Errorf(\"Clean(%q) = %q, want %q\", test.result, s, test.result)\n+\t\t\tt.Errorf(\"CleanPath(%q) = %q, want %q\", test.result, s, test.result)\n \t\t}\n \t}\n }\n@@ -80,7 +80,7 @@ func TestPathCleanMallocs(t *testing.T) {\n \tfor _, test := range cleanTests {\n \t\tallocs := testing.AllocsPerRun(100, func() { CleanPath(test.result) })\n \t\tif allocs > 0 {\n-\t\t\tt.Errorf(\"Clean(%q): %v allocs, want zero\", test.result, allocs)\n+\t\t\tt.Errorf(\"CleanPath(%q): %v allocs, want zero\", test.result, allocs)\n \t\t}\n \t}\n }\ndiff --git a/router_test.go b/router_test.go\nindex 3bfa2b5..ee72b5e 100644\n--- a/router_test.go\n+++ b/router_test.go\n@@ -34,7 +34,7 @@ func TestRouter(t *testing.T) {\n \t\trouted = true\n \t\twant := map[string]string{\"name\": \"gopher\"}\n \t\tif !reflect.DeepEqual(vars, want) {\n-\t\t\tt.Fatalf(\"Wrong wildcard values: want %v, got %v\", want, vars)\n+\t\t\tt.Fatalf(\"wrong wildcard values: want %v, got %v\", want, vars)\n \t\t}\n \t})\n \n@@ -44,6 +44,6 @@ func TestRouter(t *testing.T) {\n \trouter.ServeHTTP(w, req)\n \n \tif !routed {\n-\t\tt.Fatal(\"Routing failed\")\n+\t\tt.Fatal(\"routing failed\")\n \t}\n }\ndiff --git a/tree_test.go b/tree_test.go\nindex 5a77762..dfee96a 100644\n--- a/tree_test.go\n+++ b/tree_test.go\n@@ -43,19 +43,19 @@ func checkRequests(t *testing.T, tree *node, requests testRequests) {\n \n \t\tif handler == nil {\n \t\t\tif !request.nilHandler {\n-\t\t\t\tt.Errorf(\"Handler mismatch for route '%s': Expected non-nil handler\", request.path)\n+\t\t\t\tt.Errorf(\"handle mismatch for route '%s': Expected non-nil handle\", request.path)\n \t\t\t}\n \t\t} else if request.nilHandler {\n-\t\t\tt.Errorf(\"Handler mismatch for route '%s': Expected nil handler\", request.path)\n+\t\t\tt.Errorf(\"handle mismatch for route '%s': Expected nil handle\", request.path)\n \t\t} else {\n \t\t\thandler(nil, nil, nil)\n \t\t\tif fakeHandlerValue != request.route {\n-\t\t\t\tt.Errorf(\"Handler mismatch for route '%s': Wrong handler (%s != %s)\", request.path, fakeHandlerValue, request.route)\n+\t\t\t\tt.Errorf(\"handle mismatch for route '%s': Wrong handle (%s != %s)\", request.path, fakeHandlerValue, request.route)\n \t\t\t}\n \t\t}\n \n \t\tif !reflect.DeepEqual(vars, request.vars) {\n-\t\t\tt.Errorf(\"Vars mismatch for route '%s'\", request.path)\n+\t\t\tt.Errorf(\"vars mismatch for route '%s'\", request.path)\n \t\t}\n \t}\n }\n@@ -76,7 +76,7 @@ func TestTreeAddAndGet(t *testing.T) {\n \t}\n \tfor _, route := range routes {\n \t\tif err := tree.addRoute(\"GET\", route, fakeHandler(route)); err != nil {\n-\t\t\tt.Fatalf(\"Error inserting route '%s': %s\", route, err.Error())\n+\t\t\tt.Fatalf(\"error inserting route '%s': %s\", route, err.Error())\n \t\t}\n \t}\n \n@@ -113,7 +113,7 @@ func TestTreeWildcard(t *testing.T) {\n \t}\n \tfor _, route := range routes {\n \t\tif err := tree.addRoute(\"GET\", route, fakeHandler(route)); err != nil {\n-\t\t\tt.Fatalf(\"Error inserting route '%s': %s\", route, err.Error())\n+\t\t\tt.Fatalf(\"error inserting route '%s': %s\", route, err.Error())\n \t\t}\n \t}\n \n@@ -157,12 +157,12 @@ func TestTreeWildcardConflict(t *testing.T) {\n \t\terr := tree.addRoute(\"GET\", route.path, nil)\n \t\tif err == ErrWildCardConflict {\n \t\t\tif !route.conflict {\n-\t\t\t\tt.Errorf(\"Unexpected WildcardConflict for route '%s'\", route.path)\n+\t\t\t\tt.Errorf(\"unexpected WildcardConflict for route '%s'\", route.path)\n \t\t\t}\n \t\t} else if err != nil {\n-\t\t\tt.Errorf(\"Unexpected error for route '%s': %v\", route.path, err)\n+\t\t\tt.Errorf(\"unexpected error for route '%s': %v\", route.path, err)\n \t\t} else if route.conflict {\n-\t\t\tt.Errorf(\"No error for conflicting route '%s'\", route.path)\n+\t\t\tt.Errorf(\"no error for conflicting route '%s'\", route.path)\n \t\t}\n \t}\n \n@@ -191,12 +191,12 @@ func TestTreeChildConflict(t *testing.T) {\n \t\terr := tree.addRoute(\"GET\", route.path, nil)\n \t\tif err == ErrChildConflict {\n \t\t\tif !route.conflict {\n-\t\t\t\tt.Errorf(\"Unexpected ErrCatchAllConflict for route '%s'\", route.path)\n+\t\t\t\tt.Errorf(\"unexpected ErrCatchAllConflict for route '%s'\", route.path)\n \t\t\t}\n \t\t} else if err != nil {\n-\t\t\tt.Errorf(\"Unexpected error for route '%s': %v\", route.path, err)\n+\t\t\tt.Errorf(\"unexpected error for route '%s': %v\", route.path, err)\n \t\t} else if route.conflict {\n-\t\t\tt.Errorf(\"No error for conflicting route '%s'\", route.path)\n+\t\t\tt.Errorf(\"no error for conflicting route '%s'\", route.path)\n \t\t}\n \t}\n \n@@ -215,7 +215,7 @@ func TestTreeDupliatePath(t *testing.T) {\n \t}\n \tfor _, route := range routes {\n \t\tif err := tree.addRoute(\"GET\", route, fakeHandler(route)); err != nil {\n-\t\t\tt.Fatalf(\"Error inserting route '%s': %s\", route, err.Error())\n+\t\t\tt.Fatalf(\"error inserting route '%s': %s\", route, err.Error())\n \t\t}\n \n \t\t// Add again\n@@ -223,9 +223,9 @@ func TestTreeDupliatePath(t *testing.T) {\n \t\tif err == ErrDuplicatePath {\n \t\t\t// everything is fine\n \t\t} else if err != nil {\n-\t\t\tt.Errorf(\"Unexpected error for duplicate route '%s': %v\", route, err)\n+\t\t\tt.Errorf(\"unexpected error for duplicate route '%s': %v\", route, err)\n \t\t} else {\n-\t\t\tt.Fatalf(\"No error for duplicate route '%s\", route)\n+\t\t\tt.Fatalf(\"no error for duplicate route '%s\", route)\n \t\t}\n \t}\n \n@@ -251,7 +251,7 @@ func TestEmptyWildcardName(t *testing.T) {\n \t}\n \tfor _, route := range routes {\n \t\tif err := tree.addRoute(\"GET\", route, nil); err != ErrEmptyWildcardName {\n-\t\t\tt.Errorf(\"Expected ErrEmptyWildcardName for route '%s', got: %v\", route, err)\n+\t\t\tt.Errorf(\"expected ErrEmptyWildcardName for route '%s', got: %v\", route, err)\n \t\t}\n \t}\n }\n@@ -270,11 +270,11 @@ func TestTreeCatchAllConflict(t *testing.T) {\n \tfor _, route := range routes {\n \t\tif route.conflict {\n \t\t\tif err := tree.addRoute(\"GET\", route.path, nil); err != ErrCatchAllConflict {\n-\t\t\t\tt.Errorf(\"Expected ErrCatchAllConflict for route '%s', got: %v\", route.path, err)\n+\t\t\t\tt.Errorf(\"expected ErrCatchAllConflict for route '%s', got: %v\", route.path, err)\n \t\t\t}\n \t\t} else {\n \t\t\tif err := tree.addRoute(\"GET\", route.path, nil); err != nil {\n-\t\t\t\tt.Fatalf(\"Error inserting route '%s': %s\", route.path, err.Error())\n+\t\t\t\tt.Fatalf(\"error inserting route '%s': %s\", route.path, err.Error())\n \t\t\t}\n \t\t}\n \t}\n@@ -317,7 +317,7 @@ func TestTreeTrailingSlashRedirect(t *testing.T) {\n \t}\n \tfor _, route := range routes {\n \t\tif err := tree.addRoute(\"GET\", route, fakeHandler(route)); err != nil {\n-\t\t\tt.Fatalf(\"Error inserting route '%s': %s\", route, err.Error())\n+\t\t\tt.Fatalf(\"error inserting route '%s': %s\", route, err.Error())\n \t\t}\n \t}\n \n@@ -338,9 +338,9 @@ func TestTreeTrailingSlashRedirect(t *testing.T) {\n \tfor _, route := range tsrRoutes {\n \t\thandler, _, tsr := tree.getValue(\"GET\", route)\n \t\tif handler != nil {\n-\t\t\tt.Fatalf(\"Non-nil handler for TSR route '%s\", route)\n+\t\t\tt.Fatalf(\"non-nil handler for TSR route '%s\", route)\n \t\t} else if !tsr {\n-\t\t\tt.Errorf(\"Expected TSR recommendation for route '%s'\", route)\n+\t\t\tt.Errorf(\"expected TSR recommendation for route '%s'\", route)\n \t\t}\n \t}\n \n@@ -354,9 +354,9 @@ func TestTreeTrailingSlashRedirect(t *testing.T) {\n \tfor _, route := range noTsrRoutes {\n \t\thandler, _, tsr := tree.getValue(\"GET\", route)\n \t\tif handler != nil {\n-\t\t\tt.Fatalf(\"Non-nil handler for No-TSR route '%s\", route)\n+\t\t\tt.Fatalf(\"non-nil handler for No-TSR route '%s\", route)\n \t\t} else if tsr {\n-\t\t\tt.Errorf(\"Expected no TSR recommendation for route '%s'\", route)\n+\t\t\tt.Errorf(\"expected no TSR recommendation for route '%s'\", route)\n \t\t}\n \t}\n }\n",
+  "diffTruncated": false,
+  "tree": [
+    ".travis.yml",
+    "LICENSE",
+    "path.go",
+    "path_test.go",
+    "router.go",
+    "router_test.go",
+    "tree.go",
+    "tree_test.go"
+  ],
+  "explanation": {
+    "what": "path_test.go・router_test.go・tree_test.go のテストエラーメッセージの文言を一括で整形した。エラーメッセージ内で`Clean`となっていた箇所を`CleanPath`に修正し、大文字始まりだった文言(\"Handler mismatch\"、\"Routing failed\"、\"No error\"等)を小文字始まりに統一している。",
+    "why": "Go の慣習ではエラーメッセージは通常小文字で始める(文の一部として連結されることが多いため)。おそらく直前のコミットで lint 対応を行った流れで、テストの文言もこの慣習に合わせて整理したと考えられる。",
+    "highlights": [
+      { "file": "tree_test.go", "note": "\"Handler mismatch\" → \"handle mismatch\" など、実装側の用語(handle)にも合わせて言い回しを修正している" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "inferred",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

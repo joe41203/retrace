@@ -1,0 +1,63 @@
+{
+  "seq": 120,
+  "sha": "ddb6c34a60c1447f743e8e950b230c1d2c1a7bd0",
+  "parents": [
+    "f88e0d361fa3ada4c6015805c9131a4e8e956f65",
+    "996b173a044fbf806b87498967455ce14f214ae4"
+  ],
+  "author": {
+    "name": "Julien Schmidt",
+    "email": "julienschmidt@users.noreply.github.com",
+    "date": "2015-03-21T10:05:41+08:00"
+  },
+  "message": "Merge pull request #67 from philippfranke/master\n\nAdded convenient shortcut for OPTIONS",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 15,
+    "deletions": 1
+  },
+  "files": [
+    {
+      "path": "router.go",
+      "status": "M",
+      "additions": 5,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "router_test.go",
+      "status": "M",
+      "additions": 10,
+      "deletions": 1,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/router.go b/router.go\nindex 8fa9520..5172c89 100644\n--- a/router.go\n+++ b/router.go\n@@ -178,6 +178,11 @@ func (r *Router) HEAD(path string, handle Handle) {\n \tr.Handle(\"HEAD\", path, handle)\n }\n \n+// OPTIONS is a shortcut for router.Handle(\"OPTIONS\", path, handle)\n+func (r *Router) OPTIONS(path string, handle Handle) {\n+\tr.Handle(\"OPTIONS\", path, handle)\n+}\n+\n // POST is a shortcut for router.Handle(\"POST\", path, handle)\n func (r *Router) POST(path string, handle Handle) {\n \tr.Handle(\"POST\", path, handle)\ndiff --git a/router_test.go b/router_test.go\nindex 75d2dfc..835caf0 100644\n--- a/router_test.go\n+++ b/router_test.go\n@@ -76,7 +76,7 @@ func (h handlerStruct) ServeHTTP(w http.ResponseWriter, r *http.Request) {\n }\n \n func TestRouterAPI(t *testing.T) {\n-\tvar get, head, post, put, patch, delete, handler, handlerFunc bool\n+\tvar get, head, options, post, put, patch, delete, handler, handlerFunc bool\n \n \thttpHandler := handlerStruct{&handler}\n \n@@ -87,6 +87,9 @@ func TestRouterAPI(t *testing.T) {\n \trouter.HEAD(\"/GET\", func(w http.ResponseWriter, r *http.Request, _ Params) {\n \t\thead = true\n \t})\n+\trouter.OPTIONS(\"/GET\", func(w http.ResponseWriter, r *http.Request, _ Params) {\n+\t\toptions = true\n+\t})\n \trouter.POST(\"/POST\", func(w http.ResponseWriter, r *http.Request, _ Params) {\n \t\tpost = true\n \t})\n@@ -118,6 +121,12 @@ func TestRouterAPI(t *testing.T) {\n \t\tt.Error(\"routing HEAD failed\")\n \t}\n \n+\tr, _ = http.NewRequest(\"OPTIONS\", \"/GET\", nil)\n+\trouter.ServeHTTP(w, r)\n+\tif !head {\n+\t\tt.Error(\"routing OPTIONS failed\")\n+\t}\n+\n \tr, _ = http.NewRequest(\"POST\", \"/POST\", nil)\n \trouter.ServeHTTP(w, r)\n \tif !post {\n",
+  "diffTruncated": false,
+  "tree": [
+    ".travis.yml",
+    "LICENSE",
+    "README.md",
+    "path.go",
+    "path_test.go",
+    "router.go",
+    "router_test.go",
+    "tree.go",
+    "tree_test.go"
+  ],
+  "explanation": {
+    "what": "philippfranke/master ブランチのマージ。Router.OPTIONS という新しいショートカットメソッド(内部で Handle(\"OPTIONS\", path, handle) を呼ぶだけ)を追加し、TestRouterAPI にも OPTIONS メソッドの疎通確認を追加した。",
+    "why": "コミットメッセージ(\"Added convenient shortcut for OPTIONS\")の通り、既存の GET/POST/PUT/DELETE/HEAD 等と同様に OPTIONS メソッド用の簡便なショートカットを提供する目的。",
+    "highlights": [
+      { "file": "router.go", "note": "OPTIONS は他の GET/POST 等のショートカットと同じパターンで、Handle への薄いラッパーとして実装されている" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

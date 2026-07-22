@@ -1,0 +1,72 @@
+{
+  "seq": 162,
+  "sha": "6f3f3919c8781ce5c0509c83fffc887a7830c938",
+  "parents": [
+    "bded8bf8317e322ee63b36e83701ff4f87f6985c"
+  ],
+  "author": {
+    "name": "blinklv",
+    "email": "546533416@qq.com",
+    "date": "2017-03-25T04:14:42+08:00"
+  },
+  "message": "Fix some panic information when a 'catch-all' wildcard conflict occurs. (#182)",
+  "pr": {
+    "number": 182,
+    "title": "Fix some panic information when a 'catch-all' wildcard conflict occurs.",
+    "body": "```go\r\n    tree := &node{}   \r\n    tree.addRoute(\"/who/are/*you\", fakeHandler(\"/who/are/*you\"))\r\n    tree.addRoute(\"/who/are/foo\", fakeHandler(\"/who/are/foo\")) // Wildcard Conflict panic\r\n    tree.addRoute(\"/who/are/foo/bar\", fakeHandler(\"/who/are/foo/bar\")) // Wildcard Conflict panic\r\n```\r\n\r\nThe second one and the third one will throw panic, but the information is not what I want (Maybe I don't completely understand it). It likes below:\r\n\r\n>  '' in new path '/who/are/foo' conflicts with existing wildcard '/*you' in existing prefix '/*you'\r\n\r\n> '' in new path '/who/are/foo/bar' conflicts with existing wildcard '/*you' in existing prefix '/*you'\r\n\r\nI think below information are better.\r\n\r\n> '/foo' in new path '/who/are/foo' conflicts with existing wildcard '/*you' in existing prefix '/who/are/*you'   \r\n\r\n> '/foo/bar' in new path '/who/are/foo/bar' conflicts with existing wildcard '/*you' in existing prefix '/who/are/*you'\r\n\r\nSo I change it. :)",
+    "url": "https://github.com/julienschmidt/httprouter/pull/182"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 46,
+    "deletions": 1
+  },
+  "files": [
+    {
+      "path": "tree.go",
+      "status": "M",
+      "additions": 6,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "tree_test.go",
+      "status": "M",
+      "additions": 40,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/tree.go b/tree.go\nindex 474da00..a8fa98b 100644\n--- a/tree.go\n+++ b/tree.go\n@@ -148,7 +148,12 @@ func (n *node) addRoute(path string, handle Handle) {\n \t\t\t\t\t\tcontinue walk\n \t\t\t\t\t} else {\n \t\t\t\t\t\t// Wildcard conflict\n-\t\t\t\t\t\tpathSeg := strings.SplitN(path, \"/\", 2)[0]\n+\t\t\t\t\t\tvar pathSeg string\n+\t\t\t\t\t\tif n.nType == catchAll {\n+\t\t\t\t\t\t\tpathSeg = path\n+\t\t\t\t\t\t} else {\n+\t\t\t\t\t\t\tpathSeg = strings.SplitN(path, \"/\", 2)[0]\n+\t\t\t\t\t\t}\n \t\t\t\t\t\tprefix := fullPath[:strings.Index(fullPath, pathSeg)] + n.path\n \t\t\t\t\t\tpanic(\"'\" + pathSeg +\n \t\t\t\t\t\t\t\"' in new path '\" + fullPath +\ndiff --git a/tree_test.go b/tree_test.go\nindex a49045c..e89d945 100644\n--- a/tree_test.go\n+++ b/tree_test.go\n@@ -8,6 +8,7 @@ import (\n \t\"fmt\"\n \t\"net/http\"\n \t\"reflect\"\n+\t\"regexp\"\n \t\"strings\"\n \t\"testing\"\n )\n@@ -657,3 +658,42 @@ func TestTreeInvalidNodeType(t *testing.T) {\n \t\tt.Fatalf(\"Expected panic '\"+panicMsg+\"', got '%v'\", recv)\n \t}\n }\n+\n+func TestTreeWildcardConflictEx(t *testing.T) {\n+\tconflicts := [...]struct {\n+\t\troute        string\n+\t\tsegPath      string\n+\t\texistPath    string\n+\t\texistSegPath string\n+\t}{\n+\t\t{\"/who/are/foo\", \"/foo\", `/who/are/\\*you`, `/\\*you`},\n+\t\t{\"/who/are/foo/\", \"/foo/\", `/who/are/\\*you`, `/\\*you`},\n+\t\t{\"/who/are/foo/bar\", \"/foo/bar\", `/who/are/\\*you`, `/\\*you`},\n+\t\t{\"/conxxx\", \"xxx\", `/con:tact`, `:tact`},\n+\t\t{\"/conooo/xxx\", \"ooo\", `/con:tact`, `:tact`},\n+\t}\n+\n+\tfor _, conflict := range conflicts {\n+\t\t// I have to re-create a 'tree', because the 'tree' will be\n+\t\t// in an inconsistent state when the loop recovers from the\n+\t\t// panic which threw by 'addRoute' function.\n+\t\ttree := &node{}\n+\t\troutes := [...]string{\n+\t\t\t\"/con:tact\",\n+\t\t\t\"/who/are/*you\",\n+\t\t\t\"/who/foo/hello\",\n+\t\t}\n+\n+\t\tfor _, route := range routes {\n+\t\t\ttree.addRoute(route, fakeHandler(route))\n+\t\t}\n+\n+\t\trecv := catchPanic(func() {\n+\t\t\ttree.addRoute(conflict.route, fakeHandler(conflict.route))\n+\t\t})\n+\n+\t\tif !regexp.MustCompile(fmt.Sprintf(\"'%s' in new path .* conflicts with existing wildcard '%s' in existing prefix '%s'\", conflict.segPath, conflict.existSegPath, conflict.existPath)).MatchString(fmt.Sprint(recv)) {\n+\t\t\tt.Fatalf(\"invalid wildcard conflict error (%v)\", recv)\n+\t\t}\n+\t}\n+}\n",
+  "diffTruncated": false,
+  "tree": [
+    ".travis.yml",
+    "LICENSE",
+    "README.md",
+    "path.go",
+    "path_test.go",
+    "router.go",
+    "router_test.go",
+    "tree.go",
+    "tree_test.go"
+  ],
+  "explanation": {
+    "what": "tree.goのaddRoute内、wildcard衝突時のpanicメッセージ生成ロジックを修正した。既存ノードがcatchAll(`*name`)型のとき、衝突箇所を示すpathSegに`strings.SplitN(path, \"/\", 2)[0]`(先頭セグメントのみ)ではなくpath全体を使うよう分岐を追加。tree_test.goにTestTreeWildcardConflictExを追加し、`/who/are/*you`に対し`/who/are/foo`や`/who/are/foo/bar`を登録したときのpanicメッセージが期待通りの内容(衝突セグメントと既存prefixの両方)になることを正規表現で検証している。",
+    "why": "PR本文で報告されているように、catch-allワイルドカード`*you`と衝突する新パスを登録すると、修正前は空文字列や先頭セグメントだけが衝突箇所として表示され、既存prefixも`/*you`のように途中から表示されてしまい、実際にどこで衝突しているのか分かりにくかった。catchAllノードの場合はセグメント区切りで途中を切り出す意味がない(catch-allは残り全部を飲み込むため)ので、path全体を使うことで`/foo`in new path '/who/are/foo' conflicts with existing wildcard '/*you' in existing prefix '/who/are/*you'のような分かりやすいメッセージにした。",
+    "highlights": [
+      { "file": "tree.go", "note": "n.nType == catchAll の分岐でpathSegの決め方を変えている箇所が修正の核心" },
+      { "file": "tree_test.go", "note": "TestTreeWildcardConflictExが正規表現でpanicメッセージの中身を検証している" }
+    ],
+    "langNotes": [
+      { "topic": "catch-all wildcard (`*name`)", "note": "httprouterのルーティングパターンでは`:name`が1セグメントにマッチする名前付きパラメータ、`*name`はそれ以降のパス全体を飲み込むcatch-allワイルドカード。catch-allは必ずパスの末尾に置く必要があり、他のルートとセグメント単位で衝突しうる。" }
+    ],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [
+      { "type": "pr", "number": 182, "url": "https://github.com/julienschmidt/httprouter/pull/182" }
+    ],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

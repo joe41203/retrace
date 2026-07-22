@@ -1,0 +1,62 @@
+{
+  "seq": 50,
+  "sha": "b9c775bd96caef50afdec1af19090de5d34959df",
+  "parents": [
+    "07791c6c3689c63e715a830b5778b411e23763d1"
+  ],
+  "author": {
+    "name": "Julien Schmidt",
+    "email": "github@julienschmidt.com",
+    "date": "2014-03-06T15:25:22+01:00"
+  },
+  "message": "Use nodeType instead of a set of bools",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 32,
+    "deletions": 19
+  },
+  "files": [
+    {
+      "path": "tree.go",
+      "status": "M",
+      "additions": 32,
+      "deletions": 19,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/tree.go b/tree.go\nindex 89d6a74..df88ba7 100644\n--- a/tree.go\n+++ b/tree.go\n@@ -11,19 +11,25 @@ func min(a, b int) int {\n \treturn b\n }\n \n+type nodeType uint8\n+\n+const (\n+\tstatic   nodeType = 0\n+\tparam    nodeType = 1\n+\tcatchAll nodeType = 2\n+)\n+\n type node struct {\n-\t// parent *node\n-\tpath       string\n-\tindices    []byte\n-\tchildren   []*node\n-\thandle     map[string]Handle\n-\twildChild  bool\n-\tisParam    bool\n-\tisCatchAll bool\n+\tpath      string\n+\tindices   []byte\n+\tchildren  []*node\n+\twildChild bool\n+\tnType     nodeType\n+\thandle    map[string]Handle\n }\n \n-// addRoute adds a leaf with the given handle to the path.\n-// Attention! Not concurrency-safe!\n+// addRoute adds a node with the given handle to the path.\n+// Not concurrency-safe!\n func (n *node) addRoute(method, path string, handle Handle) {\n \t// non-empty tree\n \tif len(n.path) != 0 {\n@@ -51,10 +57,11 @@ func (n *node) addRoute(method, path string, handle Handle) {\n \t\t\t\tn.wildChild = false\n \t\t\t}\n \n-\t\t\t// Make new Node a child of this node\n+\t\t\t// Make new node a child of this node\n \t\t\tif i < len(path) {\n \t\t\t\tpath = path[i:]\n \n+\t\t\t\t// catchAll\n \t\t\t\tif n.wildChild {\n \t\t\t\t\tn = n.children[0]\n \n@@ -71,7 +78,8 @@ func (n *node) addRoute(method, path string, handle Handle) {\n \n \t\t\t\tc := path[0]\n \n-\t\t\t\tif n.isParam && c == '/' && len(n.children) == 1 {\n+\t\t\t\t// param\n+\t\t\t\tif n.nType == param && c == '/' && len(n.children) == 1 {\n \t\t\t\t\tn = n.children[0]\n \t\t\t\t\tcontinue OUTER\n \t\t\t\t}\n@@ -84,6 +92,7 @@ func (n *node) addRoute(method, path string, handle Handle) {\n \t\t\t\t\t}\n \t\t\t\t}\n \n+\t\t\t\t// Otherwise insert it\n \t\t\t\tif c != ':' && c != '*' {\n \t\t\t\t\tn.indices = append(n.indices, c)\n \t\t\t\t\tchild := &node{}\n@@ -143,7 +152,7 @@ func (n *node) insertChild(method, path string, handle Handle) {\n \t\t\t\t}\n \n \t\t\t\tchild := &node{\n-\t\t\t\t\tisParam: true,\n+\t\t\t\t\tnType: param,\n \t\t\t\t}\n \t\t\t\tn.children = []*node{child}\n \t\t\t\tn.wildChild = true\n@@ -175,8 +184,8 @@ func (n *node) insertChild(method, path string, handle Handle) {\n \n \t\t\t\t// first node: catchAll node with empty path\n \t\t\t\tchild := &node{\n-\t\t\t\t\tisCatchAll: true,\n-\t\t\t\t\twildChild:  true,\n+\t\t\t\t\twildChild: true,\n+\t\t\t\t\tnType:     catchAll,\n \t\t\t\t}\n \t\t\t\tn.children = []*node{child}\n \t\t\t\tn.indices = []byte{path[i]}\n@@ -188,7 +197,7 @@ func (n *node) insertChild(method, path string, handle Handle) {\n \t\t\t\t\thandle: map[string]Handle{\n \t\t\t\t\t\tmethod: handle,\n \t\t\t\t\t},\n-\t\t\t\t\tisCatchAll: true,\n+\t\t\t\t\tnType: catchAll,\n \t\t\t\t}\n \t\t\t\tn.children = []*node{child}\n \n@@ -227,7 +236,7 @@ OUTER:\n \t\t\t\tif index == '/' {\n \t\t\t\t\tn = n.children[i]\n \t\t\t\t\ttsr = (n.path == \"/\" && n.handle[method] != nil) ||\n-\t\t\t\t\t\t(n.isCatchAll && n.children[0].handle[method] != nil)\n+\t\t\t\t\t\t(n.nType == catchAll && n.children[0].handle[method] != nil)\n \t\t\t\t\treturn\n \t\t\t\t}\n \t\t\t}\n@@ -240,7 +249,8 @@ OUTER:\n \t\t} else if n.wildChild {\n \t\t\tn = n.children[0]\n \n-\t\t\tif n.isParam {\n+\t\t\tswitch n.nType {\n+\t\t\tcase param:\n \t\t\t\t// find param end (either '/'' or path end)\n \t\t\t\tk := 0\n \t\t\t\tfor k < len(path) && path[k] != '/' {\n@@ -282,7 +292,7 @@ OUTER:\n \n \t\t\t\treturn\n \n-\t\t\t} else { // catchAll\n+\t\t\tcase catchAll:\n \t\t\t\t// save catchAll value\n \t\t\t\tif vars == nil {\n \t\t\t\t\tvars = map[string]string{\n@@ -294,6 +304,9 @@ OUTER:\n \n \t\t\t\thandle = n.handle[method]\n \t\t\t\treturn\n+\n+\t\t\tdefault:\n+\t\t\t\tpanic(\"Unknown node type\")\n \t\t\t}\n \n \t\t} else {\n",
+  "diffTruncated": false,
+  "tree": [
+    ".travis.yml",
+    "LICENSE",
+    "README.md",
+    "path.go",
+    "path_test.go",
+    "router.go",
+    "router_test.go",
+    "tree.go",
+    "tree_test.go"
+  ],
+  "explanation": {
+    "what": "tree.go の node 構造体が持っていた isParam bool と isCatchAll bool という2つの真偽値フィールドを廃止し、nodeType uint8 という単一のフィールドに統合した。nodeType の値として static(0)・param(1)・catchAll(2) の3定数を定義し、addRoute・getValue(検索処理)内の判定を if n.isParam { ... } else { // catchAll } 形式から switch n.nType { case param: ...; case catchAll: ...; default: panic(\"Unknown node type\") } 形式に書き換えている。",
+    "why": "おそらく、isParam と isCatchAll という2つの独立した bool は本来「static / param / catchAll」という互いに排他な3状態を表しており、bool の組み合わせでは両方 true になるような不正な状態も型として表現できてしまう。nodeType という専用の列挙的な型に一本化することで、ノードが必ずこの3種類のいずれかであることを明示し、switch の default 節で想定外の値を panic として検出できるようにしたと考えられる。",
+    "highlights": [
+      { "file": "tree.go", "note": "node 構造体: isParam/isCatchAll bool を廃止し nodeType 1フィールドに統合" },
+      { "file": "tree.go", "note": "getValue 内の分岐が if/else から switch n.nType { case param, case catchAll, default: panic } に変更" }
+    ],
+    "langNotes": [
+      { "topic": "nodeType (独自の列挙型)", "note": "Go には他言語のような enum キーワードがなく、named type + 定数の const ブロックで疑似的な列挙を表現する。ここでは `type nodeType uint8` を定義し、`static`・`param`・`catchAll` を nodeType 型の定数として宣言している。複数の bool フラグより状態を厳密に表現でき、switch の default で不正値を panic 検出できる利点がある。" },
+      { "topic": "switch の default 節による防御的プログラミング", "note": "Go の switch は他言語と異なり case ごとの break が不要(自動で抜ける)。ここでは nType が想定する3値以外を取り得ないはずという前提を、default: panic(...) で明示的に保証している。" }
+    ],
+    "diagram": {
+      "mermaid": "flowchart TD\n  N[\"node\"] --> T[\"nodeType\"]\n  T --> S[\"static (0)\"]\n  T --> P[\"param (1)\"]\n  T --> C[\"catchAll (2)\"]\n  S --> D1[\"通常の静的パス segment\"]\n  P --> D2[\"named parameter (:name)\"]\n  C --> D3[\"catch-all (*filepath)\"]",
+      "caption": "node.nType が取りうる3つの値と、それぞれが表すパスセグメントの種類"
+    },
+    "evidence": "inferred",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

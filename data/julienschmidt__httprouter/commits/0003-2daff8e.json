@@ -1,0 +1,53 @@
+{
+  "seq": 3,
+  "sha": "2daff8e37ec5829ced49a66d385f1574aedcaa93",
+  "parents": [
+    "aafc1087ced7f3e840eeeb5061f8b14fdf32a573"
+  ],
+  "author": {
+    "name": "Julien Schmidt",
+    "email": "github@julienschmidt.com",
+    "date": "2013-11-21T01:15:47+01:00"
+  },
+  "message": "New default NotFound handler using CleanPath",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 15,
+    "deletions": 1
+  },
+  "files": [
+    {
+      "path": "router.go",
+      "status": "M",
+      "additions": 15,
+      "deletions": 1,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/router.go b/router.go\nindex 4593de7..0b79255 100644\n--- a/router.go\n+++ b/router.go\n@@ -15,6 +15,20 @@ import (\n // parameters.\n type HandlerFunc func(http.ResponseWriter, *http.Request, map[string]string)\n \n+// NotFound is the default HTTP handler func for routes that can't be matched\n+// with an existing route.\n+// NotFound tries to redirect to a canonical URL generated with CleanPath\n+func NotFound(w http.ResponseWriter, req *http.Request) {\n+\tif req.Method != \"CONNECT\" {\n+\t\tif p := CleanPath(req.URL.Path); p != req.URL.Path && p != req.Referer() {\n+\t\t\thttp.Redirect(w, req, p, http.StatusMovedPermanently)\n+\t\t\treturn\n+\t\t}\n+\t}\n+\n+\thttp.NotFound(w, req)\n+}\n+\n // Router is a http.Handler which can be used to dispatch requests to different\n // handler functions via configurable routes\n type Router struct {\n@@ -47,7 +61,7 @@ var _ http.Handler = New()\n func New() *Router {\n \treturn &Router{\n \t\tRedirectTrailingSlash: true,\n-\t\tNotFound:              http.NotFound,\n+\t\tNotFound:              NotFound,\n \t}\n }\n \n",
+  "diffTruncated": false,
+  "tree": [
+    "LICENSE",
+    "path.go",
+    "path_test.go",
+    "router.go",
+    "router_test.go",
+    "tree.go",
+    "tree_test.go"
+  ],
+  "explanation": {
+    "what": "router.go に NotFound という独自のデフォルトハンドラ関数を追加し、Router.New() の NotFound フィールドの初期値を標準の http.NotFound からこの新関数に差し替えた。NotFound は CONNECT メソッド以外のリクエストに対して CleanPath でリクエストパスを正規化し、元のパスと異なり、かつ Referer ヘッダとも異なる場合に 301 で正規化後のパスへリダイレクトする。それ以外は従来通り http.NotFound を呼ぶ。",
+    "why": "前コミットで追加した CleanPath を活用し、`/foo//bar` のような非正規な URL でルートが見つからなかった場合に、正規化後のパスへ自動的にリダイレクトできるようにする狙いだと読み取れる。CONNECT を除外しているのは、CONNECT リクエストの対象がパスではなくホスト:ポートであり CleanPath による書き換えが意味を持たないためと考えられる。",
+    "highlights": [
+      { "file": "router.go", "note": "NotFound: CleanPath(req.URL.Path) が元のパスとも Referer とも異なる場合のみリダイレクトする条件分岐。Referer との比較はリダイレクトループを避けるための条件と読める" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

@@ -1,0 +1,72 @@
+{
+  "seq": 128,
+  "sha": "70708e46004c7bcb09b70e685a8b74a690135387",
+  "parents": [
+    "8c199fb6259ffc1af525cc3ad52ee60ba8359669"
+  ],
+  "author": {
+    "name": "Peter Downs",
+    "email": "peterldowns@gmail.com",
+    "date": "2015-06-25T02:55:31+02:00"
+  },
+  "message": "Allow chaining of any http.Handler, not just http.HandlerFunc.",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 3,
+    "additions": 53,
+    "deletions": 11
+  },
+  "files": [
+    {
+      "path": "README.md",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "router.go",
+      "status": "M",
+      "additions": 6,
+      "deletions": 6,
+      "binary": false
+    },
+    {
+      "path": "router_test.go",
+      "status": "M",
+      "additions": 46,
+      "deletions": 4,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/README.md b/README.md\nindex 9875c70..785a108 100644\n--- a/README.md\n+++ b/README.md\n@@ -297,7 +297,7 @@ func main() {\n \n **NOTE: It might be required to set [Router.HandleMethodNotAllowed](http://godoc.org/github.com/julienschmidt/httprouter#Router.HandleMethodNotAllowed) to `false` to avoid problems.**\n \n-You can use another [http.HandlerFunc](http://golang.org/pkg/net/http/#HandlerFunc), for example another router, to handle requests which could not be matched by this router by using the [Router.NotFound](http://godoc.org/github.com/julienschmidt/httprouter#Router.NotFound) handler. This allows chaining.\n+You can use another [http.Handler](http://golang.org/pkg/net/http/#Handler), for example another router, to handle requests which could not be matched by this router by using the [Router.NotFound](http://godoc.org/github.com/julienschmidt/httprouter#Router.NotFound) handler. This allows chaining.\n \n ### Static files\n The `NotFound` handler can for example be used to serve static files from the root path `/` (like an index.html file along with other assets):\ndiff --git a/router.go b/router.go\nindex 155b871..83e86fd 100644\n--- a/router.go\n+++ b/router.go\n@@ -138,14 +138,14 @@ type Router struct {\n \t// handler.\n \tHandleMethodNotAllowed bool\n \n-\t// Configurable http.HandlerFunc which is called when no matching route is\n+\t// Configurable http.Handler which is called when no matching route is\n \t// found. If it is not set, http.NotFound is used.\n-\tNotFound http.HandlerFunc\n+\tNotFound http.Handler\n \n-\t// Configurable http.HandlerFunc which is called when a request\n+\t// Configurable http.Handler which is called when a request\n \t// cannot be routed and HandleMethodNotAllowed is true.\n \t// If it is not set, http.Error with http.StatusMethodNotAllowed is used.\n-\tMethodNotAllowed http.HandlerFunc\n+\tMethodNotAllowed http.Handler\n \n \t// Function to handle panics recovered from http handlers.\n \t// It should be used to generate a error page and return the http error code\n@@ -342,7 +342,7 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {\n \t\t\thandle, _, _ := r.trees[method].getValue(req.URL.Path)\n \t\t\tif handle != nil {\n \t\t\t\tif r.MethodNotAllowed != nil {\n-\t\t\t\t\tr.MethodNotAllowed(w, req)\n+\t\t\t\t\tr.MethodNotAllowed.ServeHTTP(w, req)\n \t\t\t\t} else {\n \t\t\t\t\thttp.Error(w,\n \t\t\t\t\t\thttp.StatusText(http.StatusMethodNotAllowed),\n@@ -356,7 +356,7 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {\n \n \t// Handle 404\n \tif r.NotFound != nil {\n-\t\tr.NotFound(w, req)\n+\t\tr.NotFound.ServeHTTP(w, req)\n \t} else {\n \t\thttp.NotFound(w, req)\n \t}\ndiff --git a/router_test.go b/router_test.go\nindex 9dc6296..e3141bd 100644\n--- a/router_test.go\n+++ b/router_test.go\n@@ -174,6 +174,48 @@ func TestRouterRoot(t *testing.T) {\n \t}\n }\n \n+func TestRouterChaining(t *testing.T) {\n+\trouter1 := New()\n+\trouter2 := New()\n+\trouter1.NotFound = router2\n+\n+\tfooHit := false\n+\trouter1.POST(\"/foo\", func(w http.ResponseWriter, req *http.Request, _ Params) {\n+\t\tfooHit = true\n+\t\tw.WriteHeader(http.StatusOK)\n+\t})\n+\n+\tbarHit := false\n+\trouter2.POST(\"/bar\", func(w http.ResponseWriter, req *http.Request, _ Params) {\n+\t\tbarHit = true\n+\t\tw.WriteHeader(http.StatusOK)\n+\t})\n+\n+\tr, _ := http.NewRequest(\"POST\", \"/foo\", nil)\n+\tw := httptest.NewRecorder()\n+\trouter1.ServeHTTP(w, r)\n+\tif !(w.Code == http.StatusOK && fooHit) {\n+\t\tt.Errorf(\"Regular routing failed with router chaining.\")\n+\t\tt.FailNow()\n+\t}\n+\n+\tr, _ = http.NewRequest(\"POST\", \"/bar\", nil)\n+\tw = httptest.NewRecorder()\n+\trouter1.ServeHTTP(w, r)\n+\tif !(w.Code == http.StatusOK && barHit) {\n+\t\tt.Errorf(\"Chained routing failed with router chaining.\")\n+\t\tt.FailNow()\n+\t}\n+\n+\tr, _ = http.NewRequest(\"POST\", \"/qax\", nil)\n+\tw = httptest.NewRecorder()\n+\trouter1.ServeHTTP(w, r)\n+\tif !(w.Code == http.StatusNotFound) {\n+\t\tt.Errorf(\"NotFound behavior failed with router chaining.\")\n+\t\tt.FailNow()\n+\t}\n+}\n+\n func TestRouterNotAllowed(t *testing.T) {\n \thandlerFunc := func(_ http.ResponseWriter, _ *http.Request, _ Params) {}\n \n@@ -190,10 +232,10 @@ func TestRouterNotAllowed(t *testing.T) {\n \n \tw = httptest.NewRecorder()\n \tresponseText := \"custom method\"\n-\trouter.MethodNotAllowed = func(w http.ResponseWriter, req *http.Request) {\n+\trouter.MethodNotAllowed = http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {\n \t\tw.WriteHeader(http.StatusTeapot)\n \t\tw.Write([]byte(responseText))\n-\t}\n+\t})\n \trouter.ServeHTTP(w, r)\n \tif got := w.Body.String(); !(got == responseText) {\n \t\tt.Errorf(\"unexpected response got %q want %q\", got, responseText)\n@@ -237,10 +279,10 @@ func TestRouterNotFound(t *testing.T) {\n \n \t// Test custom not found handler\n \tvar notFound bool\n-\trouter.NotFound = func(rw http.ResponseWriter, r *http.Request) {\n+\trouter.NotFound = http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {\n \t\trw.WriteHeader(404)\n \t\tnotFound = true\n-\t}\n+\t})\n \tr, _ := http.NewRequest(\"GET\", \"/nope\", nil)\n \tw := httptest.NewRecorder()\n \trouter.ServeHTTP(w, r)\n",
+  "diffTruncated": false,
+  "tree": [
+    ".travis.yml",
+    "LICENSE",
+    "README.md",
+    "path.go",
+    "path_test.go",
+    "router.go",
+    "router_test.go",
+    "tree.go",
+    "tree_test.go"
+  ],
+  "explanation": {
+    "what": "Router 構造体のフィールド NotFound と MethodNotAllowed の型を `http.HandlerFunc` から `http.Handler` インターフェースに変更し、呼び出し箇所も `r.NotFound(w, req)` から `r.NotFound.ServeHTTP(w, req)` に変更した。TestRouterChaining という新規テストを追加し、ある Router の NotFound に別の Router を設定して未マッチ時に処理を委譲できることを検証している。既存の MethodNotAllowed / NotFound を使うテストも `http.HandlerFunc(...)` でラップする形に更新し、README のドキュメントも http.Handler に合わせて修正した。",
+    "why": "http.HandlerFunc は関数型であり ServeHTTP メソッドを持つ関数しか代入できないが、http.Handler はインターフェースなので ServeHTTP を実装する任意の値(別の *Router や http.ServeMux など)を代入できる。これにより「マッチしなかったリクエストを別のルータに委譲してチェインする」という用途が、関数リテラルに限定されず任意のハンドラ実装で可能になる。新規テストがまさに Router 同士のチェイニングを検証しており、この汎用化が目的だとわかる。",
+    "highlights": [
+      { "file": "router.go", "note": "NotFound/MethodNotAllowed の型が http.HandlerFunc → http.Handler に。呼び出しも .ServeHTTP(w, req) 経由に" },
+      { "file": "router_test.go", "note": "TestRouterChaining: router1.NotFound = router2 で委譲チェインを検証" }
+    ],
+    "langNotes": [
+      { "topic": "http.Handler と http.HandlerFunc", "note": "http.Handler は ServeHTTP(ResponseWriter, *Request) を持つインターフェース。http.HandlerFunc はその関数版アダプタで、通常の関数を http.Handler として使えるようにする型。フィールドの型を具体的な関数型からインターフェースに広げると、*Router のような任意の Handler 実装も代入できるようになる、というGoの典型的な設計判断。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

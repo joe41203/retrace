@@ -1,0 +1,53 @@
+{
+  "seq": 68,
+  "sha": "1e225c396e985fe866299c593f0bfa9e988040f2",
+  "parents": [
+    "94a1dcb3ee9b505b220c3d6c460facc1730cb9f6"
+  ],
+  "author": {
+    "name": "Julien Schmidt",
+    "email": "github@julienschmidt.com",
+    "date": "2014-06-08T20:01:08+02:00"
+  },
+  "message": "README: Update to new API",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 6,
+    "deletions": 4
+  },
+  "files": [
+    {
+      "path": "README.md",
+      "status": "M",
+      "additions": 6,
+      "deletions": 4,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/README.md b/README.md\nindex 03b7f0f..51c301f 100644\n--- a/README.md\n+++ b/README.md\n@@ -40,12 +40,12 @@ import (\n     \"log\"\n )\n \n-func Index(w http.ResponseWriter, r *http.Request, _ map[string]string) {\n+func Index(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {\n     fmt.Fprint(w, \"Welcome!\\n\")\n }\n \n-func Hello(w http.ResponseWriter, r *http.Request, vars map[string]string) {\n-    fmt.Fprintf(w, \"hello, %s!\\n\", vars[\"name\"])\n+func Hello(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {\n+    fmt.Fprintf(w, \"hello, %s!\\n\", ps.ByName(\"name\"))\n }\n \n func main() {\n@@ -59,7 +59,9 @@ func main() {\n \n ### Named parameters\n As you can see, `:name` is a *named parameter*.\n-The values are passed in a map, therefore the value of `:name` is available in `vars[\"name\"]`.\n+The values are accessible via `httprouter.Params`, which is just a slice of `httprouter.Param`s.\n+You can get the value of a parameter either by its index in the slice, or by using the `ByName(name)` method:\n+`:name` can be retrived by `ByName(\"name\")`.\n \n Named parameters only match a single path segment:\n ```\n",
+  "diffTruncated": false,
+  "tree": [
+    ".travis.yml",
+    "LICENSE",
+    "README.md",
+    "path.go",
+    "path_test.go",
+    "router.go",
+    "router_test.go",
+    "tree.go",
+    "tree_test.go"
+  ],
+  "explanation": {
+    "what": "README.md のサンプルコードとハンドラのシグネチャ説明を、直前のコミット(c2b822d)で導入された Params スライス + ByName API に合わせて更新した。`map[string]string` を使うコード例と `vars[\"name\"]` という説明を、`httprouter.Params` と `ps.ByName(\"name\")` の記述に置き換えている。",
+    "why": "seq65 で Handle のシグネチャが map から Params スライスに変わったため、ドキュメントのサンプルコードを実際の API と一致させる必要があった。",
+    "highlights": [],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

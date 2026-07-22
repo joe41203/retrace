@@ -1,0 +1,58 @@
+{
+  "seq": 222,
+  "sha": "ab38d942a0c5f10cff6cb4795b77861c7aad2561",
+  "parents": [
+    "7072f59069b7dfa4273a1febe87a643e75632578"
+  ],
+  "author": {
+    "name": "Julien Schmidt",
+    "email": "git@julienschmidt.com",
+    "date": "2019-10-03T11:47:43+02:00"
+  },
+  "message": "router: use status 308 instead of 307 for non-GET redirects\n\nFixes #206",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 6,
+    "deletions": 7
+  },
+  "files": [
+    {
+      "path": "router.go",
+      "status": "M",
+      "additions": 6,
+      "deletions": 7,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/router.go b/router.go\nindex eb9b96c..9610f71 100644\n--- a/router.go\n+++ b/router.go\n@@ -85,7 +85,7 @@ import (\n \n // Handle is a function that can be registered to a route to handle HTTP\n // requests. Like http.HandlerFunc, but has a third parameter for the values of\n-// wildcards (variables).\n+// wildcards (path variables).\n type Handle func(http.ResponseWriter, *http.Request, Params)\n \n // Param is a single URL parameter, consisting of a key and a value.\n@@ -134,7 +134,7 @@ type Router struct {\n \t// handler for the path with (without) the trailing slash exists.\n \t// For example if /foo/ is requested but a route only exists for /foo, the\n \t// client is redirected to /foo with http status code 301 for GET requests\n-\t// and 307 for all other request methods.\n+\t// and 308 for all other request methods.\n \tRedirectTrailingSlash bool\n \n \t// If enabled, the router tries to fix the current request path, if no\n@@ -142,7 +142,7 @@ type Router struct {\n \t// First superfluous path elements like ../ or // are removed.\n \t// Afterwards the router does a case-insensitive lookup of the cleaned path.\n \t// If a handle can be found for this route, the router makes a redirection\n-\t// to the corrected path with status code 301 for GET requests and 307 for\n+\t// to the corrected path with status code 301 for GET requests and 308 for\n \t// all other request methods.\n \t// For example /FOO and /..//Foo could be redirected to /foo.\n \t// RedirectTrailingSlash is independent of this option.\n@@ -429,11 +429,10 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {\n \t\t\t}\n \t\t\treturn\n \t\t} else if req.Method != http.MethodConnect && path != \"/\" {\n-\t\t\tcode := 301 // Permanent redirect, request with GET method\n+\t\t\tcode := 301 // Moved Permanently, request with GET method\n \t\t\tif req.Method != http.MethodGet {\n-\t\t\t\t// Temporary redirect, request with same method\n-\t\t\t\t// As of Go 1.3, Go does not support status code 308.\n-\t\t\t\tcode = 307\n+\t\t\t\t// Permanent Redirect, request with same method\n+\t\t\t\tcode = 308\n \t\t\t}\n \n \t\t\tif tsr && r.RedirectTrailingSlash {\n",
+  "diffTruncated": false,
+  "tree": [
+    ".travis.yml",
+    "LICENSE",
+    "README.md",
+    "go.mod",
+    "path.go",
+    "path_test.go",
+    "router.go",
+    "router_test.go",
+    "tree.go",
+    "tree_test.go"
+  ],
+  "explanation": {
+    "what": "非GETメソッドでのリダイレクト時に使うステータスコードを307(Temporary Redirect)から308(Permanent Redirect)に変更した。ServeHTTP 内の `code = 307` を `code = 308` に書き換え、コメントと RedirectTrailingSlash / RedirectFixedPath の godoc も307から308の記述に更新している。",
+    "why": "コミットメッセージの \"Fixes #206\" が示す通り、既存の307という選択が誤りだった修正。差分中のコメントには「Go 1.3時点ではステータスコード308をサポートしていなかった」という旧来の制約が書かれており、308対応後もコードだけが307のまま残っていたことがうかがえる。",
+    "highlights": [
+      { "file": "router.go", "note": "`code = 307` → `code = 308`。GETは301のまま、それ以外のメソッドは308(恒久的リダイレクトかつメソッド保持)になる" }
+    ],
+    "langNotes": [
+      { "topic": "HTTPステータス 307/308", "note": "307 Temporary Redirect と 308 Permanent Redirect はどちらもリダイレクト先へ同じHTTPメソッドとボディを引き継ぐ点で301/302と異なる。307は一時的、308は恒久的なリダイレクトを意味し、このコミットではキャッシュ・ブックマークの観点から永続的な意味を持つ308に変更している。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

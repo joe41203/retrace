@@ -1,0 +1,55 @@
+{
+  "seq": 52,
+  "sha": "fee54e5b23ce274bbfa8fcde64cfd822d926ef52",
+  "parents": [
+    "2b64d4770a2d2eab32cfb729f9c89d14df35c0d9"
+  ],
+  "author": {
+    "name": "Julien Schmidt",
+    "email": "github@julienschmidt.com",
+    "date": "2014-03-07T12:31:14+01:00"
+  },
+  "message": "Add a section on the functional principle",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 39,
+    "deletions": 0
+  },
+  "files": [
+    {
+      "path": "README.md",
+      "status": "M",
+      "additions": 39,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/README.md b/README.md\nindex 1bfd2eb..8493ce0 100644\n--- a/README.md\n+++ b/README.md\n@@ -82,6 +82,45 @@ Pattern: /src/*filepath\n  /src/subdir/somefile.go   match\n ```\n \n+## How does it work?\n+The router relies on a tree structure which makes heavy use of *common prefixes*, it is basically a *compact* [*prefix tree*](http://en.wikipedia.org/wiki/Trie) (or just [*Radix tree*](http://en.wikipedia.org/wiki/Radix_tree)). Nodes with a common prefix also share a common parent. Here is a short example what the routing tree could look like:\n+\n+```\n+Priority   Path             Handles\n+9          \\                map[GET:<1>]\n+3          ├s               map[]\n+2          |├earch\\         map[GET:<2>, POST:<3>,]\n+1          |└upport\\        map[GET:<4>]\n+2          ├blog\\           map[GET:<5>]\n+1          |    └:post      map[]\n+1          |         └\\     map[GET:<6>]\n+2          ├about-us\\       map[GET:<7>]\n+1          |        └team\\  map[GET:<8>]\n+1          └contact\\        map[GET:<9>]\n+```\n+Every `<num>` represents the memory address of a handler function. If you follow a path trough the tree from the root to the leaf, you get the complete route path, e.g `\\search\\`, for which a GET- and a POST-handler function are registered.\n+\n+Since URL pathes have a hierarchical structure and make use only of a limited set of characters, it is very likely that there are a lot of common prefixes. This allows us to easiely reduce the routing into ever smaller problems.\n+\n+Unlike hash-maps, a tree structure also allows us to use dynamic parts, e.g. the `:post` above, which is just a placeholder for a post name, since we actually match against the routing patterns instead of just comparing hashes. [As benchmarks show](https://github.com/julienschmidt/go-http-routing-benchmark), hash-map based routers also don't scale very well.\n+\n+For even better scalability, the child nodes on each tree level are ordered by priority, where the priority is just the number of handles registered in sub nodes (children, grandchildren, and so on..).\n+This helps in two ways:\n+\n+1. Nodes which are part of the most routing pathes are evaluated first. This helps to make as much routes as possible to be reachable as fast as possible.\n+2. It is some sort of cost compensation. The longest reachable path (highest cost) can always be evaluated first. The follwing scheme visualizes the tree structure. Nodes are evaluated from top to bottom and from left to right.\n+\n+\n+```\n+├------------\n+├---------\n+├-----\n+├----\n+├--\n+├--\n+└-\n+```\n+\n ## Where can I find Middleware *X*?\n This package just provides a very efficient request router with a few extra features. The router is just a [http.Handler](http://golang.org/pkg/net/http/#Handler), you can chain any http.Handler compatible middleware before the router, for example the [Gorilla handlers](http://www.gorillatoolkit.org/pkg/handlers). Or you could [just write your own](http://justinas.org/writing-http-middleware-in-go/), it's very easy!\n \n",
+  "diffTruncated": false,
+  "tree": [
+    ".travis.yml",
+    "LICENSE",
+    "README.md",
+    "path.go",
+    "path_test.go",
+    "router.go",
+    "router_test.go",
+    "tree.go",
+    "tree_test.go"
+  ],
+  "explanation": {
+    "what": "README.md に「How does it work?」セクションを新設し、ルーティングツリーが共通接頭辞に基づく圧縮 prefix tree(Radix tree)であることをASCIIアートの例とともに説明した。前日のコミットで導入した priority(サブノード数)による子ノード順序付けの意図(ヒット率の高い枝を先に評価する / 最長経路を先に評価してコストを均す)にも触れている。",
+    "why": "直前のコミットで内部実装に priority フィールドと並べ替えロジックを追加したばかりで、その設計意図はコードだけでは読み取りにくい。実装直後にドキュメントを追加しているのは、この最適化の考え方(木構造・共通接頭辞・優先度順走査)を利用者向けに言語化する目的と見られる。",
+    "highlights": [
+      { "file": "README.md", "note": "ASCIIアートで示された Priority/Path/Handles の対応表。ノードごとの priority が子孫のハンドラ数の合計であることが視覚的にわかる" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

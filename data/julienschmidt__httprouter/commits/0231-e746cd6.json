@@ -1,0 +1,56 @@
+{
+  "seq": 231,
+  "sha": "e746cd609a26ce7237331c6edd57fc455462095e",
+  "parents": [
+    "776638b9ee84fe3332f3969a0c4c6812b7aca734"
+  ],
+  "author": {
+    "name": "Julien Schmidt",
+    "email": "git@julienschmidt.com",
+    "date": "2019-10-04T19:42:14+02:00"
+  },
+  "message": "tree: further simplify addRoute",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 6,
+    "deletions": 5
+  },
+  "files": [
+    {
+      "path": "tree.go",
+      "status": "M",
+      "additions": 6,
+      "deletions": 5,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/tree.go b/tree.go\nindex acd662e..bab72a7 100644\n--- a/tree.go\n+++ b/tree.go\n@@ -179,12 +179,13 @@ walk:\n \t\t\t}\n \t\t\tn.insertChild(path, fullPath, handle)\n \t\t\treturn\n-\t\t} else if i == len(path) { // Make node a (in-path) leaf\n-\t\t\tif n.handle != nil {\n-\t\t\t\tpanic(\"a handle is already registered for path '\" + fullPath + \"'\")\n-\t\t\t}\n-\t\t\tn.handle = handle\n \t\t}\n+\n+\t\t// Otherwise add handle to current node\n+\t\tif n.handle != nil {\n+\t\t\tpanic(\"a handle is already registered for path '\" + fullPath + \"'\")\n+\t\t}\n+\t\tn.handle = handle\n \t\treturn\n \t}\n }\n",
+  "diffTruncated": false,
+  "tree": [
+    ".travis.yml",
+    "LICENSE",
+    "README.md",
+    "go.mod",
+    "path.go",
+    "path_test.go",
+    "router.go",
+    "router_test.go",
+    "tree.go",
+    "tree_test.go"
+  ],
+  "explanation": {
+    "what": "addRoute内でノードにハンドラを登録する分岐を書き直した。従来は「パス末尾に到達した場合(i == len(path))」だけ既存ハンドラの重複チェックとhandle代入を行うif節と、それ以外のreturnが分かれていたが、これを「if文を素通りしたら常にハンドラを登録してreturnする」という1本の処理に統合した。",
+    "why": "元のコードは i == len(path) の場合だけ特別扱いする形になっていたが、この関数末尾に到達する経路は実質そのケースしかなく、if-elseで分岐させる意味が薄かった。件名の「further simplify」が示す通り、直前のseq225(addRouteの可読性改善)に続く追加の単純化で、分岐をなくして意図(パスの終端に来たら必ずハンドラを登録する)を素直に読めるようにしている。",
+    "highlights": [
+      { "file": "tree.go", "note": "if-elseの分岐を廃し、ハンドラ登録とreturnを1本の流れにまとめた箇所" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

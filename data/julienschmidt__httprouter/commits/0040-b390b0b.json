@@ -1,0 +1,64 @@
+{
+  "seq": 40,
+  "sha": "b390b0becd6b3eba30b8aa3d0f91e1928dd4df6d",
+  "parents": [
+    "56c47db5e1b17eb10579953d82a6469f215dddb4"
+  ],
+  "author": {
+    "name": "Julien Schmidt",
+    "email": "github@julienschmidt.com",
+    "date": "2013-12-15T20:35:37+01:00"
+  },
+  "message": "Add PATCH shortcut func",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 18,
+    "deletions": 4
+  },
+  "files": [
+    {
+      "path": "router.go",
+      "status": "M",
+      "additions": 8,
+      "deletions": 3,
+      "binary": false
+    },
+    {
+      "path": "router_test.go",
+      "status": "M",
+      "additions": 10,
+      "deletions": 1,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/router.go b/router.go\nindex c7e014f..45a8df4 100644\n--- a/router.go\n+++ b/router.go\n@@ -34,7 +34,7 @@\n // The router matches incoming requests by the request method and the path.\n // If a handle is registered for this path and method, the router delegates the\n // request to that function.\n-// For the methods GET, POST, PUT and DELETE shortcut functions exist to\n+// For the methods GET, POST, PUT, PATCH and DELETE shortcut functions exist to\n // register handles, for all other methods router.Handle can be used.\n //\n // The registered path, against which the router matches incoming requests, can\n@@ -144,6 +144,11 @@ func (r *Router) PUT(path string, handle Handle) {\n \tr.Handle(\"PUT\", path, handle)\n }\n \n+// PATCH is a shortcut for router.Handle(\"PATCH\", path, handle)\n+func (r *Router) PATCH(path string, handle Handle) {\n+\tr.Handle(\"PATCH\", path, handle)\n+}\n+\n // DELETE is a shortcut for router.Handle(\"DELETE\", path, handle)\n func (r *Router) DELETE(path string, handle Handle) {\n \tr.Handle(\"DELETE\", path, handle)\n@@ -151,8 +156,8 @@ func (r *Router) DELETE(path string, handle Handle) {\n \n // Handle registers a new request handle with the given path and method.\n //\n-// For GET, POST, PUT and DELETE requests the respective shortcut functions can\n-// be used.\n+// For GET, POST, PUT, PATCH and DELETE requests the respective shortcut\n+// functions can be used.\n //\n // This function is intended to allow the usage of less frequently used,\n // non-standardized or custom methods (e.g. for internal communication with a\ndiff --git a/router_test.go b/router_test.go\nindex 3fbba9d..0298a5e 100644\n--- a/router_test.go\n+++ b/router_test.go\n@@ -52,7 +52,7 @@ func TestRouter(t *testing.T) {\n }\n \n func TestRouterAPI(t *testing.T) {\n-\tvar get, post, put, delete, handlerFunc bool\n+\tvar get, post, put, patch, delete, handlerFunc bool\n \n \trouter := New()\n \trouter.GET(\"/GET\", func(w http.ResponseWriter, r *http.Request, _ map[string]string) {\n@@ -64,6 +64,9 @@ func TestRouterAPI(t *testing.T) {\n \trouter.PUT(\"/PUT\", func(w http.ResponseWriter, r *http.Request, _ map[string]string) {\n \t\tput = true\n \t})\n+\trouter.PATCH(\"/PATCH\", func(w http.ResponseWriter, r *http.Request, _ map[string]string) {\n+\t\tpatch = true\n+\t})\n \trouter.DELETE(\"/DELETE\", func(w http.ResponseWriter, r *http.Request, _ map[string]string) {\n \t\tdelete = true\n \t})\n@@ -91,6 +94,12 @@ func TestRouterAPI(t *testing.T) {\n \t\tt.Error(\"routing PUT failed\")\n \t}\n \n+\tr, _ = http.NewRequest(\"PATCH\", \"/PATCH\", nil)\n+\trouter.ServeHTTP(w, r)\n+\tif !patch {\n+\t\tt.Error(\"routing PATCH failed\")\n+\t}\n+\n \tr, _ = http.NewRequest(\"DELETE\", \"/DELETE\", nil)\n \trouter.ServeHTTP(w, r)\n \tif !delete {\n",
+  "diffTruncated": false,
+  "tree": [
+    ".travis.yml",
+    "LICENSE",
+    "README.md",
+    "path.go",
+    "path_test.go",
+    "router.go",
+    "router_test.go",
+    "tree.go",
+    "tree_test.go"
+  ],
+  "explanation": {
+    "what": "Router.PATCH というショートカット関数を追加した。中身は r.Handle(\"PATCH\", path, handle) を呼ぶだけで、既存の GET/POST/PUT/DELETE と同じパターン。godocのメソッド一覧にも PATCH を追記し、router_test.go の TestRouterAPI にも PATCH のルーティングを検証するケースを加えた。",
+    "why": "コミットメッセージの通り PATCH 用のショートカット関数追加が目的。GET/POST/PUT/DELETE は既に用意されていたが、部分更新でよく使われる HTTP PATCH メソッド専用の便利関数が抜けていたため、既存メソッドと対称になるよう追加したと考えられる。",
+    "highlights": [
+      { "file": "router.go", "note": "PATCH func は他の GET/POST/PUT/DELETE と同一パターンで r.Handle(\"PATCH\", path, handle) を呼ぶだけの薄いラッパー" }
+    ],
+    "langNotes": [
+      { "topic": "HTTPメソッドショートカット関数", "note": "httprouterはHandle(method, path, handle)という汎用登録関数に加え、GET/POST/PUT/PATCH/DELETEなど頻出メソッドごとに同名の薄いラッパー関数を用意している。net/http標準のServeMuxには無いhttprouter独自の使い勝手で、Sinatra系フレームワークに親しみのあるユーザー向けのAPI設計。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

@@ -1,0 +1,62 @@
+{
+  "seq": 198,
+  "sha": "df4f025f65278a1d4f2a6baaf9ea4a3081b0c2b4",
+  "parents": [
+    "667c1dbb44f3b5528b874c3c9071b23702e3dd0f"
+  ],
+  "author": {
+    "name": "lianxm",
+    "email": "1034552569@qq.com",
+    "date": "2018-12-06T18:24:51+08:00"
+  },
+  "message": "fix maxParams bug",
+  "pr": {
+    "number": 261,
+    "title": "fix maxParams bug",
+    "body": "When there is only one route \"/cmd/*fildpath\", the structure of the tree is:\r\n 01:00 /cmd[1] <nil> false 1\r\n 01:01 [1] <nil> true 3\r\n 01:01 /*filepath[0] 0x124f970 false 3\r\nThe maxParams of the \"/cmd\" node is 0, but it should be 1",
+    "url": "https://github.com/julienschmidt/httprouter/pull/261"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 3,
+    "deletions": 0
+  },
+  "files": [
+    {
+      "path": "tree.go",
+      "status": "M",
+      "additions": 3,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/tree.go b/tree.go\nindex 7dd4e0b..e239bbf 100644\n--- a/tree.go\n+++ b/tree.go\n@@ -301,6 +301,9 @@ func (n *node) insertChild(numParams uint8, path, fullPath string, handle Handle\n \t\t\t\tnType:     catchAll,\n \t\t\t\tmaxParams: 1,\n \t\t\t}\n+\t\t\tif child.maxParams > n.maxParams {\n+\t\t\t\tn.maxParams = child.maxParams\n+\t\t\t}\n \t\t\tn.children = []*node{child}\n \t\t\tn.indices = string(path[i])\n \t\t\tn = child\n",
+  "diffTruncated": false,
+  "tree": [
+    ".travis.yml",
+    "LICENSE",
+    "README.md",
+    "go.mod",
+    "params.go",
+    "path.go",
+    "path_test.go",
+    "router.go",
+    "router_test.go",
+    "tree.go",
+    "tree_test.go"
+  ],
+  "explanation": {
+    "what": "insertChild で catchAll(`*filepath` など)ノードを新規作成する際、その子ノードの maxParams(1)が親ノードの maxParams より大きい場合に親の maxParams を引き上げる処理を追加した。",
+    "why": "PR本文に再現手順が具体的に書かれている通り、ルートが `/cmd/*filepath` 1本だけの木では、親ノード `/cmd` の maxParams が本来1であるべきところ0のままになるバグがあった。maxParams は Tree.getValue がパラメータ格納用スライスを事前確保するサイズに使われるため、過小評価されると呼び出し側の Params スライス確保が不足しうる。",
+    "highlights": [
+      { "file": "tree.go", "note": "catchAll ノード生成直後に親の maxParams を子に合わせて引き上げる1行" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [{ "type": "pr", "number": 261, "url": "https://github.com/julienschmidt/httprouter/pull/261" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

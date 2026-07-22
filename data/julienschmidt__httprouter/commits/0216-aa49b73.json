@@ -1,0 +1,56 @@
+{
+  "seq": 216,
+  "sha": "aa49b73dd2de41212264bf71211d8681829c71d8",
+  "parents": [
+    "ebb305a39bf23ab31f5b2430e76a95dd275d5a7e"
+  ],
+  "author": {
+    "name": "Julien Schmidt",
+    "email": "git@julienschmidt.com",
+    "date": "2019-09-29T18:09:18+02:00"
+  },
+  "message": "rooter: simplify params handling",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 6,
+    "deletions": 6
+  },
+  "files": [
+    {
+      "path": "router.go",
+      "status": "M",
+      "additions": 6,
+      "deletions": 6,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/router.go b/router.go\nindex 05fe77d..7a726ea 100644\n--- a/router.go\n+++ b/router.go\n@@ -417,13 +417,13 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {\n \tpath := req.URL.Path\n \n \tif root := r.trees[req.Method]; root != nil {\n-\t\tif handle, psp, tsr := root.getValue(path, r.getParams); handle != nil {\n-\t\t\tvar ps Params\n-\t\t\tif psp != nil {\n-\t\t\t\tps = *psp\n+\t\tif handle, ps, tsr := root.getValue(path, r.getParams); handle != nil {\n+\t\t\tif ps != nil {\n+\t\t\t\thandle(w, req, *ps)\n+\t\t\t\tr.putParams(ps)\n+\t\t\t} else {\n+\t\t\t\thandle(w, req, nil)\n \t\t\t}\n-\t\t\thandle(w, req, ps)\n-\t\t\tr.putParams(psp)\n \t\t\treturn\n \t\t} else if req.Method != http.MethodConnect && path != \"/\" {\n \t\t\tcode := 301 // Permanent redirect, request with GET method\n",
+  "diffTruncated": false,
+  "tree": [
+    ".travis.yml",
+    "LICENSE",
+    "README.md",
+    "go.mod",
+    "path.go",
+    "path_test.go",
+    "router.go",
+    "router_test.go",
+    "tree.go",
+    "tree_test.go"
+  ],
+  "explanation": {
+    "what": "ServeHTTP 内で `*Params` を一旦ローカル変数 `ps Params` にデリファレンスしてから `handle(w, req, ps)` を呼んでいた処理を、`ps != nil` かどうかで分岐し、nil でなければ `*ps` を渡して putParams、nil ならそのまま `handle(w, req, nil)` を呼ぶ形に整理した。",
+    "why": "コミットメッセージ「simplify params handling」の通り、前コミット(sync.Pool 導入)で追加された分岐を簡潔にする後続の手直し。中間変数を経由せず nil 判定と putParams 呼び出しをその場で行うことで、コードの見通しを良くしたと考えられる。",
+    "highlights": [
+      { "file": "router.go", "note": "ps != nil の分岐に応じて handle 呼び出しと putParams をそれぞれのブランチ内にまとめている" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

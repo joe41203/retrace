@@ -1,0 +1,56 @@
+{
+  "seq": 30,
+  "sha": "6c31f5e12b8eb2bf0d32776738ced9c316e1218b",
+  "parents": [
+    "c544507b82f1a504c0de0bc3586c45ed7589aaca"
+  ],
+  "author": {
+    "name": "Julien Schmidt",
+    "email": "github@julienschmidt.com",
+    "date": "2013-12-14T13:50:53+01:00"
+  },
+  "message": "Add Router ServeFiles test",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 30,
+    "deletions": 0
+  },
+  "files": [
+    {
+      "path": "router_test.go",
+      "status": "M",
+      "additions": 30,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/router_test.go b/router_test.go\nindex 5acb321..6237c7f 100644\n--- a/router_test.go\n+++ b/router_test.go\n@@ -5,6 +5,7 @@\n package httprouter\n \n import (\n+\t\"errors\"\n \t\"net/http\"\n \t\"reflect\"\n \t\"testing\"\n@@ -138,3 +139,32 @@ func TestRouterPanicHandler(t *testing.T) {\n \t\tt.Fatal(\"simulating failed\")\n \t}\n }\n+\n+type mockFileSystem struct {\n+\topened bool\n+}\n+\n+func (mfs *mockFileSystem) Open(name string) (http.File, error) {\n+\tmfs.opened = true\n+\treturn nil, errors.New(\"this is just a mock\")\n+}\n+\n+func TestRouterServeFiles(t *testing.T) {\n+\trouter := New()\n+\tmfs := &mockFileSystem{}\n+\n+\trecv := catchPanic(func() {\n+\t\trouter.ServeFiles(\"/noFilepath\", mfs)\n+\t})\n+\tif recv == nil {\n+\t\tt.Fatal(\"registering path not ending with '*filepath' did not panic\")\n+\t}\n+\n+\trouter.ServeFiles(\"/*filepath\", mfs)\n+\tw := new(mockResponseWriter)\n+\tr, _ := http.NewRequest(\"GET\", \"/favicon.ico\", nil)\n+\trouter.ServeHTTP(w, r)\n+\tif !mfs.opened {\n+\t\tt.Error(\"serving file failed\")\n+\t}\n+}\n",
+  "diffTruncated": false,
+  "tree": [
+    ".travis.yml",
+    "LICENSE",
+    "path.go",
+    "path_test.go",
+    "router.go",
+    "router_test.go",
+    "tree.go",
+    "tree_test.go"
+  ],
+  "explanation": {
+    "what": "router_test.go に mockFileSystem(http.FileSystem を実装し、Open が呼ばれたことだけを記録して常にエラーを返すモック)を定義し、TestRouterServeFiles を追加した。ServeFiles(\"/noFilepath\", mfs) が \"*filepath\" で終わらないパスに対して panic することと、ServeFiles(\"/*filepath\", mfs) 登録後に GET /favicon.ico をリクエストすると mockFileSystem.Open が実際に呼ばれることを検証する。",
+    "why": "件名の通り、365d4c2 で追加した ServeFiles の2つの契約(パスの検証、実際のファイルシステムへの委譲)をテストで固定する目的と考えられる。実ファイルI/Oを避けるため、http.FileSystem をモックで差し替えてOpenの呼び出しだけを確認する構成になっている。",
+    "highlights": [
+      { "file": "router_test.go", "note": "mockFileSystem で http.FileSystem をモック化し、ServeFiles が Open を呼ぶことだけを検証" }
+    ],
+    "langNotes": [
+      { "topic": "http.FileSystem のモック化", "note": "http.FileSystem は Open(name string) (http.File, error) の1メソッドだけのインターフェースなので、実ファイルを用意しなくても呼び出し記録だけを持つ最小構造体で簡単にモックできる。Go のテストでインターフェースを小さく保つ利点が表れている例。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

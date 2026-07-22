@@ -1,0 +1,64 @@
+{
+  "seq": 240,
+  "sha": "6bade33e09870c3aab467bd44cce4410bfbd1e48",
+  "parents": [
+    "15782a78c61201cf2fdbc138d63aa60fff114695"
+  ],
+  "author": {
+    "name": "Julien Schmidt",
+    "email": "git@julienschmidt.com",
+    "date": "2020-01-11T23:00:01+01:00"
+  },
+  "message": "tree: use stack buffer for common cases in findCaseInsensitivePath",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 17,
+    "deletions": 2
+  },
+  "files": [
+    {
+      "path": "tree.go",
+      "status": "M",
+      "additions": 12,
+      "deletions": 2,
+      "binary": false
+    },
+    {
+      "path": "tree_test.go",
+      "status": "M",
+      "additions": 5,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/tree.go b/tree.go\nindex 7c00c8f..49f8763 100644\n--- a/tree.go\n+++ b/tree.go\n@@ -465,12 +465,22 @@ walk: // Outer loop for walking the tree\n // It returns the case-corrected path and a bool indicating whether the lookup\n // was successful.\n func (n *node) findCaseInsensitivePath(path string, fixTrailingSlash bool) (fixedPath string, found bool) {\n+\tconst stackBufSize = 128\n+\n+\t// Use a static sized buffer on the stack in the common case.\n+\t// If the path is too long, allocate a buffer on the heap instead.\n+\tbuf := make([]byte, 0, stackBufSize)\n+\tif l := len(path) + 1; l > stackBufSize {\n+\t\tbuf = make([]byte, 0, l)\n+\t}\n+\n \tciPath := n.findCaseInsensitivePathRec(\n \t\tpath,\n-\t\tmake([]byte, 0, len(path)+1), // Preallocate enough memory for new path\n-\t\t[4]byte{},                    // Empty rune buffer\n+\t\tbuf,       // Preallocate enough memory for new path\n+\t\t[4]byte{}, // Empty rune buffer\n \t\tfixTrailingSlash,\n \t)\n+\n \treturn string(ciPath), ciPath != nil\n }\n \ndiff --git a/tree_test.go b/tree_test.go\nindex c604b74..a141131 100644\n--- a/tree_test.go\n+++ b/tree_test.go\n@@ -474,6 +474,9 @@ func TestTreeRootTrailingSlashRedirect(t *testing.T) {\n func TestTreeFindCaseInsensitivePath(t *testing.T) {\n \ttree := &node{}\n \n+\tlongPath := \"/l\" + strings.Repeat(\"o\", 128) + \"ng\"\n+\tlOngPath := \"/l\" + strings.Repeat(\"O\", 128) + \"ng/\"\n+\n \troutes := [...]string{\n \t\t\"/hi\",\n \t\t\"/b/\",\n@@ -507,6 +510,7 @@ func TestTreeFindCaseInsensitivePath(t *testing.T) {\n \t\t\"/w/♭/\", // 3 byte, last byte differs\n \t\t\"/w/𠜎\",  // 4 byte\n \t\t\"/w/𠜏/\", // 4 byte\n+\t\tlongPath,\n \t}\n \n \tfor _, route := range routes {\n@@ -599,6 +603,7 @@ func TestTreeFindCaseInsensitivePath(t *testing.T) {\n \t\t{\"/w/♭\", \"/w/♭/\", true, true},\n \t\t{\"/w/𠜎/\", \"/w/𠜎\", true, true},\n \t\t{\"/w/𠜏\", \"/w/𠜏/\", true, true},\n+\t\t{lOngPath, longPath, true, true},\n \t}\n \t// With fixTrailingSlash = true\n \tfor _, test := range tests {\n",
+  "diffTruncated": false,
+  "tree": [
+    ".travis.yml",
+    "LICENSE",
+    "README.md",
+    "go.mod",
+    "path.go",
+    "path_test.go",
+    "router.go",
+    "router_test.go",
+    "tree.go",
+    "tree_test.go"
+  ],
+  "explanation": {
+    "what": "tree.goのfindCaseInsensitivePathメソッドで、内部の再帰関数findCaseInsensitivePathRecに渡す新パス構築用バッファを、従来の make([]byte, 0, len(path)+1) による都度ヒープ確保から、stackBufSize = 128 の固定長スタックバッファに変更した。パス長+1が128を超える場合のみmakeでヒープ確保するフォールバックを追加している。あわせてtree_test.goのTestTreeFindCaseInsensitivePathに、128バイトを超える長いパス(longPath/lOngPath)を使ったテストケースを追加した。",
+    "why": "件名の通り、CleanPath(seq236)で導入したのと同じ「短い入力が大半を占めるならスタックバッファで済ませ、長い場合だけヒープ確保する」というパターンを、大文字小文字を無視した経路探索であるfindCaseInsensitivePathにも適用したもの。同じ最適化手法を別の関数に横展開する形で、共通ケースでのアロケーションをさらに削減している。",
+    "highlights": [
+      { "file": "tree.go", "note": "findCaseInsensitivePath: make([]byte, 0, len(path)+1) から stackBufSize=128 の固定バッファ+フォールバックへの変更" },
+      { "file": "tree_test.go", "note": "128バイトを超えるlongPath/lOngPathのテストケース追加。スタックバッファの閾値超えを検証する" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

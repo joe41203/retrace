@@ -1,0 +1,65 @@
+{
+  "seq": 132,
+  "sha": "dc1fe666a058716f962aaabbb3e55fb825266f97",
+  "parents": [
+    "9034cff70da2ab5888417e40d23cd213a1587f16"
+  ],
+  "author": {
+    "name": "Julien Schmidt",
+    "email": "github@julienschmidt.com",
+    "date": "2015-09-30T01:59:22+02:00"
+  },
+  "message": "Fix TSR  for / nodes before param nodes\n\nFixes #90",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 35,
+    "deletions": 4
+  },
+  "files": [
+    {
+      "path": "tree.go",
+      "status": "M",
+      "additions": 10,
+      "deletions": 3,
+      "binary": false
+    },
+    {
+      "path": "tree_test.go",
+      "status": "M",
+      "additions": 25,
+      "deletions": 1,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/tree.go b/tree.go\nindex a15bc2c..af95bd4 100644\n--- a/tree.go\n+++ b/tree.go\n@@ -33,9 +33,10 @@ func countParams(path string) uint8 {\n type nodeType uint8\n \n const (\n-\tstatic   nodeType = 0\n-\tparam    nodeType = 1\n-\tcatchAll nodeType = 2\n+\tstatic nodeType = iota // default\n+\troot\n+\tparam\n+\tcatchAll\n )\n \n type node struct {\n@@ -195,6 +196,7 @@ func (n *node) addRoute(path string, handle Handle) {\n \t\t}\n \t} else { // Empty tree\n \t\tn.insertChild(numParams, path, fullPath, handle)\n+\t\tn.nType = root\n \t}\n }\n \n@@ -411,6 +413,11 @@ walk: // Outer loop for walking the tree\n \t\t\t\treturn\n \t\t\t}\n \n+\t\t\tif path == \"/\" && n.wildChild && n.nType != root {\n+\t\t\t\ttsr = true\n+\t\t\t\treturn\n+\t\t\t}\n+\n \t\t\t// No handle found. Check if a handle for this path + a\n \t\t\t// trailing slash exists for trailing slash recommendation\n \t\t\tfor i := 0; i < len(n.indices); i++ {\ndiff --git a/tree_test.go b/tree_test.go\nindex 64f26d1..46d3299 100644\n--- a/tree_test.go\n+++ b/tree_test.go\n@@ -89,7 +89,7 @@ func checkMaxParams(t *testing.T, n *node) uint8 {\n \t\t\tmaxParams = params\n \t\t}\n \t}\n-\tif n.nType != static && !n.wildChild {\n+\tif n.nType > root && !n.wildChild {\n \t\tmaxParams++\n \t}\n \n@@ -394,6 +394,9 @@ func TestTreeTrailingSlashRedirect(t *testing.T) {\n \t\t\"/1/:id/2\",\n \t\t\"/aa\",\n \t\t\"/a/\",\n+\t\t\"/admin\",\n+\t\t\"/admin/:category\",\n+\t\t\"/admin/:category/:page\",\n \t\t\"/doc\",\n \t\t\"/doc/go_faq.html\",\n \t\t\"/doc/go1.html\",\n@@ -423,6 +426,9 @@ func TestTreeTrailingSlashRedirect(t *testing.T) {\n \t\t\"/0/go/\",\n \t\t\"/1/go\",\n \t\t\"/a\",\n+\t\t\"/admin/\",\n+\t\t\"/admin/config/\",\n+\t\t\"/admin/config/permissions/\",\n \t\t\"/doc/\",\n \t}\n \tfor _, route := range tsrRoutes {\n@@ -452,6 +458,24 @@ func TestTreeTrailingSlashRedirect(t *testing.T) {\n \t}\n }\n \n+func TestTreeRootTrailingSlashRedirect(t *testing.T) {\n+\ttree := &node{}\n+\n+\trecv := catchPanic(func() {\n+\t\ttree.addRoute(\"/:test\", fakeHandler(\"/:test\"))\n+\t})\n+\tif recv != nil {\n+\t\tt.Fatalf(\"panic inserting test route: %v\", recv)\n+\t}\n+\n+\thandler, _, tsr := tree.getValue(\"/\")\n+\tif handler != nil {\n+\t\tt.Fatalf(\"non-nil handler\")\n+\t} else if tsr {\n+\t\tt.Errorf(\"expected no TSR recommendation\")\n+\t}\n+}\n+\n func TestTreeFindCaseInsensitivePath(t *testing.T) {\n \ttree := &node{}\n \n",
+  "diffTruncated": false,
+  "tree": [
+    ".travis.yml",
+    "LICENSE",
+    "README.md",
+    "path.go",
+    "path_test.go",
+    "router.go",
+    "router_test.go",
+    "tree.go",
+    "tree_test.go"
+  ],
+  "explanation": {
+    "what": "nodeType の定数群を明示的な値指定(static=0, param=1, catchAll=2)から iota ベースの連番に変更し、新たに root という種別を追加した。root はツリーの一番上のノード(空ツリーへの最初の addRoute で作られるノード)にだけ設定される。getValue の探索ループには「path が \"/\" かつ n.wildChild が真だが n.nType が root ではない」場合に tsr(トレイリングスラッシュ推奨)を立てる分岐を追加した。",
+    "why": "コミットメッセージ \"Fix TSR for / nodes before param nodes\" と \"Fixes #90\" の通り、ルートより下の階層で \":param\" 直前に \"/\" だけを要求するパスが来たときに、誤った TSR(末尾スラッシュ)提案が出てしまう不具合を修正するため。ルートノード自身では TSR 判定をスキップする必要があり、そのためにルートかどうかを判別する root 種別を導入した。",
+    "highlights": [
+      { "file": "tree.go", "note": "nodeType の定数定義: iota 導入と root の追加" },
+      { "file": "tree.go", "note": "getValue 内の \"path == \\\"/\\\"\" かつ非 root ノードでの tsr 判定分岐" }
+    ],
+    "langNotes": [
+      { "topic": "iota", "note": "Go の const ブロックで使う自動連番の識別子。`static nodeType = iota` から始め、以降の行は値を書かずに 0,1,2... と自動採番される。既存の明示的な数値指定を iota に置き換えることで定数の追加・並び替えが安全になる。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

@@ -1,0 +1,54 @@
+{
+  "seq": 23,
+  "sha": "69d3d5379f44b4d7556d1673677221d061339140",
+  "parents": [
+    "365d4c235a2d7514f169de3c12fb9c8150de4278"
+  ],
+  "author": {
+    "name": "Julien Schmidt",
+    "email": "github@julienschmidt.com",
+    "date": "2013-12-14T11:05:28+01:00"
+  },
+  "message": "Improve documentation",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 9,
+    "deletions": 6
+  },
+  "files": [
+    {
+      "path": "router.go",
+      "status": "M",
+      "additions": 9,
+      "deletions": 6,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/router.go b/router.go\nindex 1e6a2f3..08b1d38 100644\n--- a/router.go\n+++ b/router.go\n@@ -2,7 +2,7 @@\n // Use of this source code is governed by a BSD-style license that can be found\n // in the LICENSE file.\n \n-// Package httprouter is a trie based high performance HTTP request router\n+// Package httprouter is a trie based high performance HTTP request router.\n //\n // A trivial example server is:\n //\n@@ -15,7 +15,7 @@\n //      \"log\"\n //  )\n //\n-//  func Hello(w http.ResponseWriter, req *http.Request, vars map[string]string) {\n+//  func Hello(w http.ResponseWriter, r *http.Request, vars map[string]string) {\n //      io.WriteString(w, \"hello, \" + vars[\"name\"] + \"!\\n\")\n //  }\n //\n@@ -128,12 +128,17 @@ func (r *Router) HandlerFunc(method, path string, handler http.HandlerFunc) {\n \t)\n }\n \n-// ServeFiles ... from root. The path must contain \"*filepath\", files are then\n-// served from the local path /defined/root/dir/*filepath.\n+// ServeFiles serves files from the given file system root.\n+// The path must end with \"/*filepath\", files are then served from the local\n+// path /defined/root/dir/*filepath.\n // For example if root is \"/etc\" and *filepath is \"passwd\", the local file\n // \"/etc/passwd\" would be served.\n // Internally a http.FileServer is used, therefore http.NotFound is used instead\n // of the Router's NotFound handler.\n+// To use the operating system's file system implementation,\n+// use http.Dir:\n+//\n+//     router.ServeFiles(\"/*filepath\", http.Dir(\"/var/www\")))\n func (r *Router) ServeFiles(path string, root http.FileSystem) {\n \tif len(path) < 10 || path[len(path)-9:] != \"*filepath\" {\n \t\tpanic(\"path must end with *filepath\")\n@@ -147,8 +152,6 @@ func (r *Router) ServeFiles(path string, root http.FileSystem) {\n \t\t\tpanic(\"routed request has no *filepath\")\n \t\t}\n \n-\t\tprintln(fp)\n-\n \t\treq.URL.Path = fp\n \t\tfileServer.ServeHTTP(w, req)\n \t})\n",
+  "diffTruncated": false,
+  "tree": [
+    ".travis.yml",
+    "LICENSE",
+    "path.go",
+    "path_test.go",
+    "router.go",
+    "router_test.go",
+    "tree.go",
+    "tree_test.go"
+  ],
+  "explanation": {
+    "what": "router.go のパッケージ godoc とコメントを整理した。トップレベルの例に句点を追加し、Hello ハンドラの引数名を w から r に修正、ServeFiles の godoc を「path は \\\"/*filepath\\\" で終わる必要がある」という具体的な説明に書き直し、http.Dir を使ったコード例を追記した。あわせてデバッグ用の println(fp) を削除した。",
+    "why": "直前のコミットで追加した ServeFiles のドキュメントが簡素だったため、利用者が http.Dir と組み合わせてすぐ使えるようコード例を添えて説明を具体化したと考えられる。println の削除は、開発中のデバッグ出力を本実装から取り除く後片付け。",
+    "highlights": [
+      { "file": "router.go", "note": "ServeFiles の godoc に router.ServeFiles(\"/*filepath\", http.Dir(\"/var/www\")) の使用例を追加" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

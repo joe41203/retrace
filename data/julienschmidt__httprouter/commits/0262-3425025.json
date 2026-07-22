@@ -1,0 +1,71 @@
+{
+  "seq": 262,
+  "sha": "34250257ea144905c752bfaae80d6885f190daf6",
+  "parents": [
+    "829d723ff8dce371ac6c55a1d68175d2ced8708e"
+  ],
+  "author": {
+    "name": "Fov",
+    "email": "791969680@qq.com",
+    "date": "2022-06-03T23:51:59+08:00"
+  },
+  "message": "Fix: #322 (#342)\n\nCo-authored-by: yuanyuan <yuanyuan@umu.com>",
+  "pr": {
+    "number": 342,
+    "title": "Fix: #322",
+    "body": "",
+    "url": "https://github.com/julienschmidt/httprouter/pull/342"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 25,
+    "deletions": 0
+  },
+  "files": [
+    {
+      "path": "tree.go",
+      "status": "M",
+      "additions": 5,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "tree_test.go",
+      "status": "M",
+      "additions": 20,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/tree.go b/tree.go\nindex 6eb4fe6..2d02ccd 100644\n--- a/tree.go\n+++ b/tree.go\n@@ -435,6 +435,11 @@ walk: // Outer loop for walking the tree\n \t\t\t\treturn\n \t\t\t}\n \n+\t\t\tif path == \"/\" && n.nType == static {\n+\t\t\t\ttsr = true\n+\t\t\t\treturn\n+\t\t\t}\n+\n \t\t\t// No handle found. Check if a handle for this path + a\n \t\t\t// trailing slash exists for trailing slash recommendation\n \t\t\tfor i, c := range []byte(n.indices) {\ndiff --git a/tree_test.go b/tree_test.go\nindex 2209abc..6cc28ff 100644\n--- a/tree_test.go\n+++ b/tree_test.go\n@@ -699,3 +699,23 @@ func TestTreeWildcardConflictEx(t *testing.T) {\n \t\t}\n \t}\n }\n+\n+func TestRedirectTrailingSlash(t *testing.T) {\n+\tvar data = []struct {\n+\t\tpath string\n+\t}{\n+\t\t{\"/hello/:name\"},\n+\t\t{\"/hello/:name/123\"},\n+\t\t{\"/hello/:name/234\"},\n+\t}\n+\n+\tnode := &node{}\n+\tfor _, item := range data {\n+\t\tnode.addRoute(item.path, fakeHandler(\"test\"))\n+\t}\n+\n+\t_, _, tsr := node.getValue(\"/hello/abx/\", nil)\n+\tif tsr != true {\n+\t\tt.Fatalf(\"want true, is false\")\n+\t}\n+}\n",
+  "diffTruncated": false,
+  "tree": [
+    ".travis.yml",
+    "LICENSE",
+    "README.md",
+    "go.mod",
+    "path.go",
+    "path_test.go",
+    "router.go",
+    "router_test.go",
+    "tree.go",
+    "tree_test.go"
+  ],
+  "explanation": {
+    "what": "tree.go の getValue 内、パス末尾一致でハンドラが見つからなかった際の探索ループに、ルートパス \"/\" で現在のノードが static 型のとき tsr(trailing slash redirect の可否フラグ)を true にする分岐を追加した。tree_test.go には `:name` を含む複数のワイルドカードルートを登録し、末尾にスラッシュを付けた \"/hello/abx/\" の lookup で tsr が true になることを確認する TestRedirectTrailingSlash を追加している。",
+    "why": "コミットメッセージが指す issue #322 は本 JSON には linkedIssues として収録されていないため詳細は確認できないが、追加されたテストから、おそらく名前付きパラメータを含むルート(例: /hello/:name)配下で、登録されていない末尾スラッシュ付きパス(/hello/abx/)にアクセスした際に本来期待される「末尾スラッシュへのリダイレクト」判定が働かなかった不具合を修正したものと考えられる。",
+    "highlights": [
+      { "file": "tree.go", "note": "path == \"/\" && n.nType == static の条件で tsr = true を立てる追加分岐" },
+      { "file": "tree_test.go", "note": "TestRedirectTrailingSlash: ワイルドカードルート配下での TSR 判定を検証する新規テスト" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "inferred",
+    "refs": [
+      { "type": "pr", "number": 342, "url": "https://github.com/julienschmidt/httprouter/pull/342" }
+    ],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

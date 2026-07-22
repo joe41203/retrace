@@ -1,0 +1,63 @@
+{
+  "seq": 141,
+  "sha": "5273944025bdfe8df6c10f286ce7742b83673033",
+  "parents": [
+    "b8b15a273dbacd6945205200fd37807cb7939361"
+  ],
+  "author": {
+    "name": "Julien Schmidt",
+    "email": "github@julienschmidt.com",
+    "date": "2016-02-05T21:41:47+01:00"
+  },
+  "message": "Native OPTIONS handling\n\nFixes  #98",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 153,
+    "deletions": 29
+  },
+  "files": [
+    {
+      "path": "router.go",
+      "status": "M",
+      "additions": 63,
+      "deletions": 29,
+      "binary": false
+    },
+    {
+      "path": "router_test.go",
+      "status": "M",
+      "additions": 90,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/router.go b/router.go\nindex 5d6c81c..f18a678 100644\n--- a/router.go\n+++ b/router.go\n@@ -138,6 +138,10 @@ type Router struct {\n \t// handler.\n \tHandleMethodNotAllowed bool\n \n+\t// If enabled, the router automatically replies to OPTIONS requests.\n+\t// Custom OPTIONS handlers take priority over automatic replies.\n+\tHandleOPTIONS bool\n+\n \t// Configurable http.Handler which is called when no matching route is\n \t// found. If it is not set, http.NotFound is used.\n \tNotFound http.Handler\n@@ -167,6 +171,7 @@ func New() *Router {\n \t\tRedirectTrailingSlash:  true,\n \t\tRedirectFixedPath:      true,\n \t\tHandleMethodNotAllowed: true,\n+\t\tHandleOPTIONS:          true,\n \t}\n }\n \n@@ -288,15 +293,35 @@ func (r *Router) Lookup(method, path string) (Handle, Params, bool) {\n \treturn nil, nil, false\n }\n \n+func (r *Router) allowed(path, reqMethod string) (allow string) {\n+\tfor method := range r.trees {\n+\t\t// Skip the requested method - we already tried this one\n+\t\tif method == reqMethod || method == \"OPTIONS\" {\n+\t\t\tcontinue\n+\t\t}\n+\n+\t\thandle, _, _ := r.trees[method].getValue(path)\n+\t\tif handle != nil {\n+\t\t\t// add request method to list of allowed methods\n+\t\t\tif len(allow) == 0 {\n+\t\t\t\tallow = method\n+\t\t\t} else {\n+\t\t\t\tallow += \", \" + method\n+\t\t\t}\n+\t\t}\n+\t}\n+\treturn\n+}\n+\n // ServeHTTP makes the router implement the http.Handler interface.\n func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {\n \tif r.PanicHandler != nil {\n \t\tdefer r.recv(w, req)\n \t}\n \n-\tif root := r.trees[req.Method]; root != nil {\n-\t\tpath := req.URL.Path\n+\tpath := req.URL.Path\n \n+\tif root := r.trees[req.Method]; root != nil {\n \t\tif handle, ps, tsr := root.getValue(path); handle != nil {\n \t\t\thandle(w, req, ps)\n \t\t\treturn\n@@ -333,37 +358,46 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {\n \t\t}\n \t}\n \n-\t// Handle 405\n-\tif r.HandleMethodNotAllowed {\n-\t\tvar allow string\n-\t\tfor method := range r.trees {\n-\t\t\t// Skip the requested method - we already tried this one\n-\t\t\tif method == req.Method || method == \"OPTIONS\" {\n-\t\t\t\tcontinue\n-\t\t\t}\n-\n-\t\t\thandle, _, _ := r.trees[method].getValue(req.URL.Path)\n-\t\t\tif handle != nil {\n-\t\t\t\t// add request method to list of allowed methods\n-\t\t\t\tif len(allow) == 0 {\n-\t\t\t\t\tallow = method\n-\t\t\t\t} else {\n-\t\t\t\t\tallow += \", \" + method\n+\tif req.Method == \"OPTIONS\" {\n+\t\t// Handle OPTIONS requests\n+\t\tif r.HandleOPTIONS {\n+\t\t\tvar allow string\n+\t\t\tif path == \"*\" { // server OPTIONS\n+\t\t\t\tfor method := range r.trees {\n+\t\t\t\t\tif method == \"OPTIONS\" {\n+\t\t\t\t\t\tcontinue\n+\t\t\t\t\t}\n+\n+\t\t\t\t\t// add request method to list of allowed methods\n+\t\t\t\t\tif len(allow) == 0 {\n+\t\t\t\t\t\tallow = method\n+\t\t\t\t\t} else {\n+\t\t\t\t\t\tallow += \", \" + method\n+\t\t\t\t\t}\n \t\t\t\t}\n+\t\t\t} else { // path OPTIONS\n+\t\t\t\tallow = r.allowed(path, req.Method)\n+\t\t\t}\n+\t\t\tif len(allow) > 0 {\n+\t\t\t\tw.Header().Set(\"Allow\", allow)\n+\t\t\t\treturn\n \t\t\t}\n \t\t}\n-\n-\t\tif len(allow) > 0 {\n-\t\t\tw.Header().Set(\"Allow\", allow)\n-\t\t\tif r.MethodNotAllowed != nil {\n-\t\t\t\tr.MethodNotAllowed.ServeHTTP(w, req)\n-\t\t\t} else {\n-\t\t\t\thttp.Error(w,\n-\t\t\t\t\thttp.StatusText(http.StatusMethodNotAllowed),\n-\t\t\t\t\thttp.StatusMethodNotAllowed,\n-\t\t\t\t)\n+\t} else {\n+\t\t// Handle 405\n+\t\tif r.HandleMethodNotAllowed {\n+\t\t\tif allow := r.allowed(path, req.Method); len(allow) > 0 {\n+\t\t\t\tw.Header().Set(\"Allow\", allow)\n+\t\t\t\tif r.MethodNotAllowed != nil {\n+\t\t\t\t\tr.MethodNotAllowed.ServeHTTP(w, req)\n+\t\t\t\t} else {\n+\t\t\t\t\thttp.Error(w,\n+\t\t\t\t\t\thttp.StatusText(http.StatusMethodNotAllowed),\n+\t\t\t\t\t\thttp.StatusMethodNotAllowed,\n+\t\t\t\t\t)\n+\t\t\t\t}\n+\t\t\t\treturn\n \t\t\t}\n-\t\t\treturn\n \t\t}\n \t}\n \ndiff --git a/router_test.go b/router_test.go\nindex 265bd55..db57740 100644\n--- a/router_test.go\n+++ b/router_test.go\n@@ -216,6 +216,96 @@ func TestRouterChaining(t *testing.T) {\n \t}\n }\n \n+func TestRouterOPTIONS(t *testing.T) {\n+\thandlerFunc := func(_ http.ResponseWriter, _ *http.Request, _ Params) {}\n+\n+\trouter := New()\n+\trouter.POST(\"/path\", handlerFunc)\n+\n+\t// test not allowed\n+\t// * (server)\n+\tr, _ := http.NewRequest(\"OPTIONS\", \"*\", nil)\n+\tw := httptest.NewRecorder()\n+\trouter.ServeHTTP(w, r)\n+\tif !(w.Code == http.StatusOK) {\n+\t\tt.Errorf(\"OPTIONS handling failed: Code=%d, Header=%v\", w.Code, w.Header())\n+\t} else if allow := w.Header().Get(\"Allow\"); allow != \"POST\" {\n+\t\tt.Error(\"unexpected Allow header value: \" + allow)\n+\t}\n+\n+\t// path\n+\tr, _ = http.NewRequest(\"OPTIONS\", \"/path\", nil)\n+\tw = httptest.NewRecorder()\n+\trouter.ServeHTTP(w, r)\n+\tif !(w.Code == http.StatusOK) {\n+\t\tt.Errorf(\"OPTIONS handling failed: Code=%d, Header=%v\", w.Code, w.Header())\n+\t} else if allow := w.Header().Get(\"Allow\"); allow != \"POST\" {\n+\t\tt.Error(\"unexpected Allow header value: \" + allow)\n+\t}\n+\n+\tr, _ = http.NewRequest(\"OPTIONS\", \"/doesnotexist\", nil)\n+\tw = httptest.NewRecorder()\n+\trouter.ServeHTTP(w, r)\n+\tif !(w.Code == http.StatusNotFound) {\n+\t\tt.Errorf(\"OPTIONS handling failed: Code=%d, Header=%v\", w.Code, w.Header())\n+\t}\n+\n+\t// add another method\n+\trouter.GET(\"/path\", handlerFunc)\n+\n+\t// test again\n+\t// * (server)\n+\tr, _ = http.NewRequest(\"OPTIONS\", \"*\", nil)\n+\tw = httptest.NewRecorder()\n+\trouter.ServeHTTP(w, r)\n+\tif !(w.Code == http.StatusOK) {\n+\t\tt.Errorf(\"OPTIONS handling failed: Code=%d, Header=%v\", w.Code, w.Header())\n+\t} else if allow := w.Header().Get(\"Allow\"); allow != \"POST, GET\" && allow != \"GET, POST\" {\n+\t\tt.Error(\"unexpected Allow header value: \" + allow)\n+\t}\n+\n+\t// path\n+\tr, _ = http.NewRequest(\"OPTIONS\", \"/path\", nil)\n+\tw = httptest.NewRecorder()\n+\trouter.ServeHTTP(w, r)\n+\tif !(w.Code == http.StatusOK) {\n+\t\tt.Errorf(\"OPTIONS handling failed: Code=%d, Header=%v\", w.Code, w.Header())\n+\t} else if allow := w.Header().Get(\"Allow\"); allow != \"POST, GET\" && allow != \"GET, POST\" {\n+\t\tt.Error(\"unexpected Allow header value: \" + allow)\n+\t}\n+\n+\t// custom handler\n+\tvar custom bool\n+\trouter.OPTIONS(\"/path\", func(w http.ResponseWriter, r *http.Request, _ Params) {\n+\t\tcustom = true\n+\t})\n+\n+\t// test again\n+\t// * (server)\n+\tr, _ = http.NewRequest(\"OPTIONS\", \"*\", nil)\n+\tw = httptest.NewRecorder()\n+\trouter.ServeHTTP(w, r)\n+\tif !(w.Code == http.StatusOK) {\n+\t\tt.Errorf(\"OPTIONS handling failed: Code=%d, Header=%v\", w.Code, w.Header())\n+\t} else if allow := w.Header().Get(\"Allow\"); allow != \"POST, GET\" && allow != \"GET, POST\" {\n+\t\tt.Error(\"unexpected Allow header value: \" + allow)\n+\t}\n+\tif custom {\n+\t\tt.Error(\"custom handler called on *\")\n+\t}\n+\n+\t// path\n+\tr, _ = http.NewRequest(\"OPTIONS\", \"/path\", nil)\n+\tw = httptest.NewRecorder()\n+\trouter.ServeHTTP(w, r)\n+\tif !(w.Code == http.StatusOK) {\n+\t\tt.Errorf(\"OPTIONS handling failed: Code=%d, Header=%v\", w.Code, w.Header())\n+\t}\n+\tif !custom {\n+\t\tt.Error(\"custom handler not called\")\n+\t}\n+}\n+\n func TestRouterNotAllowed(t *testing.T) {\n \thandlerFunc := func(_ http.ResponseWriter, _ *http.Request, _ Params) {}\n \n",
+  "diffTruncated": false,
+  "tree": [
+    ".travis.yml",
+    "LICENSE",
+    "README.md",
+    "path.go",
+    "path_test.go",
+    "router.go",
+    "router_test.go",
+    "tree.go",
+    "tree_test.go"
+  ],
+  "explanation": {
+    "what": "Router に HandleOPTIONS フィールドを追加し、OPTIONS メソッドのリクエストをルータ自身が処理できるようにした。ServeHTTP を、OPTIONS リクエストとそれ以外(405判定)で分岐する構造に書き換え、405判定で使っていた Allow ヘッダ収集ロジックを allowed() メソッドとして共通化して両方から呼べるようにした。",
+    "why": "コミットメッセージに \"Fixes #98\" とあり、OPTIONS メソッドをネイティブに扱えないという既存の課題に対応する変更。カスタム OPTIONS ハンドラが登録されていればそちらが優先され、無ければ自動で Allow ヘッダを返す設計にすることで、後方互換を保ちつつ RESTful API 開発の定型作業(CORSプリフライト等)を router 側で肩代わりする狙いがある。",
+    "highlights": [
+      { "file": "router.go", "note": "allowed() メソッドを新設し、405用とOPTIONS用で重複していた許可メソッド収集ロジックを一本化した" },
+      { "file": "router.go", "note": "path == \"*\" のサーバ全体向け OPTIONS(server-wide)と、特定パス向け OPTIONS を区別している" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

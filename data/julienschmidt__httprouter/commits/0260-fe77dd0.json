@@ -1,0 +1,79 @@
+{
+  "seq": 260,
+  "sha": "fe77dd05ab5a80f54110cccf1b7d8681c2648323",
+  "parents": [
+    "2d16253c761c85ed5477aea0c90958e5498eae9e"
+  ],
+  "author": {
+    "name": "Weijun Huang",
+    "email": "erichuang1994@users.noreply.github.com",
+    "date": "2020-09-21T21:50:23+08:00"
+  },
+  "message": "Support TSR when wildcard follows named param (#321)",
+  "pr": {
+    "number": 321,
+    "title": "support tsr for continuous wildcard",
+    "body": "Check #320  for details.",
+    "url": "https://github.com/julienschmidt/httprouter/pull/321"
+  },
+  "linkedIssues": [
+    {
+      "number": 320,
+      "title": "[bug?]redirect doesn't work correctly with named+Catch-All parameters",
+      "body": "```\r\nfunc TestNamedWithCatchALLRedirect(t *testing.T) {\r\n\ttree := &node{}\r\n\r\n\troutes := [...]string{\r\n\t\t\"/api/:x/*y\",\r\n\t}\r\n\tfor i := range routes {\r\n\t\troute := routes[i]\r\n\t\trecv := catchPanic(func() {\r\n\t\t\ttree.addRoute(route, fakeHandler(route))\r\n\t\t})\r\n\t\tif recv != nil {\r\n\t\t\tt.Fatalf(\"panic inserting route '%s': %v\", route, recv)\r\n\t\t}\r\n\t}\r\n\r\n\t// printChildren(tree, \"\")\r\n\r\n\ttsrRoutes := [...]string{\r\n\t\t\"/api/hi\",\r\n\t}\r\n\tfor _, route := range tsrRoutes {\r\n\t\thandler, _, tsr := tree.getValue(route, nil)\r\n\t\tif handler != nil {\r\n\t\t\tt.Fatalf(\"non-nil handler for TSR route '%s\", route)\r\n\t\t} else if !tsr {\r\n\t\t\tt.Errorf(\"expected TSR recommendation for route '%s'\", route)\r\n\t\t}\r\n\t}\r\n}\r\n```\r\nAbove test case will fail in tree_test.go. \r\nBut actually \"/api/hi/\" could get a handler",
+      "url": "https://github.com/julienschmidt/httprouter/issues/320"
+    }
+  ],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 3,
+    "deletions": 1
+  },
+  "files": [
+    {
+      "path": "tree.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "tree_test.go",
+      "status": "M",
+      "additions": 2,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/tree.go b/tree.go\nindex 2eedb30..6eb4fe6 100644\n--- a/tree.go\n+++ b/tree.go\n@@ -393,7 +393,7 @@ walk: // Outer loop for walking the tree\n \t\t\t\t\t\t// No handle found. Check if a handle for this path + a\n \t\t\t\t\t\t// trailing slash exists for TSR recommendation\n \t\t\t\t\t\tn = n.children[0]\n-\t\t\t\t\t\ttsr = (n.path == \"/\" && n.handle != nil)\n+\t\t\t\t\t\ttsr = (n.path == \"/\" && n.handle != nil) || (n.path == \"\" && n.indices == \"/\")\n \t\t\t\t\t}\n \n \t\t\t\t\treturn\ndiff --git a/tree_test.go b/tree_test.go\nindex b7d240f..2209abc 100644\n--- a/tree_test.go\n+++ b/tree_test.go\n@@ -392,6 +392,7 @@ func TestTreeTrailingSlashRedirect(t *testing.T) {\n \t\t\"/no/a\",\n \t\t\"/no/b\",\n \t\t\"/api/hello/:name\",\n+\t\t\"/vendor/:x/*y\",\n \t}\n \tfor i := range routes {\n \t\troute := routes[i]\n@@ -420,6 +421,7 @@ func TestTreeTrailingSlashRedirect(t *testing.T) {\n \t\t\"/admin/config/\",\n \t\t\"/admin/config/permissions/\",\n \t\t\"/doc/\",\n+\t\t\"/vendor/x\",\n \t}\n \tfor _, route := range tsrRoutes {\n \t\thandler, _, tsr := tree.getValue(route, nil)\n",
+  "diffTruncated": false,
+  "tree": [
+    ".travis.yml",
+    "LICENSE",
+    "README.md",
+    "go.mod",
+    "path.go",
+    "path_test.go",
+    "router.go",
+    "router_test.go",
+    "tree.go",
+    "tree_test.go"
+  ],
+  "explanation": {
+    "what": "tree.goの`getValue`内のTSR(trailing slash redirect)判定条件に`|| (n.path == \"\" && n.indices == \"/\")`を追加した。これにより`/api/:x/*y`のような「名前付きパラメータの直後にcatchAllワイルドカードが続く」ルートで、末尾スラッシュなしのパス(`/api/hi`)に対しても正しくTSRが推奨されるようになった。tree_test.goには`/vendor/:x/*y`ルートと`/vendor/x`のTSRテストケースを追加している。",
+    "why": "issue #320 に再現コードが示されている通り、named paramの後にcatchAllが続くルート構成では、末尾スラッシュを除いたパスをリクエストしてもTSR(307などでスラッシュ付きへ誘導)が推奨されず、本来到達できるはずのハンドラに届かない不具合があった。PR #321 はこの条件分岐を追加することでこれを修正した。",
+    "highlights": [
+      { "file": "tree.go", "note": "TSR判定条件に named param + catchAll の組み合わせを追加した1行" },
+      { "file": "tree_test.go", "note": "/vendor/:x/*y と /vendor/x を使った回帰テストの追加" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "issue",
+    "refs": [
+      { "type": "pr", "number": 321, "url": "https://github.com/julienschmidt/httprouter/pull/321" },
+      { "type": "issue", "number": 320, "url": "https://github.com/julienschmidt/httprouter/issues/320" }
+    ],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

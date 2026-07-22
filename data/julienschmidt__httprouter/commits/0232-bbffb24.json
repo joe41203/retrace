@@ -1,0 +1,59 @@
+{
+  "seq": 232,
+  "sha": "bbffb24dcda5ec5bd9a53bf843516e59cb4d2178",
+  "parents": [
+    "e746cd609a26ce7237331c6edd57fc455462095e"
+  ],
+  "author": {
+    "name": "Julien Schmidt",
+    "email": "git@julienschmidt.com",
+    "date": "2019-10-05T19:00:40+02:00"
+  },
+  "message": "tree: reduce complexity of insertChild",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 52,
+    "deletions": 40
+  },
+  "files": [
+    {
+      "path": "tree.go",
+      "status": "M",
+      "additions": 52,
+      "deletions": 40,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/tree.go b/tree.go\nindex bab72a7..1dd7127 100644\n--- a/tree.go\n+++ b/tree.go\n@@ -26,6 +26,31 @@ func longestCommonPrefix(a, b string) int {\n \treturn i\n }\n \n+// Search for a wildcard segment and check the name for invalid characters.\n+// Returns -1 as index, if no wildcard was found.\n+func findWildcard(path string) (wilcard string, i int, valid bool) {\n+\t// Find start\n+\tfor start, c := range []byte(path) {\n+\t\t// A wildcard starts with ':' (param) or '*' (catch-all)\n+\t\tif c != ':' && c != '*' {\n+\t\t\tcontinue\n+\t\t}\n+\n+\t\t// Find end and check for invalid characters\n+\t\tvalid = true\n+\t\tfor end, c := range []byte(path[start+1:]) {\n+\t\t\tswitch c {\n+\t\t\tcase '/':\n+\t\t\t\treturn path[start : start+1+end], start, valid\n+\t\t\tcase ':', '*':\n+\t\t\t\tvalid = false\n+\t\t\t}\n+\t\t}\n+\t\treturn path[start:], start, valid\n+\t}\n+\treturn \"\", -1, false\n+}\n+\n func countParams(path string) uint16 {\n \tvar n uint\n \tfor i := 0; i < len(path); i++ {\n@@ -191,78 +216,65 @@ walk:\n }\n \n func (n *node) insertChild(path, fullPath string, handle Handle) {\n-\tvar offset int // Already processed bytes of the path\n-\n-\t// Find prefix until first wildcard (beginning with ':' or '*')\n-\tfor i, max := 0, len(path); i < max; i++ {\n-\t\tc := path[i]\n-\t\tif c != ':' && c != '*' {\n-\t\t\tcontinue\n-\t\t}\n-\n-\t\t// Find wildcard end (either '/' or path end) and check the name for\n-\t\t// invalid characters\n-\t\tend := i + 1\n-\t\tinvalid := false\n-\t\tfor end < max {\n-\t\t\tc := path[end]\n-\t\t\tif c == '/' {\n-\t\t\t\tbreak\n-\t\t\t}\n-\t\t\tif c == ':' || c == '*' {\n-\t\t\t\tinvalid = true\n-\t\t\t}\n-\t\t\tend++\n+\tfor {\n+\t\t// Find prefix until first wildcard\n+\t\twildcard, i, valid := findWildcard(path)\n+\t\tif i < 0 { // No wilcard found\n+\t\t\tbreak\n \t\t}\n \n \t\t// The wildcard name must not contain ':' and '*'\n-\t\tif invalid {\n+\t\tif !valid {\n \t\t\tpanic(\"only one wildcard per path segment is allowed, has: '\" +\n-\t\t\t\tpath[i:end] + \"' in path '\" + fullPath + \"'\")\n+\t\t\t\twildcard + \"' in path '\" + fullPath + \"'\")\n \t\t}\n \n \t\t// Check if the wildcard has a name\n-\t\tif end-i < 2 {\n+\t\tif len(wildcard) < 2 {\n \t\t\tpanic(\"wildcards must be named with a non-empty name in path '\" + fullPath + \"'\")\n \t\t}\n \n \t\t// Check if this node has existing children which would be\n \t\t// unreachable if we insert the wildcard here\n \t\tif len(n.children) > 0 {\n-\t\t\tpanic(\"wildcard route '\" + path[i:end] +\n+\t\t\tpanic(\"wildcard segment '\" + wildcard +\n \t\t\t\t\"' conflicts with existing children in path '\" + fullPath + \"'\")\n \t\t}\n \n-\t\tif c == ':' { // param\n-\t\t\t// Split path at the beginning of the wildcard\n+\t\tif wildcard[0] == ':' { // param\n \t\t\tif i > 0 {\n-\t\t\t\tn.path = path[offset:i]\n-\t\t\t\toffset = i\n+\t\t\t\t// Insert prefix before the current wildcard\n+\t\t\t\tn.path = path[:i]\n+\t\t\t\tpath = path[i:]\n \t\t\t}\n \n+\t\t\tn.wildChild = true\n \t\t\tchild := &node{\n \t\t\t\tnType: param,\n+\t\t\t\tpath:  wildcard,\n \t\t\t}\n \t\t\tn.children = []*node{child}\n-\t\t\tn.wildChild = true\n \t\t\tn = child\n \t\t\tn.priority++\n \n \t\t\t// If the path doesn't end with the wildcard, then there\n \t\t\t// will be another non-wildcard subpath starting with '/'\n-\t\t\tif end < max {\n-\t\t\t\tn.path = path[offset:end]\n-\t\t\t\toffset = end\n-\n+\t\t\tif len(wildcard) < len(path) {\n+\t\t\t\tpath = path[len(wildcard):]\n \t\t\t\tchild := &node{\n \t\t\t\t\tpriority: 1,\n \t\t\t\t}\n \t\t\t\tn.children = []*node{child}\n \t\t\t\tn = child\n+\t\t\t\tcontinue\n \t\t\t}\n \n+\t\t\t// Otherwise we're done. Insert the handle in the new leaf\n+\t\t\tn.handle = handle\n+\t\t\treturn\n+\n \t\t} else { // catchAll\n-\t\t\tif end != max {\n+\t\t\tif i+len(wildcard) != len(path) {\n \t\t\t\tpanic(\"catch-all routes are only allowed at the end of the path in path '\" + fullPath + \"'\")\n \t\t\t}\n \n@@ -276,7 +288,7 @@ func (n *node) insertChild(path, fullPath string, handle Handle) {\n \t\t\t\tpanic(\"no / before catch-all in path '\" + fullPath + \"'\")\n \t\t\t}\n \n-\t\t\tn.path = path[offset:i]\n+\t\t\tn.path = path[:i]\n \n \t\t\t// First node: catchAll node with empty path\n \t\t\tchild := &node{\n@@ -284,7 +296,7 @@ func (n *node) insertChild(path, fullPath string, handle Handle) {\n \t\t\t\tnType:     catchAll,\n \t\t\t}\n \t\t\tn.children = []*node{child}\n-\t\t\tn.indices = string(path[i])\n+\t\t\tn.indices = string('/')\n \t\t\tn = child\n \t\t\tn.priority++\n \n@@ -301,8 +313,8 @@ func (n *node) insertChild(path, fullPath string, handle Handle) {\n \t\t}\n \t}\n \n-\t// Insert remaining path part and handle to the leaf\n-\tn.path = path[offset:]\n+\t// If no wildcard was found, simple insert the path and handle\n+\tn.path = path\n \tn.handle = handle\n }\n \n",
+  "diffTruncated": false,
+  "tree": [
+    ".travis.yml",
+    "LICENSE",
+    "README.md",
+    "go.mod",
+    "path.go",
+    "path_test.go",
+    "router.go",
+    "router_test.go",
+    "tree.go",
+    "tree_test.go"
+  ],
+  "explanation": {
+    "what": "insertChild内にインライン展開されていた「ワイルドカード(':'や'*'で始まるセグメント)の探索と妥当性チェック」ロジックを findWildcard という独立関数に切り出した。findWildcardは名前付き戻り値(wilcard string, i int, valid bool)でワイルドカード文字列・開始位置・名前の妥当性を返し、insertChild本体はfor文とfindWildcardの呼び出しに置き換わっている。",
+    "why": "件名の「reduce complexity」が示す通り、元のinsertChildは1つの関数内でワイルドカード探索・妥当性検証・ノード分割の全てを担っており、ネストしたループとif分岐が複雑だった。探索ロジックをfindWildcardへ分離することで、insertChild側は「ワイルドカードが見つかるたびにループしてノードを分割する」という骨格が見えやすくなっている。",
+    "highlights": [
+      { "file": "tree.go", "note": "新設のfindWildcard関数。ワイルドカードの開始位置・文字列・妥当性を1回の走査で返す" },
+      { "file": "tree.go", "note": "insertChildがoffset変数を使わず、pathスライス自体を都度切り詰めていく書き方に変わった" }
+    ],
+    "langNotes": [
+      { "topic": "named return values", "note": "findWildcard(path string) (wilcard string, i int, valid bool) のように戻り値に名前を付けると、関数内で単なる変数として代入でき、returnで暗黙的にその時点の値が返る。Goでは複数戻り値と組み合わせてよく使われるイディオム。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

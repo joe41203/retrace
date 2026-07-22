@@ -1,0 +1,55 @@
+{
+  "seq": 72,
+  "sha": "151a7d9cdbd0073ac9026c0edbb728cce61ddf35",
+  "parents": [
+    "2792b94cf8bd720bfb92e30ad20257f96d789472"
+  ],
+  "author": {
+    "name": "Julien Schmidt",
+    "email": "github@julienschmidt.com",
+    "date": "2014-06-09T01:33:18+02:00"
+  },
+  "message": "router: Add missing tests",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 22,
+    "deletions": 0
+  },
+  "files": [
+    {
+      "path": "router_test.go",
+      "status": "M",
+      "additions": 22,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/router_test.go b/router_test.go\nindex ed9a744..e3acc2f 100644\n--- a/router_test.go\n+++ b/router_test.go\n@@ -168,6 +168,28 @@ func TestRouterNotFound(t *testing.T) {\n \t\t\tt.Errorf(\"NotFound handling route %s failed: Code=%d, Header=%v\", tr.route, w.Code, w.Header())\n \t\t}\n \t}\n+\n+\t// Test custom not found handler\n+\tvar notFound bool\n+\trouter.NotFound = func(rw http.ResponseWriter, r *http.Request) {\n+\t\trw.WriteHeader(404)\n+\t\tnotFound = true\n+\t}\n+\tr, _ := http.NewRequest(\"GET\", \"/nope\", nil)\n+\tw := httptest.NewRecorder()\n+\trouter.ServeHTTP(w, r)\n+\tif !(w.Code == 404 && notFound == true) {\n+\t\tt.Errorf(\"Custom NotFound handler failed: Code=%d, Header=%v\", w.Code, w.Header())\n+\t}\n+\n+\t// Test other method than GET (want 307 instead of 301)\n+\trouter.PATCH(\"/path\", handlerFunc)\n+\tr, _ = http.NewRequest(\"PATCH\", \"/path/\", nil)\n+\tw = httptest.NewRecorder()\n+\trouter.ServeHTTP(w, r)\n+\tif !(w.Code == 307 && fmt.Sprint(w.Header()) == \"map[Location:[/path]]\") {\n+\t\tt.Errorf(\"Custom NotFound handler failed: Code=%d, Header=%v\", w.Code, w.Header())\n+\t}\n }\n \n func TestRouterPanicHandler(t *testing.T) {\n",
+  "diffTruncated": false,
+  "tree": [
+    ".travis.yml",
+    "LICENSE",
+    "README.md",
+    "path.go",
+    "path_test.go",
+    "router.go",
+    "router_test.go",
+    "tree.go",
+    "tree_test.go"
+  ],
+  "explanation": {
+    "what": "router_test.go の TestRouterNotFound に、カスタム NotFound ハンドラが実際に呼ばれることを確認するテストと、GET 以外のメソッド(PATCH)でトレイリングスラッシュ・リダイレクトが 301 ではなく 307 で返ることを確認するテストを追加した。",
+    "why": "Router.NotFound フィールドと、GET以外は307(Temporary Redirect)を返す挙動は既存コードに実装済みだったが、それを検証するテストが欠けていた。コミットメッセージの「Add missing tests」が示す通り、既存機能に対するテストカバレッジの補完。",
+    "highlights": [
+      { "file": "router_test.go", "note": "PATCH での TSR リダイレクトが 307 になることを確認する箇所" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

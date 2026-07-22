@@ -1,0 +1,56 @@
+{
+  "seq": 258,
+  "sha": "4f0d8066214674e810d46f1e86cf0b88727e9549",
+  "parents": [
+    "574f375a9d0da0d6cb03485a026fd317c2aa928d"
+  ],
+  "author": {
+    "name": "Julien Schmidt",
+    "email": "git@julienschmidt.com",
+    "date": "2020-08-14T20:19:15+02:00"
+  },
+  "message": "tree: reduce nesting",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 35,
+    "deletions": 34
+  },
+  "files": [
+    {
+      "path": "tree.go",
+      "status": "M",
+      "additions": 35,
+      "deletions": 34,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/tree.go b/tree.go\nindex 52fc395..2eedb30 100644\n--- a/tree.go\n+++ b/tree.go\n@@ -240,7 +240,8 @@ func (n *node) insertChild(path, fullPath string, handle Handle) {\n \t\t\t\t\"' conflicts with existing children in path '\" + fullPath + \"'\")\n \t\t}\n \n-\t\tif wildcard[0] == ':' { // param\n+\t\t// param\n+\t\tif wildcard[0] == ':' {\n \t\t\tif i > 0 {\n \t\t\t\t// Insert prefix before the current wildcard\n \t\t\t\tn.path = path[:i]\n@@ -271,45 +272,45 @@ func (n *node) insertChild(path, fullPath string, handle Handle) {\n \t\t\t// Otherwise we're done. Insert the handle in the new leaf\n \t\t\tn.handle = handle\n \t\t\treturn\n+\t\t}\n \n-\t\t} else { // catchAll\n-\t\t\tif i+len(wildcard) != len(path) {\n-\t\t\t\tpanic(\"catch-all routes are only allowed at the end of the path in path '\" + fullPath + \"'\")\n-\t\t\t}\n-\n-\t\t\tif len(n.path) > 0 && n.path[len(n.path)-1] == '/' {\n-\t\t\t\tpanic(\"catch-all conflicts with existing handle for the path segment root in path '\" + fullPath + \"'\")\n-\t\t\t}\n-\n-\t\t\t// Currently fixed width 1 for '/'\n-\t\t\ti--\n-\t\t\tif path[i] != '/' {\n-\t\t\t\tpanic(\"no / before catch-all in path '\" + fullPath + \"'\")\n-\t\t\t}\n+\t\t// catchAll\n+\t\tif i+len(wildcard) != len(path) {\n+\t\t\tpanic(\"catch-all routes are only allowed at the end of the path in path '\" + fullPath + \"'\")\n+\t\t}\n \n-\t\t\tn.path = path[:i]\n+\t\tif len(n.path) > 0 && n.path[len(n.path)-1] == '/' {\n+\t\t\tpanic(\"catch-all conflicts with existing handle for the path segment root in path '\" + fullPath + \"'\")\n+\t\t}\n \n-\t\t\t// First node: catchAll node with empty path\n-\t\t\tchild := &node{\n-\t\t\t\twildChild: true,\n-\t\t\t\tnType:     catchAll,\n-\t\t\t}\n-\t\t\tn.children = []*node{child}\n-\t\t\tn.indices = string('/')\n-\t\t\tn = child\n-\t\t\tn.priority++\n+\t\t// Currently fixed width 1 for '/'\n+\t\ti--\n+\t\tif path[i] != '/' {\n+\t\t\tpanic(\"no / before catch-all in path '\" + fullPath + \"'\")\n+\t\t}\n \n-\t\t\t// Second node: node holding the variable\n-\t\t\tchild = &node{\n-\t\t\t\tpath:     path[i:],\n-\t\t\t\tnType:    catchAll,\n-\t\t\t\thandle:   handle,\n-\t\t\t\tpriority: 1,\n-\t\t\t}\n-\t\t\tn.children = []*node{child}\n+\t\tn.path = path[:i]\n \n-\t\t\treturn\n+\t\t// First node: catchAll node with empty path\n+\t\tchild := &node{\n+\t\t\twildChild: true,\n+\t\t\tnType:     catchAll,\n+\t\t}\n+\t\tn.children = []*node{child}\n+\t\tn.indices = string('/')\n+\t\tn = child\n+\t\tn.priority++\n+\n+\t\t// Second node: node holding the variable\n+\t\tchild = &node{\n+\t\t\tpath:     path[i:],\n+\t\t\tnType:    catchAll,\n+\t\t\thandle:   handle,\n+\t\t\tpriority: 1,\n \t\t}\n+\t\tn.children = []*node{child}\n+\n+\t\treturn\n \t}\n \n \t// If no wildcard was found, simply insert the path and handle\n",
+  "diffTruncated": false,
+  "tree": [
+    ".travis.yml",
+    "LICENSE",
+    "README.md",
+    "go.mod",
+    "path.go",
+    "path_test.go",
+    "router.go",
+    "router_test.go",
+    "tree.go",
+    "tree_test.go"
+  ],
+  "explanation": {
+    "what": "tree.goの`insertChild`メソッドにあった`if wildcard[0] == ':' { param処理 } else { catchAll処理 }`というif-else構造を、param分岐の末尾を`return`で抜けるようにしてelseブロックを解消し、catchAll処理をif文の外側(同じネストレベル)に展開した。",
+    "why": "コミットメッセージ「tree: reduce nesting」の通り、param/catchAllの分岐をearly returnで抜けることでインデントの深さを1段減らし、catchAll側の処理を読みやすくする整理。",
+    "highlights": [
+      { "file": "tree.go", "note": "insertChild の param/catchAll 分岐を early return でフラット化した箇所" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

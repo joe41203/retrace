@@ -1,0 +1,69 @@
+{
+  "seq": 51,
+  "sha": "2b64d4770a2d2eab32cfb729f9c89d14df35c0d9",
+  "parents": [
+    "b9c775bd96caef50afdec1af19090de5d34959df"
+  ],
+  "author": {
+    "name": "Julien Schmidt",
+    "email": "github@julienschmidt.com",
+    "date": "2014-03-06T16:33:53+01:00"
+  },
+  "message": "Order nodes by priority (sub-nodes count)",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 53,
+    "deletions": 2
+  },
+  "files": [
+    {
+      "path": "tree.go",
+      "status": "M",
+      "additions": 31,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "tree_test.go",
+      "status": "M",
+      "additions": 22,
+      "deletions": 1,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/tree.go b/tree.go\nindex df88ba7..00ba564 100644\n--- a/tree.go\n+++ b/tree.go\n@@ -26,11 +26,32 @@ type node struct {\n \twildChild bool\n \tnType     nodeType\n \thandle    map[string]Handle\n+\tpriority  uint32\n+}\n+\n+// increments priority of the given child and reorders if necessary\n+func (n *node) incrementChildPrio(i int) int {\n+\tn.children[i].priority++\n+\tprio := n.children[i].priority\n+\t// adjust position (move to front)\n+\tfor j := i - 1; j >= 0 && n.children[j].priority < prio; j-- {\n+\t\t// swap node positions\n+\t\ttmpN := n.children[j]\n+\t\tn.children[j] = n.children[i]\n+\t\tn.children[i] = tmpN\n+\t\ttmpI := n.indices[j]\n+\t\tn.indices[j] = n.indices[i]\n+\t\tn.indices[i] = tmpI\n+\n+\t\ti--\n+\t}\n+\treturn i\n }\n \n // addRoute adds a node with the given handle to the path.\n // Not concurrency-safe!\n func (n *node) addRoute(method, path string, handle Handle) {\n+\tn.priority++\n \t// non-empty tree\n \tif len(n.path) != 0 {\n \tOUTER:\n@@ -50,6 +71,7 @@ func (n *node) addRoute(method, path string, handle Handle) {\n \t\t\t\t\tchildren:  n.children,\n \t\t\t\t\thandle:    n.handle,\n \t\t\t\t\twildChild: n.wildChild,\n+\t\t\t\t\tpriority:  n.priority - 1,\n \t\t\t\t}}\n \t\t\t\tn.indices = []byte{n.path[i]}\n \t\t\t\tn.path = path[:i]\n@@ -64,6 +86,7 @@ func (n *node) addRoute(method, path string, handle Handle) {\n \t\t\t\t// catchAll\n \t\t\t\tif n.wildChild {\n \t\t\t\t\tn = n.children[0]\n+\t\t\t\t\tn.priority++\n \n \t\t\t\t\t// Check if the wildcard matches\n \t\t\t\t\tif len(path) >= len(n.path) && n.path == path[:len(n.path)] {\n@@ -81,12 +104,14 @@ func (n *node) addRoute(method, path string, handle Handle) {\n \t\t\t\t// param\n \t\t\t\tif n.nType == param && c == '/' && len(n.children) == 1 {\n \t\t\t\t\tn = n.children[0]\n+\t\t\t\t\tn.priority++\n \t\t\t\t\tcontinue OUTER\n \t\t\t\t}\n \n \t\t\t\t// Check if a child with the next path byte exists\n \t\t\t\tfor i, index := range n.indices {\n \t\t\t\t\tif c == index {\n+\t\t\t\t\t\ti = n.incrementChildPrio(i)\n \t\t\t\t\t\tn = n.children[i]\n \t\t\t\t\t\tcontinue OUTER\n \t\t\t\t\t}\n@@ -98,6 +123,7 @@ func (n *node) addRoute(method, path string, handle Handle) {\n \t\t\t\t\tchild := &node{}\n \t\t\t\t\tn.children = append(n.children, child)\n \n+\t\t\t\t\tn.incrementChildPrio(len(n.indices) - 1)\n \t\t\t\t\tn = child\n \t\t\t\t}\n \t\t\t\tn.insertChild(method, path, handle)\n@@ -157,6 +183,7 @@ func (n *node) insertChild(method, path string, handle Handle) {\n \t\t\t\tn.children = []*node{child}\n \t\t\t\tn.wildChild = true\n \t\t\t\tn = child\n+\t\t\t\tn.priority++\n \n \t\t\t\t// if the path doesn't end with the wildcard, then there will be\n \t\t\t\t// another non-wildcard subpath starting with '/'\n@@ -167,6 +194,7 @@ func (n *node) insertChild(method, path string, handle Handle) {\n \t\t\t\t\tchild := &node{}\n \t\t\t\t\tn.children = []*node{child}\n \t\t\t\t\tn = child\n+\t\t\t\t\tn.priority++\n \t\t\t\t}\n \n \t\t\t} else { // catchAll\n@@ -190,6 +218,7 @@ func (n *node) insertChild(method, path string, handle Handle) {\n \t\t\t\tn.children = []*node{child}\n \t\t\t\tn.indices = []byte{path[i]}\n \t\t\t\tn = child\n+\t\t\t\tn.priority++\n \n \t\t\t\t// second node: node holding the variable\n \t\t\t\tchild = &node{\n@@ -197,7 +226,8 @@ func (n *node) insertChild(method, path string, handle Handle) {\n \t\t\t\t\thandle: map[string]Handle{\n \t\t\t\t\t\tmethod: handle,\n \t\t\t\t\t},\n-\t\t\t\t\tnType: catchAll,\n+\t\t\t\t\tnType:    catchAll,\n+\t\t\t\t\tpriority: 1,\n \t\t\t\t}\n \t\t\t\tn.children = []*node{child}\n \ndiff --git a/tree_test.go b/tree_test.go\nindex 291cb3b..d30c074 100644\n--- a/tree_test.go\n+++ b/tree_test.go\n@@ -12,7 +12,7 @@ import (\n )\n \n func printChildren(n *node, prefix string) {\n-\tfmt.Printf(\"%s%s[%d]  %v %t \\r\\n\", prefix, n.path, len(n.children), n.handle, n.wildChild)\n+\tfmt.Printf(\" %02d %s%s[%d] %v %t \\r\\n\", n.priority, prefix, n.path, len(n.children), n.handle, n.wildChild)\n \tfor l := len(n.path); l > 0; l-- {\n \t\tprefix += \" \"\n \t}\n@@ -60,6 +60,23 @@ func checkRequests(t *testing.T, tree *node, requests testRequests) {\n \t}\n }\n \n+func checkPriorities(t *testing.T, n *node) uint32 {\n+\tvar prio uint32\n+\tfor i := range n.children {\n+\t\tprio += checkPriorities(t, n.children[i])\n+\t}\n+\tprio += uint32(len(n.handle))\n+\n+\tif n.priority != prio {\n+\t\tt.Errorf(\n+\t\t\t\"priority mismatch for node '%s': is %d, should be %d\",\n+\t\t\tn.path, n.priority, prio,\n+\t\t)\n+\t}\n+\n+\treturn prio\n+}\n+\n func TestTreeAddAndGet(t *testing.T) {\n \ttree := &node{}\n \n@@ -91,6 +108,8 @@ func TestTreeAddAndGet(t *testing.T) {\n \t\t{\"/no\", true, \"\", nil},   // no matching child\n \t\t{\"/ab\", false, \"/ab\", nil},\n \t})\n+\n+\tcheckPriorities(t, tree)\n }\n \n func TestTreeWildcard(t *testing.T) {\n@@ -130,6 +149,8 @@ func TestTreeWildcard(t *testing.T) {\n \t\t{\"/user_gopher/about\", false, \"/user_:name/about\", map[string]string{\"name\": \"gopher\"}},\n \t\t{\"/files/js/inc/framework.js\", false, \"/files/:dir/*filepath\", map[string]string{\"dir\": \"js\", \"filepath\": \"/inc/framework.js\"}},\n \t})\n+\n+\tcheckPriorities(t, tree)\n }\n \n func catchPanic(testFunc func()) (recv interface{}) {\n",
+  "diffTruncated": false,
+  "tree": [
+    ".travis.yml",
+    "LICENSE",
+    "README.md",
+    "path.go",
+    "path_test.go",
+    "router.go",
+    "router_test.go",
+    "tree.go",
+    "tree_test.go"
+  ],
+  "explanation": {
+    "what": "node 構造体に priority(uint32)フィールドを追加し、addRoute の各段階でルート追加のたびに自ノードと通過した子ノードの priority をインクリメントするようにした。さらに incrementChildPrio メソッドを新設し、priority が増えた子ノードを、それより priority の低い兄弟ノードより前へスワップで移動させる(挿入ソート的な並べ替え)。tree_test.go には checkPriorities で全ノードの priority が実際の登録ハンドラ数(子孫を含む)と一致するかを検証するテストヘルパーを追加し、既存の2テストからも呼び出している。",
+    "why": "前のコミット(Use nodeType instead of a set of bools)でノード種別を整理した直後に、今度は探索順序そのものを最適化する土台として priority を導入している。子ノードを priority(配下に登録されたハンドラ数)の降順に並べておけば、マッチ探索時により多くのルートが属する枝を先に調べることになり、平均的なルックアップが速くなる。indices と children を同期してスワップしているのは、ノードの前方一致に使うインデックスバイト列と子ノード配列の対応関係を崩さないための実装上の制約。",
+    "highlights": [
+      { "file": "tree.go", "note": "incrementChildPrio: priority 更新後、兄弟ノードとの位置を比較しながら前方へスワップする挿入ソート的なロジック" },
+      { "file": "tree_test.go", "note": "checkPriorities: 各ノードの priority が実際のハンドラ数の合計と一致するかを再帰的に検算するテストヘルパー" }
+    ],
+    "langNotes": [
+      { "topic": "struct フィールド追加とゼロ値", "note": "Go の struct に priority uint32 を追加すると、既存の全 node リテラルはこのフィールドをゼロ値(0)で初期化する。フィールドごとに明示初期化する必要がないため、後方互換な拡張がしやすい。" },
+      { "topic": "スライスの手動並べ替え", "note": "n.children([]*node)と n.indices([]byte)を同じインデックスで対応させたまま、一時変数を使わないtmpN/tmpIによる素朴なswapで両方を同時に並べ替えている。Go の sort パッケージを使わず手書きしているのは、この一箇所だけの単純な操作でオーバーヘッドを避けるためと見られる。" }
+    ],
+    "diagram": {
+      "mermaid": "flowchart TD\n  A[\"addRoute呼び出し\"] --> B[\"通過ノードの priority++\"]\n  B --> C{\"子ノードに一致するインデックスがあるか\"}\n  C -->|\"あり\"| D[\"incrementChildPrio: 子のpriority++\"]\n  D --> E{\"左隣の兄弟よりpriorityが高いか\"}\n  E -->|\"はい\"| F[\"children/indicesをスワップして前方へ\"]\n  F --> E\n  E -->|\"いいえ\"| G[\"位置確定、探索を継続\"]\n  C -->|\"なし\"| H[\"新規子ノード追加(priorityは0スタート)\"]",
+      "caption": "addRoute でルートを登録するたびに priority を更新し、子ノードを priority 降順に並べ替える流れ"
+    },
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

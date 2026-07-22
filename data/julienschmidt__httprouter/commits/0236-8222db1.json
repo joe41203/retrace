@@ -1,0 +1,63 @@
+{
+  "seq": 236,
+  "sha": "8222db13dbb3b3ab1eb84edb61a7030708b93bfa",
+  "parents": [
+    "f53938f8d3c7f4bb35e8b574ac60145097bd96b9"
+  ],
+  "author": {
+    "name": "Julien Schmidt",
+    "email": "git@julienschmidt.com",
+    "date": "2020-01-06T13:35:02+01:00"
+  },
+  "message": "path: use stack buffer in CleanPath to avoid allocs in common case",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 21,
+    "deletions": 6
+  },
+  "files": [
+    {
+      "path": "path.go",
+      "status": "M",
+      "additions": 21,
+      "deletions": 6,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/path.go b/path.go\nindex 0331c7e..64e381f 100644\n--- a/path.go\n+++ b/path.go\n@@ -19,13 +19,18 @@ package httprouter\n //\n // If the result of this process is an empty string, \"/\" is returned\n func CleanPath(p string) string {\n+\tconst stackBufSize = 128\n+\n \t// Turn empty string into \"/\"\n \tif p == \"\" {\n \t\treturn \"/\"\n \t}\n \n+\t// Reasonably sized buffer on stack to avoid allocations in the common case.\n+\t// If a larger buffer is required, it gets allocated dynamically.\n+\tbuf := make([]byte, 0, stackBufSize)\n+\n \tn := len(p)\n-\tvar buf []byte\n \n \t// Invariants:\n \t//      reading from path; r is index of next byte to process.\n@@ -37,7 +42,12 @@ func CleanPath(p string) string {\n \n \tif p[0] != '/' {\n \t\tr = 0\n-\t\tbuf = make([]byte, n+1)\n+\n+\t\tif n+1 > stackBufSize {\n+\t\t\tbuf = make([]byte, n+1)\n+\t\t} else {\n+\t\t\tbuf = buf[:n+1]\n+\t\t}\n \t\tbuf[0] = '/'\n \t}\n \n@@ -69,7 +79,7 @@ func CleanPath(p string) string {\n \t\t\t\t// can backtrack\n \t\t\t\tw--\n \n-\t\t\t\tif buf == nil {\n+\t\t\t\tif len(buf) == 0 {\n \t\t\t\t\tfor w > 1 && p[w] != '/' {\n \t\t\t\t\t\tw--\n \t\t\t\t\t}\n@@ -103,7 +113,7 @@ func CleanPath(p string) string {\n \t\tw++\n \t}\n \n-\tif buf == nil {\n+\tif len(buf) == 0 {\n \t\treturn p[:w]\n \t}\n \treturn string(buf[:w])\n@@ -111,12 +121,17 @@ func CleanPath(p string) string {\n \n // internal helper to lazily create a buffer if necessary\n func bufApp(buf *[]byte, s string, w int, c byte) {\n-\tif *buf == nil {\n+\tif len(*buf) == 0 {\n \t\tif s[w] == c {\n \t\t\treturn\n \t\t}\n \n-\t\t*buf = make([]byte, len(s))\n+\t\tif l := len(s); l > cap(*buf) {\n+\t\t\t*buf = make([]byte, len(s))\n+\t\t} else {\n+\t\t\t*buf = (*buf)[:l]\n+\t\t}\n+\n \t\tcopy(*buf, s[:w])\n \t}\n \t(*buf)[w] = c\n",
+  "diffTruncated": false,
+  "tree": [
+    ".travis.yml",
+    "LICENSE",
+    "README.md",
+    "go.mod",
+    "path.go",
+    "path_test.go",
+    "router.go",
+    "router_test.go",
+    "tree.go",
+    "tree_test.go"
+  ],
+  "explanation": {
+    "what": "CleanPath関数に stackBufSize = 128 バイトの固定長バッファ buf := make([]byte, 0, stackBufSize) を導入した。従来は var buf []byte で宣言し、バッファが必要になった時点で make([]byte, n+1) を都度ヒープに確保していたが、変更後は「必要なサイズが128バイト以内ならあらかじめ確保済みのbufをbuf[:n+1]でスライスして使い回し、128バイトを超える場合のみヒープ確保する」という条件分岐に変わった。bufApp側もbufがnilかどうかではなくlen(buf)==0で判定するように統一されている。",
+    "why": "件名が示す通り、CleanPathが呼ばれる典型的なURLパス長は短く、ほとんどのケースでは128バイトのスタック領域に収まる。以前は書き換えが発生するたびに make で新しいスライスをヒープに確保していたため、通常サイズのパスに対しても毎回アロケーションが発生していた。関数ローカルなバッファをまず用意し、それで足りる場合はエスケープ解析によりスタック上に置かれる(ヒープに逃げない)ことを狙って、共通ケースでのアロケーションをゼロにしている。",
+    "highlights": [
+      { "file": "path.go", "note": "stackBufSize = 128 の固定長バッファ。この後さらにサイズが必要なら make で都度ヒープ確保にフォールバックする" },
+      { "file": "path.go", "note": "buf == nil から len(buf) == 0 への判定変更。空だが確保済みのバッファと未使用のバッファを区別しない設計に統一" }
+    ],
+    "langNotes": [
+      { "topic": "stack allocation via escape analysis", "note": "Goのコンパイラはエスケープ解析により、関数外に参照が漏れないローカル変数をヒープではなくスタックに置く。固定長のバッファをローカルで宣言し、それ以上のサイズが必要な場合だけ明示的にmakeでヒープ確保するのは、ホットパスでのGC負荷を避けるためのGoでよく使われるイディオムの一つ。" },
+      { "topic": "slice re-slicing (buf[:n+1])", "note": "make([]byte, 0, N) で長さ0・容量Nのスライスを作っておき、後から buf[:n+1] のように再スライスすると、容量の範囲内であれば新たなアロケーションなしに長さだけを変えられる。このコミットはこの性質を使って「容量内なら使い回し、容量を超えたらmake」という分岐を実現している。" }
+    ],
+    "diagram": {
+      "mermaid": "flowchart TD\n  A[\"CleanPathが呼ばれる\"] --> B{\"書き換えが必要か\"}\n  B -->|\"不要\"| C[\"元の文字列の部分列を返す(アロケーションなし)\"]\n  B -->|\"必要\"| D{\"必要サイズ <= 128バイトか\"}\n  D -->|\"はい\"| E[\"スタック上のbufを再スライスして使う\"]\n  D -->|\"いいえ\"| F[\"makeでヒープにバッファを確保\"]\n  E --> G[\"書き換え結果を文字列として返す\"]\n  F --> G",
+      "caption": "CleanPathにおけるスタックバッファ導入後の分岐フロー"
+    },
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

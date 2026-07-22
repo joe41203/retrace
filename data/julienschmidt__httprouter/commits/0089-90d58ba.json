@@ -1,0 +1,66 @@
+{
+  "seq": 89,
+  "sha": "90d58bada7e6154006f2728ee09053271154a8f6",
+  "parents": [
+    "91101d17f079ca3c05c6e00354e914a35aa0d3e7",
+    "4929be22df08407f11079c042c83c1a3371acae8"
+  ],
+  "author": {
+    "name": "Julien Schmidt",
+    "email": "julienschmidt@users.noreply.github.com",
+    "date": "2015-01-03T17:51:49+08:00"
+  },
+  "message": "Merge pull request #51 from javierprovecho/master\n\nAdd support for HTTP 405",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 29,
+    "deletions": 0
+  },
+  "files": [
+    {
+      "path": "router.go",
+      "status": "M",
+      "additions": 12,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "router_test.go",
+      "status": "M",
+      "additions": 17,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/router.go b/router.go\nindex 7716dc7..1028c03 100644\n--- a/router.go\n+++ b/router.go\n@@ -313,6 +313,18 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {\n \t\t}\n \t}\n \n+\t// Handle 405\n+\tfor method, _ := range r.trees {\n+\t\tif method == req.Method {\n+\t\t\tcontinue\n+\t\t}\n+\n+\t\tif handle, _, _ := r.trees[method].getValue(req.URL.Path); handle != nil {\n+\t\t\thttp.Error(w, \"405 method not allowed\", http.StatusMethodNotAllowed)\n+\t\t\treturn\n+\t\t}\n+\t}\n+\n \t// Handle 404\n \tif r.NotFound != nil {\n \t\tr.NotFound(w, req)\ndiff --git a/router_test.go b/router_test.go\nindex 7c8ac09..9703908 100644\n--- a/router_test.go\n+++ b/router_test.go\n@@ -165,6 +165,23 @@ func TestRouterRoot(t *testing.T) {\n \t}\n }\n \n+func TestRouterNotAllowed(t *testing.T) {\n+\thandlerFunc := func(_ http.ResponseWriter, _ *http.Request, _ Params) {}\n+\tmethod := \"/method\"\n+\tcode := 405\n+\n+\trouter := New()\n+\trouter.POST(method, handlerFunc)\n+\n+\t// Test not allowed\n+\tr, _ := http.NewRequest(\"GET\", method, nil)\n+\tw := httptest.NewRecorder()\n+\trouter.ServeHTTP(w, r)\n+\tif !(w.Code == code) {\n+\t\tt.Errorf(\"NotAllowed handling route %s failed: Code=%d, Header=%v\", w.Code, w.Header())\n+\t}\n+}\n+\n func TestRouterNotFound(t *testing.T) {\n \thandlerFunc := func(_ http.ResponseWriter, _ *http.Request, _ Params) {}\n \n",
+  "diffTruncated": false,
+  "tree": [
+    ".travis.yml",
+    "LICENSE",
+    "README.md",
+    "path.go",
+    "path_test.go",
+    "router.go",
+    "router_test.go",
+    "tree.go",
+    "tree_test.go"
+  ],
+  "explanation": {
+    "what": "外部コントリビューター javierprovecho の PR #51 をマージし、ServeHTTP に 405 Method Not Allowed のハンドリングを追加した。404 判定の前に、リクエストされたパスが他の HTTP メソッドの木(r.trees)には登録されているかを確認し、該当すれば http.Error で 405 を返すロジックが加わった。",
+    "why": "コミットメッセージ \"Merge pull request #51 from javierprovecho/master\\n\\nAdd support for HTTP 405\" の通り、それまで存在しなかった 405 応答(パス自体は存在するがそのメソッドのハンドラが無い場合の正しいステータスコード)をサポートするための取り込み。",
+    "highlights": [
+      { "file": "router.go", "note": "for method, _ := range r.trees でリクエストと異なる全メソッドの木を走査し、getValue が非nilハンドラを返せば405を返す" }
+    ],
+    "langNotes": [
+      { "topic": "405 Method Not Allowed のハンドリング", "note": "HTTPでは、パス自体は存在するがリクエストのメソッド(POSTなど)に対応するハンドラが登録されていない場合、404ではなく405を返すのが正しい。このコミットはそのために自分のメソッド以外の全ツリーを走査し、パスが一致するハンドラを探している。" },
+      { "topic": "r.trees (メソッドごとの Radix Tree)", "note": "httprouter は HTTP メソッドごとに独立した Radix Tree を r.trees[method] として保持しており、ルーティングはまず該当メソッドの木を引く。405判定では自分以外の木も走査する必要があるため、この時点では性能より正確性が優先されている。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

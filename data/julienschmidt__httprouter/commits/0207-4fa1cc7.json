@@ -1,0 +1,56 @@
+{
+  "seq": 207,
+  "sha": "4fa1cc7490cba144ea66eb98c4baedad73e2a8b1",
+  "parents": [
+    "e62e5dfca059cb908d56c93d8a938ee6b14a6d56"
+  ],
+  "author": {
+    "name": "chendonghai",
+    "email": "cdh_cjx@163.com",
+    "date": "2017-07-04T20:22:10+08:00"
+  },
+  "message": "router: avoid out of range with empty path(#204)\n\nCo-authored-by: Julien Schmidt <git@julienschmidt.com>",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 1,
+    "deletions": 1
+  },
+  "files": [
+    {
+      "path": "router.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/router.go b/router.go\nindex a3b3be0..ae2f944 100644\n--- a/router.go\n+++ b/router.go\n@@ -232,7 +232,7 @@ func (r *Router) DELETE(path string, handle Handle) {\n // frequently used, non-standardized or custom methods (e.g. for internal\n // communication with a proxy).\n func (r *Router) Handle(method, path string, handle Handle) {\n-\tif path[0] != '/' {\n+\tif len(path) < 1 || path[0] != '/' {\n \t\tpanic(\"path must begin with '/' in path '\" + path + \"'\")\n \t}\n \n",
+  "diffTruncated": false,
+  "tree": [
+    ".travis.yml",
+    "LICENSE",
+    "README.md",
+    "go.mod",
+    "path.go",
+    "path_test.go",
+    "router.go",
+    "router_test.go",
+    "tree.go",
+    "tree_test.go"
+  ],
+  "explanation": {
+    "what": "Router.Handle 内の先頭文字チェックを `if path[0] != '/'` から `if len(path) < 1 || path[0] != '/'` に変更した。path が空文字列の場合に path[0] へのインデックスアクセスで発生する index out of range panic を、意図した「path must begin with '/'」の panic に置き換える。",
+    "why": "コミットメッセージ「avoid out of range with empty path(#204)」の通り、空文字列のパスを渡した際に意図しない実行時エラー(スライスの範囲外アクセス)が起きていた問題を修正するもの。",
+    "highlights": [
+      { "file": "router.go", "note": "len(path) < 1 の短絡評価を先に置くことで空文字列でも path[0] にアクセスしない" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

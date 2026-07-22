@@ -1,0 +1,54 @@
+{
+  "seq": 32,
+  "sha": "baa72be5d2fb53ca98483859099b54e3e7799e1e",
+  "parents": [
+    "df50b8fd387529f3c458a07c2b53fd3b15c9b18d"
+  ],
+  "author": {
+    "name": "Julien Schmidt",
+    "email": "github@julienschmidt.com",
+    "date": "2013-12-14T14:30:44+01:00"
+  },
+  "message": "Add NotFound test",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 32,
+    "deletions": 0
+  },
+  "files": [
+    {
+      "path": "router_test.go",
+      "status": "M",
+      "additions": 32,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/router_test.go b/router_test.go\nindex 6237c7f..3fbba9d 100644\n--- a/router_test.go\n+++ b/router_test.go\n@@ -6,7 +6,9 @@ package httprouter\n \n import (\n \t\"errors\"\n+\t\"fmt\"\n \t\"net/http\"\n+\t\"net/http/httptest\"\n \t\"reflect\"\n \t\"testing\"\n )\n@@ -112,6 +114,36 @@ func TestRouterRoot(t *testing.T) {\n \t}\n }\n \n+func TestRouterNotFound(t *testing.T) {\n+\thandlerFunc := func(_ http.ResponseWriter, _ *http.Request, _ map[string]string) {}\n+\n+\trouter := New()\n+\trouter.GET(\"/path\", handlerFunc)\n+\trouter.GET(\"/dir/\", handlerFunc)\n+\n+\ttestRoutes := []struct {\n+\t\troute   string\n+\t\thandler http.HandlerFunc\n+\t\tcode    int\n+\t\theader  string\n+\t}{\n+\t\t{\"/path/\", NotFound, 301, \"map[Location:[/path]]\"},   // TSR -/\n+\t\t{\"/dir\", NotFound, 301, \"map[Location:[/dir/]]\"},     // TSR +/\n+\t\t{\"/../path\", NotFound, 301, \"map[Location:[/path]]\"}, // CleanPath\n+\t\t{\"/nope\", NotFound, 404, \"\"},                         // NotFound\n+\t\t{\"/nope\", nil, 404, \"\"},                              // NotFound\n+\t}\n+\tfor _, tr := range testRoutes {\n+\t\trouter.NotFound = tr.handler\n+\t\tr, _ := http.NewRequest(\"GET\", tr.route, nil)\n+\t\tw := httptest.NewRecorder()\n+\t\trouter.ServeHTTP(w, r)\n+\t\tif !(w.Code == tr.code && (w.Code == 404 || fmt.Sprint(w.Header()) == tr.header)) {\n+\t\t\tt.Errorf(\"NotFound handling route %s failed: Code=%d, Header=%v\", tr.route, w.Code, w.Header())\n+\t\t}\n+\t}\n+}\n+\n func TestRouterPanicHandler(t *testing.T) {\n \trouter := New()\n \tpanicHandled := false\n",
+  "diffTruncated": false,
+  "tree": [
+    ".travis.yml",
+    "LICENSE",
+    "path.go",
+    "path_test.go",
+    "router.go",
+    "router_test.go",
+    "tree.go",
+    "tree_test.go"
+  ],
+  "explanation": {
+    "what": "TestRouterNotFound を追加した。テーブル駆動で /path/ への TSR リダイレクト(301, -/)、/dir へのリダイレクト(301, +/)、/../path の CleanPath による正規化リダイレクト、未登録パス /nope の 404、NotFound ハンドラが nil のケースをそれぞれ検証している。",
+    "why": "直前の一連のコミットでカスタム NotFound ハンドラの扱いや ServeFiles を整えたのを受けて、Router.NotFound の分岐(TSR・CleanPath・純粋な404・nilハンドラ時のフォールバック)を一括でカバーするテストを追加する意図と考えられる。",
+    "highlights": [
+      { "file": "router_test.go", "note": "testRoutes のテーブルに route/handler/code/header を並べ、TSR・CleanPath・404 の各ケースを1つのループで検証している" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

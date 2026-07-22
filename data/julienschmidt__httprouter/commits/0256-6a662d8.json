@@ -1,0 +1,58 @@
+{
+  "seq": 256,
+  "sha": "6a662d88aaea791fc746bae4d9c40cf4e921ca4b",
+  "parents": [
+    "98f8ba30b5ad2e4a8fabcde0d00cc8d6390e8926"
+  ],
+  "author": {
+    "name": "Julien Schmidt",
+    "email": "git@julienschmidt.com",
+    "date": "2020-08-14T20:18:20+02:00"
+  },
+  "message": "tree_test: rewrite if-else chain as switch",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 4,
+    "deletions": 3
+  },
+  "files": [
+    {
+      "path": "tree_test.go",
+      "status": "M",
+      "additions": 4,
+      "deletions": 3,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/tree_test.go b/tree_test.go\nindex 5bd17e2..17ac6a1 100644\n--- a/tree_test.go\n+++ b/tree_test.go\n@@ -48,13 +48,14 @@ func checkRequests(t *testing.T, tree *node, requests testRequests) {\n \tfor _, request := range requests {\n \t\thandler, psp, _ := tree.getValue(request.path, getParams)\n \n-\t\tif handler == nil {\n+\t\tswitch {\n+\t\tcase handler == nil:\n \t\t\tif !request.nilHandler {\n \t\t\t\tt.Errorf(\"handle mismatch for route '%s': Expected non-nil handle\", request.path)\n \t\t\t}\n-\t\t} else if request.nilHandler {\n+\t\tcase request.nilHandler:\n \t\t\tt.Errorf(\"handle mismatch for route '%s': Expected nil handle\", request.path)\n-\t\t} else {\n+\t\tdefault:\n \t\t\thandler(nil, nil, nil)\n \t\t\tif fakeHandlerValue != request.route {\n \t\t\t\tt.Errorf(\"handle mismatch for route '%s': Wrong handle (%s != %s)\", request.path, fakeHandlerValue, request.route)\n",
+  "diffTruncated": false,
+  "tree": [
+    ".travis.yml",
+    "LICENSE",
+    "README.md",
+    "go.mod",
+    "path.go",
+    "path_test.go",
+    "router.go",
+    "router_test.go",
+    "tree.go",
+    "tree_test.go"
+  ],
+  "explanation": {
+    "what": "tree_test.goの`checkRequests`関数内にあった`if handler == nil { ... } else if request.nilHandler { ... } else { ... }`というif-elseチェーンを、`switch { case handler == nil: ...; case request.nilHandler: ...; default: ... }`という式なしswitch文に書き換えた。",
+    "why": "コミットメッセージ「tree_test: rewrite if-else chain as switch」の通り、3分岐のif-elseチェーンをGoのswitch文で表現し直す整理。",
+    "highlights": [
+      { "file": "tree_test.go", "note": "if-else チェーンを switch { case ...: } に書き換えた箇所" }
+    ],
+    "langNotes": [
+      { "topic": "式なし switch (tagless switch)", "note": "Go の switch は対象の値(タグ)を省略でき、その場合は各 case に任意の真偽式を書ける。実質的に if-else チェーンと等価だが、条件同士の並びが視覚的に揃い、default で「それ以外」を明示できる。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

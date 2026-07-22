@@ -1,0 +1,56 @@
+{
+  "seq": 226,
+  "sha": "6289311caafefac132cb3583bdd8d85580c0aecc",
+  "parents": [
+    "a62d42bea881adabafe26da3b3d2c9415539af8e"
+  ],
+  "author": {
+    "name": "Julien Schmidt",
+    "email": "git@julienschmidt.com",
+    "date": "2019-10-04T17:20:51+02:00"
+  },
+  "message": "tree: improve param name check",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 22,
+    "deletions": 15
+  },
+  "files": [
+    {
+      "path": "tree.go",
+      "status": "M",
+      "additions": 22,
+      "deletions": 15,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/tree.go b/tree.go\nindex 9e347aa..5bbb517 100644\n--- a/tree.go\n+++ b/tree.go\n@@ -179,7 +179,6 @@ walk:\n \t\t\t}\n \t\t\tn.insertChild(path, fullPath, handle)\n \t\t\treturn\n-\n \t\t} else if i == len(path) { // Make node a (in-path) leaf\n \t\t\tif n.handle != nil {\n \t\t\t\tpanic(\"a handle is already registered for path '\" + fullPath + \"'\")\n@@ -200,24 +199,25 @@ func (n *node) insertChild(path, fullPath string, handle Handle) {\n \t\t\tcontinue\n \t\t}\n \n-\t\t// Find wildcard end (either '/' or path end)\n+\t\t// Find wildcard end (either '/' or path end) and check the name for\n+\t\t// invalid characters\n \t\tend := i + 1\n-\t\tfor end < max && path[end] != '/' {\n-\t\t\tswitch path[end] {\n-\t\t\t// The wildcard name must not contain ':' and '*'\n-\t\t\tcase ':', '*':\n-\t\t\t\tpanic(\"only one wildcard per path segment is allowed, has: '\" +\n-\t\t\t\t\tpath[i:] + \"' in path '\" + fullPath + \"'\")\n-\t\t\tdefault:\n-\t\t\t\tend++\n+\t\tinvalid := false\n+\t\tfor end < max {\n+\t\t\tc := path[end]\n+\t\t\tif c == '/' {\n+\t\t\t\tbreak\n \t\t\t}\n+\t\t\tif c == ':' || c == '*' {\n+\t\t\t\tinvalid = true\n+\t\t\t}\n+\t\t\tend++\n \t\t}\n \n-\t\t// Check if this Node existing children which would be\n-\t\t// unreachable if we insert the wildcard here\n-\t\tif len(n.children) > 0 {\n-\t\t\tpanic(\"wildcard route '\" + path[i:end] +\n-\t\t\t\t\"' conflicts with existing children in path '\" + fullPath + \"'\")\n+\t\t// The wildcard name must not contain ':' and '*'\n+\t\tif invalid {\n+\t\t\tpanic(\"only one wildcard per path segment is allowed, has: '\" +\n+\t\t\t\tpath[i:end] + \"' in path '\" + fullPath + \"'\")\n \t\t}\n \n \t\t// Check if the wildcard has a name\n@@ -225,6 +225,13 @@ func (n *node) insertChild(path, fullPath string, handle Handle) {\n \t\t\tpanic(\"wildcards must be named with a non-empty name in path '\" + fullPath + \"'\")\n \t\t}\n \n+\t\t// Check if this node has existing children which would be\n+\t\t// unreachable if we insert the wildcard here\n+\t\tif len(n.children) > 0 {\n+\t\t\tpanic(\"wildcard route '\" + path[i:end] +\n+\t\t\t\t\"' conflicts with existing children in path '\" + fullPath + \"'\")\n+\t\t}\n+\n \t\tif c == ':' { // param\n \t\t\t// Split path at the beginning of the wildcard\n \t\t\tif i > 0 {\n",
+  "diffTruncated": false,
+  "tree": [
+    ".travis.yml",
+    "LICENSE",
+    "README.md",
+    "go.mod",
+    "path.go",
+    "path_test.go",
+    "router.go",
+    "router_test.go",
+    "tree.go",
+    "tree_test.go"
+  ],
+  "explanation": {
+    "what": "insertChild 内のワイルドカード名検証ロジックを整理した。従来は「ワイルカード終端を探す for ループ」の switch 文の中で ':' や '*' を見つけた瞬間に panic していたが、まず invalid フラグを立てながら終端(end)まで走査し、ループを抜けた後にまとめて panic するよう変更。また「既存の子ノードと衝突するかのチェック」を、ワイルドカード名の空チェックより後(順序を入れ替えて)行うようにした。",
+    "why": "コミットメッセージの通り、パラメータ名(ワイルドカード名)のチェックロジックの読みやすさ改善。ループの制御フローをシンプルにし、チェックの実行順序を「無効な文字→空の名前→子ノードとの衝突」という自然な順に揃えている。",
+    "highlights": [
+      { "file": "tree.go", "note": "invalid フラグで判定を終端探索ループから分離し、panic 呼び出しをループの外に出した箇所" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

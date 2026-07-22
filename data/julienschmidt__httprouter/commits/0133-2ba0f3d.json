@@ -1,0 +1,55 @@
+{
+  "seq": 133,
+  "sha": "2ba0f3d499bb3c8d1f47107eb55a597b6619d388",
+  "parents": [
+    "dc1fe666a058716f962aaabbb3e55fb825266f97"
+  ],
+  "author": {
+    "name": "Julien Schmidt",
+    "email": "julienschmidt@users.noreply.github.com",
+    "date": "2015-10-06T18:08:59+02:00"
+  },
+  "message": "README: Fix NotFound FileSever part\n\nFixes #101",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 1,
+    "deletions": 1
+  },
+  "files": [
+    {
+      "path": "README.md",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/README.md b/README.md\nindex fa4973c..1a85fe5 100644\n--- a/README.md\n+++ b/README.md\n@@ -303,7 +303,7 @@ You can use another [http.Handler](http://golang.org/pkg/net/http/#Handler), for\n The `NotFound` handler can for example be used to serve static files from the root path `/` (like an index.html file along with other assets):\n ```go\n // Serve static files from the ./public directory\n-router.NotFound = http.FileServer(http.Dir(\"public\")).ServeHTTP\n+router.NotFound = http.FileServer(http.Dir(\"public\"))\n ```\n \n But this approach sidesteps the strict core rules of this router to avoid routing problems. A cleaner approach is to use a distinct sub-path for serving files, like `/static/*filepath` or `/files/*filepath`.\n",
+  "diffTruncated": false,
+  "tree": [
+    ".travis.yml",
+    "LICENSE",
+    "README.md",
+    "path.go",
+    "path_test.go",
+    "router.go",
+    "router_test.go",
+    "tree.go",
+    "tree_test.go"
+  ],
+  "explanation": {
+    "what": "README.md の \"Static files\" 節で、`http.FileServer(http.Dir(\"public\")).ServeHTTP` という例を `http.FileServer(http.Dir(\"public\"))` に修正した。http.FileServer は既に http.Handler を返すため、`.ServeHTTP` を router.NotFound(http.Handler 型)に直接代入すればよい。",
+    "why": "コミットメッセージ \"Fixes #101\" の通り、ドキュメント中のサンプルコードの誤りを修正するため。",
+    "highlights": [
+      { "file": "README.md", "note": "router.NotFound への代入例から冗長な .ServeHTTP を削除" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

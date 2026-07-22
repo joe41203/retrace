@@ -1,0 +1,66 @@
+{
+  "seq": 209,
+  "sha": "bcdc802b5194bea5461a5aa40f0ef0ed38dc0ca7",
+  "parents": [
+    "b64ea83919261edd921848433c9b646623212f5e"
+  ],
+  "author": {
+    "name": "Julien Schmidt",
+    "email": "git@julienschmidt.com",
+    "date": "2019-09-29T19:47:51+02:00"
+  },
+  "message": "router: sort allowed methods\n\nFixes #248",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 52,
+    "deletions": 23
+  },
+  "files": [
+    {
+      "path": "router.go",
+      "status": "M",
+      "additions": 23,
+      "deletions": 15,
+      "binary": false
+    },
+    {
+      "path": "router_test.go",
+      "status": "M",
+      "additions": 29,
+      "deletions": 8,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/router.go b/router.go\nindex ae2f944..0ea70c5 100644\n--- a/router.go\n+++ b/router.go\n@@ -79,6 +79,7 @@ package httprouter\n import (\n \t\"context\"\n \t\"net/http\"\n+\t\"strings\"\n )\n \n // Handle is a function that can be registered to a route to handle HTTP\n@@ -313,18 +314,15 @@ func (r *Router) Lookup(method, path string) (Handle, Params, bool) {\n }\n \n func (r *Router) allowed(path, reqMethod string) (allow string) {\n+\tallowed := make([]string, 0, 9)\n+\n \tif path == \"*\" { // server-wide\n \t\tfor method := range r.trees {\n \t\t\tif method == http.MethodOptions {\n \t\t\t\tcontinue\n \t\t\t}\n-\n-\t\t\t// add request method to list of allowed methods\n-\t\t\tif len(allow) == 0 {\n-\t\t\t\tallow = method\n-\t\t\t} else {\n-\t\t\t\tallow += \", \" + method\n-\t\t\t}\n+\t\t\t// Add request method to list of allowed methods\n+\t\t\tallowed = append(allowed, method)\n \t\t}\n \t} else { // specific path\n \t\tfor method := range r.trees {\n@@ -335,17 +333,27 @@ func (r *Router) allowed(path, reqMethod string) (allow string) {\n \n \t\t\thandle, _, _ := r.trees[method].getValue(path)\n \t\t\tif handle != nil {\n-\t\t\t\t// add request method to list of allowed methods\n-\t\t\t\tif len(allow) == 0 {\n-\t\t\t\t\tallow = method\n-\t\t\t\t} else {\n-\t\t\t\t\tallow += \", \" + method\n-\t\t\t\t}\n+\t\t\t\t// Add request method to list of allowed methods\n+\t\t\t\tallowed = append(allowed, method)\n \t\t\t}\n \t\t}\n \t}\n-\tif len(allow) > 0 {\n-\t\tallow += \", OPTIONS\"\n+\n+\tif len(allowed) > 0 {\n+\t\t// Add request method to list of allowed methods\n+\t\tallowed = append(allowed, http.MethodOptions)\n+\n+\t\t// Sort allowed methods.\n+\t\t// sort.Strings(allowed) unfortunately causes unnecessary allocations\n+\t\t// due to allowed being moved to the heap and interface conversion\n+\t\tfor i, l := 1, len(allowed); i < l; i++ {\n+\t\t\tfor j := i; j > 0 && allowed[j] < allowed[j-1]; j-- {\n+\t\t\t\tallowed[j], allowed[j-1] = allowed[j-1], allowed[j]\n+\t\t\t}\n+\t\t}\n+\n+\t\t// return as comma separated list\n+\t\treturn strings.Join(allowed, \", \")\n \t}\n \treturn\n }\ndiff --git a/router_test.go b/router_test.go\nindex e5f2d42..7406624 100644\n--- a/router_test.go\n+++ b/router_test.go\n@@ -216,6 +216,27 @@ func TestRouterChaining(t *testing.T) {\n \t}\n }\n \n+func BenchmarkAllowed(b *testing.B) {\n+\thandlerFunc := func(_ http.ResponseWriter, _ *http.Request, _ Params) {}\n+\n+\trouter := New()\n+\trouter.POST(\"/path\", handlerFunc)\n+\trouter.GET(\"/path\", handlerFunc)\n+\n+\tb.Run(\"Global\", func(b *testing.B) {\n+\t\tb.ReportAllocs()\n+\t\tfor i := 0; i < b.N; i++ {\n+\t\t\t_ = router.allowed(\"*\", http.MethodOptions)\n+\t\t}\n+\t})\n+\tb.Run(\"Path\", func(b *testing.B) {\n+\t\tb.ReportAllocs()\n+\t\tfor i := 0; i < b.N; i++ {\n+\t\t\t_ = router.allowed(\"/path\", http.MethodOptions)\n+\t\t}\n+\t})\n+}\n+\n func TestRouterOPTIONS(t *testing.T) {\n \thandlerFunc := func(_ http.ResponseWriter, _ *http.Request, _ Params) {}\n \n@@ -229,7 +250,7 @@ func TestRouterOPTIONS(t *testing.T) {\n \trouter.ServeHTTP(w, r)\n \tif !(w.Code == http.StatusOK) {\n \t\tt.Errorf(\"OPTIONS handling failed: Code=%d, Header=%v\", w.Code, w.Header())\n-\t} else if allow := w.Header().Get(\"Allow\"); allow != \"POST, OPTIONS\" {\n+\t} else if allow := w.Header().Get(\"Allow\"); allow != \"OPTIONS, POST\" {\n \t\tt.Error(\"unexpected Allow header value: \" + allow)\n \t}\n \n@@ -239,7 +260,7 @@ func TestRouterOPTIONS(t *testing.T) {\n \trouter.ServeHTTP(w, r)\n \tif !(w.Code == http.StatusOK) {\n \t\tt.Errorf(\"OPTIONS handling failed: Code=%d, Header=%v\", w.Code, w.Header())\n-\t} else if allow := w.Header().Get(\"Allow\"); allow != \"POST, OPTIONS\" {\n+\t} else if allow := w.Header().Get(\"Allow\"); allow != \"OPTIONS, POST\" {\n \t\tt.Error(\"unexpected Allow header value: \" + allow)\n \t}\n \n@@ -260,7 +281,7 @@ func TestRouterOPTIONS(t *testing.T) {\n \trouter.ServeHTTP(w, r)\n \tif !(w.Code == http.StatusOK) {\n \t\tt.Errorf(\"OPTIONS handling failed: Code=%d, Header=%v\", w.Code, w.Header())\n-\t} else if allow := w.Header().Get(\"Allow\"); allow != \"POST, GET, OPTIONS\" && allow != \"GET, POST, OPTIONS\" {\n+\t} else if allow := w.Header().Get(\"Allow\"); allow != \"GET, OPTIONS, POST\" {\n \t\tt.Error(\"unexpected Allow header value: \" + allow)\n \t}\n \n@@ -270,7 +291,7 @@ func TestRouterOPTIONS(t *testing.T) {\n \trouter.ServeHTTP(w, r)\n \tif !(w.Code == http.StatusOK) {\n \t\tt.Errorf(\"OPTIONS handling failed: Code=%d, Header=%v\", w.Code, w.Header())\n-\t} else if allow := w.Header().Get(\"Allow\"); allow != \"POST, GET, OPTIONS\" && allow != \"GET, POST, OPTIONS\" {\n+\t} else if allow := w.Header().Get(\"Allow\"); allow != \"GET, OPTIONS, POST\" {\n \t\tt.Error(\"unexpected Allow header value: \" + allow)\n \t}\n \n@@ -287,7 +308,7 @@ func TestRouterOPTIONS(t *testing.T) {\n \trouter.ServeHTTP(w, r)\n \tif !(w.Code == http.StatusOK) {\n \t\tt.Errorf(\"OPTIONS handling failed: Code=%d, Header=%v\", w.Code, w.Header())\n-\t} else if allow := w.Header().Get(\"Allow\"); allow != \"POST, GET, OPTIONS\" && allow != \"GET, POST, OPTIONS\" {\n+\t} else if allow := w.Header().Get(\"Allow\"); allow != \"GET, OPTIONS, POST\" {\n \t\tt.Error(\"unexpected Allow header value: \" + allow)\n \t}\n \tif custom {\n@@ -318,7 +339,7 @@ func TestRouterNotAllowed(t *testing.T) {\n \trouter.ServeHTTP(w, r)\n \tif !(w.Code == http.StatusMethodNotAllowed) {\n \t\tt.Errorf(\"NotAllowed handling failed: Code=%d, Header=%v\", w.Code, w.Header())\n-\t} else if allow := w.Header().Get(\"Allow\"); allow != \"POST, OPTIONS\" {\n+\t} else if allow := w.Header().Get(\"Allow\"); allow != \"OPTIONS, POST\" {\n \t\tt.Error(\"unexpected Allow header value: \" + allow)\n \t}\n \n@@ -332,7 +353,7 @@ func TestRouterNotAllowed(t *testing.T) {\n \trouter.ServeHTTP(w, r)\n \tif !(w.Code == http.StatusMethodNotAllowed) {\n \t\tt.Errorf(\"NotAllowed handling failed: Code=%d, Header=%v\", w.Code, w.Header())\n-\t} else if allow := w.Header().Get(\"Allow\"); allow != \"POST, DELETE, OPTIONS\" && allow != \"DELETE, POST, OPTIONS\" {\n+\t} else if allow := w.Header().Get(\"Allow\"); allow != \"DELETE, OPTIONS, POST\" {\n \t\tt.Error(\"unexpected Allow header value: \" + allow)\n \t}\n \n@@ -350,7 +371,7 @@ func TestRouterNotAllowed(t *testing.T) {\n \tif w.Code != http.StatusTeapot {\n \t\tt.Errorf(\"unexpected response code %d want %d\", w.Code, http.StatusTeapot)\n \t}\n-\tif allow := w.Header().Get(\"Allow\"); allow != \"POST, DELETE, OPTIONS\" && allow != \"DELETE, POST, OPTIONS\" {\n+\tif allow := w.Header().Get(\"Allow\"); allow != \"DELETE, OPTIONS, POST\" {\n \t\tt.Error(\"unexpected Allow header value: \" + allow)\n \t}\n }\n",
+  "diffTruncated": false,
+  "tree": [
+    ".travis.yml",
+    "LICENSE",
+    "README.md",
+    "go.mod",
+    "path.go",
+    "path_test.go",
+    "router.go",
+    "router_test.go",
+    "tree.go",
+    "tree_test.go"
+  ],
+  "explanation": {
+    "what": "Router.allowed の実装を、文字列連結で許可メソッド一覧を組み立てる方式から、[]string(allowed)に追加してから挿入ソート(sort.Strings を使わず手書きのループ)でアルファベット順に並べ、最後に strings.Join でカンマ区切り文字列にする方式に変更した。OPTIONS は末尾追加ではなく他メソッドと一緒にソート対象へ加わる。router_test.go の期待値もアルファベット順(例: \"OPTIONS, POST\"、\"GET, OPTIONS, POST\")に更新し、allowed() のベンチマーク BenchmarkAllowed も追加した。",
+    "why": "コミットメッセージの「Fixes #248」の通り、Allow ヘッダーに列挙されるメソッドの順序が map の走査順(Go の map は反復順が保証されない)に依存して不安定になっていた問題を修正するもの。ソートで出力を決定的にしている。sort.Strings を使わず手書きのループにしているのは、コード中のコメントにある通りヒープへの移動やインターフェース変換によるアロケーションを避けるため。",
+    "highlights": [
+      { "file": "router.go", "note": "sort.Strings ではなく手書きの挿入ソートを使う理由がコメントで説明されている(アロケーション回避)" }
+    ],
+    "langNotes": [
+      { "topic": "map の反復順序の非決定性", "note": "Go の map はキーの反復順序が保証されない(意図的にランダム化される)。allowed 関数は以前 map をそのまま走査してメソッド名を連結していたため、レスポンスの Allow ヘッダーの順序が実行のたびに変わりうる不具合があった。" },
+      { "topic": "sort.Strings とインターフェース変換コスト", "note": "sort.Strings([]string) は内部で sort.Interface に変換されるためスライスがヒープに逃げてアロケーションが発生しうる。ホットパスではこのコストを避けるため、標準ライブラリを使わず手書きの挿入ソートで済ませている。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

@@ -1,0 +1,71 @@
+{
+  "seq": 251,
+  "sha": "f028acfbffc34e9baf5bd15dfb775a43f694031b",
+  "parents": [
+    "8c9f31f047a304abedb5614d4a18a843cd5f4a40"
+  ],
+  "author": {
+    "name": "Razon Yang",
+    "email": "razonyang@gmail.com",
+    "date": "2020-07-24T21:51:17+08:00"
+  },
+  "message": "README: Fix Automatic OPTIONS responses and CORS example bug (#314)\n\nFixes #312",
+  "pr": {
+    "number": 314,
+    "title": "README: Fix Automatic OPTIONS responses and CORS example bug",
+    "body": "#312",
+    "url": "https://github.com/julienschmidt/httprouter/pull/314"
+  },
+  "linkedIssues": [
+    {
+      "number": 312,
+      "title": "Example for 'Automatic OPTIONS responses and CORS' has a bug",
+      "body": "When adding CORS headers through the example 'Automatic OPTIONS responses and CORS', I found that the header 'Access-Control-Allow-Methods' had an empty string.\r\n\r\n```\r\n$ curl -XOPTIONS -I -H \"Access-Control-Request-Method: POST\" http://localhost:8080/test\r\nHTTP/1.1 204 No Content\r\nAccess-Control-Allow-Origin: *\r\nAccess-Control-Allow-Methods:\r\nAllow: OPTIONS, POST\r\nDate: <not important>\r\n```\r\nMy expected result would be:\r\n```\r\n$ curl -XOPTIONS -I -H \"Access-Control-Request-Method: POST\" http://localhost:8080/test\r\nHTTP/1.1 204 No Content\r\nAccess-Control-Allow-Origin: *\r\nAccess-Control-Allow-Methods: OPTIONS, POST\r\nAllow: OPTIONS, POST\r\nDate: <not important>\r\n```\r\nLooking at the code, shouldn't it be `w.Header().Get(\"Allow\")` rather than `r.Header.Get(\"Allow\")`? I don't think I have, but sorry if I missed anything here!",
+      "url": "https://github.com/julienschmidt/httprouter/issues/312"
+    }
+  ],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 1,
+    "deletions": 1
+  },
+  "files": [
+    {
+      "path": "README.md",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/README.md b/README.md\nindex d1e68b5..29d35db 100644\n--- a/README.md\n+++ b/README.md\n@@ -156,7 +156,7 @@ router.GlobalOPTIONS = http.HandlerFunc(func(w http.ResponseWriter, r *http.Requ\n     if r.Header.Get(\"Access-Control-Request-Method\") != \"\" {\n         // Set CORS headers\n         header := w.Header()\n-        header.Set(\"Access-Control-Allow-Methods\", r.Header.Get(\"Allow\"))\n+        header.Set(\"Access-Control-Allow-Methods\", header.Get(\"Allow\"))\n         header.Set(\"Access-Control-Allow-Origin\", \"*\")\n     }\n \n",
+  "diffTruncated": false,
+  "tree": [
+    ".travis.yml",
+    "LICENSE",
+    "README.md",
+    "go.mod",
+    "path.go",
+    "path_test.go",
+    "router.go",
+    "router_test.go",
+    "tree.go",
+    "tree_test.go"
+  ],
+  "explanation": {
+    "what": "READMEのCORS対応例(GlobalOPTIONSハンドラ)で、`Access-Control-Allow-Methods`ヘッダーに`r.Header.Get(\"Allow\")`(リクエストヘッダー)を渡していたのを`header.Get(\"Allow\")`(レスポンスヘッダー、`w.Header()`で取得済みの変数)に修正した。",
+    "why": "issue #312 の報告によれば、この例をそのまま使うと`Access-Control-Allow-Methods`が常に空文字列になる不具合があった。`Allow`ヘッダーはリクエストではなくレスポンス側(ルータが自動設定したもの)に入っているため、参照先を取り違えていたのが原因。",
+    "highlights": [
+      { "file": "README.md", "note": "CORSサンプルコードのヘッダー参照元の修正(1行)" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "issue",
+    "refs": [
+      { "type": "pr", "number": 314, "url": "https://github.com/julienschmidt/httprouter/pull/314" },
+      { "type": "issue", "number": 312, "url": "https://github.com/julienschmidt/httprouter/issues/312" }
+    ],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

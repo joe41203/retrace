@@ -1,0 +1,53 @@
+{
+  "seq": 39,
+  "sha": "56c47db5e1b17eb10579953d82a6469f215dddb4",
+  "parents": [
+    "1a75e6135abc64b2cd01d3268099f95ef7a739ff"
+  ],
+  "author": {
+    "name": "Julien Schmidt",
+    "email": "github@julienschmidt.com",
+    "date": "2013-12-15T12:52:30+01:00"
+  },
+  "message": "Update godoc",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 10,
+    "deletions": 9
+  },
+  "files": [
+    {
+      "path": "router.go",
+      "status": "M",
+      "additions": 10,
+      "deletions": 9,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/router.go b/router.go\nindex a54061c..c7e014f 100644\n--- a/router.go\n+++ b/router.go\n@@ -4,7 +4,7 @@\n \n // Package httprouter is a trie based high performance HTTP request router.\n //\n-// A trivial example server is:\n+// A trivial example is:\n //\n //  package main\n //\n@@ -42,20 +42,21 @@\n //  Syntax    Type\n //  :name     Parameter\n //  *name     CatchAll\n-// The value of wildcards is saved in a map as vars[name] = value. The map is\n-// passed to the Handle as a parameter.\n+// The value of wildcards is saved in a map as vars[\"name\"] = value. The map is\n+// passed to the Handle func as a parameter.\n //\n-// Parameters are variable path segments. They match anything until the next /\n+// Parameters are variable path segments. They match anything until the next '/'\n // or the path end:\n //  Path: /blog/:category/:post\n //\n //  Requests:\n-//   /blog/go/request-routers            match: category=\"go\"; post=\"request-routers\"\n+//   /blog/go/request-routers            match: category=\"go\", post=\"request-routers\"\n+//   /blog/go/request-routers/           no match, but the router would redirect\n //   /blog/go/                           no match\n //   /blog/go/request-routers/comments   no match\n //\n // CatchAll wildcards match anything until the path end, including the directory\n-// index (the / before the CatchAll). Since they match anything until the end,\n+// index (the '/'' before the CatchAll). Since they match anything until the end,\n // CatchAll wildcards must always be the last element in the defined path.\n //  Path: /files/*filepath\n //\n@@ -72,8 +73,8 @@ import (\n )\n \n // Handle is a function that can be registered to a route to handle HTTP\n-// requests. Like http.HandlerFunc, but has a third parameter for the route\n-// parameters.\n+// requests. Like http.HandlerFunc, but has a third parameter for the values of\n+// wildcards (variables).\n type Handle func(http.ResponseWriter, *http.Request, map[string]string)\n \n // NotFound is the default HTTP handler func for routes that can't be matched\n@@ -150,7 +151,7 @@ func (r *Router) DELETE(path string, handle Handle) {\n \n // Handle registers a new request handle with the given path and method.\n //\n-// For GET / POST / PUT or DELETE requests the respective shortcut functions can\n+// For GET, POST, PUT and DELETE requests the respective shortcut functions can\n // be used.\n //\n // This function is intended to allow the usage of less frequently used,\n",
+  "diffTruncated": false,
+  "tree": [
+    ".travis.yml",
+    "LICENSE",
+    "README.md",
+    "path.go",
+    "path_test.go",
+    "router.go",
+    "router_test.go",
+    "tree.go",
+    "tree_test.go"
+  ],
+  "explanation": {
+    "what": "router.go の godoc コメントを細部にわたり微修正した。vars[name] を vars[\"name\"] という正確なマップアクセス表記に直し、Parameter のマッチ例に「末尾スラッシュ付きは無マッチだがリダイレクトされる」という行を追加、Handle 型の説明を「route parameters」から「wildcards (variables)」というより一般的な語に置き換え、「GET / POST / PUT or DELETE」を「GET, POST, PUT and DELETE」という表記に統一した。",
+    "why": "コミットメッセージの通り godoc の継続的な推敲。マップアクセスの記法や英文の表記ゆれ、説明の精度を細かく積み上げて仕上げる作業と考えられる。",
+    "highlights": [],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

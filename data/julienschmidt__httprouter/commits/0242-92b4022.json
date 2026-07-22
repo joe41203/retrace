@@ -1,0 +1,58 @@
+{
+  "seq": 242,
+  "sha": "92b40224d545dc82d51192e40442096d3efcdaa0",
+  "parents": [
+    "cfa3cb764b4fc4eb98cae67a2020a91c79e065be"
+  ],
+  "author": {
+    "name": "Julien Schmidt",
+    "email": "git@julienschmidt.com",
+    "date": "2020-01-12T13:09:26+01:00"
+  },
+  "message": "router: range over Params values",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 3,
+    "deletions": 3
+  },
+  "files": [
+    {
+      "path": "router.go",
+      "status": "M",
+      "additions": 3,
+      "deletions": 3,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/router.go b/router.go\nindex 088ceec..301622b 100644\n--- a/router.go\n+++ b/router.go\n@@ -102,9 +102,9 @@ type Params []Param\n // ByName returns the value of the first Param which key matches the given name.\n // If no matching Param is found, an empty string is returned.\n func (ps Params) ByName(name string) string {\n-\tfor i := range ps {\n-\t\tif ps[i].Key == name {\n-\t\t\treturn ps[i].Value\n+\tfor _, p := range ps {\n+\t\tif p.Key == name {\n+\t\t\treturn p.Value\n \t\t}\n \t}\n \treturn \"\"\n",
+  "diffTruncated": false,
+  "tree": [
+    ".travis.yml",
+    "LICENSE",
+    "README.md",
+    "go.mod",
+    "path.go",
+    "path_test.go",
+    "router.go",
+    "router_test.go",
+    "tree.go",
+    "tree_test.go"
+  ],
+  "explanation": {
+    "what": "router.go の Params.ByName メソッドを、インデックスアクセス(`for i := range ps` + `ps[i]`)から values による range(`for _, p := range ps`)に書き換えた。",
+    "why": "コミットメッセージの通り、Params の要素そのものを扱うだけならインデックス経由よりも values を直接受け取る range の方が簡潔で Go らしい書き方になるための整理と考えられる。",
+    "highlights": [
+      { "file": "router.go", "note": "ByName の走査を `ps[i].Key` から `p.Key` に変更。読み取り専用の走査なので values コピーで問題ない。" }
+    ],
+    "langNotes": [
+      { "topic": "range over values vs index", "note": "Go の for-range はスライスの要素をコピーして受け取れる(`for _, p := range ps`)。要素を書き換えない読み取り専用の走査ではこちらの方が簡潔で、インデックス経由(`for i := range ps`)は要素を書き換えたい場合に使うのが一般的な使い分け。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

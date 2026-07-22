@@ -1,0 +1,66 @@
+{
+  "seq": 98,
+  "sha": "aeec11926f7a8fab580383810e1b1bbba99bdaa7",
+  "parents": [
+    "b55664b9e92004aebb7f19a19a9d06271f3a41fc"
+  ],
+  "author": {
+    "name": "Julien Schmidt",
+    "email": "github@julienschmidt.com",
+    "date": "2015-01-16T00:16:12+08:00"
+  },
+  "message": "Reintroduce (optional) 405 handling\n\nBased on #51\nFixes #30\nFixed #52",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 46,
+    "deletions": 3
+  },
+  "files": [
+    {
+      "path": "router.go",
+      "status": "M",
+      "additions": 31,
+      "deletions": 3,
+      "binary": false
+    },
+    {
+      "path": "router_test.go",
+      "status": "M",
+      "additions": 15,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/router.go b/router.go\nindex 7716dc7..ac3d680 100644\n--- a/router.go\n+++ b/router.go\n@@ -123,13 +123,21 @@ type Router struct {\n \t// handle is registered for it.\n \t// First superfluous path elements like ../ or // are removed.\n \t// Afterwards the router does a case-insensitive lookup of the cleaned path.\n-\t// If a handle can be found for this route, the router makes a  redirection\n+\t// If a handle can be found for this route, the router makes a redirection\n \t// to the corrected path with status code 301 for GET requests and 307 for\n \t// all other request methods.\n \t// For example /FOO and /..//Foo could be redirected to /foo.\n \t// RedirectTrailingSlash is independent of this option.\n \tRedirectFixedPath bool\n \n+\t// If enabled, the router checks if another method is allowed for the\n+\t// current route, if the current request can not be routed.\n+\t// If this is the case, the request is answered with 'Method Not Allowed'\n+\t// and HTTP status code 405.\n+\t// If no other Method is allowed, the request is delegated to the NotFound\n+\t// handler.\n+\tHandleMethodNotAllowed bool\n+\n \t// Configurable http.HandlerFunc which is called when no matching route is\n \t// found. If it is not set, http.NotFound is used.\n \tNotFound http.HandlerFunc\n@@ -149,8 +157,9 @@ var _ http.Handler = New()\n // Path auto-correction, including trailing slashes, is enabled by default.\n func New() *Router {\n \treturn &Router{\n-\t\tRedirectTrailingSlash: true,\n-\t\tRedirectFixedPath:     true,\n+\t\tRedirectTrailingSlash:  true,\n+\t\tRedirectFixedPath:      true,\n+\t\tHandleMethodNotAllowed: true,\n \t}\n }\n \n@@ -313,6 +322,25 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {\n \t\t}\n \t}\n \n+\t// Handle 405\n+\tif r.HandleMethodNotAllowed {\n+\t\tfor method := range r.trees {\n+\t\t\t// Skip the requested method - we already tried this one\n+\t\t\tif method == req.Method {\n+\t\t\t\tcontinue\n+\t\t\t}\n+\n+\t\t\thandle, _, _ := r.trees[method].getValue(req.URL.Path)\n+\t\t\tif handle != nil {\n+\t\t\t\thttp.Error(w,\n+\t\t\t\t\thttp.StatusText(http.StatusMethodNotAllowed),\n+\t\t\t\t\thttp.StatusMethodNotAllowed,\n+\t\t\t\t)\n+\t\t\t\treturn\n+\t\t\t}\n+\t\t}\n+\t}\n+\n \t// Handle 404\n \tif r.NotFound != nil {\n \t\tr.NotFound(w, req)\ndiff --git a/router_test.go b/router_test.go\nindex 7c8ac09..6292ba8 100644\n--- a/router_test.go\n+++ b/router_test.go\n@@ -165,6 +165,21 @@ func TestRouterRoot(t *testing.T) {\n \t}\n }\n \n+func TestRouterNotAllowed(t *testing.T) {\n+\thandlerFunc := func(_ http.ResponseWriter, _ *http.Request, _ Params) {}\n+\n+\trouter := New()\n+\trouter.POST(\"/path\", handlerFunc)\n+\n+\t// Test not allowed\n+\tr, _ := http.NewRequest(\"GET\", \"/path\", nil)\n+\tw := httptest.NewRecorder()\n+\trouter.ServeHTTP(w, r)\n+\tif !(w.Code == http.StatusMethodNotAllowed) {\n+\t\tt.Errorf(\"NotAllowed handling route %s failed: Code=%d, Header=%v\", w.Code, w.Header())\n+\t}\n+}\n+\n func TestRouterNotFound(t *testing.T) {\n \thandlerFunc := func(_ http.ResponseWriter, _ *http.Request, _ Params) {}\n \n",
+  "diffTruncated": false,
+  "tree": [
+    ".travis.yml",
+    "LICENSE",
+    "README.md",
+    "path.go",
+    "path_test.go",
+    "router.go",
+    "router_test.go",
+    "tree.go",
+    "tree_test.go"
+  ],
+  "explanation": {
+    "what": "405 (Method Not Allowed) ハンドリングを、Router 構造体に追加した HandleMethodNotAllowed という bool フィールドで有効・無効を切り替えられる形にして再導入した。New() のデフォルトでは true。ServeHTTP は r.HandleMethodNotAllowed が true のときだけ、リクエストされたメソッド以外の全メソッドの木を調べ、handle が見つかれば 405 を返す。テスト TestRouterNotAllowed も復活させている。",
+    "why": "コミットメッセージに \"Based on #51 / Fixes #30 / Fixed #52\" とある。seq95 で PR #51 由来の 405 ハンドリングを一度 revert した(#52 の問題のため)が、機能自体は issue #30 で求められていたため、今回はオプトアウト可能な HandleMethodNotAllowed フラグを設けることで、以前 #52 で問題になったであろう「常時 405 判定が走る」副作用を利用者が制御できるようにして再導入したと考えられる。",
+    "highlights": [
+      { "file": "router.go", "note": "Router.HandleMethodNotAllowed フィールドと New() でのデフォルト true、ServeHTTP 内の if r.HandleMethodNotAllowed { ... } 分岐" },
+      { "file": "router_test.go", "note": "TestRouterNotAllowed を復活(http.StatusMethodNotAllowed で判定するよう更新)" }
+    ],
+    "langNotes": [],
+    "diagram": {
+      "mermaid": "flowchart TD\n  A[\"PR#51 405ハンドリング導入\"] --> B[\"revert (Fixes #52)\"]\n  B --> C[\"HandleMethodNotAllowed フラグ付きで再導入 (Based on #51 / Fixes #30)\"]",
+      "caption": "405 (Method Not Allowed) ハンドリングの導入→revert→再導入の経緯"
+    },
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

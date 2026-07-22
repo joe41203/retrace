@@ -1,0 +1,53 @@
+{
+  "seq": 55,
+  "sha": "97bf7ceb15acba05c3a92e8a8ace5edc228136a2",
+  "parents": [
+    "d444fc4c17037a5e791b98926299c606b4952479"
+  ],
+  "author": {
+    "name": "Julien Schmidt",
+    "email": "github@julienschmidt.com",
+    "date": "2014-03-08T15:22:36+01:00"
+  },
+  "message": "Improve the doc of the middleware example",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 11,
+    "deletions": 1
+  },
+  "files": [
+    {
+      "path": "README.md",
+      "status": "M",
+      "additions": 11,
+      "deletions": 1,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/README.md b/README.md\nindex 4ea1ce5..a98c293 100644\n--- a/README.md\n+++ b/README.md\n@@ -129,24 +129,34 @@ This package just provides a very efficient request router with a few extra feat\n Here is a quick example: Does your server serve multiple domains / hosts? You want to use subdomains?\n Define a router per host!\n ```go\n+// We need an object that implements the http.Handler interface.\n+// Therefore we need a type for which we implement the ServeHTTP method.\n+// We just use a map here, in which we map host names to http.Handlers\n type HostSwitch map[string]http.Handler\n \n+// Implement the ServerHTTP method on our new type\n func (hs HostSwitch) ServeHTTP(w http.ResponseWriter, r *http.Request) {\n+\t// Check if a http.Handler is registered for the given host.\n+\t// If yes, use it to handle the request.\n \tif handler := hs[r.URL.Host]; handler != nil {\n \t\thandler.ServeHTTP(w, r)\n \t}\n \n+\t// Handle host names for wich no handler is registered\n \thttp.Error(w, \"Forbidden\", 403) // Or Redirect?\n }\n \n func main() {\n+\t// Initialze a router as usual \n     router := httprouter.New()\n     router.GET(\"/\", Index)\n     router.GET(\"/hello/:name\", Hello)\n \n+    // Make a new HostSwitch and insert the router for example.com\n     hs := make(HostSwitch)\n-\ths[\"example.com\"] = router\n+    hs[\"example.com\"] = router\n \n+    // Use the HostSwitch to listen and serve on port 12345\n     log.Fatal(http.ListenAndServe(\":12345\", hs))\n }\n ```\n",
+  "diffTruncated": false,
+  "tree": [
+    ".travis.yml",
+    "LICENSE",
+    "README.md",
+    "path.go",
+    "path_test.go",
+    "router.go",
+    "router_test.go",
+    "tree.go",
+    "tree_test.go"
+  ],
+  "explanation": {
+    "what": "README.md 内の HostSwitch(ホスト名ごとにルータを切り替えるミドルウェア例)のコード例に、各行の役割を説明するコメントを追加した。コード自体の変更はない。",
+    "why": "コミットメッセージの通り、既存のミドルウェア例のドキュメント性を高める目的の変更。",
+    "highlights": [],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

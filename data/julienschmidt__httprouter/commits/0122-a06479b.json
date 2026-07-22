@@ -1,0 +1,55 @@
+{
+  "seq": 122,
+  "sha": "a06479bbfade5f796b8d45d13c24fa3e588eb0f5",
+  "parents": [
+    "b56ed26e9b26a68a75818787604d294534a033b2"
+  ],
+  "author": {
+    "name": "Julien Schmidt",
+    "email": "github@julienschmidt.com",
+    "date": "2015-03-21T10:58:04+08:00"
+  },
+  "message": "tree: Add comment on #65 fix",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 2,
+    "deletions": 0
+  },
+  "files": [
+    {
+      "path": "tree.go",
+      "status": "M",
+      "additions": 2,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/tree.go b/tree.go\nindex 47af948..b9d51e4 100644\n--- a/tree.go\n+++ b/tree.go\n@@ -118,6 +118,7 @@ func (n *node) addRoute(path string, handle Handle) {\n \t\t\t\t}\n \n \t\t\t\tn.children = []*node{&child}\n+\t\t\t\t// []byte for proper unicode char conversion, see #65\n \t\t\t\tn.indices = string([]byte{n.path[i]})\n \t\t\t\tn.path = path[:i]\n \t\t\t\tn.handle = nil\n@@ -169,6 +170,7 @@ func (n *node) addRoute(path string, handle Handle) {\n \n \t\t\t\t// Otherwise insert it\n \t\t\t\tif c != ':' && c != '*' {\n+\t\t\t\t\t// []byte for proper unicode char conversion, see #65\n \t\t\t\t\tn.indices += string([]byte{c})\n \t\t\t\t\tchild := &node{\n \t\t\t\t\t\tmaxParams: numParams,\n",
+  "diffTruncated": false,
+  "tree": [
+    ".travis.yml",
+    "LICENSE",
+    "README.md",
+    "path.go",
+    "path_test.go",
+    "router.go",
+    "router_test.go",
+    "tree.go",
+    "tree_test.go"
+  ],
+  "explanation": {
+    "what": "直前のコミット(#65 の non-ascii panic 修正)で `string([]byte{...})` に変更した2箇所に、「[]byte for proper unicode char conversion, see #65」というコメントを追加した。コードの動作は変えていない。",
+    "why": "string(byte) と string([]byte{byte}) の違いは一見して意図が分かりにくく、将来 string([]byte{...}) を単純化しようとして再度バグを埋め込むリスクがある。#65 の issue/PR 番号を参照するコメントを残すことで、なぜこの一見冗長な書き方が必要かを後から追える形にしている。",
+    "highlights": [
+      { "file": "tree.go", "note": "コメント2行の追加のみ。直前コミットの意図を明文化" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

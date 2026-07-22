@@ -1,0 +1,59 @@
+{
+  "seq": 225,
+  "sha": "a62d42bea881adabafe26da3b3d2c9415539af8e",
+  "parents": [
+    "3e505fb5696d8a71112a3aeb131220440b47e797"
+  ],
+  "author": {
+    "name": "Julien Schmidt",
+    "email": "git@julienschmidt.com",
+    "date": "2019-10-04T17:15:44+02:00"
+  },
+  "message": "tree: improve readability of addRoute",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 97,
+    "deletions": 91
+  },
+  "files": [
+    {
+      "path": "tree.go",
+      "status": "M",
+      "additions": 97,
+      "deletions": 91,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/tree.go b/tree.go\nindex 9ff9c20..9e347aa 100644\n--- a/tree.go\n+++ b/tree.go\n@@ -17,6 +17,15 @@ func min(a, b int) int {\n \treturn b\n }\n \n+func longestCommonPrefix(a, b string) int {\n+\ti := 0\n+\tmax := min(len(a), len(b))\n+\tfor i < max && a[i] == b[i] {\n+\t\ti++\n+\t}\n+\treturn i\n+}\n+\n func countParams(path string) uint16 {\n \tvar n uint\n \tfor i := 0; i < len(path); i++ {\n@@ -39,10 +48,10 @@ const (\n \n type node struct {\n \tpath      string\n+\tindices   string\n \twildChild bool\n \tnType     nodeType\n \tpriority  uint32\n-\tindices   string\n \tchildren  []*node\n \thandle    Handle\n }\n@@ -77,110 +86,107 @@ func (n *node) addRoute(path string, handle Handle) {\n \tfullPath := path\n \tn.priority++\n \n-\t// Non-empty tree\n-\tif len(n.path) > 0 || len(n.children) > 0 {\n-\twalk:\n-\t\tfor {\n-\t\t\t// Find the longest common prefix.\n-\t\t\t// This also implies that the common prefix contains no ':' or '*'\n-\t\t\t// since the existing key can't contain those chars.\n-\t\t\ti := 0\n-\t\t\tmax := min(len(path), len(n.path))\n-\t\t\tfor i < max && path[i] == n.path[i] {\n-\t\t\t\ti++\n-\t\t\t}\n-\n-\t\t\t// Split edge\n-\t\t\tif i < len(n.path) {\n-\t\t\t\tchild := node{\n-\t\t\t\t\tpath:      n.path[i:],\n-\t\t\t\t\twildChild: n.wildChild,\n-\t\t\t\t\tnType:     static,\n-\t\t\t\t\tindices:   n.indices,\n-\t\t\t\t\tchildren:  n.children,\n-\t\t\t\t\thandle:    n.handle,\n-\t\t\t\t\tpriority:  n.priority - 1,\n-\t\t\t\t}\n+\t// Empty tree\n+\tif len(n.path) == 0 && len(n.indices) == 0 {\n+\t\tn.insertChild(path, fullPath, handle)\n+\t\tn.nType = root\n+\t\treturn\n+\t}\n \n-\t\t\t\tn.children = []*node{&child}\n-\t\t\t\t// []byte for proper unicode char conversion, see #65\n-\t\t\t\tn.indices = string([]byte{n.path[i]})\n-\t\t\t\tn.path = path[:i]\n-\t\t\t\tn.handle = nil\n-\t\t\t\tn.wildChild = false\n+walk:\n+\tfor {\n+\t\t// Find the longest common prefix.\n+\t\t// This also implies that the common prefix contains no ':' or '*'\n+\t\t// since the existing key can't contain those chars.\n+\t\ti := longestCommonPrefix(path, n.path)\n+\n+\t\t// Split edge\n+\t\tif i < len(n.path) {\n+\t\t\tchild := node{\n+\t\t\t\tpath:      n.path[i:],\n+\t\t\t\twildChild: n.wildChild,\n+\t\t\t\tnType:     static,\n+\t\t\t\tindices:   n.indices,\n+\t\t\t\tchildren:  n.children,\n+\t\t\t\thandle:    n.handle,\n+\t\t\t\tpriority:  n.priority - 1,\n \t\t\t}\n \n-\t\t\t// Make new node a child of this node\n-\t\t\tif i < len(path) {\n-\t\t\t\tpath = path[i:]\n-\n-\t\t\t\tif n.wildChild {\n-\t\t\t\t\tn = n.children[0]\n-\t\t\t\t\tn.priority++\n-\n-\t\t\t\t\t// Check if the wildcard matches\n-\t\t\t\t\tif len(path) >= len(n.path) && n.path == path[:len(n.path)] &&\n-\t\t\t\t\t\t// Adding a child to a catchAll is not possible\n-\t\t\t\t\t\tn.nType != catchAll &&\n-\t\t\t\t\t\t// Check for longer wildcard, e.g. :name and :names\n-\t\t\t\t\t\t(len(n.path) >= len(path) || path[len(n.path)] == '/') {\n-\t\t\t\t\t\tcontinue walk\n-\t\t\t\t\t} else {\n-\t\t\t\t\t\t// Wildcard conflict\n-\t\t\t\t\t\tpathSeg := path\n-\t\t\t\t\t\tif n.nType != catchAll {\n-\t\t\t\t\t\t\tpathSeg = strings.SplitN(pathSeg, \"/\", 2)[0]\n-\t\t\t\t\t\t}\n-\t\t\t\t\t\tprefix := fullPath[:strings.Index(fullPath, pathSeg)] + n.path\n-\t\t\t\t\t\tpanic(\"'\" + pathSeg +\n-\t\t\t\t\t\t\t\"' in new path '\" + fullPath +\n-\t\t\t\t\t\t\t\"' conflicts with existing wildcard '\" + n.path +\n-\t\t\t\t\t\t\t\"' in existing prefix '\" + prefix +\n-\t\t\t\t\t\t\t\"'\")\n-\t\t\t\t\t}\n-\t\t\t\t}\n+\t\t\tn.children = []*node{&child}\n+\t\t\t// []byte for proper unicode char conversion, see #65\n+\t\t\tn.indices = string([]byte{n.path[i]})\n+\t\t\tn.path = path[:i]\n+\t\t\tn.handle = nil\n+\t\t\tn.wildChild = false\n+\t\t}\n \n-\t\t\t\tc := path[0]\n+\t\t// Make new node a child of this node\n+\t\tif i < len(path) {\n+\t\t\tpath = path[i:]\n \n-\t\t\t\t// '/' after param\n-\t\t\t\tif n.nType == param && c == '/' && len(n.children) == 1 {\n-\t\t\t\t\tn = n.children[0]\n-\t\t\t\t\tn.priority++\n+\t\t\tif n.wildChild {\n+\t\t\t\tn = n.children[0]\n+\t\t\t\tn.priority++\n+\n+\t\t\t\t// Check if the wildcard matches\n+\t\t\t\tif len(path) >= len(n.path) && n.path == path[:len(n.path)] &&\n+\t\t\t\t\t// Adding a child to a catchAll is not possible\n+\t\t\t\t\tn.nType != catchAll &&\n+\t\t\t\t\t// Check for longer wildcard, e.g. :name and :names\n+\t\t\t\t\t(len(n.path) >= len(path) || path[len(n.path)] == '/') {\n \t\t\t\t\tcontinue walk\n-\t\t\t\t}\n-\n-\t\t\t\t// Check if a child with the next path byte exists\n-\t\t\t\tfor i, max := 0, len(n.indices); i < max; i++ {\n-\t\t\t\t\tif c == n.indices[i] {\n-\t\t\t\t\t\ti = n.incrementChildPrio(i)\n-\t\t\t\t\t\tn = n.children[i]\n-\t\t\t\t\t\tcontinue walk\n+\t\t\t\t} else {\n+\t\t\t\t\t// Wildcard conflict\n+\t\t\t\t\tpathSeg := path\n+\t\t\t\t\tif n.nType != catchAll {\n+\t\t\t\t\t\tpathSeg = strings.SplitN(pathSeg, \"/\", 2)[0]\n \t\t\t\t\t}\n+\t\t\t\t\tprefix := fullPath[:strings.Index(fullPath, pathSeg)] + n.path\n+\t\t\t\t\tpanic(\"'\" + pathSeg +\n+\t\t\t\t\t\t\"' in new path '\" + fullPath +\n+\t\t\t\t\t\t\"' conflicts with existing wildcard '\" + n.path +\n+\t\t\t\t\t\t\"' in existing prefix '\" + prefix +\n+\t\t\t\t\t\t\"'\")\n \t\t\t\t}\n+\t\t\t}\n \n-\t\t\t\t// Otherwise insert it\n-\t\t\t\tif c != ':' && c != '*' {\n-\t\t\t\t\t// []byte for proper unicode char conversion, see #65\n-\t\t\t\t\tn.indices += string([]byte{c})\n-\t\t\t\t\tchild := &node{}\n-\t\t\t\t\tn.children = append(n.children, child)\n-\t\t\t\t\tn.incrementChildPrio(len(n.indices) - 1)\n-\t\t\t\t\tn = child\n-\t\t\t\t}\n-\t\t\t\tn.insertChild(path, fullPath, handle)\n-\t\t\t\treturn\n+\t\t\tc := path[0]\n \n-\t\t\t} else if i == len(path) { // Make node a (in-path) leaf\n-\t\t\t\tif n.handle != nil {\n-\t\t\t\t\tpanic(\"a handle is already registered for path '\" + fullPath + \"'\")\n+\t\t\t// '/' after param\n+\t\t\tif n.nType == param && c == '/' && len(n.children) == 1 {\n+\t\t\t\tn = n.children[0]\n+\t\t\t\tn.priority++\n+\t\t\t\tcontinue walk\n+\t\t\t}\n+\n+\t\t\t// Check if a child with the next path byte exists\n+\t\t\tfor i, max := 0, len(n.indices); i < max; i++ {\n+\t\t\t\tif c == n.indices[i] {\n+\t\t\t\t\ti = n.incrementChildPrio(i)\n+\t\t\t\t\tn = n.children[i]\n+\t\t\t\t\tcontinue walk\n \t\t\t\t}\n-\t\t\t\tn.handle = handle\n \t\t\t}\n+\n+\t\t\t// Otherwise insert it\n+\t\t\tif c != ':' && c != '*' {\n+\t\t\t\t// []byte for proper unicode char conversion, see #65\n+\t\t\t\tn.indices += string([]byte{c})\n+\t\t\t\tchild := &node{}\n+\t\t\t\tn.children = append(n.children, child)\n+\t\t\t\tn.incrementChildPrio(len(n.indices) - 1)\n+\t\t\t\tn = child\n+\t\t\t}\n+\t\t\tn.insertChild(path, fullPath, handle)\n \t\t\treturn\n+\n+\t\t} else if i == len(path) { // Make node a (in-path) leaf\n+\t\t\tif n.handle != nil {\n+\t\t\t\tpanic(\"a handle is already registered for path '\" + fullPath + \"'\")\n+\t\t\t}\n+\t\t\tn.handle = handle\n \t\t}\n-\t} else { // Empty tree\n-\t\tn.insertChild(path, fullPath, handle)\n-\t\tn.nType = root\n+\t\treturn\n \t}\n }\n \n",
+  "diffTruncated": false,
+  "tree": [
+    ".travis.yml",
+    "LICENSE",
+    "README.md",
+    "go.mod",
+    "path.go",
+    "path_test.go",
+    "router.go",
+    "router_test.go",
+    "tree.go",
+    "tree_test.go"
+  ],
+  "explanation": {
+    "what": "tree.go の addRoute を整理した。最長共通接頭辞を求めるインラインループを `longestCommonPrefix(a, b string) int` という独立関数に切り出し、if-else で分岐していた「空のツリー」ケースを早期return化して(空なら insertChild して return、そうでなければ walk ループへ)、以降のロジックのネストを1段浅くした。node 構造体のフィールド順序も並べ替えている(indices を path の直後に移動)。",
+    "why": "コミットメッセージ通り addRoute の可読性向上が目的。従来は「非空ツリー」の巨大な if ブロックの中に walk ループ全体が入れ子になっていたが、空ツリーの分岐を先に return させることで、主要な木構築ロジック(walk ループ)がトップレベルの関数本体に出て読みやすくなっている。",
+    "highlights": [
+      { "file": "tree.go", "note": "longestCommonPrefix への切り出しと、空ツリー分岐の早期return化でネストが1段浅くなった箇所" }
+    ],
+    "langNotes": [],
+    "diagram": {
+      "mermaid": "flowchart TD\n  A[\"addRoute(path, handle)\"] --> B{\"ツリーは空か?\"}\n  B -->|\"yes\"| C[\"insertChild で直接挿入 / nType=root / return\"]\n  B -->|\"no\"| D[\"walk ループ開始\"]\n  D --> E[\"longestCommonPrefix で共通接頭辞を計算\"]\n  E --> F{\"共通接頭辞が n.path より短いか?\"}\n  F -->|\"yes\"| G[\"ノードを分割(split edge)\"]\n  F -->|\"no\"| H{\"path が共通接頭辞より長いか?\"}\n  G --> H\n  H -->|\"yes\"| I[\"子ノードを辿る/新規作成してinsertChild\"]\n  H -->|\"no\"| J[\"このノードをリーフとしてhandleを登録\"]",
+      "caption": "addRoute のリファクタリング後の制御フロー: 空ツリーの早期returnと、共通接頭辞に基づく分割・挿入の分岐"
+    },
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

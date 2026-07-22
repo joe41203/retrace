@@ -1,0 +1,57 @@
+{
+  "seq": 36,
+  "sha": "b4f29e2fb50d5050c01e1894a4d466a439d941c5",
+  "parents": [
+    "583d46fd983af7d92876ae29240edc8e181ebc18"
+  ],
+  "author": {
+    "name": "Julien Schmidt",
+    "email": "github@julienschmidt.com",
+    "date": "2013-12-14T18:45:34+01:00"
+  },
+  "message": "Update README.md",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 7,
+    "deletions": 4
+  },
+  "files": [
+    {
+      "path": "README.md",
+      "status": "M",
+      "additions": 7,
+      "deletions": 4,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/README.md b/README.md\nindex e497856..8960256 100644\n--- a/README.md\n+++ b/README.md\n@@ -14,7 +14,7 @@ A compressing dynamic trie (radix tree) structure is used for efficient matching\n ## Features\n **Variables in your routing pattern:** Stop parsing the requested URL path, just give the path segment a name and the router delivers the value to you. Because of the design of the router, pattern variables are very cheap.\n \n-**Only explicit matches:** With other routers / *mux*es, like http.ServeMux, a requested URL path can be matched by multiple patterns. Therefore they have some awkward pattern priority rules, like *longest match* or *first registered, first matched*. By design, a request can only match exactly one or no route. \n+**Only explicit matches:** With other routers / muxes, like http.ServeMux, a requested URL path could match multiple patterns. Therefore they have some awkward pattern priority rules, like *longest match* or *first registered, first matched*. By design of this router, a request can only match exactly one or no route. As a result, there are also no unintended matches, which makes it great for SEO. \n \n **Stop caring about trailing slashes:** Choose the URL style you like, the router automatically redirects the client if a trailing slash is missing or if there is one extra. Of course it only does so, if the new path has a handler. If you don't like it, you can turn off this behavior.\n \n@@ -61,8 +61,11 @@ If we had the pattern `/user/:user`, only requests with a URL path like `/user/g\n \n **Note:** Since this router has only explicit matches, you can not register static routes and paramters for the same path segment. For example you can not register the patterns `/user/new` and `/user/:user` at the same time.\n \n-### CatchAlls\n-The second type are *catchAll*s and have the form `*name`. Like the name suggest, they match everything.\n+### Catch-All routes\n+The second type are *catch-all* routes and have the form `*name`. Like the name suggest, they match everything.\n Therefore they must always be at the **end** of the pattern.\n \n-The pattern `/src/*filepath` would match `/src/`, `/src/somefile.go`, `/src/subdir/somefile.go` and so on. \n+The pattern `/src/*filepath` would match `/src/`, `/src/somefile.go`, `/src/subdir/somefile.go` and so on.\n+\n+## Where can I find Middleware *X*?\n+This package just provides a very efficient request router with a few extra features. The router is just a [http.Handler](http://golang.org/pkg/net/http/#Handler), you can chain any http.Handler compatible middleware before the router, for example the [Gorilla handlers](http://www.gorillatoolkit.org/pkg/handlers). Or you could [just write your own](http://justinas.org/writing-http-middleware-in-go/), it's very easy!\n",
+  "diffTruncated": false,
+  "tree": [
+    ".travis.yml",
+    "LICENSE",
+    "README.md",
+    "path.go",
+    "path_test.go",
+    "router.go",
+    "router_test.go",
+    "tree.go",
+    "tree_test.go"
+  ],
+  "explanation": {
+    "what": "README.md の文言を再調整した。Only explicit matches の説明を「muxes」の斜体を外して SEO 面での利点を追記し、CatchAlls を Catch-All routes という見出しに改称、末尾に「Where can I find Middleware X?」という新セクションを追加して、本ルータは単なる http.Handler なので任意の http.Handler 互換ミドルウェア(Gorilla handlers 等)を前段に連結できる旨を説明した。",
+    "why": "コミットメッセージの通り README の更新。ルータ自体にミドルウェア機構を内蔵しない設計方針を踏まえ、利用者からの「ミドルウェアはどこ？」という疑問に答えるための説明を追加したと考えられる。",
+    "highlights": [
+      { "file": "README.md", "note": "Where can I find Middleware X? セクションで、ルータ=http.Handlerとして任意のミドルウェアをチェーンする設計思想を説明している" }
+    ],
+    "langNotes": [
+      { "topic": "http.Handler の連結によるミドルウェア", "note": "Goには専用のミドルウェアAPIはなく、http.Handler を実装した関数やラッパーを外側から重ねて呼び出す(A(B(router)))のが一般的な合成パターン。httprouter自体もただの http.Handler なので、Gorilla handlers のような他ライブラリや自作の薄いラッパーをそのまま前段に挟める。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

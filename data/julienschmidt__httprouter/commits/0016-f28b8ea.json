@@ -1,0 +1,54 @@
+{
+  "seq": 16,
+  "sha": "f28b8eac2bc8c2a6be8354b685f930e712d5e30c",
+  "parents": [
+    "148a91e59822ed21c2f4a6829a44562526152506"
+  ],
+  "author": {
+    "name": "Julien Schmidt",
+    "email": "github@julienschmidt.com",
+    "date": "2013-12-12T03:26:40+01:00"
+  },
+  "message": "refactoring",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 8,
+    "deletions": 7
+  },
+  "files": [
+    {
+      "path": "router.go",
+      "status": "M",
+      "additions": 8,
+      "deletions": 7,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/router.go b/router.go\nindex d8e5e74..48e860f 100644\n--- a/router.go\n+++ b/router.go\n@@ -2,7 +2,7 @@\n // Use of this source code is governed by a BSD-style license that can be found\n // in the LICENSE file.\n \n-// Package httprouter is a radix tree based high performance HTTP request router\n+// Package httprouter is a trie based high performance HTTP request router\n package httprouter\n \n import (\n@@ -20,8 +20,9 @@ type Handle func(http.ResponseWriter, *http.Request, map[string]string)\n // Otherwise the request is delegated to http.NotFound.\n func NotFound(w http.ResponseWriter, req *http.Request) {\n \tif req.Method != \"CONNECT\" {\n-\t\tif p := CleanPath(req.URL.Path); p != req.URL.Path && p != req.Referer() {\n-\t\t\thttp.Redirect(w, req, p, http.StatusMovedPermanently)\n+\t\tpath := req.URL.Path\n+\t\tif cp := CleanPath(path); cp != path && cp != req.Referer() {\n+\t\t\thttp.Redirect(w, req, cp, http.StatusMovedPermanently)\n \t\t\treturn\n \t\t}\n \t}\n@@ -111,12 +112,12 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {\n \t\thandle(w, req, vars)\n \t} else if tsr && r.RedirectTrailingSlash && path != \"/\" {\n \t\tif path[len(path)-1] == '/' {\n-\t\t\thttp.Redirect(w, req, path[:len(path)-1], http.StatusMovedPermanently)\n-\t\t\treturn\n+\t\t\tpath = path[:len(path)-1]\n \t\t} else {\n-\t\t\thttp.Redirect(w, req, path+\"/\", http.StatusMovedPermanently)\n-\t\t\treturn\n+\t\t\tpath = path + \"/\"\n \t\t}\n+\t\thttp.Redirect(w, req, path, http.StatusMovedPermanently)\n+\t\treturn\n \t} else { // Handle 404\n \t\tr.NotFound(w, req)\n \t}\n",
+  "diffTruncated": false,
+  "tree": [
+    ".travis.yml",
+    "LICENSE",
+    "path.go",
+    "path_test.go",
+    "router.go",
+    "router_test.go",
+    "tree.go",
+    "tree_test.go"
+  ],
+  "explanation": {
+    "what": "パッケージコメントの \"radix tree based\" を \"trie based\" に変更。NotFound 関数内で req.URL.Path を path 変数に一度だけ束縛してから使うよう整理。ServeHTTP の TSR リダイレクト分岐で、末尾スラッシュの付加/除去後にどちらも共通の http.Redirect 呼び出しへ合流するよう重複コードを削除した。",
+    "why": "コミットメッセージは \"refactoring\" のみで具体的な意図の記載はない。おそらく重複した http.Redirect 呼び出しの統合と、変数の再利用によるコードの簡潔化が目的と考えられる。",
+    "highlights": [
+      { "file": "router.go", "note": "TSR分岐の if/else 両方にあった http.Redirect(w, req, ..., http.StatusMovedPermanently) を1箇所に統合" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "inferred",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

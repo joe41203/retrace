@@ -1,0 +1,57 @@
+{
+  "seq": 140,
+  "sha": "b8b15a273dbacd6945205200fd37807cb7939361",
+  "parents": [
+    "9cf8746fac22178418ddf050451e0b00aa607291"
+  ],
+  "author": {
+    "name": "Julien Schmidt",
+    "email": "github@julienschmidt.com",
+    "date": "2016-02-05T19:36:58+01:00"
+  },
+  "message": "tree: explicitly use node type static\n\nFixes #104",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 1,
+    "deletions": 0
+  },
+  "files": [
+    {
+      "path": "tree.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/tree.go b/tree.go\nindex faf5fdc..eeadec9 100644\n--- a/tree.go\n+++ b/tree.go\n@@ -106,6 +106,7 @@ func (n *node) addRoute(path string, handle Handle) {\n \t\t\t\tchild := node{\n \t\t\t\t\tpath:      n.path[i:],\n \t\t\t\t\twildChild: n.wildChild,\n+\t\t\t\t\tnType:     static,\n \t\t\t\t\tindices:   n.indices,\n \t\t\t\t\tchildren:  n.children,\n \t\t\t\t\thandle:    n.handle,\n",
+  "diffTruncated": false,
+  "tree": [
+    ".travis.yml",
+    "LICENSE",
+    "README.md",
+    "path.go",
+    "path_test.go",
+    "router.go",
+    "router_test.go",
+    "tree.go",
+    "tree_test.go"
+  ],
+  "explanation": {
+    "what": "addRoute 内でノードを分割する際に生成する新しい子ノード(child)の nType フィールドに、明示的に static を代入するようにした。これまでは指定がなく nodeType のゼロ値(static と同じ値の0)に頼っていた。",
+    "why": "コミットメッセージ \"Fixes #104\" の通り、struct のフィールドをゼロ値に暗黙的に依存するのではなく、意図を明示するための修正。seq132 で nodeType の定数が iota ベースに変更され static=0 のままだが、暗黙のゼロ値依存はコードの可読性・将来の定数並び替え耐性の面で問題になり得るため明示化した。",
+    "highlights": [
+      { "file": "tree.go", "note": "分割ノード生成時の複合リテラルに `nType: static` を追加" }
+    ],
+    "langNotes": [
+      { "topic": "struct zero value", "note": "Go の構造体リテラルでフィールドを省略すると、そのフィールドの型のゼロ値(数値型なら0)が入る。nodeType は uint8 ベースの型で static が0のため、省略しても動作上は同じだが、意図を読み手に明示するために書く流儀がある。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

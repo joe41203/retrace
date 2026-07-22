@@ -1,0 +1,57 @@
+{
+  "seq": 37,
+  "sha": "60bcc59c8c55fc6fe45ae600d55c29a92e7ea374",
+  "parents": [
+    "b4f29e2fb50d5050c01e1894a4d466a439d941c5"
+  ],
+  "author": {
+    "name": "Julien Schmidt",
+    "email": "github@julienschmidt.com",
+    "date": "2013-12-14T23:29:43+01:00"
+  },
+  "message": "Improve godoc",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 39,
+    "deletions": 0
+  },
+  "files": [
+    {
+      "path": "router.go",
+      "status": "M",
+      "additions": 39,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/router.go b/router.go\nindex 407e5bf..9361a18 100644\n--- a/router.go\n+++ b/router.go\n@@ -31,6 +31,38 @@\n //      log.Fatal(http.ListenAndServe(\":12345\", router))\n //  }\n //\n+// The router matches incoming requests by the request method and the path.\n+// If a handle is registered for this path and method, the router delegates the\n+// request to that function.\n+// For the methods GET, POST, PUT and DELETE shortcut functions exist to\n+// register handles, for all other methods router.Handle can be used.\n+//\n+// The registered path, against which the router matches incoming requests, can\n+// contain two types of wildcards:\n+//  Syntax    Type\n+//  :name     Parameter\n+//  *name     CatchAll\n+// The value of wildcards is saved in a map as vars[name] = value. The map is\n+// passed to the Handle as a parameter.\n+//\n+// Parameters are variable path segments. They match anything until the next /\n+// or the path end:\n+//  Path: /blog/:category/:post\n+//\n+//  Requests:\n+//   /blog/go/request-routers            match: category=\"go\"; post=\"request-routers\"\n+//   /blog/go/                           no match\n+//   /blog/go/request-routers/comments   no match\n+//\n+// CatchAll wildcards match anything until the path end, including the They must therefore\n+// always be the last element in the defined path.\n+//  Path: /files/*filepath\n+//\n+//  Requests:\n+//   /files/                             match: filepath=\"/\"\n+//   /files/LICENSE                      match: filepath=\"/LICENSE\"\n+//   /files/templates/article.html       match: filepath=\"/templates/article.html\"\n+//   /files                              no match, but the router would redirect\n //\n package httprouter\n \n@@ -116,6 +148,13 @@ func (r *Router) DELETE(path string, handle Handle) {\n }\n \n // Handle registers a new request handle with the given path and method.\n+//\n+// For GET / POST / PUT or DELETE requests the respective shortcut functions can\n+// be used.\n+//\n+// This function is intended to allow the usage of less frequently used,\n+// non-standardized or custom methods (e.g. for internal communication with a\n+// proxy).\n func (r *Router) Handle(method, path string, handle Handle) {\n \tif path[0] != '/' {\n \t\tpanic(\"path must begin with '/'\")\n",
+  "diffTruncated": false,
+  "tree": [
+    ".travis.yml",
+    "LICENSE",
+    "README.md",
+    "path.go",
+    "path_test.go",
+    "router.go",
+    "router_test.go",
+    "tree.go",
+    "tree_test.go"
+  ],
+  "explanation": {
+    "what": "router.go 冒頭のパッケージ godoc コメントを大幅に加筆した。リクエストがメソッドとパスでどう照合されるか、GET/POST/PUT/DELETE のショートカット関数の存在、:name(Parameter)と *name(CatchAll)というワイルドカード構文の表とマッチ例、Handle 関数への godoc も追加している。",
+    "why": "コミットメッセージの通り godoc の改善が目的。README では利用者向けの平易な説明を整えた一方、pkg.go.dev やコード上で直接参照される godoc コメント自体にはまだ詳細な仕様(マッチ規則・ワイルドカード種別)が書かれていなかったため、そちらも同水準に引き上げたと考えられる。",
+    "highlights": [
+      { "file": "router.go", "note": "パッケージコメントに :name / *name のワイルドカード表とマッチ・非マッチ例を追加し、godocとして参照可能な仕様書になった" }
+    ],
+    "langNotes": [
+      { "topic": "godoc コメント規約", "note": "Goでは // で始まる連続コメントがそのままパッケージ・関数のドキュメントとして godoc / pkg.go.dev に抽出される。インデントした行はコード例やテーブルとして等幅表示され、このコミットのようにコメント内に擬似的な表や実行例を書くのがGoエコシステムでの一般的な作法。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

@@ -1,0 +1,55 @@
+{
+  "seq": 66,
+  "sha": "98665328923ace5dbdc9da04c651cfd22072cd13",
+  "parents": [
+    "c2b822d3a5f09b736b66f3f3f17f76c548015385"
+  ],
+  "author": {
+    "name": "Julien Schmidt",
+    "email": "github@julienschmidt.com",
+    "date": "2014-06-08T09:15:16+02:00"
+  },
+  "message": "CleanPath: remove impossible check",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 1,
+    "deletions": 5
+  },
+  "files": [
+    {
+      "path": "path.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 5,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/path.go b/path.go\nindex b040085..486134d 100644\n--- a/path.go\n+++ b/path.go\n@@ -19,6 +19,7 @@ package httprouter\n //\n // If the result of this process is an empty string, \"/\" is returned\n func CleanPath(p string) string {\n+\t// Turn empty string into \"/\"\n \tif p == \"\" {\n \t\treturn \"/\"\n \t}\n@@ -102,11 +103,6 @@ func CleanPath(p string) string {\n \t\tw++\n \t}\n \n-\t// Turn empty string into \"/\"\n-\tif w == 0 {\n-\t\treturn \"/\"\n-\t}\n-\n \tif buf == nil {\n \t\treturn p[:w]\n \t}\n",
+  "diffTruncated": false,
+  "tree": [
+    ".travis.yml",
+    "LICENSE",
+    "README.md",
+    "path.go",
+    "path_test.go",
+    "router.go",
+    "router_test.go",
+    "tree.go",
+    "tree_test.go"
+  ],
+  "explanation": {
+    "what": "CleanPath 内で末尾に `w == 0 の場合に \"/\" を返す` チェックを削除し、代わりに関数冒頭の `p == \"\" の場合に \"/\" を返す` チェックにコメントを追加した。",
+    "why": "コミットメッセージ \"remove impossible check\" の通り、関数冒頭で空文字列は既に \"/\" として早期リターンされているため、その後の処理で書き込みバイト数 w が0になるケースは実際には発生しえない、到達不能なチェックだったための削除。",
+    "highlights": [
+      { "file": "path.go", "note": "末尾の w == 0 チェックを削除、冒頭の空文字列チェックにコメントを追加" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

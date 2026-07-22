@@ -1,0 +1,66 @@
+{
+  "seq": 223,
+  "sha": "59e6ae001480c6e6de7dc6607b33308ccf35419d",
+  "parents": [
+    "ab38d942a0c5f10cff6cb4795b77861c7aad2561"
+  ],
+  "author": {
+    "name": "Julien Schmidt",
+    "email": "git@julienschmidt.com",
+    "date": "2019-10-03T12:40:03+02:00"
+  },
+  "message": "router: use status constants from http package and fix test",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 18,
+    "deletions": 17
+  },
+  "files": [
+    {
+      "path": "router.go",
+      "status": "M",
+      "additions": 3,
+      "deletions": 2,
+      "binary": false
+    },
+    {
+      "path": "router_test.go",
+      "status": "M",
+      "additions": 15,
+      "deletions": 15,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/router.go b/router.go\nindex 9610f71..d42e79a 100644\n--- a/router.go\n+++ b/router.go\n@@ -429,10 +429,11 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {\n \t\t\t}\n \t\t\treturn\n \t\t} else if req.Method != http.MethodConnect && path != \"/\" {\n-\t\t\tcode := 301 // Moved Permanently, request with GET method\n+\t\t\t// Moved Permanently, request with GET method\n+\t\t\tcode := http.StatusMovedPermanently\n \t\t\tif req.Method != http.MethodGet {\n \t\t\t\t// Permanent Redirect, request with same method\n-\t\t\t\tcode = 308\n+\t\t\t\tcode = http.StatusPermanentRedirect\n \t\t\t}\n \n \t\t\tif tsr && r.RedirectTrailingSlash {\ndiff --git a/router_test.go b/router_test.go\nindex 856a4d4..b8f2cef 100644\n--- a/router_test.go\n+++ b/router_test.go\n@@ -395,21 +395,21 @@ func TestRouterNotFound(t *testing.T) {\n \t\tcode     int\n \t\tlocation string\n \t}{\n-\t\t{\"/path/\", 301, \"/path\"},   // TSR -/\n-\t\t{\"/dir\", 301, \"/dir/\"},     // TSR +/\n-\t\t{\"\", 301, \"/\"},             // TSR +/\n-\t\t{\"/PATH\", 301, \"/path\"},    // Fixed Case\n-\t\t{\"/DIR/\", 301, \"/dir/\"},    // Fixed Case\n-\t\t{\"/PATH/\", 301, \"/path\"},   // Fixed Case -/\n-\t\t{\"/DIR\", 301, \"/dir/\"},     // Fixed Case +/\n-\t\t{\"/../path\", 301, \"/path\"}, // CleanPath\n-\t\t{\"/nope\", 404, \"\"},         // NotFound\n+\t\t{\"/path/\", http.StatusMovedPermanently, \"/path\"},   // TSR -/\n+\t\t{\"/dir\", http.StatusMovedPermanently, \"/dir/\"},     // TSR +/\n+\t\t{\"\", http.StatusMovedPermanently, \"/\"},             // TSR +/\n+\t\t{\"/PATH\", http.StatusMovedPermanently, \"/path\"},    // Fixed Case\n+\t\t{\"/DIR/\", http.StatusMovedPermanently, \"/dir/\"},    // Fixed Case\n+\t\t{\"/PATH/\", http.StatusMovedPermanently, \"/path\"},   // Fixed Case -/\n+\t\t{\"/DIR\", http.StatusMovedPermanently, \"/dir/\"},     // Fixed Case +/\n+\t\t{\"/../path\", http.StatusMovedPermanently, \"/path\"}, // CleanPath\n+\t\t{\"/nope\", http.StatusNotFound, \"\"},                 // NotFound\n \t}\n \tfor _, tr := range testRoutes {\n \t\tr, _ := http.NewRequest(http.MethodGet, tr.route, nil)\n \t\tw := httptest.NewRecorder()\n \t\trouter.ServeHTTP(w, r)\n-\t\tif !(w.Code == tr.code && (w.Code == 404 || fmt.Sprint(w.Header().Get(\"Location\")) == tr.location)) {\n+\t\tif !(w.Code == tr.code && (w.Code == http.StatusNotFound || fmt.Sprint(w.Header().Get(\"Location\")) == tr.location)) {\n \t\t\tt.Errorf(\"NotFound handling route %s failed: Code=%d, Header=%v\", tr.route, w.Code, w.Header().Get(\"Location\"))\n \t\t}\n \t}\n@@ -417,22 +417,22 @@ func TestRouterNotFound(t *testing.T) {\n \t// Test custom not found handler\n \tvar notFound bool\n \trouter.NotFound = http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {\n-\t\trw.WriteHeader(404)\n+\t\trw.WriteHeader(http.StatusNotFound)\n \t\tnotFound = true\n \t})\n \tr, _ := http.NewRequest(http.MethodGet, \"/nope\", nil)\n \tw := httptest.NewRecorder()\n \trouter.ServeHTTP(w, r)\n-\tif !(w.Code == 404 && notFound == true) {\n+\tif !(w.Code == http.StatusNotFound && notFound == true) {\n \t\tt.Errorf(\"Custom NotFound handler failed: Code=%d, Header=%v\", w.Code, w.Header())\n \t}\n \n-\t// Test other method than GET (want 307 instead of 301)\n+\t// Test other method than GET (want 308 instead of 301)\n \trouter.PATCH(\"/path\", handlerFunc)\n \tr, _ = http.NewRequest(http.MethodPatch, \"/path/\", nil)\n \tw = httptest.NewRecorder()\n \trouter.ServeHTTP(w, r)\n-\tif !(w.Code == 307 && fmt.Sprint(w.Header()) == \"map[Location:[/path]]\") {\n+\tif !(w.Code == http.StatusPermanentRedirect && fmt.Sprint(w.Header()) == \"map[Location:[/path]]\") {\n \t\tt.Errorf(\"Custom NotFound handler failed: Code=%d, Header=%v\", w.Code, w.Header())\n \t}\n \n@@ -442,7 +442,7 @@ func TestRouterNotFound(t *testing.T) {\n \tr, _ = http.NewRequest(http.MethodGet, \"/\", nil)\n \tw = httptest.NewRecorder()\n \trouter.ServeHTTP(w, r)\n-\tif !(w.Code == 404) {\n+\tif !(w.Code == http.StatusNotFound) {\n \t\tt.Errorf(\"NotFound handling route / failed: Code=%d\", w.Code)\n \t}\n }\n",
+  "diffTruncated": false,
+  "tree": [
+    ".travis.yml",
+    "LICENSE",
+    "README.md",
+    "go.mod",
+    "path.go",
+    "path_test.go",
+    "router.go",
+    "router_test.go",
+    "tree.go",
+    "tree_test.go"
+  ],
+  "explanation": {
+    "what": "ServeHTTP 内でリテラルの301/308をそれぞれ http.StatusMovedPermanently / http.StatusPermanentRedirect に置き換えた。router_test.go 側もマジックナンバー(301, 404, 307)をすべて http パッケージの定数(http.StatusMovedPermanently, http.StatusNotFound, http.StatusPermanentRedirect)に統一し、前コミットで307のまま残っていたテストのアサーションも308相当の定数に修正している。",
+    "why": "前コミットでコード側は307から308へ変更されたが、router_test.go には期待値307のままの古いテスト(\"want 307 instead of 301\")が残っており、それを含めてステータスコードの表記をマジックナンバーから可読な標準ライブラリ定数に揃える整理。",
+    "highlights": [
+      { "file": "router.go", "note": "301/308 を http.StatusMovedPermanently / http.StatusPermanentRedirect に置換" },
+      { "file": "router_test.go", "note": "テストの期待値307が308(http.StatusPermanentRedirect)に修正され、コメントも \"want 308 instead of 301\" に更新" }
+    ],
+    "langNotes": [
+      { "topic": "net/http のステータスコード定数", "note": "Go標準ライブラリの net/http パッケージは http.StatusOK, http.StatusNotFound など主要なHTTPステータスコードを定数として提供する。マジックナンバーの301/404より意図が読み取りやすく、golint 等の静的解析でも推奨される書き方。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

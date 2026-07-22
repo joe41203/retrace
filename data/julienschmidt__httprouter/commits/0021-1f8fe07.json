@@ -1,0 +1,65 @@
+{
+  "seq": 21,
+  "sha": "1f8fe070234a39b78b59f75ba22e639aecc4c499",
+  "parents": [
+    "8099e9495a3c9f26e4d2c5563718f351b8408d1c"
+  ],
+  "author": {
+    "name": "Julien Schmidt",
+    "email": "github@julienschmidt.com",
+    "date": "2013-12-14T10:46:51+01:00"
+  },
+  "message": "Improve the behavior of catchAll routes",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 71,
+    "deletions": 37
+  },
+  "files": [
+    {
+      "path": "tree.go",
+      "status": "M",
+      "additions": 64,
+      "deletions": 33,
+      "binary": false
+    },
+    {
+      "path": "tree_test.go",
+      "status": "M",
+      "additions": 7,
+      "deletions": 4,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/tree.go b/tree.go\nindex 5f4eb3c..761ac02 100644\n--- a/tree.go\n+++ b/tree.go\n@@ -96,6 +96,10 @@ func (n *node) addRoute(method, path string, handle Handle) {\n \t\t\t\treturn\n \n \t\t\t} else if i == len(path) { // Make node a (in-path) leaf\n+\t\t\t\tif n.wildChild && n.children[0].isCatchAll {\n+\t\t\t\t\tpanic(\"conflict with catchAll route\")\n+\t\t\t\t}\n+\n \t\t\t\tif n.handle == nil {\n \t\t\t\t\tn.handle = map[string]Handle{\n \t\t\t\t\t\tmethod: handle,\n@@ -136,36 +140,64 @@ func (n *node) insertChild(method, path string, handle Handle) {\n \t\t\t\tpanic(\"wildcards must be named with a non-empty name\")\n \t\t\t}\n \n-\t\t\tif b == '*' && len(path) != k {\n-\t\t\t\tpanic(\"catchAlls are only allowed at the end of the path\")\n-\t\t\t}\n+\t\t\tif b == ':' { // param\n+\t\t\t\t// split path at the beginning of the wildcard\n+\t\t\t\tif i > 0 {\n+\t\t\t\t\tn.path = path[offset:i]\n+\t\t\t\t\toffset = i\n+\t\t\t\t}\n \n-\t\t\t// split path at the beginning of the wildcard\n-\t\t\tchild := &node{}\n-\t\t\tif b == ':' {\n-\t\t\t\tchild.isParam = true\n-\t\t\t} else {\n-\t\t\t\tchild.isCatchAll = true\n-\t\t\t}\n+\t\t\t\tchild := &node{\n+\t\t\t\t\tisParam: true,\n+\t\t\t\t}\n+\t\t\t\tn.children = []*node{child}\n+\t\t\t\tn.wildChild = true\n+\t\t\t\tn = child\n \n-\t\t\tif i > 0 {\n-\t\t\t\tn.path = path[offset:i]\n-\t\t\t\toffset = i\n-\t\t\t}\n+\t\t\t\t// if the path doesn't end with the wildcard, then there will be\n+\t\t\t\t// another non-wildcard subpath starting with '/'\n+\t\t\t\tif k < j {\n+\t\t\t\t\tn.path = path[offset:k]\n+\t\t\t\t\toffset = k\n+\n+\t\t\t\t\tchild := &node{}\n+\t\t\t\t\tn.children = []*node{child}\n+\t\t\t\t\tn = child\n+\t\t\t\t}\n \n-\t\t\tn.children = []*node{child}\n-\t\t\tn.wildChild = true\n-\t\t\tn = child\n+\t\t\t} else { // catchAll\n+\t\t\t\tif len(path) != k {\n+\t\t\t\t\tpanic(\"catchAlls are only allowed at the end of the path\")\n+\t\t\t\t}\n \n-\t\t\t// if the path doesn't end with the wildcard, then there will be\n-\t\t\t// another non-wildcard subpath starting with '/'\n-\t\t\tif k < j {\n-\t\t\t\tn.path = path[offset:k]\n-\t\t\t\toffset = k\n+\t\t\t\t// currently fixed width 1 for '/'\n+\t\t\t\ti--\n+\t\t\t\tif path[i] != '/' {\n+\t\t\t\t\tpanic(\"no / before catchAll\")\n+\t\t\t\t}\n \n-\t\t\t\tchild := &node{}\n+\t\t\t\tn.path = path[offset:i]\n+\n+\t\t\t\t// first node: catchAll node with empty path\n+\t\t\t\tchild := &node{\n+\t\t\t\t\tisCatchAll: true,\n+\t\t\t\t\twildChild:  true,\n+\t\t\t\t}\n \t\t\t\tn.children = []*node{child}\n+\t\t\t\tn.indices = []byte{path[i]}\n \t\t\t\tn = child\n+\n+\t\t\t\t// second node: node holding the variable\n+\t\t\t\tchild = &node{\n+\t\t\t\t\tpath: path[i:],\n+\t\t\t\t\thandle: map[string]Handle{\n+\t\t\t\t\t\tmethod: handle,\n+\t\t\t\t\t},\n+\t\t\t\t\tisCatchAll: true,\n+\t\t\t\t}\n+\t\t\t\tn.children = []*node{child}\n+\n+\t\t\t\treturn\n \t\t\t}\n \t\t}\n \t}\n@@ -195,7 +227,7 @@ OUTER:\n \t\t\t}\n \n \t\t\t// No handle found. Check if a handle for this path + a\n-\t\t\t// trailing slash exists for TSR recommendation\n+\t\t\t// trailing slash exists for trailing slash recommendation\n \t\t\tfor i, index := range n.indices {\n \t\t\t\tif index == '/' {\n \t\t\t\t\tn = n.children[i]\n@@ -209,14 +241,13 @@ OUTER:\n \n \t\t\treturn\n \n-\t\t} else if n.wildChild == true {\n+\t\t} else if n.wildChild {\n \t\t\tn = n.children[0]\n \n \t\t\tif n.isParam {\n \t\t\t\t// find param end (either '/'' or path end)\n \t\t\t\tk := 0\n-\t\t\t\tl := len(path)\n-\t\t\t\tfor k < l && path[k] != '/' {\n+\t\t\t\tfor k < len(path) && path[k] != '/' {\n \t\t\t\t\tk++\n \t\t\t\t}\n \n@@ -230,13 +261,13 @@ OUTER:\n \t\t\t\t}\n \n \t\t\t\t// we need to go deeper!\n-\t\t\t\tif k < l {\n+\t\t\t\tif k < len(path) {\n \t\t\t\t\tif len(n.children) > 0 {\n \t\t\t\t\t\tpath = path[k:]\n \t\t\t\t\t\tn = n.children[0]\n \t\t\t\t\t\tcontinue\n \t\t\t\t\t} else { // ... but we can't\n-\t\t\t\t\t\ttsr = (l == k+1)\n+\t\t\t\t\t\ttsr = (len(path) == k+1)\n \t\t\t\t\t\treturn\n \t\t\t\t\t}\n \t\t\t\t}\n@@ -259,10 +290,10 @@ OUTER:\n \t\t\t\t// save catchAll value\n \t\t\t\tif vars == nil {\n \t\t\t\t\tvars = map[string]string{\n-\t\t\t\t\t\tn.path[1:]: path,\n+\t\t\t\t\t\tn.path[2:]: path,\n \t\t\t\t\t}\n \t\t\t\t} else {\n-\t\t\t\t\tvars[n.path[1:]] = path\n+\t\t\t\t\tvars[n.path[2:]] = path\n \t\t\t\t}\n \n \t\t\t\thandle = n.handle[method]\n@@ -279,8 +310,8 @@ OUTER:\n \t\t\t\t}\n \t\t\t}\n \n-\t\t\t// Nothing found. We can recommend to redirect to the same URL without\n-\t\t\t// a trailing slash if a leaf exists for that path\n+\t\t\t// Nothing found. We can recommend to redirect to the same URL\n+\t\t\t// without a trailing slash if a leaf exists for that path\n \t\t\ttsr = (path == \"/\" && n.handle[method] != nil)\n \t\t\treturn\n \t\t}\ndiff --git a/tree_test.go b/tree_test.go\nindex 5e0de6c..c6b4f32 100644\n--- a/tree_test.go\n+++ b/tree_test.go\n@@ -12,7 +12,7 @@ import (\n )\n \n func printChildren(n *node, prefix string) {\n-\tfmt.Printf(\"%s%s[%d]  %v \\r\\n\", prefix, n.path, len(n.children), n.handle)\n+\tfmt.Printf(\"%s%s[%d]  %v %t \\r\\n\", prefix, n.path, len(n.children), n.handle, n.wildChild)\n \tfor l := len(n.path); l > 0; l-- {\n \t\tprefix += \" \"\n \t}\n@@ -120,8 +120,8 @@ func TestTreeWildcard(t *testing.T) {\n \t\t{\"/cmd/test/\", false, \"/cmd/:tool/\", map[string]string{\"tool\": \"test\"}},\n \t\t{\"/cmd/test\", true, \"\", map[string]string{\"tool\": \"test\"}},\n \t\t{\"/cmd/test/3\", false, \"/cmd/:tool/:sub\", map[string]string{\"tool\": \"test\", \"sub\": \"3\"}},\n-\t\t{\"/src/\", true, \"\", nil},\n-\t\t{\"/src/some/file.png\", false, \"/src/*filepath\", map[string]string{\"filepath\": \"some/file.png\"}},\n+\t\t{\"/src/\", false, \"/src/*filepath\", map[string]string{\"filepath\": \"/\"}},\n+\t\t{\"/src/some/file.png\", false, \"/src/*filepath\", map[string]string{\"filepath\": \"/some/file.png\"}},\n \t\t{\"/search/\", false, \"/search/\", nil},\n \t\t{\"/search/someth!ng+in+ünìcodé\", false, \"/search/:query\", map[string]string{\"query\": \"someth!ng+in+ünìcodé\"}},\n \t\t{\"/search/someth!ng+in+ünìcodé/\", true, \"\", map[string]string{\"query\": \"someth!ng+in+ünìcodé\"}},\n@@ -170,6 +170,9 @@ func TestTreeWildcardConflict(t *testing.T) {\n \t\t{\"/cmd/vet\", true},\n \t\t{\"/src/*filepath\", false},\n \t\t{\"/src/*filepathx\", true},\n+\t\t{\"/src/\", true},\n+\t\t{\"/src1/\", false},\n+\t\t{\"/src1/*filepath\", true},\n \t\t{\"/search/:query\", false},\n \t\t{\"/search/invalid\", true},\n \t\t{\"/user_:name\", false},\n@@ -229,7 +232,7 @@ func TestTreeDupliatePath(t *testing.T) {\n \tcheckRequests(t, tree, testRequests{\n \t\t{\"/\", false, \"/\", nil},\n \t\t{\"/doc/\", false, \"/doc/\", nil},\n-\t\t{\"/src/some/file.png\", false, \"/src/*filepath\", map[string]string{\"filepath\": \"some/file.png\"}},\n+\t\t{\"/src/some/file.png\", false, \"/src/*filepath\", map[string]string{\"filepath\": \"/some/file.png\"}},\n \t\t{\"/search/someth!ng+in+ünìcodé\", false, \"/search/:query\", map[string]string{\"query\": \"someth!ng+in+ünìcodé\"}},\n \t\t{\"/user_gopher\", false, \"/user_:name\", map[string]string{\"name\": \"gopher\"}},\n \t})\n",
+  "diffTruncated": false,
+  "tree": [
+    ".travis.yml",
+    "LICENSE",
+    "path.go",
+    "path_test.go",
+    "router.go",
+    "router_test.go",
+    "tree.go",
+    "tree_test.go"
+  ],
+  "explanation": {
+    "what": "tree.go の insertChild と getValue を書き換え、catchAll(*param)ルートの木構造と検索処理を変更した。catchAll は「空パスの中間ノード(isCatchAll, wildChild)」と「実際のパスと handle を持つ子ノード(isCatchAll)」の2階層に分割されるようになった。合わせて、catchAll で捕捉した値を vars に格納する際のキーが n.path[1:] から n.path[2:] に変わり(例: /src/some/file.png → filepath の値が \"some/file.png\" から \"/some/file.png\" に変化)、addRoute 側にも wildChild の子が既に isCatchAll のノードへさらにルートを登録しようとした場合に panic するチェックが追加された。tree_test.go のテストケースも新しい挙動に合わせて更新されている。",
+    "why": "おそらく、catchAll ノードを2階層に分けたことで「\"/src/\" のように catchAll の直前で終わるパス」もTSR(末尾スラッシュ)判定やindices探索の対象にできるようにする狙いがあったと考えられる。実際このコミット以降、TestTreeWildcardConflict に \"/src/\" \"/src1/\" \"/src1/*filepath\" のケースが追加されており、catchAll と通常セグメントの衝突検出を木構造レベルで正しく扱えるようにする意図が読み取れる。",
+    "highlights": [
+      { "file": "tree.go", "note": "insertChild の catchAll 分岐: 空パスの isCatchAll ノードと、実パスを持つ isCatchAll 子ノードの2段構成に変更" },
+      { "file": "tree_test.go", "note": "filepath の値が先頭に \"/\" を含むようになった変更(\"some/file.png\" → \"/some/file.png\")" }
+    ],
+    "langNotes": [],
+    "diagram": {
+      "mermaid": "flowchart TD\n  A[\"/src (node)\"] --> B[\"catchAll node (empty path, wildChild)\"]\n  B --> C[\"*filepath node (path=\\\"/filepath\\\", handle set)\"]",
+      "caption": "catchAll ルートは空パスの中間ノードと実パスを持つ子ノードの2階層に分割される"
+    },
+    "evidence": "inferred",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

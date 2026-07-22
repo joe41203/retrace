@@ -1,0 +1,63 @@
+{
+  "seq": 149,
+  "sha": "153d9c9fa8b6a5995c6a300cca099e1f3408733f",
+  "parents": [
+    "2c34ec888a7359c0750064e0a4c8df360806c255"
+  ],
+  "author": {
+    "name": "Julien Schmidt",
+    "email": "git@julienschmidt.com",
+    "date": "2016-02-15T13:44:08+01:00"
+  },
+  "message": "Add OPTIONS to list in Allow header\n\nFixes #132",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 34,
+    "deletions": 33
+  },
+  "files": [
+    {
+      "path": "router.go",
+      "status": "M",
+      "additions": 26,
+      "deletions": 25,
+      "binary": false
+    },
+    {
+      "path": "router_test.go",
+      "status": "M",
+      "additions": 8,
+      "deletions": 8,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/router.go b/router.go\nindex f18a678..bb17330 100644\n--- a/router.go\n+++ b/router.go\n@@ -294,14 +294,12 @@ func (r *Router) Lookup(method, path string) (Handle, Params, bool) {\n }\n \n func (r *Router) allowed(path, reqMethod string) (allow string) {\n-\tfor method := range r.trees {\n-\t\t// Skip the requested method - we already tried this one\n-\t\tif method == reqMethod || method == \"OPTIONS\" {\n-\t\t\tcontinue\n-\t\t}\n+\tif path == \"*\" { // server-wide\n+\t\tfor method := range r.trees {\n+\t\t\tif method == \"OPTIONS\" {\n+\t\t\t\tcontinue\n+\t\t\t}\n \n-\t\thandle, _, _ := r.trees[method].getValue(path)\n-\t\tif handle != nil {\n \t\t\t// add request method to list of allowed methods\n \t\t\tif len(allow) == 0 {\n \t\t\t\tallow = method\n@@ -309,6 +307,26 @@ func (r *Router) allowed(path, reqMethod string) (allow string) {\n \t\t\t\tallow += \", \" + method\n \t\t\t}\n \t\t}\n+\t} else { // specific path\n+\t\tfor method := range r.trees {\n+\t\t\t// Skip the requested method - we already tried this one\n+\t\t\tif method == reqMethod || method == \"OPTIONS\" {\n+\t\t\t\tcontinue\n+\t\t\t}\n+\n+\t\t\thandle, _, _ := r.trees[method].getValue(path)\n+\t\t\tif handle != nil {\n+\t\t\t\t// add request method to list of allowed methods\n+\t\t\t\tif len(allow) == 0 {\n+\t\t\t\t\tallow = method\n+\t\t\t\t} else {\n+\t\t\t\t\tallow += \", \" + method\n+\t\t\t\t}\n+\t\t\t}\n+\t\t}\n+\t}\n+\tif len(allow) > 0 {\n+\t\tallow += \", OPTIONS\"\n \t}\n \treturn\n }\n@@ -361,24 +379,7 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {\n \tif req.Method == \"OPTIONS\" {\n \t\t// Handle OPTIONS requests\n \t\tif r.HandleOPTIONS {\n-\t\t\tvar allow string\n-\t\t\tif path == \"*\" { // server OPTIONS\n-\t\t\t\tfor method := range r.trees {\n-\t\t\t\t\tif method == \"OPTIONS\" {\n-\t\t\t\t\t\tcontinue\n-\t\t\t\t\t}\n-\n-\t\t\t\t\t// add request method to list of allowed methods\n-\t\t\t\t\tif len(allow) == 0 {\n-\t\t\t\t\t\tallow = method\n-\t\t\t\t\t} else {\n-\t\t\t\t\t\tallow += \", \" + method\n-\t\t\t\t\t}\n-\t\t\t\t}\n-\t\t\t} else { // path OPTIONS\n-\t\t\t\tallow = r.allowed(path, req.Method)\n-\t\t\t}\n-\t\t\tif len(allow) > 0 {\n+\t\t\tif allow := r.allowed(path, req.Method); len(allow) > 0 {\n \t\t\t\tw.Header().Set(\"Allow\", allow)\n \t\t\t\treturn\n \t\t\t}\ndiff --git a/router_test.go b/router_test.go\nindex db57740..88895a3 100644\n--- a/router_test.go\n+++ b/router_test.go\n@@ -229,7 +229,7 @@ func TestRouterOPTIONS(t *testing.T) {\n \trouter.ServeHTTP(w, r)\n \tif !(w.Code == http.StatusOK) {\n \t\tt.Errorf(\"OPTIONS handling failed: Code=%d, Header=%v\", w.Code, w.Header())\n-\t} else if allow := w.Header().Get(\"Allow\"); allow != \"POST\" {\n+\t} else if allow := w.Header().Get(\"Allow\"); allow != \"POST, OPTIONS\" {\n \t\tt.Error(\"unexpected Allow header value: \" + allow)\n \t}\n \n@@ -239,7 +239,7 @@ func TestRouterOPTIONS(t *testing.T) {\n \trouter.ServeHTTP(w, r)\n \tif !(w.Code == http.StatusOK) {\n \t\tt.Errorf(\"OPTIONS handling failed: Code=%d, Header=%v\", w.Code, w.Header())\n-\t} else if allow := w.Header().Get(\"Allow\"); allow != \"POST\" {\n+\t} else if allow := w.Header().Get(\"Allow\"); allow != \"POST, OPTIONS\" {\n \t\tt.Error(\"unexpected Allow header value: \" + allow)\n \t}\n \n@@ -260,7 +260,7 @@ func TestRouterOPTIONS(t *testing.T) {\n \trouter.ServeHTTP(w, r)\n \tif !(w.Code == http.StatusOK) {\n \t\tt.Errorf(\"OPTIONS handling failed: Code=%d, Header=%v\", w.Code, w.Header())\n-\t} else if allow := w.Header().Get(\"Allow\"); allow != \"POST, GET\" && allow != \"GET, POST\" {\n+\t} else if allow := w.Header().Get(\"Allow\"); allow != \"POST, GET, OPTIONS\" && allow != \"GET, POST, OPTIONS\" {\n \t\tt.Error(\"unexpected Allow header value: \" + allow)\n \t}\n \n@@ -270,7 +270,7 @@ func TestRouterOPTIONS(t *testing.T) {\n \trouter.ServeHTTP(w, r)\n \tif !(w.Code == http.StatusOK) {\n \t\tt.Errorf(\"OPTIONS handling failed: Code=%d, Header=%v\", w.Code, w.Header())\n-\t} else if allow := w.Header().Get(\"Allow\"); allow != \"POST, GET\" && allow != \"GET, POST\" {\n+\t} else if allow := w.Header().Get(\"Allow\"); allow != \"POST, GET, OPTIONS\" && allow != \"GET, POST, OPTIONS\" {\n \t\tt.Error(\"unexpected Allow header value: \" + allow)\n \t}\n \n@@ -287,7 +287,7 @@ func TestRouterOPTIONS(t *testing.T) {\n \trouter.ServeHTTP(w, r)\n \tif !(w.Code == http.StatusOK) {\n \t\tt.Errorf(\"OPTIONS handling failed: Code=%d, Header=%v\", w.Code, w.Header())\n-\t} else if allow := w.Header().Get(\"Allow\"); allow != \"POST, GET\" && allow != \"GET, POST\" {\n+\t} else if allow := w.Header().Get(\"Allow\"); allow != \"POST, GET, OPTIONS\" && allow != \"GET, POST, OPTIONS\" {\n \t\tt.Error(\"unexpected Allow header value: \" + allow)\n \t}\n \tif custom {\n@@ -318,7 +318,7 @@ func TestRouterNotAllowed(t *testing.T) {\n \trouter.ServeHTTP(w, r)\n \tif !(w.Code == http.StatusMethodNotAllowed) {\n \t\tt.Errorf(\"NotAllowed handling failed: Code=%d, Header=%v\", w.Code, w.Header())\n-\t} else if allow := w.Header().Get(\"Allow\"); allow != \"POST\" {\n+\t} else if allow := w.Header().Get(\"Allow\"); allow != \"POST, OPTIONS\" {\n \t\tt.Error(\"unexpected Allow header value: \" + allow)\n \t}\n \n@@ -332,7 +332,7 @@ func TestRouterNotAllowed(t *testing.T) {\n \trouter.ServeHTTP(w, r)\n \tif !(w.Code == http.StatusMethodNotAllowed) {\n \t\tt.Errorf(\"NotAllowed handling failed: Code=%d, Header=%v\", w.Code, w.Header())\n-\t} else if allow := w.Header().Get(\"Allow\"); allow != \"POST, DELETE\" && allow != \"DELETE, POST\" {\n+\t} else if allow := w.Header().Get(\"Allow\"); allow != \"POST, DELETE, OPTIONS\" && allow != \"DELETE, POST, OPTIONS\" {\n \t\tt.Error(\"unexpected Allow header value: \" + allow)\n \t}\n \n@@ -350,7 +350,7 @@ func TestRouterNotAllowed(t *testing.T) {\n \tif w.Code != http.StatusTeapot {\n \t\tt.Errorf(\"unexpected response code %d want %d\", w.Code, http.StatusTeapot)\n \t}\n-\tif allow := w.Header().Get(\"Allow\"); allow != \"POST, DELETE\" && allow != \"DELETE, POST\" {\n+\tif allow := w.Header().Get(\"Allow\"); allow != \"POST, DELETE, OPTIONS\" && allow != \"DELETE, POST, OPTIONS\" {\n \t\tt.Error(\"unexpected Allow header value: \" + allow)\n \t}\n }\n",
+  "diffTruncated": false,
+  "tree": [
+    ".travis.yml",
+    "LICENSE",
+    "README.md",
+    "path.go",
+    "path_test.go",
+    "router.go",
+    "router_test.go",
+    "tree.go",
+    "tree_test.go"
+  ],
+  "explanation": {
+    "what": "allowed() メソッドを、path == \"*\" のサーバ全体向けと特定パス向けの2分岐にリファクタリングし、収集した許可メソッド一覧の末尾に必ず \"OPTIONS\" 自身を追加するようにした。あわせて ServeHTTP 側でサーバ全体向け OPTIONS 処理を allowed() 呼び出しに一本化し、重複していたロジックを削除した。テストの期待値もすべて \"POST, OPTIONS\" のように OPTIONS を含む形に更新している。",
+    "why": "コミットメッセージに \"Fixes #132\" とあり、Allow ヘッダに OPTIONS メソッド自体が含まれていなかった問題を修正する変更。OPTIONS リクエスト自体をルータが処理できる以上、Allow ヘッダにも OPTIONS を含めるのが仕様上正しいという判断による。",
+    "highlights": [
+      { "file": "router.go", "note": "allowed() 内で server-wide と specific path の分岐がより明確な if/else 構造になった" },
+      { "file": "router_test.go", "note": "TestRouterOPTIONS と TestRouterNotAllowed の期待 Allow 値がすべて \", OPTIONS\" 付きに変わっている" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

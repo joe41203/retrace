@@ -1,0 +1,56 @@
+{
+  "seq": 217,
+  "sha": "19b98be7737c102a3b78ca81c8d0e81040c4ad36",
+  "parents": [
+    "aa49b73dd2de41212264bf71211d8681829c71d8"
+  ],
+  "author": {
+    "name": "Julien Schmidt",
+    "email": "git@julienschmidt.com",
+    "date": "2019-09-30T10:07:34+02:00"
+  },
+  "message": "tree: optimize countParams",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 3,
+    "deletions": 9
+  },
+  "files": [
+    {
+      "path": "tree.go",
+      "status": "M",
+      "additions": 3,
+      "deletions": 9,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/tree.go b/tree.go\nindex 512309a..df86a68 100644\n--- a/tree.go\n+++ b/tree.go\n@@ -17,20 +17,14 @@ func min(a, b int) int {\n \treturn b\n }\n \n-const maxParamCount uint16 = ^uint16(0)\n-\n func countParams(path string) uint16 {\n \tvar n uint\n \tfor i := 0; i < len(path); i++ {\n-\t\tif path[i] != ':' && path[i] != '*' {\n-\t\t\tcontinue\n+\t\tswitch path[i] {\n+\t\tcase ':', '*':\n+\t\t\tn++\n \t\t}\n-\t\tn++\n \t}\n-\tif n >= uint(maxParamCount) {\n-\t\treturn maxParamCount\n-\t}\n-\n \treturn uint16(n)\n }\n \n",
+  "diffTruncated": false,
+  "tree": [
+    ".travis.yml",
+    "LICENSE",
+    "README.md",
+    "go.mod",
+    "path.go",
+    "path_test.go",
+    "router.go",
+    "router_test.go",
+    "tree.go",
+    "tree_test.go"
+  ],
+  "explanation": {
+    "what": "countParams から `maxParamCount` 定数と、その上限に達したときの早期リターン処理を削除し、ループ本体を if 文から switch 文に書き換えた。カウント方式自体(':' と '*' の出現数を数える)は変わっていない。",
+    "why": "コミットメッセージ「optimize countParams」の通り高速化目的。前コミットまでで maxParams は uint8 から uint16 に拡張されており、oob(オーバーフロー)を心配するほど大きなパス数は現実的に想定しなくてよくなったため、上限チェックの分岐そのものを削って単純化・高速化したと考えられる。",
+    "highlights": [
+      { "file": "tree.go", "note": "maxParamCount によるキャップ処理を削除し、switch path[i] { case ':', '*': } のシンプルな数え上げに一本化" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

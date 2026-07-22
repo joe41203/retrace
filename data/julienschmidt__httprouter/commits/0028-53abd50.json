@@ -1,0 +1,54 @@
+{
+  "seq": 28,
+  "sha": "53abd5013eba81b3681a236bcdbdd6b1dab85c95",
+  "parents": [
+    "8550d9062e26c5a0cb70ee61b6af3665a30796ae"
+  ],
+  "author": {
+    "name": "Julien Schmidt",
+    "email": "github@julienschmidt.com",
+    "date": "2013-12-14T13:24:14+01:00"
+  },
+  "message": "Add Router API test",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 53,
+    "deletions": 0
+  },
+  "files": [
+    {
+      "path": "router_test.go",
+      "status": "M",
+      "additions": 53,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/router_test.go b/router_test.go\nindex f875a19..a763219 100644\n--- a/router_test.go\n+++ b/router_test.go\n@@ -48,6 +48,59 @@ func TestRouter(t *testing.T) {\n \t}\n }\n \n+func TestRouterAPI(t *testing.T) {\n+\tvar get, post, put, delete, handlerFunc bool\n+\n+\trouter := New()\n+\trouter.GET(\"/GET\", func(w http.ResponseWriter, r *http.Request, _ map[string]string) {\n+\t\tget = true\n+\t})\n+\trouter.POST(\"/POST\", func(w http.ResponseWriter, r *http.Request, _ map[string]string) {\n+\t\tpost = true\n+\t})\n+\trouter.PUT(\"/PUT\", func(w http.ResponseWriter, r *http.Request, _ map[string]string) {\n+\t\tput = true\n+\t})\n+\trouter.DELETE(\"/DELETE\", func(w http.ResponseWriter, r *http.Request, _ map[string]string) {\n+\t\tdelete = true\n+\t})\n+\trouter.HandlerFunc(\"GET\", \"/HandlerFunc\", func(w http.ResponseWriter, r *http.Request) {\n+\t\thandlerFunc = true\n+\t})\n+\n+\tw := new(mockResponseWriter)\n+\n+\tr, _ := http.NewRequest(\"GET\", \"/GET\", nil)\n+\trouter.ServeHTTP(w, r)\n+\tif !get {\n+\t\tt.Error(\"routing GET failed\")\n+\t}\n+\n+\tr, _ = http.NewRequest(\"POST\", \"/POST\", nil)\n+\trouter.ServeHTTP(w, r)\n+\tif !post {\n+\t\tt.Error(\"routing POST failed\")\n+\t}\n+\n+\tr, _ = http.NewRequest(\"PUT\", \"/PUT\", nil)\n+\trouter.ServeHTTP(w, r)\n+\tif !put {\n+\t\tt.Error(\"routing PUT failed\")\n+\t}\n+\n+\tr, _ = http.NewRequest(\"DELETE\", \"/DELETE\", nil)\n+\trouter.ServeHTTP(w, r)\n+\tif !delete {\n+\t\tt.Error(\"routing DELETE failed\")\n+\t}\n+\n+\tr, _ = http.NewRequest(\"GET\", \"/HandlerFunc\", nil)\n+\trouter.ServeHTTP(w, r)\n+\tif !handlerFunc {\n+\t\tt.Error(\"routing HandlerFunc failed\")\n+\t}\n+}\n+\n func TestRouterPanicHandler(t *testing.T) {\n \trouter := New()\n \tpanicHandled := false\n",
+  "diffTruncated": false,
+  "tree": [
+    ".travis.yml",
+    "LICENSE",
+    "path.go",
+    "path_test.go",
+    "router.go",
+    "router_test.go",
+    "tree.go",
+    "tree_test.go"
+  ],
+  "explanation": {
+    "what": "router_test.go に TestRouterAPI を追加した。GET/POST/PUT/DELETE の各ショートカットメソッドと HandlerFunc アダプタそれぞれについて、ルート登録後に mockResponseWriter 経由で ServeHTTP を呼び出し、対応するハンドラのフラグ(get, post, put, delete, handlerFunc)が立つことを検証する。",
+    "why": "件名の通り、Router の公開 API(HTTPメソッドごとのルーティングと HandlerFunc アダプタ)が実際に正しくディスパッチされることを一括で確認するテストを追加している。",
+    "highlights": [
+      { "file": "router_test.go", "note": "TestRouterAPI: GET/POST/PUT/DELETE と HandlerFunc アダプタの一括疎通確認" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

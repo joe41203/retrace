@@ -1,0 +1,69 @@
+{
+  "seq": 246,
+  "sha": "0a8b88a57ebc6ee00c2aa568bd88e318a598232b",
+  "parents": [
+    "4d33e11c88aafaaffcd28c1300128fad2f50ce2b"
+  ],
+  "author": {
+    "name": "Julien Schmidt",
+    "email": "git@julienschmidt.com",
+    "date": "2020-01-12T21:46:47+01:00"
+  },
+  "message": "router: save matched route path to Params",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 39,
+    "deletions": 33
+  },
+  "files": [
+    {
+      "path": "router.go",
+      "status": "M",
+      "additions": 31,
+      "deletions": 23,
+      "binary": false
+    },
+    {
+      "path": "router_test.go",
+      "status": "M",
+      "additions": 8,
+      "deletions": 10,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/router.go b/router.go\nindex b6cb821..25a5a80 100644\n--- a/router.go\n+++ b/router.go\n@@ -122,23 +122,13 @@ func ParamsFromContext(ctx context.Context) Params {\n \treturn p\n }\n \n-type matchKey struct{}\n+// MatchedRoutePathParam is the Param name under which the path of the matched\n+// route is stored.\n+var MatchedRoutePathParam = \"$matchedRoutePath\"\n \n-// MatchedRoutePathKey is the request context key under which the handler path\n-// match is stored.\n-var MatchedRoutePathKey = matchKey{}\n-\n-// MatchedRoutePathFromContext retrieves the matched route path from the context.\n-func MatchedRoutePathFromContext(ctx context.Context) string {\n-\tp, _ := ctx.Value(MatchedRoutePathKey).(string)\n-\treturn p\n-}\n-\n-func saveMatchedRoutePathToContext(path string, handle Handle) Handle {\n-\treturn func(w http.ResponseWriter, req *http.Request, ps Params) {\n-\t\treq = req.WithContext(context.WithValue(req.Context(), MatchedRoutePathKey, path))\n-\t\thandle(w, req, ps)\n-\t}\n+// MatchedRoutePath retrieves the path of the matched route.\n+func (ps Params) MatchedRoutePath() string {\n+\treturn ps.ByName(MatchedRoutePathParam)\n }\n \n // Router is a http.Handler which can be used to dispatch requests to different\n@@ -149,11 +139,11 @@ type Router struct {\n \tparamsPool sync.Pool\n \tmaxParams  uint16\n \n-\t// SaveMatchedRoutePathToContext when enabled adds the matched route path\n-\t// onto the http.Request context before invoking the handler.\n+\t// If enabled, adds the matched route path onto the http.Request context\n+\t// before invoking the handler.\n \t// The matched route path is only added to handlers of routes that were\n \t// registered when this option was enabled.\n-\tSaveMatchedRoutePathToContext bool\n+\tSaveMatchedRoutePath bool\n \n \t// Enables automatic redirection if the current route can't be matched but a\n \t// handler for the path with (without) the trailing slash exists.\n@@ -239,6 +229,21 @@ func (r *Router) putParams(ps *Params) {\n \t}\n }\n \n+func (r *Router) saveMatchedRoutePath(path string, handle Handle) Handle {\n+\treturn func(w http.ResponseWriter, req *http.Request, ps Params) {\n+\t\tif ps == nil {\n+\t\t\tpsp := r.getParams()\n+\t\t\tps := (*psp)[0:1]\n+\t\t\tps[0] = Param{Key: MatchedRoutePathParam, Value: path}\n+\t\t\thandle(w, req, ps)\n+\t\t\tr.putParams(psp)\n+\t\t} else {\n+\t\t\tps = append(ps, Param{Key: MatchedRoutePathParam, Value: path})\n+\t\t\thandle(w, req, ps)\n+\t\t}\n+\t}\n+}\n+\n // GET is a shortcut for router.Handle(http.MethodGet, path, handle)\n func (r *Router) GET(path string, handle Handle) {\n \tr.Handle(http.MethodGet, path, handle)\n@@ -283,6 +288,8 @@ func (r *Router) DELETE(path string, handle Handle) {\n // frequently used, non-standardized or custom methods (e.g. for internal\n // communication with a proxy).\n func (r *Router) Handle(method, path string, handle Handle) {\n+\tvarsCount := uint16(0)\n+\n \tif method == \"\" {\n \t\tpanic(\"method must not be empty\")\n \t}\n@@ -293,8 +300,9 @@ func (r *Router) Handle(method, path string, handle Handle) {\n \t\tpanic(\"handle must not be nil\")\n \t}\n \n-\tif r.SaveMatchedRoutePathToContext {\n-\t\thandle = saveMatchedRoutePathToContext(path, handle)\n+\tif r.SaveMatchedRoutePath {\n+\t\tvarsCount++\n+\t\thandle = r.saveMatchedRoutePath(path, handle)\n \t}\n \n \tif r.trees == nil {\n@@ -312,8 +320,8 @@ func (r *Router) Handle(method, path string, handle Handle) {\n \troot.addRoute(path, handle)\n \n \t// Update maxParams\n-\tif pc := countParams(path); pc > r.maxParams {\n-\t\tr.maxParams = pc\n+\tif paramsCount := countParams(path); paramsCount+varsCount > r.maxParams {\n+\t\tr.maxParams = paramsCount + varsCount\n \t}\n \n \t// Lazy-init paramsPool alloc func\ndiff --git a/router_test.go b/router_test.go\nindex 1f685d4..f9eca13 100644\n--- a/router_test.go\n+++ b/router_test.go\n@@ -610,11 +610,10 @@ func TestRouterParamsFromContext(t *testing.T) {\n \t}\n }\n \n-func TestRouterMatchedRoutePathFromContext(t *testing.T) {\n+func TestRouterMatchedRoutePath(t *testing.T) {\n \trouted1 := false\n-\thandlerFunc1 := func(_ http.ResponseWriter, req *http.Request) {\n-\t\t// get params from request context\n-\t\troute := MatchedRoutePathFromContext(req.Context())\n+\thandle1 := func(_ http.ResponseWriter, req *http.Request, ps Params) {\n+\t\troute := ps.MatchedRoutePath()\n \t\tif route != \"/user/:name\" {\n \t\t\tt.Fatalf(\"Wrong matched route: want /user/:name, got %q\", route)\n \t\t}\n@@ -622,9 +621,8 @@ func TestRouterMatchedRoutePathFromContext(t *testing.T) {\n \t}\n \n \trouted2 := false\n-\thandlerFunc2 := func(_ http.ResponseWriter, req *http.Request) {\n-\t\t// get params from request context\n-\t\troute := MatchedRoutePathFromContext(req.Context())\n+\thandle2 := func(_ http.ResponseWriter, req *http.Request, ps Params) {\n+\t\troute := ps.MatchedRoutePath()\n \t\tif route != \"/user/:name/details\" {\n \t\t\tt.Fatalf(\"Wrong matched route: want /user/:name/details, got %q\", route)\n \t\t}\n@@ -632,9 +630,9 @@ func TestRouterMatchedRoutePathFromContext(t *testing.T) {\n \t}\n \n \trouter := New()\n-\trouter.SaveMatchedRoutePathToContext = true\n-\trouter.HandlerFunc(http.MethodGet, \"/user/:name\", handlerFunc1)\n-\trouter.HandlerFunc(http.MethodGet, \"/user/:name/details\", handlerFunc2)\n+\trouter.SaveMatchedRoutePath = true\n+\trouter.Handle(http.MethodGet, \"/user/:name\", handle1)\n+\trouter.Handle(http.MethodGet, \"/user/:name/details\", handle2)\n \n \tw := new(mockResponseWriter)\n \tr, _ := http.NewRequest(http.MethodGet, \"/user/gopher\", nil)\n",
+  "diffTruncated": false,
+  "tree": [
+    ".travis.yml",
+    "LICENSE",
+    "README.md",
+    "go.mod",
+    "path.go",
+    "path_test.go",
+    "router.go",
+    "router_test.go",
+    "tree.go",
+    "tree_test.go"
+  ],
+  "explanation": {
+    "what": "マッチ済みルートパスの保存方法を、context.WithValue によるリクエストコンテキスト経由から、既存の Params スライスに `Param{Key: \"$matchedRoutePath\", Value: path}` を追加する方式に置き換えた。MatchedRoutePathFromContext / matchKey / saveMatchedRoutePathToContext は削除され、代わりに公開変数 MatchedRoutePathParam と、Params に生えるメソッド MatchedRoutePath()、Router のフィールド名も SaveMatchedRoutePathToContext から SaveMatchedRoutePath に変更された。あわせて Handle 登録時に varsCount で maxParams を1つ多めに見積もるようにした。",
+    "why": "コミットメッセージ自体は変更内容の記述のみで理由は明言されていないが、おそらく httprouter が Params をアロケーションプールで再利用する設計(zero garbage 志向)であるのに対し、context.WithValue は独自にラップした Request を都度生成するため、既存の Params 経由の値渡しの方が一貫性があり低コストだったための設計転換と考えられる。",
+    "highlights": [
+      { "file": "router.go", "note": "saveMatchedRoutePath は ps が nil(パラメータなしの静的ルート)かどうかで getParams からの新規取得と既存 Params への append を使い分けている。" },
+      { "file": "router.go", "note": "varsCount を導入し、SaveMatchedRoutePath 有効時は maxParams の見積もりに常に+1して Params の再アロケーションを防いでいる。" }
+    ],
+    "langNotes": [
+      { "topic": "sync.Pool によるパラメータ再利用", "note": "getParams/putParams は sync.Pool から Params スライスを貸し出す httprouter の既存の仕組み。ここでは matched route path 用の Param もこのプールされたスライスに追加することで、リクエストごとの追加アロケーションを避けている。" }
+    ],
+    "diagram": {
+      "mermaid": "flowchart LR\n  A[\"seq243: context.WithValue で保存\"] --> B[\"MatchedRoutePathFromContext(ctx)で取得\"]\n  C[\"seq246: Params に Param追加で保存\"] --> D[\"ps.MatchedRoutePath()で取得\"]\n  A -.->|\"設計変更\"| C",
+      "caption": "マッチ済みルートパスの保存方式が context 経由から Params 経由へ設計転換した様子"
+    },
+    "evidence": "inferred",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

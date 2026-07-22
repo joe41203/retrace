@@ -1,0 +1,55 @@
+{
+  "seq": 33,
+  "sha": "29a9e74dbed8c44f709c1e2031281ef226180763",
+  "parents": [
+    "baa72be5d2fb53ca98483859099b54e3e7799e1e"
+  ],
+  "author": {
+    "name": "Julien Schmidt",
+    "email": "github@julienschmidt.com",
+    "date": "2013-12-14T16:34:19+01:00"
+  },
+  "message": "Create README.md",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 56,
+    "deletions": 0
+  },
+  "files": [
+    {
+      "path": "README.md",
+      "status": "A",
+      "additions": 56,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/README.md b/README.md\nnew file mode 100644\nindex 0000000..f127247\n--- /dev/null\n+++ b/README.md\n@@ -0,0 +1,56 @@\n+# HttpRouter [![Build Status](https://travis-ci.org/julienschmidt/httprouter.png?branch=master)](https://travis-ci.org/julienschmidt/httprouter) [![Codebot](https://codebot.io/badge/github.com/julienschmidt/httprouter.png)](http://codebot.io/doc/pkg/github.com/julienschmidt/httprouter \"Codebot\") [![GoDoc](http://godoc.org/github.com/julienschmidt/httprouter?status.png)](http://godoc.org/github.com/julienschmidt/httprouter)\n+\n+HttpRouter is a high performance HTTP request router\n+(also called *multiplexer* or just *mux* for short).\n+\n+In contrast to the default mux of Go's net/http package, this router supports\n+variables in the routing pattern and matches against the request method.\n+It also scales better.\n+\n+The router is optimized for best performance and a small memory footprint.\n+It scales well even with very long pathes and a large number of routes.\n+A compressing dynamic trie (radix tree) structure is used for efficient matching.\n+\n+## Usage\n+\n+Let's start with a trivial example:\n+```go\n+package main\n+\n+import (\n+    \"fmt\"\n+    \"github.com/julienschmidt/httprouter\"\n+    \"net/http\"\n+    \"log\"\n+)\n+\n+func Index(w http.ResponseWriter, r *http.Request, _ map[string]string) {\n+    fmt.Fprint(w, \"Welcome!\\n\")\n+}\n+\n+func Hello(w http.ResponseWriter, r *http.Request, vars map[string]string) {\n+    fmt.Fprintf(w, \"hello, %s!\\n\", vars[\"name\"])\n+}\n+\n+func main() {\n+    router := httprouter.New()\n+    router.GET(\"/\", Index)\n+    router.GET(\"/hello/:name\", Hello)\n+\n+    log.Fatal(http.ListenAndServe(\":12345\", router))\n+}\n+```\n+\n+### Named parameters\n+As you can see, `:name` is a *named parameter*.\n+The values are passed in map, therefore the value of `:name` is available in `vars[\"name\"]`.\n+\n+Named parameters only match a single path segment.\n+If we had the pattern `/user/:user`, only requests with a URL path like `/user/gordon` or\n+`/user/you` would be matched by this pattern, not `/user/gordon/profile` or `/user/`.\n+\n+### CatchAlls\n+The second type are *catchAll*s and have the form `*name`. Like the name suggest, they match everything.\n+Therefore they must always be at the **end** of the pattern.\n+\n+The pattern `/src/*filepath` would match `/src/`, `/src/somefile.go`,  `/src/subdir/somefile.go` and so on. \n",
+  "diffTruncated": false,
+  "tree": [
+    ".travis.yml",
+    "LICENSE",
+    "README.md",
+    "path.go",
+    "path_test.go",
+    "router.go",
+    "router_test.go",
+    "tree.go",
+    "tree_test.go"
+  ],
+  "explanation": {
+    "what": "README.md を新規作成した。ビルドバッジ(Travis CI・Codebot・GoDoc)、ルータの概要(高性能・net/http標準muxとの違い・radix tree採用)、トリビアルな使用例、Named parameters(:name)と CatchAll(*name)の説明を記載している。",
+    "why": "コミットメッセージの通りドキュメント整備が目的。それまで godoc コメント(router.go)だけだったプロジェクト説明を、GitHub上で最初に読まれる README として独立させ、利用者向けの導入文書を用意したと考えられる。",
+    "highlights": [
+      { "file": "README.md", "note": "Named parameters(:name)と CatchAll(*name)という2種類のワイルドカード構文がここで初めて文書化されている" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

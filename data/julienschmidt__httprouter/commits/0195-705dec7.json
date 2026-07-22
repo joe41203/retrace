@@ -1,0 +1,83 @@
+{
+  "seq": 195,
+  "sha": "705dec71322f50c507dc0c13e8d2fbc2ec6212be",
+  "parents": [
+    "5ae94dc50114da2d1a0bd1ee2206c106bbc4530b"
+  ],
+  "author": {
+    "name": "Julien Schmidt",
+    "email": "git@julienschmidt.com",
+    "date": "2019-09-14T13:02:06+02:00"
+  },
+  "message": "increase min go version to 1.7, remove legacy params",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 4,
+    "additions": 3,
+    "deletions": 26
+  },
+  "files": [
+    {
+      "path": ".travis.yml",
+      "status": "M",
+      "additions": 0,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "go.mod",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "params.go",
+      "status": "R",
+      "additions": 2,
+      "deletions": 8,
+      "binary": false,
+      "oldPath": "params_go17.go"
+    },
+    {
+      "path": "params_legacy.go",
+      "status": "D",
+      "additions": 0,
+      "deletions": 16,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/.travis.yml b/.travis.yml\nindex 8bffe48..ffacfb5 100644\n--- a/.travis.yml\n+++ b/.travis.yml\n@@ -1,7 +1,6 @@\n sudo: false\n language: go\n go:\n-  - 1.6.x\n   - 1.7.x\n   - 1.8.x\n   - 1.9.x\ndiff --git a/go.mod b/go.mod\nindex 2cff4fe..26cc80e 100644\n--- a/go.mod\n+++ b/go.mod\n@@ -1,3 +1,3 @@\n module github.com/julienschmidt/httprouter\n \n-go 1.6\n+go 1.7\ndiff --git a/params_go17.go b/params.go\nsimilarity index 79%\nrename from params_go17.go\nrename to params.go\nindex abb4209..5fb39d9 100644\n--- a/params_go17.go\n+++ b/params.go\n@@ -1,5 +1,3 @@\n-// +build go1.7\n-\n package httprouter\n \n import (\n@@ -10,13 +8,11 @@ import (\n type paramsKey struct{}\n \n // ParamsKey is the request context key under which URL params are stored.\n-//\n-// This is only present from go 1.7.\n var ParamsKey = paramsKey{}\n \n // Handler is an adapter which allows the usage of an http.Handler as a\n-// request handle. With go 1.7+, the Params will be available in the\n-// request context under ParamsKey.\n+// request handle.\n+// The Params are available in the request context under ParamsKey.\n func (r *Router) Handler(method, path string, handler http.Handler) {\n \tr.Handle(method, path,\n \t\tfunc(w http.ResponseWriter, req *http.Request, p Params) {\n@@ -30,8 +26,6 @@ func (r *Router) Handler(method, path string, handler http.Handler) {\n \n // ParamsFromContext pulls the URL parameters from a request context,\n // or returns nil if none are present.\n-//\n-// This is only present from go 1.7.\n func ParamsFromContext(ctx context.Context) Params {\n \tp, _ := ctx.Value(ParamsKey).(Params)\n \treturn p\ndiff --git a/params_legacy.go b/params_legacy.go\ndeleted file mode 100644\nindex 0278a44..0000000\n--- a/params_legacy.go\n+++ /dev/null\n@@ -1,16 +0,0 @@\n-// +build !go1.7\n-\n-package httprouter\n-\n-import \"net/http\"\n-\n-// Handler is an adapter which allows the usage of an http.Handler as a\n-// request handle. With go 1.7+, the Params will be available in the\n-// request context under ParamsKey.\n-func (r *Router) Handler(method, path string, handler http.Handler) {\n-\tr.Handle(method, path,\n-\t\tfunc(w http.ResponseWriter, req *http.Request, _ Params) {\n-\t\t\thandler.ServeHTTP(w, req)\n-\t\t},\n-\t)\n-}\n",
+  "diffTruncated": false,
+  "tree": [
+    ".travis.yml",
+    "LICENSE",
+    "README.md",
+    "go.mod",
+    "params.go",
+    "path.go",
+    "path_test.go",
+    "router.go",
+    "router_test.go",
+    "tree.go",
+    "tree_test.go"
+  ],
+  "explanation": {
+    "what": "最低サポート Go バージョンを 1.7 に引き上げ、go 1.6 未満向けの分岐実装だった params_legacy.go を削除し、params_go17.go を params.go にリネームした。ビルドタグとコメント中の「go 1.7+」「This is only present from go 1.7」といった条件付き記述もあわせて除去し、context 経由の Params 受け渡しを唯一の実装として扱うようにした。",
+    "why": "章文脈(context経由のParams受け渡し)にある通り、Params を http.Request の context に格納する仕組みは Go 1.7 で追加された `context` パッケージ標準化に依存しており、それ以前のバージョン向けに別実装(params_legacy.go)を用意して分岐していた。最低バージョンを 1.7 に引き上げたことで、この分岐が不要になり削除された。",
+    "highlights": [
+      { "file": "params_legacy.go", "note": "削除されたファイル。`!go1.7` ビルドタグでコンパイル対象外にしていた旧実装" },
+      { "file": "params.go", "note": "params_go17.go からのリネーム後、`+build go1.7` タグとバージョン限定のコメントが除去されている" }
+    ],
+    "langNotes": [
+      { "topic": "build constraint (`// +build`)", "note": "ファイル先頭のコメント `// +build go1.7` / `// +build !go1.7` は Go のビルドタグで、指定した条件(Goバージョンなど)を満たすときだけそのファイルをコンパイル対象に含める。バージョン間の API 差異を吸収する古典的な手法で、このコミットではサポート対象バージョンの絞り込みにより不要になった。" },
+      { "topic": "context.Context 経由のパラメータ受け渡し", "note": "ParamsFromContext は `ctx.Value(ParamsKey)` で URL パラメータを取り出す。Go 1.7 で標準化された `context` パッケージにより、リクエストスコープの値を http.Request 経由で運べるようになったことが前提になっている。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

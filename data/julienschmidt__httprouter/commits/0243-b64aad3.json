@@ -1,0 +1,65 @@
+{
+  "seq": 243,
+  "sha": "b64aad36d57ed0ffa2ea095059ffacfd6c9727de",
+  "parents": [
+    "92b40224d545dc82d51192e40442096d3efcdaa0"
+  ],
+  "author": {
+    "name": "George MacRorie",
+    "email": "me@georgemac.com",
+    "date": "2019-11-21T14:46:54+01:00"
+  },
+  "message": "router: add option to save matched route path\n\nFixes #139\nFixes #286\n\nCo-authored-by: Julien Schmidt <git@julienschmidt.com>",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 53,
+    "deletions": 0
+  },
+  "files": [
+    {
+      "path": "router.go",
+      "status": "M",
+      "additions": 27,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "router_test.go",
+      "status": "M",
+      "additions": 26,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/router.go b/router.go\nindex 301622b..e3013a6 100644\n--- a/router.go\n+++ b/router.go\n@@ -122,6 +122,25 @@ func ParamsFromContext(ctx context.Context) Params {\n \treturn p\n }\n \n+type matchKey struct{}\n+\n+// MatchedRoutePathKey is the request context key under which the handler path\n+// match is stored.\n+var MatchedRoutePathKey = matchKey{}\n+\n+// MatchedRoutePathFromContext retrieves the matched route path from the context.\n+func MatchedRoutePathFromContext(ctx context.Context) string {\n+\tp, _ := ctx.Value(MatchedRoutePathKey).(string)\n+\treturn p\n+}\n+\n+func saveMatchedRoutePathToContext(path string, handle Handle) Handle {\n+\treturn func(w http.ResponseWriter, req *http.Request, ps Params) {\n+\t\treq = req.WithContext(context.WithValue(req.Context(), MatchedRoutePathKey, path))\n+\t\thandle(w, req, ps)\n+\t}\n+}\n+\n // Router is a http.Handler which can be used to dispatch requests to different\n // handler functions via configurable routes\n type Router struct {\n@@ -130,6 +149,10 @@ type Router struct {\n \tparamsPool sync.Pool\n \tmaxParams  uint16\n \n+\t// SaveMatchedRoutePathToContext when enabled adds the matched route path\n+\t// onto the http.Request context before invoking the handler\n+\tSaveMatchedRoutePathToContext bool\n+\n \t// Enables automatic redirection if the current route can't be matched but a\n \t// handler for the path with (without) the trailing slash exists.\n \t// For example if /foo/ is requested but a route only exists for /foo, the\n@@ -268,6 +291,10 @@ func (r *Router) Handle(method, path string, handle Handle) {\n \t\tpanic(\"handle must not be nil\")\n \t}\n \n+\tif r.SaveMatchedRoutePathToContext {\n+\t\thandle = saveMatchedRoutePathToContext(path, handle)\n+\t}\n+\n \tif r.trees == nil {\n \t\tr.trees = make(map[string]*node)\n \t}\ndiff --git a/router_test.go b/router_test.go\nindex 2aa1859..c336f8c 100644\n--- a/router_test.go\n+++ b/router_test.go\n@@ -610,6 +610,32 @@ func TestRouterParamsFromContext(t *testing.T) {\n \t}\n }\n \n+func TestRouterMatchedRouteFromContext(t *testing.T) {\n+\trouted := false\n+\n+\thandlerFunc := func(_ http.ResponseWriter, req *http.Request) {\n+\t\t// get params from request context\n+\t\troute := MatchedRoutePathFromContext(req.Context())\n+\n+\t\tif route != \"/user/:name\" {\n+\t\t\tt.Fatalf(\"Wrong matched route: want /user/:name, got %q\", route)\n+\t\t}\n+\n+\t\trouted = true\n+\t}\n+\n+\trouter := New()\n+\trouter.SaveMatchedRoutePathToContext = true\n+\trouter.HandlerFunc(http.MethodGet, \"/user/:name\", handlerFunc)\n+\n+\tw := new(mockResponseWriter)\n+\tr, _ := http.NewRequest(http.MethodGet, \"/user/gopher\", nil)\n+\trouter.ServeHTTP(w, r)\n+\tif !routed {\n+\t\tt.Fatal(\"Routing failed!\")\n+\t}\n+}\n+\n type mockFileSystem struct {\n \topened bool\n }\n",
+  "diffTruncated": false,
+  "tree": [
+    ".travis.yml",
+    "LICENSE",
+    "README.md",
+    "go.mod",
+    "path.go",
+    "path_test.go",
+    "router.go",
+    "router_test.go",
+    "tree.go",
+    "tree_test.go"
+  ],
+  "explanation": {
+    "what": "Router に SaveMatchedRoutePathToContext というオプトインの bool フィールドを追加し、有効化するとハンドラ実行前に `context.WithValue` でマッチしたルートパス(例: \"/user/:name\")を http.Request のコンテキストに埋め込むようにした。取得用の MatchedRoutePathFromContext 関数と、そのためのハンドララッパー saveMatchedRoutePathToContext も新設した。",
+    "why": "コミットメッセージに \"Fixes #139\" \"Fixes #286\" とあり、動的パラメータではなく実際にマッチした生のルートパターン文字列(例: メトリクスのラベルやログの正規化)を取得したいという要望に応えるための機能追加と考えられる。デフォルトでは無効(オプトイン)にすることで、この機能を使わない既存ユーザーへの影響(余分な context 生成コスト)を避けている。",
+    "highlights": [
+      { "file": "router.go", "note": "SaveMatchedRoutePathToContext が true のときだけ Handle をラップして context に値を積む、オプトイン設計。" }
+    ],
+    "langNotes": [
+      { "topic": "context.WithValue", "note": "Go の context パッケージはリクエストスコープの値をキーバリューで運ぶ仕組み。ここでは衝突を避けるため空 struct 型 matchKey{} を専用のコンテキストキーとして使っており、これは文字列キーの衝突を避ける Go の定番イディオム。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

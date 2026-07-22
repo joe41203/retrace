@@ -1,0 +1,64 @@
+{
+  "seq": 221,
+  "sha": "7072f59069b7dfa4273a1febe87a643e75632578",
+  "parents": [
+    "b9a36063a10f224c4ae2596f12964d9e59443515"
+  ],
+  "author": {
+    "name": "Julien Schmidt",
+    "email": "git@julienschmidt.com",
+    "date": "2019-10-01T01:15:32+02:00"
+  },
+  "message": "router: properly handle nil params in Lookup\n\nFixes #280",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 19,
+    "deletions": 2
+  },
+  "files": [
+    {
+      "path": "router.go",
+      "status": "M",
+      "additions": 3,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "router_test.go",
+      "status": "M",
+      "additions": 16,
+      "deletions": 2,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/router.go b/router.go\nindex 7a726ea..eb9b96c 100644\n--- a/router.go\n+++ b/router.go\n@@ -353,6 +353,9 @@ func (r *Router) Lookup(method, path string) (Handle, Params, bool) {\n \t\t\tr.putParams(ps)\n \t\t\treturn nil, nil, tsr\n \t\t}\n+\t\tif ps == nil {\n+\t\t\treturn handle, nil, tsr\n+\t\t}\n \t\treturn handle, *ps, tsr\n \t}\n \treturn nil, nil, false\ndiff --git a/router_test.go b/router_test.go\nindex 37b140b..856a4d4 100644\n--- a/router_test.go\n+++ b/router_test.go\n@@ -495,7 +495,6 @@ func TestRouterLookup(t *testing.T) {\n \n \t// insert route and try again\n \trouter.GET(\"/user/:name\", wantHandle)\n-\n \thandle, params, _ := router.Lookup(http.MethodGet, \"/user/gopher\")\n \tif handle == nil {\n \t\tt.Fatal(\"Got no handle!\")\n@@ -505,10 +504,25 @@ func TestRouterLookup(t *testing.T) {\n \t\t\tt.Fatal(\"Routing failed!\")\n \t\t}\n \t}\n-\n \tif !reflect.DeepEqual(params, wantParams) {\n \t\tt.Fatalf(\"Wrong parameter values: want %v, got %v\", wantParams, params)\n \t}\n+\trouted = false\n+\n+\t// route without param\n+\trouter.GET(\"/user\", wantHandle)\n+\thandle, params, _ = router.Lookup(http.MethodGet, \"/user\")\n+\tif handle == nil {\n+\t\tt.Fatal(\"Got no handle!\")\n+\t} else {\n+\t\thandle(nil, nil, nil)\n+\t\tif !routed {\n+\t\t\tt.Fatal(\"Routing failed!\")\n+\t\t}\n+\t}\n+\tif params != nil {\n+\t\tt.Fatalf(\"Wrong parameter values: want %v, got %v\", nil, params)\n+\t}\n \n \thandle, _, tsr = router.Lookup(http.MethodGet, \"/user/gopher/\")\n \tif handle != nil {\n",
+  "diffTruncated": false,
+  "tree": [
+    ".travis.yml",
+    "LICENSE",
+    "README.md",
+    "go.mod",
+    "path.go",
+    "path_test.go",
+    "router.go",
+    "router_test.go",
+    "tree.go",
+    "tree_test.go"
+  ],
+  "explanation": {
+    "what": "Router.Lookup が返す Params が nil のケースを router.go に追加した。ツリー探索でパラメータが1つも無いルート(例: \"/user\")がマッチしたとき、ps(*Params型)がnilのまま `*ps` を評価すると nil ポインタ参照になるため、その手前で `ps == nil` を判定して `nil` を Params として返す分岐を挿入した。router_test.go にはパラメータ無しルートの Lookup を検証するテストケースを追加している。",
+    "why": "コミットメッセージの \"Fixes #280\" が示す通り、パラメータを持たないルートで Lookup を呼んだ際に nil ポインタ参照が起きる不具合の修正。",
+    "highlights": [
+      { "file": "router.go", "note": "`if ps == nil { return handle, nil, tsr }` が追加された箇所。*ps の直前でガードしている" },
+      { "file": "router_test.go", "note": "パラメータの無いルート /user を登録し、Lookup の戻り値 params が nil であることを検証する新規ケース" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

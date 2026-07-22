@@ -1,0 +1,58 @@
+{
+  "seq": 214,
+  "sha": "4eec211fa4e8df74ed978dc5681612131854144f",
+  "parents": [
+    "8e1132c0c4f38ecd8ba7d9f96149e4b52566d9e6"
+  ],
+  "author": {
+    "name": "Julien Schmidt",
+    "email": "git@julienschmidt.com",
+    "date": "2019-09-30T01:21:22+02:00"
+  },
+  "message": "tree: fix node struct packing",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 1,
+    "deletions": 1
+  },
+  "files": [
+    {
+      "path": "tree.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/tree.go b/tree.go\nindex 87c8c24..c9fdf5b 100644\n--- a/tree.go\n+++ b/tree.go\n@@ -48,10 +48,10 @@ type node struct {\n \twildChild bool\n \tnType     nodeType\n \tmaxParams uint8\n+\tpriority  uint32\n \tindices   string\n \tchildren  []*node\n \thandle    Handle\n-\tpriority  uint32\n }\n \n // increments priority of the given child and reorders if necessary\n",
+  "diffTruncated": false,
+  "tree": [
+    ".travis.yml",
+    "LICENSE",
+    "README.md",
+    "go.mod",
+    "path.go",
+    "path_test.go",
+    "router.go",
+    "router_test.go",
+    "tree.go",
+    "tree_test.go"
+  ],
+  "explanation": {
+    "what": "tree.go の node 構造体で `priority uint32` フィールドの宣言位置を、末尾から `indices`/`children`/`handle` の直前(`maxParams uint8` 削除跡)に移動した。フィールドの型や値は変更していない。",
+    "why": "コミットメッセージ「fix node struct packing」から、Go コンパイラのメモリアライメント規則によって生じるパディング(隙間)を減らすための並び替えだと分かる。直前のコミットで `maxParams uint8` が消えたことで整列の隙間ができ、`priority uint32` を前方に寄せることで構造体のメモリサイズを詰められる。",
+    "highlights": [
+      { "file": "tree.go", "note": "node 構造体内で priority uint32 の宣言位置だけを移動(型・意味は不変)" }
+    ],
+    "langNotes": [
+      { "topic": "struct のフィールド並びとメモリパッキング", "note": "Go の struct はフィールド宣言順にメモリ上へ配置され、各フィールドは自身のサイズ境界にアラインされるためパディングが生じることがある。フィールドをサイズの大きい順に並べるとパディングが減り、struct 全体のメモリ使用量を削減できる。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

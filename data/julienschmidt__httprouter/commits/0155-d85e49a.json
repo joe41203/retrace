@@ -1,0 +1,55 @@
+{
+  "seq": 155,
+  "sha": "d85e49a534330879ebc119594d19fff6b94ca5fc",
+  "parents": [
+    "3695eeab107edb46a611a089b561793d2a61396d"
+  ],
+  "author": {
+    "name": "Julien Schmidt",
+    "email": "git@julienschmidt.com",
+    "date": "2016-10-21T03:37:15+08:00"
+  },
+  "message": "tree: Improve wildcard conflict panic reason\n\nFixes #151",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 12,
+    "deletions": 9
+  },
+  "files": [
+    {
+      "path": "tree.go",
+      "status": "M",
+      "additions": 12,
+      "deletions": 9,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/tree.go b/tree.go\nindex b735534..ef9d564 100644\n--- a/tree.go\n+++ b/tree.go\n@@ -144,16 +144,19 @@ func (n *node) addRoute(path string, handle Handle) {\n \t\t\t\t\tnumParams--\n \n \t\t\t\t\t// Check if the wildcard matches\n-\t\t\t\t\tif len(path) >= len(n.path) && n.path == path[:len(n.path)] {\n-\t\t\t\t\t\t// check for longer wildcard, e.g. :name and :names\n-\t\t\t\t\t\tif len(n.path) >= len(path) || path[len(n.path)] == '/' {\n-\t\t\t\t\t\t\tcontinue walk\n-\t\t\t\t\t\t}\n+\t\t\t\t\tif len(path) >= len(n.path) && n.path == path[:len(n.path)] &&\n+\t\t\t\t\t\t// Check for longer wildcard, e.g. :name and :names\n+\t\t\t\t\t\t(len(n.path) >= len(path) || path[len(n.path)] == '/') {\n+\t\t\t\t\t\tcontinue walk\n+\t\t\t\t\t} else {\n+\t\t\t\t\t\t// Wildcard conflict\n+\t\t\t\t\t\tpathSeg := strings.SplitN(path, \"/\", 2)[0]\n+\t\t\t\t\t\tprefix := fullPath[:strings.Index(fullPath, pathSeg)] + n.path\n+\t\t\t\t\t\tpanic(\"'\" + pathSeg +\n+\t\t\t\t\t\t\t\"' in new path '\" + fullPath + \"'\" +\n+\t\t\t\t\t\t\t\"' conflicts with existing wildcard '\" + n.path +\n+\t\t\t\t\t\t\t\"' in existing prefix '\" + prefix + \"'\")\n \t\t\t\t\t}\n-\n-\t\t\t\t\tpanic(\"path segment '\" + path +\n-\t\t\t\t\t\t\"' conflicts with existing wildcard '\" + n.path +\n-\t\t\t\t\t\t\"' in path '\" + fullPath + \"'\")\n \t\t\t\t}\n \n \t\t\t\tc := path[0]\n",
+  "diffTruncated": false,
+  "tree": [
+    ".travis.yml",
+    "LICENSE",
+    "README.md",
+    "path.go",
+    "path_test.go",
+    "router.go",
+    "router_test.go",
+    "tree.go",
+    "tree_test.go"
+  ],
+  "explanation": {
+    "what": "node.addRoute 内でワイルドカードの競合を検知した際の panic メッセージを改善した。従来は衝突したパス全体を丸ごと表示する曖昧な文言だったが、strings.SplitN でパスの先頭セグメントだけを取り出し、fullPath 中の該当位置から共通プレフィックスを算出することで、「'<セグメント>' in new path '<新パス>' conflicts with existing wildcard '<既存ワイルドカード>' in existing prefix '<共通プレフィックス>'」という、どのセグメントがどこで衝突したかを具体的に示すメッセージに変更した。",
+    "why": "コミットメッセージにある通り issue #151 の修正であり、ルート登録時にワイルドカード名(例: :name と :names)が衝突したとき、開発者が原因箇所を特定しやすいよう panic メッセージの情報量を増やす狙い。",
+    "highlights": [
+      { "file": "tree.go", "note": "strings.SplitN(path, \"/\", 2)[0] でセグメントを切り出し、panic文言に埋め込んでいる箇所" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

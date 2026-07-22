@@ -1,0 +1,64 @@
+{
+  "seq": 73,
+  "sha": "dadc6376e36472f55e27fa83c8188db36dfd4109",
+  "parents": [
+    "151a7d9cdbd0073ac9026c0edbb728cce61ddf35"
+  ],
+  "author": {
+    "name": "Julien Schmidt",
+    "email": "github@julienschmidt.com",
+    "date": "2014-06-09T01:37:14+02:00"
+  },
+  "message": "Add http.Handler adapter",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 28,
+    "deletions": 1
+  },
+  "files": [
+    {
+      "path": "router.go",
+      "status": "M",
+      "additions": 10,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "router_test.go",
+      "status": "M",
+      "additions": 18,
+      "deletions": 1,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/router.go b/router.go\nindex 13cec28..c6614b2 100644\n--- a/router.go\n+++ b/router.go\n@@ -205,6 +205,16 @@ func (r *Router) Handle(method, path string, handle Handle) {\n \troot.addRoute(path, handle)\n }\n \n+// Handler is an adapter which allows the usage of an http.Handler as a\n+// request handle.\n+func (r *Router) Handler(method, path string, handler http.Handler) {\n+\tr.Handle(method, path,\n+\t\tfunc(w http.ResponseWriter, req *http.Request, _ Params) {\n+\t\t\thandler.ServeHTTP(w, req)\n+\t\t},\n+\t)\n+}\n+\n // HandlerFunc is an adapter which allows the usage of an http.HandlerFunc as a\n // request handle.\n func (r *Router) HandlerFunc(method, path string, handler http.HandlerFunc) {\ndiff --git a/router_test.go b/router_test.go\nindex e3acc2f..f13d598 100644\n--- a/router_test.go\n+++ b/router_test.go\n@@ -67,8 +67,18 @@ func TestRouter(t *testing.T) {\n \t}\n }\n \n+type handlerStruct struct {\n+\thandeled *bool\n+}\n+\n+func (h handlerStruct) ServeHTTP(w http.ResponseWriter, r *http.Request) {\n+\t*h.handeled = true\n+}\n+\n func TestRouterAPI(t *testing.T) {\n-\tvar get, post, put, patch, delete, handlerFunc bool\n+\tvar get, post, put, patch, delete, handler, handlerFunc bool\n+\n+\thttpHandler := handlerStruct{&handler}\n \n \trouter := New()\n \trouter.GET(\"/GET\", func(w http.ResponseWriter, r *http.Request, _ Params) {\n@@ -86,6 +96,7 @@ func TestRouterAPI(t *testing.T) {\n \trouter.DELETE(\"/DELETE\", func(w http.ResponseWriter, r *http.Request, _ Params) {\n \t\tdelete = true\n \t})\n+\trouter.Handler(\"GET\", \"/Handler\", httpHandler)\n \trouter.HandlerFunc(\"GET\", \"/HandlerFunc\", func(w http.ResponseWriter, r *http.Request) {\n \t\thandlerFunc = true\n \t})\n@@ -122,6 +133,12 @@ func TestRouterAPI(t *testing.T) {\n \t\tt.Error(\"routing DELETE failed\")\n \t}\n \n+\tr, _ = http.NewRequest(\"GET\", \"/Handler\", nil)\n+\trouter.ServeHTTP(w, r)\n+\tif !handler {\n+\t\tt.Error(\"routing Handler failed\")\n+\t}\n+\n \tr, _ = http.NewRequest(\"GET\", \"/HandlerFunc\", nil)\n \trouter.ServeHTTP(w, r)\n \tif !handlerFunc {\n",
+  "diffTruncated": false,
+  "tree": [
+    ".travis.yml",
+    "LICENSE",
+    "README.md",
+    "path.go",
+    "path_test.go",
+    "router.go",
+    "router_test.go",
+    "tree.go",
+    "tree_test.go"
+  ],
+  "explanation": {
+    "what": "Router.Handler(method, path, handler http.Handler) を追加した。内部では Handle 型のクロージャで handler.ServeHTTP(w, req) を呼ぶだけの実装で、Params 引数は無視(_)される。テストでは http.Handler を実装する handlerStruct を用意して動作確認している。",
+    "why": "直前の seq70 で router.go の godoc は http.HandlerFunc アダプタ(HandlerFunc メソッド)には触れていたが、http.Handler インターフェースそのものを実装した既存コードを httprouter のルートに登録する手段が無かった。HandlerFunc に加えて Handler を用意することで、関数だけでなく構造体で実装された http.Handler もそのまま登録できるようにした。",
+    "highlights": [
+      { "file": "router.go", "note": "Router.Handler: http.Handler をラップして Handle にする最小限のアダプタ" }
+    ],
+    "langNotes": [
+      { "topic": "http.Handler アダプタ", "note": "Go の net/http では http.Handler(ServeHTTP メソッドを持つ型)と http.HandlerFunc(関数型)の2種類のハンドラ表現がある。httprouter は自前の Handle 型(第3引数に Params を取る)を使うため、両方を Handle に変換するアダプタメソッド(Handler / HandlerFunc)を用意して既存の net/http エコシステムとの相互運用性を保っている。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

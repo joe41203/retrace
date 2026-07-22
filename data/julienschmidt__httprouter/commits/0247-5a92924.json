@@ -1,0 +1,56 @@
+{
+  "seq": 247,
+  "sha": "5a929245551f3b06a94a32dc1e573176b80140a9",
+  "parents": [
+    "0a8b88a57ebc6ee00c2aa568bd88e318a598232b"
+  ],
+  "author": {
+    "name": "Julien Schmidt",
+    "email": "git@julienschmidt.com",
+    "date": "2020-01-13T20:59:30+01:00"
+  },
+  "message": "router: extend matched route path test for static routes",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 28,
+    "deletions": 8
+  },
+  "files": [
+    {
+      "path": "router_test.go",
+      "status": "M",
+      "additions": 28,
+      "deletions": 8,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/router_test.go b/router_test.go\nindex f9eca13..ae7d243 100644\n--- a/router_test.go\n+++ b/router_test.go\n@@ -611,40 +611,60 @@ func TestRouterParamsFromContext(t *testing.T) {\n }\n \n func TestRouterMatchedRoutePath(t *testing.T) {\n+\troute1 := \"/user/:name\"\n \trouted1 := false\n \thandle1 := func(_ http.ResponseWriter, req *http.Request, ps Params) {\n \t\troute := ps.MatchedRoutePath()\n-\t\tif route != \"/user/:name\" {\n-\t\t\tt.Fatalf(\"Wrong matched route: want /user/:name, got %q\", route)\n+\t\tif route != route1 {\n+\t\t\tt.Fatalf(\"Wrong matched route: want %s, got %s\", route1, route)\n \t\t}\n \t\trouted1 = true\n \t}\n \n+\troute2 := \"/user/:name/details\"\n \trouted2 := false\n \thandle2 := func(_ http.ResponseWriter, req *http.Request, ps Params) {\n \t\troute := ps.MatchedRoutePath()\n-\t\tif route != \"/user/:name/details\" {\n-\t\t\tt.Fatalf(\"Wrong matched route: want /user/:name/details, got %q\", route)\n+\t\tif route != route2 {\n+\t\t\tt.Fatalf(\"Wrong matched route: want %s, got %s\", route2, route)\n \t\t}\n \t\trouted2 = true\n \t}\n \n+\troute3 := \"/\"\n+\trouted3 := false\n+\thandle3 := func(_ http.ResponseWriter, req *http.Request, ps Params) {\n+\t\troute := ps.MatchedRoutePath()\n+\t\tif route != route3 {\n+\t\t\tt.Fatalf(\"Wrong matched route: want %s, got %s\", route3, route)\n+\t\t}\n+\t\trouted3 = true\n+\t}\n+\n \trouter := New()\n \trouter.SaveMatchedRoutePath = true\n-\trouter.Handle(http.MethodGet, \"/user/:name\", handle1)\n-\trouter.Handle(http.MethodGet, \"/user/:name/details\", handle2)\n+\trouter.Handle(http.MethodGet, route1, handle1)\n+\trouter.Handle(http.MethodGet, route2, handle2)\n+\trouter.Handle(http.MethodGet, route3, handle3)\n \n \tw := new(mockResponseWriter)\n \tr, _ := http.NewRequest(http.MethodGet, \"/user/gopher\", nil)\n \trouter.ServeHTTP(w, r)\n-\tif !routed1 || routed2 {\n+\tif !routed1 || routed2 || routed3 {\n \t\tt.Fatal(\"Routing failed!\")\n \t}\n \n \tw = new(mockResponseWriter)\n \tr, _ = http.NewRequest(http.MethodGet, \"/user/gopher/details\", nil)\n \trouter.ServeHTTP(w, r)\n-\tif !routed2 {\n+\tif !routed2 || routed3 {\n+\t\tt.Fatal(\"Routing failed!\")\n+\t}\n+\n+\tw = new(mockResponseWriter)\n+\tr, _ = http.NewRequest(http.MethodGet, \"/\", nil)\n+\trouter.ServeHTTP(w, r)\n+\tif !routed3 {\n \t\tt.Fatal(\"Routing failed!\")\n \t}\n }\n",
+  "diffTruncated": false,
+  "tree": [
+    ".travis.yml",
+    "LICENSE",
+    "README.md",
+    "go.mod",
+    "path.go",
+    "path_test.go",
+    "router.go",
+    "router_test.go",
+    "tree.go",
+    "tree_test.go"
+  ],
+  "explanation": {
+    "what": "TestRouterMatchedRoutePath に、パラメータを持たない静的ルート \"/\" (route3/handle3/routed3)を追加し、動的ルートと静的ルートが混在していても互いに誤ってマッチしないことを検証するようにテストを拡張した。",
+    "why": "コミットメッセージの通り、前コミットで追加された「Params が nil の場合(静的ルート)は新規に Params を確保する」という分岐を、静的ルートを対象にしたテストケースで確認するための拡充と考えられる。",
+    "highlights": [
+      { "file": "router_test.go", "note": "route3 = \"/\" はパラメータを持たない静的ルートで、seq246 の nil 分岐(psp := r.getParams())を通るケースを検証している。" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

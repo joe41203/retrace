@@ -1,0 +1,59 @@
+{
+  "seq": 233,
+  "sha": "08a3b3d20bbeeab9ca4889bcdb65fec0423ef882",
+  "parents": [
+    "bbffb24dcda5ec5bd9a53bf843516e59cb4d2178"
+  ],
+  "author": {
+    "name": "Julien Schmidt",
+    "email": "git@julienschmidt.com",
+    "date": "2019-10-05T19:17:06+02:00"
+  },
+  "message": "tree: use range []byte(string) loops\n\nThe compiler got smarter and optimizes this case to just iterate over\nthe bytes without any allocations.",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 23,
+    "deletions": 23
+  },
+  "files": [
+    {
+      "path": "tree.go",
+      "status": "M",
+      "additions": 23,
+      "deletions": 23,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/tree.go b/tree.go\nindex 1dd7127..94c35f4 100644\n--- a/tree.go\n+++ b/tree.go\n@@ -53,7 +53,7 @@ func findWildcard(path string) (wilcard string, i int, valid bool) {\n \n func countParams(path string) uint16 {\n \tvar n uint\n-\tfor i := 0; i < len(path); i++ {\n+\tfor i := range []byte(path) {\n \t\tswitch path[i] {\n \t\tcase ':', '*':\n \t\t\tn++\n@@ -175,18 +175,18 @@ walk:\n \t\t\t\t}\n \t\t\t}\n \n-\t\t\tc := path[0]\n+\t\t\tidxc := path[0]\n \n \t\t\t// '/' after param\n-\t\t\tif n.nType == param && c == '/' && len(n.children) == 1 {\n+\t\t\tif n.nType == param && idxc == '/' && len(n.children) == 1 {\n \t\t\t\tn = n.children[0]\n \t\t\t\tn.priority++\n \t\t\t\tcontinue walk\n \t\t\t}\n \n \t\t\t// Check if a child with the next path byte exists\n-\t\t\tfor i, max := 0, len(n.indices); i < max; i++ {\n-\t\t\t\tif c == n.indices[i] {\n+\t\t\tfor i, c := range []byte(n.indices) {\n+\t\t\t\tif c == idxc {\n \t\t\t\t\ti = n.incrementChildPrio(i)\n \t\t\t\t\tn = n.children[i]\n \t\t\t\t\tcontinue walk\n@@ -194,9 +194,9 @@ walk:\n \t\t\t}\n \n \t\t\t// Otherwise insert it\n-\t\t\tif c != ':' && c != '*' {\n+\t\t\tif idxc != ':' && idxc != '*' {\n \t\t\t\t// []byte for proper unicode char conversion, see #65\n-\t\t\t\tn.indices += string([]byte{c})\n+\t\t\t\tn.indices += string([]byte{idxc})\n \t\t\t\tchild := &node{}\n \t\t\t\tn.children = append(n.children, child)\n \t\t\t\tn.incrementChildPrio(len(n.indices) - 1)\n@@ -335,9 +335,9 @@ walk: // Outer loop for walking the tree\n \t\t\t\t// child, we can just look up the next child node and continue\n \t\t\t\t// to walk down the tree\n \t\t\t\tif !n.wildChild {\n-\t\t\t\t\tindices := n.indices\n-\t\t\t\t\tfor i, max, c := 0, len(indices), path[0]; i < max; i++ {\n-\t\t\t\t\t\tif c == indices[i] {\n+\t\t\t\t\tidxc := path[0]\n+\t\t\t\t\tfor i, c := range []byte(n.indices) {\n+\t\t\t\t\t\tif c == idxc {\n \t\t\t\t\t\t\tn = n.children[i]\n \t\t\t\t\t\t\tprefix = n.path\n \t\t\t\t\t\t\tcontinue walk\n@@ -440,9 +440,8 @@ walk: // Outer loop for walking the tree\n \n \t\t\t// No handle found. Check if a handle for this path + a\n \t\t\t// trailing slash exists for trailing slash recommendation\n-\t\t\tindices := n.indices\n-\t\t\tfor i, max := 0, len(indices); i < max; i++ {\n-\t\t\t\tif indices[i] == '/' {\n+\t\t\tfor i, c := range []byte(n.indices) {\n+\t\t\t\tif c == '/' {\n \t\t\t\t\tn = n.children[i]\n \t\t\t\t\ttsr = (len(n.path) == 1 && n.handle != nil) ||\n \t\t\t\t\t\t(n.nType == catchAll && n.children[0].handle != nil)\n@@ -512,8 +511,9 @@ walk: // Outer loop for walking the tree\n \n \t\t\t\tif rb[0] != 0 {\n \t\t\t\t\t// Old rune not finished\n-\t\t\t\t\tfor i, max := 0, len(n.indices); i < max; i++ {\n-\t\t\t\t\t\tif n.indices[i] == rb[0] {\n+\t\t\t\t\tidxc := rb[0]\n+\t\t\t\t\tfor i, c := range []byte(n.indices) {\n+\t\t\t\t\t\tif c == idxc {\n \t\t\t\t\t\t\t// continue with child node\n \t\t\t\t\t\t\tn = n.children[i]\n \t\t\t\t\t\t\tnpLen = len(n.path)\n@@ -543,10 +543,10 @@ walk: // Outer loop for walking the tree\n \t\t\t\t\t// Skip already processed bytes\n \t\t\t\t\trb = shiftNRuneBytes(rb, off)\n \n-\t\t\t\t\tindices := n.indices\n-\t\t\t\t\tfor i, max, c := 0, len(indices), rb[0]; i < max; i++ {\n+\t\t\t\t\tidxc := rb[0]\n+\t\t\t\t\tfor i, c := range []byte(n.indices) {\n \t\t\t\t\t\t// Lowercase matches\n-\t\t\t\t\t\tif indices[i] == c {\n+\t\t\t\t\t\tif c == idxc {\n \t\t\t\t\t\t\t// must use a recursive approach since both the\n \t\t\t\t\t\t\t// uppercase byte and the lowercase byte might exist\n \t\t\t\t\t\t\t// as an index\n@@ -565,9 +565,10 @@ walk: // Outer loop for walking the tree\n \t\t\t\t\t\tutf8.EncodeRune(rb[:], up)\n \t\t\t\t\t\trb = shiftNRuneBytes(rb, off)\n \n-\t\t\t\t\t\tfor i, max, c := 0, len(indices), rb[0]; i < max; i++ {\n+\t\t\t\t\t\tidxc := rb[0]\n+\t\t\t\t\t\tfor i, c := range []byte(n.indices) {\n \t\t\t\t\t\t\t// Uppercase matches\n-\t\t\t\t\t\t\tif indices[i] == c {\n+\t\t\t\t\t\t\tif c == idxc {\n \t\t\t\t\t\t\t\t// Continue with child node\n \t\t\t\t\t\t\t\tn = n.children[i]\n \t\t\t\t\t\t\t\tnpLen = len(n.path)\n@@ -642,9 +643,8 @@ walk: // Outer loop for walking the tree\n \t\t\t// No handle found.\n \t\t\t// Try to fix the path by adding a trailing slash\n \t\t\tif fixTrailingSlash {\n-\t\t\t\tindices := n.indices\n-\t\t\t\tfor i, max := 0, len(indices); i < max; i++ {\n-\t\t\t\t\tif indices[i] == '/' {\n+\t\t\t\tfor i, c := range []byte(n.indices) {\n+\t\t\t\t\tif c == '/' {\n \t\t\t\t\t\tn = n.children[i]\n \t\t\t\t\t\tif (len(n.path) == 1 && n.handle != nil) ||\n \t\t\t\t\t\t\t(n.nType == catchAll && n.children[0].handle != nil) {\n",
+  "diffTruncated": false,
+  "tree": [
+    ".travis.yml",
+    "LICENSE",
+    "README.md",
+    "go.mod",
+    "path.go",
+    "path_test.go",
+    "router.go",
+    "router_test.go",
+    "tree.go",
+    "tree_test.go"
+  ],
+  "explanation": {
+    "what": "tree.go内の複数箇所で、`for i := 0; i < len(s); i++ { c := s[i] ... }` という添字ループを `for i, c := range []byte(s) { ... }` という range ループに書き換えた。countParams、addRouteの子ノード探索、getValueのインデックス走査、findCaseInsensitivePathのルーン単位の走査など、tree.go内のインデックス文字列(n.indices)やパスをバイト単位で舐める箇所が対象。",
+    "why": "コミットメッセージに明記されている通り、Goコンパイラの最適化が進み、文字列を []byte に変換して range する書き方でも、実際にはバイトスライスへの変換アロケーションを伴わずにバイトを直接反復できるようになったため。添字での手動ループより range のほうが可読性が高く、かつ性能面のデメリットがなくなったことでこの書き換えに踏み切っている。",
+    "highlights": [
+      { "file": "tree.go", "note": "countParams: for i := 0; i < len(path); i++ → for i := range []byte(path) への書き換え" },
+      { "file": "tree.go", "note": "n.indices を走査する複数箇所で idxc という変数名を導入し、path[0]由来の比較対象と区別している" }
+    ],
+    "langNotes": [
+      { "topic": "range []byte(string)", "note": "文字列をそのまま range するとUTF-8のルーン単位でイテレートされるが、[]byte(s) に変換してから range するとバイト単位でイテレートできる。かつてはこの変換自体がヒープアロケーションを伴うことがあったが、コンパイラの最適化により range 専用の文脈では変換コストなしにバイト列を走査できるようになった、という性能特性の変化がこのコミットの背景にある。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

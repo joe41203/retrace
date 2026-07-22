@@ -1,0 +1,57 @@
+{
+  "seq": 22,
+  "sha": "365d4c235a2d7514f169de3c12fb9c8150de4278",
+  "parents": [
+    "1f8fe070234a39b78b59f75ba22e639aecc4c499"
+  ],
+  "author": {
+    "name": "Julien Schmidt",
+    "email": "github@julienschmidt.com",
+    "date": "2013-12-14T10:52:52+01:00"
+  },
+  "message": "Add a function to serve files",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 26,
+    "deletions": 0
+  },
+  "files": [
+    {
+      "path": "router.go",
+      "status": "M",
+      "additions": 26,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/router.go b/router.go\nindex ff65dd1..1e6a2f3 100644\n--- a/router.go\n+++ b/router.go\n@@ -128,6 +128,32 @@ func (r *Router) HandlerFunc(method, path string, handler http.HandlerFunc) {\n \t)\n }\n \n+// ServeFiles ... from root. The path must contain \"*filepath\", files are then\n+// served from the local path /defined/root/dir/*filepath.\n+// For example if root is \"/etc\" and *filepath is \"passwd\", the local file\n+// \"/etc/passwd\" would be served.\n+// Internally a http.FileServer is used, therefore http.NotFound is used instead\n+// of the Router's NotFound handler.\n+func (r *Router) ServeFiles(path string, root http.FileSystem) {\n+\tif len(path) < 10 || path[len(path)-9:] != \"*filepath\" {\n+\t\tpanic(\"path must end with *filepath\")\n+\t}\n+\n+\tfileServer := http.FileServer(root)\n+\n+\tr.GET(path, func(w http.ResponseWriter, req *http.Request, vars map[string]string) {\n+\t\tfp, ok := vars[\"filepath\"]\n+\t\tif !ok {\n+\t\t\tpanic(\"routed request has no *filepath\")\n+\t\t}\n+\n+\t\tprintln(fp)\n+\n+\t\treq.URL.Path = fp\n+\t\tfileServer.ServeHTTP(w, req)\n+\t})\n+}\n+\n func (r *Router) recv(w http.ResponseWriter, req *http.Request) {\n \tif rcv := recover(); rcv != nil {\n \t\tr.PanicHandler(w, req, rcv)\n",
+  "diffTruncated": false,
+  "tree": [
+    ".travis.yml",
+    "LICENSE",
+    "path.go",
+    "path_test.go",
+    "router.go",
+    "router_test.go",
+    "tree.go",
+    "tree_test.go"
+  ],
+  "explanation": {
+    "what": "router.go に Router.ServeFiles メソッドを追加した。path が \"*filepath\" で終わることを検証したうえで http.FileServer(root) を生成し、GET ルートとして登録する。ハンドラ内では vars[\"filepath\"] を取り出して req.URL.Path に上書きし、fileServer.ServeHTTP に処理を委譲する。",
+    "why": "直前の 1f8fe07 で catchAll ルートの挙動を整えたことを受けて、その catchAll を実際に活用する組み込み機能として静的ファイル配信を追加したと考えられる。root には http.FileSystem を受け取ることで、http.Dir によるOSファイルシステム配信だけでなく任意の実装を差し込めるようにしている。",
+    "highlights": [
+      { "file": "router.go", "note": "ServeFiles: *filepath を使った catchAll ルートを http.FileServer に橋渡しする実装" }
+    ],
+    "langNotes": [
+      { "topic": "http.FileSystem / http.FileServer", "note": "http.FileSystem は Open(name string) (http.File, error) だけを持つインターフェースで、http.Dir(パス文字列)がOSのディレクトリを実装として提供する。http.FileServer(root) はこのインターフェースを受け取り、静的ファイル配信用の http.Handler を生成する標準ライブラリの機能。" },
+      { "topic": "catchAll (*filepath)", "note": "httprouter のルートパスに *name と書くと、それ以降のパス全体(スラッシュ区切りの残り全部)を1つの値として捕捉する catchAll パラメータになる。ServeFiles はこれを使い、/static/*filepath のようなルートで任意の階層のファイルを1つのハンドラで受けられるようにしている。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

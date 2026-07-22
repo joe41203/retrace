@@ -1,0 +1,62 @@
+{
+  "seq": 87,
+  "sha": "925b09e25bea4ccff77c6eaab40794dd75351705",
+  "parents": [
+    "bbf259c39542256d5d8d696df5f0afbe3518f3c4"
+  ],
+  "author": {
+    "name": "Julien Schmidt",
+    "email": "github@julienschmidt.com",
+    "date": "2014-12-07T02:14:16+08:00"
+  },
+  "message": "Fix TSR for empty path\n\nResulted in a panic before. Fixes #45",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 3,
+    "deletions": 1
+  },
+  "files": [
+    {
+      "path": "router.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "router_test.go",
+      "status": "M",
+      "additions": 2,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/router.go b/router.go\nindex a6be43c..7716dc7 100644\n--- a/router.go\n+++ b/router.go\n@@ -289,7 +289,7 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {\n \t\t\t}\n \n \t\t\tif tsr && r.RedirectTrailingSlash {\n-\t\t\t\tif path[len(path)-1] == '/' {\n+\t\t\t\tif len(path) > 1 && path[len(path)-1] == '/' {\n \t\t\t\t\treq.URL.Path = path[:len(path)-1]\n \t\t\t\t} else {\n \t\t\t\t\treq.URL.Path = path + \"/\"\ndiff --git a/router_test.go b/router_test.go\nindex 08dab29..19aeb39 100644\n--- a/router_test.go\n+++ b/router_test.go\n@@ -171,6 +171,7 @@ func TestRouterNotFound(t *testing.T) {\n \trouter := New()\n \trouter.GET(\"/path\", handlerFunc)\n \trouter.GET(\"/dir/\", handlerFunc)\n+\trouter.GET(\"/\", handlerFunc)\n \n \ttestRoutes := []struct {\n \t\troute  string\n@@ -179,6 +180,7 @@ func TestRouterNotFound(t *testing.T) {\n \t}{\n \t\t{\"/path/\", 301, \"map[Location:[/path]]\"},   // TSR -/\n \t\t{\"/dir\", 301, \"map[Location:[/dir/]]\"},     // TSR +/\n+\t\t{\"/dir\", 301, \"map[Location:[/dir/]]\"},     // TSR +/\n \t\t{\"/PATH\", 301, \"map[Location:[/path]]\"},    // Fixed Case\n \t\t{\"/DIR/\", 301, \"map[Location:[/dir/]]\"},    // Fixed Case\n \t\t{\"/PATH/\", 301, \"map[Location:[/path]]\"},   // Fixed Case -/\n",
+  "diffTruncated": false,
+  "tree": [
+    ".travis.yml",
+    "LICENSE",
+    "README.md",
+    "path.go",
+    "path_test.go",
+    "router.go",
+    "router_test.go",
+    "tree.go",
+    "tree_test.go"
+  ],
+  "explanation": {
+    "what": "ServeHTTP 内の TSR(Trailing Slash Redirect)判定で、path[len(path)-1] == '/' の前に len(path) > 1 のガードを追加した。あわせてルートパス \"/\" 登録時の空パスによる TSR も検証するテストケースを追加した。",
+    "why": "コミットメッセージ \"Fix TSR for empty path\\n\\nResulted in a panic before. Fixes #45\" の通り、path が空文字列のときに path[len(path)-1] へアクセスすると index out of range で panic していた不具合の修正。",
+    "highlights": [
+      { "file": "router.go", "note": "len(path) > 1 の追加で、空文字列や1文字パスに対する末尾インデックスアクセスの panic を防ぐ" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

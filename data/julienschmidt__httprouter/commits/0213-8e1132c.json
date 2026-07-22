@@ -1,0 +1,58 @@
+{
+  "seq": 213,
+  "sha": "8e1132c0c4f38ecd8ba7d9f96149e4b52566d9e6",
+  "parents": [
+    "2fda79dd70f321055df768a9b8c89daba790277e"
+  ],
+  "author": {
+    "name": "Julien Schmidt",
+    "email": "git@julienschmidt.com",
+    "date": "2019-09-30T01:21:06+02:00"
+  },
+  "message": "router: fix ineffective assignment in test",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 1,
+    "deletions": 1
+  },
+  "files": [
+    {
+      "path": "router_test.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/router_test.go b/router_test.go\nindex 26079de..37b140b 100644\n--- a/router_test.go\n+++ b/router_test.go\n@@ -496,7 +496,7 @@ func TestRouterLookup(t *testing.T) {\n \t// insert route and try again\n \trouter.GET(\"/user/:name\", wantHandle)\n \n-\thandle, params, tsr := router.Lookup(http.MethodGet, \"/user/gopher\")\n+\thandle, params, _ := router.Lookup(http.MethodGet, \"/user/gopher\")\n \tif handle == nil {\n \t\tt.Fatal(\"Got no handle!\")\n \t} else {\n",
+  "diffTruncated": false,
+  "tree": [
+    ".travis.yml",
+    "LICENSE",
+    "README.md",
+    "go.mod",
+    "path.go",
+    "path_test.go",
+    "router.go",
+    "router_test.go",
+    "tree.go",
+    "tree_test.go"
+  ],
+  "explanation": {
+    "what": "TestRouterLookup 内で使っていない `tsr` 変数を `_` に置き換えた。Go の未使用変数チェックを通すための1行修正。",
+    "why": "コミットメッセージ「fix ineffective assignment in test」の通り、`tsr` を受け取っていたが以降で参照していなかったため、静的解析(go vet や lint)が指摘する無効な代入を解消したと考えられる。",
+    "highlights": [
+      { "file": "router_test.go", "note": "Lookup の戻り値のうち使わない tsr をブランク識別子 _ に変更" }
+    ],
+    "langNotes": [
+      { "topic": "ブランク識別子 _", "note": "Go では多値返却の一部を使わない場合、`_` を割り当てることで「意図的に無視している」ことを示す。未使用変数はコンパイルエラーになるため、この慣習は頻出する。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

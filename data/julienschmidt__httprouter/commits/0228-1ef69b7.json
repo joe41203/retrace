@@ -1,0 +1,66 @@
+{
+  "seq": 228,
+  "sha": "1ef69b73a2bc1a4e5ceb8267f872d10a6eb90b8d",
+  "parents": [
+    "e1d836068390fda70a608348e13b5d4795b3d5d9"
+  ],
+  "author": {
+    "name": "Julien Schmidt",
+    "email": "git@julienschmidt.com",
+    "date": "2019-10-04T17:32:35+02:00"
+  },
+  "message": "tree: return string from findCaseInsensitivePath, and only if found",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 25,
+    "deletions": 21
+  },
+  "files": [
+    {
+      "path": "router.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "tree.go",
+      "status": "M",
+      "additions": 24,
+      "deletions": 20,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/router.go b/router.go\nindex d42e79a..0970b54 100644\n--- a/router.go\n+++ b/router.go\n@@ -453,7 +453,7 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {\n \t\t\t\t\tr.RedirectTrailingSlash,\n \t\t\t\t)\n \t\t\t\tif found {\n-\t\t\t\t\treq.URL.Path = string(fixedPath)\n+\t\t\t\t\treq.URL.Path = fixedPath\n \t\t\t\t\thttp.Redirect(w, req, req.URL.String(), code)\n \t\t\t\t\treturn\n \t\t\t\t}\ndiff --git a/tree.go b/tree.go\nindex 20347c8..acd662e 100644\n--- a/tree.go\n+++ b/tree.go\n@@ -452,13 +452,14 @@ walk: // Outer loop for walking the tree\n // It can optionally also fix trailing slashes.\n // It returns the case-corrected path and a bool indicating whether the lookup\n // was successful.\n-func (n *node) findCaseInsensitivePath(path string, fixTrailingSlash bool) (ciPath []byte, found bool) {\n-\treturn n.findCaseInsensitivePathRec(\n+func (n *node) findCaseInsensitivePath(path string, fixTrailingSlash bool) (fixedPath string, found bool) {\n+\tciPath := n.findCaseInsensitivePathRec(\n \t\tpath,\n \t\tmake([]byte, 0, len(path)+1), // Preallocate enough memory for new path\n \t\t[4]byte{},                    // Empty rune buffer\n \t\tfixTrailingSlash,\n \t)\n+\treturn string(ciPath), ciPath != nil\n }\n \n // Shift bytes in array by n bytes left\n@@ -478,7 +479,7 @@ func shiftNRuneBytes(rb [4]byte, n int) [4]byte {\n }\n \n // Recursive case-insensitive lookup function used by n.findCaseInsensitivePath\n-func (n *node) findCaseInsensitivePathRec(path string, ciPath []byte, rb [4]byte, fixTrailingSlash bool) ([]byte, bool) {\n+func (n *node) findCaseInsensitivePathRec(path string, ciPath []byte, rb [4]byte, fixTrailingSlash bool) []byte {\n \tnpLen := len(n.path)\n \n walk: // Outer loop for walking the tree\n@@ -536,10 +537,10 @@ walk: // Outer loop for walking the tree\n \t\t\t\t\t\t\t// must use a recursive approach since both the\n \t\t\t\t\t\t\t// uppercase byte and the lowercase byte might exist\n \t\t\t\t\t\t\t// as an index\n-\t\t\t\t\t\t\tif out, found := n.children[i].findCaseInsensitivePathRec(\n+\t\t\t\t\t\t\tif out := n.children[i].findCaseInsensitivePathRec(\n \t\t\t\t\t\t\t\tpath, ciPath, rb, fixTrailingSlash,\n-\t\t\t\t\t\t\t); found {\n-\t\t\t\t\t\t\t\treturn out, true\n+\t\t\t\t\t\t\t); out != nil {\n+\t\t\t\t\t\t\t\treturn out\n \t\t\t\t\t\t\t}\n \t\t\t\t\t\t\tbreak\n \t\t\t\t\t\t}\n@@ -565,7 +566,10 @@ walk: // Outer loop for walking the tree\n \n \t\t\t\t// Nothing found. We can recommend to redirect to the same URL\n \t\t\t\t// without a trailing slash if a leaf exists for that path\n-\t\t\t\treturn ciPath, (fixTrailingSlash && path == \"/\" && n.handle != nil)\n+\t\t\t\tif fixTrailingSlash && path == \"/\" && n.handle != nil {\n+\t\t\t\t\treturn ciPath\n+\t\t\t\t}\n+\t\t\t\treturn nil\n \t\t\t}\n \n \t\t\tn = n.children[0]\n@@ -592,25 +596,25 @@ walk: // Outer loop for walking the tree\n \n \t\t\t\t\t// ... but we can't\n \t\t\t\t\tif fixTrailingSlash && len(path) == end+1 {\n-\t\t\t\t\t\treturn ciPath, true\n+\t\t\t\t\t\treturn ciPath\n \t\t\t\t\t}\n-\t\t\t\t\treturn ciPath, false\n+\t\t\t\t\treturn nil\n \t\t\t\t}\n \n \t\t\t\tif n.handle != nil {\n-\t\t\t\t\treturn ciPath, true\n+\t\t\t\t\treturn ciPath\n \t\t\t\t} else if fixTrailingSlash && len(n.children) == 1 {\n \t\t\t\t\t// No handle found. Check if a handle for this path + a\n \t\t\t\t\t// trailing slash exists\n \t\t\t\t\tn = n.children[0]\n \t\t\t\t\tif n.path == \"/\" && n.handle != nil {\n-\t\t\t\t\t\treturn append(ciPath, '/'), true\n+\t\t\t\t\t\treturn append(ciPath, '/')\n \t\t\t\t\t}\n \t\t\t\t}\n-\t\t\t\treturn ciPath, false\n+\t\t\t\treturn nil\n \n \t\t\tcase catchAll:\n-\t\t\t\treturn append(ciPath, path...), true\n+\t\t\t\treturn append(ciPath, path...)\n \n \t\t\tdefault:\n \t\t\t\tpanic(\"invalid node type\")\n@@ -619,7 +623,7 @@ walk: // Outer loop for walking the tree\n \t\t\t// We should have reached the node containing the handle.\n \t\t\t// Check if this node has a handle registered.\n \t\t\tif n.handle != nil {\n-\t\t\t\treturn ciPath, true\n+\t\t\t\treturn ciPath\n \t\t\t}\n \n \t\t\t// No handle found.\n@@ -631,13 +635,13 @@ walk: // Outer loop for walking the tree\n \t\t\t\t\t\tn = n.children[i]\n \t\t\t\t\t\tif (len(n.path) == 1 && n.handle != nil) ||\n \t\t\t\t\t\t\t(n.nType == catchAll && n.children[0].handle != nil) {\n-\t\t\t\t\t\t\treturn append(ciPath, '/'), true\n+\t\t\t\t\t\t\treturn append(ciPath, '/')\n \t\t\t\t\t\t}\n-\t\t\t\t\t\treturn ciPath, false\n+\t\t\t\t\t\treturn nil\n \t\t\t\t\t}\n \t\t\t\t}\n \t\t\t}\n-\t\t\treturn ciPath, false\n+\t\t\treturn nil\n \t\t}\n \t}\n \n@@ -645,12 +649,12 @@ walk: // Outer loop for walking the tree\n \t// Try to fix the path by adding / removing a trailing slash\n \tif fixTrailingSlash {\n \t\tif path == \"/\" {\n-\t\t\treturn ciPath, true\n+\t\t\treturn ciPath\n \t\t}\n \t\tif len(path)+1 == npLen && n.path[len(path)] == '/' &&\n \t\t\tstrings.EqualFold(path[1:], n.path[1:len(path)]) && n.handle != nil {\n-\t\t\treturn append(ciPath, n.path...), true\n+\t\t\treturn append(ciPath, n.path...)\n \t\t}\n \t}\n-\treturn ciPath, false\n+\treturn nil\n }\n",
+  "diffTruncated": false,
+  "tree": [
+    ".travis.yml",
+    "LICENSE",
+    "README.md",
+    "go.mod",
+    "path.go",
+    "path_test.go",
+    "router.go",
+    "router_test.go",
+    "tree.go",
+    "tree_test.go"
+  ],
+  "explanation": {
+    "what": "findCaseInsensitivePath の戻り値を `([]byte, bool)` から `(string, bool)` に変更し、内部で使う再帰関数 findCaseInsensitivePathRec の戻り値も `([]byte, bool)` から単一の `[]byte`(見つからなければ nil)に簡略化した。呼び出し側だった router.go の `req.URL.Path = string(fixedPath)` も不要な変換を削除して `req.URL.Path = fixedPath` に変えている。",
+    "why": "コミットメッセージの通り、見つかった場合のみ意味のある値を返すという設計に統一する変更。再帰関数側は「見つかったかどうか」を bool で別管理する代わりに nil を「見つからなかった」の目印として使うことで、戻り値のペアを1つ減らし呼び出し側の条件分岐(`if out, found := ...; found`)も `if out := ...; out != nil` へ単純化できている。",
+    "highlights": [
+      { "file": "tree.go", "note": "findCaseInsensitivePathRec の戻り値を ([]byte, bool) から []byte(nil可)に統一し、呼び出し側の分岐を簡略化" },
+      { "file": "router.go", "note": "fixedPath が既に string になったため string() 変換が不要になった箇所" }
+    ],
+    "langNotes": [
+      { "topic": "nilスライスを「見つからない」の目印に使う慣用", "note": "Goのスライスは nil かどうかを比較でき、ゼロ値としての nil と空スライスを区別できる。この変更は「見つかった/見つからなかった」を表す bool の代わりに、戻り値のスライスが nil かどうかで結果を表現しており、戻り値の数を減らせる典型的なGoのイディオム。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

@@ -1,0 +1,63 @@
+{
+  "seq": 14,
+  "sha": "0ba55b135a76b26c994618006fc1e08b988d8e5a",
+  "parents": [
+    "638f68c77a4da27cc34b8533ec6df24dc1924f55"
+  ],
+  "author": {
+    "name": "Julien Schmidt",
+    "email": "github@julienschmidt.com",
+    "date": "2013-12-11T21:33:57+01:00"
+  },
+  "message": "Ignore TSR for root path\n\nAvoids endless redirect loop",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 8,
+    "deletions": 7
+  },
+  "files": [
+    {
+      "path": "router.go",
+      "status": "M",
+      "additions": 5,
+      "deletions": 4,
+      "binary": false
+    },
+    {
+      "path": "tree.go",
+      "status": "M",
+      "additions": 3,
+      "deletions": 3,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/router.go b/router.go\nindex 63d9324..6a3b2cd 100644\n--- a/router.go\n+++ b/router.go\n@@ -17,7 +17,8 @@ type Handle func(http.ResponseWriter, *http.Request, map[string]string)\n \n // NotFound is the default HTTP handler func for routes that can't be matched\n // with an existing route.\n-// NotFound tries to redirect to a canonical URL generated with CleanPath\n+// NotFound tries to redirect to a canonical URL generated with CleanPath.\n+// Otherwise the request is delegated to http.NotFound.\n func NotFound(w http.ResponseWriter, req *http.Request) {\n \tif req.Method != \"CONNECT\" {\n \t\tif p := CleanPath(req.URL.Path); p != req.URL.Path && p != req.Referer() {\n@@ -36,8 +37,8 @@ type Router struct {\n \n \t// Enables automatic redirection if the current route can't be matched but\n \t// handler for the path with (without) the trailing slash exists.\n-\t// For example if a route for /foo exists but /foo/ is requested, the client\n-\t// would be redirected to /foo with http status code 301.\n+\t// For example if /foo/ is requested but a route only exists for /foo, the\n+\t// client is redirected to /foo with http status code 301.\n \tRedirectTrailingSlash bool\n \n \t// Configurable handler func which is used when no matching route is found.\n@@ -109,7 +110,7 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {\n \n \tif handle, vars, tsr := r.getValue(req.Method, path); handle != nil {\n \t\thandle(w, req, vars)\n-\t} else if tsr && r.RedirectTrailingSlash {\n+\t} else if tsr && r.RedirectTrailingSlash && path != \"/\" {\n \t\tif path[len(path)-1] == '/' {\n \t\t\thttp.Redirect(w, req, path[:len(path)-1], http.StatusMovedPermanently)\n \t\t\treturn\ndiff --git a/tree.go b/tree.go\nindex 1f66a87..f66af3c 100644\n--- a/tree.go\n+++ b/tree.go\n@@ -234,7 +234,7 @@ OUTER:\n \t\t\t\t\tk++\n \t\t\t\t}\n \n-\t\t\t\t// save param handle\n+\t\t\t\t// save param value\n \t\t\t\tif vars == nil {\n \t\t\t\t\tvars = map[string]string{\n \t\t\t\t\t\tn.path[1:]: path[:k],\n@@ -270,7 +270,7 @@ OUTER:\n \t\t\t\treturn\n \n \t\t\t} else { // catchAll\n-\t\t\t\t// save handle\n+\t\t\t\t// save catchAll value\n \t\t\t\tif vars == nil {\n \t\t\t\t\tvars = map[string]string{\n \t\t\t\t\t\tn.path[1:]: path,\n@@ -302,6 +302,6 @@ OUTER:\n \n \t// Nothing found. We can recommend to redirect to the same URL with an extra\n \t// trailing slash if a leaf exists for that path\n-\ttsr = (n.handle != nil && len(path)+1 == len(n.path) && n.path[len(path)] == '/') || (path == \"/\")\n+\ttsr = (len(path)+1 == len(n.path) && n.path[len(path)] == '/' && n.handle[method] != nil) || (path == \"/\")\n \treturn\n }\n",
+  "diffTruncated": false,
+  "tree": [
+    ".travis.yml",
+    "LICENSE",
+    "path.go",
+    "path_test.go",
+    "router.go",
+    "router_test.go",
+    "tree.go",
+    "tree_test.go"
+  ],
+  "explanation": {
+    "what": "ServeHTTP の TSR(trailing slash redirect)判定条件に `path != \"/\"` を追加し、ルートパス自身へのリダイレクトを抑止した。また tree.go の getValue で TSR 推奨フラグの算出条件を `n.handle != nil` から `n.handle[method] != nil` に変更し、該当 HTTP メソッドのハンドラが存在する場合のみ TSR を推奨するようにした。",
+    "why": "コミットメッセージの通り、ルートパス(\"/\")に対して無限リダイレクトループが発生する不具合を防ぐための修正。",
+    "highlights": [
+      { "file": "tree.go", "note": "tsr の算出式に `method` を絡めることで、メソッドごとの Handle 登録状況を見て TSR 判定するようになっている" }
+    ],
+    "langNotes": [
+      { "topic": "TSR (trailing slash redirect)", "note": "httprouter は末尾スラッシュの有無だけが違う類似ルートが登録されているとき、301リダイレクトで正規URLへ誘導する機能を持つ。ここではルートパス \"/\" 自身に対してこの仕組みが働くと無限ループになるため、明示的に除外している。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

@@ -1,0 +1,53 @@
+{
+  "seq": 34,
+  "sha": "cdd9d500574ff51fdd115f7e9254afee4a5f71a1",
+  "parents": [
+    "29a9e74dbed8c44f709c1e2031281ef226180763"
+  ],
+  "author": {
+    "name": "Julien Schmidt",
+    "email": "github@julienschmidt.com",
+    "date": "2013-12-14T17:03:20+01:00"
+  },
+  "message": "Update PathClean test strings",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 9,
+    "deletions": 3
+  },
+  "files": [
+    {
+      "path": "path_test.go",
+      "status": "M",
+      "additions": 9,
+      "deletions": 3,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/path_test.go b/path_test.go\nindex 5c018e8..c4ceda5 100644\n--- a/path_test.go\n+++ b/path_test.go\n@@ -14,13 +14,17 @@ var cleanTests = []struct {\n \tpath, result string\n }{\n \t// Already clean\n+\t{\"/\", \"/\"},\n+\t{\"/abc\", \"/abc\"},\n+\t{\"/a/b/c\", \"/a/b/c\"},\n+\t{\"/abc/\", \"/abc/\"},\n+\t{\"/a/b/c/\", \"/a/b/c/\"},\n+\n+\t// missing root\n \t{\"\", \"/\"},\n \t{\"abc\", \"/abc\"},\n \t{\"abc/def\", \"/abc/def\"},\n \t{\"a/b/c\", \"/a/b/c\"},\n-\t{\"/\", \"/\"},\n-\t{\"../..\", \"/\"},\n-\t{\"../../abc\", \"/abc\"},\n \n \t// Remove doubled slash\n \t{\"//\", \"/\"},\n@@ -43,6 +47,8 @@ var cleanTests = []struct {\n \t{\"..\", \"/\"},\n \t{\"../\", \"/\"},\n \t{\"../../\", \"/\"},\n+\t{\"../..\", \"/\"},\n+\t{\"../../abc\", \"/abc\"},\n \t{\"/abc/def/ghi/../jkl\", \"/abc/def/jkl\"},\n \t{\"/abc/def/../ghi/../jkl\", \"/abc/jkl\"},\n \t{\"/abc/def/..\", \"/abc\"},\n",
+  "diffTruncated": false,
+  "tree": [
+    ".travis.yml",
+    "LICENSE",
+    "README.md",
+    "path.go",
+    "path_test.go",
+    "router.go",
+    "router_test.go",
+    "tree.go",
+    "tree_test.go"
+  ],
+  "explanation": {
+    "what": "path_test.go の cleanTests テーブルを整理した。「既にクリーンなパス」の区分に /、/abc、/a/b/c などのケースを追加し、「ルートが無いパス」区分から誤って混在していた ../.. 系のケースを「相対パスの上位ディレクトリ参照」区分へ移し直している。",
+    "why": "コミットメッセージの通りテスト文字列の整理が目的。CleanPath のテストケースがカテゴリ(既にクリーン/ルート欠落/相対パス参照)ごとに正しく分類されておらず、可読性・網羅性のためにテーブルを並べ替えたと考えられる。",
+    "highlights": [],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

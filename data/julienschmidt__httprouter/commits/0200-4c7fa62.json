@@ -1,0 +1,60 @@
+{
+  "seq": 200,
+  "sha": "4c7fa626ec2b0dcdf2a926656da705a4a1f0208d",
+  "parents": [
+    "ccb1657ac6d5d3c7e98861d977faaf2a0f9507b7"
+  ],
+  "author": {
+    "name": "Julien Schmidt",
+    "email": "git@julienschmidt.com",
+    "date": "2019-09-25T22:29:11+02:00"
+  },
+  "message": "tree: add test for #261",
+  "pr": {
+    "number": 261,
+    "title": "fix maxParams bug",
+    "body": "When there is only one route \"/cmd/*fildpath\", the structure of the tree is:\r\n 01:00 /cmd[1] <nil> false 1\r\n 01:01 [1] <nil> true 3\r\n 01:01 /*filepath[0] 0x124f970 false 3\r\nThe maxParams of the \"/cmd\" node is 0, but it should be 1",
+    "url": "https://github.com/julienschmidt/httprouter/pull/261"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 7,
+    "deletions": 0
+  },
+  "files": [
+    {
+      "path": "tree_test.go",
+      "status": "M",
+      "additions": 7,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/tree_test.go b/tree_test.go\nindex e89d945..d358ae2 100644\n--- a/tree_test.go\n+++ b/tree_test.go\n@@ -344,6 +344,13 @@ func TestTreeCatchAllConflictRoot(t *testing.T) {\n \ttestRoutes(t, routes)\n }\n \n+func TestTreeCatchMaxParams(t *testing.T) {\n+\ttree := &node{}\n+\tvar route = \"/cmd/*filepath\"\n+\ttree.addRoute(route, fakeHandler(route))\n+\tcheckMaxParams(t, tree)\n+}\n+\n func TestTreeDoubleWildcard(t *testing.T) {\n \tconst panicMsg = \"only one wildcard per path segment is allowed\"\n \n",
+  "diffTruncated": false,
+  "tree": [
+    ".travis.yml",
+    "LICENSE",
+    "README.md",
+    "go.mod",
+    "params.go",
+    "path.go",
+    "path_test.go",
+    "router.go",
+    "router_test.go",
+    "tree.go",
+    "tree_test.go"
+  ],
+  "explanation": {
+    "what": "PR本文にあった再現ケース(単一ルート `/cmd/*filepath`)を TestTreeCatchMaxParams として tree_test.go に追加し、既存ヘルパー checkMaxParams で木全体の maxParams 整合性を検証するようにした。",
+    "why": "PR #261 で修正した maxParams の過小評価バグに対する回帰テストを追加し、同じ問題が再発しないことを保証する。",
+    "highlights": [],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [{ "type": "pr", "number": 261, "url": "https://github.com/julienschmidt/httprouter/pull/261" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

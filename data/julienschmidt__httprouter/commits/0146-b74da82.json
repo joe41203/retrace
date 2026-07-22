@@ -1,0 +1,53 @@
+{
+  "seq": 146,
+  "sha": "b74da820a2aa53314008e35ee79631ddba491aa0",
+  "parents": [
+    "6e0ff1339a6bc1e6ea66670cb4f6496d3dbb85b6"
+  ],
+  "author": {
+    "name": "Julien Schmidt",
+    "email": "git@julienschmidt.com",
+    "date": "2016-02-07T06:50:16+01:00"
+  },
+  "message": "tree: remove dead code",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 1,
+    "deletions": 5
+  },
+  "files": [
+    {
+      "path": "tree.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 5,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/tree.go b/tree.go\nindex c5e0d85..b735534 100644\n--- a/tree.go\n+++ b/tree.go\n@@ -473,6 +473,7 @@ func shiftNRuneBytes(rb [4]byte, n int) [4]byte {\n \t}\n }\n \n+// recursive case-insensitive lookup function used by n.findCaseInsensitivePath\n func (n *node) findCaseInsensitivePathRec(path, loPath string, ciPath []byte, rb [4]byte, fixTrailingSlash bool) ([]byte, bool) {\n \tloNPath := strings.ToLower(n.path)\n \n@@ -500,11 +501,6 @@ walk: // outer loop for walking the tree\n \t\t\t\t\t\t\tn = n.children[i]\n \t\t\t\t\t\t\tloNPath = strings.ToLower(n.path)\n \t\t\t\t\t\t\tcontinue walk\n-\t\t\t\t\t\t\t/*if out, found := n.children[i].findCaseInsensitivePathRec(\n-\t\t\t\t\t\t\t\tpath, loPath, ciPath, rb, fixTrailingSlash,\n-\t\t\t\t\t\t\t); found {\n-\t\t\t\t\t\t\t\treturn out, true\n-\t\t\t\t\t\t\t}*/\n \t\t\t\t\t\t}\n \t\t\t\t\t}\n \t\t\t\t} else {\n",
+  "diffTruncated": false,
+  "tree": [
+    ".travis.yml",
+    "LICENSE",
+    "README.md",
+    "path.go",
+    "path_test.go",
+    "router.go",
+    "router_test.go",
+    "tree.go",
+    "tree_test.go"
+  ],
+  "explanation": {
+    "what": "前コミットでループ化した際にコメントアウトのまま残っていた旧再帰呼び出しのコードを削除し、findCaseInsensitivePathRec 関数の直前にその役割を説明するコメントを追加した。",
+    "why": "コミットメッセージ \"remove dead code\" の通り、前コミット(6e0ff13)でループへの置き換え後も参照用にコメントアウトして残していた到達不能なコードを、動作確認後に片付けるための整理コミット。",
+    "highlights": [],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

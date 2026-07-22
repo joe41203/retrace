@@ -1,0 +1,60 @@
+{
+  "seq": 199,
+  "sha": "ccb1657ac6d5d3c7e98861d977faaf2a0f9507b7",
+  "parents": [
+    "df4f025f65278a1d4f2a6baaf9ea4a3081b0c2b4"
+  ],
+  "author": {
+    "name": "Julien Schmidt",
+    "email": "git@julienschmidt.com",
+    "date": "2019-09-25T22:20:06+02:00"
+  },
+  "message": "tree: simplify maxParams check for catch-all and add comment",
+  "pr": {
+    "number": 261,
+    "title": "fix maxParams bug",
+    "body": "When there is only one route \"/cmd/*fildpath\", the structure of the tree is:\r\n 01:00 /cmd[1] <nil> false 1\r\n 01:01 [1] <nil> true 3\r\n 01:01 /*filepath[0] 0x124f970 false 3\r\nThe maxParams of the \"/cmd\" node is 0, but it should be 1",
+    "url": "https://github.com/julienschmidt/httprouter/pull/261"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 3,
+    "deletions": 2
+  },
+  "files": [
+    {
+      "path": "tree.go",
+      "status": "M",
+      "additions": 3,
+      "deletions": 2,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/tree.go b/tree.go\nindex e239bbf..b248ca2 100644\n--- a/tree.go\n+++ b/tree.go\n@@ -301,8 +301,9 @@ func (n *node) insertChild(numParams uint8, path, fullPath string, handle Handle\n \t\t\t\tnType:     catchAll,\n \t\t\t\tmaxParams: 1,\n \t\t\t}\n-\t\t\tif child.maxParams > n.maxParams {\n-\t\t\t\tn.maxParams = child.maxParams\n+\t\t\t// update maxParams of the parent node\n+\t\t\tif n.maxParams < 1 {\n+\t\t\t\tn.maxParams = 1\n \t\t\t}\n \t\t\tn.children = []*node{child}\n \t\t\tn.indices = string(path[i])\n",
+  "diffTruncated": false,
+  "tree": [
+    ".travis.yml",
+    "LICENSE",
+    "README.md",
+    "go.mod",
+    "params.go",
+    "path.go",
+    "path_test.go",
+    "router.go",
+    "router_test.go",
+    "tree.go",
+    "tree_test.go"
+  ],
+  "explanation": {
+    "what": "前コミットで追加した「子の maxParams と比較して親を更新する」処理を、catchAll ノードの maxParams が常に1であることを踏まえて `if n.maxParams < 1 { n.maxParams = 1 }` という単純な形に簡略化し、意図を説明するコメントを添えた。",
+    "why": "同じ PR #261 の修正を、直前の比較ベースの実装から簡潔な形に整理する追随コミット。catchAll ノードの maxParams は生成時点で常に1固定のため、子の値を汎用的に比較する必要はなく、定数1との比較で十分と判断されている。",
+    "highlights": [],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [{ "type": "pr", "number": 261, "url": "https://github.com/julienschmidt/httprouter/pull/261" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

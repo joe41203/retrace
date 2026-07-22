@@ -1,0 +1,57 @@
+{
+  "seq": 145,
+  "sha": "6e0ff1339a6bc1e6ea66670cb4f6496d3dbb85b6",
+  "parents": [
+    "a7a8c643b99a27aea6945b74bcef52e58d7249ab"
+  ],
+  "author": {
+    "name": "Julien Schmidt",
+    "email": "git@julienschmidt.com",
+    "date": "2016-02-07T06:47:14+01:00"
+  },
+  "message": "tree: avoid recursion in case-insensitive when possible",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 16,
+    "deletions": 10
+  },
+  "files": [
+    {
+      "path": "tree.go",
+      "status": "M",
+      "additions": 16,
+      "deletions": 10,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/tree.go b/tree.go\nindex 808f1e4..c5e0d85 100644\n--- a/tree.go\n+++ b/tree.go\n@@ -321,7 +321,7 @@ func (n *node) insertChild(numParams uint8, path, fullPath string, handle Handle\n // made if a handle exists with an extra (without the) trailing slash for the\n // given path.\n func (n *node) getValue(path string) (handle Handle, p Params, tsr bool) {\n-walk: // Outer loop for walking the tree\n+walk: // outer loop for walking the tree\n \tfor {\n \t\tif len(path) > len(n.path) {\n \t\t\tif path[:len(n.path)] == n.path {\n@@ -476,6 +476,7 @@ func shiftNRuneBytes(rb [4]byte, n int) [4]byte {\n func (n *node) findCaseInsensitivePathRec(path, loPath string, ciPath []byte, rb [4]byte, fixTrailingSlash bool) ([]byte, bool) {\n \tloNPath := strings.ToLower(n.path)\n \n+walk: // outer loop for walking the tree\n \tfor len(loPath) >= len(loNPath) && (len(loNPath) == 0 || loPath[1:len(loNPath)] == loNPath[1:]) {\n \t\t// add common path to result\n \t\tciPath = append(ciPath, n.path...)\n@@ -495,11 +496,15 @@ func (n *node) findCaseInsensitivePathRec(path, loPath string, ciPath []byte, rb\n \t\t\t\t\t// old rune not finished\n \t\t\t\t\tfor i := 0; i < len(n.indices); i++ {\n \t\t\t\t\t\tif n.indices[i] == rb[0] {\n-\t\t\t\t\t\t\tif out, found := n.children[i].findCaseInsensitivePathRec(\n+\t\t\t\t\t\t\t// continue with child node\n+\t\t\t\t\t\t\tn = n.children[i]\n+\t\t\t\t\t\t\tloNPath = strings.ToLower(n.path)\n+\t\t\t\t\t\t\tcontinue walk\n+\t\t\t\t\t\t\t/*if out, found := n.children[i].findCaseInsensitivePathRec(\n \t\t\t\t\t\t\t\tpath, loPath, ciPath, rb, fixTrailingSlash,\n \t\t\t\t\t\t\t); found {\n \t\t\t\t\t\t\t\treturn out, true\n-\t\t\t\t\t\t\t}\n+\t\t\t\t\t\t\t}*/\n \t\t\t\t\t\t}\n \t\t\t\t\t}\n \t\t\t\t} else {\n@@ -523,16 +528,18 @@ func (n *node) findCaseInsensitivePathRec(path, loPath string, ciPath []byte, rb\n \t\t\t\t\t// skipp already processed bytes\n \t\t\t\t\trb = shiftNRuneBytes(rb, off)\n \n-\t\t\t\t\t// must use recursive approach since both the uppercase\n-\t\t\t\t\t// byte and the lowercase byte might exist as an index\n \t\t\t\t\tfor i := 0; i < len(n.indices); i++ {\n \t\t\t\t\t\t// lowercase matches\n \t\t\t\t\t\tif n.indices[i] == rb[0] {\n+\t\t\t\t\t\t\t// must use a recursive approach since both the\n+\t\t\t\t\t\t\t// uppercase byte and the lowercase byte might exist\n+\t\t\t\t\t\t\t// as an index\n \t\t\t\t\t\t\tif out, found := n.children[i].findCaseInsensitivePathRec(\n \t\t\t\t\t\t\t\tpath, loPath, ciPath, rb, fixTrailingSlash,\n \t\t\t\t\t\t\t); found {\n \t\t\t\t\t\t\t\treturn out, true\n \t\t\t\t\t\t\t}\n+\t\t\t\t\t\t\tbreak\n \t\t\t\t\t\t}\n \t\t\t\t\t}\n \n@@ -544,11 +551,10 @@ func (n *node) findCaseInsensitivePathRec(path, loPath string, ciPath []byte, rb\n \t\t\t\t\t\tfor i := 0; i < len(n.indices); i++ {\n \t\t\t\t\t\t\t// uppercase matches\n \t\t\t\t\t\t\tif n.indices[i] == rb[0] {\n-\t\t\t\t\t\t\t\tif out, found := n.children[i].findCaseInsensitivePathRec(\n-\t\t\t\t\t\t\t\t\tpath, loPath, ciPath, rb, fixTrailingSlash,\n-\t\t\t\t\t\t\t\t); found {\n-\t\t\t\t\t\t\t\t\treturn out, true\n-\t\t\t\t\t\t\t\t}\n+\t\t\t\t\t\t\t\t// continue with child node\n+\t\t\t\t\t\t\t\tn = n.children[i]\n+\t\t\t\t\t\t\t\tloNPath = strings.ToLower(n.path)\n+\t\t\t\t\t\t\t\tcontinue walk\n \t\t\t\t\t\t\t}\n \t\t\t\t\t\t}\n \t\t\t\t\t}\n",
+  "diffTruncated": false,
+  "tree": [
+    ".travis.yml",
+    "LICENSE",
+    "README.md",
+    "path.go",
+    "path_test.go",
+    "router.go",
+    "router_test.go",
+    "tree.go",
+    "tree_test.go"
+  ],
+  "explanation": {
+    "what": "findCaseInsensitivePathRec 内で子ノードへ降りる際に使っていた再帰呼び出し(n.children[i].findCaseInsensitivePathRec(...))を、`walk:` ラベル付き for ループへの `continue walk` に置き換えた。あわせて getValue 側の既存ループラベルのコメント表記も揃えている。",
+    "why": "コミットメッセージ \"avoid recursion in case-insensitive when possible\" の通り、木を1階層降りるだけの決定的な経路(一致するインデックスが1つに絞られる場合)では関数呼び出しのオーバーヘッドとスタック消費を避けるため、ループによる反復に置き換えている。大文字・小文字の両方が候補になり得る箇所ではコメントの通り引き続き再帰呼び出しが残る。",
+    "highlights": [
+      { "file": "tree.go", "note": "`walk:` ラベルと `continue walk` により、子ノードへの遷移を関数呼び出しなしで行っている" }
+    ],
+    "langNotes": [
+      { "topic": "ラベル付き continue", "note": "Go では for 文にラベルを付け、ネストしたループの内側から `continue walk` のように外側のループへ制御を戻せる。ここでは再帰呼び出しの代わりに `n = n.children[i]` として次のノードに切り替えつつ同じループを継続するのに使われている。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

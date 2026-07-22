@@ -1,0 +1,56 @@
+{
+  "seq": 212,
+  "sha": "2fda79dd70f321055df768a9b8c89daba790277e",
+  "parents": [
+    "b390476b92b14b79a3df554867be35d160b5c8c1"
+  ],
+  "author": {
+    "name": "Julien Schmidt",
+    "email": "git@julienschmidt.com",
+    "date": "2019-09-30T01:02:29+02:00"
+  },
+  "message": "router: minor style fixes",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 12,
+    "deletions": 15
+  },
+  "files": [
+    {
+      "path": "router.go",
+      "status": "M",
+      "additions": 12,
+      "deletions": 15,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/router.go b/router.go\nindex c4eb807..599529d 100644\n--- a/router.go\n+++ b/router.go\n@@ -421,28 +421,25 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {\n \n \tif req.Method == http.MethodOptions && r.HandleOPTIONS {\n \t\t// Handle OPTIONS requests\n-\t\tif allow := r.allowed(path, http.MethodOptions); len(allow) > 0 {\n+\t\tif allow := r.allowed(path, http.MethodOptions); allow != \"\" {\n \t\t\tw.Header().Set(\"Allow\", allow)\n \t\t\tif r.GlobalOPTIONS != nil {\n \t\t\t\tr.GlobalOPTIONS.ServeHTTP(w, req)\n \t\t\t}\n \t\t\treturn\n \t\t}\n-\t} else {\n-\t\t// Handle 405\n-\t\tif r.HandleMethodNotAllowed {\n-\t\t\tif allow := r.allowed(path, req.Method); len(allow) > 0 {\n-\t\t\t\tw.Header().Set(\"Allow\", allow)\n-\t\t\t\tif r.MethodNotAllowed != nil {\n-\t\t\t\t\tr.MethodNotAllowed.ServeHTTP(w, req)\n-\t\t\t\t} else {\n-\t\t\t\t\thttp.Error(w,\n-\t\t\t\t\t\thttp.StatusText(http.StatusMethodNotAllowed),\n-\t\t\t\t\t\thttp.StatusMethodNotAllowed,\n-\t\t\t\t\t)\n-\t\t\t\t}\n-\t\t\t\treturn\n+\t} else if r.HandleMethodNotAllowed { // Handle 405\n+\t\tif allow := r.allowed(path, req.Method); allow != \"\" {\n+\t\t\tw.Header().Set(\"Allow\", allow)\n+\t\t\tif r.MethodNotAllowed != nil {\n+\t\t\t\tr.MethodNotAllowed.ServeHTTP(w, req)\n+\t\t\t} else {\n+\t\t\t\thttp.Error(w,\n+\t\t\t\t\thttp.StatusText(http.StatusMethodNotAllowed),\n+\t\t\t\t\thttp.StatusMethodNotAllowed,\n+\t\t\t\t)\n \t\t\t}\n+\t\t\treturn\n \t\t}\n \t}\n \n",
+  "diffTruncated": false,
+  "tree": [
+    ".travis.yml",
+    "LICENSE",
+    "README.md",
+    "go.mod",
+    "path.go",
+    "path_test.go",
+    "router.go",
+    "router_test.go",
+    "tree.go",
+    "tree_test.go"
+  ],
+  "explanation": {
+    "what": "ServeHTTP 内の OPTIONS/405 処理を if-else チェーンから `else if r.HandleMethodNotAllowed` という条件付き else if に書き換え、余分なネストを1段減らした。`len(allow) > 0` の比較も `allow != \"\"` に統一した。",
+    "why": "直前の GlobalOPTIONS 追加でこのブロックのネストが深くなったため、条件を else if に畳んで可読性を整えたと考えられる。動作を変えないコミットメッセージ「minor style fixes」からも、リファクタリング目的であることがうかがえる。",
+    "highlights": [
+      { "file": "router.go", "note": "if/else の入れ子を else if に平坦化し、405処理ブロックのインデントを1段浅くしている" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

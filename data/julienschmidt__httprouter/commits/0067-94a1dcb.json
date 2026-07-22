@@ -1,0 +1,63 @@
+{
+  "seq": 67,
+  "sha": "94a1dcb3ee9b505b220c3d6c460facc1730cb9f6",
+  "parents": [
+    "98665328923ace5dbdc9da04c651cfd22072cd13"
+  ],
+  "author": {
+    "name": "Julien Schmidt",
+    "email": "github@julienschmidt.com",
+    "date": "2014-06-08T17:58:54+02:00"
+  },
+  "message": "tree: fix maxParams for splitted nodes",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 36,
+    "deletions": 4
+  },
+  "files": [
+    {
+      "path": "tree.go",
+      "status": "M",
+      "additions": 12,
+      "deletions": 4,
+      "binary": false
+    },
+    {
+      "path": "tree_test.go",
+      "status": "M",
+      "additions": 24,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/tree.go b/tree.go\nindex ce39cd4..6aea17a 100644\n--- a/tree.go\n+++ b/tree.go\n@@ -88,20 +88,28 @@ func (n *node) addRoute(method, path string, handle Handle) {\n \t\t\t// This also implies that the commom prefix contains no ':' or '*'\n \t\t\t// since the existing key can't contain this chars.\n \t\t\ti := 0\n-\t\t\tfor j := min(len(path), len(n.path)); i < j && path[i] == n.path[i]; i++ {\n+\t\t\tfor max := min(len(path), len(n.path)); i < max && path[i] == n.path[i]; i++ {\n \t\t\t}\n \n \t\t\t// Split edge\n \t\t\tif i < len(n.path) {\n-\t\t\t\tn.children = []*node{&node{\n+\t\t\t\tchild := node{\n \t\t\t\t\tpath:      n.path[i:],\n \t\t\t\t\twildChild: n.wildChild,\n-\t\t\t\t\tmaxParams: n.maxParams,\n \t\t\t\t\tindices:   n.indices,\n \t\t\t\t\tchildren:  n.children,\n \t\t\t\t\thandle:    n.handle,\n \t\t\t\t\tpriority:  n.priority - 1,\n-\t\t\t\t}}\n+\t\t\t\t}\n+\n+\t\t\t\t// Update maxParams (max of all children)\n+\t\t\t\tfor i := range child.children {\n+\t\t\t\t\tif child.children[i].maxParams > child.maxParams {\n+\t\t\t\t\t\tchild.maxParams = child.children[i].maxParams\n+\t\t\t\t\t}\n+\t\t\t\t}\n+\n+\t\t\t\tn.children = []*node{&child}\n \t\t\t\tn.indices = []byte{n.path[i]}\n \t\t\t\tn.path = path[:i]\n \t\t\t\tn.handle = nil\ndiff --git a/tree_test.go b/tree_test.go\nindex 0fa1486..1744b52 100644\n--- a/tree_test.go\n+++ b/tree_test.go\n@@ -78,6 +78,28 @@ func checkPriorities(t *testing.T, n *node) uint32 {\n \treturn prio\n }\n \n+func checkMaxParams(t *testing.T, n *node) uint8 {\n+\tvar maxParams uint8\n+\tfor i := range n.children {\n+\t\tparams := checkMaxParams(t, n.children[i])\n+\t\tif params > maxParams {\n+\t\t\tmaxParams = params\n+\t\t}\n+\t}\n+\tif n.nType != static && !n.wildChild {\n+\t\tmaxParams++\n+\t}\n+\n+\tif n.maxParams != maxParams {\n+\t\tt.Errorf(\n+\t\t\t\"maxParams mismatch for node '%s': is %d, should be %d\",\n+\t\t\tn.path, n.maxParams, maxParams,\n+\t\t)\n+\t}\n+\n+\treturn maxParams\n+}\n+\n func TestCountParams(t *testing.T) {\n \tif countParams(\"/path/:param1/static/*catch-all\") != 2 {\n \t\tt.Fail()\n@@ -120,6 +142,7 @@ func TestTreeAddAndGet(t *testing.T) {\n \t})\n \n \tcheckPriorities(t, tree)\n+\tcheckMaxParams(t, tree)\n }\n \n func TestTreeWildcard(t *testing.T) {\n@@ -165,6 +188,7 @@ func TestTreeWildcard(t *testing.T) {\n \t})\n \n \tcheckPriorities(t, tree)\n+\tcheckMaxParams(t, tree)\n }\n \n func catchPanic(testFunc func()) (recv interface{}) {\n",
+  "diffTruncated": false,
+  "tree": [
+    ".travis.yml",
+    "LICENSE",
+    "README.md",
+    "path.go",
+    "path_test.go",
+    "router.go",
+    "router_test.go",
+    "tree.go",
+    "tree_test.go"
+  ],
+  "explanation": {
+    "what": "addRoute のエッジ分割処理(既存ノードのパスを共通接頭辞で分割し新しい子ノードを作る箇所)で、新しい子ノードの maxParams を親から単純にコピーしていたのをやめ、分割後に実際に子となる旧children それぞれの maxParams の最大値を計算して設定するように修正した。テストヘルパー checkMaxParams を追加し、木全体を巡回して各ノードの maxParams が「自ノード以下の子孫が持つワイルドカード数の最大値」と一致するか検証する。",
+    "why": "前々コミット(c2b822d)で導入した maxParams の事前確保サイズ計算に誤りがあった修正。エッジ分割で作られる新しい子ノードは元のノード(親)の一部を引き継ぐが、そのノードが実際に保持するワイルドカードの深さは元の children 側の値に依存するため、親の maxParams をそのままコピーするだけでは不正確な値になりうる。checkMaxParams というテスト専用の再帰検証関数を用意したことからも、maxParams の整合性が重要な不変条件として扱われていることが伺える。",
+    "highlights": [
+      { "file": "tree.go", "note": "エッジ分割時に child.children を走査して maxParams の最大値を再計算する処理を追加" },
+      { "file": "tree_test.go", "note": "checkMaxParams: 木を再帰的に辿り、各ノードの maxParams が子孫のワイルドカード数と整合するか検証するテストヘルパー" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

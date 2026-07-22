@@ -1,0 +1,65 @@
+{
+  "seq": 253,
+  "sha": "f91437c9fb78979af880df4e98d539b3027cd6e8",
+  "parents": [
+    "719e522b345b40a9d6ad6e65115a4420e4e508f3"
+  ],
+  "author": {
+    "name": "Julien Schmidt",
+    "email": "git@julienschmidt.com",
+    "date": "2020-08-14T20:16:16+02:00"
+  },
+  "message": "Fix for-range scope issues",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 22,
+    "deletions": 10
+  },
+  "files": [
+    {
+      "path": "path_test.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "tree_test.go",
+      "status": "M",
+      "additions": 21,
+      "deletions": 10,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/path_test.go b/path_test.go\nindex 182748f..ad3bfea 100644\n--- a/path_test.go\n+++ b/path_test.go\n@@ -83,6 +83,7 @@ func TestPathCleanMallocs(t *testing.T) {\n \t}\n \n \tfor _, test := range cleanTests {\n+\t\ttest := test\n \t\tallocs := testing.AllocsPerRun(100, func() { CleanPath(test.result) })\n \t\tif allocs > 0 {\n \t\t\tt.Errorf(\"CleanPath(%q): %v allocs, want zero\", test.result, allocs)\ndiff --git a/tree_test.go b/tree_test.go\nindex a141131..68e43a5 100644\n--- a/tree_test.go\n+++ b/tree_test.go\n@@ -202,7 +202,8 @@ type testRoute struct {\n func testRoutes(t *testing.T, routes []testRoute) {\n \ttree := &node{}\n \n-\tfor _, route := range routes {\n+\tfor i := range routes {\n+\t\troute := routes[i]\n \t\trecv := catchPanic(func() {\n \t\t\ttree.addRoute(route.path, nil)\n \t\t})\n@@ -266,7 +267,8 @@ func TestTreeDupliatePath(t *testing.T) {\n \t\t\"/search/:query\",\n \t\t\"/user_:name\",\n \t}\n-\tfor _, route := range routes {\n+\tfor i := range routes {\n+\t\troute := routes[i]\n \t\trecv := catchPanic(func() {\n \t\t\ttree.addRoute(route, fakeHandler(route))\n \t\t})\n@@ -303,7 +305,8 @@ func TestEmptyWildcardName(t *testing.T) {\n \t\t\"/cmd/:/\",\n \t\t\"/src/*\",\n \t}\n-\tfor _, route := range routes {\n+\tfor i := range routes {\n+\t\troute := routes[i]\n \t\trecv := catchPanic(func() {\n \t\t\ttree.addRoute(route, nil)\n \t\t})\n@@ -347,7 +350,8 @@ func TestTreeDoubleWildcard(t *testing.T) {\n \t\t\"/:foo*bar\",\n \t}\n \n-\tfor _, route := range routes {\n+\tfor i := range routes {\n+\t\troute := routes[i]\n \t\ttree := &node{}\n \t\trecv := catchPanic(func() {\n \t\t\ttree.addRoute(route, nil)\n@@ -399,7 +403,8 @@ func TestTreeTrailingSlashRedirect(t *testing.T) {\n \t\t\"/no/b\",\n \t\t\"/api/hello/:name\",\n \t}\n-\tfor _, route := range routes {\n+\tfor i := range routes {\n+\t\troute := routes[i]\n \t\trecv := catchPanic(func() {\n \t\t\ttree.addRoute(route, fakeHandler(route))\n \t\t})\n@@ -513,7 +518,8 @@ func TestTreeFindCaseInsensitivePath(t *testing.T) {\n \t\tlongPath,\n \t}\n \n-\tfor _, route := range routes {\n+\tfor i := range routes {\n+\t\troute := routes[i]\n \t\trecv := catchPanic(func() {\n \t\t\ttree.addRoute(route, fakeHandler(route))\n \t\t})\n@@ -524,7 +530,8 @@ func TestTreeFindCaseInsensitivePath(t *testing.T) {\n \n \t// Check out == in for all registered routes\n \t// With fixTrailingSlash = true\n-\tfor _, route := range routes {\n+\tfor i := range routes {\n+\t\troute := routes[i]\n \t\tout, found := tree.findCaseInsensitivePath(route, true)\n \t\tif !found {\n \t\t\tt.Errorf(\"Route '%s' not found!\", route)\n@@ -533,7 +540,8 @@ func TestTreeFindCaseInsensitivePath(t *testing.T) {\n \t\t}\n \t}\n \t// With fixTrailingSlash = false\n-\tfor _, route := range routes {\n+\tfor i := range routes {\n+\t\troute := routes[i]\n \t\tout, found := tree.findCaseInsensitivePath(route, false)\n \t\tif !found {\n \t\t\tt.Errorf(\"Route '%s' not found!\", route)\n@@ -672,7 +680,9 @@ func TestTreeWildcardConflictEx(t *testing.T) {\n \t\t{\"/conooo/xxx\", \"ooo\", `/con:tact`, `:tact`},\n \t}\n \n-\tfor _, conflict := range conflicts {\n+\tfor i := range conflicts {\n+\t\tconflict := conflicts[i]\n+\n \t\t// I have to re-create a 'tree', because the 'tree' will be\n \t\t// in an inconsistent state when the loop recovers from the\n \t\t// panic which threw by 'addRoute' function.\n@@ -683,7 +693,8 @@ func TestTreeWildcardConflictEx(t *testing.T) {\n \t\t\t\"/who/foo/hello\",\n \t\t}\n \n-\t\tfor _, route := range routes {\n+\t\tfor i := range routes {\n+\t\t\troute := routes[i]\n \t\t\ttree.addRoute(route, fakeHandler(route))\n \t\t}\n \n",
+  "diffTruncated": false,
+  "tree": [
+    ".travis.yml",
+    "LICENSE",
+    "README.md",
+    "go.mod",
+    "path.go",
+    "path_test.go",
+    "router.go",
+    "router_test.go",
+    "tree.go",
+    "tree_test.go"
+  ],
+  "explanation": {
+    "what": "path_test.goとtree_test.goのテストコードで、`for _, route := range routes { ... catchPanic(func(){...}) ... }`のようにループ内でクロージャがループ変数を捕捉している箇所を、`for i := range routes { route := routes[i]; ... }`という形に書き換えた(path_test.goでは`test := test`を追加)。",
+    "why": "コミットメッセージ「Fix for-range scope issues」が示す通り、for-rangeのループ変数はループ全体で使い回される単一の変数であり、クロージャ内で参照すると意図しない値(多くは最後の要素)を捕捉してしまう。goroutineを起こさない同期的なテストコードでも、`catchPanic(func(){...})`のようなクロージャを都度ループ内で作る場合は同様の注意が必要となる。",
+    "highlights": [
+      { "file": "tree_test.go", "note": "for _, route := range routes をfor i := range + route := routes[i] に書き換えたパターンが繰り返し登場" }
+    ],
+    "langNotes": [
+      { "topic": "for-range のループ変数スコープ問題", "note": "Go の for-range (このバージョンの言語仕様当時) は、ループ変数を毎回再利用する。ループ内でクロージャ(無名関数)を作ってそのループ変数を捕捉すると、実行時に参照される値はクロージャ生成時ではなく呼び出し時の値になり、想定外の要素を参照してしまうことがある。対策として `route := routes[i]` のようにループ内で変数を再宣言し、イテレーションごとに独立したローカル変数を作る。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

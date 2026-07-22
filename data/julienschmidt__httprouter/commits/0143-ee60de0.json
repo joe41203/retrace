@@ -1,0 +1,69 @@
+{
+  "seq": 143,
+  "sha": "ee60de09e78360ebe0ae6c28a2ce245ac959827d",
+  "parents": [
+    "d94d446eb345f8da40124f1ba74a71ff4172f128"
+  ],
+  "author": {
+    "name": "Julien Schmidt",
+    "email": "github@julienschmidt.com",
+    "date": "2016-02-06T08:31:42+01:00"
+  },
+  "message": "tree: fix case-insensitive unicode lookup\n\nFixes #113",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 64,
+    "deletions": 20
+  },
+  "files": [
+    {
+      "path": "tree.go",
+      "status": "M",
+      "additions": 54,
+      "deletions": 20,
+      "binary": false
+    },
+    {
+      "path": "tree_test.go",
+      "status": "M",
+      "additions": 10,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/tree.go b/tree.go\nindex eeadec9..48f25f9 100644\n--- a/tree.go\n+++ b/tree.go\n@@ -7,6 +7,7 @@ package httprouter\n import (\n \t\"strings\"\n \t\"unicode\"\n+\t\"unicode/utf8\"\n )\n \n func min(a, b int) int {\n@@ -447,34 +448,64 @@ walk: // Outer loop for walking the tree\n // It returns the case-corrected path and a bool indicating whether the lookup\n // was successful.\n func (n *node) findCaseInsensitivePath(path string, fixTrailingSlash bool) (ciPath []byte, found bool) {\n-\tciPath = make([]byte, 0, len(path)+1) // preallocate enough memory\n+\treturn n.findCaseInsensitivePathRec(\n+\t\tpath,\n+\t\tstrings.ToLower(path),\n+\t\tmake([]byte, 0, len(path)+1), // preallocate enough memory for new path\n+\t\t[4]byte{},                    // empty rune buffer\n+\t\tfixTrailingSlash,\n+\t)\n+}\n+\n+func (n *node) findCaseInsensitivePathRec(path, loPath string, ciPath []byte, rb [4]byte, fixTrailingSlash bool) ([]byte, bool) {\n+\tloNPath := strings.ToLower(n.path)\n \n \t// Outer loop for walking the tree\n-\tfor len(path) >= len(n.path) && strings.ToLower(path[:len(n.path)]) == strings.ToLower(n.path) {\n-\t\tpath = path[len(n.path):]\n+\tfor len(loPath) >= len(loNPath) && loPath[:len(loNPath)] == loNPath {\n+\t\t// add common path to result\n \t\tciPath = append(ciPath, n.path...)\n \n+\t\tpath = path[len(n.path):]\n+\t\tloPath = loPath[len(loNPath):]\n+\n \t\tif len(path) > 0 {\n \t\t\t// If this node does not have a wildcard (param or catchAll) child,\n \t\t\t// we can just look up the next child node and continue to walk down\n \t\t\t// the tree\n \t\t\tif !n.wildChild {\n-\t\t\t\tr := unicode.ToLower(rune(path[0]))\n-\t\t\t\tfor i, index := range n.indices {\n-\t\t\t\t\t// must use recursive approach since both index and\n-\t\t\t\t\t// ToLower(index) could exist. We must check both.\n-\t\t\t\t\tif r == unicode.ToLower(index) {\n-\t\t\t\t\t\tout, found := n.children[i].findCaseInsensitivePath(path, fixTrailingSlash)\n-\t\t\t\t\t\tif found {\n-\t\t\t\t\t\t\treturn append(ciPath, out...), true\n-\t\t\t\t\t\t}\n+\t\t\t\t// get lowercase and uppercase runes\n+\t\t\t\tvar lr, ur [4]byte\n+\t\t\t\tif rb[0] != 0 {\n+\t\t\t\t\t// old rune not finished\n+\t\t\t\t\tlr = rb\n+\t\t\t\t} else {\n+\t\t\t\t\t// start a new rune\n+\t\t\t\t\trv, _ := utf8.DecodeRuneInString(loPath)\n+\t\t\t\t\tutf8.EncodeRune(lr[:], rv)\n+\t\t\t\t\tutf8.EncodeRune(ur[:], unicode.ToUpper(rv))\n+\t\t\t\t}\n+\n+\t\t\t\tfor i := 0; i < len(n.indices); i++ {\n+\t\t\t\t\t// must use recursive approach since both the uppercase\n+\t\t\t\t\t// byte and the lowercase byte might exist as an index.\n+\t\t\t\t\tif idx := n.indices[i]; idx == lr[0] {\n+\t\t\t\t\t\trb = lr // lowercase matches\n+\t\t\t\t\t} else if idx == ur[0] {\n+\t\t\t\t\t\trb = ur // uppercase matches\n+\t\t\t\t\t} else {\n+\t\t\t\t\t\tcontinue // no match, try next index\n+\t\t\t\t\t}\n+\n+\t\t\t\t\tif out, found := n.children[i].findCaseInsensitivePathRec(\n+\t\t\t\t\t\tpath, loPath, ciPath,\n+\t\t\t\t\t\t[4]byte{rb[1], rb[2], rb[3], 0}, fixTrailingSlash); found {\n+\t\t\t\t\t\treturn out, true\n \t\t\t\t\t}\n \t\t\t\t}\n \n \t\t\t\t// Nothing found. We can recommend to redirect to the same URL\n \t\t\t\t// without a trailing slash if a leaf exists for that path\n-\t\t\t\tfound = (fixTrailingSlash && path == \"/\" && n.handle != nil)\n-\t\t\t\treturn\n+\t\t\t\treturn ciPath, (fixTrailingSlash && path == \"/\" && n.handle != nil)\n \t\t\t}\n \n \t\t\tn = n.children[0]\n@@ -492,8 +523,11 @@ func (n *node) findCaseInsensitivePath(path string, fixTrailingSlash bool) (ciPa\n \t\t\t\t// we need to go deeper!\n \t\t\t\tif k < len(path) {\n \t\t\t\t\tif len(n.children) > 0 {\n+\t\t\t\t\t\t// continue with child node\n \t\t\t\t\t\tpath = path[k:]\n+\t\t\t\t\t\tloPath = loPath[k:]\n \t\t\t\t\t\tn = n.children[0]\n+\t\t\t\t\t\tloNPath = strings.ToLower(n.path)\n \t\t\t\t\t\tcontinue\n \t\t\t\t\t}\n \n@@ -501,7 +535,7 @@ func (n *node) findCaseInsensitivePath(path string, fixTrailingSlash bool) (ciPa\n \t\t\t\t\tif fixTrailingSlash && len(path) == k+1 {\n \t\t\t\t\t\treturn ciPath, true\n \t\t\t\t\t}\n-\t\t\t\t\treturn\n+\t\t\t\t\treturn ciPath, false\n \t\t\t\t}\n \n \t\t\t\tif n.handle != nil {\n@@ -514,7 +548,7 @@ func (n *node) findCaseInsensitivePath(path string, fixTrailingSlash bool) (ciPa\n \t\t\t\t\t\treturn append(ciPath, '/'), true\n \t\t\t\t\t}\n \t\t\t\t}\n-\t\t\t\treturn\n+\t\t\t\treturn ciPath, false\n \n \t\t\tcase catchAll:\n \t\t\t\treturn append(ciPath, path...), true\n@@ -539,11 +573,11 @@ func (n *node) findCaseInsensitivePath(path string, fixTrailingSlash bool) (ciPa\n \t\t\t\t\t\t\t(n.nType == catchAll && n.children[0].handle != nil) {\n \t\t\t\t\t\t\treturn append(ciPath, '/'), true\n \t\t\t\t\t\t}\n-\t\t\t\t\t\treturn\n+\t\t\t\t\t\treturn ciPath, false\n \t\t\t\t\t}\n \t\t\t\t}\n \t\t\t}\n-\t\t\treturn\n+\t\t\treturn ciPath, false\n \t\t}\n \t}\n \n@@ -554,10 +588,10 @@ func (n *node) findCaseInsensitivePath(path string, fixTrailingSlash bool) (ciPa\n \t\t\treturn ciPath, true\n \t\t}\n \t\tif len(path)+1 == len(n.path) && n.path[len(path)] == '/' &&\n-\t\t\tstrings.ToLower(path) == strings.ToLower(n.path[:len(path)]) &&\n+\t\t\tloPath == loNPath[:len(loPath)] &&\n \t\t\tn.handle != nil {\n \t\t\treturn append(ciPath, n.path...), true\n \t\t}\n \t}\n-\treturn\n+\treturn ciPath, false\n }\ndiff --git a/tree_test.go b/tree_test.go\nindex 531768d..e28e8f1 100644\n--- a/tree_test.go\n+++ b/tree_test.go\n@@ -502,6 +502,10 @@ func TestTreeFindCaseInsensitivePath(t *testing.T) {\n \t\t\"/doc/go/away\",\n \t\t\"/no/a\",\n \t\t\"/no/b\",\n+\t\t\"/Π\",\n+\t\t\"/apfêl/\",\n+\t\t\"/äpfêl/\",\n+\t\t\"/öpfêl\",\n \t}\n \n \tfor _, route := range routes {\n@@ -580,6 +584,12 @@ func TestTreeFindCaseInsensitivePath(t *testing.T) {\n \t\t{\"/DOC/\", \"/doc\", true, true},\n \t\t{\"/NO\", \"\", false, true},\n \t\t{\"/DOC/GO\", \"\", false, true},\n+\t\t{\"/π\", \"/Π\", true, false},\n+\t\t{\"/π/\", \"/Π\", true, true},\n+\t\t{\"/ÄPFÊL/\", \"/äpfêl/\", true, false},\n+\t\t{\"/ÄPFÊL\", \"/äpfêl/\", true, true},\n+\t\t{\"/ÖPFÊL/\", \"/öpfêl\", true, true},\n+\t\t{\"/ÖPFÊL\", \"/öpfêl\", true, false},\n \t}\n \t// With fixTrailingSlash = true\n \tfor _, test := range tests {\n",
+  "diffTruncated": false,
+  "tree": [
+    ".travis.yml",
+    "LICENSE",
+    "README.md",
+    "path.go",
+    "path_test.go",
+    "router.go",
+    "router_test.go",
+    "tree.go",
+    "tree_test.go"
+  ],
+  "explanation": {
+    "what": "findCaseInsensitivePath の大文字小文字を無視した探索を、マルチバイト文字(Unicode)を考慮した実装に書き換えた。従来は1バイト単位で unicode.ToLower(rune(path[0])) していた比較を、strings.ToLower した小文字パス loPath 同士の比較に変え、子ノードの探索も utf8.DecodeRuneInString でルーン単位にデコードしてから大文字・小文字それぞれのバイト列を index と照合するようにした。実際のツリー探索は findCaseInsensitivePathRec という新しいレシーバ関数に切り出されている。",
+    "why": "コミットメッセージに \"Fixes #113\" とあり、既存実装が ASCII 前提の1バイト比較だったため、\"/Π\" や \"äpfêl\" のようなマルチバイト文字を含むパスの大文字小文字無視ルックアップが正しく動作しない問題を修正する変更。",
+    "highlights": [
+      { "file": "tree.go", "note": "findCaseInsensitivePathRec が新設され、rune のバイト列を [4]byte のバッファ(rb)に持ち回しながら子ノードを再帰的に辿る" },
+      { "file": "tree_test.go", "note": "ギリシャ文字Πやウムラウト付きラテン文字を含むテストケースが追加され、修正対象のバグを再現している" }
+    ],
+    "langNotes": [
+      { "topic": "utf8.DecodeRuneInString / rune", "note": "Go の string は UTF-8 バイト列であり、1文字(1 rune)が1〜4バイトになりうる。unicode.ToLower(rune(path[0])) のように先頭1バイトだけを rune に変換すると、マルチバイト文字の先頭バイトを不正な1文字として誤変換してしまう。utf8.DecodeRuneInString は文字列先頭から正しく1ルーンをデコードし、そのバイト長も返す。" },
+      { "topic": "[4]byte によるルーンバッファ", "note": "Go のUTF-8ルーンは最大4バイトなので、rb [4]byte で1ルーン分のエンコード結果を保持し、木を1階層ずつ降りる際に処理済みバイト数だけずらして使い回している。" }
+    ],
+    "diagram": {
+      "mermaid": "flowchart TD\n  A[\"findCaseInsensitivePath(path)\"] --> B[\"loPath = strings.ToLower(path)\"]\n  B --> C[\"findCaseInsensitivePathRec(node, path, loPath, rb)\"]\n  C --> D{\"loPath はこのノードの loNPath で始まるか\"}\n  D -- \"no\" --> E[\"見つからない\"]\n  D -- \"yes\" --> F{\"wildChild か\"}\n  F -- \"no\" --> G[\"utf8.DecodeRuneInString で次のルーンを取得\"]\n  G --> H[\"大文字・小文字バイト列を indices と照合\"]\n  H --> I[\"一致した子ノードで再帰\"]\n  F -- \"yes\" --> J[\"param/catchAll ノードへ進む\"]",
+      "caption": "大文字小文字を無視したUnicode対応パス探索の流れ"
+    },
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

@@ -1,0 +1,61 @@
+{
+  "seq": 210,
+  "sha": "aff381be15b3011d172e03888b2022b5b919aea4",
+  "parents": [
+    "bcdc802b5194bea5461a5aa40f0ef0ed38dc0ca7"
+  ],
+  "author": {
+    "name": "Julien Schmidt",
+    "email": "git@julienschmidt.com",
+    "date": "2019-09-29T19:49:02+02:00"
+  },
+  "message": "router: cache allowed methods for *",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 16,
+    "deletions": 6
+  },
+  "files": [
+    {
+      "path": "router.go",
+      "status": "M",
+      "additions": 16,
+      "deletions": 6,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/router.go b/router.go\nindex 0ea70c5..392c433 100644\n--- a/router.go\n+++ b/router.go\n@@ -156,6 +156,9 @@ type Router struct {\n \t// Custom OPTIONS handlers take priority over automatic replies.\n \tHandleOPTIONS bool\n \n+\t// Cached value of global (*) allowed methods\n+\tglobalAllowed string\n+\n \t// Configurable http.Handler which is called when no matching route is\n \t// found. If it is not set, http.NotFound is used.\n \tNotFound http.Handler\n@@ -245,6 +248,8 @@ func (r *Router) Handle(method, path string, handle Handle) {\n \tif root == nil {\n \t\troot = new(node)\n \t\tr.trees[method] = root\n+\n+\t\tr.globalAllowed = r.allowed(\"*\", \"\")\n \t}\n \n \troot.addRoute(path, handle)\n@@ -317,12 +322,17 @@ func (r *Router) allowed(path, reqMethod string) (allow string) {\n \tallowed := make([]string, 0, 9)\n \n \tif path == \"*\" { // server-wide\n-\t\tfor method := range r.trees {\n-\t\t\tif method == http.MethodOptions {\n-\t\t\t\tcontinue\n+\t\t// empty method is used for internal calls to refresh the cache\n+\t\tif reqMethod == \"\" {\n+\t\t\tfor method := range r.trees {\n+\t\t\t\tif method == http.MethodOptions {\n+\t\t\t\t\tcontinue\n+\t\t\t\t}\n+\t\t\t\t// Add request method to list of allowed methods\n+\t\t\t\tallowed = append(allowed, method)\n \t\t\t}\n-\t\t\t// Add request method to list of allowed methods\n-\t\t\tallowed = append(allowed, method)\n+\t\t} else {\n+\t\t\treturn r.globalAllowed\n \t\t}\n \t} else { // specific path\n \t\tfor method := range r.trees {\n@@ -405,7 +415,7 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {\n \n \tif req.Method == http.MethodOptions && r.HandleOPTIONS {\n \t\t// Handle OPTIONS requests\n-\t\tif allow := r.allowed(path, req.Method); len(allow) > 0 {\n+\t\tif allow := r.allowed(path, http.MethodOptions); len(allow) > 0 {\n \t\t\tw.Header().Set(\"Allow\", allow)\n \t\t\treturn\n \t\t}\n",
+  "diffTruncated": false,
+  "tree": [
+    ".travis.yml",
+    "LICENSE",
+    "README.md",
+    "go.mod",
+    "path.go",
+    "path_test.go",
+    "router.go",
+    "router_test.go",
+    "tree.go",
+    "tree_test.go"
+  ],
+  "explanation": {
+    "what": "Router 構造体に globalAllowed string フィールドを追加し、新しい HTTP メソッドのツリーが Handle 経由で初めて登録されるたびに r.allowed(\"*\", \"\") を呼んでキャッシュを再計算するようにした。allowed 関数は path==\"*\" のケースで reqMethod が空文字列(内部からの再計算呼び出し)のときだけ全メソッドを走査し、そうでなければキャッシュ済みの r.globalAllowed をそのまま返すよう分岐した。ServeHTTP 側も r.allowed(path, req.Method) から r.allowed(path, http.MethodOptions) 呼び出しに変更されている。",
+    "why": "おそらく、server-wide(path==\"*\")の OPTIONS リクエストのたびに全メソッドツリーを毎回走査してソートし直すのは無駄なため、ルート登録時(トップレベルのメソッドツリーが増えたタイミング)だけ再計算してキャッシュし、リクエスト処理時はキャッシュを返すだけにする最適化とみられる。コミットメッセージ以外に詳細な動機の記述はない。",
+    "highlights": [
+      { "file": "router.go", "note": "reqMethod が空文字列かどうかで「キャッシュ再計算」と「キャッシュ参照」を切り分けている(内部呼び出し専用の合図として空文字列を使っている)" }
+    ],
+    "langNotes": [
+      { "topic": "GlobalOPTIONS のキャッシュ", "note": "path=\"*\" 宛の OPTIONS リクエスト(サーバー全体に何が許可されているかを問い合わせる、いわゆる server-wide OPTIONS)は頻繁に来る可能性がある一方、許可メソッドの集合はルート登録時にしか変わらない。そこで計算結果を Router.globalAllowed に保持し、リクエストのたびの再計算を避けている。" }
+    ],
+    "diagram": {
+      "mermaid": "flowchart TD\n  A[\"Router.Handle でメソッドのツリーを初登録\"] --> B[\"r.globalAllowed = r.allowed(\\\"*\\\", \\\"\\\")\"]\n  C[\"OPTIONS * リクエスト到着\"] --> D[\"r.allowed(\\\"*\\\", http.MethodOptions)\"]\n  D --> E[\"reqMethod が空でないので r.globalAllowed をそのまま返す\"]\n  B -.->|\"キャッシュ更新\"| E",
+      "caption": "GlobalOPTIONS(server-wide OPTIONS)向けの許可メソッド一覧は、ルート登録時に再計算してキャッシュし、リクエスト時はキャッシュを返すだけにする"
+    },
+    "evidence": "inferred",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

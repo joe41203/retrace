@@ -1,0 +1,56 @@
+{
+  "seq": 230,
+  "sha": "776638b9ee84fe3332f3969a0c4c6812b7aca734",
+  "parents": [
+    "48eff9eecf5f2986feb581252b1d46bd763ee7ac"
+  ],
+  "author": {
+    "name": "Julien Schmidt",
+    "email": "git@julienschmidt.com",
+    "date": "2019-10-04T18:48:04+02:00"
+  },
+  "message": "router: fix input validation test",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 5,
+    "deletions": 3
+  },
+  "files": [
+    {
+      "path": "router_test.go",
+      "status": "M",
+      "additions": 5,
+      "deletions": 3,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/router_test.go b/router_test.go\nindex 8a4c74b..2aa1859 100644\n--- a/router_test.go\n+++ b/router_test.go\n@@ -167,22 +167,24 @@ func TestRouterAPI(t *testing.T) {\n func TestRouterInvalidInput(t *testing.T) {\n \trouter := New()\n \n+\thandle := func(_ http.ResponseWriter, _ *http.Request, _ Params) {}\n+\n \trecv := catchPanic(func() {\n-\t\trouter.Handle(\"\", \"/\", nil)\n+\t\trouter.Handle(\"\", \"/\", handle)\n \t})\n \tif recv == nil {\n \t\tt.Fatal(\"registering empty method did not panic\")\n \t}\n \n \trecv = catchPanic(func() {\n-\t\trouter.Handle(\"\", \"\", nil)\n+\t\trouter.GET(\"\", handle)\n \t})\n \tif recv == nil {\n \t\tt.Fatal(\"registering empty path did not panic\")\n \t}\n \n \trecv = catchPanic(func() {\n-\t\trouter.GET(\"noSlashRoot\", nil)\n+\t\trouter.GET(\"noSlashRoot\", handle)\n \t})\n \tif recv == nil {\n \t\tt.Fatal(\"registering path not beginning with '/' did not panic\")\n",
+  "diffTruncated": false,
+  "tree": [
+    ".travis.yml",
+    "LICENSE",
+    "README.md",
+    "go.mod",
+    "path.go",
+    "path_test.go",
+    "router.go",
+    "router_test.go",
+    "tree.go",
+    "tree_test.go"
+  ],
+  "explanation": {
+    "what": "前コミットで追加した TestRouterInvalidInput のテストケースを修正した。すべての router.Handle / router.GET 呼び出しで nil の代わりに実在するハンドラ関数 `handle` を渡すよう変更し、「空パスが panic するか」を検証するケースは `router.Handle(\"\", \"\", handle)` ではなく `router.GET(\"\", handle)` に置き換えている。",
+    "why": "前コミット(48eff9e)で追加したテストは nil ハンドラを渡していたため、意図した検証対象(空メソッド名・空パス・パス形式)とは別に nilハンドラチェックにも同時に引っかかってしまい、各ケースが本来テストしたい条件だけを検証できていなかった。それを実ハンドラに差し替えて各チェックを独立させる修正。",
+    "highlights": [
+      { "file": "router_test.go", "note": "nil の代わりに実ハンドラ `handle` を渡すよう統一し、各テストケースが検証対象の条件だけで panic することを確認できるようにした" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

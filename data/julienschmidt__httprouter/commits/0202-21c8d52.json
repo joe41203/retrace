@@ -1,0 +1,56 @@
+{
+  "seq": 202,
+  "sha": "21c8d5201d51ea174dae281222c42f24c61e20e6",
+  "parents": [
+    "0162dec293e2e5a2a7e1c66c03d95df69a89a347"
+  ],
+  "author": {
+    "name": "Julien Schmidt",
+    "email": "git@julienschmidt.com",
+    "date": "2019-09-25T22:53:52+02:00"
+  },
+  "message": "router: add test for ParamsFromContext",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 24,
+    "deletions": 0
+  },
+  "files": [
+    {
+      "path": "router_test.go",
+      "status": "M",
+      "additions": 24,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/router_test.go b/router_test.go\nindex 9f1c215..69fad70 100644\n--- a/router_test.go\n+++ b/router_test.go\n@@ -500,6 +500,30 @@ func TestRouterLookup(t *testing.T) {\n \t}\n }\n \n+func TestRouterParamsFromContext(t *testing.T) {\n+\trouted := false\n+\twantParams := Params{Param{\"name\", \"gopher\"}}\n+\thandlerFunc := func(_ http.ResponseWriter, req *http.Request) {\n+\t\t// get params from request context\n+\t\tparams := ParamsFromContext(req.Context())\n+\n+\t\tif !reflect.DeepEqual(params, wantParams) {\n+\t\t\tt.Fatalf(\"Wrong parameter values: want %v, got %v\", wantParams, params)\n+\t\t}\n+\n+\t\trouted = true\n+\t}\n+\trouter := New()\n+\trouter.HandlerFunc(http.MethodGet, \"/user/:name\", handlerFunc)\n+\n+\tw := new(mockResponseWriter)\n+\tr, _ := http.NewRequest(http.MethodGet, \"/user/gopher\", nil)\n+\trouter.ServeHTTP(w, r)\n+\tif !routed {\n+\t\tt.Fatal(\"Routing failed!\")\n+\t}\n+}\n+\n type mockFileSystem struct {\n \topened bool\n }\n",
+  "diffTruncated": false,
+  "tree": [
+    ".travis.yml",
+    "LICENSE",
+    "README.md",
+    "go.mod",
+    "path.go",
+    "path_test.go",
+    "router.go",
+    "router_test.go",
+    "tree.go",
+    "tree_test.go"
+  ],
+  "explanation": {
+    "what": "router_test.go に TestRouterParamsFromContext を追加した。HandlerFunc アダプタで登録したルート /user/:name にリクエストし、ハンドラ内で ParamsFromContext(req.Context()) が期待通りの Params(name=gopher)を返すことを検証する。",
+    "why": "直前の2コミット(0201: paramsKey 関連コードの router.go への移動)で context 経由の Params 受け渡し機構が触られたため、その動作を保証するテストを追加したもの。コミットメッセージ「add test for ParamsFromContext」がそのまま裏付けとなっている。",
+    "highlights": [
+      { "file": "router_test.go", "note": "router.HandlerFunc で登録したハンドラ内で ParamsFromContext を呼び、reflect.DeepEqual で Params を検証している" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

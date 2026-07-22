@@ -1,0 +1,65 @@
+{
+  "seq": 254,
+  "sha": "ca14a4f911b860a6c5d2b4071766f795e68cba8d",
+  "parents": [
+    "f91437c9fb78979af880df4e98d539b3027cd6e8"
+  ],
+  "author": {
+    "name": "Julien Schmidt",
+    "email": "git@julienschmidt.com",
+    "date": "2020-08-14T20:16:42+02:00"
+  },
+  "message": "Remove bare returns",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 3,
+    "deletions": 2
+  },
+  "files": [
+    {
+      "path": "path_test.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "router.go",
+      "status": "M",
+      "additions": 2,
+      "deletions": 1,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/path_test.go b/path_test.go\nindex ad3bfea..cfadd32 100644\n--- a/path_test.go\n+++ b/path_test.go\n@@ -120,7 +120,7 @@ func genLongPaths() (testPaths []cleanPathTest) {\n \t\t\tresult: correctPath,\n \t\t})\n \t}\n-\treturn\n+\treturn testPaths\n }\n \n func TestPathCleanLong(t *testing.T) {\ndiff --git a/router.go b/router.go\nindex 385c049..9919c0e 100644\n--- a/router.go\n+++ b/router.go\n@@ -453,7 +453,8 @@ func (r *Router) allowed(path, reqMethod string) (allow string) {\n \t\t// return as comma separated list\n \t\treturn strings.Join(allowed, \", \")\n \t}\n-\treturn\n+\n+\treturn allow\n }\n \n // ServeHTTP makes the router implement the http.Handler interface.\n",
+  "diffTruncated": false,
+  "tree": [
+    ".travis.yml",
+    "LICENSE",
+    "README.md",
+    "go.mod",
+    "path.go",
+    "path_test.go",
+    "router.go",
+    "router_test.go",
+    "tree.go",
+    "tree_test.go"
+  ],
+  "explanation": {
+    "what": "path_test.goの`genLongPaths`とrouter.goの`allowed`メソッドにあった`return`(値を書かないbare return)を、それぞれ`return testPaths`・`return allow`という明示的な戻り値付きのreturnに書き換えた。",
+    "why": "コミットメッセージ「Remove bare returns」が示す通り、named return values(`testPaths`や`allow`)を使う関数でも戻り値を明示することで、どの変数が返っているか読み手にわかりやすくする意図の整理。",
+    "highlights": [
+      { "file": "router.go", "note": "allowed メソッド末尾の bare return を return allow に変更" }
+    ],
+    "langNotes": [
+      { "topic": "bare return(裸の return)", "note": "Go では戻り値に名前を付けた named return values を使うと、値を書かずに `return` だけで関数を抜けられる(直前に代入された named return の値がそのまま返る)。可読性を下げるとして敬遠されることが多く、このコミットでは戻り値を明示する書き方に統一している。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

@@ -1,0 +1,54 @@
+{
+  "seq": 29,
+  "sha": "c544507b82f1a504c0de0bc3586c45ed7589aaca",
+  "parents": [
+    "53abd5013eba81b3681a236bcdbdd6b1dab85c95"
+  ],
+  "author": {
+    "name": "Julien Schmidt",
+    "email": "github@julienschmidt.com",
+    "date": "2013-12-14T13:26:44+01:00"
+  },
+  "message": "Add Router root test",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 10,
+    "deletions": 0
+  },
+  "files": [
+    {
+      "path": "router_test.go",
+      "status": "M",
+      "additions": 10,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/router_test.go b/router_test.go\nindex a763219..5acb321 100644\n--- a/router_test.go\n+++ b/router_test.go\n@@ -101,6 +101,16 @@ func TestRouterAPI(t *testing.T) {\n \t}\n }\n \n+func TestRouterRoot(t *testing.T) {\n+\trouter := New()\n+\trecv := catchPanic(func() {\n+\t\trouter.GET(\"noSlashRoot\", nil)\n+\t})\n+\tif recv == nil {\n+\t\tt.Fatal(\"registering path not beginning with '/' did not panic\")\n+\t}\n+}\n+\n func TestRouterPanicHandler(t *testing.T) {\n \trouter := New()\n \tpanicHandled := false\n",
+  "diffTruncated": false,
+  "tree": [
+    ".travis.yml",
+    "LICENSE",
+    "path.go",
+    "path_test.go",
+    "router.go",
+    "router_test.go",
+    "tree.go",
+    "tree_test.go"
+  ],
+  "explanation": {
+    "what": "router_test.go に TestRouterRoot を追加した。router.GET(\"noSlashRoot\", nil) のように先頭が '/' でないパスを登録しようとすると panic することを catchPanic ヘルパーで検証する。",
+    "why": "件名の通り、ルートパスが '/' から始まらない場合に登録を拒否するルータの制約を明示的にテストで固定する目的と考えられる。",
+    "highlights": [
+      { "file": "router_test.go", "note": "TestRouterRoot: '/' で始まらないパス登録時の panic を検証" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

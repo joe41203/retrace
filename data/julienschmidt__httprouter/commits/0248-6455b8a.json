@@ -1,0 +1,54 @@
+{
+  "seq": 248,
+  "sha": "6455b8a2397b4b3942d593905f61ec0a2919f6a7",
+  "parents": [
+    "5a929245551f3b06a94a32dc1e573176b80140a9"
+  ],
+  "author": {
+    "name": "Julien Schmidt",
+    "email": "git@julienschmidt.com",
+    "date": "2020-01-13T21:02:49+01:00"
+  },
+  "message": "router: clarify that Params.MatchedRoutePath requires Router.SaveMatchedRoutePath to be set",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 2,
+    "deletions": 0
+  },
+  "files": [
+    {
+      "path": "router.go",
+      "status": "M",
+      "additions": 2,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/router.go b/router.go\nindex 25a5a80..488c7cf 100644\n--- a/router.go\n+++ b/router.go\n@@ -127,6 +127,8 @@ func ParamsFromContext(ctx context.Context) Params {\n var MatchedRoutePathParam = \"$matchedRoutePath\"\n \n // MatchedRoutePath retrieves the path of the matched route.\n+// Router.SaveMatchedRoutePath must have been enabled when the respective\n+// handler was added, otherwise this function always returns an empty string.\n func (ps Params) MatchedRoutePath() string {\n \treturn ps.ByName(MatchedRoutePathParam)\n }\n",
+  "diffTruncated": false,
+  "tree": [
+    ".travis.yml",
+    "LICENSE",
+    "README.md",
+    "go.mod",
+    "path.go",
+    "path_test.go",
+    "router.go",
+    "router_test.go",
+    "tree.go",
+    "tree_test.go"
+  ],
+  "explanation": {
+    "what": "Params.MatchedRoutePath() の godoc コメントに、「Router.SaveMatchedRoutePath が対象ハンドラの登録時に有効化されていなければ、常に空文字列を返す」という前提条件の説明を追加した。",
+    "why": "コミットメッセージの通り、この API がオプトイン機能(SaveMatchedRoutePath)に依存していることを利用者に明示するためのドキュメント補足と考えられる。",
+    "highlights": [],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

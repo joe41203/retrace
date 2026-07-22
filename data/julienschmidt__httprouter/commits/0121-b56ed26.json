@@ -1,0 +1,66 @@
+{
+  "seq": 121,
+  "sha": "b56ed26e9b26a68a75818787604d294534a033b2",
+  "parents": [
+    "ddb6c34a60c1447f743e8e950b230c1d2c1a7bd0",
+    "7988dc183bec5afb85c44d1ac75a443e82bd899f"
+  ],
+  "author": {
+    "name": "Julien Schmidt",
+    "email": "julienschmidt@users.noreply.github.com",
+    "date": "2015-03-21T10:54:32+08:00"
+  },
+  "message": "Merge pull request #65 from oov/fix-panic\n\ntree: fix panic in non-ascii routes",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 6,
+    "deletions": 2
+  },
+  "files": [
+    {
+      "path": "tree.go",
+      "status": "M",
+      "additions": 2,
+      "deletions": 2,
+      "binary": false
+    },
+    {
+      "path": "tree_test.go",
+      "status": "M",
+      "additions": 4,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/tree.go b/tree.go\nindex af91966..47af948 100644\n--- a/tree.go\n+++ b/tree.go\n@@ -118,7 +118,7 @@ func (n *node) addRoute(path string, handle Handle) {\n \t\t\t\t}\n \n \t\t\t\tn.children = []*node{&child}\n-\t\t\t\tn.indices = string(n.path[i])\n+\t\t\t\tn.indices = string([]byte{n.path[i]})\n \t\t\t\tn.path = path[:i]\n \t\t\t\tn.handle = nil\n \t\t\t\tn.wildChild = false\n@@ -169,7 +169,7 @@ func (n *node) addRoute(path string, handle Handle) {\n \n \t\t\t\t// Otherwise insert it\n \t\t\t\tif c != ':' && c != '*' {\n-\t\t\t\t\tn.indices += string(c)\n+\t\t\t\t\tn.indices += string([]byte{c})\n \t\t\t\t\tchild := &node{\n \t\t\t\t\t\tmaxParams: numParams,\n \t\t\t\t\t}\ndiff --git a/tree_test.go b/tree_test.go\nindex 484621e..262681b 100644\n--- a/tree_test.go\n+++ b/tree_test.go\n@@ -125,6 +125,8 @@ func TestTreeAddAndGet(t *testing.T) {\n \t\t\"/doc/\",\n \t\t\"/doc/go_faq.html\",\n \t\t\"/doc/go1.html\",\n+\t\t\"/α\",\n+\t\t\"/β\",\n \t}\n \tfor _, route := range routes {\n \t\ttree.addRoute(route, fakeHandler(route))\n@@ -142,6 +144,8 @@ func TestTreeAddAndGet(t *testing.T) {\n \t\t{\"/cona\", true, \"\", nil}, // key mismatch\n \t\t{\"/no\", true, \"\", nil},   // no matching child\n \t\t{\"/ab\", false, \"/ab\", nil},\n+\t\t{\"/α\", false, \"/α\", nil},\n+\t\t{\"/β\", false, \"/β\", nil},\n \t})\n \n \tcheckPriorities(t, tree)\n",
+  "diffTruncated": false,
+  "tree": [
+    ".travis.yml",
+    "LICENSE",
+    "README.md",
+    "path.go",
+    "path_test.go",
+    "router.go",
+    "router_test.go",
+    "tree.go",
+    "tree_test.go"
+  ],
+  "explanation": {
+    "what": "tree.go の addRoute 内で、子ノードへの分岐に使う indices 文字列を組み立てる箇所を `string(n.path[i])` / `string(c)` から `string([]byte{n.path[i]})` / `string([]byte{c})` に変更した。tree_test.go には非ASCII文字(α, β)のルートを追加し、この修正が効いていることを確認するテストケースを加えている。",
+    "why": "Go では byte 値を `string()` に直接渡すと、その数値を Unicode コードポイント(rune)として解釈してUTF-8エンコードしてしまう。path のバイトは本来 UTF-8 の生バイト列の一部であり、それを rune 変換すると非ASCII文字を含むパスで意図しない文字列に化けてpanicや誤動作を招く。`[]byte{...}` でラップしてから string 化することで「1バイトのバイト列」として正しく扱う。",
+    "highlights": [
+      { "file": "tree.go", "note": "string(n.path[i]) と string(c) の2箇所を []byte{} 経由に修正。indices は子ノードへの分岐キー" },
+      { "file": "tree_test.go", "note": "/α, /β という非ASCIIパスの追加テスト" }
+    ],
+    "langNotes": [
+      { "topic": "string(byte) と rune 変換", "note": "Go では string(x) の x が整数型(byteやint)の場合、その値をUnicodeコードポイントとして解釈しUTF-8エンコードする。byteの生の値をそのまま文字列化したいときは string([]byte{x}) とする必要があり、この違いを誤ると非ASCII入力でバグになる。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

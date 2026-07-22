@@ -1,0 +1,56 @@
+{
+  "seq": 220,
+  "sha": "b9a36063a10f224c4ae2596f12964d9e59443515",
+  "parents": [
+    "83b1fecca6b7e284b26c8fe3f83f2a2bb5436c0f"
+  ],
+  "author": {
+    "name": "Julien Schmidt",
+    "email": "git@julienschmidt.com",
+    "date": "2019-09-30T18:58:29+02:00"
+  },
+  "message": "tree: minor optimizations",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 38,
+    "deletions": 31
+  },
+  "files": [
+    {
+      "path": "tree.go",
+      "status": "M",
+      "additions": 38,
+      "deletions": 31,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/tree.go b/tree.go\nindex cd37c1f..9ff9c20 100644\n--- a/tree.go\n+++ b/tree.go\n@@ -49,16 +49,16 @@ type node struct {\n \n // Increments priority of the given child and reorders if necessary\n func (n *node) incrementChildPrio(pos int) int {\n-\tn.children[pos].priority++\n-\tprio := n.children[pos].priority\n+\tcs := n.children\n+\tcs[pos].priority++\n+\tprio := cs[pos].priority\n \n \t// Adjust position (move to front)\n \tnewPos := pos\n-\tfor newPos > 0 && n.children[newPos-1].priority < prio {\n-\t\t// swap node positions\n-\t\tn.children[newPos-1], n.children[newPos] = n.children[newPos], n.children[newPos-1]\n+\tfor ; newPos > 0 && cs[newPos-1].priority < prio; newPos-- {\n+\t\t// Swap node positions\n+\t\tcs[newPos-1], cs[newPos] = cs[newPos], cs[newPos-1]\n \n-\t\tnewPos--\n \t}\n \n \t// Build new index char string\n@@ -150,7 +150,7 @@ func (n *node) addRoute(path string, handle Handle) {\n \t\t\t\t}\n \n \t\t\t\t// Check if a child with the next path byte exists\n-\t\t\t\tfor i := 0; i < len(n.indices); i++ {\n+\t\t\t\tfor i, max := 0, len(n.indices); i < max; i++ {\n \t\t\t\t\tif c == n.indices[i] {\n \t\t\t\t\t\ti = n.incrementChildPrio(i)\n \t\t\t\t\t\tn = n.children[i]\n@@ -300,17 +300,20 @@ func (n *node) insertChild(path, fullPath string, handle Handle) {\n func (n *node) getValue(path string, params func() *Params) (handle Handle, ps *Params, tsr bool) {\n walk: // Outer loop for walking the tree\n \tfor {\n-\t\tif len(path) > len(n.path) {\n-\t\t\tif path[:len(n.path)] == n.path {\n-\t\t\t\tpath = path[len(n.path):]\n+\t\tprefix := n.path\n+\t\tif len(path) > len(prefix) {\n+\t\t\tif path[:len(prefix)] == prefix {\n+\t\t\t\tpath = path[len(prefix):]\n \t\t\t\t// If this node does not have a wildcard (param or catchAll)\n \t\t\t\t// child,  we can just look up the next child node and continue\n \t\t\t\t// to walk down the tree\n \t\t\t\tif !n.wildChild {\n \t\t\t\t\tc := path[0]\n-\t\t\t\t\tfor i := 0; i < len(n.indices); i++ {\n-\t\t\t\t\t\tif c == n.indices[i] {\n+\t\t\t\t\tindices := n.indices\n+\t\t\t\t\tfor i, max := 0, len(indices); i < max; i++ {\n+\t\t\t\t\t\tif c == indices[i] {\n \t\t\t\t\t\t\tn = n.children[i]\n+\t\t\t\t\t\t\tprefix = n.path\n \t\t\t\t\t\t\tcontinue walk\n \t\t\t\t\t\t}\n \t\t\t\t\t}\n@@ -352,6 +355,7 @@ walk: // Outer loop for walking the tree\n \t\t\t\t\t\tif len(n.children) > 0 {\n \t\t\t\t\t\t\tpath = path[end:]\n \t\t\t\t\t\t\tn = n.children[0]\n+\t\t\t\t\t\t\tprefix = n.path\n \t\t\t\t\t\t\tcontinue walk\n \t\t\t\t\t\t}\n \n@@ -393,7 +397,7 @@ walk: // Outer loop for walking the tree\n \t\t\t\t\tpanic(\"invalid node type\")\n \t\t\t\t}\n \t\t\t}\n-\t\t} else if path == n.path {\n+\t\t} else if path == prefix {\n \t\t\t// We should have reached the node containing the handle.\n \t\t\t// Check if this node has a handle registered.\n \t\t\tif handle = n.handle; handle != nil {\n@@ -407,8 +411,9 @@ walk: // Outer loop for walking the tree\n \n \t\t\t// No handle found. Check if a handle for this path + a\n \t\t\t// trailing slash exists for trailing slash recommendation\n-\t\t\tfor i := 0; i < len(n.indices); i++ {\n-\t\t\t\tif n.indices[i] == '/' {\n+\t\t\tindices := n.indices\n+\t\t\tfor i, max := 0, len(indices); i < max; i++ {\n+\t\t\t\tif indices[i] == '/' {\n \t\t\t\t\tn = n.children[i]\n \t\t\t\t\ttsr = (len(n.path) == 1 && n.handle != nil) ||\n \t\t\t\t\t\t(n.nType == catchAll && n.children[0].handle != nil)\n@@ -422,8 +427,8 @@ walk: // Outer loop for walking the tree\n \t\t// Nothing found. We can recommend to redirect to the same URL with an\n \t\t// extra trailing slash if a leaf exists for that path\n \t\ttsr = (path == \"/\") ||\n-\t\t\t(len(n.path) == len(path)+1 && n.path[len(path)] == '/' &&\n-\t\t\t\tpath == n.path[:len(n.path)-1] && n.handle != nil)\n+\t\t\t(len(prefix) == len(path)+1 && prefix[len(path)] == '/' &&\n+\t\t\t\tpath == prefix[:len(prefix)-1] && n.handle != nil)\n \t\treturn\n \t}\n }\n@@ -478,7 +483,7 @@ walk: // Outer loop for walking the tree\n \n \t\t\t\tif rb[0] != 0 {\n \t\t\t\t\t// Old rune not finished\n-\t\t\t\t\tfor i := 0; i < len(n.indices); i++ {\n+\t\t\t\t\tfor i, max := 0, len(n.indices); i < max; i++ {\n \t\t\t\t\t\tif n.indices[i] == rb[0] {\n \t\t\t\t\t\t\t// continue with child node\n \t\t\t\t\t\t\tn = n.children[i]\n@@ -509,9 +514,10 @@ walk: // Outer loop for walking the tree\n \t\t\t\t\t// Skip already processed bytes\n \t\t\t\t\trb = shiftNRuneBytes(rb, off)\n \n-\t\t\t\t\tfor i := 0; i < len(n.indices); i++ {\n+\t\t\t\t\tindices := n.indices\n+\t\t\t\t\tfor i, max, c := 0, len(indices), rb[0]; i < max; i++ {\n \t\t\t\t\t\t// Lowercase matches\n-\t\t\t\t\t\tif n.indices[i] == rb[0] {\n+\t\t\t\t\t\tif indices[i] == c {\n \t\t\t\t\t\t\t// must use a recursive approach since both the\n \t\t\t\t\t\t\t// uppercase byte and the lowercase byte might exist\n \t\t\t\t\t\t\t// as an index\n@@ -530,9 +536,9 @@ walk: // Outer loop for walking the tree\n \t\t\t\t\t\tutf8.EncodeRune(rb[:], up)\n \t\t\t\t\t\trb = shiftNRuneBytes(rb, off)\n \n-\t\t\t\t\t\tfor i, c := 0, rb[0]; i < len(n.indices); i++ {\n+\t\t\t\t\t\tfor i, max, c := 0, len(indices), rb[0]; i < max; i++ {\n \t\t\t\t\t\t\t// Uppercase matches\n-\t\t\t\t\t\t\tif n.indices[i] == c {\n+\t\t\t\t\t\t\tif indices[i] == c {\n \t\t\t\t\t\t\t\t// Continue with child node\n \t\t\t\t\t\t\t\tn = n.children[i]\n \t\t\t\t\t\t\t\tnpLen = len(n.path)\n@@ -551,26 +557,26 @@ walk: // Outer loop for walking the tree\n \t\t\tswitch n.nType {\n \t\t\tcase param:\n \t\t\t\t// Find param end (either '/' or path end)\n-\t\t\t\tk := 0\n-\t\t\t\tfor k < len(path) && path[k] != '/' {\n-\t\t\t\t\tk++\n+\t\t\t\tend := 0\n+\t\t\t\tfor end < len(path) && path[end] != '/' {\n+\t\t\t\t\tend++\n \t\t\t\t}\n \n \t\t\t\t// Add param value to case insensitive path\n-\t\t\t\tciPath = append(ciPath, path[:k]...)\n+\t\t\t\tciPath = append(ciPath, path[:end]...)\n \n \t\t\t\t// We need to go deeper!\n-\t\t\t\tif k < len(path) {\n+\t\t\t\tif end < len(path) {\n \t\t\t\t\tif len(n.children) > 0 {\n \t\t\t\t\t\t// Continue with child node\n \t\t\t\t\t\tn = n.children[0]\n \t\t\t\t\t\tnpLen = len(n.path)\n-\t\t\t\t\t\tpath = path[k:]\n+\t\t\t\t\t\tpath = path[end:]\n \t\t\t\t\t\tcontinue\n \t\t\t\t\t}\n \n \t\t\t\t\t// ... but we can't\n-\t\t\t\t\tif fixTrailingSlash && len(path) == k+1 {\n+\t\t\t\t\tif fixTrailingSlash && len(path) == end+1 {\n \t\t\t\t\t\treturn ciPath, true\n \t\t\t\t\t}\n \t\t\t\t\treturn ciPath, false\n@@ -604,8 +610,9 @@ walk: // Outer loop for walking the tree\n \t\t\t// No handle found.\n \t\t\t// Try to fix the path by adding a trailing slash\n \t\t\tif fixTrailingSlash {\n-\t\t\t\tfor i := 0; i < len(n.indices); i++ {\n-\t\t\t\t\tif n.indices[i] == '/' {\n+\t\t\t\tindices := n.indices\n+\t\t\t\tfor i, max := 0, len(indices); i < max; i++ {\n+\t\t\t\t\tif indices[i] == '/' {\n \t\t\t\t\t\tn = n.children[i]\n \t\t\t\t\t\tif (len(n.path) == 1 && n.handle != nil) ||\n \t\t\t\t\t\t\t(n.nType == catchAll && n.children[0].handle != nil) {\n",
+  "diffTruncated": false,
+  "tree": [
+    ".travis.yml",
+    "LICENSE",
+    "README.md",
+    "go.mod",
+    "path.go",
+    "path_test.go",
+    "router.go",
+    "router_test.go",
+    "tree.go",
+    "tree_test.go"
+  ],
+  "explanation": {
+    "what": "getValue や incrementChildPrio、findCaseInsensitivePathRec の各ループで、`n.indices` や `n.children` を毎回フィールド経由で参照する代わりに `cs := n.children` / `indices := n.indices` のようにローカル変数へ一度だけ取り出し、ループ内ではそのローカル変数を使うように変更した。ループの終了条件も `len(n.indices)` を毎回呼ぶ代わりに `max` としてループ開始時に一度だけ計算する形にした。また getValue では `n.path` を `prefix` というローカル変数にキャッシュし、木を降りるたびに更新するようにした。",
+    "why": "コミットメッセージ「minor optimizations」の通り、ホットパスであるツリー探索(getValue)やノード優先度更新の関数で、フィールドアクセスやスライス長の再計算を減らして実行速度を上げることが目的と考えられる。ロジック自体(何を探し、何を返すか)は変更していない。",
+    "highlights": [
+      { "file": "tree.go", "note": "getValue のループで n.path を prefix にキャッシュし、n.indices/n.children もローカル変数 indices/cs に退避してから走査する" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

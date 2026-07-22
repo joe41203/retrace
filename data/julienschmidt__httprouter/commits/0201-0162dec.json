@@ -1,0 +1,65 @@
+{
+  "seq": 201,
+  "sha": "0162dec293e2e5a2a7e1c66c03d95df69a89a347",
+  "parents": [
+    "4c7fa626ec2b0dcdf2a926656da705a4a1f0208d"
+  ],
+  "author": {
+    "name": "Julien Schmidt",
+    "email": "git@julienschmidt.com",
+    "date": "2019-09-25T22:39:14+02:00"
+  },
+  "message": "router: move context params stuff to router.go",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 27,
+    "deletions": 32
+  },
+  "files": [
+    {
+      "path": "params.go",
+      "status": "D",
+      "additions": 0,
+      "deletions": 32,
+      "binary": false
+    },
+    {
+      "path": "router.go",
+      "status": "M",
+      "additions": 27,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/params.go b/params.go\ndeleted file mode 100644\nindex 5fb39d9..0000000\n--- a/params.go\n+++ /dev/null\n@@ -1,32 +0,0 @@\n-package httprouter\n-\n-import (\n-\t\"context\"\n-\t\"net/http\"\n-)\n-\n-type paramsKey struct{}\n-\n-// ParamsKey is the request context key under which URL params are stored.\n-var ParamsKey = paramsKey{}\n-\n-// Handler is an adapter which allows the usage of an http.Handler as a\n-// request handle.\n-// The Params are available in the request context under ParamsKey.\n-func (r *Router) Handler(method, path string, handler http.Handler) {\n-\tr.Handle(method, path,\n-\t\tfunc(w http.ResponseWriter, req *http.Request, p Params) {\n-\t\t\tctx := req.Context()\n-\t\t\tctx = context.WithValue(ctx, ParamsKey, p)\n-\t\t\treq = req.WithContext(ctx)\n-\t\t\thandler.ServeHTTP(w, req)\n-\t\t},\n-\t)\n-}\n-\n-// ParamsFromContext pulls the URL parameters from a request context,\n-// or returns nil if none are present.\n-func ParamsFromContext(ctx context.Context) Params {\n-\tp, _ := ctx.Value(ParamsKey).(Params)\n-\treturn p\n-}\ndiff --git a/router.go b/router.go\nindex 2dfe5c4..130acda 100644\n--- a/router.go\n+++ b/router.go\n@@ -77,6 +77,7 @@\n package httprouter\n \n import (\n+\t\"context\"\n \t\"net/http\"\n )\n \n@@ -107,6 +108,18 @@ func (ps Params) ByName(name string) string {\n \treturn \"\"\n }\n \n+type paramsKey struct{}\n+\n+// ParamsKey is the request context key under which URL params are stored.\n+var ParamsKey = paramsKey{}\n+\n+// ParamsFromContext pulls the URL parameters from a request context,\n+// or returns nil if none are present.\n+func ParamsFromContext(ctx context.Context) Params {\n+\tp, _ := ctx.Value(ParamsKey).(Params)\n+\treturn p\n+}\n+\n // Router is a http.Handler which can be used to dispatch requests to different\n // handler functions via configurable routes\n type Router struct {\n@@ -236,6 +249,20 @@ func (r *Router) Handle(method, path string, handle Handle) {\n \troot.addRoute(path, handle)\n }\n \n+// Handler is an adapter which allows the usage of an http.Handler as a\n+// request handle.\n+// The Params are available in the request context under ParamsKey.\n+func (r *Router) Handler(method, path string, handler http.Handler) {\n+\tr.Handle(method, path,\n+\t\tfunc(w http.ResponseWriter, req *http.Request, p Params) {\n+\t\t\tctx := req.Context()\n+\t\t\tctx = context.WithValue(ctx, ParamsKey, p)\n+\t\t\treq = req.WithContext(ctx)\n+\t\t\thandler.ServeHTTP(w, req)\n+\t\t},\n+\t)\n+}\n+\n // HandlerFunc is an adapter which allows the usage of an http.HandlerFunc as a\n // request handle.\n func (r *Router) HandlerFunc(method, path string, handler http.HandlerFunc) {\n",
+  "diffTruncated": false,
+  "tree": [
+    ".travis.yml",
+    "LICENSE",
+    "README.md",
+    "go.mod",
+    "path.go",
+    "path_test.go",
+    "router.go",
+    "router_test.go",
+    "tree.go",
+    "tree_test.go"
+  ],
+  "explanation": {
+    "what": "params.go を削除し、そこにあった paramsKey 型・ParamsKey 変数・ParamsFromContext 関数を router.go に移動した。ロジックの変更はなく、ファイル構成のみの整理。",
+    "why": "おそらく、context 経由で URL パラメータを受け渡す仕組み(paramsKey/ParamsKey/ParamsFromContext)は Router.Handler の実装と密接に関わるため、別ファイルに分けるより router.go にまとめた方が見通しが良いと判断したとみられる。コミットメッセージ以外に判断材料はなく、詳細な動機は不明。",
+    "highlights": [
+      { "file": "router.go", "note": "paramsKey/ParamsKey/ParamsFromContext がここに集約され、Router.Handler の直前に配置された" }
+    ],
+    "langNotes": [
+      { "topic": "context.WithValue と非公開キー型", "note": "paramsKey は非公開の空 struct 型で、その型の値(ParamsKey)をキーとして context に値を格納している。文字列などの公開型をキーに使うと他パッケージの値と衝突しうるため、非公開の独自型を使うのが Go の context のイディオム。" }
+    ],
+    "diagram": null,
+    "evidence": "inferred",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

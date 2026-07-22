@@ -1,0 +1,55 @@
+{
+  "seq": 47,
+  "sha": "0707169cd3c23443f56b3fc5eec2a1e17b5ffd29",
+  "parents": [
+    "4c44706a204939309a047afbb4369cea5546d1a8"
+  ],
+  "author": {
+    "name": "Julien Schmidt",
+    "email": "github@julienschmidt.com",
+    "date": "2014-01-09T11:10:15+01:00"
+  },
+  "message": "Add \"zero garbage\" to features",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 2,
+    "deletions": 0
+  },
+  "files": [
+    {
+      "path": "README.md",
+      "status": "M",
+      "additions": 2,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/README.md b/README.md\nindex 945e63b..45cb94b 100644\n--- a/README.md\n+++ b/README.md\n@@ -12,6 +12,8 @@ It scales well even with very long pathes and a large number of routes.\n A compressing dynamic trie (radix tree) structure is used for efficient matching.\n \n ## Features\n+**Zero Garbage:** The matching and dispatching process generates zero bytes of garbage. In fact, the only heap allocations that are made, is by building the map containing the variables key-value pairs. If the request path contains no variables, not a single heap allocation is necessary.\n+\n **Variables in your routing pattern:** Stop parsing the requested URL path, just give the path segment a name and the router delivers the value to you. Because of the design of the router, pattern variables are very cheap.\n \n **Only explicit matches:** With other routers / muxes, like http.ServeMux, a requested URL path could match multiple patterns. Therefore they have some awkward pattern priority rules, like *longest match* or *first registered, first matched*. By design of this router, a request can only match exactly one or no route. As a result, there are also no unintended matches, which makes it great for SEO. \n",
+  "diffTruncated": false,
+  "tree": [
+    ".travis.yml",
+    "LICENSE",
+    "README.md",
+    "path.go",
+    "path_test.go",
+    "router.go",
+    "router_test.go",
+    "tree.go",
+    "tree_test.go"
+  ],
+  "explanation": {
+    "what": "README.md の Features 節に「Zero Garbage」という項目を追加した。マッチングとディスパッチの過程でヒープ割り当てをほぼ発生させないこと、変数を含まないリクエストパスであれば1バイトもヒープ確保しないことを説明している。",
+    "why": "コミットメッセージ通り、ルータの重要な性能特性(ゼロガベージでのマッチング)を機能一覧として明文化するための追加。",
+    "highlights": [],
+    "langNotes": [
+      { "topic": "ヒープ割り当てとGC負荷", "note": "Go では値がヒープに逃げる(escape)とガベージコレクタの対象になり、割り当てと回収のコストがパフォーマンスに響く。ここで言う「zero garbage」は、ルーティングの本体処理がヒープ確保を伴わない設計であることを指し、Go 製ルータの性能訴求としてよく使われる観点。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

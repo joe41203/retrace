@@ -1,0 +1,62 @@
+{
+  "seq": 102,
+  "sha": "00ce1c6a267162792c367acc43b1681a884e1872",
+  "parents": [
+    "2b89d7c27df525fc9b85a9ae255867c484c50ff0"
+  ],
+  "author": {
+    "name": "Julien Schmidt",
+    "email": "github@julienschmidt.com",
+    "date": "2015-01-24T14:28:53+08:00"
+  },
+  "message": "tree: Add invalid node type test\n\nRaises the test coverage to 100%",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 27,
+    "deletions": 2
+  },
+  "files": [
+    {
+      "path": "tree.go",
+      "status": "M",
+      "additions": 2,
+      "deletions": 2,
+      "binary": false
+    },
+    {
+      "path": "tree_test.go",
+      "status": "M",
+      "additions": 25,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/tree.go b/tree.go\nindex 933b5cb..121d0c3 100644\n--- a/tree.go\n+++ b/tree.go\n@@ -379,7 +379,7 @@ walk: // Outer loop for walking the tree\n \t\t\t\t\treturn\n \n \t\t\t\tdefault:\n-\t\t\t\t\tpanic(\"Unknown node type\")\n+\t\t\t\t\tpanic(\"Invalid node type\")\n \t\t\t\t}\n \t\t\t}\n \t\t} else if path == n.path {\n@@ -490,7 +490,7 @@ func (n *node) findCaseInsensitivePath(path string, fixTrailingSlash bool) (ciPa\n \t\t\t\t\treturn append(ciPath, path...), true\n \n \t\t\t\tdefault:\n-\t\t\t\t\tpanic(\"Unknown node type\")\n+\t\t\t\t\tpanic(\"Invalid node type\")\n \t\t\t\t}\n \t\t\t}\n \t\t} else {\ndiff --git a/tree_test.go b/tree_test.go\nindex cf4d170..ed1f9a8 100644\n--- a/tree_test.go\n+++ b/tree_test.go\n@@ -557,3 +557,28 @@ func TestTreeFindCaseInsensitivePath(t *testing.T) {\n \t\t}\n \t}\n }\n+\n+func TestTreeInvalidNodeType(t *testing.T) {\n+\ttree := &node{}\n+\ttree.addRoute(\"/\", fakeHandler(\"/\"))\n+\ttree.addRoute(\"/:page\", fakeHandler(\"/:page\"))\n+\n+\t// set invalid node type\n+\ttree.children[0].nType = 42\n+\n+\t// normal lookup\n+\trecv := catchPanic(func() {\n+\t\ttree.getValue(\"/test\")\n+\t})\n+\tif rs, ok := recv.(string); !ok || rs != \"Invalid node type\" {\n+\t\tt.Fatalf(`Expected panic \"Invalid node type\", got \"%v\"`, recv)\n+\t}\n+\n+\t// case-insensitive lookup\n+\trecv = catchPanic(func() {\n+\t\ttree.findCaseInsensitivePath(\"/test\", true)\n+\t})\n+\tif rs, ok := recv.(string); !ok || rs != \"Invalid node type\" {\n+\t\tt.Fatalf(`Expected panic \"Invalid node type\", got \"%v\"`, recv)\n+\t}\n+}\n",
+  "diffTruncated": false,
+  "tree": [
+    ".travis.yml",
+    "LICENSE",
+    "README.md",
+    "path.go",
+    "path_test.go",
+    "router.go",
+    "router_test.go",
+    "tree.go",
+    "tree_test.go"
+  ],
+  "explanation": {
+    "what": "tree.go の getValue と findCaseInsensitivePath にある default ケースの panic メッセージを \"Unknown node type\" から \"Invalid node type\" に変更し、tree_test.go に TestTreeInvalidNodeType を追加した。テストは node の nType フィールドに存在しない値 42 を直接代入し、getValue と findCaseInsensitivePath の両方がこの panic メッセージで異常終了することを確認している。",
+    "why": "コミットメッセージにある通り、この default 分岐は通常の入力では到達不能なコードパスであり、テストカバレッジを100%にするために意図的に nType を不正値に書き換えて到達させている。",
+    "highlights": [
+      { "file": "tree_test.go", "note": "tree.children[0].nType = 42 で内部状態を直接壊し、到達困難な default 分岐を強制的に踏む手法" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

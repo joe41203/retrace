@@ -1,0 +1,56 @@
+{
+  "seq": 227,
+  "sha": "e1d836068390fda70a608348e13b5d4795b3d5d9",
+  "parents": [
+    "6289311caafefac132cb3583bdd8d85580c0aecc"
+  ],
+  "author": {
+    "name": "Julien Schmidt",
+    "email": "git@julienschmidt.com",
+    "date": "2019-10-04T17:26:22+02:00"
+  },
+  "message": "tree: minor documentation and style fixes in getValue",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 6,
+    "deletions": 4
+  },
+  "files": [
+    {
+      "path": "tree.go",
+      "status": "M",
+      "additions": 6,
+      "deletions": 4,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/tree.go b/tree.go\nindex 5bbb517..20347c8 100644\n--- a/tree.go\n+++ b/tree.go\n@@ -317,13 +317,13 @@ walk: // Outer loop for walking the tree\n \t\tif len(path) > len(prefix) {\n \t\t\tif path[:len(prefix)] == prefix {\n \t\t\t\tpath = path[len(prefix):]\n+\n \t\t\t\t// If this node does not have a wildcard (param or catchAll)\n-\t\t\t\t// child,  we can just look up the next child node and continue\n+\t\t\t\t// child, we can just look up the next child node and continue\n \t\t\t\t// to walk down the tree\n \t\t\t\tif !n.wildChild {\n-\t\t\t\t\tc := path[0]\n \t\t\t\t\tindices := n.indices\n-\t\t\t\t\tfor i, max := 0, len(indices); i < max; i++ {\n+\t\t\t\t\tfor i, max, c := 0, len(indices), path[0]; i < max; i++ {\n \t\t\t\t\t\tif c == indices[i] {\n \t\t\t\t\t\t\tn = n.children[i]\n \t\t\t\t\t\t\tprefix = n.path\n@@ -417,6 +417,9 @@ walk: // Outer loop for walking the tree\n \t\t\t\treturn\n \t\t\t}\n \n+\t\t\t// If there is no handle for this route, but this route has a\n+\t\t\t// wildcard child, there must be a handle for this path with an\n+\t\t\t// additional trailing slash\n \t\t\tif path == \"/\" && n.wildChild && n.nType != root {\n \t\t\t\ttsr = true\n \t\t\t\treturn\n@@ -433,7 +436,6 @@ walk: // Outer loop for walking the tree\n \t\t\t\t\treturn\n \t\t\t\t}\n \t\t\t}\n-\n \t\t\treturn\n \t\t}\n \n",
+  "diffTruncated": false,
+  "tree": [
+    ".travis.yml",
+    "LICENSE",
+    "README.md",
+    "go.mod",
+    "path.go",
+    "path_test.go",
+    "router.go",
+    "router_test.go",
+    "tree.go",
+    "tree_test.go"
+  ],
+  "explanation": {
+    "what": "getValue(木のルックアップ関数)内で、子ノードのインデックス検索用に一時変数として持っていた `c := path[0]` を for ループの初期化文に統合し(`for i, max, c := 0, len(indices), path[0]; ...`)、コメントの誤字(二重スペース)を修正、空行の追加・削除によるコメントブロックの区切りを整えた。動作を変えないスタイル・ドキュメントの微修正。",
+    "why": "コミットメッセージの通り、getValue のドキュメントとスタイルの軽微な修正。ロジックの変更は無く、変数のスコープを縮小しコメントの読みやすさを整える整理。",
+    "highlights": [
+      { "file": "tree.go", "note": "`c := path[0]` を for 文の初期化に統合し、変数のスコープを狭めた箇所" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

@@ -1,0 +1,56 @@
+{
+  "seq": 252,
+  "sha": "719e522b345b40a9d6ad6e65115a4420e4e508f3",
+  "parents": [
+    "f028acfbffc34e9baf5bd15dfb775a43f694031b"
+  ],
+  "author": {
+    "name": "Julien Schmidt",
+    "email": "git@julienschmidt.com",
+    "date": "2020-07-27T00:45:45+02:00"
+  },
+  "message": "tree: simplify empty tree check",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 1,
+    "deletions": 3
+  },
+  "files": [
+    {
+      "path": "tree.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 3,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/tree.go b/tree.go\nindex 4da1033..52fc395 100644\n--- a/tree.go\n+++ b/tree.go\n@@ -92,7 +92,6 @@ func (n *node) incrementChildPrio(pos int) int {\n \tfor ; newPos > 0 && cs[newPos-1].priority < prio; newPos-- {\n \t\t// Swap node positions\n \t\tcs[newPos-1], cs[newPos] = cs[newPos], cs[newPos-1]\n-\n \t}\n \n \t// Build new index char string\n@@ -112,7 +111,7 @@ func (n *node) addRoute(path string, handle Handle) {\n \tn.priority++\n \n \t// Empty tree\n-\tif len(n.path) == 0 && len(n.indices) == 0 {\n+\tif n.path == \"\" && n.indices == \"\" {\n \t\tn.insertChild(path, fullPath, handle)\n \t\tn.nType = root\n \t\treturn\n@@ -348,7 +347,6 @@ walk: // Outer loop for walking the tree\n \t\t\t\t\t// trailing slash if a leaf exists for that path.\n \t\t\t\t\ttsr = (path == \"/\" && n.handle != nil)\n \t\t\t\t\treturn\n-\n \t\t\t\t}\n \n \t\t\t\t// Handle wildcard child\n",
+  "diffTruncated": false,
+  "tree": [
+    ".travis.yml",
+    "LICENSE",
+    "README.md",
+    "go.mod",
+    "path.go",
+    "path_test.go",
+    "router.go",
+    "router_test.go",
+    "tree.go",
+    "tree_test.go"
+  ],
+  "explanation": {
+    "what": "tree.goの3箇所を整理した。空のツリー判定を`len(n.path) == 0 && len(n.indices) == 0`から`n.path == \"\" && n.indices == \"\"`という文字列比較に書き換え、`incrementChildPrio`と`getValue`内の不要な空行2箇所を削除した。",
+    "why": "コミットメッセージの通り、空ツリー判定のロジック自体は変えず、より簡潔な書き方に揃える意図の整理。",
+    "highlights": [
+      { "file": "tree.go", "note": "空ツリー判定を len() 比較から文字列の空判定に書き換えた箇所" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

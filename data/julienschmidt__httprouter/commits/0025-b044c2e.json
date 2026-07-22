@@ -1,0 +1,61 @@
+{
+  "seq": 25,
+  "sha": "b044c2e8fcabb053f1295bd75784da36ef32f91c",
+  "parents": [
+    "a7325e510c4d62c243d78431f04ac5e366c15c6d"
+  ],
+  "author": {
+    "name": "Julien Schmidt",
+    "email": "github@julienschmidt.com",
+    "date": "2013-12-14T11:47:32+01:00"
+  },
+  "message": "Fix TSR for catchAll routes",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 4,
+    "deletions": 1
+  },
+  "files": [
+    {
+      "path": "tree.go",
+      "status": "M",
+      "additions": 2,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "tree_test.go",
+      "status": "M",
+      "additions": 2,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/tree.go b/tree.go\nindex 761ac02..c2686d9 100644\n--- a/tree.go\n+++ b/tree.go\n@@ -231,7 +231,8 @@ OUTER:\n \t\t\tfor i, index := range n.indices {\n \t\t\t\tif index == '/' {\n \t\t\t\t\tn = n.children[i]\n-\t\t\t\t\ttsr = (n.path == \"/\" && n.handle[method] != nil)\n+\t\t\t\t\ttsr = (n.path == \"/\" && n.handle[method] != nil) ||\n+\t\t\t\t\t\t(n.isCatchAll && n.children[0].handle[method] != nil)\n \t\t\t\t\treturn\n \t\t\t\t}\n \t\t\t}\ndiff --git a/tree_test.go b/tree_test.go\nindex c6b4f32..0e74dc6 100644\n--- a/tree_test.go\n+++ b/tree_test.go\n@@ -285,6 +285,7 @@ func TestTreeTrailingSlashRedirect(t *testing.T) {\n \t\t\"/b/\",\n \t\t\"/search/:query\",\n \t\t\"/cmd/:tool/\",\n+\t\t\"/src/*filepath\",\n \t\t\"/x\",\n \t\t\"/x/y\",\n \t\t\"/y/\",\n@@ -317,6 +318,7 @@ func TestTreeTrailingSlashRedirect(t *testing.T) {\n \t\t\"/b\",\n \t\t\"/search/gopher/\",\n \t\t\"/cmd/vet\",\n+\t\t\"/src\",\n \t\t\"/x/\",\n \t\t\"/y\",\n \t\t\"/0/go/\",\n",
+  "diffTruncated": false,
+  "tree": [
+    ".travis.yml",
+    "LICENSE",
+    "path.go",
+    "path_test.go",
+    "router.go",
+    "router_test.go",
+    "tree.go",
+    "tree_test.go"
+  ],
+  "explanation": {
+    "what": "tree.go の getValue における TSR(trailing slash redirect)判定条件に、catchAll ノードのケースを追加した。indices を辿って '/' の子ノードに移った際、その子ノードが isCatchAll かつ children[0].handle[method] が存在する場合も TSR 候補とみなすようにした。tree_test.go の TestTreeTrailingSlashRedirect にも \"/src/*filepath\" ルートと \"/src\" というリクエストパスのテストケースを追加している。",
+    "why": "コミット件名の通り、catchAll ルート配下でのTSR判定に不具合があったための修正。例えば \"/src/*filepath\" が登録されているとき \"/src\" でアクセスした場合に、末尾スラッシュ付き \"/src/\" へのリダイレクトを推奨できるようにする意図と考えられる。",
+    "highlights": [
+      { "file": "tree.go", "note": "tsr の条件式に (n.isCatchAll && n.children[0].handle[method] != nil) を or 追加" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

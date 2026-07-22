@@ -1,0 +1,55 @@
+{
+  "seq": 59,
+  "sha": "de97a55d3b72a3b775b759fec9c10f517ae772a0",
+  "parents": [
+    "f3d201d5a2dbac4fbaf79d409e67f2a93c882b06"
+  ],
+  "author": {
+    "name": "Julien Schmidt",
+    "email": "github@julienschmidt.com",
+    "date": "2014-03-24T01:08:02+01:00"
+  },
+  "message": "Fix the HostSwitch example\n\nThanks to Tobias Schwarz for reporting problems!",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 14,
+    "deletions": 13
+  },
+  "files": [
+    {
+      "path": "README.md",
+      "status": "M",
+      "additions": 14,
+      "deletions": 13,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/README.md b/README.md\nindex 9e28d50..03b7f0f 100644\n--- a/README.md\n+++ b/README.md\n@@ -131,32 +131,33 @@ Define a router per host!\n ```go\n // We need an object that implements the http.Handler interface.\n // Therefore we need a type for which we implement the ServeHTTP method.\n-// We just use a map here, in which we map host names to http.Handlers\n+// We just use a map here, in which we map host names (with port) to http.Handlers\n type HostSwitch map[string]http.Handler\n \n // Implement the ServerHTTP method on our new type\n func (hs HostSwitch) ServeHTTP(w http.ResponseWriter, r *http.Request) {\n \t// Check if a http.Handler is registered for the given host.\n \t// If yes, use it to handle the request.\n-\tif handler := hs[r.URL.Host]; handler != nil {\n+\tif handler := hs[r.Host]; handler != nil {\n \t\thandler.ServeHTTP(w, r)\n+\t} else {\n+\t\t// Handle host names for wich no handler is registered\n+\t\thttp.Error(w, \"Forbidden\", 403) // Or Redirect?\n \t}\n-\n-\t// Handle host names for wich no handler is registered\n-\thttp.Error(w, \"Forbidden\", 403) // Or Redirect?\n }\n \n func main() {\n \t// Initialze a router as usual \n-    router := httprouter.New()\n-    router.GET(\"/\", Index)\n-    router.GET(\"/hello/:name\", Hello)\n+\trouter := httprouter.New()\n+\trouter.GET(\"/\", Index)\n+\trouter.GET(\"/hello/:name\", Hello)\n \n-    // Make a new HostSwitch and insert the router for example.com\n-    hs := make(HostSwitch)\n-    hs[\"example.com\"] = router\n+\t// Make a new HostSwitch and insert the router (our http handler)\n+\t// for example.com and port 12345\n+\ths := make(HostSwitch)\n+\ths[\"example.com:12345\"] = router\n \n-    // Use the HostSwitch to listen and serve on port 12345\n-    log.Fatal(http.ListenAndServe(\":12345\", hs))\n+\t// Use the HostSwitch to listen and serve on port 12345\n+\tlog.Fatal(http.ListenAndServe(\":12345\", hs))\n }\n ```\n",
+  "diffTruncated": false,
+  "tree": [
+    ".travis.yml",
+    "LICENSE",
+    "README.md",
+    "path.go",
+    "path_test.go",
+    "router.go",
+    "router_test.go",
+    "tree.go",
+    "tree_test.go"
+  ],
+  "explanation": {
+    "what": "README.md の HostSwitch サンプルコードを修正した。ホスト名の参照を `r.URL.Host`(通常は空)から `r.Host`(実際にリクエストのHostヘッダが入るフィールド)に直し、if/elseの制御フローも「ハンドラが無ければ403」という一貫した分岐に整理した。あわせてインデントをタブに統一し、ポート番号込みのホスト名(`example.com:12345`)を使う例に更新した。",
+    "why": "コミットメッセージに「Thanks to Tobias Schwarz for reporting problems!」とあり、外部からの指摘を受けてサンプルコードの誤りを修正したことが分かる。net/http の Request では、サーバ側で受け取ったリクエストのホスト名は URL.Host ではなく Host フィールドに入る、というAPIの使い方の誤りが実際にあったと考えられる。",
+    "highlights": [
+      { "file": "README.md", "note": "r.URL.Host → r.Host への修正。サーバ側のリクエストではURLではなくHostフィールドを見る必要がある" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

@@ -1,0 +1,56 @@
+{
+  "seq": 238,
+  "sha": "8e4b52b881a5220199361a383698abed7720411c",
+  "parents": [
+    "7b49e86e83232ee8072527dc90555e6f78fc9642"
+  ],
+  "author": {
+    "name": "Julien Schmidt",
+    "email": "git@julienschmidt.com",
+    "date": "2020-01-06T15:54:43+01:00"
+  },
+  "message": "path: add test and benchmark for long CleanPath inputs",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 54,
+    "deletions": 2
+  },
+  "files": [
+    {
+      "path": "path_test.go",
+      "status": "M",
+      "additions": 54,
+      "deletions": 2,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/path_test.go b/path_test.go\nindex 5eaf026..182748f 100644\n--- a/path_test.go\n+++ b/path_test.go\n@@ -6,12 +6,15 @@\n package httprouter\n \n import (\n+\t\"strings\"\n \t\"testing\"\n )\n \n-var cleanTests = []struct {\n+type cleanPathTest struct {\n \tpath, result string\n-}{\n+}\n+\n+var cleanTests = []cleanPathTest{\n \t// Already clean\n \t{\"/\", \"/\"},\n \t{\"/abc\", \"/abc\"},\n@@ -88,6 +91,55 @@ func TestPathCleanMallocs(t *testing.T) {\n }\n \n func BenchmarkPathClean(b *testing.B) {\n+\tb.ReportAllocs()\n+\n+\tfor i := 0; i < b.N; i++ {\n+\t\tfor _, test := range cleanTests {\n+\t\t\tCleanPath(test.path)\n+\t\t}\n+\t}\n+}\n+\n+func genLongPaths() (testPaths []cleanPathTest) {\n+\tfor i := 1; i <= 1234; i++ {\n+\t\tss := strings.Repeat(\"a\", i)\n+\n+\t\tcorrectPath := \"/\" + ss\n+\t\ttestPaths = append(testPaths, cleanPathTest{\n+\t\t\tpath:   correctPath,\n+\t\t\tresult: correctPath,\n+\t\t}, cleanPathTest{\n+\t\t\tpath:   ss,\n+\t\t\tresult: correctPath,\n+\t\t}, cleanPathTest{\n+\t\t\tpath:   \"//\" + ss,\n+\t\t\tresult: correctPath,\n+\t\t}, cleanPathTest{\n+\t\t\tpath:   \"/\" + ss + \"/b/..\",\n+\t\t\tresult: correctPath,\n+\t\t})\n+\t}\n+\treturn\n+}\n+\n+func TestPathCleanLong(t *testing.T) {\n+\tcleanTests := genLongPaths()\n+\n+\tfor _, test := range cleanTests {\n+\t\tif s := CleanPath(test.path); s != test.result {\n+\t\t\tt.Errorf(\"CleanPath(%q) = %q, want %q\", test.path, s, test.result)\n+\t\t}\n+\t\tif s := CleanPath(test.result); s != test.result {\n+\t\t\tt.Errorf(\"CleanPath(%q) = %q, want %q\", test.result, s, test.result)\n+\t\t}\n+\t}\n+}\n+\n+func BenchmarkPathCleanLong(b *testing.B) {\n+\tcleanTests := genLongPaths()\n+\tb.ResetTimer()\n+\tb.ReportAllocs()\n+\n \tfor i := 0; i < b.N; i++ {\n \t\tfor _, test := range cleanTests {\n \t\t\tCleanPath(test.path)\n",
+  "diffTruncated": false,
+  "tree": [
+    ".travis.yml",
+    "LICENSE",
+    "README.md",
+    "go.mod",
+    "path.go",
+    "path_test.go",
+    "router.go",
+    "router_test.go",
+    "tree.go",
+    "tree_test.go"
+  ],
+  "explanation": {
+    "what": "path_test.go に、128バイトのスタックバッファを超える長さのパスに対するテスト(TestPathCleanLong)とベンチマーク(BenchmarkPathCleanLong)を追加した。genLongPaths関数で1〜1234文字のパスを様々なパターン(既に正規化済み・先頭スラッシュなし・二重スラッシュあり・\"..\"を含む等)で生成し、CleanPathの結果を検証する。既存のcleanTestsの型もcleanPathTestという名前付き構造体型に切り出し、既存のBenchmarkPathCleanにb.ReportAllocs()を追加してアロケーション数もベンチマーク出力に含めるようにした。",
+    "why": "おそらく、seq236でCleanPathに128バイトのスタックバッファを導入したことで、バッファ長を超える入力の場合にヒープ確保へフォールバックする分岐が新たに生まれたため、その分岐が正しく機能するかを検証するテストと、その場合の性能特性を確認するベンチマークが必要になったと考えられる。",
+    "highlights": [
+      { "file": "path_test.go", "note": "genLongPaths: 1〜1234文字の長いパスを複数パターンで生成し、スタックバッファの閾値(128バイト)を超えるケースを網羅する" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "inferred",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

@@ -1,0 +1,56 @@
+{
+  "seq": 257,
+  "sha": "574f375a9d0da0d6cb03485a026fd317c2aa928d",
+  "parents": [
+    "6a662d88aaea791fc746bae4d9c40cf4e921ca4b"
+  ],
+  "author": {
+    "name": "Julien Schmidt",
+    "email": "git@julienschmidt.com",
+    "date": "2020-08-14T20:18:46+02:00"
+  },
+  "message": "tree_test: remove superfluous conversions to string",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 9,
+    "deletions": 9
+  },
+  "files": [
+    {
+      "path": "tree_test.go",
+      "status": "M",
+      "additions": 9,
+      "deletions": 9,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/tree_test.go b/tree_test.go\nindex 17ac6a1..b7d240f 100644\n--- a/tree_test.go\n+++ b/tree_test.go\n@@ -525,8 +525,8 @@ func TestTreeFindCaseInsensitivePath(t *testing.T) {\n \t\tout, found := tree.findCaseInsensitivePath(route, true)\n \t\tif !found {\n \t\t\tt.Errorf(\"Route '%s' not found!\", route)\n-\t\t} else if string(out) != route {\n-\t\t\tt.Errorf(\"Wrong result for route '%s': %s\", route, string(out))\n+\t\t} else if out != route {\n+\t\t\tt.Errorf(\"Wrong result for route '%s': %s\", route, out)\n \t\t}\n \t}\n \t// With fixTrailingSlash = false\n@@ -535,8 +535,8 @@ func TestTreeFindCaseInsensitivePath(t *testing.T) {\n \t\tout, found := tree.findCaseInsensitivePath(route, false)\n \t\tif !found {\n \t\t\tt.Errorf(\"Route '%s' not found!\", route)\n-\t\t} else if string(out) != route {\n-\t\t\tt.Errorf(\"Wrong result for route '%s': %s\", route, string(out))\n+\t\t} else if out != route {\n+\t\t\tt.Errorf(\"Wrong result for route '%s': %s\", route, out)\n \t\t}\n \t}\n \n@@ -606,9 +606,9 @@ func TestTreeFindCaseInsensitivePath(t *testing.T) {\n \t// With fixTrailingSlash = true\n \tfor _, test := range tests {\n \t\tout, found := tree.findCaseInsensitivePath(test.in, true)\n-\t\tif found != test.found || (found && (string(out) != test.out)) {\n+\t\tif found != test.found || (found && (out != test.out)) {\n \t\t\tt.Errorf(\"Wrong result for '%s': got %s, %t; want %s, %t\",\n-\t\t\t\ttest.in, string(out), found, test.out, test.found)\n+\t\t\t\ttest.in, out, found, test.out, test.found)\n \t\t\treturn\n \t\t}\n \t}\n@@ -617,12 +617,12 @@ func TestTreeFindCaseInsensitivePath(t *testing.T) {\n \t\tout, found := tree.findCaseInsensitivePath(test.in, false)\n \t\tif test.slash {\n \t\t\tif found { // test needs a trailingSlash fix. It must not be found!\n-\t\t\t\tt.Errorf(\"Found without fixTrailingSlash: %s; got %s\", test.in, string(out))\n+\t\t\t\tt.Errorf(\"Found without fixTrailingSlash: %s; got %s\", test.in, out)\n \t\t\t}\n \t\t} else {\n-\t\t\tif found != test.found || (found && (string(out) != test.out)) {\n+\t\t\tif found != test.found || (found && (out != test.out)) {\n \t\t\t\tt.Errorf(\"Wrong result for '%s': got %s, %t; want %s, %t\",\n-\t\t\t\t\ttest.in, string(out), found, test.out, test.found)\n+\t\t\t\t\ttest.in, out, found, test.out, test.found)\n \t\t\t\treturn\n \t\t\t}\n \t\t}\n",
+  "diffTruncated": false,
+  "tree": [
+    ".travis.yml",
+    "LICENSE",
+    "README.md",
+    "go.mod",
+    "path.go",
+    "path_test.go",
+    "router.go",
+    "router_test.go",
+    "tree.go",
+    "tree_test.go"
+  ],
+  "explanation": {
+    "what": "tree_test.goの`TestTreeFindCaseInsensitivePath`内で、`findCaseInsensitivePath`の戻り値`out`に対して行っていた`string(out)`という変換を除去し、`out`をそのまま比較・出力するように書き換えた。",
+    "why": "コミットメッセージ「remove superfluous conversions to string」が示す通り、`out`が既にstring型であるため`string(out)`への変換は不要な冗長コードだった。",
+    "highlights": [
+      { "file": "tree_test.go", "note": "string(out) の不要な型変換を除去した箇所" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

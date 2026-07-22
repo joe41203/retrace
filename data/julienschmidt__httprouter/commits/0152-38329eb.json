@@ -1,0 +1,61 @@
+{
+  "seq": 152,
+  "sha": "38329ebacf363cf2f41f0182ada6e2a7c003029e",
+  "parents": [
+    "fb79d6a91d3e4a9ecb6d945b218d78fc0d9b1939",
+    "9dcdf460b98c532efeb1b44afd6f775cf7c760b6"
+  ],
+  "author": {
+    "name": "Julien Schmidt",
+    "email": "julienschmidt@users.noreply.github.com",
+    "date": "2016-08-10T21:37:55+02:00"
+  },
+  "message": "Merge pull request #152 from nothingmuch/patch-1\n\nREADME: Improve readability of BasicAuth example",
+  "pr": {
+    "number": 152,
+    "title": "Improve readability of BasicAuth example",
+    "body": "Since `net/http` already provides the necessary functionality, this change removes the technical details of parsing RFC 2617 headers.\n",
+    "url": "https://github.com/julienschmidt/httprouter/pull/152"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 24,
+    "deletions": 38
+  },
+  "files": [
+    {
+      "path": "README.md",
+      "status": "M",
+      "additions": 24,
+      "deletions": 38,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/README.md b/README.md\nindex 7752aaa..2bc0381 100644\n--- a/README.md\n+++ b/README.md\n@@ -185,60 +185,46 @@ Another quick example: Basic Authentication (RFC 2617) for handles:\n package main\n \n import (\n-    \"bytes\"\n-    \"encoding/base64\"\n-    \"fmt\"\n-    \"github.com/julienschmidt/httprouter\"\n-    \"net/http\"\n-    \"log\"\n-    \"strings\"\n+\t\"fmt\"\n+\t\"log\"\n+\t\"net/http\"\n+\n+\t\"github.com/julienschmidt/httprouter\"\n )\n \n-func BasicAuth(h httprouter.Handle, user, pass []byte) httprouter.Handle {\n+func BasicAuth(h httprouter.Handle, requiredUser, requiredPassword string) httprouter.Handle {\n \treturn func(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {\n-\t\tconst basicAuthPrefix string = \"Basic \"\n-\n \t\t// Get the Basic Authentication credentials\n-\t\tauth := r.Header.Get(\"Authorization\")\n-\t\tif strings.HasPrefix(auth, basicAuthPrefix) {\n-\t\t\t// Check credentials\n-\t\t\tpayload, err := base64.StdEncoding.DecodeString(auth[len(basicAuthPrefix):])\n-\t\t\tif err == nil {\n-\t\t\t\tpair := bytes.SplitN(payload, []byte(\":\"), 2)\n-\t\t\t\tif len(pair) == 2 &&\n-\t\t\t\t\tbytes.Equal(pair[0], user) &&\n-\t\t\t\t\tbytes.Equal(pair[1], pass) {\n-\n-\t\t\t\t\t// Delegate request to the given handle\n-\t\t\t\t\th(w, r, ps)\n-\t\t\t\t\treturn\n-\t\t\t\t}\n-\t\t\t}\n+\t\tuser, password, hasAuth := r.BasicAuth()\n+\n+\t\tif hasAuth && user == requiredUser && password == requiredPassword {\n+\t\t\t// Delegate request to the given handle\n+\t\t\th(w, r, ps)\n+\t\t} else {\n+\t\t\t// Request Basic Authentication otherwise\n+\t\t\tw.Header().Set(\"WWW-Authenticate\", \"Basic realm=Restricted\")\n+\t\t\thttp.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)\n \t\t}\n-\n-\t\t// Request Basic Authentication otherwise\n-\t\tw.Header().Set(\"WWW-Authenticate\", \"Basic realm=Restricted\")\n-\t\thttp.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)\n \t}\n }\n \n func Index(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {\n-    fmt.Fprint(w, \"Not protected!\\n\")\n+\tfmt.Fprint(w, \"Not protected!\\n\")\n }\n \n func Protected(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {\n-    fmt.Fprint(w, \"Protected!\\n\")\n+\tfmt.Fprint(w, \"Protected!\\n\")\n }\n \n func main() {\n-    user := []byte(\"gordon\")\n-    pass := []byte(\"secret!\")\n-    \n-    router := httprouter.New()\n-    router.GET(\"/\", Index)\n-    router.GET(\"/protected/\", BasicAuth(Protected, user, pass))\n+\tuser := \"gordon\"\n+\tpass := \"secret!\"\n \n-    log.Fatal(http.ListenAndServe(\":8080\", router))\n+\trouter := httprouter.New()\n+\trouter.GET(\"/\", Index)\n+\trouter.GET(\"/protected/\", BasicAuth(Protected, user, pass))\n+\n+\tlog.Fatal(http.ListenAndServe(\":8080\", router))\n }\n ```\n \n",
+  "diffTruncated": false,
+  "tree": [
+    ".travis.yml",
+    "LICENSE",
+    "README.md",
+    "path.go",
+    "path_test.go",
+    "router.go",
+    "router_test.go",
+    "tree.go",
+    "tree_test.go"
+  ],
+  "explanation": {
+    "what": "README.md 内の Basic Authentication サンプルコードを書き換えた PR #152 のマージコミット。自前で `Authorization` ヘッダをパースして base64 デコードし `bytes.Equal` で比較していた実装を、標準ライブラリの `r.BasicAuth()` の呼び出し1つに置き換え、ユーザー名/パスワードの型も `[]byte` から `string` に変更している。インデントも半角スペースからタブに揃えた。",
+    "why": "PR 本文にある通り、net/http が既に Basic Auth ヘッダのパース機能を提供しているため、RFC 2617 ヘッダを手動でパースする冗長なコードを削り、サンプルの可読性を上げる目的。",
+    "highlights": [
+      { "file": "README.md", "note": "手動パース(base64デコード+bytes.SplitN+bytes.Equal)が r.BasicAuth() の1行に置き換わっている" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [{ "type": "pr", "number": 152, "url": "https://github.com/julienschmidt/httprouter/pull/152" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

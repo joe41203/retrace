@@ -1,0 +1,56 @@
+{
+  "seq": 237,
+  "sha": "7b49e86e83232ee8072527dc90555e6f78fc9642",
+  "parents": [
+    "8222db13dbb3b3ab1eb84edb61a7030708b93bfa"
+  ],
+  "author": {
+    "name": "Julien Schmidt",
+    "email": "git@julienschmidt.com",
+    "date": "2020-01-06T13:54:12+01:00"
+  },
+  "message": "path: avoid some dereferences in bufApp",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 6,
+    "deletions": 4
+  },
+  "files": [
+    {
+      "path": "path.go",
+      "status": "M",
+      "additions": 6,
+      "deletions": 4,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/path.go b/path.go\nindex 64e381f..8866914 100644\n--- a/path.go\n+++ b/path.go\n@@ -121,18 +121,20 @@ func CleanPath(p string) string {\n \n // internal helper to lazily create a buffer if necessary\n func bufApp(buf *[]byte, s string, w int, c byte) {\n-\tif len(*buf) == 0 {\n+\tb := *buf\n+\tif len(b) == 0 {\n \t\tif s[w] == c {\n \t\t\treturn\n \t\t}\n \n-\t\tif l := len(s); l > cap(*buf) {\n+\t\tif l := len(s); l > cap(b) {\n \t\t\t*buf = make([]byte, len(s))\n \t\t} else {\n \t\t\t*buf = (*buf)[:l]\n \t\t}\n+\t\tb = *buf\n \n-\t\tcopy(*buf, s[:w])\n+\t\tcopy(b, s[:w])\n \t}\n-\t(*buf)[w] = c\n+\tb[w] = c\n }\n",
+  "diffTruncated": false,
+  "tree": [
+    ".travis.yml",
+    "LICENSE",
+    "README.md",
+    "go.mod",
+    "path.go",
+    "path_test.go",
+    "router.go",
+    "router_test.go",
+    "tree.go",
+    "tree_test.go"
+  ],
+  "explanation": {
+    "what": "bufApp関数内で *buf への複数回のポインタ参照(デリファレンス)を b := *buf という局所変数に一度だけ受けて使い回す形に書き換えた。バッファを新規に用意した後も b = *buf で最新のスライスヘッダを取り直し、以降の copy(b, ...) や b[w] = c はローカル変数 b を経由するようにしている。",
+    "why": "件名の通り、*buf という間接参照を関数内で複数回書く代わりに一度だけ行うことで、ポインタ経由のアクセス回数を減らす意図の最適化。直前のseq236でCleanPathのアロケーション削減に着手したのに続き、ホットパスであるbufAppについてもさらに細かいレベルでの無駄を削っている。",
+    "highlights": [
+      { "file": "path.go", "note": "b := *buf で受けてから b を使い回す形に変更。バッファ再確保後は b = *buf で改めて取得している" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

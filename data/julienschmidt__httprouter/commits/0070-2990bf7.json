@@ -1,0 +1,69 @@
+{
+  "seq": 70,
+  "sha": "2990bf7f3cd4ac0476ebc27cfa6c8c8e0b2e9908",
+  "parents": [
+    "8e9a1a473064f32cb60872f12ecf1bdff79a4e64"
+  ],
+  "author": {
+    "name": "Julien Schmidt",
+    "email": "github@julienschmidt.com",
+    "date": "2014-06-09T00:49:32+02:00"
+  },
+  "message": "Better path autocorrection",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 3,
+    "additions": 52,
+    "deletions": 52
+  },
+  "files": [
+    {
+      "path": "README.md",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "router.go",
+      "status": "M",
+      "additions": 40,
+      "deletions": 37,
+      "binary": false
+    },
+    {
+      "path": "router_test.go",
+      "status": "M",
+      "additions": 11,
+      "deletions": 14,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/README.md b/README.md\nindex fd8ebc1..80bfc70 100644\n--- a/README.md\n+++ b/README.md\n@@ -104,7 +104,7 @@ Priority   Path             Handle\n 1          |        └team\\  *<7>\n 1          └contact\\        *<8>\n ```\n-Every `´*<num>` represents the memory address of a handler function (a pointer). If you follow a path trough the tree from the root to the leaf, you get the complete route path, e.g `\\blog\\:post\\`, where `:post` is just a placeholder ([*parameter*](#named-parameters)) for an actual post name. Unlike hash-maps, a tree structure also allows us to use dynamic parts like the `:post` parameter, since we actually match against the routing patterns instead of just comparing hashes. [As benchmarks show](https://github.com/julienschmidt/go-http-routing-benchmark), this works very well and efficient.\n+Every `*<num>` represents the memory address of a handler function (a pointer). If you follow a path trough the tree from the root to the leaf, you get the complete route path, e.g `\\blog\\:post\\`, where `:post` is just a placeholder ([*parameter*](#named-parameters)) for an actual post name. Unlike hash-maps, a tree structure also allows us to use dynamic parts like the `:post` parameter, since we actually match against the routing patterns instead of just comparing hashes. [As benchmarks show](https://github.com/julienschmidt/go-http-routing-benchmark), this works very well and efficient.\n \n Since URL paths have a hierarchical structure and make use only of a limited set of characters (byte values), it is very likely that there are a lot of common prefixes. This allows us to easily reduce the routing into ever smaller problems.\n Moreover the router manages a separate tree for every request method. For one thing it is more space efficient than holding a method->handle map in every single node, for another thing is also allows us to greatly reduce the routing problem before even starting the look-up in the prefix-tree.\ndiff --git a/router.go b/router.go\nindex cc9af1a..1a6f26b 100644\n--- a/router.go\n+++ b/router.go\n@@ -99,22 +99,6 @@ func (ps Params) ByName(name string) string {\n \treturn \"\"\n }\n \n-// NotFound is the default HTTP handler func for routes that can't be matched\n-// with an existing route.\n-// NotFound tries to redirect to a canonical URL generated with CleanPath.\n-// Otherwise the request is delegated to http.NotFound.\n-func NotFound(w http.ResponseWriter, req *http.Request) {\n-\tif req.Method != \"CONNECT\" {\n-\t\tpath := req.URL.Path\n-\t\tif cp := CleanPath(path); cp != path && cp != req.Referer() {\n-\t\t\thttp.Redirect(w, req, cp, http.StatusMovedPermanently)\n-\t\t\treturn\n-\t\t}\n-\t}\n-\n-\thttp.NotFound(w, req)\n-}\n-\n // Router is a http.Handler which can be used to dispatch requests to different\n // handler functions via configurable routes\n type Router struct {\n@@ -126,15 +110,19 @@ type Router struct {\n \t// client is redirected to /foo with http status code 301.\n \tRedirectTrailingSlash bool\n \n-\t// Enables automatic redirection if the current route can't be matched but a\n-\t// case-insensitive lookup of the path finds a handler.\n-\t// The router then permanent redirects (http status code 301) to the\n-\t// corrected path.\n-\t// For example /FOO and /Foo could be redirected to /foo.\n-\tRedirectCaseInsensitive bool\n+\t// If enabled, the router tries to fix the current request path, if no\n+\t// handle is registered for it.\n+\t// First superfluous path elements like `../` or `//` are removed.\n+\t// Afterwards the router does a case-insensitive lookup of the cleaned path.\n+\t// If a handle can be found for this route, the router makes a  redirection\n+\t// to the corrected path with status code 301 for GET requests and 307 for\n+\t// all other request methods.\n+\t// For example /FOO and /..//Foo could be redirected to /foo.\n+\t// RedirectTrailingSlash is independet of this option.\n+\tRedirectFixedPath bool\n \n \t// Configurable handler func which is used when no matching route is found.\n-\t// Default is the NotFound func of this package.\n+\t// If not set, http.NotFound is used.\n \tNotFound http.HandlerFunc\n \n \t// Handler func to handle panics recovered from http handlers.\n@@ -153,9 +141,8 @@ var _ http.Handler = New()\n // requested Host.\n func New() *Router {\n \treturn &Router{\n-\t\tRedirectTrailingSlash:   true,\n-\t\tRedirectCaseInsensitive: true,\n-\t\tNotFound:                NotFound,\n+\t\tRedirectTrailingSlash: true,\n+\t\tRedirectFixedPath:     true,\n \t}\n }\n \n@@ -261,20 +248,36 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {\n \t\tif handle, ps, tsr := root.getValue(path); handle != nil {\n \t\t\thandle(w, req, ps)\n \t\t\treturn\n-\t\t} else if tsr && r.RedirectTrailingSlash && path != \"/\" {\n-\t\t\tif path[len(path)-1] == '/' {\n-\t\t\t\tpath = path[:len(path)-1]\n-\t\t\t} else {\n-\t\t\t\tpath = path + \"/\"\n+\t\t} else if req.Method != \"CONNECT\" {\n+\t\t\tcode := 301 // Permanent redirect, request with GET method\n+\t\t\tif req.Method != \"GET\" {\n+\t\t\t\t// Temporary redirect, request with same method\n+\t\t\t\t// As of Go 1.3, Go does not support status code 308.\n+\t\t\t\tcode = 307\n \t\t\t}\n-\t\t\thttp.Redirect(w, req, path, http.StatusMovedPermanently)\n-\t\t\treturn\n-\t\t} else if r.RedirectCaseInsensitive {\n-\t\t\tfixedPath, found := root.findCaseInsensitivePath(path, r.RedirectTrailingSlash)\n-\t\t\tif found {\n-\t\t\t\thttp.Redirect(w, req, string(fixedPath), http.StatusMovedPermanently)\n+\n+\t\t\tif tsr && r.RedirectTrailingSlash && path != \"/\" {\n+\t\t\t\tif path[len(path)-1] == '/' {\n+\t\t\t\t\treq.URL.Path = path[:len(path)-1]\n+\t\t\t\t} else {\n+\t\t\t\t\treq.URL.Path = path + \"/\"\n+\t\t\t\t}\n+\t\t\t\thttp.Redirect(w, req, req.URL.String(), code)\n \t\t\t\treturn\n \t\t\t}\n+\n+\t\t\t// Try to fix the request path\n+\t\t\tif r.RedirectFixedPath {\n+\t\t\t\tfixedPath, found := root.findCaseInsensitivePath(\n+\t\t\t\t\tCleanPath(path),\n+\t\t\t\t\tr.RedirectTrailingSlash,\n+\t\t\t\t)\n+\t\t\t\tif found {\n+\t\t\t\t\treq.URL.Path = string(fixedPath)\n+\t\t\t\t\thttp.Redirect(w, req, req.URL.String(), code)\n+\t\t\t\t\treturn\n+\t\t\t\t}\n+\t\t\t}\n \t\t}\n \t}\n \ndiff --git a/router_test.go b/router_test.go\nindex fa08c97..ed9a744 100644\n--- a/router_test.go\n+++ b/router_test.go\n@@ -147,23 +147,20 @@ func TestRouterNotFound(t *testing.T) {\n \trouter.GET(\"/dir/\", handlerFunc)\n \n \ttestRoutes := []struct {\n-\t\troute   string\n-\t\thandler http.HandlerFunc\n-\t\tcode    int\n-\t\theader  string\n+\t\troute  string\n+\t\tcode   int\n+\t\theader string\n \t}{\n-\t\t{\"/path/\", NotFound, 301, \"map[Location:[/path]]\"},   // TSR -/\n-\t\t{\"/dir\", NotFound, 301, \"map[Location:[/dir/]]\"},     // TSR +/\n-\t\t{\"/PATH\", NotFound, 301, \"map[Location:[/path]]\"},    // Fixed Case\n-\t\t{\"/DIR/\", NotFound, 301, \"map[Location:[/dir/]]\"},    // Fixed Case\n-\t\t{\"/PATH/\", NotFound, 301, \"map[Location:[/path]]\"},   // Fixed Case -/\n-\t\t{\"/DIR\", NotFound, 301, \"map[Location:[/dir/]]\"},     // Fixed Case +/\n-\t\t{\"/../path\", NotFound, 301, \"map[Location:[/path]]\"}, // CleanPath\n-\t\t{\"/nope\", NotFound, 404, \"\"},                         // NotFound\n-\t\t{\"/nope\", nil, 404, \"\"},                              // NotFound\n+\t\t{\"/path/\", 301, \"map[Location:[/path]]\"},   // TSR -/\n+\t\t{\"/dir\", 301, \"map[Location:[/dir/]]\"},     // TSR +/\n+\t\t{\"/PATH\", 301, \"map[Location:[/path]]\"},    // Fixed Case\n+\t\t{\"/DIR/\", 301, \"map[Location:[/dir/]]\"},    // Fixed Case\n+\t\t{\"/PATH/\", 301, \"map[Location:[/path]]\"},   // Fixed Case -/\n+\t\t{\"/DIR\", 301, \"map[Location:[/dir/]]\"},     // Fixed Case +/\n+\t\t{\"/../path\", 301, \"map[Location:[/path]]\"}, // CleanPath\n+\t\t{\"/nope\", 404, \"\"},                         // NotFound\n \t}\n \tfor _, tr := range testRoutes {\n-\t\trouter.NotFound = tr.handler\n \t\tr, _ := http.NewRequest(\"GET\", tr.route, nil)\n \t\tw := httptest.NewRecorder()\n \t\trouter.ServeHTTP(w, r)\n",
+  "diffTruncated": false,
+  "tree": [
+    ".travis.yml",
+    "LICENSE",
+    "README.md",
+    "path.go",
+    "path_test.go",
+    "router.go",
+    "router_test.go",
+    "tree.go",
+    "tree_test.go"
+  ],
+  "explanation": {
+    "what": "パッケージ提供の NotFound 関数(CleanPath によるリダイレクトのみ行っていた)を削除し、Router.RedirectCaseInsensitive オプションを RedirectFixedPath に置き換えた。ServeHTTP は一致失敗時にまず CleanPath(path) でパスを正規化してから findCaseInsensitivePath を呼ぶことで、パス自動補正とケース補正を1つの経路に統合した。またリダイレクトのステータスコードを、GET リクエストは 301(恒久的リダイレクト)、それ以外のメソッドは 307(一時的リダイレクト、同じメソッドで再送される)に分けた。CONNECT メソッドはこれらの自動補正・リダイレクト処理の対象から除外している。",
+    "why": "コミットメッセージ \"Better path autocorrection\" の通り、大文字小文字補正(RedirectCaseInsensitive)と `../` や `//` の除去(CleanPath)がこれまで別々の場所で提供されていたのを一本化し、より広い範囲のパス誤りを1つの設定項目でカバーする狙いとみられる。307導入は、GET以外(POST等)のリクエストをリダイレクトする際にHTTPメソッドとボディを保持したまま追随させるための配慮で、301のみだとブラウザ等がGETに変換してしまう問題を避けている。",
+    "highlights": [
+      { "file": "router.go", "note": "CleanPath(path) を経てから findCaseInsensitivePath を呼ぶ一本化された自動補正フロー。GET以外は307でリダイレクト" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

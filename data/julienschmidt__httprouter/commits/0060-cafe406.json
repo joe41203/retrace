@@ -1,0 +1,63 @@
+{
+  "seq": 60,
+  "sha": "cafe406d7b1bad12d39c4912353630c3a0e8f012",
+  "parents": [
+    "de97a55d3b72a3b775b759fec9c10f517ae772a0"
+  ],
+  "author": {
+    "name": "Julien Schmidt",
+    "email": "github@julienschmidt.com",
+    "date": "2014-04-16T14:16:28+02:00"
+  },
+  "message": "fix issue #3 +tests",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 75,
+    "deletions": 1
+  },
+  "files": [
+    {
+      "path": "tree.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "tree_test.go",
+      "status": "M",
+      "additions": 74,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/tree.go b/tree.go\nindex 3509038..10252d4 100644\n--- a/tree.go\n+++ b/tree.go\n@@ -54,7 +54,7 @@ func (n *node) incrementChildPrio(i int) int {\n func (n *node) addRoute(method, path string, handle Handle) {\n \tn.priority++\n \t// non-empty tree\n-\tif len(n.path) != 0 {\n+\tif len(n.path) > 0 || len(n.children) > 0 {\n \tOUTER:\n \t\tfor {\n \t\t\t// Find the longest common prefix.\ndiff --git a/tree_test.go b/tree_test.go\nindex d30c074..59541e8 100644\n--- a/tree_test.go\n+++ b/tree_test.go\n@@ -290,6 +290,80 @@ func TestTreeCatchAllConflict(t *testing.T) {\n \ttestRoutes(t, routes)\n }\n \n+func TestTreeMultipleHandlers(t *testing.T) {\n+\ttree := &node{}\n+\n+\tmethods := [...]string{\n+\t\t\"GET\",\n+\t\t\"PUT\",\n+\t\t\"POST\",\n+\t\t\"DELETE\",\n+\t\t\"PATCH\",\n+\t}\n+\n+\troutes := [...]string{\n+\t\t\"/\",\n+\t\t\"/dir1\",\n+\t\t\"/dir2/:param\",\n+\t\t\"/dir2\",\n+\t\t\"/dir3/*catchAll\",\n+\t\t\"/d\",\n+\t}\n+\n+\tfor _, route := range routes {\n+\t\tfor _, method := range methods {\n+\t\t\trecv := catchPanic(func() {\n+\t\t\t\ttree.addRoute(method, route, nil)\n+\t\t\t})\n+\t\t\tif recv != nil {\n+\t\t\t\tt.Fatalf(\"panic while inserting multiple handlers (method %s) for route '%s\", method, route)\n+\t\t\t}\n+\t\t}\n+\t}\n+}\n+\n+func TestTreeMultipleHandlersParamRoot(t *testing.T) {\n+\ttree := &node{}\n+\n+\tmethods := [...]string{\n+\t\t\"GET\",\n+\t\t\"PUT\",\n+\t\t\"POST\",\n+\t\t\"DELETE\",\n+\t\t\"PATCH\",\n+\t}\n+\n+\tfor _, method := range methods {\n+\t\trecv := catchPanic(func() {\n+\t\t\ttree.addRoute(method, \"/:param\", nil)\n+\t\t})\n+\t\tif recv != nil {\n+\t\t\tt.Fatalf(\"panic while inserting multiple handlers (method %s) for route /:param\", method)\n+\t\t}\n+\t}\n+}\n+\n+func TestTreeMultipleHandlersCatchAllRoot(t *testing.T) {\n+\ttree := &node{}\n+\n+\tmethods := [...]string{\n+\t\t\"GET\",\n+\t\t\"PUT\",\n+\t\t\"POST\",\n+\t\t\"DELETE\",\n+\t\t\"PATCH\",\n+\t}\n+\n+\tfor _, method := range methods {\n+\t\trecv := catchPanic(func() {\n+\t\t\ttree.addRoute(method, \"/*catchAll\", nil)\n+\t\t})\n+\t\tif recv != nil {\n+\t\t\tt.Fatalf(\"panic while inserting multiple handlers (method %s) for route /*catchAll\", method)\n+\t\t}\n+\t}\n+}\n+\n /*func TestTreeDuplicateWildcard(t *testing.T) {\n \ttree := &node{}\n \n",
+  "diffTruncated": false,
+  "tree": [
+    ".travis.yml",
+    "LICENSE",
+    "README.md",
+    "path.go",
+    "path_test.go",
+    "router.go",
+    "router_test.go",
+    "tree.go",
+    "tree_test.go"
+  ],
+  "explanation": {
+    "what": "tree.go の addRoute で「既存のツリーが空かどうか」を判定する条件を `len(n.path) != 0` から `len(n.path) > 0 || len(n.children) > 0` に変更した。あわせて tree_test.go に、同一パスに複数の HTTP メソッド(GET/PUT/POST/DELETE/PATCH)でハンドラを登録してもパニックしないことを検証する3つのテスト(TestTreeMultipleHandlers、TestTreeMultipleHandlersParamRoot、TestTreeMultipleHandlersCatchAllRoot)を追加した。",
+    "why": "コミットメッセージの「fix issue #3」から、報告されたバグの修正であることが分かる(issue自体の本文はこのJSONには含まれていない)。path が空でも children が既に存在するノード(例えば `/:param` や `/*catchAll` をルートに登録した直後、別メソッドで同じパスに2つ目のハンドラを追加する場合)を「空のツリー」と誤判定していたと考えられ、新設した3テストがまさにその複数メソッド登録のシナリオを再現している。",
+    "highlights": [
+      { "file": "tree.go", "note": "`len(n.path) != 0` → `len(n.path) > 0 || len(n.children) > 0`。path が空でも children があれば非空ツリーとして扱う" },
+      { "file": "tree_test.go", "note": "TestTreeMultipleHandlers系: 同じルートに複数メソッドのハンドラを登録してもpanicしないことをcatchPanicで検証" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

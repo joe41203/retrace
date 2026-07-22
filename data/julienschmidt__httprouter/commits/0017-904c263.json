@@ -1,0 +1,56 @@
+{
+  "seq": 17,
+  "sha": "904c2638d0765a2ef2ab0ff6d07bda0a86d6ff85",
+  "parents": [
+    "f28b8eac2bc8c2a6be8354b685f930e712d5e30c"
+  ],
+  "author": {
+    "name": "Julien Schmidt",
+    "email": "github@julienschmidt.com",
+    "date": "2013-12-12T03:27:42+01:00"
+  },
+  "message": "Add a http.HandlerFunc adapter",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 10,
+    "deletions": 0
+  },
+  "files": [
+    {
+      "path": "router.go",
+      "status": "M",
+      "additions": 10,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/router.go b/router.go\nindex 48e860f..c1b6ad8 100644\n--- a/router.go\n+++ b/router.go\n@@ -94,6 +94,16 @@ func (r *Router) Handle(method, path string, handle Handle) {\n \tr.addRoute(method, path, handle)\n }\n \n+// HandlerFunc is an adapter which allows the usage of a http.HandlerFunc as a\n+// request handle.\n+func (r *Router) HandlerFunc(method, path string, handler http.HandlerFunc) {\n+\tr.Handle(method, path,\n+\t\tfunc(w http.ResponseWriter, req *http.Request, _ map[string]string) {\n+\t\t\thandler(w, req)\n+\t\t},\n+\t)\n+}\n+\n func (r *Router) recv(w http.ResponseWriter, req *http.Request) {\n \tif rcv := recover(); rcv != nil {\n \t\tr.PanicHandler(w, req, rcv)\n",
+  "diffTruncated": false,
+  "tree": [
+    ".travis.yml",
+    "LICENSE",
+    "path.go",
+    "path_test.go",
+    "router.go",
+    "router_test.go",
+    "tree.go",
+    "tree_test.go"
+  ],
+  "explanation": {
+    "what": "Router に HandlerFunc(method, path string, handler http.HandlerFunc) メソッドを追加した。内部で r.Handle を呼び、標準の http.HandlerFunc(w, req のみを受け取る関数)を httprouter 独自の Handle 型(w, req, vars を受け取る)にラップするアダプタとして機能する。",
+    "why": "コミットメッセージの通り、標準ライブラリの http.HandlerFunc をそのまま httprouter に登録できるようにするためのアダプタ関数を追加する意図。named パラメータ(vars)を使わない既存の http.HandlerFunc 実装を httprouter に持ち込みやすくする。",
+    "highlights": [
+      { "file": "router.go", "note": "HandlerFunc は vars を捨てて標準シグネチャの handler(w, req) を呼ぶだけの薄いラッパー" }
+    ],
+    "langNotes": [
+      { "topic": "アダプタ関数", "note": "Go では異なるシグネチャの関数型を橋渡しするために、クロージャで元の関数をラップする「アダプタ」パターンがよく使われる。ここでは httprouter 独自の Handle 型と標準の http.HandlerFunc 型を相互運用可能にしている。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

@@ -1,0 +1,56 @@
+{
+  "seq": 244,
+  "sha": "f6c6c29247efd93f6f20930285b064ca977942fb",
+  "parents": [
+    "b64aad36d57ed0ffa2ea095059ffacfd6c9727de"
+  ],
+  "author": {
+    "name": "Julien Schmidt",
+    "email": "git@julienschmidt.com",
+    "date": "2020-01-12T13:53:35+01:00"
+  },
+  "message": "router: extended MatchedRoutePathFromContext test",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 23,
+    "deletions": 8
+  },
+  "files": [
+    {
+      "path": "router_test.go",
+      "status": "M",
+      "additions": 23,
+      "deletions": 8,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/router_test.go b/router_test.go\nindex c336f8c..1f685d4 100644\n--- a/router_test.go\n+++ b/router_test.go\n@@ -610,28 +610,43 @@ func TestRouterParamsFromContext(t *testing.T) {\n \t}\n }\n \n-func TestRouterMatchedRouteFromContext(t *testing.T) {\n-\trouted := false\n-\n-\thandlerFunc := func(_ http.ResponseWriter, req *http.Request) {\n+func TestRouterMatchedRoutePathFromContext(t *testing.T) {\n+\trouted1 := false\n+\thandlerFunc1 := func(_ http.ResponseWriter, req *http.Request) {\n \t\t// get params from request context\n \t\troute := MatchedRoutePathFromContext(req.Context())\n-\n \t\tif route != \"/user/:name\" {\n \t\t\tt.Fatalf(\"Wrong matched route: want /user/:name, got %q\", route)\n \t\t}\n+\t\trouted1 = true\n+\t}\n \n-\t\trouted = true\n+\trouted2 := false\n+\thandlerFunc2 := func(_ http.ResponseWriter, req *http.Request) {\n+\t\t// get params from request context\n+\t\troute := MatchedRoutePathFromContext(req.Context())\n+\t\tif route != \"/user/:name/details\" {\n+\t\t\tt.Fatalf(\"Wrong matched route: want /user/:name/details, got %q\", route)\n+\t\t}\n+\t\trouted2 = true\n \t}\n \n \trouter := New()\n \trouter.SaveMatchedRoutePathToContext = true\n-\trouter.HandlerFunc(http.MethodGet, \"/user/:name\", handlerFunc)\n+\trouter.HandlerFunc(http.MethodGet, \"/user/:name\", handlerFunc1)\n+\trouter.HandlerFunc(http.MethodGet, \"/user/:name/details\", handlerFunc2)\n \n \tw := new(mockResponseWriter)\n \tr, _ := http.NewRequest(http.MethodGet, \"/user/gopher\", nil)\n \trouter.ServeHTTP(w, r)\n-\tif !routed {\n+\tif !routed1 || routed2 {\n+\t\tt.Fatal(\"Routing failed!\")\n+\t}\n+\n+\tw = new(mockResponseWriter)\n+\tr, _ = http.NewRequest(http.MethodGet, \"/user/gopher/details\", nil)\n+\trouter.ServeHTTP(w, r)\n+\tif !routed2 {\n \t\tt.Fatal(\"Routing failed!\")\n \t}\n }\n",
+  "diffTruncated": false,
+  "tree": [
+    ".travis.yml",
+    "LICENSE",
+    "README.md",
+    "go.mod",
+    "path.go",
+    "path_test.go",
+    "router.go",
+    "router_test.go",
+    "tree.go",
+    "tree_test.go"
+  ],
+  "explanation": {
+    "what": "TestRouterMatchedRouteFromContext を TestRouterMatchedRoutePathFromContext にリネームし、\"/user/:name\" と \"/user/:name/details\" という2つの重なり合うルートを登録して、それぞれ正しいマッチ済みパスがコンテキストから取れるかを検証するケースを追加した。",
+    "why": "前コミットで追加した機能が単一ルートだけでなく、パスの一部が重なる複数ルートでも正しく区別してマッチ済みパスを返せることを確認するための、テストの拡充と考えられる。",
+    "highlights": [
+      { "file": "router_test.go", "note": "handlerFunc1/handlerFunc2 で routed1/routed2 のフラグを分け、意図しない方のハンドラが呼ばれていないかも検証している。" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

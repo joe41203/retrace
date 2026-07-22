@@ -1,0 +1,56 @@
+{
+  "seq": 224,
+  "sha": "3e505fb5696d8a71112a3aeb131220440b47e797",
+  "parents": [
+    "59e6ae001480c6e6de7dc6607b33308ccf35419d"
+  ],
+  "author": {
+    "name": "Julien Schmidt",
+    "email": "git@julienschmidt.com",
+    "date": "2019-10-03T12:45:25+02:00"
+  },
+  "message": "travis: don't wait for go master build and allow it to fail",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 4,
+    "deletions": 0
+  },
+  "files": [
+    {
+      "path": ".travis.yml",
+      "status": "M",
+      "additions": 4,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/.travis.yml b/.travis.yml\nindex ffacfb5..559c92e 100644\n--- a/.travis.yml\n+++ b/.travis.yml\n@@ -9,6 +9,10 @@ go:\n   - 1.12.x\n   - 1.13.x\n   - master\n+matrix:\n+  allow_failures:\n+    - go: master\n+  fast_finish: true\n before_install:\n   - go get github.com/mattn/goveralls\n script:\n",
+  "diffTruncated": false,
+  "tree": [
+    ".travis.yml",
+    "LICENSE",
+    "README.md",
+    "go.mod",
+    "path.go",
+    "path_test.go",
+    "router.go",
+    "router_test.go",
+    "tree.go",
+    "tree_test.go"
+  ],
+  "explanation": {
+    "what": ".travis.yml に `matrix.allow_failures` と `fast_finish` を追加し、go: master(開発版ビルド)が失敗してもCI全体を失敗扱いにせず、他ジョブの結果が揃い次第ビルドを終了できるようにした。",
+    "why": "コミットメッセージの通り、Goの開発版(master)ビルドの失敗を待たず、また失敗してもCI全体をブロックしないようにする設定変更。安定版Goでのテスト結果を優先し、開発版特有の非互換や不安定さでCIが赤くなるのを避ける意図と読み取れる。",
+    "highlights": [
+      { "file": ".travis.yml", "note": "allow_failures で go: master の失敗を許容し、fast_finish で他ジョブ完了時点で早期終了する設定を追加" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

@@ -1,0 +1,54 @@
+{
+  "seq": 119,
+  "sha": "f88e0d361fa3ada4c6015805c9131a4e8e956f65",
+  "parents": [
+    "b428fda53bb0a764fea9c76c9413512eda291dec",
+    "69041da6c7d594e5a4c5284ccc3fc551087d2f83"
+  ],
+  "author": {
+    "name": "Julien Schmidt",
+    "email": "julienschmidt@users.noreply.github.com",
+    "date": "2015-03-12T01:16:23+08:00"
+  },
+  "message": "Merge pull request #64 from lhigueragamboa/simplify_handler_func\n\nrouter: Reuse Handler method in HandlerFunc",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 1,
+    "deletions": 5
+  },
+  "files": [
+    {
+      "path": "router.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 5,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/router.go b/router.go\nindex 8c9550f..8fa9520 100644\n--- a/router.go\n+++ b/router.go\n@@ -237,11 +237,7 @@ func (r *Router) Handler(method, path string, handler http.Handler) {\n // HandlerFunc is an adapter which allows the usage of an http.HandlerFunc as a\n // request handle.\n func (r *Router) HandlerFunc(method, path string, handler http.HandlerFunc) {\n-\tr.Handle(method, path,\n-\t\tfunc(w http.ResponseWriter, req *http.Request, _ Params) {\n-\t\t\thandler(w, req)\n-\t\t},\n-\t)\n+\tr.Handler(method, path, handler)\n }\n \n // ServeFiles serves files from the given file system root.\n",
+  "diffTruncated": false,
+  "tree": [
+    ".travis.yml",
+    "LICENSE",
+    "README.md",
+    "path.go",
+    "path_test.go",
+    "router.go",
+    "router_test.go",
+    "tree.go",
+    "tree_test.go"
+  ],
+  "explanation": {
+    "what": "lhigueragamboa/simplify_handler_func ブランチのマージ。Router.HandlerFunc の実装を、独自に Handle 用のクロージャを書いていた形から、既存の Router.Handler メソッドをそのまま呼び出す形に簡略化した。",
+    "why": "コミットメッセージ(\"router: Reuse Handler method in HandlerFunc\")の通り、HandlerFunc は最終的に Handler と同じ処理(標準の http.Handler/http.HandlerFunc を httprouter の Handle シグネチャにアダプトする処理)を行っていたため、重複コードを排除して Handler に委譲する形にした。",
+    "highlights": [],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

@@ -1,0 +1,56 @@
+{
+  "seq": 99,
+  "sha": "2913780ee44a32395d9a2cf75ee6382b768f422a",
+  "parents": [
+    "aeec11926f7a8fab580383810e1b1bbba99bdaa7",
+    "b33fcde1997fe5b61a1224ebb7ce42c8ad930b1e"
+  ],
+  "author": {
+    "name": "Julien Schmidt",
+    "email": "github@julienschmidt.com",
+    "date": "2015-01-16T03:35:18+08:00"
+  },
+  "message": "Merge branch 'chaining'",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 15,
+    "deletions": 0
+  },
+  "files": [
+    {
+      "path": "README.md",
+      "status": "M",
+      "additions": 15,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/README.md b/README.md\nindex e06c1be..ead553c 100644\n--- a/README.md\n+++ b/README.md\n@@ -290,6 +290,21 @@ func main() {\n }\n ```\n \n+## Chaining with the NotFound handler\n+\n+**NOTE: It might be required to set [Router.HandleMethodNotAllowed](http://godoc.org/github.com/julienschmidt/httprouter#Router.HandleMethodNotAllowed) to `false` to avoid problems.**\n+\n+You can use another [http.HandlerFunc](http://golang.org/pkg/net/http/#HandlerFunc), for example another router, to handle requests which could not be matched by this router by using the [Router.NotFound](http://godoc.org/github.com/julienschmidt/httprouter#Router.NotFound) handler. This allows chaining.\n+\n+### Static files\n+The `NotFound` handler can for example be used to serve static files from the root path `/` (like an index.html file along with other assets):\n+```go\n+// Serve static files from the ./public directory\n+router.NotFound = http.FileServer(http.Dir(\"public\")).ServeHTTP\n+```\n+\n+But this approach sidesteps the strict core rules of this router to avoid routing problems. A cleaner approach is to use a distinct sub-path for serving files, like `/static/*filepath` or `/files/*filepath`.\n+\n ## Web Frameworks & Co based on HttpRouter\n If the HttpRouter is a bit too minimalistic for you, you might try one of the following more high-level 3rd-party web frameworks building upon the HttpRouter package:\n * [Gin](https://github.com/gin-gonic/gin): Features a martini-like API with much better performance\n",
+  "diffTruncated": false,
+  "tree": [
+    ".travis.yml",
+    "LICENSE",
+    "README.md",
+    "path.go",
+    "path_test.go",
+    "router.go",
+    "router_test.go",
+    "tree.go",
+    "tree_test.go"
+  ],
+  "explanation": {
+    "what": "'chaining' ブランチをマージし、README.md に \"Chaining with the NotFound handler\" という節を追加した。Router.NotFound に別の http.HandlerFunc(たとえば http.FileServer や別のルータ)を割り当てることで、このルータで処理しきれないリクエストを別ハンドラに委譲できることを説明し、静的ファイル配信の例を示している。",
+    "why": "直前の seq98 で HandleMethodNotAllowed による 405 ハンドリングが(デフォルト有効で)再導入されたため、NotFound へのチェイニングを行う利用者向けに、405 ハンドリングが有効なままだと問題が起きうる旨の注意書きを添えている。2つの機能追加が組み合わさったときの利用者向けガイダンスと考えられる。",
+    "highlights": [
+      { "file": "README.md", "note": "NotFound ハンドラへのチェイニング例と、HandleMethodNotAllowed を false にする必要がある場合がある旨の注意書き" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

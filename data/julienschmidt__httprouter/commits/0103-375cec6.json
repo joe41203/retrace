@@ -1,0 +1,53 @@
+{
+  "seq": 103,
+  "sha": "375cec60bc730c75f1a3dbe23a3ee94479de60ae",
+  "parents": [
+    "00ce1c6a267162792c367acc43b1681a884e1872"
+  ],
+  "author": {
+    "name": "Julien Schmidt",
+    "email": "github@julienschmidt.com",
+    "date": "2015-02-09T08:48:14+08:00"
+  },
+  "message": "Fix TestRouterNotAllowed error format",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 1,
+    "deletions": 1
+  },
+  "files": [
+    {
+      "path": "router_test.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/router_test.go b/router_test.go\nindex 6292ba8..7b07dfb 100644\n--- a/router_test.go\n+++ b/router_test.go\n@@ -176,7 +176,7 @@ func TestRouterNotAllowed(t *testing.T) {\n \tw := httptest.NewRecorder()\n \trouter.ServeHTTP(w, r)\n \tif !(w.Code == http.StatusMethodNotAllowed) {\n-\t\tt.Errorf(\"NotAllowed handling route %s failed: Code=%d, Header=%v\", w.Code, w.Header())\n+\t\tt.Errorf(\"NotAllowed handling failed: Code=%d, Header=%v\", w.Code, w.Header())\n \t}\n }\n \n",
+  "diffTruncated": false,
+  "tree": [
+    ".travis.yml",
+    "LICENSE",
+    "README.md",
+    "path.go",
+    "path_test.go",
+    "router.go",
+    "router_test.go",
+    "tree.go",
+    "tree_test.go"
+  ],
+  "explanation": {
+    "what": "router_test.go の TestRouterNotAllowed 内のエラーメッセージ文字列を \"NotAllowed handling route %s failed: Code=%d, Header=%v\" から \"NotAllowed handling failed: Code=%d, Header=%v\" に修正した。修正前は %s, %d, %v の3つのフォーマット指定子に対して w.Code, w.Header() の2つしか引数が渡されておらず、数が一致していなかった。",
+    "why": "コミットメッセージ通り、Fmt検証(go vet 等)で警告となる不正なフォーマット文字列を修正するための小さな訂正と考えられる。",
+    "highlights": [],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

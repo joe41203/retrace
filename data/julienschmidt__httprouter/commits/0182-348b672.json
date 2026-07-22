@@ -1,0 +1,62 @@
+{
+  "seq": 182,
+  "sha": "348b672cd90d8190f8240323e372ecd1e66b59dc",
+  "parents": [
+    "adbc77eec0d91467376ca515bc3a14b8434d0f18"
+  ],
+  "author": {
+    "name": "soren yang",
+    "email": "SorenYang@foxmail.com",
+    "date": "2018-07-15T09:18:54-07:00"
+  },
+  "message": "small enhance at CleanPath (#243)",
+  "pr": {
+    "number": 243,
+    "title": "small enhance at CleanPath",
+    "body": "",
+    "url": "https://github.com/julienschmidt/httprouter/pull/243"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 2,
+    "deletions": 2
+  },
+  "files": [
+    {
+      "path": "path.go",
+      "status": "M",
+      "additions": 2,
+      "deletions": 2,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/path.go b/path.go\nindex d64edf0..0331c7e 100644\n--- a/path.go\n+++ b/path.go\n@@ -59,11 +59,11 @@ func CleanPath(p string) string {\n \n \t\tcase p[r] == '.' && p[r+1] == '/':\n \t\t\t// . element\n-\t\t\tr++\n+\t\t\tr += 2\n \n \t\tcase p[r] == '.' && p[r+1] == '.' && (r+2 == n || p[r+2] == '/'):\n \t\t\t// .. element: remove to last /\n-\t\t\tr += 2\n+\t\t\tr += 3\n \n \t\t\tif w > 1 {\n \t\t\t\t// can backtrack\n",
+  "diffTruncated": false,
+  "tree": [
+    ".travis.yml",
+    "LICENSE",
+    "README.md",
+    "params_go17.go",
+    "params_legacy.go",
+    "path.go",
+    "path_test.go",
+    "router.go",
+    "router_test.go",
+    "tree.go",
+    "tree_test.go"
+  ],
+  "explanation": {
+    "what": "CleanPath の相対パス解決ロジックで、`.` 要素をスキップする際の読み取り位置を `r++`(1文字分)から `r += 2`(`./` の2文字分)に、`..` 要素をスキップする際を `r += 2` から `r += 3`(`../` の3文字分)に修正した。",
+    "why": "コミットメッセージは \"small enhance\" とのみ述べ具体的な動機の説明はないが、diff自体は `.` 要素が実際には区切りのスラッシュを含めて2文字、`..` 要素はスラッシュを含めて3文字であるにもかかわらず、従来の加算値がそれより1少なかった箇所を正しい文字数に合わせる修正になっている。",
+    "highlights": [
+      { "file": "path.go", "note": "`.` と `..` 要素をスキップするオフセットが末尾のスラッシュ分だけ足りていなかった箇所の修正" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [{ "type": "pr", "number": 243, "url": "https://github.com/julienschmidt/httprouter/pull/243" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

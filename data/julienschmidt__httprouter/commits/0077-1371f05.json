@@ -1,0 +1,55 @@
+{
+  "seq": 77,
+  "sha": "1371f052ac8e75ed49c88d9940be1ec569fb4f24",
+  "parents": [
+    "aa4ab18aa1c0cfa2e4049cf907e02357e19a0e37"
+  ],
+  "author": {
+    "name": "Julien Schmidt",
+    "email": "github@julienschmidt.com",
+    "date": "2014-06-11T15:48:14+02:00"
+  },
+  "message": "tree: TSR path length check\n\nfixes #8",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 2,
+    "deletions": 1
+  },
+  "files": [
+    {
+      "path": "tree.go",
+      "status": "M",
+      "additions": 2,
+      "deletions": 1,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/tree.go b/tree.go\nindex ee2add6..933b5cb 100644\n--- a/tree.go\n+++ b/tree.go\n@@ -406,7 +406,8 @@ walk: // Outer loop for walking the tree\n \t\t// Nothing found. We can recommend to redirect to the same URL with an\n \t\t// extra trailing slash if a leaf exists for that path\n \t\ttsr = (path == \"/\") ||\n-\t\t\t(n.path[len(path)] == '/' && path == n.path[:len(n.path)-1] && n.handle != nil)\n+\t\t\t(len(n.path) == len(path)+1 && n.path[len(path)] == '/' &&\n+\t\t\t\tpath == n.path[:len(n.path)-1] && n.handle != nil)\n \t\treturn\n \t}\n }\n",
+  "diffTruncated": false,
+  "tree": [
+    ".travis.yml",
+    "LICENSE",
+    "README.md",
+    "path.go",
+    "path_test.go",
+    "router.go",
+    "router_test.go",
+    "tree.go",
+    "tree_test.go"
+  ],
+  "explanation": {
+    "what": "tree.go の getValue 内、トレイリングスラッシュ・リダイレクト(TSR)推奨判定に長さチェック len(n.path) == len(path)+1 を追加した。従来は n.path[len(path)] == '/' の判定だけで、path が n.path より短い場合に n.path[len(path)] が本来意図しない別の位置の文字を指してしまう(または path が n.path より長いケースで不整合な比較になる)ケースを防ぐ。",
+    "why": "コミットメッセージの「fixes #8」が示す通り、特定のパスの組み合わせで TSR 判定が誤って真になる(または範囲外アクセスに近い誤動作を起こす)バグ報告への対応。長さが完全に一致する場合(nodeのpathがpathよりちょうど1文字=スラッシュ分だけ長い)という条件を明示的に加えることで、誤判定を防いでいる。",
+    "highlights": [
+      { "file": "tree.go", "note": "TSR 判定に len(n.path) == len(path)+1 の長さ一致チェックを追加" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

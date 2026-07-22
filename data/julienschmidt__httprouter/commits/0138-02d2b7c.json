@@ -1,0 +1,65 @@
+{
+  "seq": 138,
+  "sha": "02d2b7cc4ba3894f46dc65769c0b3d92bd177a05",
+  "parents": [
+    "abb0dc9f755ff0a9d818db28d9d8b9810066e2b5"
+  ],
+  "author": {
+    "name": "Julien Schmidt",
+    "email": "github@julienschmidt.com",
+    "date": "2016-02-05T17:54:57+01:00"
+  },
+  "message": "Send Allow header when 405 Method Not Allowed\n\nRequired by RFC 2616",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 40,
+    "deletions": 8
+  },
+  "files": [
+    {
+      "path": "router.go",
+      "status": "M",
+      "additions": 20,
+      "deletions": 7,
+      "binary": false
+    },
+    {
+      "path": "router_test.go",
+      "status": "M",
+      "additions": 20,
+      "deletions": 1,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/router.go b/router.go\nindex 8b5ff34..1f7bbe9 100644\n--- a/router.go\n+++ b/router.go\n@@ -145,6 +145,8 @@ type Router struct {\n \t// Configurable http.Handler which is called when a request\n \t// cannot be routed and HandleMethodNotAllowed is true.\n \t// If it is not set, http.Error with http.StatusMethodNotAllowed is used.\n+\t// The \"Allow\" header with allowed request methods is set before the handler\n+\t// is called.\n \tMethodNotAllowed http.Handler\n \n \t// Function to handle panics recovered from http handlers.\n@@ -333,6 +335,7 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {\n \n \t// Handle 405\n \tif r.HandleMethodNotAllowed {\n+\t\tvar allow string\n \t\tfor method := range r.trees {\n \t\t\t// Skip the requested method - we already tried this one\n \t\t\tif method == req.Method {\n@@ -341,17 +344,27 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {\n \n \t\t\thandle, _, _ := r.trees[method].getValue(req.URL.Path)\n \t\t\tif handle != nil {\n-\t\t\t\tif r.MethodNotAllowed != nil {\n-\t\t\t\t\tr.MethodNotAllowed.ServeHTTP(w, req)\n+\t\t\t\t// add request method to list of allowed methods\n+\t\t\t\tif len(allow) == 0 {\n+\t\t\t\t\tallow = method\n \t\t\t\t} else {\n-\t\t\t\t\thttp.Error(w,\n-\t\t\t\t\t\thttp.StatusText(http.StatusMethodNotAllowed),\n-\t\t\t\t\t\thttp.StatusMethodNotAllowed,\n-\t\t\t\t\t)\n+\t\t\t\t\tallow += \", \" + method\n \t\t\t\t}\n-\t\t\t\treturn\n \t\t\t}\n \t\t}\n+\n+\t\tif len(allow) > 0 {\n+\t\t\tw.Header().Set(\"Allow\", allow)\n+\t\t\tif r.MethodNotAllowed != nil {\n+\t\t\t\tr.MethodNotAllowed.ServeHTTP(w, req)\n+\t\t\t} else {\n+\t\t\t\thttp.Error(w,\n+\t\t\t\t\thttp.StatusText(http.StatusMethodNotAllowed),\n+\t\t\t\t\thttp.StatusMethodNotAllowed,\n+\t\t\t\t)\n+\t\t\t}\n+\t\t\treturn\n+\t\t}\n \t}\n \n \t// Handle 404\ndiff --git a/router_test.go b/router_test.go\nindex e3141bd..0924d48 100644\n--- a/router_test.go\n+++ b/router_test.go\n@@ -222,14 +222,30 @@ func TestRouterNotAllowed(t *testing.T) {\n \trouter := New()\n \trouter.POST(\"/path\", handlerFunc)\n \n-\t// Test not allowed\n+\t// test not allowed\n \tr, _ := http.NewRequest(\"GET\", \"/path\", nil)\n \tw := httptest.NewRecorder()\n \trouter.ServeHTTP(w, r)\n \tif !(w.Code == http.StatusMethodNotAllowed) {\n \t\tt.Errorf(\"NotAllowed handling failed: Code=%d, Header=%v\", w.Code, w.Header())\n+\t} else if allow := w.Header().Get(\"Allow\"); allow != \"POST\" {\n+\t\tt.Error(\"unexpected Allow header value: \" + allow)\n \t}\n \n+\t// add another method\n+\trouter.DELETE(\"/path\", handlerFunc)\n+\n+\t// test again\n+\tr, _ = http.NewRequest(\"GET\", \"/path\", nil)\n+\tw = httptest.NewRecorder()\n+\trouter.ServeHTTP(w, r)\n+\tif !(w.Code == http.StatusMethodNotAllowed) {\n+\t\tt.Errorf(\"NotAllowed handling failed: Code=%d, Header=%v\", w.Code, w.Header())\n+\t} else if allow := w.Header().Get(\"Allow\"); allow != \"POST, DELETE\" && allow != \"DELETE, POST\" {\n+\t\tt.Error(\"unexpected Allow header value: \" + allow)\n+\t}\n+\n+\t// test custom handler\n \tw = httptest.NewRecorder()\n \tresponseText := \"custom method\"\n \trouter.MethodNotAllowed = http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {\n@@ -243,6 +259,9 @@ func TestRouterNotAllowed(t *testing.T) {\n \tif w.Code != http.StatusTeapot {\n \t\tt.Errorf(\"unexpected response code %d want %d\", w.Code, http.StatusTeapot)\n \t}\n+\tif allow := w.Header().Get(\"Allow\"); allow != \"POST, DELETE\" && allow != \"DELETE, POST\" {\n+\t\tt.Error(\"unexpected Allow header value: \" + allow)\n+\t}\n }\n \n func TestRouterNotFound(t *testing.T) {\n",
+  "diffTruncated": false,
+  "tree": [
+    ".travis.yml",
+    "LICENSE",
+    "README.md",
+    "path.go",
+    "path_test.go",
+    "router.go",
+    "router_test.go",
+    "tree.go",
+    "tree_test.go"
+  ],
+  "explanation": {
+    "what": "405 Method Not Allowed 応答時に Allow ヘッダを付与するようにした。ServeHTTP の 405 処理で、リクエストパスに対して登録されている他メソッドを走査するループの中で allow 文字列(カンマ区切りのメソッド名)を組み立て、w.Header().Set(\"Allow\", allow) を MethodNotAllowed ハンドラ呼び出し前に実行する。allow が空(=該当パスにどのメソッドも登録されていない)場合は 405 を返さず後続の 404 処理に進むよう制御フローも変更した。",
+    "why": "コミットメッセージ \"Required by RFC 2616\" の通り、405 応答には利用可能なメソッド一覧を示す Allow ヘッダが必須という HTTP 仕様への準拠。従来は allow ヘッダなしで即座に 405 を返していた。",
+    "highlights": [
+      { "file": "router.go", "note": "ServeHTTP の 405 処理: allow 文字列の構築と Header().Set(\"Allow\", allow) の追加" },
+      { "file": "router_test.go", "note": "複数メソッド登録時に Allow ヘッダの値(順不同を許容)を検証するテストを追加" }
+    ],
+    "langNotes": [
+      { "topic": "Allow header", "note": "HTTP の 405 Method Not Allowed 応答では、そのリソースが許可しているメソッド一覧を Allow ヘッダで返すことが仕様(RFC 2616)で求められる。このコミットで httprouter が初めてこれに対応した。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

@@ -1,0 +1,63 @@
+{
+  "seq": 61,
+  "sha": "9b1fa09c72280f35b53536e843664c0c205987c8",
+  "parents": [
+    "cafe406d7b1bad12d39c4912353630c3a0e8f012"
+  ],
+  "author": {
+    "name": "Julien Schmidt",
+    "email": "github@julienschmidt.com",
+    "date": "2014-04-17T04:26:35+02:00"
+  },
+  "message": "Fix catch-all and segment root conflict check\n\ncloses #3",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 17,
+    "deletions": 5
+  },
+  "files": [
+    {
+      "path": "tree.go",
+      "status": "M",
+      "additions": 8,
+      "deletions": 4,
+      "binary": false
+    },
+    {
+      "path": "tree_test.go",
+      "status": "M",
+      "additions": 9,
+      "deletions": 1,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/tree.go b/tree.go\nindex 10252d4..4e47c03 100644\n--- a/tree.go\n+++ b/tree.go\n@@ -153,7 +153,7 @@ func (n *node) insertChild(method, path string, handle Handle) {\n \n \t// find prefix until first wildcard (beginning with ':'' or '*'')\n \tfor i, j := 0, len(path); i < j; i++ {\n-\t\tif b := path[i]; b == ':' || b == '*' {\n+\t\tif c := path[i]; c == ':' || c == '*' {\n \t\t\t// Check if this Node existing children which would be\n \t\t\t// unreachable if we insert the wildcard here\n \t\t\tif len(n.children) > 0 {\n@@ -170,7 +170,7 @@ func (n *node) insertChild(method, path string, handle Handle) {\n \t\t\t\tpanic(\"wildcards must be named with a non-empty name\")\n \t\t\t}\n \n-\t\t\tif b == ':' { // param\n+\t\t\tif c == ':' { // param\n \t\t\t\t// split path at the beginning of the wildcard\n \t\t\t\tif i > 0 {\n \t\t\t\t\tn.path = path[offset:i]\n@@ -199,13 +199,17 @@ func (n *node) insertChild(method, path string, handle Handle) {\n \n \t\t\t} else { // catchAll\n \t\t\t\tif len(path) != k {\n-\t\t\t\t\tpanic(\"catchAlls are only allowed at the end of the path\")\n+\t\t\t\t\tpanic(\"catch-all routes are only allowed at the end of the path\")\n+\t\t\t\t}\n+\n+\t\t\t\tif len(n.path) > 0 && n.path[len(n.path)-1] == '/' {\n+\t\t\t\t\tpanic(\"catch-all conflicts with existing handle for the path segment root\")\n \t\t\t\t}\n \n \t\t\t\t// currently fixed width 1 for '/'\n \t\t\t\ti--\n \t\t\t\tif path[i] != '/' {\n-\t\t\t\t\tpanic(\"no / before catchAll\")\n+\t\t\t\t\tpanic(\"no / before catch-all\")\n \t\t\t\t}\n \n \t\t\t\tn.path = path[offset:i]\ndiff --git a/tree_test.go b/tree_test.go\nindex 59541e8..40dfad0 100644\n--- a/tree_test.go\n+++ b/tree_test.go\n@@ -12,7 +12,7 @@ import (\n )\n \n func printChildren(n *node, prefix string) {\n-\tfmt.Printf(\" %02d %s%s[%d] %v %t \\r\\n\", n.priority, prefix, n.path, len(n.children), n.handle, n.wildChild)\n+\tfmt.Printf(\" %02d %s%s[%d] %v %t %d \\r\\n\", n.priority, prefix, n.path, len(n.children), n.handle, n.wildChild, n.nType)\n \tfor l := len(n.path); l > 0; l-- {\n \t\tprefix += \" \"\n \t}\n@@ -290,6 +290,14 @@ func TestTreeCatchAllConflict(t *testing.T) {\n \ttestRoutes(t, routes)\n }\n \n+func TestTreeCatchAllConflictRoot(t *testing.T) {\n+\troutes := []testRoute{\n+\t\t{\"/\", false},\n+\t\t{\"/*filepath\", true},\n+\t}\n+\ttestRoutes(t, routes)\n+}\n+\n func TestTreeMultipleHandlers(t *testing.T) {\n \ttree := &node{}\n \n",
+  "diffTruncated": false,
+  "tree": [
+    ".travis.yml",
+    "LICENSE",
+    "README.md",
+    "path.go",
+    "path_test.go",
+    "router.go",
+    "router_test.go",
+    "tree.go",
+    "tree_test.go"
+  ],
+  "explanation": {
+    "what": "insertChild 内でシャドーイングされていたループ変数 b を c にリネームし(可読性のためのみで挙動変更なし)、catch-all ルートがパスセグメントのルート(末尾が '/' のパス)と衝突する場合に panic するチェックを追加した。あわせて panic メッセージを \"catchAlls\" から \"catch-all routes\" に、\"no / before catchAll\" から \"no / before catch-all\" に統一した。",
+    "why": "コミットメッセージの \"closes #3\" から、既存の issue で報告された特定の入力(例: \"/\" と \"/*filepath\" を同時登録するケース)で catch-all とルートセグメントが黙って衝突し、想定外の挙動になっていた問題を修正したと分かる。テストに TestTreeCatchAllConflictRoot が追加されており、この衝突パターンを panic で検出することを保証している。",
+    "highlights": [
+      { "file": "tree.go", "note": "catch-all 追加時に n.path の末尾が '/' なら panic する新チェック" },
+      { "file": "tree_test.go", "note": "TestTreeCatchAllConflictRoot で '/' と '/*filepath' の同時登録が衝突として検出されることを確認" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

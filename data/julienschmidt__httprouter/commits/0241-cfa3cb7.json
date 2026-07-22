@@ -1,0 +1,56 @@
+{
+  "seq": 241,
+  "sha": "cfa3cb764b4fc4eb98cae67a2020a91c79e065be",
+  "parents": [
+    "6bade33e09870c3aab467bd44cce4410bfbd1e48"
+  ],
+  "author": {
+    "name": "Julien Schmidt",
+    "email": "git@julienschmidt.com",
+    "date": "2020-01-12T13:07:48+01:00"
+  },
+  "message": "tree: remove duplicate assignment",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 0,
+    "deletions": 2
+  },
+  "files": [
+    {
+      "path": "tree.go",
+      "status": "M",
+      "additions": 0,
+      "deletions": 2,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/tree.go b/tree.go\nindex 49f8763..4da1033 100644\n--- a/tree.go\n+++ b/tree.go\n@@ -339,7 +339,6 @@ walk: // Outer loop for walking the tree\n \t\t\t\t\tfor i, c := range []byte(n.indices) {\n \t\t\t\t\t\tif c == idxc {\n \t\t\t\t\t\t\tn = n.children[i]\n-\t\t\t\t\t\t\tprefix = n.path\n \t\t\t\t\t\t\tcontinue walk\n \t\t\t\t\t\t}\n \t\t\t\t\t}\n@@ -381,7 +380,6 @@ walk: // Outer loop for walking the tree\n \t\t\t\t\t\tif len(n.children) > 0 {\n \t\t\t\t\t\t\tpath = path[end:]\n \t\t\t\t\t\t\tn = n.children[0]\n-\t\t\t\t\t\t\tprefix = n.path\n \t\t\t\t\t\t\tcontinue walk\n \t\t\t\t\t\t}\n \n",
+  "diffTruncated": false,
+  "tree": [
+    ".travis.yml",
+    "LICENSE",
+    "README.md",
+    "go.mod",
+    "path.go",
+    "path_test.go",
+    "router.go",
+    "router_test.go",
+    "tree.go",
+    "tree_test.go"
+  ],
+  "explanation": {
+    "what": "tree.go の addRoute のノード走査ループ(walkラベル付き)内で、n.children[i] や n.children[0] に n を更新した直後に行っていた `prefix = n.path` という重複代入を2箇所削除した。",
+    "why": "同じ値を代入するコードが走査ループの複数分岐に重複して存在しており、コミットメッセージが示す通り単純な重複除去のクリーンアップと考えられる。挙動に影響しない整理であり、直前の可読性改善作業の延長線上にある。",
+    "highlights": [
+      { "file": "tree.go", "note": "walk ラベル付きループ内の2箇所で `prefix = n.path` が削除されている。ロジックには影響しない冗長コードの除去。" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

@@ -1,0 +1,65 @@
+{
+  "seq": 79,
+  "sha": "f78f58a0db024498843b0cca4bf4cc5cf4659cfc",
+  "parents": [
+    "ca3fec50c3d5ffe644ecd926c484baeb8af09f2e"
+  ],
+  "author": {
+    "name": "Julien Schmidt",
+    "email": "github@julienschmidt.com",
+    "date": "2014-07-01T19:40:44+02:00"
+  },
+  "message": "Avoid redirect loops to \"/\"\n\nfixes #15",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 12,
+    "deletions": 2
+  },
+  "files": [
+    {
+      "path": "router.go",
+      "status": "M",
+      "additions": 2,
+      "deletions": 2,
+      "binary": false
+    },
+    {
+      "path": "router_test.go",
+      "status": "M",
+      "additions": 10,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/router.go b/router.go\nindex f4fff35..87e1010 100644\n--- a/router.go\n+++ b/router.go\n@@ -275,7 +275,7 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {\n \t\tif handle, ps, tsr := root.getValue(path); handle != nil {\n \t\t\thandle(w, req, ps)\n \t\t\treturn\n-\t\t} else if req.Method != \"CONNECT\" {\n+\t\t} else if req.Method != \"CONNECT\" && path != \"/\" {\n \t\t\tcode := 301 // Permanent redirect, request with GET method\n \t\t\tif req.Method != \"GET\" {\n \t\t\t\t// Temporary redirect, request with same method\n@@ -283,7 +283,7 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {\n \t\t\t\tcode = 307\n \t\t\t}\n \n-\t\t\tif tsr && r.RedirectTrailingSlash && path != \"/\" {\n+\t\t\tif tsr && r.RedirectTrailingSlash {\n \t\t\t\tif path[len(path)-1] == '/' {\n \t\t\t\t\treq.URL.Path = path[:len(path)-1]\n \t\t\t\t} else {\ndiff --git a/router_test.go b/router_test.go\nindex b87ef0d..ca59066 100644\n--- a/router_test.go\n+++ b/router_test.go\n@@ -207,6 +207,16 @@ func TestRouterNotFound(t *testing.T) {\n \tif !(w.Code == 307 && fmt.Sprint(w.Header()) == \"map[Location:[/path]]\") {\n \t\tt.Errorf(\"Custom NotFound handler failed: Code=%d, Header=%v\", w.Code, w.Header())\n \t}\n+\n+\t// Test special case where no node for the prefix \"/\" exists\n+\trouter = New()\n+\trouter.GET(\"/a\", handlerFunc)\n+\tr, _ = http.NewRequest(\"GET\", \"/\", nil)\n+\tw = httptest.NewRecorder()\n+\trouter.ServeHTTP(w, r)\n+\tif !(w.Code == 404) {\n+\t\tt.Errorf(\"NotFound handling route / failed: Code=%d\", w.Code)\n+\t}\n }\n \n func TestRouterPanicHandler(t *testing.T) {\n",
+  "diffTruncated": false,
+  "tree": [
+    ".travis.yml",
+    "LICENSE",
+    "README.md",
+    "path.go",
+    "path_test.go",
+    "router.go",
+    "router_test.go",
+    "tree.go",
+    "tree_test.go"
+  ],
+  "explanation": {
+    "what": "ServeHTTP 内のリダイレクト条件を修正した。従来は tsr && r.RedirectTrailingSlash && path != \"/\" という条件でリダイレクトの可否を判定していたが、path != \"/\" の除外を外側の else if 節(req.Method != \"CONNECT\" && path != \"/\")に移動した。ルートパス \"/\" にハンドラが登録されておらず、かつ tsr が真になり得る特殊なツリー構造の場合に、\"/\" への無限リダイレクトが発生しうる問題を修正している。",
+    "why": "コミットメッセージの「fixes #15」が示す通り、\"/\" へのリダイレクトが繰り返される不具合報告への対応。テストでは \"/a\" だけを登録した Router に \"/\" でアクセスした際、リダイレクトではなく素直に 404 になることを確認している。",
+    "highlights": [
+      { "file": "router.go", "note": "path != \"/\" の除外条件を tsr 判定から外側の else if へ移動" },
+      { "file": "router_test.go", "note": "ルートに対応するノードが無い場合に \"/\" へのアクセスが404になることを確認" }
+    ],
+    "langNotes": [
+      { "topic": "リダイレクトループ回避", "note": "httprouter はトレイリングスラッシュの有無や大文字小文字の違いを自動修正してリダイレクトする機能を持つが、修正先が \"/\" のような特殊パスの場合、条件分岐の順序次第では自分自身へのリダイレクトを繰り返す無限ループになりうる。この修正はその境界条件を潰すもの。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

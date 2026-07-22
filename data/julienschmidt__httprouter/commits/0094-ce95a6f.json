@@ -1,0 +1,57 @@
+{
+  "seq": 94,
+  "sha": "ce95a6f83e52d2f1bc5694842dce3e54da7c6501",
+  "parents": [
+    "99873563b6bbe559753ca32caec04480843fbb0f"
+  ],
+  "author": {
+    "name": "Julien Schmidt",
+    "email": "julienschmidt@users.noreply.github.com",
+    "date": "2015-01-04T14:47:15+08:00"
+  },
+  "message": "README: Add Basic Auth example",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 62,
+    "deletions": 0
+  },
+  "files": [
+    {
+      "path": "README.md",
+      "status": "M",
+      "additions": 62,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/README.md b/README.md\nindex 082e4cf..e22d6f5 100644\n--- a/README.md\n+++ b/README.md\n@@ -191,6 +191,7 @@ it's very easy!\n \n Alternatively, you could try [a framework building upon HttpRouter](#web-frameworks-building-upon-httprouter).\n \n+### Multi-domain / Sub-domains\n Here is a quick example: Does your server serve multiple domains / hosts?\n You want to use sub-domains?\n Define a router per host!\n@@ -228,6 +229,67 @@ func main() {\n }\n ```\n \n+### Basic Authentication\n+Another quick example: Basic Authentification (RFC 2617) for handles:\n+\n+```go\n+package main\n+\n+import (\n+    \"bytes\"\n+    \"encoding/base64\"\n+    \"fmt\"\n+    \"github.com/julienschmidt/httprouter\"\n+    \"net/http\"\n+    \"log\"\n+    \"strings\"\n+)\n+\n+func BasicAuth(h httprouter.Handle, user, pass []byte) httprouter.Handle {\n+\treturn func(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {\n+\t\tconst basicAuthPrefix string = \"Basic \"\n+\n+\t\t// Get the Basic Authentication credentials\n+\t\tauth := r.Header.Get(\"Authorization\")\n+\t\tif strings.HasPrefix(auth, basicAuthPrefix) {\n+\t\t\t// Check credentials\n+\t\t\tpayload, err := base64.StdEncoding.DecodeString(auth[len(basicAuthPrefix):])\n+\t\t\tif err == nil {\n+\t\t\t\tpair := bytes.SplitN(payload, []byte(\":\"), 2)\n+\t\t\t\tif len(pair) == 2 && bytes.Equal(pair[0], user) && bytes.Equal(pair[1], pass) {\n+\t\t\t\t\t// Delegate request to the given handle\n+\t\t\t\t\th(w, r, ps)\n+\t\t\t\t\treturn\n+\t\t\t\t}\n+\t\t\t}\n+\t\t}\n+\n+\t\t// Request Basic Authentication otherwise\n+\t\tw.Header().Set(\"WWW-Authenticate\", \"Basic realm=Restricted\")\n+\t\thttp.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)\n+\t}\n+}\n+\n+func Index(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {\n+    fmt.Fprint(w, \"Not protected!\\n\")\n+}\n+\n+func Protected(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {\n+    fmt.Fprint(w, \"Protected!\\n\")\n+}\n+\n+func main() {\n+    user := []byte(\"gordon\")\n+    pass := []byte(\"secret!\")\n+    \n+    router := httprouter.New()\n+    router.GET(\"/\", Index)\n+    router.GET(\"/protected/\", BasicAuth(Protected, user, pass))\n+\n+    log.Fatal(http.ListenAndServe(\":8080\", router))\n+}\n+```\n+\n ## Web Frameworks building upon HttpRouter\n If the HttpRouter is a bit too minimalistic for you, you might try one of the following more high-level 3rd-party web frameworks building upon the HttpRouter package:\n * [Gin](https://github.com/gin-gonic/gin): Features a martini-like API with much better performance\n",
+  "diffTruncated": false,
+  "tree": [
+    ".travis.yml",
+    "LICENSE",
+    "README.md",
+    "path.go",
+    "path_test.go",
+    "router.go",
+    "router_test.go",
+    "tree.go",
+    "tree_test.go"
+  ],
+  "explanation": {
+    "what": "README.md に Basic Authentication (RFC 2617) を使う例を追加した。BasicAuth という httprouter.Handle を返すラッパー関数で、Authorization ヘッダを検証してから元のハンドラに処理を委譲するか、401 を返す実装例を示している。あわせて既存のマルチドメイン例の直前に見出しを補っている。",
+    "why": "既存のミドルウェア例や http.HandlerFunc アダプタの例に続き、httprouter を素の net/http 上でどう組み合わせて認証を実装するかを具体例で示すためのドキュメント追加と考えられる。",
+    "highlights": [
+      { "file": "README.md", "note": "BasicAuth 関数: httprouter.Handle を受け取り httprouter.Handle を返すラッパーパターンの例" }
+    ],
+    "langNotes": [
+      { "topic": "Handle ラッパー(高階関数)", "note": "BasicAuth(h httprouter.Handle, user, pass []byte) httprouter.Handle という形は、Go でミドルウェアを表現する典型的なイディオム。ハンドラを引数に取り、認証などの前処理を挟んだ新しいハンドラをクロージャとして返す。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

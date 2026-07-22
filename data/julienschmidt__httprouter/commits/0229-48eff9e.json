@@ -1,0 +1,64 @@
+{
+  "seq": 229,
+  "sha": "48eff9eecf5f2986feb581252b1d46bd763ee7ac",
+  "parents": [
+    "1ef69b73a2bc1a4e5ceb8267f872d10a6eb90b8d"
+  ],
+  "author": {
+    "name": "Julien Schmidt",
+    "email": "git@julienschmidt.com",
+    "date": "2019-10-04T18:42:52+02:00"
+  },
+  "message": "router: better input validation",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 29,
+    "deletions": 1
+  },
+  "files": [
+    {
+      "path": "router.go",
+      "status": "M",
+      "additions": 6,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "router_test.go",
+      "status": "M",
+      "additions": 23,
+      "deletions": 1,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/router.go b/router.go\nindex 0970b54..088ceec 100644\n--- a/router.go\n+++ b/router.go\n@@ -258,9 +258,15 @@ func (r *Router) DELETE(path string, handle Handle) {\n // frequently used, non-standardized or custom methods (e.g. for internal\n // communication with a proxy).\n func (r *Router) Handle(method, path string, handle Handle) {\n+\tif method == \"\" {\n+\t\tpanic(\"method must not be empty\")\n+\t}\n \tif len(path) < 1 || path[0] != '/' {\n \t\tpanic(\"path must begin with '/' in path '\" + path + \"'\")\n \t}\n+\tif handle == nil {\n+\t\tpanic(\"handle must not be nil\")\n+\t}\n \n \tif r.trees == nil {\n \t\tr.trees = make(map[string]*node)\ndiff --git a/router_test.go b/router_test.go\nindex b8f2cef..8a4c74b 100644\n--- a/router_test.go\n+++ b/router_test.go\n@@ -164,14 +164,36 @@ func TestRouterAPI(t *testing.T) {\n \t}\n }\n \n-func TestRouterRoot(t *testing.T) {\n+func TestRouterInvalidInput(t *testing.T) {\n \trouter := New()\n+\n \trecv := catchPanic(func() {\n+\t\trouter.Handle(\"\", \"/\", nil)\n+\t})\n+\tif recv == nil {\n+\t\tt.Fatal(\"registering empty method did not panic\")\n+\t}\n+\n+\trecv = catchPanic(func() {\n+\t\trouter.Handle(\"\", \"\", nil)\n+\t})\n+\tif recv == nil {\n+\t\tt.Fatal(\"registering empty path did not panic\")\n+\t}\n+\n+\trecv = catchPanic(func() {\n \t\trouter.GET(\"noSlashRoot\", nil)\n \t})\n \tif recv == nil {\n \t\tt.Fatal(\"registering path not beginning with '/' did not panic\")\n \t}\n+\n+\trecv = catchPanic(func() {\n+\t\trouter.GET(\"/\", nil)\n+\t})\n+\tif recv == nil {\n+\t\tt.Fatal(\"registering nil handler did not panic\")\n+\t}\n }\n \n func TestRouterChaining(t *testing.T) {\n",
+  "diffTruncated": false,
+  "tree": [
+    ".travis.yml",
+    "LICENSE",
+    "README.md",
+    "go.mod",
+    "path.go",
+    "path_test.go",
+    "router.go",
+    "router_test.go",
+    "tree.go",
+    "tree_test.go"
+  ],
+  "explanation": {
+    "what": "Router.Handle にメソッド名が空文字列の場合と handle が nil の場合の panic チェックを追加した(パスが '/' で始まらない既存チェックに加えて)。router_test.go の TestRouterRoot を TestRouterInvalidInput にリネーム・拡張し、空メソッド名・空パス・nilハンドラそれぞれで panic することを検証するケースを追加している。",
+    "why": "コミットメッセージの通り、Router.Handle への不正な入力(空メソッド・nilハンドラ)に対するバリデーションを強化する変更。不正な状態のままツリーに登録されて後段で分かりにくいエラーになるより、登録時点で早期に panic させる設計方針(httprouterはエラーを戻り値でなくpanicで通知する)に沿っている。",
+    "highlights": [
+      { "file": "router.go", "note": "`method == \"\"` と `handle == nil` の panic チェックが追加された箇所" },
+      { "file": "router_test.go", "note": "TestRouterRoot → TestRouterInvalidInput への改名と、空メソッド名・nilハンドラのテストケース追加" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

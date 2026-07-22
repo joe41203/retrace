@@ -1,0 +1,60 @@
+{
+  "seq": 197,
+  "sha": "667c1dbb44f3b5528b874c3c9071b23702e3dd0f",
+  "parents": [
+    "6d4f4fb4d2ae6d1cb069aecb0e330fd3ee9e0b43"
+  ],
+  "author": {
+    "name": "Julien Schmidt",
+    "email": "git@julienschmidt.com",
+    "date": "2019-09-24T02:07:05+02:00"
+  },
+  "message": "tree: fix findCaseInsensitivePath for split multibyte runes",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 28,
+    "deletions": 27
+  },
+  "files": [
+    {
+      "path": "tree.go",
+      "status": "M",
+      "additions": 28,
+      "deletions": 27,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/tree.go b/tree.go\nindex bff7306..7dd4e0b 100644\n--- a/tree.go\n+++ b/tree.go\n@@ -460,7 +460,6 @@ walk: // outer loop for walking the tree\n func (n *node) findCaseInsensitivePath(path string, fixTrailingSlash bool) (ciPath []byte, found bool) {\n \treturn n.findCaseInsensitivePathRec(\n \t\tpath,\n-\t\tstrings.ToLower(path),\n \t\tmake([]byte, 0, len(path)+1), // preallocate enough memory for new path\n \t\t[4]byte{},                    // empty rune buffer\n \t\tfixTrailingSlash,\n@@ -484,24 +483,24 @@ func shiftNRuneBytes(rb [4]byte, n int) [4]byte {\n }\n \n // recursive case-insensitive lookup function used by n.findCaseInsensitivePath\n-func (n *node) findCaseInsensitivePathRec(path, loPath string, ciPath []byte, rb [4]byte, fixTrailingSlash bool) ([]byte, bool) {\n-\tloNPath := strings.ToLower(n.path)\n+func (n *node) findCaseInsensitivePathRec(path string, ciPath []byte, rb [4]byte, fixTrailingSlash bool) ([]byte, bool) {\n+\tnpLen := len(n.path)\n \n walk: // outer loop for walking the tree\n-\tfor len(loPath) >= len(loNPath) && (len(loNPath) == 0 || loPath[1:len(loNPath)] == loNPath[1:]) {\n-\t\t// add common path to result\n-\t\tciPath = append(ciPath, n.path...)\n+\tfor len(path) >= npLen && (npLen == 0 || strings.EqualFold(path[1:npLen], n.path[1:])) {\n+\t\t// add common prefix to result\n \n-\t\tif path = path[len(n.path):]; len(path) > 0 {\n-\t\t\tloOld := loPath\n-\t\t\tloPath = loPath[len(loNPath):]\n+\t\toldPath := path\n+\t\tpath = path[npLen:]\n+\t\tciPath = append(ciPath, n.path...)\n \n+\t\tif len(path) > 0 {\n \t\t\t// If this node does not have a wildcard (param or catchAll) child,\n \t\t\t// we can just look up the next child node and continue to walk down\n \t\t\t// the tree\n \t\t\tif !n.wildChild {\n \t\t\t\t// skip rune bytes already processed\n-\t\t\t\trb = shiftNRuneBytes(rb, len(loNPath))\n+\t\t\t\trb = shiftNRuneBytes(rb, npLen)\n \n \t\t\t\tif rb[0] != 0 {\n \t\t\t\t\t// old rune not finished\n@@ -509,7 +508,7 @@ walk: // outer loop for walking the tree\n \t\t\t\t\t\tif n.indices[i] == rb[0] {\n \t\t\t\t\t\t\t// continue with child node\n \t\t\t\t\t\t\tn = n.children[i]\n-\t\t\t\t\t\t\tloNPath = strings.ToLower(n.path)\n+\t\t\t\t\t\t\tnpLen = len(n.path)\n \t\t\t\t\t\t\tcontinue walk\n \t\t\t\t\t\t}\n \t\t\t\t\t}\n@@ -521,17 +520,19 @@ walk: // outer loop for walking the tree\n \t\t\t\t\t// runes are up to 4 byte long,\n \t\t\t\t\t// -4 would definitely be another rune\n \t\t\t\t\tvar off int\n-\t\t\t\t\tfor max := min(len(loNPath), 3); off < max; off++ {\n-\t\t\t\t\t\tif i := len(loNPath) - off; utf8.RuneStart(loOld[i]) {\n-\t\t\t\t\t\t\t// read rune from cached lowercase path\n-\t\t\t\t\t\t\trv, _ = utf8.DecodeRuneInString(loOld[i:])\n+\t\t\t\t\tfor max := min(npLen, 3); off < max; off++ {\n+\t\t\t\t\t\tif i := npLen - off; utf8.RuneStart(oldPath[i]) {\n+\t\t\t\t\t\t\t// read rune from cached path\n+\t\t\t\t\t\t\trv, _ = utf8.DecodeRuneInString(oldPath[i:])\n \t\t\t\t\t\t\tbreak\n \t\t\t\t\t\t}\n \t\t\t\t\t}\n \n \t\t\t\t\t// calculate lowercase bytes of current rune\n-\t\t\t\t\tutf8.EncodeRune(rb[:], rv)\n-\t\t\t\t\t// skipp already processed bytes\n+\t\t\t\t\tlo := unicode.ToLower(rv)\n+\t\t\t\t\tutf8.EncodeRune(rb[:], lo)\n+\n+\t\t\t\t\t// skip already processed bytes\n \t\t\t\t\trb = shiftNRuneBytes(rb, off)\n \n \t\t\t\t\tfor i := 0; i < len(n.indices); i++ {\n@@ -541,7 +542,7 @@ walk: // outer loop for walking the tree\n \t\t\t\t\t\t\t// uppercase byte and the lowercase byte might exist\n \t\t\t\t\t\t\t// as an index\n \t\t\t\t\t\t\tif out, found := n.children[i].findCaseInsensitivePathRec(\n-\t\t\t\t\t\t\t\tpath, loPath, ciPath, rb, fixTrailingSlash,\n+\t\t\t\t\t\t\t\tpath, ciPath, rb, fixTrailingSlash,\n \t\t\t\t\t\t\t); found {\n \t\t\t\t\t\t\t\treturn out, true\n \t\t\t\t\t\t\t}\n@@ -549,17 +550,18 @@ walk: // outer loop for walking the tree\n \t\t\t\t\t\t}\n \t\t\t\t\t}\n \n-\t\t\t\t\t// same for uppercase rune, if it differs\n-\t\t\t\t\tif up := unicode.ToUpper(rv); up != rv {\n+\t\t\t\t\t// if we found no match, the same for the uppercase rune,\n+\t\t\t\t\t// if it differs\n+\t\t\t\t\tif up := unicode.ToUpper(rv); up != lo {\n \t\t\t\t\t\tutf8.EncodeRune(rb[:], up)\n \t\t\t\t\t\trb = shiftNRuneBytes(rb, off)\n \n-\t\t\t\t\t\tfor i := 0; i < len(n.indices); i++ {\n+\t\t\t\t\t\tfor i, c := 0, rb[0]; i < len(n.indices); i++ {\n \t\t\t\t\t\t\t// uppercase matches\n-\t\t\t\t\t\t\tif n.indices[i] == rb[0] {\n+\t\t\t\t\t\t\tif n.indices[i] == c {\n \t\t\t\t\t\t\t\t// continue with child node\n \t\t\t\t\t\t\t\tn = n.children[i]\n-\t\t\t\t\t\t\t\tloNPath = strings.ToLower(n.path)\n+\t\t\t\t\t\t\t\tnpLen = len(n.path)\n \t\t\t\t\t\t\t\tcontinue walk\n \t\t\t\t\t\t\t}\n \t\t\t\t\t\t}\n@@ -588,8 +590,7 @@ walk: // outer loop for walking the tree\n \t\t\t\t\tif len(n.children) > 0 {\n \t\t\t\t\t\t// continue with child node\n \t\t\t\t\t\tn = n.children[0]\n-\t\t\t\t\t\tloNPath = strings.ToLower(n.path)\n-\t\t\t\t\t\tloPath = loPath[k:]\n+\t\t\t\t\t\tnpLen = len(n.path)\n \t\t\t\t\t\tpath = path[k:]\n \t\t\t\t\t\tcontinue\n \t\t\t\t\t}\n@@ -650,8 +651,8 @@ walk: // outer loop for walking the tree\n \t\tif path == \"/\" {\n \t\t\treturn ciPath, true\n \t\t}\n-\t\tif len(loPath)+1 == len(loNPath) && loNPath[len(loPath)] == '/' &&\n-\t\t\tloPath[1:] == loNPath[1:len(loPath)] && n.handle != nil {\n+\t\tif len(path)+1 == npLen && n.path[len(path)] == '/' &&\n+\t\t\tstrings.EqualFold(path[1:], n.path[1:len(path)]) && n.handle != nil {\n \t\t\treturn append(ciPath, n.path...), true\n \t\t}\n \t}\n",
+  "diffTruncated": false,
+  "tree": [
+    ".travis.yml",
+    "LICENSE",
+    "README.md",
+    "go.mod",
+    "params.go",
+    "path.go",
+    "path_test.go",
+    "router.go",
+    "router_test.go",
+    "tree.go",
+    "tree_test.go"
+  ],
+  "explanation": {
+    "what": "findCaseInsensitivePath / findCaseInsensitivePathRec を書き換え、事前に `strings.ToLower(path)` した文字列(loPath)を丸ごと保持する方式から、大小文字を区別せず比較する `strings.EqualFold` とバイト長ベースの比較(npLen)に変更した。ルーン単位の大文字小文字変換も `unicode.ToLower`/`unicode.ToUpper` を都度呼ぶ形に切り替えている。",
+    "why": "コミットメッセージ「fix findCaseInsensitivePath for split multibyte runes」の通り、事前に文字列全体を ToLower していた旧実装では、マルチバイト文字(rune)がノード境界で分割される場合にバイト単位のオフセット計算とルーン境界がずれ、不正な結果になるバグがあった。EqualFold による比較とバイト長主体の管理に切り替えることで、この境界のずれを避けている。",
+    "highlights": [
+      { "file": "tree.go", "note": "loPath(事前ToLower済み文字列)を廃止し、path のバイト長(npLen)と EqualFold で比較する方式に変更" }
+    ],
+    "langNotes": [
+      { "topic": "rune とマルチバイト境界の分割問題", "note": "Go の string は UTF-8 バイト列であり、rune(Unicodeコードポイント)は1〜4バイトにまたがることがある。木構造のノード境界がバイト単位で決まっていると、マルチバイト文字の途中で path が分割され、大文字小文字比較や再構築時にバイト列が壊れる可能性がある。このコミットはその境界問題への対処。" },
+      { "topic": "strings.EqualFold", "note": "大文字小文字を区別せずに文字列を比較する標準ライブラリ関数。事前に ToLower した文字列を保持するより、比較のたびに EqualFold を呼ぶ方が余分な文字列アロケーションを避けられる。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

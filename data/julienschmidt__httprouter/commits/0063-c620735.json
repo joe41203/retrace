@@ -1,0 +1,55 @@
+{
+  "seq": 63,
+  "sha": "c620735377165efcc00e891e6f440db483495439",
+  "parents": [
+    "55e37c2533aed033f00d4b77a9f9d13dfacf3aa1"
+  ],
+  "author": {
+    "name": "Julien Schmidt",
+    "email": "github@julienschmidt.com",
+    "date": "2014-06-06T22:30:33+02:00"
+  },
+  "message": "Fix ServeHTTP\n\nforgot a return",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 1,
+    "deletions": 0
+  },
+  "files": [
+    {
+      "path": "router.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/router.go b/router.go\nindex 9a8fe95..0e645f5 100644\n--- a/router.go\n+++ b/router.go\n@@ -226,6 +226,7 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {\n \n \tif handle, vars, tsr := r.getValue(req.Method, path); handle != nil {\n \t\thandle(w, req, vars)\n+\t\treturn\n \t} else if tsr && r.RedirectTrailingSlash && path != \"/\" {\n \t\tif path[len(path)-1] == '/' {\n \t\t\tpath = path[:len(path)-1]\n",
+  "diffTruncated": false,
+  "tree": [
+    ".travis.yml",
+    "LICENSE",
+    "README.md",
+    "path.go",
+    "path_test.go",
+    "router.go",
+    "router_test.go",
+    "tree.go",
+    "tree_test.go"
+  ],
+  "explanation": {
+    "what": "ServeHTTP 内で handle が見つかった直後の分岐に return 文を1行追加した。これが無いと、if-else if チェーンの最初の条件が成立して handle(w, req, vars) を実行した後も後続の else if 節の評価には進まないものの、関数末尾に到達してしまい意図しない挙動を招く恐れがあった。",
+    "why": "コミットメッセージの \"forgot a return\" が示す通り、前コミット(55e37c2)でケースインセンシティブなリダイレクト分岐を else if として追加した際に、正常系である最初の分岐に return を書き忘れたための単純な追記修正。",
+    "highlights": [
+      { "file": "router.go", "note": "handle(w, req, vars) の直後に return を追加" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

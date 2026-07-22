@@ -1,0 +1,56 @@
+{
+  "seq": 255,
+  "sha": "98f8ba30b5ad2e4a8fabcde0d00cc8d6390e8926",
+  "parents": [
+    "ca14a4f911b860a6c5d2b4071766f795e68cba8d"
+  ],
+  "author": {
+    "name": "Julien Schmidt",
+    "email": "git@julienschmidt.com",
+    "date": "2020-08-14T20:17:12+02:00"
+  },
+  "message": "tree_test: remove dead code",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 14,
+    "deletions": 25
+  },
+  "files": [
+    {
+      "path": "tree_test.go",
+      "status": "M",
+      "additions": 14,
+      "deletions": 25,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/tree_test.go b/tree_test.go\nindex 68e43a5..5bd17e2 100644\n--- a/tree_test.go\n+++ b/tree_test.go\n@@ -13,15 +13,15 @@ import (\n \t\"testing\"\n )\n \n-func printChildren(n *node, prefix string) {\n-\tfmt.Printf(\" %02d %s%s[%d] %v %t %d \\r\\n\", n.priority, prefix, n.path, len(n.children), n.handle, n.wildChild, n.nType)\n-\tfor l := len(n.path); l > 0; l-- {\n-\t\tprefix += \" \"\n-\t}\n-\tfor _, child := range n.children {\n-\t\tprintChildren(child, prefix)\n-\t}\n-}\n+// func printChildren(n *node, prefix string) {\n+// \tfmt.Printf(\" %02d %s%s[%d] %v %t %d \\r\\n\", n.priority, prefix, n.path, len(n.children), n.handle, n.wildChild, n.nType)\n+// \tfor l := len(n.path); l > 0; l-- {\n+// \t\tprefix += \" \"\n+// \t}\n+// \tfor _, child := range n.children {\n+// \t\tprintChildren(child, prefix)\n+// \t}\n+// }\n \n // Used as a workaround since we can't compare functions or their addresses\n var fakeHandlerValue string\n@@ -121,7 +121,7 @@ func TestTreeAddAndGet(t *testing.T) {\n \t\ttree.addRoute(route, fakeHandler(route))\n \t}\n \n-\t//printChildren(tree, \"\")\n+\t// printChildren(tree, \"\")\n \n \tcheckRequests(t, tree, testRequests{\n \t\t{\"/a\", false, \"/a\", nil},\n@@ -163,7 +163,7 @@ func TestTreeWildcard(t *testing.T) {\n \t\ttree.addRoute(route, fakeHandler(route))\n \t}\n \n-\t//printChildren(tree, \"\")\n+\t// printChildren(tree, \"\")\n \n \tcheckRequests(t, tree, testRequests{\n \t\t{\"/\", false, \"/\", nil},\n@@ -217,7 +217,7 @@ func testRoutes(t *testing.T, routes []testRoute) {\n \t\t}\n \t}\n \n-\t//printChildren(tree, \"\")\n+\t// printChildren(tree, \"\")\n }\n \n func TestTreeWildcardConflict(t *testing.T) {\n@@ -285,7 +285,7 @@ func TestTreeDupliatePath(t *testing.T) {\n \t\t}\n \t}\n \n-\t//printChildren(tree, \"\")\n+\t// printChildren(tree, \"\")\n \n \tcheckRequests(t, tree, testRequests{\n \t\t{\"/\", false, \"/\", nil},\n@@ -363,17 +363,6 @@ func TestTreeDoubleWildcard(t *testing.T) {\n \t}\n }\n \n-/*func TestTreeDuplicateWildcard(t *testing.T) {\n-\ttree := &node{}\n-\n-\troutes := [...]string{\n-\t\t\"/:id/:name/:id\",\n-\t}\n-\tfor _, route := range routes {\n-\t\t...\n-\t}\n-}*/\n-\n func TestTreeTrailingSlashRedirect(t *testing.T) {\n \ttree := &node{}\n \n@@ -413,7 +402,7 @@ func TestTreeTrailingSlashRedirect(t *testing.T) {\n \t\t}\n \t}\n \n-\t//printChildren(tree, \"\")\n+\t// printChildren(tree, \"\")\n \n \ttsrRoutes := [...]string{\n \t\t\"/hi/\",\n",
+  "diffTruncated": false,
+  "tree": [
+    ".travis.yml",
+    "LICENSE",
+    "README.md",
+    "go.mod",
+    "path.go",
+    "path_test.go",
+    "router.go",
+    "router_test.go",
+    "tree.go",
+    "tree_test.go"
+  ],
+  "explanation": {
+    "what": "tree_test.goのデバッグ用関数`printChildren`をコメントアウトし、それを呼び出していた`//printChildren(tree, \"\")`のコメントを`// printChildren(tree, \"\")`という体裁(スペース挿入)に統一した。また丸ごとコメントアウトされたままだった`TestTreeDuplicateWildcard`のテスト関数(中身が`...`で未完成)を削除した。",
+    "why": "コミットメッセージ「tree_test: remove dead code」の通り、使われていない・未完成のコードを整理する目的。printChildrenは削除ではなくコメントアウトのまま残され、デバッグ時に再度使えるようにしている。",
+    "highlights": [
+      { "file": "tree_test.go", "note": "未完成のまま残っていた TestTreeDuplicateWildcard の削除" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

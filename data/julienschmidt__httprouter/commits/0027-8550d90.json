@@ -1,0 +1,54 @@
+{
+  "seq": 27,
+  "sha": "8550d9062e26c5a0cb70ee61b6af3665a30796ae",
+  "parents": [
+    "eb0baa1d91cdccb5222b729cbec1a40c0c2af88f"
+  ],
+  "author": {
+    "name": "Julien Schmidt",
+    "email": "github@julienschmidt.com",
+    "date": "2013-12-14T13:06:12+01:00"
+  },
+  "message": "Test two additional special cases",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 3,
+    "deletions": 0
+  },
+  "files": [
+    {
+      "path": "tree_test.go",
+      "status": "M",
+      "additions": 3,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/tree_test.go b/tree_test.go\nindex 0e74dc6..291cb3b 100644\n--- a/tree_test.go\n+++ b/tree_test.go\n@@ -105,6 +105,7 @@ func TestTreeWildcard(t *testing.T) {\n \t\t\"/search/:query\",\n \t\t\"/user_:name\",\n \t\t\"/user_:name/about\",\n+\t\t\"/files/:dir/*filepath\",\n \t\t\"/doc/\",\n \t\t\"/doc/go_faq.html\",\n \t\t\"/doc/go1.html\",\n@@ -127,6 +128,7 @@ func TestTreeWildcard(t *testing.T) {\n \t\t{\"/search/someth!ng+in+ünìcodé/\", true, \"\", map[string]string{\"query\": \"someth!ng+in+ünìcodé\"}},\n \t\t{\"/user_gopher\", false, \"/user_:name\", map[string]string{\"name\": \"gopher\"}},\n \t\t{\"/user_gopher/about\", false, \"/user_:name/about\", map[string]string{\"name\": \"gopher\"}},\n+\t\t{\"/files/js/inc/framework.js\", false, \"/files/:dir/*filepath\", map[string]string{\"dir\": \"js\", \"filepath\": \"/inc/framework.js\"}},\n \t})\n }\n \n@@ -173,6 +175,7 @@ func TestTreeWildcardConflict(t *testing.T) {\n \t\t{\"/src/\", true},\n \t\t{\"/src1/\", false},\n \t\t{\"/src1/*filepath\", true},\n+\t\t{\"/src2*filepath\", true},\n \t\t{\"/search/:query\", false},\n \t\t{\"/search/invalid\", true},\n \t\t{\"/user_:name\", false},\n",
+  "diffTruncated": false,
+  "tree": [
+    ".travis.yml",
+    "LICENSE",
+    "path.go",
+    "path_test.go",
+    "router.go",
+    "router_test.go",
+    "tree.go",
+    "tree_test.go"
+  ],
+  "explanation": {
+    "what": "tree_test.go に2つの追加ケースを足した。TestTreeWildcard に \"/files/:dir/*filepath\" というパラメータと catchAll を組み合わせたルートを登録し、\"/files/js/inc/framework.js\" が dir=\"js\", filepath=\"/inc/framework.js\" として解決されることを検証する。TestTreeWildcardConflict には \"/src2*filepath\"(スラッシュを挟まずに catchAll が続くケース)が衝突として panic することを確認するケースを追加した。",
+    "why": "件名の通り、既存のテストではカバーされていなかった特殊ケース(:param と *filepath の併用、スラッシュなしで catchAll が続くパスの妥当性検証)を補うための追加と考えられる。",
+    "highlights": [
+      { "file": "tree_test.go", "note": "\"/files/:dir/*filepath\" のようにパラメータと catchAll を同一ルートに併用するケースのテスト" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

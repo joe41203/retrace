@@ -1,0 +1,61 @@
+{
+  "seq": 10,
+  "sha": "a001a0ef8cb9a18f0dc03b2022aec7880e333965",
+  "parents": [
+    "9ff567db080c9902f8358f6dbfde946cc1318aee"
+  ],
+  "author": {
+    "name": "Julien Schmidt",
+    "email": "github@julienschmidt.com",
+    "date": "2013-12-11T14:52:10+01:00"
+  },
+  "message": "lint",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 7,
+    "deletions": 7
+  },
+  "files": [
+    {
+      "path": "router.go",
+      "status": "M",
+      "additions": 2,
+      "deletions": 2,
+      "binary": false
+    },
+    {
+      "path": "tree.go",
+      "status": "M",
+      "additions": 5,
+      "deletions": 5,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/router.go b/router.go\nindex 6e5187c..7cc140b 100644\n--- a/router.go\n+++ b/router.go\n@@ -2,7 +2,7 @@\n // Use of this source code is governed by a BSD-style license that can be found\n // in the LICENSE file.\n \n-// A radix tree based HTTP request router\n+// Package httprouter is a radix tree based high performance HTTP request router\n package httprouter\n \n import (\n@@ -88,7 +88,7 @@ func (r *Router) DELETE(path string, handle Handle) error {\n // Handle registers a new request handle with the given path and method.\n func (r *Router) Handle(method, path string, handle Handle) error {\n \tif path[0] != '/' {\n-\t\treturn errors.New(\"Path must begin with /\")\n+\t\treturn errors.New(\"path must begin with '/'\")\n \t}\n \treturn r.addRoute(method, path, handle)\n }\ndiff --git a/tree.go b/tree.go\nindex bc1cf1a..1f66a87 100644\n--- a/tree.go\n+++ b/tree.go\n@@ -16,11 +16,11 @@ func min(a, b int) int {\n }\n \n var (\n-\tErrDuplicatePath     = errors.New(\"A Hanlde is already registered for this method at this path\")\n-\tErrEmptyWildcardName = errors.New(\"Wildcards must be named with a non-empty name\")\n-\tErrCatchAllConflict  = errors.New(\"CatchAlls are only allowed at the end of the path\")\n-\tErrChildConflict     = errors.New(\"Can't insert a wildcard route because this path has existing children\")\n-\tErrWildCardConflict  = errors.New(\"Conflict with wildcard route\")\n+\tErrDuplicatePath     = errors.New(\"a Handle is already registered for this method at this path\")\n+\tErrEmptyWildcardName = errors.New(\"wildcards must be named with a non-empty name\")\n+\tErrCatchAllConflict  = errors.New(\"catchAlls are only allowed at the end of the path\")\n+\tErrChildConflict     = errors.New(\"can't insert a wildcard route because this path has existing children\")\n+\tErrWildCardConflict  = errors.New(\"conflict with wildcard route\")\n )\n \n type node struct {\n",
+  "diffTruncated": false,
+  "tree": [
+    ".travis.yml",
+    "LICENSE",
+    "path.go",
+    "path_test.go",
+    "router.go",
+    "router_test.go",
+    "tree.go",
+    "tree_test.go"
+  ],
+  "explanation": {
+    "what": "router.go のパッケージコメントを1行のシンプルな説明から \"Package httprouter is a radix tree based high performance HTTP request router\" というより具体的な godoc コメントに変更し、エラーメッセージ文字列を小文字始まりに統一した(例: \"Path must begin with /\" → \"path must begin with '/'\"、tree.go の Err* 系エラーメッセージも同様に先頭を小文字化)。ロジックの変更は無い。",
+    "why": "コミットメッセージ \"lint\" の通り、Go の慣習である「エラーメッセージは大文字で始めない」という lint 指摘(golint 等)への対応と考えられる。パッケージコメントの拡充は godoc に表示される説明を分かりやすくする目的だと推測できる。",
+    "highlights": [],
+    "langNotes": [
+      { "topic": "Go のエラーメッセージ規約", "note": "Go の公式スタイルでは errors.New や fmt.Errorf に渡す文字列は句読点なし・小文字始まりが推奨される(他のエラーと連結されたときに不自然にならないため)。golint はこの規約から外れる大文字始まりのエラーメッセージを指摘する。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

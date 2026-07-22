@@ -1,0 +1,57 @@
+{
+  "seq": 42,
+  "sha": "f793382d36265620cbedf9f02a2ea0fcdddc441e",
+  "parents": [
+    "4fa5fdb8cd85fa937e8328b373546c6bd1f7afe0"
+  ],
+  "author": {
+    "name": "Julien Schmidt",
+    "email": "github@julienschmidt.com",
+    "date": "2013-12-16T16:27:22+01:00"
+  },
+  "message": "Add a middleware example",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 25,
+    "deletions": 0
+  },
+  "files": [
+    {
+      "path": "README.md",
+      "status": "M",
+      "additions": 25,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/README.md b/README.md\nindex 8960256..a84b05e 100644\n--- a/README.md\n+++ b/README.md\n@@ -69,3 +69,28 @@ The pattern `/src/*filepath` would match `/src/`, `/src/somefile.go`, `/src/subd\n \n ## Where can I find Middleware *X*?\n This package just provides a very efficient request router with a few extra features. The router is just a [http.Handler](http://golang.org/pkg/net/http/#Handler), you can chain any http.Handler compatible middleware before the router, for example the [Gorilla handlers](http://www.gorillatoolkit.org/pkg/handlers). Or you could [just write your own](http://justinas.org/writing-http-middleware-in-go/), it's very easy!\n+\n+Here is a quick example: Does your servere serve multiple domains / hosts?\n+Define a router per host!\n+```go\n+type HostSwitch map[string]http.Handler\n+\n+func (hs HostSwitch) ServeHTTP(w http.ResponseWriter, r *http.Request) {\n+\tif handler := hs[r.URL.Host]; handler != nil {\n+\t\thandler.ServeHTTP(w, r)\n+\t}\n+\n+\thttp.Error(w, \"Forbidden\", 403) // Or Redirect?\n+}\n+\n+func main() {\n+    router := httprouter.New()\n+    router.GET(\"/\", Index)\n+    router.GET(\"/hello/:name\", Hello)\n+\n+    hs := make(HostSwitch)\n+\ths[\"example.com\"] = router\n+\n+    log.Fatal(http.ListenAndServe(\":12345\", hs))\n+}\n+```\n",
+  "diffTruncated": false,
+  "tree": [
+    ".travis.yml",
+    "LICENSE",
+    "README.md",
+    "path.go",
+    "path_test.go",
+    "router.go",
+    "router_test.go",
+    "tree.go",
+    "tree_test.go"
+  ],
+  "explanation": {
+    "what": "README.md の「Where can I find Middleware X?」節に、ホスト名ごとにルータを切り替える HostSwitch というミドルウェア実装例を追加した。http.Handler を実装した map[string]http.Handler 型で、リクエストの Host に応じて対応するルータへ処理を委譲する。",
+    "why": "httprouter 自体はミドルウェアを持たず http.Handler として振る舞うだけであることを README で説明していたので、その具体的な活用例(マルチテナント的にホストごとにルータを分ける)を示すために追加された。",
+    "highlights": [
+      { "file": "README.md", "note": "HostSwitch 型が http.Handler の ServeHTTP を実装し、Host ヘッダで委譲先ルータを切り替える例" }
+    ],
+    "langNotes": [
+      { "topic": "http.Handler の合成", "note": "Go の net/http では ServeHTTP(w, r) を実装しさえすれば独自の型を http.Handler として扱える。この例の HostSwitch(map[string]http.Handler)のように、Handler を保持・委譲する型を作ることで、フレームワーク側の仕組みなしにミドルウェアやルーティングの階層化ができる。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

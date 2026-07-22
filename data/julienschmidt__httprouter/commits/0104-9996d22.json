@@ -1,0 +1,55 @@
+{
+  "seq": 104,
+  "sha": "9996d22d0add1f51cba971b2a99cc6587937d193",
+  "parents": [
+    "375cec60bc730c75f1a3dbe23a3ee94479de60ae"
+  ],
+  "author": {
+    "name": "Julien Schmidt",
+    "email": "github@julienschmidt.com",
+    "date": "2015-02-09T08:59:16+08:00"
+  },
+  "message": "tree: change branch indent\n\nmake go lint happy",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 36,
+    "deletions": 37
+  },
+  "files": [
+    {
+      "path": "tree.go",
+      "status": "M",
+      "additions": 36,
+      "deletions": 37,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/tree.go b/tree.go\nindex 121d0c3..c84a489 100644\n--- a/tree.go\n+++ b/tree.go\n@@ -445,53 +445,52 @@ func (n *node) findCaseInsensitivePath(path string, fixTrailingSlash bool) (ciPa\n \t\t\t\t// without a trailing slash if a leaf exists for that path\n \t\t\t\tfound = (fixTrailingSlash && path == \"/\" && n.handle != nil)\n \t\t\t\treturn\n+\t\t\t}\n \n-\t\t\t} else {\n-\t\t\t\tn = n.children[0]\n-\n-\t\t\t\tswitch n.nType {\n-\t\t\t\tcase param:\n-\t\t\t\t\t// find param end (either '/' or path end)\n-\t\t\t\t\tk := 0\n-\t\t\t\t\tfor k < len(path) && path[k] != '/' {\n-\t\t\t\t\t\tk++\n-\t\t\t\t\t}\n+\t\t\tn = n.children[0]\n+\t\t\tswitch n.nType {\n+\t\t\tcase param:\n+\t\t\t\t// find param end (either '/' or path end)\n+\t\t\t\tk := 0\n+\t\t\t\tfor k < len(path) && path[k] != '/' {\n+\t\t\t\t\tk++\n+\t\t\t\t}\n \n-\t\t\t\t\t// add param value to case insensitive path\n-\t\t\t\t\tciPath = append(ciPath, path[:k]...)\n+\t\t\t\t// add param value to case insensitive path\n+\t\t\t\tciPath = append(ciPath, path[:k]...)\n \n-\t\t\t\t\t// we need to go deeper!\n-\t\t\t\t\tif k < len(path) {\n-\t\t\t\t\t\tif len(n.children) > 0 {\n-\t\t\t\t\t\t\tpath = path[k:]\n-\t\t\t\t\t\t\tn = n.children[0]\n-\t\t\t\t\t\t\tcontinue\n-\t\t\t\t\t\t} else { // ... but we can't\n-\t\t\t\t\t\t\tif fixTrailingSlash && len(path) == k+1 {\n-\t\t\t\t\t\t\t\treturn ciPath, true\n-\t\t\t\t\t\t\t}\n-\t\t\t\t\t\t\treturn\n-\t\t\t\t\t\t}\n+\t\t\t\t// we need to go deeper!\n+\t\t\t\tif k < len(path) {\n+\t\t\t\t\tif len(n.children) > 0 {\n+\t\t\t\t\t\tpath = path[k:]\n+\t\t\t\t\t\tn = n.children[0]\n+\t\t\t\t\t\tcontinue\n \t\t\t\t\t}\n \n-\t\t\t\t\tif n.handle != nil {\n+\t\t\t\t\t// ... but we can't\n+\t\t\t\t\tif fixTrailingSlash && len(path) == k+1 {\n \t\t\t\t\t\treturn ciPath, true\n-\t\t\t\t\t} else if fixTrailingSlash && len(n.children) == 1 {\n-\t\t\t\t\t\t// No handle found. Check if a handle for this path + a\n-\t\t\t\t\t\t// trailing slash exists\n-\t\t\t\t\t\tn = n.children[0]\n-\t\t\t\t\t\tif n.path == \"/\" && n.handle != nil {\n-\t\t\t\t\t\t\treturn append(ciPath, '/'), true\n-\t\t\t\t\t\t}\n \t\t\t\t\t}\n \t\t\t\t\treturn\n+\t\t\t\t}\n \n-\t\t\t\tcase catchAll:\n-\t\t\t\t\treturn append(ciPath, path...), true\n-\n-\t\t\t\tdefault:\n-\t\t\t\t\tpanic(\"Invalid node type\")\n+\t\t\t\tif n.handle != nil {\n+\t\t\t\t\treturn ciPath, true\n+\t\t\t\t} else if fixTrailingSlash && len(n.children) == 1 {\n+\t\t\t\t\t// No handle found. Check if a handle for this path + a\n+\t\t\t\t\t// trailing slash exists\n+\t\t\t\t\tn = n.children[0]\n+\t\t\t\t\tif n.path == \"/\" && n.handle != nil {\n+\t\t\t\t\t\treturn append(ciPath, '/'), true\n+\t\t\t\t\t}\n \t\t\t\t}\n+\t\t\t\treturn\n+\n+\t\t\tcase catchAll:\n+\t\t\t\treturn append(ciPath, path...), true\n+\n+\t\t\tdefault:\n+\t\t\t\tpanic(\"Invalid node type\")\n \t\t\t}\n \t\t} else {\n \t\t\t// We should have reached the node containing the handle.\n",
+  "diffTruncated": false,
+  "tree": [
+    ".travis.yml",
+    "LICENSE",
+    "README.md",
+    "path.go",
+    "path_test.go",
+    "router.go",
+    "router_test.go",
+    "tree.go",
+    "tree_test.go"
+  ],
+  "explanation": {
+    "what": "tree.go の findCaseInsensitivePath 内で、else ブロックにネストされていた大きな switch 文をアーリーリターン形式に書き換えた。ロジック自体は変えず、`if ... { ... } else { n = n.children[0]; switch ... }` の構造を `if ... { return }` としてから else を排し、以降のコードのインデントを1段減らしている。",
+    "why": "コミットメッセージの \"make go lint happy\" の通り、golint(または類似のリンター)が指摘するネストの深さ・不要な else 節を解消するための純粋なスタイル修正で、挙動の変更は意図していない。",
+    "highlights": [],
+    "langNotes": [
+      { "topic": "早期リターンによるネスト解消", "note": "Go では if-else で早期 return できる場合に else を書かず、後続処理をそのまま続けるスタイルが gofmt/golint 系の慣習として好まれる。このコミットはその典型例。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

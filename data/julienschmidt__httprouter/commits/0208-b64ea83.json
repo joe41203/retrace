@@ -1,0 +1,63 @@
+{
+  "seq": 208,
+  "sha": "b64ea83919261edd921848433c9b646623212f5e",
+  "parents": [
+    "4fa1cc7490cba144ea66eb98c4baedad73e2a8b1"
+  ],
+  "author": {
+    "name": "Julien Schmidt",
+    "email": "git@julienschmidt.com",
+    "date": "2019-09-26T00:37:31+02:00"
+  },
+  "message": "tree: prevent adding children to catchAlls\n\nFixes #172",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 4,
+    "deletions": 0
+  },
+  "files": [
+    {
+      "path": "tree.go",
+      "status": "M",
+      "additions": 2,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "tree_test.go",
+      "status": "M",
+      "additions": 2,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/tree.go b/tree.go\nindex b248ca2..87c8c24 100644\n--- a/tree.go\n+++ b/tree.go\n@@ -146,6 +146,8 @@ func (n *node) addRoute(path string, handle Handle) {\n \n \t\t\t\t\t// Check if the wildcard matches\n \t\t\t\t\tif len(path) >= len(n.path) && n.path == path[:len(n.path)] &&\n+\t\t\t\t\t\t// Adding a child to a catchAll is not possible\n+\t\t\t\t\t\tn.nType != catchAll &&\n \t\t\t\t\t\t// Check for longer wildcard, e.g. :name and :names\n \t\t\t\t\t\t(len(n.path) >= len(path) || path[len(n.path)] == '/') {\n \t\t\t\t\t\tcontinue walk\ndiff --git a/tree_test.go b/tree_test.go\nindex d358ae2..2e309af 100644\n--- a/tree_test.go\n+++ b/tree_test.go\n@@ -332,6 +332,8 @@ func TestTreeCatchAllConflict(t *testing.T) {\n \t\t{\"/src/*filepath/x\", true},\n \t\t{\"/src2/\", false},\n \t\t{\"/src2/*filepath/x\", true},\n+\t\t{\"/src3/*filepath\", false},\n+\t\t{\"/src3/*filepath/x\", true},\n \t}\n \ttestRoutes(t, routes)\n }\n",
+  "diffTruncated": false,
+  "tree": [
+    ".travis.yml",
+    "LICENSE",
+    "README.md",
+    "go.mod",
+    "path.go",
+    "path_test.go",
+    "router.go",
+    "router_test.go",
+    "tree.go",
+    "tree_test.go"
+  ],
+  "explanation": {
+    "what": "tree.go の addRoute 内、既存ノードがワイルドカードにマッチするかを判定する条件に `n.nType != catchAll` を追加した。これにより catchAll ノード(*filepath など)に対して新たな子ルートを追加しようとした場合、その分岐に入らず別の経路(新規ノード追加や衝突検出)に進むようになる。tree_test.go にも /src3/*filepath と /src3/*filepath/x の組み合わせのテストケースを追加した。",
+    "why": "コミットメッセージの「Fixes #172」の通り、catchAll ルートの配下にさらに子ルートを追加しようとした際の不正な挙動を修正するもの。catchAll は本来それ以降のパス全体を1つのパラメータとして受け取るため、その下に子ノードを持たせることは想定されていない。",
+    "highlights": [
+      { "file": "tree.go", "note": "n.nType != catchAll の一文が、catchAll ノードへの子ノード追加を防ぐガードとして挿入されている" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

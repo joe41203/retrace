@@ -1,0 +1,54 @@
+{
+  "seq": 26,
+  "sha": "eb0baa1d91cdccb5222b729cbec1a40c0c2af88f",
+  "parents": [
+    "b044c2e8fcabb053f1295bd75784da36ef32f91c"
+  ],
+  "author": {
+    "name": "Julien Schmidt",
+    "email": "github@julienschmidt.com",
+    "date": "2013-12-14T13:04:48+01:00"
+  },
+  "message": "Remove obsolete check",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 0,
+    "deletions": 5
+  },
+  "files": [
+    {
+      "path": "tree.go",
+      "status": "M",
+      "additions": 0,
+      "deletions": 5,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/tree.go b/tree.go\nindex c2686d9..89d6a74 100644\n--- a/tree.go\n+++ b/tree.go\n@@ -71,7 +71,6 @@ func (n *node) addRoute(method, path string, handle Handle) {\n \n \t\t\t\tc := path[0]\n \n-\t\t\t\t// TODO: allow variable delimiter\n \t\t\t\tif n.isParam && c == '/' && len(n.children) == 1 {\n \t\t\t\t\tn = n.children[0]\n \t\t\t\t\tcontinue OUTER\n@@ -96,10 +95,6 @@ func (n *node) addRoute(method, path string, handle Handle) {\n \t\t\t\treturn\n \n \t\t\t} else if i == len(path) { // Make node a (in-path) leaf\n-\t\t\t\tif n.wildChild && n.children[0].isCatchAll {\n-\t\t\t\t\tpanic(\"conflict with catchAll route\")\n-\t\t\t\t}\n-\n \t\t\t\tif n.handle == nil {\n \t\t\t\t\tn.handle = map[string]Handle{\n \t\t\t\t\t\tmethod: handle,\n",
+  "diffTruncated": false,
+  "tree": [
+    ".travis.yml",
+    "LICENSE",
+    "path.go",
+    "path_test.go",
+    "router.go",
+    "router_test.go",
+    "tree.go",
+    "tree_test.go"
+  ],
+  "explanation": {
+    "what": "tree.go の addRoute から、「wildChild かつ children[0].isCatchAll のときに panic(\\\"conflict with catchAll route\\\")」というチェックと、変数デリミタ許容を示す TODO コメントを削除した。",
+    "why": "おそらく、1f8fe07 で catchAll ノードを空パスの中間ノードと実パスの子ノードに分ける2階層構造へ変更した結果、このチェックが検知しようとしていた状態(同じノードの wildChild 直下がいきなり catchAll になる状況)は新しい木構造ではそもそも発生しなくなり、到達不能なコードになったためだと考えられる。",
+    "highlights": [
+      { "file": "tree.go", "note": "conflict with catchAll route の panic チェックを削除" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "inferred",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

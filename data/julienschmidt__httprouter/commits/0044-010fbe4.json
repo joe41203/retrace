@@ -1,0 +1,55 @@
+{
+  "seq": 44,
+  "sha": "010fbe4df2cf59369b039a53672ddf1ee6b1fdff",
+  "parents": [
+    "c7be5ac5f702db851933594369ed51f6ee276a91"
+  ],
+  "author": {
+    "name": "Julien Schmidt",
+    "email": "github@julienschmidt.com",
+    "date": "2013-12-16T22:18:20+01:00"
+  },
+  "message": "Update README.md",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 19,
+    "deletions": 6
+  },
+  "files": [
+    {
+      "path": "README.md",
+      "status": "M",
+      "additions": 19,
+      "deletions": 6,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/README.md b/README.md\nindex a84b05e..83709fe 100644\n--- a/README.md\n+++ b/README.md\n@@ -23,6 +23,8 @@ A compressing dynamic trie (radix tree) structure is used for efficient matching\n Of course you can also set a custom NotFound handler and serve files.\n \n ## Usage\n+This is you a quick introduction, view the [GoDoc](http://godoc.org/github.com/julienschmidt/httprouter) for details.\n+\n Let's start with a trivial example:\n ```go\n package main\n@@ -55,22 +57,33 @@ func main() {\n As you can see, `:name` is a *named parameter*.\n The values are passed in map, therefore the value of `:name` is available in `vars[\"name\"]`.\n \n-Named parameters only match a single path segment.\n-If we had the pattern `/user/:user`, only requests with a URL path like `/user/gordon` or\n-`/user/you` would be matched by this pattern, not `/user/gordon/profile` or `/user/`.\n+Named parameters only match a single path segment:\n+```\n+Pattern: /user/:user\n+\n+ /user/gordon              match\n+ /user/you                 match\n+ /user/gordon/profile      no match\n+ /user/                    no match\n+```\n \n **Note:** Since this router has only explicit matches, you can not register static routes and paramters for the same path segment. For example you can not register the patterns `/user/new` and `/user/:user` at the same time.\n \n ### Catch-All routes\n The second type are *catch-all* routes and have the form `*name`. Like the name suggest, they match everything.\n-Therefore they must always be at the **end** of the pattern.\n+Therefore they must always be at the **end** of the pattern:\n+```\n+Pattern: /src/*filepath\n \n-The pattern `/src/*filepath` would match `/src/`, `/src/somefile.go`, `/src/subdir/somefile.go` and so on.\n+ /src/                     match\n+ /src/somefile.go          match\n+ /src/subdir/somefile.go   match\n+```\n \n ## Where can I find Middleware *X*?\n This package just provides a very efficient request router with a few extra features. The router is just a [http.Handler](http://golang.org/pkg/net/http/#Handler), you can chain any http.Handler compatible middleware before the router, for example the [Gorilla handlers](http://www.gorillatoolkit.org/pkg/handlers). Or you could [just write your own](http://justinas.org/writing-http-middleware-in-go/), it's very easy!\n \n-Here is a quick example: Does your servere serve multiple domains / hosts?\n+Here is a quick example: Does your server serve multiple domains / hosts?\n Define a router per host!\n ```go\n type HostSwitch map[string]http.Handler\n",
+  "diffTruncated": false,
+  "tree": [
+    ".travis.yml",
+    "LICENSE",
+    "README.md",
+    "path.go",
+    "path_test.go",
+    "router.go",
+    "router_test.go",
+    "tree.go",
+    "tree_test.go"
+  ],
+  "explanation": {
+    "what": "README.md の Usage 節を整備した。GoDoc へのリンクを冒頭に追加し、named parameters と catch-all routes の説明を文章から「Pattern / match / no match」形式のコードブロック例に書き換えた。文中の typo(\"servere\" → \"server\")も修正している。",
+    "why": "おそらく、named parameters と catch-all の挙動を文章だけで説明するより、マッチする例・しない例を並べたコードブロックの方が読み手に伝わりやすいと判断して整理したと考えられる。",
+    "highlights": [
+      { "file": "README.md", "note": "named parameters と catch-all の match/no match 一覧が新設された" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "inferred",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

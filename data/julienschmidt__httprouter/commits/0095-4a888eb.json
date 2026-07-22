@@ -1,0 +1,63 @@
+{
+  "seq": 95,
+  "sha": "4a888eb9823b065f25bcade0f8c78997186ee7ea",
+  "parents": [
+    "ce95a6f83e52d2f1bc5694842dce3e54da7c6501"
+  ],
+  "author": {
+    "name": "Julien Schmidt",
+    "email": "github@julienschmidt.com",
+    "date": "2015-01-06T15:22:20+08:00"
+  },
+  "message": "Revert \"Merge pull request #51\"\n\nFixes #52",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 0,
+    "deletions": 32
+  },
+  "files": [
+    {
+      "path": "router.go",
+      "status": "M",
+      "additions": 0,
+      "deletions": 15,
+      "binary": false
+    },
+    {
+      "path": "router_test.go",
+      "status": "M",
+      "additions": 0,
+      "deletions": 17,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/router.go b/router.go\nindex 3a562bd..7716dc7 100644\n--- a/router.go\n+++ b/router.go\n@@ -313,21 +313,6 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {\n \t\t}\n \t}\n \n-\t// Handle 405\n-\tfor method := range r.trees {\n-\t\tif method == req.Method {\n-\t\t\tcontinue\n-\t\t}\n-\n-\t\tif handle, _, _ := r.trees[method].getValue(req.URL.Path); handle != nil {\n-\t\t\thttp.Error(w,\n-\t\t\t\thttp.StatusText(http.StatusMethodNotAllowed),\n-\t\t\t\thttp.StatusMethodNotAllowed,\n-\t\t\t)\n-\t\t\treturn\n-\t\t}\n-\t}\n-\n \t// Handle 404\n \tif r.NotFound != nil {\n \t\tr.NotFound(w, req)\ndiff --git a/router_test.go b/router_test.go\nindex 9703908..7c8ac09 100644\n--- a/router_test.go\n+++ b/router_test.go\n@@ -165,23 +165,6 @@ func TestRouterRoot(t *testing.T) {\n \t}\n }\n \n-func TestRouterNotAllowed(t *testing.T) {\n-\thandlerFunc := func(_ http.ResponseWriter, _ *http.Request, _ Params) {}\n-\tmethod := \"/method\"\n-\tcode := 405\n-\n-\trouter := New()\n-\trouter.POST(method, handlerFunc)\n-\n-\t// Test not allowed\n-\tr, _ := http.NewRequest(\"GET\", method, nil)\n-\tw := httptest.NewRecorder()\n-\trouter.ServeHTTP(w, r)\n-\tif !(w.Code == code) {\n-\t\tt.Errorf(\"NotAllowed handling route %s failed: Code=%d, Header=%v\", w.Code, w.Header())\n-\t}\n-}\n-\n func TestRouterNotFound(t *testing.T) {\n \thandlerFunc := func(_ http.ResponseWriter, _ *http.Request, _ Params) {}\n \n",
+  "diffTruncated": false,
+  "tree": [
+    ".travis.yml",
+    "LICENSE",
+    "README.md",
+    "path.go",
+    "path_test.go",
+    "router.go",
+    "router_test.go",
+    "tree.go",
+    "tree_test.go"
+  ],
+  "explanation": {
+    "what": "seq89 (PR #51) で導入された 405 (Method Not Allowed) ハンドリングを ServeHTTP から丸ごと削除し、対応するテスト TestRouterNotAllowed も削除した。ルータの動作は 405 判定を挟まない元の形に戻る。",
+    "why": "コミットメッセージが \"Revert \\\"Merge pull request #51\\\" / Fixes #52\" と明記しており、#51 で入った実装が #52 で問題を引き起こしたためいったん取り消したと読める。この時点では常時 405 判定が走る実装だったため、副作用(既存ルーティング挙動への影響)が issue として報告されたものと推測される。",
+    "highlights": [
+      { "file": "router.go", "note": "PR #51 で追加された 405 分岐(for method := range r.trees { ... }) をまるごと削除" },
+      { "file": "router_test.go", "note": "対応する TestRouterNotAllowed を削除" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

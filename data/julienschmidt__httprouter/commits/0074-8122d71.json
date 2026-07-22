@@ -1,0 +1,55 @@
+{
+  "seq": 74,
+  "sha": "8122d71ccc831e26a56e2c9f1758eb296d34bee3",
+  "parents": [
+    "dadc6376e36472f55e27fa83c8188db36dfd4109"
+  ],
+  "author": {
+    "name": "Julien Schmidt",
+    "email": "github@julienschmidt.com",
+    "date": "2014-06-09T01:48:25+02:00"
+  },
+  "message": "README: Notice on http.Handler",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 11,
+    "deletions": 0
+  },
+  "files": [
+    {
+      "path": "README.md",
+      "status": "M",
+      "additions": 11,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/README.md b/README.md\nindex f33bfee..5a9b88f 100644\n--- a/README.md\n+++ b/README.md\n@@ -168,6 +168,17 @@ structure. Nodes are evaluated from top to bottom and from left to right.\n └-\n ```\n \n+\n+## Why doesn't this work with http.Handler?\n+**It does!** The router itself implements the http.Handler interface.\n+Moreover the router provides convenient [adapters for http.Handler](http://godoc.org/github.com/julienschmidt/httprouter#Router.Handler)s and [http.HandlerFunc](http://godoc.org/github.com/julienschmidt/httprouter#Router.HandlerFunc)s\n+which allows them to be used as a [httprouter.Handle](http://godoc.org/github.com/julienschmidt/httprouter#Router.Handle) when registering a route.\n+The only disadvantage is, that no parameter values can be retrieved when a\n+http.Handler or http.HandlerFunc is used, since there is no efficient way to\n+pass the values with the existing function parameters.\n+Therefore [httprouter.Handle](http://godoc.org/github.com/julienschmidt/httprouter#Router.Handle) has a third function parameter.\n+\n+\n ## Where can I find Middleware *X*?\n This package just provides a very efficient request router with a few extra\n features. The router is just a [http.Handler](http://golang.org/pkg/net/http/#Handler),\n",
+  "diffTruncated": false,
+  "tree": [
+    ".travis.yml",
+    "LICENSE",
+    "README.md",
+    "path.go",
+    "path_test.go",
+    "router.go",
+    "router_test.go",
+    "tree.go",
+    "tree_test.go"
+  ],
+  "explanation": {
+    "what": "README.md に「Why doesn't this work with http.Handler?」という Q&A セクションを追加し、Router 自体が http.Handler を実装していること、Router.Handler / Router.HandlerFunc という変換アダプタが用意されていること、ただし http.Handler / http.HandlerFunc 経由ではパスパラメータを受け取れない(httprouter.Handle だけが第3引数で Params を受け取れる)という制約を明記した。",
+    "why": "直前の seq73 で Router.Handler アダプタを追加したが、httprouter が net/http の標準インターフェースと衝突しているように見える(「http.Handler と互換性がないのでは」という疑問を持たれやすい)ため、README で誤解を先回りして解消する意図と読める。",
+    "highlights": [
+      { "file": "README.md", "note": "http.Handler 経由ではパラメータが取れないという制約の明記" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

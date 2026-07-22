@@ -1,0 +1,56 @@
+{
+  "seq": 12,
+  "sha": "0ebf00ed4faeec113f9c44859509e9e032a07d99",
+  "parents": [
+    "0009e536a677446d388ec88903c9bf3615d894ed"
+  ],
+  "author": {
+    "name": "Julien Schmidt",
+    "email": "github@julienschmidt.com",
+    "date": "2013-12-11T16:04:33+01:00"
+  },
+  "message": "Add a PanicHandler test",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 28,
+    "deletions": 0
+  },
+  "files": [
+    {
+      "path": "router_test.go",
+      "status": "M",
+      "additions": 28,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/router_test.go b/router_test.go\nindex ee72b5e..f875a19 100644\n--- a/router_test.go\n+++ b/router_test.go\n@@ -47,3 +47,31 @@ func TestRouter(t *testing.T) {\n \t\tt.Fatal(\"routing failed\")\n \t}\n }\n+\n+func TestRouterPanicHandler(t *testing.T) {\n+\trouter := New()\n+\tpanicHandled := false\n+\n+\trouter.PanicHandler = func(rw http.ResponseWriter, r *http.Request, p interface{}) {\n+\t\tpanicHandled = true\n+\t}\n+\n+\trouter.Handle(\"PUT\", \"/user/:name\", func(_ http.ResponseWriter, _ *http.Request, _ map[string]string) {\n+\t\tpanic(\"oops!\")\n+\t})\n+\n+\tw := new(mockResponseWriter)\n+\treq, _ := http.NewRequest(\"PUT\", \"/user/gopher\", nil)\n+\n+\tdefer func() {\n+\t\tif rcv := recover(); rcv != nil {\n+\t\t\tt.Fatal(\"handling panic failed\")\n+\t\t}\n+\t}()\n+\n+\trouter.ServeHTTP(w, req)\n+\n+\tif !panicHandled {\n+\t\tt.Fatal(\"simulating failed\")\n+\t}\n+}\n",
+  "diffTruncated": false,
+  "tree": [
+    ".travis.yml",
+    "LICENSE",
+    "path.go",
+    "path_test.go",
+    "router.go",
+    "router_test.go",
+    "tree.go",
+    "tree_test.go"
+  ],
+  "explanation": {
+    "what": "router_test.go に TestRouterPanicHandler を追加した。Router.PanicHandler にハンドラを設定し、ルート内で panic(\"oops!\") を起こすハンドラを登録した上で ServeHTTP を呼び、PanicHandler が呼ばれて panicHandled フラグが true になること、かつ panic がテスト自体に伝播しないことを確認する。",
+    "why": "コミットメッセージの通り、直前までに実装した PanicHandler(ハンドラ内の panic を recover して呼び出し元へ通知する仕組み)に対するテストを追加するのが目的。",
+    "highlights": [
+      { "file": "router_test.go", "note": "defer + recover() でテスト自身がハンドラの panic に巻き込まれないようにしている点" }
+    ],
+    "langNotes": [
+      { "topic": "panic/recover", "note": "Go にはtry/catchがなく、異常系の中断は panic、その捕捉は defer 内の recover() で行う。ここでは router 内部の recv() が recover することで、ハンドラの panic が呼び出し元(HTTPサーバ全体)を巻き込まずに済むことをテストしている。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

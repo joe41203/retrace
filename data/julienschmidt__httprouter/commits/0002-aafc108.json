@@ -1,0 +1,64 @@
+{
+  "seq": 2,
+  "sha": "aafc1087ced7f3e840eeeb5061f8b14fdf32a573",
+  "parents": [
+    "37170e05813172d680c5ee42cab93b77b76339ba"
+  ],
+  "author": {
+    "name": "Julien Schmidt",
+    "email": "github@julienschmidt.com",
+    "date": "2013-11-19T23:10:57+01:00"
+  },
+  "message": "Add func to build clean canonical path",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 212,
+    "deletions": 0
+  },
+  "files": [
+    {
+      "path": "path.go",
+      "status": "A",
+      "additions": 126,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "path_test.go",
+      "status": "A",
+      "additions": 86,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/path.go b/path.go\nnew file mode 100644\nindex 0000000..06643cc\n--- /dev/null\n+++ b/path.go\n@@ -0,0 +1,126 @@\n+// Copyright 2013 Julien Schmidt. All rights reserved.\n+// Based on the path package, Copyright 2009 The Go Authors.\n+// Use of this source code is governed by a BSD-style license that can be found\n+// in the LICENSE file.\n+\n+package router\n+\n+// CleanPath returns a canonical URL path for p, eliminating . and .. elements.\n+//\n+// The following rules are applied iteratively until no further processing can\n+// be done:\n+//\t1. Replace multiple slashes with a single slash.\n+//\t2. Eliminate each . path name element (the current directory).\n+//\t3. Eliminate each inner .. path name element (the parent directory)\n+//\t   along with the non-.. element that precedes it.\n+//\t4. Eliminate .. elements that begin a rooted path:\n+//\t   that is, replace \"/..\" by \"/\" at the beginning of a path.\n+//\n+// If the result of this process is an empty string, \"/\" is returned\n+func CleanPath(p string) string {\n+\tif p == \"\" {\n+\t\treturn \"/\"\n+\t}\n+\n+\tn := len(p)\n+\tvar buf []byte\n+\n+\t// Invariants:\n+\t//      reading from path; r is index of next byte to process.\n+\t//      writing to buf; w is index of next byte to write.\n+\n+\t// path must start with '/'\n+\tr := 1\n+\tw := 1\n+\n+\tif p[0] != '/' {\n+\t\tr = 0\n+\t\tbuf = make([]byte, n+1)\n+\t\tbuf[0] = '/'\n+\t}\n+\n+\ttrailing := n > 2 && p[n-1] == '/'\n+\n+\t// A bit more clunky without a 'lazybuf' like the path package, but the loop\n+\t// gets completely inlined (bufApp). So in contrast to the path package this\n+\t// loop has no expensive function calls (except 1x make)\n+\n+\tfor r < n {\n+\t\tswitch {\n+\t\tcase p[r] == '/':\n+\t\t\t// empty path element, trailing slash is added after the end\n+\t\t\tr++\n+\n+\t\tcase p[r] == '.' && r+1 == n:\n+\t\t\ttrailing = true\n+\t\t\tr++\n+\n+\t\tcase p[r] == '.' && p[r+1] == '/':\n+\t\t\t// . element\n+\t\t\tr++\n+\n+\t\tcase p[r] == '.' && p[r+1] == '.' && (r+2 == n || p[r+2] == '/'):\n+\t\t\t// .. element: remove to last /\n+\t\t\tr += 2\n+\n+\t\t\tif w > 1 {\n+\t\t\t\t// can backtrack\n+\t\t\t\tw--\n+\n+\t\t\t\tif buf == nil {\n+\t\t\t\t\tfor w > 1 && p[w] != '/' {\n+\t\t\t\t\t\tw--\n+\t\t\t\t\t}\n+\t\t\t\t} else {\n+\t\t\t\t\tfor w > 1 && buf[w] != '/' {\n+\t\t\t\t\t\tw--\n+\t\t\t\t\t}\n+\t\t\t\t}\n+\t\t\t}\n+\n+\t\tdefault:\n+\t\t\t// real path element.\n+\t\t\t// add slash if needed\n+\t\t\tif w > 1 {\n+\t\t\t\tbufApp(&buf, p, w, '/')\n+\t\t\t\tw++\n+\t\t\t}\n+\n+\t\t\t// copy element\n+\t\t\tfor r < n && p[r] != '/' {\n+\t\t\t\tbufApp(&buf, p, w, p[r])\n+\t\t\t\tw++\n+\t\t\t\tr++\n+\t\t\t}\n+\t\t}\n+\t}\n+\n+\t// re-append trailing slash\n+\tif trailing && w > 1 {\n+\t\tbufApp(&buf, p, w, '/')\n+\t\tw++\n+\t}\n+\n+\t// Turn empty string into \"/\"\n+\tif w == 0 {\n+\t\treturn \"/\"\n+\t}\n+\n+\tif buf == nil {\n+\t\treturn p[:w]\n+\t}\n+\treturn string(buf[:w])\n+}\n+\n+// internal helper to lazily create a buffer if necessary\n+func bufApp(buf *[]byte, s string, w int, c byte) {\n+\tif *buf == nil {\n+\t\tif s[w] == c {\n+\t\t\treturn\n+\t\t}\n+\n+\t\t*buf = make([]byte, len(s))\n+\t\tcopy(*buf, s[:w])\n+\t}\n+\t(*buf)[w] = c\n+}\ndiff --git a/path_test.go b/path_test.go\nnew file mode 100644\nindex 0000000..ead9f16\n--- /dev/null\n+++ b/path_test.go\n@@ -0,0 +1,86 @@\n+// Copyright 2013 Julien Schmidt. All rights reserved.\n+// Based on the path package, Copyright 2009 The Go Authors.\n+// Use of this source code is governed by a BSD-style license that can be found\n+// in the LICENSE file.\n+\n+package router\n+\n+import (\n+\t\"runtime\"\n+\t\"testing\"\n+)\n+\n+var cleanTests = []struct {\n+\tpath, result string\n+}{\n+\t// Already clean\n+\t{\"\", \"/\"},\n+\t{\"abc\", \"/abc\"},\n+\t{\"abc/def\", \"/abc/def\"},\n+\t{\"a/b/c\", \"/a/b/c\"},\n+\t{\"/\", \"/\"},\n+\t{\"../..\", \"/\"},\n+\t{\"../../abc\", \"/abc\"},\n+\n+\t// Remove doubled slash\n+\t{\"//\", \"/\"},\n+\t{\"/abc//\", \"/abc/\"},\n+\t{\"/abc/def//\", \"/abc/def/\"},\n+\t{\"/a/b/c//\", \"/a/b/c/\"},\n+\t{\"/abc//def//ghi\", \"/abc/def/ghi\"},\n+\t{\"//abc\", \"/abc\"},\n+\t{\"///abc\", \"/abc\"},\n+\t{\"//abc//\", \"/abc/\"},\n+\n+\t// Remove . elements\n+\t{\".\", \"/\"},\n+\t{\"./\", \"/\"},\n+\t{\"/abc/./def\", \"/abc/def\"},\n+\t{\"/./abc/def\", \"/abc/def\"},\n+\t{\"/abc/.\", \"/abc/\"},\n+\n+\t// Remove .. elements\n+\t{\"..\", \"/\"},\n+\t{\"../\", \"/\"},\n+\t{\"../../\", \"/\"},\n+\t{\"/abc/def/ghi/../jkl\", \"/abc/def/jkl\"},\n+\t{\"/abc/def/../ghi/../jkl\", \"/abc/jkl\"},\n+\t{\"/abc/def/..\", \"/abc\"},\n+\t{\"/abc/def/../..\", \"/\"},\n+\t{\"/abc/def/../../..\", \"/\"},\n+\t{\"/abc/def/../../..\", \"/\"},\n+\t{\"/abc/def/../../../ghi/jkl/../../../mno\", \"/mno\"},\n+\n+\t// Combinations\n+\t{\"abc/./../def\", \"/def\"},\n+\t{\"abc//./../def\", \"/def\"},\n+\t{\"abc/../../././../def\", \"/def\"},\n+}\n+\n+func TestPathClean(t *testing.T) {\n+\tfor _, test := range cleanTests {\n+\t\tif s := CleanPath(test.path); s != test.result {\n+\t\t\tt.Errorf(\"Clean(%q) = %q, want %q\", test.path, s, test.result)\n+\t\t}\n+\t\tif s := CleanPath(test.result); s != test.result {\n+\t\t\tt.Errorf(\"Clean(%q) = %q, want %q\", test.result, s, test.result)\n+\t\t}\n+\t}\n+}\n+\n+func TestPathCleanMallocs(t *testing.T) {\n+\tif testing.Short() {\n+\t\tt.Skip(\"skipping malloc count in short mode\")\n+\t}\n+\tif runtime.GOMAXPROCS(0) > 1 {\n+\t\tt.Log(\"skipping AllocsPerRun checks; GOMAXPROCS>1\")\n+\t\treturn\n+\t}\n+\n+\tfor _, test := range cleanTests {\n+\t\tallocs := testing.AllocsPerRun(100, func() { CleanPath(test.result) })\n+\t\tif allocs > 0 {\n+\t\t\tt.Errorf(\"Clean(%q): %v allocs, want zero\", test.result, allocs)\n+\t\t}\n+\t}\n+}\n",
+  "diffTruncated": false,
+  "tree": [
+    "LICENSE",
+    "path.go",
+    "path_test.go",
+    "router.go",
+    "router_test.go",
+    "tree.go",
+    "tree_test.go"
+  ],
+  "explanation": {
+    "what": "path.go を新規追加し、URL パスを正規化する CleanPath 関数を実装した。標準ライブラリの path.Clean と同じ規則(多重スラッシュの圧縮、`.`/`..` 要素の除去)を適用するが、実装コメントにある通り path パッケージの `lazybuf` を使わず、書き込み先バッファを必要になるまで nil のまま遅延生成する方式にしている。path_test.go には入力/期待値のテーブルテストに加え、TestPathCleanMallocs という、変更不要な入力に対してアロケーションがゼロであることを testing.AllocsPerRun で検証するテストが含まれる。",
+    "why": "おそらく、この直後のコミット群で NotFound ハンドラや CleanPath ベースのリダイレクトを作る前提として、URL の正規化ロジックをルータ本体から独立した関数として先に用意したと考えられる。TestPathCleanMallocs を最初から用意している点から、ゼロアロケーションへのこだわりが早い段階からの設計目標だったことがうかがえる。",
+    "highlights": [
+      { "file": "path.go", "note": "buf を nil のまま進め、実際に元の文字列と異なる書き込みが必要になった時点で初めて make([]byte, ...) する遅延バッファ確保(bufApp)。変更が不要な入力ではアロケーションを避ける工夫" },
+      { "file": "path_test.go", "note": "TestPathCleanMallocs が testing.AllocsPerRun でゼロアロケーションを検証している。GOMAXPROCS>1 のときはスキップする注記付き" }
+    ],
+    "langNotes": [
+      { "topic": "[]byte と string の変換・遅延バッファ確保", "note": "Go の string はイミュータブルなので、書き換えが必要な処理では []byte のバッファに書き込んでから string() で変換するのが定石。CleanPath はさらに一歩進み、入力を書き換える必要が生じるまで buf を nil のまま保持し、必要になった瞬間だけ make で確保することで、変更不要な大多数のパスでのメモリ確保を避けている。" },
+      { "topic": "testing.AllocsPerRun", "note": "指定回数だけ関数を実行し、1回あたりの平均ヒープアロケーション回数を返す testing パッケージの関数。ゼロアロケーションを維持したいホットパスの回帰テストとして使われる。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

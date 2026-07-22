@@ -1,0 +1,52 @@
+{
+  "seq": 13,
+  "sha": "638f68c77a4da27cc34b8533ec6df24dc1924f55",
+  "parents": [
+    "0ebf00ed4faeec113f9c44859509e9e032a07d99"
+  ],
+  "author": {
+    "name": "Julien Schmidt",
+    "email": "github@julienschmidt.com",
+    "date": "2013-12-11T20:07:20+01:00"
+  },
+  "message": "refactoring",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 12,
+    "deletions": 12
+  },
+  "files": [
+    {
+      "path": "router.go",
+      "status": "M",
+      "additions": 12,
+      "deletions": 12,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/router.go b/router.go\nindex 7cc140b..63d9324 100644\n--- a/router.go\n+++ b/router.go\n@@ -18,15 +18,15 @@ type Handle func(http.ResponseWriter, *http.Request, map[string]string)\n // NotFound is the default HTTP handler func for routes that can't be matched\n // with an existing route.\n // NotFound tries to redirect to a canonical URL generated with CleanPath\n-func NotFound(rw http.ResponseWriter, req *http.Request) {\n+func NotFound(w http.ResponseWriter, req *http.Request) {\n \tif req.Method != \"CONNECT\" {\n \t\tif p := CleanPath(req.URL.Path); p != req.URL.Path && p != req.Referer() {\n-\t\t\thttp.Redirect(rw, req, p, http.StatusMovedPermanently)\n+\t\t\thttp.Redirect(w, req, p, http.StatusMovedPermanently)\n \t\t\treturn\n \t\t}\n \t}\n \n-\thttp.NotFound(rw, req)\n+\thttp.NotFound(w, req)\n }\n \n // Router is a http.Handler which can be used to dispatch requests to different\n@@ -41,7 +41,7 @@ type Router struct {\n \tRedirectTrailingSlash bool\n \n \t// Configurable handler func which is used when no matching route is found.\n-\t// Default is the NotFound func of this package\n+\t// Default is the NotFound func of this package.\n \tNotFound http.HandlerFunc\n \n \t// Handler func to handle panics recovered from http handlers.\n@@ -93,31 +93,31 @@ func (r *Router) Handle(method, path string, handle Handle) error {\n \treturn r.addRoute(method, path, handle)\n }\n \n-func (r *Router) recv(rw http.ResponseWriter, req *http.Request) {\n+func (r *Router) recv(w http.ResponseWriter, req *http.Request) {\n \tif rcv := recover(); rcv != nil {\n-\t\tr.PanicHandler(rw, req, rcv)\n+\t\tr.PanicHandler(w, req, rcv)\n \t}\n }\n \n // Make the router implement the http.Handler interface.\n-func (r *Router) ServeHTTP(rw http.ResponseWriter, req *http.Request) {\n+func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {\n \tif r.PanicHandler != nil {\n-\t\tdefer r.recv(rw, req)\n+\t\tdefer r.recv(w, req)\n \t}\n \n \tpath := req.URL.Path\n \n \tif handle, vars, tsr := r.getValue(req.Method, path); handle != nil {\n-\t\thandle(rw, req, vars)\n+\t\thandle(w, req, vars)\n \t} else if tsr && r.RedirectTrailingSlash {\n \t\tif path[len(path)-1] == '/' {\n-\t\t\thttp.Redirect(rw, req, path[:len(path)-1], http.StatusMovedPermanently)\n+\t\t\thttp.Redirect(w, req, path[:len(path)-1], http.StatusMovedPermanently)\n \t\t\treturn\n \t\t} else {\n-\t\t\thttp.Redirect(rw, req, path+\"/\", http.StatusMovedPermanently)\n+\t\t\thttp.Redirect(w, req, path+\"/\", http.StatusMovedPermanently)\n \t\t\treturn\n \t\t}\n \t} else { // Handle 404\n-\t\tr.NotFound(rw, req)\n+\t\tr.NotFound(w, req)\n \t}\n }\n",
+  "diffTruncated": false,
+  "tree": [
+    ".travis.yml",
+    "LICENSE",
+    "path.go",
+    "path_test.go",
+    "router.go",
+    "router_test.go",
+    "tree.go",
+    "tree_test.go"
+  ],
+  "explanation": {
+    "what": "router.go 内で ResponseWriter を受け取る引数名を `rw` から `w` に統一した(NotFound, recv, ServeHTTP など)。ロジックの変更はなく、変数名のリネームのみ。",
+    "why": "おそらく net/http パッケージの慣習(http.HandlerFunc のシグネチャで w http.ResponseWriter とするのが一般的)に合わせ、コードベース全体で命名を統一する目的のリファクタと考えられる。",
+    "highlights": [],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "inferred",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

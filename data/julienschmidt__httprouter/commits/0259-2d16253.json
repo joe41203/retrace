@@ -1,0 +1,59 @@
+{
+  "seq": 259,
+  "sha": "2d16253c761c85ed5477aea0c90958e5498eae9e",
+  "parents": [
+    "4f0d8066214674e810d46f1e86cf0b88727e9549"
+  ],
+  "author": {
+    "name": "Julien Schmidt",
+    "email": "git@julienschmidt.com",
+    "date": "2020-08-14T20:20:55+02:00"
+  },
+  "message": "router: explicitly ignore cast err and remove ps shadowing",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 2,
+    "deletions": 2
+  },
+  "files": [
+    {
+      "path": "router.go",
+      "status": "M",
+      "additions": 2,
+      "deletions": 2,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/router.go b/router.go\nindex 9919c0e..1eab403 100644\n--- a/router.go\n+++ b/router.go\n@@ -220,7 +220,7 @@ func New() *Router {\n }\n \n func (r *Router) getParams() *Params {\n-\tps := r.paramsPool.Get().(*Params)\n+\tps, _ := r.paramsPool.Get().(*Params)\n \t*ps = (*ps)[0:0] // reset slice\n \treturn ps\n }\n@@ -235,7 +235,7 @@ func (r *Router) saveMatchedRoutePath(path string, handle Handle) Handle {\n \treturn func(w http.ResponseWriter, req *http.Request, ps Params) {\n \t\tif ps == nil {\n \t\t\tpsp := r.getParams()\n-\t\t\tps := (*psp)[0:1]\n+\t\t\tps = (*psp)[0:1]\n \t\t\tps[0] = Param{Key: MatchedRoutePathParam, Value: path}\n \t\t\thandle(w, req, ps)\n \t\t\tr.putParams(psp)\n",
+  "diffTruncated": false,
+  "tree": [
+    ".travis.yml",
+    "LICENSE",
+    "README.md",
+    "go.mod",
+    "path.go",
+    "path_test.go",
+    "router.go",
+    "router_test.go",
+    "tree.go",
+    "tree_test.go"
+  ],
+  "explanation": {
+    "what": "router.goの`getParams`メソッドで`ps := r.paramsPool.Get().(*Params)`という型アサーションを`ps, _ := r.paramsPool.Get().(*Params)`というcomma-ok形式に変更した。また`saveMatchedRoutePath`内で新たに`ps := (*psp)[0:1]`と`:=`宣言していた箇所を、外側スコープの`ps`への代入`ps = (*psp)[0:1]`に修正した。",
+    "why": "コミットメッセージ「explicitly ignore cast err and remove ps shadowing」の通り、2つの意図がある。1つは型アサーションの失敗時panicの可能性を静的解析ツール(golintなど)に指摘されないよう明示的に無視する形にしたこと、もう1つは`:=`による変数宣言が外側の`ps`引数を覆い隠す(shadowing)バグの芽を取り除いたこと。",
+    "highlights": [
+      { "file": "router.go", "note": "ps := (*psp)[0:1] を ps = (*psp)[0:1] に変更し、引数 ps のシャドーイングを解消した箇所" }
+    ],
+    "langNotes": [
+      { "topic": "型アサーションの comma-ok 形式", "note": "Go の型アサーション `x.(T)` は失敗すると panic するが、`v, ok := x.(T)` の2値形式(comma-ok)にすると失敗時に ok が false になるだけで panic しない。ここでは2値目を `_` で明示的に捨てており、1値形式のまま panic しうるコードであることを読み手・lintツールに対して意識的な選択として示している。" },
+      { "topic": "変数シャドーイング(shadowing)", "note": "Go では `:=` を使うと、既に外側スコープに同名の変数があってもブロック内で新しいローカル変数が作られてしまう。関数の引数名と同じ名前を `:=` で再宣言すると、意図せず外側の変数を隠して別物になるバグの温床になる。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

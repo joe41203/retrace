@@ -1,0 +1,60 @@
+{
+  "seq": 6,
+  "sha": "5374cada7686b8d9daf5787b52fb7b2464e78093",
+  "parents": [
+    "48110743510861ec5c615789e4c6679cca4712f3"
+  ],
+  "author": {
+    "name": "Julien Schmidt",
+    "email": "github@julienschmidt.com",
+    "date": "2013-12-05T16:09:47+01:00"
+  },
+  "message": "Another small refactoring",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 5,
+    "deletions": 6
+  },
+  "files": [
+    {
+      "path": "tree.go",
+      "status": "M",
+      "additions": 2,
+      "deletions": 3,
+      "binary": false
+    },
+    {
+      "path": "tree_test.go",
+      "status": "M",
+      "additions": 3,
+      "deletions": 3,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/tree.go b/tree.go\nindex 77663f1..46bbd60 100644\n--- a/tree.go\n+++ b/tree.go\n@@ -193,8 +193,9 @@ func (n *node) getValue(key string) (value HandlerFunc, vars map[string]string,\n \t// Walk tree nodes\n OUTER:\n \tfor len(key) >= len(n.key) && key[:len(n.key)] == n.key {\n+\t\tkey = key[len(n.key):]\n \n-\t\tif len(key) == len(n.key) {\n+\t\tif len(key) == 0 {\n \t\t\t// Check if this node has a registered handler\n \t\t\tif value = n.value; value != nil {\n \t\t\t\treturn\n@@ -212,7 +213,6 @@ OUTER:\n \t\t\treturn\n \n \t\t} else if n.wildChild == true {\n-\t\t\tkey = key[len(n.key):]\n \t\t\tn = n.children[0]\n \n \t\t\tif n.isParam {\n@@ -271,7 +271,6 @@ OUTER:\n \t\t\t}\n \n \t\t} else {\n-\t\t\tkey = key[len(n.key):]\n \t\t\tc := key[0]\n \n \t\t\tfor i, index := range n.indices {\ndiff --git a/tree_test.go b/tree_test.go\nindex 748ed50..27dc5e6 100644\n--- a/tree_test.go\n+++ b/tree_test.go\n@@ -127,8 +127,8 @@ func TestTreeWildcard(t *testing.T) {\n \t\t{\"/src/\", true, \"\", nil},\n \t\t{\"/src/some/file.png\", false, \"/src/*filepath\", map[string]string{\"filepath\": \"some/file.png\"}},\n \t\t{\"/search/\", false, \"/search/\", nil},\n-\t\t{\"/search/some+cräzy+sh!t\", false, \"/search/:query\", map[string]string{\"query\": \"some+cräzy+sh!t\"}},\n-\t\t{\"/search/some+cräzy+sh!t/\", true, \"\", map[string]string{\"query\": \"some+cräzy+sh!t\"}},\n+\t\t{\"/search/someth!ng+in+ünìcodé\", false, \"/search/:query\", map[string]string{\"query\": \"someth!ng+in+ünìcodé\"}},\n+\t\t{\"/search/someth!ng+in+ünìcodé/\", true, \"\", map[string]string{\"query\": \"someth!ng+in+ünìcodé\"}},\n \t\t{\"/user_gopher\", false, \"/user_:name\", map[string]string{\"name\": \"gopher\"}},\n \t\t{\"/user_gopher/about\", false, \"/user_:name/about\", map[string]string{\"name\": \"gopher\"}},\n \t})\n@@ -235,7 +235,7 @@ func TestTreeDupliatePath(t *testing.T) {\n \t\t{\"/\", false, \"/\", nil},\n \t\t{\"/doc/\", false, \"/doc/\", nil},\n \t\t{\"/src/some/file.png\", false, \"/src/*filepath\", map[string]string{\"filepath\": \"some/file.png\"}},\n-\t\t{\"/search/some+cräzy+sh!t\", false, \"/search/:query\", map[string]string{\"query\": \"some+cräzy+sh!t\"}},\n+\t\t{\"/search/someth!ng+in+ünìcodé\", false, \"/search/:query\", map[string]string{\"query\": \"someth!ng+in+ünìcodé\"}},\n \t\t{\"/user_gopher\", false, \"/user_:name\", map[string]string{\"name\": \"gopher\"}},\n \t})\n }\n",
+  "diffTruncated": false,
+  "tree": [
+    "LICENSE",
+    "path.go",
+    "path_test.go",
+    "router.go",
+    "router_test.go",
+    "tree.go",
+    "tree_test.go"
+  ],
+  "explanation": {
+    "what": "tree.go の getValue で、`key = key[len(n.key):]` によるキーの前進処理を3箇所の分岐それぞれから、ループ先頭の1箇所に統一した。あわせて `if len(key) == len(n.key)` だった終端判定を、前進後の残りキー長で判定する `if len(key) == 0` に書き換えている。tree_test.go はテスト文字列内のマルチバイト文字(cräzy+sh!t)を someth!ng+in+ünìcodé に置き換えているが、検証内容は変えていない。",
+    "why": "おそらく、3箇所に重複していた `key = key[len(n.key):]` を1箇所にまとめることでロジックの重複を排除し、以降のノード種別ごとの分岐(wildChild/catchAll/通常ノード)を単純化する目的のリファクタリングと考えられる。テスト文字列の変更は、非ASCII文字を含むケースを別のUnicode文字種で確認する意図と推測されるが、確証はない。",
+    "highlights": [
+      { "file": "tree.go", "note": "key の前進処理をループ先頭に集約したことで、以降の3つの分岐(終端/wildChild/通常子ノード)がキー前進を意識せずに書けるようになっている" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "inferred",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

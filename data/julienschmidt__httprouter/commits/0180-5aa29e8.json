@@ -1,0 +1,69 @@
+{
+  "seq": 180,
+  "sha": "5aa29e8dfcfa8e46993f5058297931ec75eb93dd",
+  "parents": [
+    "d1898390779332322e6b5ca5011da4bf249bb056"
+  ],
+  "author": {
+    "name": "Huan Wang",
+    "email": "fredwanghuan@gmail.com",
+    "date": "2018-04-11T09:39:45-06:00"
+  },
+  "message": "path: fix missing root in paths with length 2 (#239)",
+  "pr": {
+    "number": 239,
+    "title": "add an edge case",
+    "body": "Looked into the src yesterday and found a subtle edge case. The trailing was hardcoded to match n > 2 only. However, it could be the case that a single character path with trailing slash without the root slash. Not sure how much it would affect (or at all), but it just a thing.\r\n\r\nSimply fixed that line and added a new test case.",
+    "url": "https://github.com/julienschmidt/httprouter/pull/239"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 2,
+    "deletions": 1
+  },
+  "files": [
+    {
+      "path": "path.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "path_test.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/path.go b/path.go\nindex 486134d..d64edf0 100644\n--- a/path.go\n+++ b/path.go\n@@ -41,7 +41,7 @@ func CleanPath(p string) string {\n \t\tbuf[0] = '/'\n \t}\n \n-\ttrailing := n > 2 && p[n-1] == '/'\n+\ttrailing := n > 1 && p[n-1] == '/'\n \n \t// A bit more clunky without a 'lazybuf' like the path package, but the loop\n \t// gets completely inlined (bufApp). So in contrast to the path package this\ndiff --git a/path_test.go b/path_test.go\nindex c4ceda5..75fde32 100644\n--- a/path_test.go\n+++ b/path_test.go\n@@ -22,6 +22,7 @@ var cleanTests = []struct {\n \n \t// missing root\n \t{\"\", \"/\"},\n+\t{\"a/\", \"/a/\"},\n \t{\"abc\", \"/abc\"},\n \t{\"abc/def\", \"/abc/def\"},\n \t{\"a/b/c\", \"/a/b/c\"},\n",
+  "diffTruncated": false,
+  "tree": [
+    ".travis.yml",
+    "LICENSE",
+    "README.md",
+    "params_go17.go",
+    "params_legacy.go",
+    "path.go",
+    "path_test.go",
+    "router.go",
+    "router_test.go",
+    "tree.go",
+    "tree_test.go"
+  ],
+  "explanation": {
+    "what": "CleanPath のトレイリングスラッシュ判定条件を `n > 2` から `n > 1` に修正し、長さ2のパス(例: \"a/\")でも末尾スラッシュが正しく検出されるようにした。あわせて \"a/\" → \"/a/\" というテストケースを path_test.go に追加した。",
+    "why": "PR本文にある通り、元の条件では長さ2のパスにルート \"/\" が付与される過程でトレイリングスラッシュの判定が1文字分ずれ、末尾スラッシュを持つ1文字パスのケースが正しく扱われないエッジケースがあったため、境界条件を修正した。",
+    "highlights": [
+      { "file": "path.go", "note": "trailing 判定の境界値を n > 2 から n > 1 に変更した1行" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [{ "type": "pr", "number": 239, "url": "https://github.com/julienschmidt/httprouter/pull/239" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

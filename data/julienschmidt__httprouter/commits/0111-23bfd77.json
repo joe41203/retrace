@@ -1,0 +1,58 @@
+{
+  "seq": 111,
+  "sha": "23bfd775669e45fdea288fa0ba62aed1a19e2bff",
+  "parents": [
+    "1920724575a29b4da2ac388ce9dcf2c53e2138c0"
+  ],
+  "author": {
+    "name": "Julien Schmidt",
+    "email": "github@julienschmidt.com",
+    "date": "2015-02-15T00:06:11+08:00"
+  },
+  "message": "tree: Use strings instead of []byte for indices\n\ndecreases memory usage",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 34,
+    "deletions": 28
+  },
+  "files": [
+    {
+      "path": "tree.go",
+      "status": "M",
+      "additions": 34,
+      "deletions": 28,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/tree.go b/tree.go\nindex e96d361..f697008 100644\n--- a/tree.go\n+++ b/tree.go\n@@ -43,30 +43,36 @@ type node struct {\n \twildChild bool\n \tnType     nodeType\n \tmaxParams uint8\n-\tindices   []byte\n+\tindices   string\n \tchildren  []*node\n \thandle    Handle\n \tpriority  uint32\n }\n \n // increments priority of the given child and reorders if necessary\n-func (n *node) incrementChildPrio(i int) int {\n-\tn.children[i].priority++\n-\tprio := n.children[i].priority\n+func (n *node) incrementChildPrio(pos int) int {\n+\tn.children[pos].priority++\n+\tprio := n.children[pos].priority\n \n \t// adjust position (move to front)\n-\tfor j := i - 1; j >= 0 && n.children[j].priority < prio; j-- {\n+\tnewPos := pos\n+\tfor newPos > 0 && n.children[newPos-1].priority < prio {\n \t\t// swap node positions\n-\t\ttmpN := n.children[j]\n-\t\tn.children[j] = n.children[i]\n-\t\tn.children[i] = tmpN\n-\t\ttmpI := n.indices[j]\n-\t\tn.indices[j] = n.indices[i]\n-\t\tn.indices[i] = tmpI\n-\n-\t\ti--\n+\t\ttmpN := n.children[newPos-1]\n+\t\tn.children[newPos-1] = n.children[newPos]\n+\t\tn.children[newPos] = tmpN\n+\n+\t\tnewPos--\n+\t}\n+\n+\t// build new index char string\n+\tif newPos != pos {\n+\t\tn.indices = n.indices[:newPos] + // unchanged prefix, might be empty\n+\t\t\tn.indices[pos:pos+1] + // the index char we move\n+\t\t\tn.indices[newPos:pos] + n.indices[pos+1:] // rest without char at 'pos'\n \t}\n-\treturn i\n+\n+\treturn newPos\n }\n \n // addRoute adds a node with the given handle to the path.\n@@ -110,7 +116,7 @@ func (n *node) addRoute(path string, handle Handle) {\n \t\t\t\t}\n \n \t\t\t\tn.children = []*node{&child}\n-\t\t\t\tn.indices = []byte{n.path[i]}\n+\t\t\t\tn.indices = string(n.path[i])\n \t\t\t\tn.path = path[:i]\n \t\t\t\tn.handle = nil\n \t\t\t\tn.wildChild = false\n@@ -151,8 +157,8 @@ func (n *node) addRoute(path string, handle Handle) {\n \t\t\t\t}\n \n \t\t\t\t// Check if a child with the next path byte exists\n-\t\t\t\tfor i, index := range n.indices {\n-\t\t\t\t\tif c == index {\n+\t\t\t\tfor i := 0; i < len(n.indices); i++ {\n+\t\t\t\t\tif c == n.indices[i] {\n \t\t\t\t\t\ti = n.incrementChildPrio(i)\n \t\t\t\t\t\tn = n.children[i]\n \t\t\t\t\t\tcontinue WALK\n@@ -161,7 +167,7 @@ func (n *node) addRoute(path string, handle Handle) {\n \n \t\t\t\t// Otherwise insert it\n \t\t\t\tif c != ':' && c != '*' {\n-\t\t\t\t\tn.indices = append(n.indices, c)\n+\t\t\t\t\tn.indices += string(c)\n \t\t\t\t\tchild := &node{\n \t\t\t\t\t\tmaxParams: numParams,\n \t\t\t\t\t}\n@@ -273,7 +279,7 @@ func (n *node) insertChild(numParams uint8, path string, handle Handle) {\n \t\t\t\tmaxParams: 1,\n \t\t\t}\n \t\t\tn.children = []*node{child}\n-\t\t\tn.indices = []byte{path[i]}\n+\t\t\tn.indices = string(path[i])\n \t\t\tn = child\n \t\t\tn.priority++\n \n@@ -312,8 +318,8 @@ walk: // Outer loop for walking the tree\n \t\t\t\t// to walk down the tree\n \t\t\t\tif !n.wildChild {\n \t\t\t\t\tc := path[0]\n-\t\t\t\t\tfor i, index := range n.indices {\n-\t\t\t\t\t\tif c == index {\n+\t\t\t\t\tfor i := 0; i < len(n.indices); i++ {\n+\t\t\t\t\t\tif c == n.indices[i] {\n \t\t\t\t\t\t\tn = n.children[i]\n \t\t\t\t\t\t\tcontinue walk\n \t\t\t\t\t\t}\n@@ -398,10 +404,10 @@ walk: // Outer loop for walking the tree\n \n \t\t\t// No handle found. Check if a handle for this path + a\n \t\t\t// trailing slash exists for trailing slash recommendation\n-\t\t\tfor i, index := range n.indices {\n-\t\t\t\tif index == '/' {\n+\t\t\tfor i := 0; i < len(n.indices); i++ {\n+\t\t\t\tif n.indices[i] == '/' {\n \t\t\t\t\tn = n.children[i]\n-\t\t\t\t\ttsr = (n.path == \"/\" && n.handle != nil) ||\n+\t\t\t\t\ttsr = (len(n.path) == 1 && n.handle != nil) ||\n \t\t\t\t\t\t(n.nType == catchAll && n.children[0].handle != nil)\n \t\t\t\t\treturn\n \t\t\t\t}\n@@ -440,7 +446,7 @@ func (n *node) findCaseInsensitivePath(path string, fixTrailingSlash bool) (ciPa\n \t\t\t\tfor i, index := range n.indices {\n \t\t\t\t\t// must use recursive approach since both index and\n \t\t\t\t\t// ToLower(index) could exist. We must check both.\n-\t\t\t\t\tif r == unicode.ToLower(rune(index)) {\n+\t\t\t\t\tif r == unicode.ToLower(index) {\n \t\t\t\t\t\tout, found := n.children[i].findCaseInsensitivePath(path, fixTrailingSlash)\n \t\t\t\t\t\tif found {\n \t\t\t\t\t\t\treturn append(ciPath, out...), true\n@@ -509,10 +515,10 @@ func (n *node) findCaseInsensitivePath(path string, fixTrailingSlash bool) (ciPa\n \t\t\t// No handle found.\n \t\t\t// Try to fix the path by adding a trailing slash\n \t\t\tif fixTrailingSlash {\n-\t\t\t\tfor i, index := range n.indices {\n-\t\t\t\t\tif index == '/' {\n+\t\t\t\tfor i := 0; i < len(n.indices); i++ {\n+\t\t\t\t\tif n.indices[i] == '/' {\n \t\t\t\t\t\tn = n.children[i]\n-\t\t\t\t\t\tif (n.path == \"/\" && n.handle != nil) ||\n+\t\t\t\t\t\tif (len(n.path) == 1 && n.handle != nil) ||\n \t\t\t\t\t\t\t(n.nType == catchAll && n.children[0].handle != nil) {\n \t\t\t\t\t\t\treturn append(ciPath, '/'), true\n \t\t\t\t\t\t}\n",
+  "diffTruncated": false,
+  "tree": [
+    ".travis.yml",
+    "LICENSE",
+    "README.md",
+    "path.go",
+    "path_test.go",
+    "router.go",
+    "router_test.go",
+    "tree.go",
+    "tree_test.go"
+  ],
+  "explanation": {
+    "what": "node.indices のフィールド型を []byte から string に変更した。あわせて incrementChildPrio・addRoute・insertChild・getValue・findCaseInsensitivePath 内の range ループを index アクセスの for ループに書き換え、byte 文字列連結(append→+= string(c))や部分文字列の組み替えでインデックス配列を再構築するようにした。",
+    "why": "コミットメッセージに \"decreases memory usage\" と明記されている通り、Go の string は不変で読み取り専用の軽量な参照型のため、可変長スライスである []byte よりもメモリオーバーヘッドが小さい。Radix Tree の各ノードが持つ「子への分岐文字」の配列という小さく頻繁に生成されるデータ構造にとって、この差が積み重なるとルータ全体のメモリ使用量に効いてくる。",
+    "highlights": [
+      { "file": "tree.go", "note": "incrementChildPrio: 子の優先度が上がって並び替える際、indices もスライスのスワップではなく文字列の部分文字列組み替え(n.indices[:newPos] + 移動文字 + 残り)で再構築している" }
+    ],
+    "langNotes": [
+      { "topic": "string as immutable byte sequence", "note": "Go の string は不変(immutable)なバイト列で、[]byte のような可変長スライスに比べてメモリ効率がよい代わりに、1文字の追加や入れ替えのたびに新しい文字列を生成し直す必要がある。このコミットの incrementChildPrio は、その制約下で部分文字列の連結によりインデックス配列を再構成している。"},
+      { "topic": "string(c) によるbyte→string変換", "note": "string(c) は単一の byte(または rune)を1文字の文字列に変換するイディオム。ここでは append(n.indices, c) だった []byte への追加を n.indices += string(c) という文字列連結に置き換えている。"}
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

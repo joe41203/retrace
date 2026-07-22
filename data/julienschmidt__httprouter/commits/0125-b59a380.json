@@ -1,0 +1,70 @@
+{
+  "seq": 125,
+  "sha": "b59a38004596b696aca7aa2adccfa68760864d86",
+  "parents": [
+    "05f42936f5dc61f534614bd7e0697d4da0454a5f"
+  ],
+  "author": {
+    "name": "Julien Schmidt",
+    "email": "github@julienschmidt.com",
+    "date": "2015-04-08T19:04:29+02:00"
+  },
+  "message": "Improve error messages",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 3,
+    "additions": 32,
+    "deletions": 26
+  },
+  "files": [
+    {
+      "path": "router.go",
+      "status": "M",
+      "additions": 2,
+      "deletions": 2,
+      "binary": false
+    },
+    {
+      "path": "tree.go",
+      "status": "M",
+      "additions": 23,
+      "deletions": 19,
+      "binary": false
+    },
+    {
+      "path": "tree_test.go",
+      "status": "M",
+      "additions": 7,
+      "deletions": 5,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/router.go b/router.go\nindex 5172c89..155b871 100644\n--- a/router.go\n+++ b/router.go\n@@ -213,7 +213,7 @@ func (r *Router) DELETE(path string, handle Handle) {\n // communication with a proxy).\n func (r *Router) Handle(method, path string, handle Handle) {\n \tif path[0] != '/' {\n-\t\tpanic(\"path must begin with '/'\")\n+\t\tpanic(\"path must begin with '/' in path '\" + path + \"'\")\n \t}\n \n \tif r.trees == nil {\n@@ -257,7 +257,7 @@ func (r *Router) HandlerFunc(method, path string, handler http.HandlerFunc) {\n //     router.ServeFiles(\"/src/*filepath\", http.Dir(\"/var/www\"))\n func (r *Router) ServeFiles(path string, root http.FileSystem) {\n \tif len(path) < 10 || path[len(path)-10:] != \"/*filepath\" {\n-\t\tpanic(\"path must end with /*filepath\")\n+\t\tpanic(\"path must end with /*filepath in path '\" + path + \"'\")\n \t}\n \n \tfileServer := http.FileServer(root)\ndiff --git a/tree.go b/tree.go\nindex b741654..a15bc2c 100644\n--- a/tree.go\n+++ b/tree.go\n@@ -7,7 +7,6 @@ package httprouter\n import (\n \t\"strings\"\n \t\"unicode\"\n-\t\"fmt\"\n )\n \n func min(a, b int) int {\n@@ -79,6 +78,7 @@ func (n *node) incrementChildPrio(pos int) int {\n // addRoute adds a node with the given handle to the path.\n // Not concurrency-safe!\n func (n *node) addRoute(path string, handle Handle) {\n+\tfullPath := path\n \tn.priority++\n \tnumParams := countParams(path)\n \n@@ -148,7 +148,9 @@ func (n *node) addRoute(path string, handle Handle) {\n \t\t\t\t\t\t}\n \t\t\t\t\t}\n \n-\t\t\t\t\tpanic(fmt.Sprintf(\"conflict with wildcard route. has %q got %q\", path, n.path))\n+\t\t\t\t\tpanic(\"path segment '\" + path +\n+\t\t\t\t\t\t\"' conflicts with existing wildcard '\" + n.path +\n+\t\t\t\t\t\t\"' in path '\" + fullPath + \"'\")\n \t\t\t\t}\n \n \t\t\t\tc := path[0]\n@@ -180,23 +182,23 @@ func (n *node) addRoute(path string, handle Handle) {\n \t\t\t\t\tn.incrementChildPrio(len(n.indices) - 1)\n \t\t\t\t\tn = child\n \t\t\t\t}\n-\t\t\t\tn.insertChild(numParams, path, handle)\n+\t\t\t\tn.insertChild(numParams, path, fullPath, handle)\n \t\t\t\treturn\n \n \t\t\t} else if i == len(path) { // Make node a (in-path) leaf\n \t\t\t\tif n.handle != nil {\n-\t\t\t\t\tpanic(fmt.Sprintf(\"a Handle is already registered for this path (%q)\", path))\n+\t\t\t\t\tpanic(\"a handle is already registered for path ''\" + fullPath + \"'\")\n \t\t\t\t}\n \t\t\t\tn.handle = handle\n \t\t\t}\n \t\t\treturn\n \t\t}\n \t} else { // Empty tree\n-\t\tn.insertChild(numParams, path, handle)\n+\t\tn.insertChild(numParams, path, fullPath, handle)\n \t}\n }\n \n-func (n *node) insertChild(numParams uint8, path string, handle Handle) {\n+func (n *node) insertChild(numParams uint8, path, fullPath string, handle Handle) {\n \tvar offset int // already handled bytes of the path\n \n \t// find prefix until first wildcard (beginning with ':'' or '*'')\n@@ -206,27 +208,29 @@ func (n *node) insertChild(numParams uint8, path string, handle Handle) {\n \t\t\tcontinue\n \t\t}\n \n-\t\t// check if this Node existing children which would be\n-\t\t// unreachable if we insert the wildcard here\n-\t\tif len(n.children) > 0 {\n-\t\t\tpanic(\"wildcard route conflicts with existing children\")\n-\t\t}\n-\n \t\t// find wildcard end (either '/' or path end)\n \t\tend := i + 1\n \t\tfor end < max && path[end] != '/' {\n \t\t\tswitch path[end] {\n \t\t\t// the wildcard name must not contain ':' and '*'\n \t\t\tcase ':', '*':\n-\t\t\t\tpanic(\"only one wildcard per path segment is allowed\")\n+\t\t\t\tpanic(\"only one wildcard per path segment is allowed, has: '\" +\n+\t\t\t\t\tpath[i:] + \"' in path '\" + fullPath + \"'\")\n \t\t\tdefault:\n \t\t\t\tend++\n \t\t\t}\n \t\t}\n \n+\t\t// check if this Node existing children which would be\n+\t\t// unreachable if we insert the wildcard here\n+\t\tif len(n.children) > 0 {\n+\t\t\tpanic(\"wildcard route '\" + path[i:end] +\n+\t\t\t\t\"' conflicts with existing children in path '\" + fullPath + \"'\")\n+\t\t}\n+\n \t\t// check if the wildcard has a name\n \t\tif end-i < 2 {\n-\t\t\tpanic(\"wildcards must be named with a non-empty name\")\n+\t\t\tpanic(\"wildcards must be named with a non-empty name in path '\" + fullPath + \"'\")\n \t\t}\n \n \t\tif c == ':' { // param\n@@ -262,17 +266,17 @@ func (n *node) insertChild(numParams uint8, path string, handle Handle) {\n \n \t\t} else { // catchAll\n \t\t\tif end != max || numParams > 1 {\n-\t\t\t\tpanic(\"catch-all routes are only allowed at the end of the path\")\n+\t\t\t\tpanic(\"catch-all routes are only allowed at the end of the path in path '\" + fullPath + \"'\")\n \t\t\t}\n \n \t\t\tif len(n.path) > 0 && n.path[len(n.path)-1] == '/' {\n-\t\t\t\tpanic(\"catch-all conflicts with existing handle for the path segment root\")\n+\t\t\t\tpanic(\"catch-all conflicts with existing handle for the path segment root in path '\" + fullPath + \"'\")\n \t\t\t}\n \n \t\t\t// currently fixed width 1 for '/'\n \t\t\ti--\n \t\t\tif path[i] != '/' {\n-\t\t\t\tpanic(\"no / before catch-all\")\n+\t\t\t\tpanic(\"no / before catch-all in path '\" + fullPath + \"'\")\n \t\t\t}\n \n \t\t\tn.path = path[offset:i]\n@@ -397,7 +401,7 @@ walk: // Outer loop for walking the tree\n \t\t\t\t\treturn\n \n \t\t\t\tdefault:\n-\t\t\t\t\tpanic(\"Invalid node type\")\n+\t\t\t\t\tpanic(\"invalid node type\")\n \t\t\t\t}\n \t\t\t}\n \t\t} else if path == n.path {\n@@ -508,7 +512,7 @@ func (n *node) findCaseInsensitivePath(path string, fixTrailingSlash bool) (ciPa\n \t\t\t\treturn append(ciPath, path...), true\n \n \t\t\tdefault:\n-\t\t\t\tpanic(\"Invalid node type\")\n+\t\t\t\tpanic(\"invalid node type\")\n \t\t\t}\n \t\t} else {\n \t\t\t// We should have reached the node containing the handle.\ndiff --git a/tree_test.go b/tree_test.go\nindex 262681b..64f26d1 100644\n--- a/tree_test.go\n+++ b/tree_test.go\n@@ -358,7 +358,7 @@ func TestTreeDoubleWildcard(t *testing.T) {\n \t\t\ttree.addRoute(route, nil)\n \t\t})\n \n-\t\tif rs, ok := recv.(string); !ok || rs != panicMsg {\n+\t\tif rs, ok := recv.(string); !ok || !strings.HasPrefix(rs, panicMsg) {\n \t\t\tt.Fatalf(`\"Expected panic \"%s\" for route '%s', got \"%v\"`, panicMsg, route, recv)\n \t\t}\n \t}\n@@ -584,6 +584,8 @@ func TestTreeFindCaseInsensitivePath(t *testing.T) {\n }\n \n func TestTreeInvalidNodeType(t *testing.T) {\n+\tconst panicMsg = \"invalid node type\"\n+\n \ttree := &node{}\n \ttree.addRoute(\"/\", fakeHandler(\"/\"))\n \ttree.addRoute(\"/:page\", fakeHandler(\"/:page\"))\n@@ -595,15 +597,15 @@ func TestTreeInvalidNodeType(t *testing.T) {\n \trecv := catchPanic(func() {\n \t\ttree.getValue(\"/test\")\n \t})\n-\tif rs, ok := recv.(string); !ok || rs != \"Invalid node type\" {\n-\t\tt.Fatalf(`Expected panic \"Invalid node type\", got \"%v\"`, recv)\n+\tif rs, ok := recv.(string); !ok || rs != panicMsg {\n+\t\tt.Fatalf(\"Expected panic '\"+panicMsg+\"', got '%v'\", recv)\n \t}\n \n \t// case-insensitive lookup\n \trecv = catchPanic(func() {\n \t\ttree.findCaseInsensitivePath(\"/test\", true)\n \t})\n-\tif rs, ok := recv.(string); !ok || rs != \"Invalid node type\" {\n-\t\tt.Fatalf(`Expected panic \"Invalid node type\", got \"%v\"`, recv)\n+\tif rs, ok := recv.(string); !ok || rs != panicMsg {\n+\t\tt.Fatalf(\"Expected panic '\"+panicMsg+\"', got '%v'\", recv)\n \t}\n }\n",
+  "diffTruncated": false,
+  "tree": [
+    ".travis.yml",
+    "LICENSE",
+    "README.md",
+    "path.go",
+    "path_test.go",
+    "router.go",
+    "router_test.go",
+    "tree.go",
+    "tree_test.go"
+  ],
+  "explanation": {
+    "what": "前コミットで導入した fmt.Sprintf ベースの panic メッセージを廃止し、文字列連結に置き換えた上で、addRoute の引数として渡された元のパス全体を fullPath として保持し insertChild にも引き渡すよう変更した。これにより「wildcard route conflicts with existing children」「only one wildcard per path segment」「no / before catch-all」など tree.go 内のほぼ全ての panic メッセージに、衝突箇所だけでなく登録しようとしたパス全体(fullPath)が含まれるようになった。router.go の Handle / ServeFiles の panic メッセージにも対象パスを追加し、tree_test.go は panic メッセージの前方一致(strings.HasPrefix)判定に変更した。fmt パッケージの import も不要になり削除している。",
+    "why": "1つ前のコミットで fmt.Sprintf により部分的なパス情報を出す改善をしたが、部分パス(path)だけでは「ルート全体のどこで衝突が起きたか」が分かりにくいという課題が残っていた。fullPath を導入して常に元の完全なパスをエラーに含めることで、ルート定義の衝突箇所をより特定しやすくしている。また fmt.Sprintf より軽量な文字列連結にしたのは、ルータのホットパスではないものの直前のコミットで加えたばかりの依存を最小化する意図と考えられる。",
+    "highlights": [
+      { "file": "tree.go", "note": "addRoute/insertChild に fullPath を通す設計変更。panic メッセージが全ルートパスを含むように" },
+      { "file": "tree_test.go", "note": "panic メッセージ末尾が変わるため、完全一致から strings.HasPrefix の前方一致判定に変更" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

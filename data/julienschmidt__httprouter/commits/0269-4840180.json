@@ -1,0 +1,63 @@
+{
+  "seq": 269,
+  "sha": "484018016424d215c0b87c42f4c9b57d980fbd00",
+  "parents": [
+    "ef8578da8d8e1217ea44313b23edf46154b198ab"
+  ],
+  "author": {
+    "name": "Simon Hauser",
+    "email": "Simon-Hauser@outlook.de",
+    "date": "2024-01-30T11:56:56+01:00"
+  },
+  "message": "fix: only append MethodOptions as allowed method if HandleOPTIONS is true (#360)",
+  "pr": {
+    "number": 360,
+    "title": "fix: only append MethodOptions as allowed method if HandleOPTIONS is true",
+    "body": "",
+    "url": "https://github.com/julienschmidt/httprouter/pull/360"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 3,
+    "deletions": 1
+  },
+  "files": [
+    {
+      "path": "router.go",
+      "status": "M",
+      "additions": 3,
+      "deletions": 1,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/router.go b/router.go\nindex 1eab403..818448a 100644\n--- a/router.go\n+++ b/router.go\n@@ -439,7 +439,9 @@ func (r *Router) allowed(path, reqMethod string) (allow string) {\n \n \tif len(allowed) > 0 {\n \t\t// Add request method to list of allowed methods\n-\t\tallowed = append(allowed, http.MethodOptions)\n+\t\tif r.HandleOPTIONS {\n+\t\t\tallowed = append(allowed, http.MethodOptions)\n+\t\t}\n \n \t\t// Sort allowed methods.\n \t\t// sort.Strings(allowed) unfortunately causes unnecessary allocations\n",
+  "diffTruncated": false,
+  "tree": [
+    ".travis.yml",
+    "LICENSE",
+    "README.md",
+    "go.mod",
+    "path.go",
+    "path_test.go",
+    "router.go",
+    "router_test.go",
+    "tree.go",
+    "tree_test.go"
+  ],
+  "explanation": {
+    "what": "router.go の allowed メソッドで、405 Method Not Allowed 応答時の Allow ヘッダーに使う許可メソッド一覧へ http.MethodOptions(\"OPTIONS\")を無条件に追加していた処理を、r.HandleOPTIONS が true の場合のみ追加するよう条件分岐で囲んだ。",
+    "why": "PR タイトル「fix: only append MethodOptions as allowed method if HandleOPTIONS is true」が示す通り、Router.HandleOPTIONS を false に設定して OPTIONS の自動処理を無効化しているケースでも Allow ヘッダーに OPTIONS が含まれてしまい、実際にはハンドリングしないメソッドを許可済みと申告してしまう不整合があった。これを HandleOPTIONS フラグと整合させる修正。",
+    "highlights": [
+      { "file": "router.go", "note": "allowed メソッド内、r.HandleOPTIONS の真偽で http.MethodOptions の追加有無を切り替える箇所" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [
+      { "type": "pr", "number": 360, "url": "https://github.com/julienschmidt/httprouter/pull/360" }
+    ],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

@@ -1,0 +1,62 @@
+{
+  "seq": 181,
+  "sha": "adbc77eec0d91467376ca515bc3a14b8434d0f18",
+  "parents": [
+    "5aa29e8dfcfa8e46993f5058297931ec75eb93dd"
+  ],
+  "author": {
+    "name": "Todd Niswonger",
+    "email": "tniswong@users.noreply.github.com",
+    "date": "2018-04-11T10:45:01-05:00"
+  },
+  "message": "Throw 405 if !handleOPTIONS and no OPTIONS handler set (#201)",
+  "pr": {
+    "number": 201,
+    "title": "Fix r.handleOPTIONS = false. Should trigger 405 if not allowed.",
+    "body": "When r.handleOPTIONS is false, and no OPTIONS handler has been configured, currently the server responds with a 404 Not Found.\r\n\r\nInstead, I'd prefer to see this return a 405 Method Not Allowed.",
+    "url": "https://github.com/julienschmidt/httprouter/pull/201"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 4,
+    "deletions": 6
+  },
+  "files": [
+    {
+      "path": "router.go",
+      "status": "M",
+      "additions": 4,
+      "deletions": 6,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/router.go b/router.go\nindex bfd4db0..558e139 100644\n--- a/router.go\n+++ b/router.go\n@@ -366,13 +366,11 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {\n \t\t}\n \t}\n \n-\tif req.Method == \"OPTIONS\" {\n+\tif req.Method == \"OPTIONS\" && r.HandleOPTIONS {\n \t\t// Handle OPTIONS requests\n-\t\tif r.HandleOPTIONS {\n-\t\t\tif allow := r.allowed(path, req.Method); len(allow) > 0 {\n-\t\t\t\tw.Header().Set(\"Allow\", allow)\n-\t\t\t\treturn\n-\t\t\t}\n+\t\tif allow := r.allowed(path, req.Method); len(allow) > 0 {\n+\t\t\tw.Header().Set(\"Allow\", allow)\n+\t\t\treturn\n \t\t}\n \t} else {\n \t\t// Handle 405\n",
+  "diffTruncated": false,
+  "tree": [
+    ".travis.yml",
+    "LICENSE",
+    "README.md",
+    "params_go17.go",
+    "params_legacy.go",
+    "path.go",
+    "path_test.go",
+    "router.go",
+    "router_test.go",
+    "tree.go",
+    "tree_test.go"
+  ],
+  "explanation": {
+    "what": "ServeHTTP 内の OPTIONS 処理を、`req.Method == \"OPTIONS\"` と `r.HandleOPTIONS` の二重の if 分岐から `req.Method == \"OPTIONS\" && r.HandleOPTIONS` という単一条件に統合した。これにより HandleOPTIONS が false の場合は else 節の 405 (Method Not Allowed) 処理に自然に流れるようになる。",
+    "why": "PR本文の通り、r.HandleOPTIONS が false かつ OPTIONS 用ハンドラも未設定のとき、修正前は外側の if (req.Method == \"OPTIONS\") に入った時点で else の405分岐が実行されず、結果として404 Not Foundが返っていた。呼び出し元は405を期待していたため、条件式を一段にまとめてelse節に確実に到達するよう修正した。",
+    "highlights": [
+      { "file": "router.go", "note": "if 文をネストから && の単一条件に畳んだことで、else の405処理に落ちる経路が生まれた点が本質" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [{ "type": "pr", "number": 201, "url": "https://github.com/julienschmidt/httprouter/pull/201" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

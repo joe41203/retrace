@@ -1,0 +1,58 @@
+{
+  "seq": 124,
+  "sha": "05f42936f5dc61f534614bd7e0697d4da0454a5f",
+  "parents": [
+    "999ba04938b528fb4fb859231ee929958b8db4a6",
+    "b6c5a22ee62a5d724bfbb7a949d8bafb30458065"
+  ],
+  "author": {
+    "name": "Julien Schmidt",
+    "email": "julienschmidt@users.noreply.github.com",
+    "date": "2015-04-08T12:47:53+02:00"
+  },
+  "message": "Merge pull request #74 from dlsniper/better-error-messages\n\nBetter error messages",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 3,
+    "deletions": 2
+  },
+  "files": [
+    {
+      "path": "tree.go",
+      "status": "M",
+      "additions": 3,
+      "deletions": 2,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/tree.go b/tree.go\nindex b9d51e4..b741654 100644\n--- a/tree.go\n+++ b/tree.go\n@@ -7,6 +7,7 @@ package httprouter\n import (\n \t\"strings\"\n \t\"unicode\"\n+\t\"fmt\"\n )\n \n func min(a, b int) int {\n@@ -147,7 +148,7 @@ func (n *node) addRoute(path string, handle Handle) {\n \t\t\t\t\t\t}\n \t\t\t\t\t}\n \n-\t\t\t\t\tpanic(\"conflict with wildcard route\")\n+\t\t\t\t\tpanic(fmt.Sprintf(\"conflict with wildcard route. has %q got %q\", path, n.path))\n \t\t\t\t}\n \n \t\t\t\tc := path[0]\n@@ -184,7 +185,7 @@ func (n *node) addRoute(path string, handle Handle) {\n \n \t\t\t} else if i == len(path) { // Make node a (in-path) leaf\n \t\t\t\tif n.handle != nil {\n-\t\t\t\t\tpanic(\"a Handle is already registered for this path\")\n+\t\t\t\t\tpanic(fmt.Sprintf(\"a Handle is already registered for this path (%q)\", path))\n \t\t\t\t}\n \t\t\t\tn.handle = handle\n \t\t\t}\n",
+  "diffTruncated": false,
+  "tree": [
+    ".travis.yml",
+    "LICENSE",
+    "README.md",
+    "path.go",
+    "path_test.go",
+    "router.go",
+    "router_test.go",
+    "tree.go",
+    "tree_test.go"
+  ],
+  "explanation": {
+    "what": "tree.go の addRoute 内で、ワイルドカードルート衝突時と重複ハンドラ登録時の panic メッセージを、固定文字列から `fmt.Sprintf` で実際の path と n.path を埋め込む形式に変更した。",
+    "why": "httprouter はエラーを戻り値ではなく panic で通知する設計のため、panic メッセージがそのままデバッグ情報になる。どのパスがどの既存ルートと衝突したかを示すことで、ルート登録ミスの原因特定を容易にする狙いがある(PRタイトル「Better error messages」より)。",
+    "highlights": [
+      { "file": "tree.go", "note": "panic(\"conflict with wildcard route\") 等の固定文字列を fmt.Sprintf で対象パス入りに変更" }
+    ],
+    "langNotes": [
+      { "topic": "panic とエラー通知", "note": "httprouter はルート定義の不整合(ワイルドカード衝突など)を通常のerror戻り値ではなくpanicで通知する設計。ルート登録は起動時に一度きり行われる想定のため、実行時エラーというよりプログラミングミスの検出として扱われている。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

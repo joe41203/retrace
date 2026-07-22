@@ -1,0 +1,65 @@
+{
+  "seq": 191,
+  "sha": "2d849fc0bce7c1d1590cea59759cbb38ffec65df",
+  "parents": [
+    "90ef33e1709f1f049b2ecc4dfab58869d93eff14"
+  ],
+  "author": {
+    "name": "Sean Chen",
+    "email": "40845434+two@users.noreply.github.com",
+    "date": "2019-09-14T18:33:30+08:00"
+  },
+  "message": "use maxParamCount const instead of magic number (#247)",
+  "pr": {
+    "number": 247,
+    "title": "use const instead of magic number",
+    "body": "",
+    "url": "https://github.com/julienschmidt/httprouter/pull/247"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 5,
+    "deletions": 2
+  },
+  "files": [
+    {
+      "path": "tree.go",
+      "status": "M",
+      "additions": 5,
+      "deletions": 2,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/tree.go b/tree.go\nindex a8fa98b..bff7306 100644\n--- a/tree.go\n+++ b/tree.go\n@@ -17,6 +17,8 @@ func min(a, b int) int {\n \treturn b\n }\n \n+const maxParamCount uint8 = ^uint8(0)\n+\n func countParams(path string) uint8 {\n \tvar n uint\n \tfor i := 0; i < len(path); i++ {\n@@ -25,9 +27,10 @@ func countParams(path string) uint8 {\n \t\t}\n \t\tn++\n \t}\n-\tif n >= 255 {\n-\t\treturn 255\n+\tif n >= uint(maxParamCount) {\n+\t\treturn maxParamCount\n \t}\n+\n \treturn uint8(n)\n }\n \n",
+  "diffTruncated": false,
+  "tree": [
+    ".travis.yml",
+    "LICENSE",
+    "README.md",
+    "go.mod",
+    "params_go17.go",
+    "params_legacy.go",
+    "path.go",
+    "path_test.go",
+    "router.go",
+    "router_test.go",
+    "tree.go",
+    "tree_test.go"
+  ],
+  "explanation": {
+    "what": "countParams 内でパラメータ数の上限を表していたリテラル 255 を、`const maxParamCount uint8 = ^uint8(0)` という named constant に置き換えた。比較・返り値の両方をこの定数経由に統一している。",
+    "why": "255 という数値はコメントなしでは「なぜ255か(uint8の最大値だから)」が読み取りにくいマジックナンバーだった。`^uint8(0)`(全ビット反転)で uint8 の最大値を表す定数に切り出すことで、型の意味と値の関係が名前から自明になる。",
+    "highlights": [
+      { "file": "tree.go", "note": "`^uint8(0)` は0のビット反転で uint8 の最大値(255)を得る Go のイディオム" }
+    ],
+    "langNotes": [
+      { "topic": "^uint8(0) によるビット反転", "note": "Go の単項 `^` はビットごとの補数(NOT)演算子。`^uint8(0)` は全ビットを1にするので、その型の最大値になる。255 と書くより「この型の最大値」という意図が伝わる。" }
+    ],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [{ "type": "pr", "number": 247, "url": "https://github.com/julienschmidt/httprouter/pull/247" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

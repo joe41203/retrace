@@ -1,0 +1,54 @@
+{
+  "seq": 19,
+  "sha": "e98c40dd8de89057893ac506b89a2df31f4806b4",
+  "parents": [
+    "398c5a6894239670c3138604ea15c1d5b73ebf2e"
+  ],
+  "author": {
+    "name": "Julien Schmidt",
+    "email": "github@julienschmidt.com",
+    "date": "2013-12-12T03:43:04+01:00"
+  },
+  "message": "Use http.NotFound if NotFound is nil",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 5,
+    "deletions": 1
+  },
+  "files": [
+    {
+      "path": "router.go",
+      "status": "M",
+      "additions": 5,
+      "deletions": 1,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/router.go b/router.go\nindex c1b6ad8..cc6f491 100644\n--- a/router.go\n+++ b/router.go\n@@ -129,6 +129,10 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {\n \t\thttp.Redirect(w, req, path, http.StatusMovedPermanently)\n \t\treturn\n \t} else { // Handle 404\n-\t\tr.NotFound(w, req)\n+\t\tif r.NotFound != nil {\n+\t\t\tr.NotFound(w, req)\n+\t\t} else {\n+\t\t\thttp.NotFound(w, req)\n+\t\t}\n \t}\n }\n",
+  "diffTruncated": false,
+  "tree": [
+    ".travis.yml",
+    "LICENSE",
+    "path.go",
+    "path_test.go",
+    "router.go",
+    "router_test.go",
+    "tree.go",
+    "tree_test.go"
+  ],
+  "explanation": {
+    "what": "ServeHTTP の 404 処理を、r.NotFound を無条件に呼ぶ形から `if r.NotFound != nil { r.NotFound(w, req) } else { http.NotFound(w, req) }` という nil チェック付きの分岐に変更した。",
+    "why": "コミットメッセージの通り、Router.NotFound フィールドが nil のまま使われた場合に nil ポインタ呼び出しで panic するのを避け、標準の http.NotFound にフォールバックさせることが目的。",
+    "highlights": [
+      { "file": "router.go", "note": "Router.NotFound フィールドは元々 New() でパッケージの NotFound 関数が既定値として設定されていたが、ここでは利用者が明示的に nil を設定した場合の安全策を追加している" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

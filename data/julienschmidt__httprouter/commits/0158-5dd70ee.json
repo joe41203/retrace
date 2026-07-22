@@ -1,0 +1,63 @@
+{
+  "seq": 158,
+  "sha": "5dd70ee059943e81987a817fa1a755b11dd119c1",
+  "parents": [
+    "4563b0ba73e4db6c6423b60a26f3cadd2e9a1ec9",
+    "d35c3c30a68aa079d62486657b0e5548bb882cdd"
+  ],
+  "author": {
+    "name": "Julien Schmidt",
+    "email": "julienschmidt@users.noreply.github.com",
+    "date": "2016-12-03T16:33:52+08:00"
+  },
+  "message": "Merge pull request #166 from donutloop/master\n\nincrementChildPrio: Improved swap node position",
+  "pr": {
+    "number": 166,
+    "title": "incrementChildPrio: Improved swap node position",
+    "body": "",
+    "url": "https://github.com/julienschmidt/httprouter/pull/166"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 1,
+    "deletions": 3
+  },
+  "files": [
+    {
+      "path": "tree.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 3,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/tree.go b/tree.go\nindex 1f4f995..474da00 100644\n--- a/tree.go\n+++ b/tree.go\n@@ -60,9 +60,7 @@ func (n *node) incrementChildPrio(pos int) int {\n \tnewPos := pos\n \tfor newPos > 0 && n.children[newPos-1].priority < prio {\n \t\t// swap node positions\n-\t\ttmpN := n.children[newPos-1]\n-\t\tn.children[newPos-1] = n.children[newPos]\n-\t\tn.children[newPos] = tmpN\n+\t\tn.children[newPos-1], n.children[newPos] = n.children[newPos], n.children[newPos-1]\n \n \t\tnewPos--\n \t}\n",
+  "diffTruncated": false,
+  "tree": [
+    ".travis.yml",
+    "LICENSE",
+    "README.md",
+    "path.go",
+    "path_test.go",
+    "router.go",
+    "router_test.go",
+    "tree.go",
+    "tree_test.go"
+  ],
+  "explanation": {
+    "what": "node.incrementChildPrio 内で子ノードの優先度に応じて隣接する2要素を入れ替える処理を、一時変数 tmpN を使った3行のswapから、Go のタプル代入 `n.children[newPos-1], n.children[newPos] = n.children[newPos], n.children[newPos-1]` の1行に書き換えた PR #166 のマージコミット。",
+    "why": "PR タイトル「incrementChildPrio: Improved swap node position」の通り、動作を変えずにスワップ処理をより簡潔なコードに整理する目的。",
+    "highlights": [
+      { "file": "tree.go", "note": "一時変数を使わない多重代入によるスワップへの書き換え" }
+    ],
+    "langNotes": [
+      { "topic": "多重代入によるスワップ", "note": "Go では `a, b = b, a` のように複数の値を同時に代入できるため、一時変数を用意せずに2つの変数の値を入れ替えられる。右辺は代入前にまとめて評価されるため、順序を気にせず安全にスワップできる。" }
+    ],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [{ "type": "pr", "number": 166, "url": "https://github.com/julienschmidt/httprouter/pull/166" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

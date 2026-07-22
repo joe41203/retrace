@@ -1,0 +1,60 @@
+{
+  "seq": 171,
+  "sha": "0b0afca848ce5cf472a0dbb426b54e5cdb630f16",
+  "parents": [
+    "78865fbbf4a4e0e73fa1d65b4df3c01311b0a912"
+  ],
+  "author": {
+    "name": "Rebecca Stambler",
+    "email": "rstambler@golang.org",
+    "date": "2017-10-27T09:33:06-04:00"
+  },
+  "message": "router_test.go: fix to handle changes to Content-Type header (#220)",
+  "pr": {
+    "number": 220,
+    "title": "fix router_test.go to handle Content-Type in header",
+    "body": "https://github.com/golang/go/commit/fd29d03f70238abf460f56209a2ccc76dec6509e sets the Content-Type header in redirects, which breaks this test.",
+    "url": "https://github.com/julienschmidt/httprouter/pull/220"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 14,
+    "deletions": 14
+  },
+  "files": [
+    {
+      "path": "router_test.go",
+      "status": "M",
+      "additions": 14,
+      "deletions": 14,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/router_test.go b/router_test.go\nindex fe58c8a..b774a4e 100644\n--- a/router_test.go\n+++ b/router_test.go\n@@ -364,26 +364,26 @@ func TestRouterNotFound(t *testing.T) {\n \trouter.GET(\"/\", handlerFunc)\n \n \ttestRoutes := []struct {\n-\t\troute  string\n-\t\tcode   int\n-\t\theader string\n+\t\troute    string\n+\t\tcode     int\n+\t\tlocation string\n \t}{\n-\t\t{\"/path/\", 301, \"map[Location:[/path]]\"},   // TSR -/\n-\t\t{\"/dir\", 301, \"map[Location:[/dir/]]\"},     // TSR +/\n-\t\t{\"\", 301, \"map[Location:[/]]\"},             // TSR +/\n-\t\t{\"/PATH\", 301, \"map[Location:[/path]]\"},    // Fixed Case\n-\t\t{\"/DIR/\", 301, \"map[Location:[/dir/]]\"},    // Fixed Case\n-\t\t{\"/PATH/\", 301, \"map[Location:[/path]]\"},   // Fixed Case -/\n-\t\t{\"/DIR\", 301, \"map[Location:[/dir/]]\"},     // Fixed Case +/\n-\t\t{\"/../path\", 301, \"map[Location:[/path]]\"}, // CleanPath\n-\t\t{\"/nope\", 404, \"\"},                         // NotFound\n+\t\t{\"/path/\", 301, \"/path\"},   // TSR -/\n+\t\t{\"/dir\", 301, \"/dir/\"},     // TSR +/\n+\t\t{\"\", 301, \"/\"},             // TSR +/\n+\t\t{\"/PATH\", 301, \"/path\"},    // Fixed Case\n+\t\t{\"/DIR/\", 301, \"/dir/\"},    // Fixed Case\n+\t\t{\"/PATH/\", 301, \"/path\"},   // Fixed Case -/\n+\t\t{\"/DIR\", 301, \"/dir/\"},     // Fixed Case +/\n+\t\t{\"/../path\", 301, \"/path\"}, // CleanPath\n+\t\t{\"/nope\", 404, \"\"},         // NotFound\n \t}\n \tfor _, tr := range testRoutes {\n \t\tr, _ := http.NewRequest(\"GET\", tr.route, nil)\n \t\tw := httptest.NewRecorder()\n \t\trouter.ServeHTTP(w, r)\n-\t\tif !(w.Code == tr.code && (w.Code == 404 || fmt.Sprint(w.Header()) == tr.header)) {\n-\t\t\tt.Errorf(\"NotFound handling route %s failed: Code=%d, Header=%v\", tr.route, w.Code, w.Header())\n+\t\tif !(w.Code == tr.code && (w.Code == 404 || fmt.Sprint(w.Header().Get(\"Location\")) == tr.location)) {\n+\t\t\tt.Errorf(\"NotFound handling route %s failed: Code=%d, Header=%v\", tr.route, w.Code, w.Header().Get(\"Location\"))\n \t\t}\n \t}\n \n",
+  "diffTruncated": false,
+  "tree": [
+    ".travis.yml",
+    "LICENSE",
+    "README.md",
+    "path.go",
+    "path_test.go",
+    "router.go",
+    "router_test.go",
+    "tree.go",
+    "tree_test.go"
+  ],
+  "explanation": {
+    "what": "router_test.go の TestRouterNotFound を修正し、レスポンスヘッダ全体を文字列比較していたテストを Location ヘッダ単体の比較に変更した。",
+    "why": "PR本文が参照する golang/go の変更で、リダイレクトレスポンスに Content-Type ヘッダが新たに付与されるようになったため、ヘッダマップ全体を文字列化して比較していた既存テストが余分な Content-Type の分だけ不一致になり壊れていた。テストの意図（Location の値が正しいこと）に絞って比較することでこの影響を受けないようにした。",
+    "highlights": [
+      { "file": "router_test.go", "note": "header 文字列全体の比較から w.Header().Get(\"Location\") 比較へ変更している箇所" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [{ "type": "pr", "number": 220, "url": "https://github.com/julienschmidt/httprouter/pull/220" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

@@ -1,0 +1,56 @@
+{
+  "seq": 31,
+  "sha": "df50b8fd387529f3c458a07c2b53fd3b15c9b18d",
+  "parents": [
+    "6c31f5e12b8eb2bf0d32776738ced9c316e1218b"
+  ],
+  "author": {
+    "name": "Julien Schmidt",
+    "email": "github@julienschmidt.com",
+    "date": "2013-12-14T13:54:45+01:00"
+  },
+  "message": "Simplify router.ServeFiles a bit",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 3,
+    "deletions": 8
+  },
+  "files": [
+    {
+      "path": "router.go",
+      "status": "M",
+      "additions": 3,
+      "deletions": 8,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/router.go b/router.go\nindex d1cd60a..407e5bf 100644\n--- a/router.go\n+++ b/router.go\n@@ -145,19 +145,14 @@ func (r *Router) HandlerFunc(method, path string, handler http.HandlerFunc) {\n //\n //     router.ServeFiles(\"/*filepath\", http.Dir(\"/var/www\"))\n func (r *Router) ServeFiles(path string, root http.FileSystem) {\n-\tif len(path) < 10 || path[len(path)-9:] != \"*filepath\" {\n-\t\tpanic(\"path must end with *filepath\")\n+\tif len(path) < 10 || path[len(path)-10:] != \"/*filepath\" {\n+\t\tpanic(\"path must end with /*filepath\")\n \t}\n \n \tfileServer := http.FileServer(root)\n \n \tr.GET(path, func(w http.ResponseWriter, req *http.Request, vars map[string]string) {\n-\t\tfp, ok := vars[\"filepath\"]\n-\t\tif !ok {\n-\t\t\tpanic(\"routed request has no *filepath\")\n-\t\t}\n-\n-\t\treq.URL.Path = fp\n+\t\treq.URL.Path = vars[\"filepath\"]\n \t\tfileServer.ServeHTTP(w, req)\n \t})\n }\n",
+  "diffTruncated": false,
+  "tree": [
+    ".travis.yml",
+    "LICENSE",
+    "path.go",
+    "path_test.go",
+    "router.go",
+    "router_test.go",
+    "tree.go",
+    "tree_test.go"
+  ],
+  "explanation": {
+    "what": "router.ServeFiles を簡略化した。パスの末尾チェックを \"*filepath\" から \"/*filepath\" に厳密化し、ハンドラ内で vars[\"filepath\"] の有無を確認する if !ok / panic のコードを削除して、値を直接代入する形に変えた。",
+    "why": "コミットメッセージの通り「a bit simplify」が目的。ルート登録時点で \"/*filepath\" 形式が保証されるため、ハンドラ実行時に vars からの取り出しが失敗するケースは実質あり得ず、その防御コードは冗長だった。",
+    "highlights": [
+      { "file": "router.go", "note": "vars[\"filepath\"] の存在確認をやめ、Goのmapはキーが無ければゼロ値(空文字)を返す性質に委ねている" }
+    ],
+    "langNotes": [
+      { "topic": "map のゼロ値アクセス", "note": "Goのmapは存在しないキーを読むとpanicせず値型のゼロ値(string なら \"\")を返す。カンマ2つ目の ok を受け取らなければ存在確認自体を省略できるため、このコミットでは fp, ok := vars[...]; if !ok { panic(...) } という防御コードを削り、vars[\"filepath\"] を直接代入する形に簡略化している。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

@@ -1,0 +1,64 @@
+{
+  "seq": 139,
+  "sha": "9cf8746fac22178418ddf050451e0b00aa607291",
+  "parents": [
+    "02d2b7cc4ba3894f46dc65769c0b3d92bd177a05"
+  ],
+  "author": {
+    "name": "Julien Schmidt",
+    "email": "github@julienschmidt.com",
+    "date": "2016-02-05T19:26:30+01:00"
+  },
+  "message": "Ignore OPTIONS as allowed method\nUpdates #98",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 2,
+    "deletions": 1
+  },
+  "files": [
+    {
+      "path": "router.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "router_test.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/router.go b/router.go\nindex 1f7bbe9..5d6c81c 100644\n--- a/router.go\n+++ b/router.go\n@@ -338,7 +338,7 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {\n \t\tvar allow string\n \t\tfor method := range r.trees {\n \t\t\t// Skip the requested method - we already tried this one\n-\t\t\tif method == req.Method {\n+\t\t\tif method == req.Method || method == \"OPTIONS\" {\n \t\t\t\tcontinue\n \t\t\t}\n \ndiff --git a/router_test.go b/router_test.go\nindex 0924d48..265bd55 100644\n--- a/router_test.go\n+++ b/router_test.go\n@@ -234,6 +234,7 @@ func TestRouterNotAllowed(t *testing.T) {\n \n \t// add another method\n \trouter.DELETE(\"/path\", handlerFunc)\n+\trouter.OPTIONS(\"/path\", handlerFunc) // must be ignored\n \n \t// test again\n \tr, _ = http.NewRequest(\"GET\", \"/path\", nil)\n",
+  "diffTruncated": false,
+  "tree": [
+    ".travis.yml",
+    "LICENSE",
+    "README.md",
+    "path.go",
+    "path_test.go",
+    "router.go",
+    "router_test.go",
+    "tree.go",
+    "tree_test.go"
+  ],
+  "explanation": {
+    "what": "405 処理で許可メソッド一覧(Allow ヘッダ)を組み立てる際、OPTIONS メソッドをリクエストメソッドと同様にスキップ対象に加えた。router_test.go にも OPTIONS ハンドラを登録した上で Allow ヘッダに含まれないことを確認する行を追加した。",
+    "why": "コミットメッセージ \"Ignore OPTIONS as allowed method\" および \"Updates #98\" の通り、OPTIONS は CORS プリフライトなどブラウザが自動送信する特殊なメソッドであり、これを 405 の Allow 一覧に混ぜると意図しない挙動になるための除外。",
+    "highlights": [
+      { "file": "router.go", "note": "allow 文字列構築ループの条件に `|| method == \"OPTIONS\"` を追加" }
+    ],
+    "langNotes": [
+      { "topic": "OPTIONS method", "note": "OPTIONS はブラウザの CORS プリフライトリクエストなどで自動的に送出される HTTP メソッド。前コミットで追加された Allow ヘッダ生成ロジックに手動登録されていない OPTIONS ハンドラの有無が混ざらないよう、明示的に除外している。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

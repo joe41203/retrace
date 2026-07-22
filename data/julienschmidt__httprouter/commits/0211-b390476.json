@@ -1,0 +1,71 @@
+{
+  "seq": 211,
+  "sha": "b390476b92b14b79a3df554867be35d160b5c8c1",
+  "parents": [
+    "aff381be15b3011d172e03888b2022b5b919aea4"
+  ],
+  "author": {
+    "name": "Julien Schmidt",
+    "email": "git@julienschmidt.com",
+    "date": "2019-09-29T22:26:07+02:00"
+  },
+  "message": "router: add GlobalOPTIONS handler\n\nCloses #200, #214, #260\nUpdates #156",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 3,
+    "additions": 37,
+    "deletions": 3
+  },
+  "files": [
+    {
+      "path": "README.md",
+      "status": "M",
+      "additions": 19,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "router.go",
+      "status": "M",
+      "additions": 9,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "router_test.go",
+      "status": "M",
+      "additions": 9,
+      "deletions": 3,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/README.md b/README.md\nindex 5d3793c..d1e68b5 100644\n--- a/README.md\n+++ b/README.md\n@@ -146,6 +146,25 @@ Alternatively, one can also use `params := r.Context().Value(httprouter.ParamsKe\n \n Just try it out for yourself, the usage of HttpRouter is very straightforward. The package is compact and minimalistic, but also probably one of the easiest routers to set up.\n \n+## Automatic OPTIONS responses and CORS\n+\n+One might wish to modify automatic responses to OPTIONS requests, e.g. to support [CORS preflight requests](https://developer.mozilla.org/en-US/docs/Glossary/preflight_request) or to set other headers.\n+This can be achieved using the [`Router.GlobalOPTIONS`](https://godoc.org/github.com/julienschmidt/httprouter#Router.GlobalOPTIONS) handler:\n+\n+```go\n+router.GlobalOPTIONS = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {\n+    if r.Header.Get(\"Access-Control-Request-Method\") != \"\" {\n+        // Set CORS headers\n+        header := w.Header()\n+        header.Set(\"Access-Control-Allow-Methods\", r.Header.Get(\"Allow\"))\n+        header.Set(\"Access-Control-Allow-Origin\", \"*\")\n+    }\n+\n+    // Adjust status code to 204\n+    w.WriteHeader(http.StatusNoContent)\n+})\n+```\n+\n ## Where can I find Middleware *X*?\n \n This package just provides a very efficient request router with a few extra features. The router is just a [`http.Handler`](https://golang.org/pkg/net/http/#Handler), you can chain any http.Handler compatible middleware before the router, for example the [Gorilla handlers](http://www.gorillatoolkit.org/pkg/handlers). Or you could [just write your own](https://justinas.org/writing-http-middleware-in-go/), it's very easy!\ndiff --git a/router.go b/router.go\nindex 392c433..c4eb807 100644\n--- a/router.go\n+++ b/router.go\n@@ -156,6 +156,12 @@ type Router struct {\n \t// Custom OPTIONS handlers take priority over automatic replies.\n \tHandleOPTIONS bool\n \n+\t// An optional http.Handler that is called on automatic OPTIONS requests.\n+\t// The handler is only called if HandleOPTIONS is true and no OPTIONS\n+\t// handler for the specific path was set.\n+\t// The \"Allowed\" header is set before calling the handler.\n+\tGlobalOPTIONS http.Handler\n+\n \t// Cached value of global (*) allowed methods\n \tglobalAllowed string\n \n@@ -417,6 +423,9 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {\n \t\t// Handle OPTIONS requests\n \t\tif allow := r.allowed(path, http.MethodOptions); len(allow) > 0 {\n \t\t\tw.Header().Set(\"Allow\", allow)\n+\t\t\tif r.GlobalOPTIONS != nil {\n+\t\t\t\tr.GlobalOPTIONS.ServeHTTP(w, req)\n+\t\t\t}\n \t\t\treturn\n \t\t}\n \t} else {\ndiff --git a/router_test.go b/router_test.go\nindex 7406624..26079de 100644\n--- a/router_test.go\n+++ b/router_test.go\n@@ -274,12 +274,18 @@ func TestRouterOPTIONS(t *testing.T) {\n \t// add another method\n \trouter.GET(\"/path\", handlerFunc)\n \n+\t// set a global OPTIONS handler\n+\trouter.GlobalOPTIONS = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {\n+\t\t// Adjust status code to 204\n+\t\tw.WriteHeader(http.StatusNoContent)\n+\t})\n+\n \t// test again\n \t// * (server)\n \tr, _ = http.NewRequest(http.MethodOptions, \"*\", nil)\n \tw = httptest.NewRecorder()\n \trouter.ServeHTTP(w, r)\n-\tif !(w.Code == http.StatusOK) {\n+\tif !(w.Code == http.StatusNoContent) {\n \t\tt.Errorf(\"OPTIONS handling failed: Code=%d, Header=%v\", w.Code, w.Header())\n \t} else if allow := w.Header().Get(\"Allow\"); allow != \"GET, OPTIONS, POST\" {\n \t\tt.Error(\"unexpected Allow header value: \" + allow)\n@@ -289,7 +295,7 @@ func TestRouterOPTIONS(t *testing.T) {\n \tr, _ = http.NewRequest(http.MethodOptions, \"/path\", nil)\n \tw = httptest.NewRecorder()\n \trouter.ServeHTTP(w, r)\n-\tif !(w.Code == http.StatusOK) {\n+\tif !(w.Code == http.StatusNoContent) {\n \t\tt.Errorf(\"OPTIONS handling failed: Code=%d, Header=%v\", w.Code, w.Header())\n \t} else if allow := w.Header().Get(\"Allow\"); allow != \"GET, OPTIONS, POST\" {\n \t\tt.Error(\"unexpected Allow header value: \" + allow)\n@@ -306,7 +312,7 @@ func TestRouterOPTIONS(t *testing.T) {\n \tr, _ = http.NewRequest(http.MethodOptions, \"*\", nil)\n \tw = httptest.NewRecorder()\n \trouter.ServeHTTP(w, r)\n-\tif !(w.Code == http.StatusOK) {\n+\tif !(w.Code == http.StatusNoContent) {\n \t\tt.Errorf(\"OPTIONS handling failed: Code=%d, Header=%v\", w.Code, w.Header())\n \t} else if allow := w.Header().Get(\"Allow\"); allow != \"GET, OPTIONS, POST\" {\n \t\tt.Error(\"unexpected Allow header value: \" + allow)\n",
+  "diffTruncated": false,
+  "tree": [
+    ".travis.yml",
+    "LICENSE",
+    "README.md",
+    "go.mod",
+    "path.go",
+    "path_test.go",
+    "router.go",
+    "router_test.go",
+    "tree.go",
+    "tree_test.go"
+  ],
+  "explanation": {
+    "what": "Router 構造体に `GlobalOPTIONS http.Handler` フィールドを追加した。自動 OPTIONS 応答時に `Allow` ヘッダーを設定した後、`GlobalOPTIONS` が設定されていればそのハンドラを呼び出すようにした。README には CORS プリフライトリクエスト対応を例に、`Allow` ヘッダーの値を `Access-Control-Allow-Methods` にコピーして 204 を返す使用例が追加された。",
+    "why": "コミットメッセージの `Closes #200, #214, #260` から、複数の issue が「OPTIONS レスポンスをカスタマイズしたい(CORS 等)」という同種の要望だったと分かる。既存の `HandleOPTIONS` は Allow ヘッダーを付けるだけで固定的な応答しかできなかったため、任意の http.Handler をフックできるようにして、CORS プリフライトのような追加ヘッダー設定や独自のステータスコードに対応できるようにしたと考えられる。",
+    "highlights": [
+      { "file": "router.go", "note": "allowed() が空でない Allow ヘッダーを返した後、GlobalOPTIONS が設定されていれば呼び出す分岐を追加" },
+      { "file": "README.md", "note": "CORS プリフライト対応の実装例。Access-Control-Allow-Methods に Allow ヘッダーの値をそのまま転用している" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

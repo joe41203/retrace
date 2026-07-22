@@ -1,0 +1,54 @@
+{
+  "seq": 24,
+  "sha": "a7325e510c4d62c243d78431f04ac5e366c15c6d",
+  "parents": [
+    "69d3d5379f44b4d7556d1673677221d061339140"
+  ],
+  "author": {
+    "name": "Julien Schmidt",
+    "email": "github@julienschmidt.com",
+    "date": "2013-12-14T11:14:48+01:00"
+  },
+  "message": "Extend the trivial server example",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 8,
+    "deletions": 3
+  },
+  "files": [
+    {
+      "path": "router.go",
+      "status": "M",
+      "additions": 8,
+      "deletions": 3,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/router.go b/router.go\nindex 08b1d38..d1cd60a 100644\n--- a/router.go\n+++ b/router.go\n@@ -9,18 +9,23 @@\n //  package main\n //\n //  import (\n+//      \"fmt\"\n //      \"github.com/julienschmidt/httprouter\"\n-//      \"io\"\n //      \"net/http\"\n //      \"log\"\n //  )\n //\n+//  func Index(w http.ResponseWriter, r *http.Request, _ map[string]string) {\n+//      fmt.Fprint(w, \"Welcome!\\n\")\n+//  }\n+//\n //  func Hello(w http.ResponseWriter, r *http.Request, vars map[string]string) {\n-//      io.WriteString(w, \"hello, \" + vars[\"name\"] + \"!\\n\")\n+//      fmt.Fprintf(w, \"hello, %s!\\n\", vars[\"name\"])\n //  }\n //\n //  func main() {\n //      router := httprouter.New()\n+//      router.GET(\"/\", Index)\n //      router.GET(\"/hello/:name\", Hello)\n //\n //      log.Fatal(http.ListenAndServe(\":12345\", router))\n@@ -138,7 +143,7 @@ func (r *Router) HandlerFunc(method, path string, handler http.HandlerFunc) {\n // To use the operating system's file system implementation,\n // use http.Dir:\n //\n-//     router.ServeFiles(\"/*filepath\", http.Dir(\"/var/www\")))\n+//     router.ServeFiles(\"/*filepath\", http.Dir(\"/var/www\"))\n func (r *Router) ServeFiles(path string, root http.FileSystem) {\n \tif len(path) < 10 || path[len(path)-9:] != \"*filepath\" {\n \t\tpanic(\"path must end with *filepath\")\n",
+  "diffTruncated": false,
+  "tree": [
+    ".travis.yml",
+    "LICENSE",
+    "path.go",
+    "path_test.go",
+    "router.go",
+    "router_test.go",
+    "tree.go",
+    "tree_test.go"
+  ],
+  "explanation": {
+    "what": "router.go パッケージ godoc のサンプルコードに Index ハンドラ(ルート \"/\" 向け)を追加し、router.GET(\"/\", Index) を main 関数の例に加えた。Hello ハンドラの本文も io.WriteString から fmt.Fprintf を使った書き方に変更し、import から \"io\" を除いて \"fmt\" に差し替えた。ServeFiles の godoc 中の末尾の余分な閉じ括弧も削除している。",
+    "why": "直前までに ServeFiles や複数 HTTP メソッドのハンドラを実装してきたので、パッケージ冒頭のトップレベル例をより実践的な形(複数ルート・fmt を使った定型的な書き方)に揃える目的だったと考えられる。",
+    "highlights": [
+      { "file": "router.go", "note": "godoc サンプル: Index ハンドラの追加と router.GET(\"/\", Index) の登録例" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}
