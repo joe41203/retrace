@@ -52,7 +52,7 @@ node generator/extract.mjs --repo <owner>/<repo>
 
 ### 2. 解説(各コミットの explanation)を sonnet サブエージェントに委譲
 
-`explanation` が `null` のコミットだけを対象にする(再開可能性のため)。対象を**約10件ずつのバッチ**に分け、各バッチを1つの **sonnet サブエージェント**(Agent ツール, `subagent_type` は一般実行系, `model: sonnet`)に委譲する。バッチは並列に投げてよい。
+`explanation` が `null` のコミットだけを対象にする(再開可能性のため)。対象を**約10件ずつのバッチ**に分け、各バッチを1つの **`retrace-explainer` サブエージェント**(Agent ツール, `subagent_type: retrace-explainer`。定義 `.claude/agents/retrace-explainer.md` に規律・スキーマを内蔵)に委譲する。バッチは並列に投げてよい。retrace-explainer が未ロードのセッション(定義追加直後など)では、一般実行系 + `model: sonnet` で代替し、以下の指示と規律全文を渡す。
 
 各サブエージェントへの指示に必ず含めるもの:
 
@@ -61,6 +61,7 @@ node generator/extract.mjs --repo <owner>/<repo>
 - **反ハルシネーション規律の全文**(下記)
 - explanation のスキーマ(下記)
 - 「書き戻したら、対象 JSON が正しい JSON のままか(パースできるか)を確認せよ」
+  (なお `data/*/commits/*.json` への書き込みは PostToolUse フック `.claude/hooks/check-commit-json.mjs` でも自動検証され、壊れた書き込みは即座に指摘が返る)
 
 サブエージェントが埋める `explanation` のスキーマ(DESIGN.md 準拠):
 
