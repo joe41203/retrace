@@ -146,18 +146,32 @@
     "what": "デフォルトの HelpPrinter がフラグ・コマンドの `group:\"X\"` タグを再びヘルプ出力に反映するようにした。model.go の `Node.Group` / `Flag.Group` を文字列から新設の `*Group`(Key/Title)構造体に変更し、build.go の buildGroupForKey で group キーごとに `*Group` を解決、help.go に collectFlagGroups / collectCommandGroups を追加してグループ単位で見出し付きに出力する。未グループの項目は常に先頭にまとめて表示する。加えて `Groups([]Group)` オプションでグループのタイトルを外部から指定できるようにした。ツリー表示ではグループはこれまで通り無視される。",
     "why": "issue #134 の指摘通り、以前のリファクタリングで group タグの実際の出力反映が失われていた(コードは残っていたが未使用)。PR body ではこれを機に「グループにタイトルや説明文を持たせたい」という拡張案も示されており、Group を単なる文字列でなく専用の構造体に格上げすることで、その後の拡張(このコミットの次で実装される Description 等)の土台を作っている。",
     "highlights": [
-      { "file": "model.go", "note": "`Group` フィールドを `string` から `*Group` 構造体に変更。ネストしたコマンドが親のグループを継承する ClosestGroup() も追加" },
-      { "file": "help.go", "note": "collectFlagGroups / collectCommandGroups がグループ出現順を保ったまま未グループ項目を先頭に固定する" }
+      {
+        "file": "model.go",
+        "note": "`Group` フィールドを `string` から `*Group` 構造体に変更。ネストしたコマンドが親のグループを継承する ClosestGroup() も追加"
+      },
+      {
+        "file": "help.go",
+        "note": "collectFlagGroups / collectCommandGroups がグループ出現順を保ったまま未グループ項目を先頭に固定する"
+      }
     ],
     "langNotes": [],
     "diagram": {
-      "mermaid": "flowchart TD\n  A[\"struct tag group:\\\"X\\\"\"] --> B[\"Tag.Group (文字列)\"]\n  B --> C[\"buildGroupForKey()\"]\n  D[\"kong.Groups([]Group)\"] --> C\n  C --> E[\"Node.Group / Flag.Group (*Group)\"]\n  E --> F[\"collectFlagGroups / collectCommandGroups\"]\n  F --> G[\"ヘルプ出力(見出し付きグループ)\"]",
+      "mermaid": "flowchart TD\n  A[\"struct tag group:#quot;X#quot;\"] --> B[\"Tag.Group (文字列)\"]\n  B --> C[\"buildGroupForKey()\"]\n  D[\"kong.Groups([]Group)\"] --> C\n  C --> E[\"Node.Group / Flag.Group (*Group)\"]\n  E --> F[\"collectFlagGroups / collectCommandGroups\"]\n  F --> G[\"ヘルプ出力(見出し付きグループ)\"]",
       "caption": "group タグからヘルプ出力までのデータフロー"
     },
     "evidence": "pr",
     "refs": [
-      { "type": "pr", "number": 135, "url": "https://github.com/alecthomas/kong/pull/135" },
-      { "type": "issue", "number": 134, "url": "https://github.com/alecthomas/kong/issues/134" }
+      {
+        "type": "pr",
+        "number": 135,
+        "url": "https://github.com/alecthomas/kong/pull/135"
+      },
+      {
+        "type": "issue",
+        "number": 134,
+        "url": "https://github.com/alecthomas/kong/issues/134"
+      }
     ],
     "model": "claude-sonnet-5",
     "generatedAt": "2026-07-22T00:00:00Z"

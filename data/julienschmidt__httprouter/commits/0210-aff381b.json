@@ -44,13 +44,19 @@
     "what": "Router 構造体に globalAllowed string フィールドを追加し、新しい HTTP メソッドのツリーが Handle 経由で初めて登録されるたびに r.allowed(\"*\", \"\") を呼んでキャッシュを再計算するようにした。allowed 関数は path==\"*\" のケースで reqMethod が空文字列(内部からの再計算呼び出し)のときだけ全メソッドを走査し、そうでなければキャッシュ済みの r.globalAllowed をそのまま返すよう分岐した。ServeHTTP 側も r.allowed(path, req.Method) から r.allowed(path, http.MethodOptions) 呼び出しに変更されている。",
     "why": "おそらく、server-wide(path==\"*\")の OPTIONS リクエストのたびに全メソッドツリーを毎回走査してソートし直すのは無駄なため、ルート登録時(トップレベルのメソッドツリーが増えたタイミング)だけ再計算してキャッシュし、リクエスト処理時はキャッシュを返すだけにする最適化とみられる。コミットメッセージ以外に詳細な動機の記述はない。",
     "highlights": [
-      { "file": "router.go", "note": "reqMethod が空文字列かどうかで「キャッシュ再計算」と「キャッシュ参照」を切り分けている(内部呼び出し専用の合図として空文字列を使っている)" }
+      {
+        "file": "router.go",
+        "note": "reqMethod が空文字列かどうかで「キャッシュ再計算」と「キャッシュ参照」を切り分けている(内部呼び出し専用の合図として空文字列を使っている)"
+      }
     ],
     "langNotes": [
-      { "topic": "GlobalOPTIONS のキャッシュ", "note": "path=\"*\" 宛の OPTIONS リクエスト(サーバー全体に何が許可されているかを問い合わせる、いわゆる server-wide OPTIONS)は頻繁に来る可能性がある一方、許可メソッドの集合はルート登録時にしか変わらない。そこで計算結果を Router.globalAllowed に保持し、リクエストのたびの再計算を避けている。" }
+      {
+        "topic": "GlobalOPTIONS のキャッシュ",
+        "note": "path=\"*\" 宛の OPTIONS リクエスト(サーバー全体に何が許可されているかを問い合わせる、いわゆる server-wide OPTIONS)は頻繁に来る可能性がある一方、許可メソッドの集合はルート登録時にしか変わらない。そこで計算結果を Router.globalAllowed に保持し、リクエストのたびの再計算を避けている。"
+      }
     ],
     "diagram": {
-      "mermaid": "flowchart TD\n  A[\"Router.Handle でメソッドのツリーを初登録\"] --> B[\"r.globalAllowed = r.allowed(\\\"*\\\", \\\"\\\")\"]\n  C[\"OPTIONS * リクエスト到着\"] --> D[\"r.allowed(\\\"*\\\", http.MethodOptions)\"]\n  D --> E[\"reqMethod が空でないので r.globalAllowed をそのまま返す\"]\n  B -.->|\"キャッシュ更新\"| E",
+      "mermaid": "flowchart TD\n  A[\"Router.Handle でメソッドのツリーを初登録\"] --> B[\"r.globalAllowed = r.allowed(#quot;*#quot;, #quot;#quot;)\"]\n  C[\"OPTIONS * リクエスト到着\"] --> D[\"r.allowed(#quot;*#quot;, http.MethodOptions)\"]\n  D --> E[\"reqMethod が空でないので r.globalAllowed をそのまま返す\"]\n  B -.->|\"キャッシュ更新\"| E",
       "caption": "GlobalOPTIONS(server-wide OPTIONS)向けの許可メソッド一覧は、ルート登録時に再計算してキャッシュし、リクエスト時はキャッシュを返すだけにする"
     },
     "evidence": "inferred",

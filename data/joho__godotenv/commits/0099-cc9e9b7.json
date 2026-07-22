@@ -101,22 +101,44 @@
     "what": "パーサを行単位の bufio.Scanner ベースから、ファイル全体をバイト列として扱う新しい parser.go(parseBytes/getStatementStart/locateKeyName/extractVarValue)に置き換えた。これによりシングルクォート・ダブルクォートで囲まれた値の中に改行を含む複数行文字列(例 `OPTION_J='line 1\\nline 2'`)を正しく1つの値として解析できるようになった。あわせて Parse/Unmarshal は新設の UnmarshalBytes 経由になり、Exec と loadFile のエラーハンドリングも強化され、fixtures/comments.env などコメント処理のテストケースも追加された。",
     "why": "linkedIssues #117 が報告する通り、従来の行単位パーサは `URLS=\"foo\\nbar\"` のような複数行の値を1行ずつ別々のキーとして誤って分割していた。PR 本文にある通り以前に一度提出された #118 を土台に、テストを拡充した上でこの根本原因(行ベースの走査では引用符をまたぐ改行を追えないこと)を解消するためにバイト列ベースの状態遷移パーサへ書き換えた。",
     "highlights": [
-      { "file": "parser.go", "note": "getStatementStart→locateKeyName→extractVarValue の3段階で1文ずつ切り出す新パーサ" },
-      { "file": "fixtures/quoted.env", "note": "OPTION_J〜M に複数行値・エスケープされたクォートを追加した回帰用フィクスチャ" },
-      { "file": "godotenv.go", "note": "旧 Parse/isIgnoredLine を削除し UnmarshalBytes に委譲" }
+      {
+        "file": "parser.go",
+        "note": "getStatementStart→locateKeyName→extractVarValue の3段階で1文ずつ切り出す新パーサ"
+      },
+      {
+        "file": "fixtures/quoted.env",
+        "note": "OPTION_J〜M に複数行値・エスケープされたクォートを追加した回帰用フィクスチャ"
+      },
+      {
+        "file": "godotenv.go",
+        "note": "旧 Parse/isIgnoredLine を削除し UnmarshalBytes に委譲"
+      }
     ],
     "langNotes": [
-      { "topic": "[]byte とカーソル方式のパース", "note": "Go の文字列処理では文字列を []byte にキャストしてスライスで前進しながら解析する書き方がよく使われる。ここでは cutset という []byte のスライスを次第に短くしていくことで、正規表現や行分割に頼らずに1パスで走査している。" },
-      { "topic": "bytes.IndexFunc / TrimLeftFunc", "note": "bytes パッケージの *Func 系関数は述語関数(rune -> bool)を渡してバイト列を走査できる。isSpace や isCharFunc のような小さなヘルパー関数と組み合わせ、空白や特定文字の位置を関数型スタイルで探している。" },
-      { "topic": "多値関数の戻り値の慣習", "note": "locateKeyName や extractVarValue は (result, rest []byte, err error) の3値を返す。Go では『処理結果』『残りの入力』『エラー』を同時に返す関数シグネチャがパーサ実装の定番パターンになっている。" }
+      {
+        "topic": "[]byte とカーソル方式のパース",
+        "note": "Go の文字列処理では文字列を []byte にキャストしてスライスで前進しながら解析する書き方がよく使われる。ここでは cutset という []byte のスライスを次第に短くしていくことで、正規表現や行分割に頼らずに1パスで走査している。"
+      },
+      {
+        "topic": "bytes.IndexFunc / TrimLeftFunc",
+        "note": "bytes パッケージの *Func 系関数は述語関数(rune -> bool)を渡してバイト列を走査できる。isSpace や isCharFunc のような小さなヘルパー関数と組み合わせ、空白や特定文字の位置を関数型スタイルで探している。"
+      },
+      {
+        "topic": "多値関数の戻り値の慣習",
+        "note": "locateKeyName や extractVarValue は (result, rest []byte, err error) の3値を返す。Go では『処理結果』『残りの入力』『エラー』を同時に返す関数シグネチャがパーサ実装の定番パターンになっている。"
+      }
     ],
     "diagram": {
-      "mermaid": "flowchart TD\n  A[\"parseBytes(src, out)\"] --> B[\"getStatementStart: コメント/空白をスキップ\"]\n  B -->|\"入力終端\"| F[\"終了\"]\n  B -->|\"文の先頭\"| C[\"locateKeyName: export接頭辞とキー名を抽出\"]\n  C --> D[\"extractVarValue: クォート種別を判定\"]\n  D -->|\"クォートなし\"| E[\"空白まで読み取り expandVariables\"]\n  D -->|\"' または \\\" で開始\"| G[\"対応する終端クォートまで読み取り(改行を含めてよい)\"]\n  G -->|\"ダブルクォートのみ\"| H[\"expandEscapes + expandVariables\"]\n  E --> I[\"out[key]=value, 残りをcutsetへ\"]\n  H --> I\n  I --> B",
+      "mermaid": "flowchart TD\n  A[\"parseBytes(src, out)\"] --> B[\"getStatementStart: コメント/空白をスキップ\"]\n  B -->|\"入力終端\"| F[\"終了\"]\n  B -->|\"文の先頭\"| C[\"locateKeyName: export接頭辞とキー名を抽出\"]\n  C --> D[\"extractVarValue: クォート種別を判定\"]\n  D -->|\"クォートなし\"| E[\"空白まで読み取り expandVariables\"]\n  D -->|\"' または #quot; で開始\"| G[\"対応する終端クォートまで読み取り(改行を含めてよい)\"]\n  G -->|\"ダブルクォートのみ\"| H[\"expandEscapes + expandVariables\"]\n  E --> I[\"out[key]=value, 残りをcutsetへ\"]\n  H --> I\n  I --> B",
       "caption": "1文ずつ切り出す新パーサ(parser.go)の状態遷移。クォート内の改行を読み飛ばせる点が複数行文字列対応の核心。"
     },
     "evidence": "issue",
     "refs": [
-      { "type": "pr", "number": 156, "url": "https://github.com/joho/godotenv/pull/156" }
+      {
+        "type": "pr",
+        "number": 156,
+        "url": "https://github.com/joho/godotenv/pull/156"
+      }
     ],
     "model": "claude-sonnet-5",
     "generatedAt": "2026-07-22T00:00:00Z"

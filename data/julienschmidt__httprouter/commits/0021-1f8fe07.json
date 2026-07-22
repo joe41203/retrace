@@ -49,12 +49,18 @@
     "what": "tree.go の insertChild と getValue を書き換え、catchAll(*param)ルートの木構造と検索処理を変更した。catchAll は「空パスの中間ノード(isCatchAll, wildChild)」と「実際のパスと handle を持つ子ノード(isCatchAll)」の2階層に分割されるようになった。合わせて、catchAll で捕捉した値を vars に格納する際のキーが n.path[1:] から n.path[2:] に変わり(例: /src/some/file.png → filepath の値が \"some/file.png\" から \"/some/file.png\" に変化)、addRoute 側にも wildChild の子が既に isCatchAll のノードへさらにルートを登録しようとした場合に panic するチェックが追加された。tree_test.go のテストケースも新しい挙動に合わせて更新されている。",
     "why": "おそらく、catchAll ノードを2階層に分けたことで「\"/src/\" のように catchAll の直前で終わるパス」もTSR(末尾スラッシュ)判定やindices探索の対象にできるようにする狙いがあったと考えられる。実際このコミット以降、TestTreeWildcardConflict に \"/src/\" \"/src1/\" \"/src1/*filepath\" のケースが追加されており、catchAll と通常セグメントの衝突検出を木構造レベルで正しく扱えるようにする意図が読み取れる。",
     "highlights": [
-      { "file": "tree.go", "note": "insertChild の catchAll 分岐: 空パスの isCatchAll ノードと、実パスを持つ isCatchAll 子ノードの2段構成に変更" },
-      { "file": "tree_test.go", "note": "filepath の値が先頭に \"/\" を含むようになった変更(\"some/file.png\" → \"/some/file.png\")" }
+      {
+        "file": "tree.go",
+        "note": "insertChild の catchAll 分岐: 空パスの isCatchAll ノードと、実パスを持つ isCatchAll 子ノードの2段構成に変更"
+      },
+      {
+        "file": "tree_test.go",
+        "note": "filepath の値が先頭に \"/\" を含むようになった変更(\"some/file.png\" → \"/some/file.png\")"
+      }
     ],
     "langNotes": [],
     "diagram": {
-      "mermaid": "flowchart TD\n  A[\"/src (node)\"] --> B[\"catchAll node (empty path, wildChild)\"]\n  B --> C[\"*filepath node (path=\\\"/filepath\\\", handle set)\"]",
+      "mermaid": "flowchart TD\n  A[\"/src (node)\"] --> B[\"catchAll node (empty path, wildChild)\"]\n  B --> C[\"*filepath node (path=#quot;/filepath#quot;, handle set)\"]",
       "caption": "catchAll ルートは空パスの中間ノードと実パスを持つ子ノードの2階層に分割される"
     },
     "evidence": "inferred",
