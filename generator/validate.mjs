@@ -140,6 +140,18 @@ function validateExplanation(exp, ctx) {
     err(`${ctx}: explanation.evidence が ${validEvidence.join("|")} でない (=${exp.evidence})`);
   }
   if (!Array.isArray(exp.refs)) err(`${ctx}: explanation.refs 配列でない`);
+  // langNotes は任意(言語学習メモ)。存在するなら {topic, note} の配列。
+  if ("langNotes" in exp && exp.langNotes != null) {
+    if (!Array.isArray(exp.langNotes)) {
+      err(`${ctx}: explanation.langNotes 配列でない`);
+    } else {
+      for (const note of exp.langNotes) {
+        if (!isString(note?.topic) || !isString(note?.note)) {
+          err(`${ctx}: explanation.langNotes の要素が { topic, note } でない`);
+        }
+      }
+    }
+  }
   // diagram は任意。存在するなら null または { mermaid, caption } object。
   if ("diagram" in exp && exp.diagram !== null) {
     if (typeof exp.diagram !== "object") {

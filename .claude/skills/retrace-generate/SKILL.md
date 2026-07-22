@@ -70,6 +70,7 @@ node generator/extract.mjs --repo <owner>/<repo>
   "what": "何をしたか(1〜3文、日本語)",
   "why": "なぜそうしたか。根拠があれば引用しつつ、なければ『おそらく〜』と推測を明示",
   "highlights": [{ "file": "attacker/attacker.go", "note": "読みどころの短い注記" }],
+  "langNotes": [{ "topic": "goroutine", "note": "言語固有概念の短い解説(1〜3文)" }],
   "diagram": { "mermaid": "flowchart LR\n  A[\"CLI\"] --> B[\"attacker\"]", "caption": "図の1行説明" },
   "evidence": "pr | issue | message | inferred",
   "refs": [{ "type": "pr", "number": 12, "url": "…" }],
@@ -79,6 +80,8 @@ node generator/extract.mjs --repo <owner>/<repo>
 ```
 
 - `highlights` は 0〜3 件。diff の中で「まず読むべき箇所」を指す。無理に埋めない
+- `langNotes` は 0〜4 件。**読者像: プログラミング歴10年・対象言語/フレームワークは初心者**(2026-07-22 ユーザー指定)。言語・フレームワーク・エコシステム固有のイディオム・API・慣習が**初登場する/重要な役割を果たす**コミットで、topic(概念名、コード上の呼び名)と note(1〜3文)を書く。一般的なプログラミング概念の初歩解説は書かない。該当なしは `[]`
+- 解説は**可能な限り充実させる**。why は背景・設計判断まで踏み込む(2〜5文)。ただし充実の手段は根拠の深掘りであって推測の水増しではない(反ハルシネーション規律が優先)
 - `refs` は根拠にしたリンク(PR / issue)。`inferred` の場合は空配列でよい
 - `generatedAt` は生成時刻(ISO8601)
 - **`diagram` は任意**。該当しないコミットは **`null`**(大多数はこれ)。次の「diagram の指針」に従う

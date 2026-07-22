@@ -20,5 +20,6 @@ retrace のデータスキーマ(commit JSON / explanation / chapters / index)�
 - [ ] `viewer/scripts/make-fixture.mjs` — fixture が新フィールドの代表値を網羅しているか
 - [ ] `.claude/skills/retrace-generate/SKILL.md` — 生成指示(explanation スキーマの記載)
 - [ ] `.claude/agents/retrace-explainer.md` — 解説バッチの出力スキーマ記載
+- [ ] `.claude/hooks/check-commit-json.mjs` — 書き込み時の explanation 形状チェック
 
 完了確認: 変更後に `node --test generator/lib.test.mjs`、`node generator/validate.mjs --id fixture__demo`(fixture 再生成後)、`cd viewer && npm run build` の3つが通ること。

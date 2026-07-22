@@ -106,6 +106,7 @@ flowchart LR
   "what": "何をしたか(1〜3文)",
   "why": "なぜそうしたか。根拠があれば引用、なければ『おそらく〜』と推測を明示",
   "highlights": [{ "file": "attacker/attacker.go", "note": "読みどころの短い注記" }],
+  "langNotes": [{ "topic": "goroutine", "note": "言語・フレームワーク固有概念の短い解説(1〜3文)" }],
   "diagram": { "mermaid": "flowchart LR\n  A[\"CLI\"] --> B[\"attacker\"]", "caption": "図の1行説明" },
   "evidence": "pr | issue | message | inferred",
   "refs": [{ "type": "pr", "number": 12, "url": "…" }],
@@ -114,6 +115,9 @@ flowchart LR
 ```
 
 - `diagram` は**任意**(該当しないコミットは `null`)。アーキテクチャ変更・データフロー導入・状態遷移など、**図が構造理解を実際に助けるコミットのみ**に付ける(全体の1〜2割目安)。flowchart / sequenceDiagram 中心、10ノード以下、ラベルは必ずダブルクォートで囲む(Mermaid の構文エラー予防)
+- **読者像(2026-07-22 ユーザー指定)**: プログラミング歴10年だが、**対象の言語・フレームワークは初心者**。新しい言語を OSS の歴史で学ぶのがこのツールの主用途
+- `langNotes`(0〜4件)は言語・フレームワーク・エコシステム固有のイディオム・API・慣習(例: Go の goroutine / channel / embedding / error wrapping、cobra、go.mod)が**そのコミットに初登場する・重要な役割を果たす**ときに書く。一般的なプログラミング概念(HTTP・テスト一般・並行処理一般)の初歩解説は書かない。該当なしは `[]`
+- 解説は**可能な限り充実させる**方針。what は観察事実を具体的に、why は背景・設計判断まで踏み込む(2〜5文)。ただし充実の手段は根拠の深掘りであって、推測の水増しではない(反ハルシネーション規律が優先)
 
 ## ジェネレーター仕様(generator/)
 

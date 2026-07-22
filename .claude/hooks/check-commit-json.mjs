@@ -48,6 +48,13 @@ if (ex !== null) {
   if (typeof ex.why !== "string" || !ex.why) fail(`${filePath}: explanation.why が空`);
   if (!EVIDENCE.includes(ex.evidence)) fail(`${filePath}: evidence は ${EVIDENCE.join("|")} のいずれか`);
   if (!Array.isArray(ex.highlights)) fail(`${filePath}: explanation.highlights は配列`);
+  if ("langNotes" in ex && ex.langNotes != null) {
+    if (!Array.isArray(ex.langNotes)) fail(`${filePath}: explanation.langNotes は配列`);
+    for (const n of ex.langNotes) {
+      if (typeof n?.topic !== "string" || typeof n?.note !== "string")
+        fail(`${filePath}: langNotes の要素は { topic: string, note: string }`);
+    }
+  }
   if (ex.evidence === "inferred" && !/おそらく/.test(ex.why))
     fail(`${filePath}: evidence=inferred の why には「おそらく」を含める(反ハルシネーション規律)`);
   if (ex.diagram != null) {
