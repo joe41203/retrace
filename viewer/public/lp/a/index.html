@@ -8,6 +8,9 @@
       name="description"
       content="実在の OSS を Initial commit から順に、LLM 解説付きで追体験する学習ツール。diff・意図・読みどころを1コミットずつ読み解く。"
     />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="icon" href="/favicon.ico" sizes="32x32" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -104,6 +107,10 @@
       }
       .brand .prompt {
         color: var(--green);
+      }
+      .brand .logo-mark {
+        color: var(--green);
+        flex: none;
       }
       .brand .cursor {
         display: inline-block;
@@ -236,6 +243,31 @@
         margin-left: 12px;
         font-size: 12px;
         color: var(--fg-dim);
+      }
+      /* 音声トグル（動画プレーヤー） */
+      .sound-toggle {
+        margin-left: auto;
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        font-family: var(--mono);
+        font-size: 12px;
+        color: var(--fg-muted);
+        background: transparent;
+        border: 1px solid var(--border-bright);
+        border-radius: 6px;
+        padding: 5px 10px;
+        cursor: pointer;
+        transition: all 0.16s ease;
+      }
+      .sound-toggle:hover {
+        color: var(--green);
+        border-color: var(--green);
+        background: rgba(63, 185, 80, 0.08);
+      }
+      .sound-toggle[aria-pressed="true"] {
+        color: var(--green);
+        border-color: var(--green);
       }
       .terminal-body {
         padding: 22px 20px;
@@ -441,7 +473,15 @@
     <header>
       <div class="wrap nav">
         <div class="brand">
-          <span class="prompt">&gt;_</span>
+          <svg class="logo-mark" viewBox="0 0 32 32" fill="none" width="24" height="24" aria-hidden="true">
+            <path d="M11 25.5 L11 7.5" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/>
+            <path d="M15 25.5 L26 25.5" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/>
+            <path d="M14.5 18.5 L22.5 18.5" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" opacity=".6"/>
+            <path d="M14.5 11.5 L24 11.5" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" opacity=".38"/>
+            <circle cx="11" cy="18.5" r="2.1" stroke="currentColor" stroke-width="2.4"/>
+            <circle cx="11" cy="11.5" r="2.1" stroke="currentColor" stroke-width="2.4"/>
+            <circle cx="11" cy="25.5" r="3" fill="currentColor"/>
+          </svg>
           Retrace<span class="cursor"></span>
         </div>
         <a class="nav-cta" href="/">追体験を始める</a>
@@ -539,14 +579,20 @@
           <p class="section-lead">
             git log を最初から。diff と LLM 解説を重ねながら、設計が育つ過程を1コミットずつ辿る——その体験を 40 秒で。
           </p>
-          <div class="terminal" style="margin-top: 40px">
+          <div class="terminal video-player" style="margin-top: 40px">
             <div class="terminal-bar">
               <span class="tdot r"></span>
               <span class="tdot y"></span>
               <span class="tdot g"></span>
               <span class="tpath">retrace — intro.mp4</span>
+              <button type="button" class="sound-toggle" aria-pressed="false" aria-label="音声を再生">
+                <svg class="ic-muted" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H2v6h4l5 4V5z"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></svg>
+                <svg class="ic-sound" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none"><path d="M11 5 6 9H2v6h4l5 4V5z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M19 5a9 9 0 0 1 0 14"/></svg>
+                <span class="sound-label">音声オン</span>
+              </button>
             </div>
             <video
+              id="promo-video"
               src="/video/retrace-promo.mp4"
               poster="/video/retrace-promo-poster.png"
               autoplay
@@ -682,5 +728,36 @@
         </div>
       </div>
     </footer>
+
+    <script>
+      // 音声トグル: ミュート自動再生の動画を、クリックで音声ON/OFF
+      (function () {
+        var video = document.getElementById("promo-video");
+        var btn = document.querySelector(".sound-toggle");
+        if (!video || !btn) return;
+        var icMuted = btn.querySelector(".ic-muted");
+        var icSound = btn.querySelector(".ic-sound");
+        var label = btn.querySelector(".sound-label");
+        function render() {
+          var on = !video.muted;
+          btn.setAttribute("aria-pressed", on ? "true" : "false");
+          btn.setAttribute("aria-label", on ? "音声を停止" : "音声を再生");
+          if (icMuted) icMuted.style.display = on ? "none" : "";
+          if (icSound) icSound.style.display = on ? "" : "none";
+          if (label) label.textContent = on ? "音声オフ" : "音声オン";
+        }
+        btn.addEventListener("click", function () {
+          video.muted = !video.muted;
+          if (!video.muted) {
+            // 音声ONにしたら頭出しして確実に再生
+            var p = video.play();
+            if (p && p.catch) p.catch(function () {});
+          }
+          render();
+        });
+        video.addEventListener("volumechange", render);
+        render();
+      })();
+    </script>
   </body>
 </html>
