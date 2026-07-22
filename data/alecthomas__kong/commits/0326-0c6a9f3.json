@@ -1,0 +1,157 @@
+{
+  "seq": 326,
+  "sha": "0c6a9f3a3d4bec030d61c630a9f211bc7162f522",
+  "parents": [
+    "9c8b401de0922f80852f2c9d3143c0e44cf53e7f"
+  ],
+  "author": {
+    "name": "Jacob Hochstetler",
+    "email": "jacob.hochstetler@gmail.com",
+    "date": "2022-09-20T07:55:05-05:00"
+  },
+  "message": "Merging issue 280 with master changes (#296)",
+  "pr": {
+    "number": 296,
+    "title": "Merging issue 280 with master changes",
+    "body": "Merging #280 with master for this PR. ",
+    "url": "https://github.com/alecthomas/kong/pull/296"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 5,
+    "additions": 293,
+    "deletions": 5
+  },
+  "files": [
+    {
+      "path": "README.md",
+      "status": "M",
+      "additions": 15,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "context.go",
+      "status": "M",
+      "additions": 25,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "kong_test.go",
+      "status": "M",
+      "additions": 231,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "mapper.go",
+      "status": "M",
+      "additions": 18,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "tag.go",
+      "status": "M",
+      "additions": 4,
+      "deletions": 2,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/README.md b/README.md\nindex 099ac90..40cdbb7 100644\n--- a/README.md\n+++ b/README.md\n@@ -444,6 +444,20 @@ var CLI struct {\n \n For flags, multiple key+value pairs should be separated by `mapsep:\"rune\"` tag (defaults to `;`) eg. `--set=\"key1=value1;key2=value2\"`.\n \n+## Pointers\n+\n+Pointers work like the underlying type, except that you can differentiate between the presence of the zero value and no value being supplied.\n+\n+For example:\n+\n+```go\n+var CLI struct {\n+\tFoo *int\n+}\n+```\n+\n+Would produce a nil value for `Foo` if no `--foo` argument is supplied, but would have a pointer to the value 0 if the argument `--foo=0` was supplied.\n+\n ## Nested data structure\n \n Kong support a nested data structure as well with `embed:\"\"`. You can combine `embed:\"\"` with `prefix:\"\"`:\n@@ -689,4 +703,4 @@ See the [section on hooks](#hooks-beforeresolve-beforeapply-afterapply-and-the-b\n \n ### Other options\n \n-The full set of options can be found [here](https://godoc.org/github.com/alecthomas/kong#Option).\n+The full set of options can be found [here](https://godoc.org/github.com/alecthomas/kong#Option).\n\\ No newline at end of file\ndiff --git a/context.go b/context.go\nindex b5c6e6d..de43925 100644\n--- a/context.go\n+++ b/context.go\n@@ -663,6 +663,22 @@ func (c *Context) Apply() (string, error) {\n \treturn strings.Join(path, \" \"), nil\n }\n \n+func flipBoolValue(value reflect.Value) error {\n+\tif value.Kind() == reflect.Bool {\n+\t\tvalue.SetBool(!value.Bool())\n+\t\treturn nil\n+\t}\n+\n+\tif value.Kind() == reflect.Ptr {\n+\t\tif !value.IsNil() {\n+\t\t\treturn flipBoolValue(value.Elem())\n+\t\t}\n+\t\treturn nil\n+\t}\n+\n+\treturn fmt.Errorf(\"cannot negate a value of %s\", value.Type().String())\n+}\n+\n func (c *Context) parseFlag(flags []*Flag, match string) (err error) {\n \tcandidates := []string{}\n \tfor _, flag := range flags {\n@@ -691,7 +707,10 @@ func (c *Context) parseFlag(flags []*Flag, match string) (err error) {\n \t\t}\n \t\tif flag.Negated {\n \t\t\tvalue := c.getValue(flag.Value)\n-\t\t\tvalue.SetBool(!value.Bool())\n+\t\t\terr := flipBoolValue(value)\n+\t\t\tif err != nil {\n+\t\t\t\treturn err\n+\t\t\t}\n \t\t\tflag.Value.Apply(value)\n \t\t}\n \t\tc.Path = append(c.Path, &Path{Flag: flag})\n@@ -891,6 +910,11 @@ func checkEnum(value *Value, target reflect.Value) error {\n \tcase reflect.Map, reflect.Struct:\n \t\treturn errors.New(\"enum can only be applied to a slice or value\")\n \n+\tcase reflect.Ptr:\n+\t\tif target.IsNil() {\n+\t\t\treturn nil\n+\t\t}\n+\t\treturn checkEnum(value, target.Elem())\n \tdefault:\n \t\tenumSlice := value.EnumSlice()\n \t\tv := fmt.Sprintf(\"%v\", target)\ndiff --git a/kong_test.go b/kong_test.go\nindex cb7f204..8964cfb 100644\n--- a/kong_test.go\n+++ b/kong_test.go\n@@ -1736,3 +1736,234 @@ func TestCumulativeArgumentNotLast(t *testing.T) {\n \t_, err := kong.New(&cli)\n \tassert.Error(t, err)\n }\n+\n+func TestStringPointer(t *testing.T) {\n+\tvar cli struct {\n+\t\tFoo *string\n+\t}\n+\tk, err := kong.New(&cli)\n+\trequire.NoError(t, err)\n+\trequire.NotNil(t, k)\n+\tctx, err := k.Parse([]string{\"--foo\", \"wtf\"})\n+\trequire.NoError(t, err)\n+\trequire.NotNil(t, ctx)\n+\trequire.NotNil(t, cli.Foo)\n+\trequire.Equal(t, \"wtf\", *cli.Foo)\n+}\n+\n+func TestStringPointerNoValue(t *testing.T) {\n+\tvar cli struct {\n+\t\tFoo *string\n+\t}\n+\tk, err := kong.New(&cli)\n+\trequire.NoError(t, err)\n+\trequire.NotNil(t, k)\n+\tctx, err := k.Parse([]string{})\n+\trequire.NoError(t, err)\n+\trequire.NotNil(t, ctx)\n+\trequire.Nil(t, cli.Foo)\n+}\n+\n+func TestStringPointerDefault(t *testing.T) {\n+\tvar cli struct {\n+\t\tFoo *string `default:\"stuff\"`\n+\t}\n+\tk, err := kong.New(&cli)\n+\trequire.NoError(t, err)\n+\trequire.NotNil(t, k)\n+\tctx, err := k.Parse([]string{})\n+\trequire.NoError(t, err)\n+\trequire.NotNil(t, ctx)\n+\trequire.NotNil(t, cli.Foo)\n+\trequire.Equal(t, \"stuff\", *cli.Foo)\n+}\n+\n+func TestStringPointerAliasNoValue(t *testing.T) {\n+\ttype Foo string\n+\tvar cli struct {\n+\t\tF *Foo\n+\t}\n+\tk, err := kong.New(&cli)\n+\trequire.NoError(t, err)\n+\trequire.NotNil(t, k)\n+\tctx, err := k.Parse([]string{})\n+\trequire.NoError(t, err)\n+\trequire.NotNil(t, ctx)\n+\trequire.Nil(t, cli.F)\n+}\n+\n+func TestStringPointerAlias(t *testing.T) {\n+\ttype Foo string\n+\tvar cli struct {\n+\t\tF *Foo\n+\t}\n+\tk, err := kong.New(&cli)\n+\trequire.NoError(t, err)\n+\trequire.NotNil(t, k)\n+\tctx, err := k.Parse([]string{\"--f=value\"})\n+\trequire.NoError(t, err)\n+\trequire.NotNil(t, ctx)\n+\trequire.NotNil(t, cli.F)\n+\trequire.Equal(t, Foo(\"value\"), *cli.F)\n+}\n+\n+func TestStringPointerEmptyValue(t *testing.T) {\n+\tvar cli struct {\n+\t\tF *string\n+\t\tG *string\n+\t}\n+\tk, err := kong.New(&cli)\n+\trequire.NoError(t, err)\n+\trequire.NotNil(t, k)\n+\tctx, err := k.Parse([]string{\"--f\", \"\", \"--g=\"})\n+\trequire.NoError(t, err)\n+\trequire.NotNil(t, ctx)\n+\trequire.NotNil(t, cli.F)\n+\trequire.NotNil(t, cli.G)\n+\trequire.Equal(t, \"\", *cli.F)\n+\trequire.Equal(t, \"\", *cli.G)\n+}\n+\n+func TestIntPtr(t *testing.T) {\n+\tvar cli struct {\n+\t\tF *int\n+\t\tG *int\n+\t}\n+\tk, err := kong.New(&cli)\n+\trequire.NoError(t, err)\n+\trequire.NotNil(t, k)\n+\tctx, err := k.Parse([]string{\"--f=6\"})\n+\trequire.NoError(t, err)\n+\trequire.NotNil(t, ctx)\n+\trequire.NotNil(t, cli.F)\n+\trequire.Nil(t, cli.G)\n+\trequire.Equal(t, 6, *cli.F)\n+}\n+\n+func TestBoolPtr(t *testing.T) {\n+\tvar cli struct {\n+\t\tX *bool\n+\t}\n+\tk, err := kong.New(&cli)\n+\trequire.NoError(t, err)\n+\trequire.NotNil(t, k)\n+\tctx, err := k.Parse([]string{\"--x\"})\n+\trequire.NoError(t, err)\n+\trequire.NotNil(t, ctx)\n+\trequire.NotNil(t, cli.X)\n+\trequire.Equal(t, true, *cli.X)\n+}\n+\n+func TestBoolPtrFalse(t *testing.T) {\n+\tvar cli struct {\n+\t\tX *bool\n+\t}\n+\tk, err := kong.New(&cli)\n+\trequire.NoError(t, err)\n+\trequire.NotNil(t, k)\n+\tctx, err := k.Parse([]string{\"--x=false\"})\n+\trequire.NoError(t, err)\n+\trequire.NotNil(t, ctx)\n+\trequire.NotNil(t, cli.X)\n+\trequire.Equal(t, false, *cli.X)\n+}\n+\n+func TestBoolPtrNegated(t *testing.T) {\n+\tvar cli struct {\n+\t\tX *bool `negatable:\"\"`\n+\t}\n+\tk, err := kong.New(&cli)\n+\trequire.NoError(t, err)\n+\trequire.NotNil(t, k)\n+\tctx, err := k.Parse([]string{\"--no-x\"})\n+\trequire.NoError(t, err)\n+\trequire.NotNil(t, ctx)\n+\trequire.NotNil(t, cli.X)\n+\trequire.Equal(t, false, *cli.X)\n+}\n+\n+func TestNilNegatableBoolPtr(t *testing.T) {\n+\tvar cli struct {\n+\t\tX *bool `negatable:\"\"`\n+\t}\n+\tk, err := kong.New(&cli)\n+\trequire.NoError(t, err)\n+\trequire.NotNil(t, k)\n+\tctx, err := k.Parse([]string{})\n+\trequire.NoError(t, err)\n+\trequire.NotNil(t, ctx)\n+\trequire.Nil(t, cli.X)\n+}\n+\n+func TestBoolPtrNil(t *testing.T) {\n+\tvar cli struct {\n+\t\tX *bool\n+\t}\n+\tk, err := kong.New(&cli)\n+\trequire.NoError(t, err)\n+\trequire.NotNil(t, k)\n+\tctx, err := k.Parse([]string{})\n+\trequire.NoError(t, err)\n+\trequire.NotNil(t, ctx)\n+\trequire.Nil(t, cli.X)\n+}\n+\n+func TestUnsupportedPtr(t *testing.T) {\n+\t//nolint:structcheck,unused\n+\ttype Foo struct {\n+\t\tx int\n+\t\ty int\n+\t}\n+\n+\tvar cli struct {\n+\t\tF *Foo\n+\t}\n+\tk, err := kong.New(&cli)\n+\trequire.NoError(t, err)\n+\trequire.NotNil(t, k)\n+\tctx, err := k.Parse([]string{\"--f=whatever\"})\n+\trequire.Nil(t, ctx)\n+\trequire.Error(t, err)\n+\trequire.Equal(t, \"--f: cannot find mapper for kong_test.Foo\", err.Error())\n+}\n+\n+func TestEnumPtr(t *testing.T) {\n+\tvar cli struct {\n+\t\tX *string `enum:\"A,B,C\" default:\"C\"`\n+\t}\n+\tk, err := kong.New(&cli)\n+\trequire.NoError(t, err)\n+\trequire.NotNil(t, k)\n+\tctx, err := k.Parse([]string{\"--x=A\"})\n+\trequire.NoError(t, err)\n+\trequire.NotNil(t, ctx)\n+\trequire.NotNil(t, cli.X)\n+\trequire.Equal(t, \"A\", *cli.X)\n+}\n+\n+func TestEnumPtrOmitted(t *testing.T) {\n+\tvar cli struct {\n+\t\tX *string `enum:\"A,B,C\" default:\"C\"`\n+\t}\n+\tk, err := kong.New(&cli)\n+\trequire.NoError(t, err)\n+\trequire.NotNil(t, k)\n+\tctx, err := k.Parse([]string{})\n+\trequire.NoError(t, err)\n+\trequire.NotNil(t, ctx)\n+\trequire.NotNil(t, cli.X)\n+\trequire.Equal(t, \"C\", *cli.X)\n+}\n+\n+func TestEnumPtrOmittedNoDefault(t *testing.T) {\n+\tvar cli struct {\n+\t\tX *string `enum:\"A,B,C\"`\n+\t}\n+\tk, err := kong.New(&cli)\n+\trequire.NoError(t, err)\n+\trequire.NotNil(t, k)\n+\tctx, err := k.Parse([]string{})\n+\trequire.NoError(t, err)\n+\trequire.NotNil(t, ctx)\n+\trequire.Nil(t, cli.X)\n+}\ndiff --git a/mapper.go b/mapper.go\nindex 6e17d9e..e94ae76 100644\n--- a/mapper.go\n+++ b/mapper.go\n@@ -274,7 +274,8 @@ func (r *Registry) RegisterDefaults() *Registry {\n \t\tRegisterName(\"path\", pathMapper(r)).\n \t\tRegisterName(\"existingfile\", existingFileMapper(r)).\n \t\tRegisterName(\"existingdir\", existingDirMapper(r)).\n-\t\tRegisterName(\"counter\", counterMapper())\n+\t\tRegisterName(\"counter\", counterMapper()).\n+\t\tRegisterKind(reflect.Ptr, ptrMapper(r))\n }\n \n type boolMapper struct{}\n@@ -669,6 +670,22 @@ func existingDirMapper(r *Registry) MapperFunc {\n \t}\n }\n \n+func ptrMapper(r *Registry) MapperFunc {\n+\treturn func(ctx *DecodeContext, target reflect.Value) error {\n+\t\telem := reflect.New(target.Type().Elem()).Elem()\n+\t\tnestedMapper := r.ForValue(elem)\n+\t\tif nestedMapper == nil {\n+\t\t\treturn fmt.Errorf(\"cannot find mapper for %v\", target.Type().Elem().String())\n+\t\t}\n+\t\terr := nestedMapper.Decode(ctx, elem)\n+\t\tif err != nil {\n+\t\t\treturn err\n+\t\t}\n+\t\ttarget.Set(elem.Addr())\n+\t\treturn nil\n+\t}\n+}\n+\n func counterMapper() MapperFunc {\n \treturn func(ctx *DecodeContext, target reflect.Value) error {\n \t\tif ctx.Scan.Peek().Type == FlagValueToken {\ndiff --git a/tag.go b/tag.go\nindex 8e159dd..b471613 100644\n--- a/tag.go\n+++ b/tag.go\n@@ -169,9 +169,11 @@ func parseTag(parent reflect.Value, ft reflect.StructField) (*Tag, error) {\n func hydrateTag(t *Tag, typ reflect.Type) error { // nolint: gocyclo\n \tvar typeName string\n \tvar isBool bool\n+\tvar isBoolPtr bool\n \tif typ != nil {\n \t\ttypeName = typ.Name()\n \t\tisBool = typ.Kind() == reflect.Bool\n+\t\tisBoolPtr = typ.Kind() == reflect.Ptr && typ.Elem().Kind() == reflect.Bool\n \t}\n \tvar err error\n \tt.Cmd = t.Has(\"cmd\")\n@@ -212,7 +214,7 @@ func hydrateTag(t *Tag, typ reflect.Type) error { // nolint: gocyclo\n \tt.EnvPrefix = t.Get(\"envprefix\")\n \tt.Embed = t.Has(\"embed\")\n \tnegatable := t.Has(\"negatable\")\n-\tif negatable && !isBool {\n+\tif negatable && !isBool && !isBoolPtr {\n \t\treturn fmt.Errorf(\"negatable can only be set on booleans\")\n \t}\n \tt.Negatable = negatable\n@@ -230,7 +232,7 @@ func hydrateTag(t *Tag, typ reflect.Type) error { // nolint: gocyclo\n \t}\n \tt.PlaceHolder = t.Get(\"placeholder\")\n \tt.Enum = t.Get(\"enum\")\n-\tscalarType := (typ == nil || !(typ.Kind() == reflect.Slice || typ.Kind() == reflect.Map))\n+\tscalarType := (typ == nil || !(typ.Kind() == reflect.Slice || typ.Kind() == reflect.Map || typ.Kind() == reflect.Ptr))\n \tif t.Enum != \"\" && !(t.Required || t.HasDefault) && scalarType {\n \t\treturn fmt.Errorf(\"enum value is only valid if it is either required or has a valid default value\")\n \t}\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/FUNDING.yml",
+    ".github/workflows/ci.yml",
+    ".gitignore",
+    ".golangci.yml",
+    "COPYING",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/README.md",
+    "_examples/server/console.go",
+    "_examples/server/go.mod",
+    "_examples/server/go.sum",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/commandstring/main.go",
+    "_examples/shell/help/README.md",
+    "_examples/shell/help/main.go",
+    "benchmark_test.go",
+    "bin/.go-1.18.3.pkg",
+    "bin/.golangci-lint-1.46.2.pkg",
+    "bin/README.hermit.md",
+    "bin/activate-hermit",
+    "bin/go",
+    "bin/gofmt",
+    "bin/golangci-lint",
+    "bin/hermit",
+    "bin/hermit.hcl",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "config_test.go",
+    "context.go",
+    "defaults.go",
+    "defaults_test.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "go.mod",
+    "go.sum",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "helpwrap1.18_test.go",
+    "helpwrap1.19_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_linux_test.go",
+    "mapper_test.go",
+    "mapper_windows_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "testdata/file.txt",
+    "util.go",
+    "util_test.go",
+    "visit.go"
+  ],
+  "explanation": {
+    "what": "任意の型のポインタフィールド(`*int`, `*string`, `*bool` など)を Kong のフラグ・引数として扱えるようにする ptrMapper を mapper.go に追加し、Registry.RegisterKind(reflect.Ptr, ...) で登録した。ptrMapper は reflect でポインタの指す型の new インスタンスを作り、その型に対応する既存の Mapper に処理を委譲してから、結果のアドレスを元のポインタフィールドにセットする。あわせて tag.go では bool ポインタも negatable タグ・enum タグの対象として認識するよう isBoolPtr 判定を追加し、context.go では negatable なポインタの bool 値を反転する flipBoolValue を追加した。README にポインタ型フィールドの挙動(値が渡されなければ nil、`--foo=0` のように渡されればゼロ値へのポインタになる)の説明も追加している。",
+    "why": "PR本文には「PR #280 を master にマージした」とのみ記載があり、直接の設計動機は書かれていない。ポインタ型を導入することで、フラグが「一切指定されなかった(nil)」状態と「明示的にゼロ値が指定された(&0 など)」状態を区別できるようになる点がテスト群(TestStringPointerNoValue や TestBoolPtrNil など)から読み取れる。通常の値型では両者を区別する手段がないため、この区別を必要とする利用者向けの機能追加とみられる。",
+    "highlights": [
+      { "file": "mapper.go", "note": "ptrMapper: reflect.New で要素型のインスタンスを作り、対応する Mapper に Decode を委譲してから target.Set(elem.Addr()) で書き戻す" },
+      { "file": "context.go", "note": "flipBoolValue が reflect.Ptr を再帰的に辿って negatable なポインタの bool を反転する" },
+      { "file": "kong_test.go", "note": "TestStringPointer 系・TestBoolPtr 系など、nil と ゼロ値の区別を検証する多数のテストが追加されている" }
+    ],
+    "langNotes": [
+      { "topic": "RegisterKind(reflect.Ptr, ...)", "note": "Kong の Mapper 登録は具体型・reflect.Kind・struct タグ経由の3系統がある。ここでは reflect.Kind 単位(全てのポインタ型に一括適用)で ptrMapper を登録しており、個々のポインタ型ごとに Mapper を書かずに済む。" }
+    ],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [{ "type": "pr", "number": 296, "url": "https://github.com/alecthomas/kong/pull/296" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

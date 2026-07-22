@@ -1,0 +1,147 @@
+{
+  "seq": 205,
+  "sha": "88ecc9c4e977bd29c4b21b3e83ec56045d549328",
+  "parents": [
+    "cbae65d2271fc930f5968e2dbe83e71f5670ae3a"
+  ],
+  "author": {
+    "name": "Alec Thomas",
+    "email": "alec@swapoff.org",
+    "date": "2020-09-08T13:09:04+10:00"
+  },
+  "message": "Fix enum's from envars not validating (fixes #107).\n\nAlso added a mapper for `*os.File`.",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 7,
+    "additions": 64,
+    "deletions": 7
+  },
+  "files": [
+    {
+      "path": "README.md",
+      "status": "M",
+      "additions": 11,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "context.go",
+      "status": "M",
+      "additions": 3,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "hooks.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "kong_test.go",
+      "status": "M",
+      "additions": 2,
+      "deletions": 2,
+      "binary": false
+    },
+    {
+      "path": "mapper.go",
+      "status": "M",
+      "additions": 28,
+      "deletions": 2,
+      "binary": false
+    },
+    {
+      "path": "mapper_test.go",
+      "status": "M",
+      "additions": 18,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "testdata/file.txt",
+      "status": "A",
+      "additions": 1,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/README.md b/README.md\nindex eaad200..e38778f 100644\n--- a/README.md\n+++ b/README.md\n@@ -382,11 +382,21 @@ Slices and maps treat type tags specially. For slices, the `type:\"\"` tag\n specifies the element type. For maps, the tag has the format\n `tag:\"[<key>]:[<value>]\"` where either may be omitted.\n \n+## Supported field types\n+\n \n ## Custom decoders (mappers)\n \n+\n Any field implementing `encoding.TextUnmarshaler` or `json.Unmarshaler` will use those interfaces\n-for decoding values.\n+for decoding values. Kong also includes builtin support for many common Go types:\n+\n+| Type                | Description\n+|---------------------|--------------------------------------------\n+| `time.Duration`     | Populated using `time.ParseDuration()`.\n+| `time.Time`         | Populated using `time.Parse()`. Format defaults to RFC3339 but can be overridden with the `format:\"X\"` tag.\n+| `*os.File`          | Path to a file that will be opened, or `-` for `os.Stdin`. File must be closed by the user.\n+| `*url.URL`          | Populated with `url.Parse()`.\n \n For more fine-grained control, if a field implements the\n [MapperValue](https://godoc.org/github.com/alecthomas/kong#MapperValue)\ndiff --git a/context.go b/context.go\nindex ada529e..56efd92 100644\n--- a/context.go\n+++ b/context.go\n@@ -2,6 +2,7 @@ package kong\n \n import (\n \t\"fmt\"\n+\t\"os\"\n \t\"reflect\"\n \t\"sort\"\n \t\"strconv\"\n@@ -136,7 +137,8 @@ func (c *Context) Empty() bool {\n func (c *Context) Validate() error { // nolint: gocyclo\n \terr := Visit(c.Model, func(node Visitable, next Next) error {\n \t\tif value, ok := node.(*Value); ok {\n-\t\t\tif value.Enum != \"\" && (!value.Required || value.Default != \"\") {\n+\t\t\t_, ok := os.LookupEnv(value.Tag.Env)\n+\t\t\tif value.Enum != \"\" && (!value.Required || value.Default != \"\" || (value.Tag.Env != \"\" && ok)) {\n \t\t\t\tif err := checkEnum(value, value.Target); err != nil {\n \t\t\t\t\treturn err\n \t\t\t\t}\ndiff --git a/hooks.go b/hooks.go\nindex 08fa171..d166b08 100644\n--- a/hooks.go\n+++ b/hooks.go\n@@ -1,6 +1,6 @@\n package kong\n \n-// BeforeResolve is a documentation-only interface describing hooks that run before values are set.\n+// BeforeResolve is a documentation-only interface describing hooks that run before resolvers are applied.\n type BeforeResolve interface {\n \t// This is not the correct signature - see README for details.\n \tBeforeResolve(args ...interface{}) error\ndiff --git a/kong_test.go b/kong_test.go\nindex 40731c3..6c2097a 100644\n--- a/kong_test.go\n+++ b/kong_test.go\n@@ -743,7 +743,7 @@ func TestEnvarEnumValidated(t *testing.T) {\n \t})\n \tdefer restore()\n \tvar cli struct {\n-\t\tFlag string `env:\"FLAG\" enum:\"valid\" default:\"valid\"`\n+\t\tFlag string `env:\"FLAG\" required:\"\" enum:\"valid\"`\n \t}\n \tp := mustNew(t, &cli)\n \t_, err := p.Parse(nil)\n@@ -798,7 +798,7 @@ func TestIssue40EnumAcrossCommands(t *testing.T) {\n \t\t\tOneArg string `arg:\"\" required:\"\"`\n \t\t} `cmd:\"\"`\n \t\tTwo struct {\n-\t\t\tTwoArg string `arg:\"\" enum:\"a,b,c\" required:\"\"`\n+\t\t\tTwoArg string `arg:\"\" enum:\"a,b,c\" required:\"\" env:\"FOO\"`\n \t\t} `cmd:\"\"`\n \t\tThree struct {\n \t\t\tThreeArg string `arg:\"\" optional:\"\" default:\"a\" enum:\"a,b,c\"`\ndiff --git a/mapper.go b/mapper.go\nindex a42bc5d..875e438 100644\n--- a/mapper.go\n+++ b/mapper.go\n@@ -231,8 +231,8 @@ func (r *Registry) RegisterDefaults() *Registry {\n \t\tRegisterKind(reflect.Int16, intDecoder(16)).\n \t\tRegisterKind(reflect.Int32, intDecoder(32)).\n \t\tRegisterKind(reflect.Int64, intDecoder(64)).\n-\t\tRegisterKind(reflect.Uint, uintDecoder(64)).\n-\t\tRegisterKind(reflect.Uint8, uintDecoder(bits.UintSize)).\n+\t\tRegisterKind(reflect.Uint, uintDecoder(bits.UintSize)).\n+\t\tRegisterKind(reflect.Uint8, uintDecoder(8)).\n \t\tRegisterKind(reflect.Uint16, uintDecoder(16)).\n \t\tRegisterKind(reflect.Uint32, uintDecoder(32)).\n \t\tRegisterKind(reflect.Uint64, uintDecoder(64)).\n@@ -248,6 +248,7 @@ func (r *Registry) RegisterDefaults() *Registry {\n \t\tRegisterType(reflect.TypeOf(time.Time{}), timeDecoder()).\n \t\tRegisterType(reflect.TypeOf(time.Duration(0)), durationDecoder()).\n \t\tRegisterType(reflect.TypeOf(&url.URL{}), urlMapper()).\n+\t\tRegisterType(reflect.TypeOf(&os.File{}), fileMapper(r)).\n \t\tRegisterName(\"path\", pathMapper(r)).\n \t\tRegisterName(\"existingfile\", existingFileMapper(r)).\n \t\tRegisterName(\"existingdir\", existingDirMapper(r)).\n@@ -541,6 +542,31 @@ func pathMapper(r *Registry) MapperFunc {\n \t}\n }\n \n+func fileMapper(r *Registry) MapperFunc {\n+\treturn func(ctx *DecodeContext, target reflect.Value) error {\n+\t\tif target.Kind() == reflect.Slice {\n+\t\t\treturn sliceDecoder(r)(ctx, target)\n+\t\t}\n+\t\tvar path string\n+\t\terr := ctx.Scan.PopValueInto(\"file\", &path)\n+\t\tif err != nil {\n+\t\t\treturn err\n+\t\t}\n+\t\tvar file *os.File\n+\t\tif path == \"-\" {\n+\t\t\tfile = os.Stdin\n+\t\t} else {\n+\t\t\tpath = ExpandPath(path)\n+\t\t\tfile, err = os.Open(path) // nolint: gosec\n+\t\t\tif err != nil {\n+\t\t\t\treturn err\n+\t\t\t}\n+\t\t}\n+\t\ttarget.Set(reflect.ValueOf(file))\n+\t\treturn nil\n+\t}\n+}\n+\n func existingFileMapper(r *Registry) MapperFunc {\n \treturn func(ctx *DecodeContext, target reflect.Value) error {\n \t\tif target.Kind() == reflect.Slice {\ndiff --git a/mapper_test.go b/mapper_test.go\nindex c0ba855..ca4f42f 100644\n--- a/mapper_test.go\n+++ b/mapper_test.go\n@@ -345,3 +345,21 @@ func TestNumbers(t *testing.T) {\n \t\t}, cli)\n \t})\n }\n+\n+func TestFileMapper(t *testing.T) {\n+\ttype CLI struct {\n+\t\tFile *os.File `arg:\"\"`\n+\t}\n+\tvar cli CLI\n+\tp := mustNew(t, &cli)\n+\t_, err := p.Parse([]string{\"testdata/file.txt\"})\n+\trequire.NoError(t, err)\n+\trequire.NotNil(t, cli.File)\n+\t_ = cli.File.Close()\n+\t_, err = p.Parse([]string{\"testdata/missing.txt\"})\n+\trequire.Error(t, err)\n+\trequire.Contains(t, err.Error(), \"missing.txt: no such file or directory\")\n+\t_, err = p.Parse([]string{\"-\"})\n+\trequire.NoError(t, err)\n+\trequire.Equal(t, os.Stdin, cli.File)\n+}\ndiff --git a/testdata/file.txt b/testdata/file.txt\nnew file mode 100644\nindex 0000000..4baf047\n--- /dev/null\n+++ b/testdata/file.txt\n@@ -0,0 +1 @@\n+Hello world.\n\\ No newline at end of file\n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    ".gitignore",
+    ".golangci.yml",
+    "COPYING",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/README.md",
+    "_examples/server/console.go",
+    "_examples/server/go.mod",
+    "_examples/server/go.sum",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/main.go",
+    "benchmark_test.go",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "config_test.go",
+    "context.go",
+    "defaults.go",
+    "defaults_test.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "go.mod",
+    "go.sum",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "testdata/file.txt",
+    "util.go",
+    "util_test.go",
+    "visit.go"
+  ],
+  "explanation": {
+    "what": "context.go の Context.Validate() で、値が env タグ経由で環境変数から供給される場合も enum バリデーション(checkEnum)が働くよう条件式に os.LookupEnv(value.Tag.Env) の結果を追加した。あわせて mapper.go に *os.File 用の fileMapper を新規追加し(パスまたは \"-\" で os.Stdin を受け付ける)、RegisterDefaults に登録した。ついでに reflect.Uint / reflect.Uint8 に対応する uintDecoder のビット幅指定が入れ替わっていた誤りも修正している。",
+    "why": "コミットメッセージの通り、issue #107 で報告された「envar から与えた値に対して enum バリデーションが効かない」不具合を修正するのが主目的。従来の条件式は required でない、またはデフォルト値がある場合のみバリデーションをスキップする設計だったが、env タグで値が来る場合も同様にスキップされてしまっていたため、環境変数経由の値が実際に enum 集合内にあるかを見ていなかった。あわせて *os.File のマッパーをおまけで追加し、パスからファイルを開く、または \"-\" で標準入力を扱えるようにしている。",
+    "highlights": [
+      { "file": "context.go", "note": "os.LookupEnv(value.Tag.Env) を enum チェック条件に組み込んだ箇所" },
+      { "file": "mapper.go", "note": "新設の fileMapper。\"-\" を os.Stdin として扱う特殊ケースがある" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

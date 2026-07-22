@@ -1,0 +1,103 @@
+{
+  "seq": 202,
+  "sha": "055081422d565c9c1c0fe787c87d79fdccfa3a81",
+  "parents": [
+    "e10381694b57f756f68f30cfa5158785f231d618"
+  ],
+  "author": {
+    "name": "Alec Thomas",
+    "email": "alec@swapoff.org",
+    "date": "2020-07-10T16:37:03+10:00"
+  },
+  "message": "When using resolvers, use last value only.\n\nThis fixes an issue where the value and all its hooks would\nbe applied for each resolver, making it difficult to compose multiple\nconfig files.",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 19,
+    "deletions": 11
+  },
+  "files": [
+    {
+      "path": "context.go",
+      "status": "M",
+      "additions": 19,
+      "deletions": 11,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/context.go b/context.go\nindex 73086c8..ada529e 100644\n--- a/context.go\n+++ b/context.go\n@@ -444,26 +444,34 @@ func (c *Context) Resolve() error {\n \t\t\tif _, ok := c.values[flag.Value]; ok {\n \t\t\t\tcontinue\n \t\t\t}\n+\n+\t\t\t// Pick the last resolved value.\n+\t\t\tvar selected interface{}\n \t\t\tfor _, resolver := range resolvers {\n \t\t\t\ts, err := resolver.Resolve(c, path, flag)\n \t\t\t\tif err != nil {\n-\t\t\t\t\treturn err\n+\t\t\t\t\treturn errors.Wrap(err, flag.ShortSummary())\n \t\t\t\t}\n \t\t\t\tif s == nil {\n \t\t\t\t\tcontinue\n \t\t\t\t}\n+\t\t\t\tselected = s\n+\t\t\t}\n \n-\t\t\t\tscan := Scan().PushTyped(s, FlagValueToken)\n-\t\t\t\tdelete(c.values, flag.Value)\n-\t\t\t\terr = flag.Parse(scan, c.getValue(flag.Value))\n-\t\t\t\tif err != nil {\n-\t\t\t\t\treturn err\n-\t\t\t\t}\n-\t\t\t\tinserted = append(inserted, &Path{\n-\t\t\t\t\tFlag:     flag,\n-\t\t\t\t\tResolved: true,\n-\t\t\t\t})\n+\t\t\tif selected == nil {\n+\t\t\t\tcontinue\n+\t\t\t}\n+\n+\t\t\tscan := Scan().PushTyped(selected, FlagValueToken)\n+\t\t\tdelete(c.values, flag.Value)\n+\t\t\terr := flag.Parse(scan, c.getValue(flag.Value))\n+\t\t\tif err != nil {\n+\t\t\t\treturn err\n \t\t\t}\n+\t\t\tinserted = append(inserted, &Path{\n+\t\t\t\tFlag:     flag,\n+\t\t\t\tResolved: true,\n+\t\t\t})\n \t\t}\n \t}\n \tc.Path = append(inserted, c.Path...)\n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    ".gitignore",
+    ".golangci.yml",
+    "COPYING",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/README.md",
+    "_examples/server/console.go",
+    "_examples/server/go.mod",
+    "_examples/server/go.sum",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/main.go",
+    "benchmark_test.go",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "config_test.go",
+    "context.go",
+    "defaults.go",
+    "defaults_test.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "go.mod",
+    "go.sum",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "util.go",
+    "util_test.go",
+    "visit.go"
+  ],
+  "explanation": {
+    "what": "context.go の Context.Resolve() を変更し、あるフラグに対して複数の Resolver が登録されている場合に、最初に見つかった値を即座に適用するのをやめ、全 resolver を走査して最後に得られた値(selected)だけを一度だけ適用するように書き換えた。resolver のエラーは errors.Wrap でフラグ名の情報を付与するようにもなった。",
+    "why": "コミットメッセージの通り、これまでは resolver ごとに値とフックが毎回適用されてしまい、複数の設定ファイル(config resolver)を重ねて使う際に意図しない副作用(フックの多重実行や値の上書き順序の混乱)が起きていた。resolver 一覧を先に全部評価してから最後の値だけを一度適用する方式にすることで、複数設定ソースの合成(compose)を行いやすくしている。",
+    "highlights": [
+      { "file": "context.go", "note": "selected 変数に最後の resolver 結果だけを保持し、ループの外で一度だけ flag.Parse を呼ぶ構造に変更" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

@@ -1,0 +1,117 @@
+{
+  "seq": 236,
+  "sha": "09467435e1a911affe851d6c69e332e917daa680",
+  "parents": [
+    "456575db97b112641945b4f219495d0509e58fc0"
+  ],
+  "author": {
+    "name": "Dustin Spicuzza",
+    "email": "dustin@virtualroadside.com",
+    "date": "2021-03-09T00:28:38-05:00"
+  },
+  "message": "Add option to not expand subcommand help",
+  "pr": {
+    "number": 150,
+    "title": "Add option to not expand subcommand help",
+    "body": "With a CLI that has lots of options, subcommands are useful for making the toplevel help message less cluttered. This makes it even less so.\r\n\r\nWithout option:\r\n\r\n```\r\nCommands:\r\n  cmd               Some command\r\n  has-subs sub-1    Subcommand 1\r\n  has-subs sub-2    Subcommand 2\r\n```\r\n\r\nWith option:\r\n\r\n```\r\nCommands:\r\n  cmd         Some command\r\n  has-subs    Command with subs\r\n```",
+    "url": "https://github.com/alecthomas/kong/pull/150"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 98,
+    "deletions": 1
+  },
+  "files": [
+    {
+      "path": "help.go",
+      "status": "M",
+      "additions": 9,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "help_test.go",
+      "status": "M",
+      "additions": 89,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/help.go b/help.go\nindex d9f65bf..b0fc81d 100644\n--- a/help.go\n+++ b/help.go\n@@ -48,6 +48,9 @@ type HelpOptions struct {\n \t// The following exported templates can be used: kong.SpaceIndenter, kong.LineIndenter, kong.TreeIndenter\n \t// The kong.SpaceIndenter will be used by default.\n \tIndenter HelpIndenter\n+\n+\t// Don't show the help associated with subcommands\n+\tNoExpandSubcommands bool\n }\n \n // Apply options to Kong as a configuration option.\n@@ -180,7 +183,12 @@ func printNodeDetail(w *helpWriter, node *Node, hide bool) {\n \tif !w.FlagsLast {\n \t\tprintFlags()\n \t}\n-\tcmds := node.Leaves(hide)\n+\tvar cmds []*Node\n+\tif w.NoExpandSubcommands {\n+\t\tcmds = node.Children\n+\t} else {\n+\t\tcmds = node.Leaves(hide)\n+\t}\n \tif len(cmds) > 0 {\n \t\tiw := w.Indent()\n \t\tif w.Tree {\ndiff --git a/help_test.go b/help_test.go\nindex aa1a984..7537486 100644\n--- a/help_test.go\n+++ b/help_test.go\n@@ -334,6 +334,95 @@ Commands:\n \t})\n }\n \n+func TestHelpCompactNoExpand(t *testing.T) {\n+\t// nolint: govet\n+\tvar cli struct {\n+\t\tOne struct {\n+\t\t\tThing struct {\n+\t\t\t\tArg string `arg help:\"argument\"`\n+\t\t\t} `cmd help:\"subcommand thing\"`\n+\t\t\tOther struct {\n+\t\t\t\tOther string `arg help:\"other arg\"`\n+\t\t\t} `arg help:\"subcommand other\"`\n+\t\t} `cmd help:\"subcommand one\" group:\"Group A\" aliases:\"un,uno\"` // Groups are ignored in trees\n+\n+\t\tTwo struct {\n+\t\t\tThree threeArg `arg help:\"Sub-sub-arg.\"`\n+\n+\t\t\tFour struct {\n+\t\t\t} `cmd help:\"Sub-sub-command.\" aliases:\"for,fore\"`\n+\t\t} `cmd help:\"Another subcommand.\"`\n+\t}\n+\n+\tw := bytes.NewBuffer(nil)\n+\texited := false\n+\tapp := mustNew(t, &cli,\n+\t\tkong.Name(\"test-app\"),\n+\t\tkong.Description(\"A test app.\"),\n+\t\tkong.Writers(w, w),\n+\t\tkong.ConfigureHelp(kong.HelpOptions{\n+\t\t\tCompact:             true,\n+\t\t\tNoExpandSubcommands: true,\n+\t\t}),\n+\t\tkong.Exit(func(int) {\n+\t\t\texited = true\n+\t\t\tpanic(true) // Panic to fake \"exit\".\n+\t\t}),\n+\t)\n+\n+\tt.Run(\"Full\", func(t *testing.T) {\n+\t\trequire.PanicsWithValue(t, true, func() {\n+\t\t\t_, err := app.Parse([]string{\"--help\"})\n+\t\t\trequire.NoError(t, err)\n+\t\t})\n+\t\trequire.True(t, exited)\n+\t\texpected := `Usage: test-app <command>\n+\n+A test app.\n+\n+Flags:\n+  -h, --help    Show context-sensitive help.\n+\n+Commands:\n+  two    Another subcommand.\n+\n+Group A\n+  one    subcommand one\n+\n+Run \"test-app <command> --help\" for more information on a command.\n+`\n+\t\tif expected != w.String() {\n+\t\t\tt.Errorf(\"help command returned:\\n%v\\n\\nwant:\\n%v\", w.String(), expected)\n+\t\t}\n+\t\trequire.Equal(t, expected, w.String())\n+\t})\n+\n+\tt.Run(\"Selected\", func(t *testing.T) {\n+\t\texited = false\n+\t\tw.Truncate(0)\n+\t\trequire.PanicsWithValue(t, true, func() {\n+\t\t\t_, err := app.Parse([]string{\"one\", \"--help\"})\n+\t\t\trequire.NoError(t, err)\n+\t\t})\n+\t\trequire.True(t, exited)\n+\t\texpected := `Usage: test-app one <command>\n+\n+subcommand one\n+\n+Flags:\n+  -h, --help    Show context-sensitive help.\n+\n+Group A\n+  one thing      subcommand thing\n+  one <other>    subcommand other\n+`\n+\t\tif expected != w.String() {\n+\t\t\tt.Errorf(\"help command returned:\\n%v\\n\\nwant:\\n%v\", w.String(), expected)\n+\t\t}\n+\t\trequire.Equal(t, expected, w.String())\n+\t})\n+}\n+\n func TestEnvarAutoHelp(t *testing.T) {\n \tvar cli struct {\n \t\tFlag string `env:\"FLAG\" help:\"A flag.\"`\n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    ".github/FUNDING.yml",
+    ".gitignore",
+    ".golangci.yml",
+    "COPYING",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/README.md",
+    "_examples/server/console.go",
+    "_examples/server/go.mod",
+    "_examples/server/go.sum",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/main.go",
+    "benchmark_test.go",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "config_test.go",
+    "context.go",
+    "defaults.go",
+    "defaults_test.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "go.mod",
+    "go.sum",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "testdata/file.txt",
+    "util.go",
+    "util_test.go",
+    "visit.go"
+  ],
+  "explanation": {
+    "what": "HelpOptions に `NoExpandSubcommands` フィールドを追加し、true のときは help.go の printNodeDetail で `node.Leaves(hide)`(サブコマンドの葉ノードまで再帰的に展開したリスト)ではなく `node.Children`(直下の子ノードのみ)を表示するようにした。help_test.go に TestHelpCompactNoExpand を追加し、Compact + NoExpandSubcommands の組み合わせでトップレベルとサブコマンド選択時それぞれのヘルプ出力を検証している。",
+    "why": "PR本文によれば、サブコマンドを多く持つ CLI ではデフォルトの Leaves() 展開によりトップレベルのヘルプに全ての孫コマンドまで列挙されて煩雑になる。NoExpandSubcommands を有効にすると `has-subs sub-1` `has-subs sub-2` のような展開をせず `has-subs` とだけ表示し、ヘルプを簡潔にできる。",
+    "highlights": [
+      { "file": "help.go", "note": "node.Leaves(hide) と node.Children の切り替えで展開有無を制御" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [{ "type": "pr", "number": 150, "url": "https://github.com/alecthomas/kong/pull/150" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

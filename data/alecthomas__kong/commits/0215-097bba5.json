@@ -1,0 +1,126 @@
+{
+  "seq": 215,
+  "sha": "097bba54ecc3ca993ab0e2703330b6e78d219ea3",
+  "parents": [
+    "73064c7b8f4a3d2d79fa0511a6d6fbb8dbd24785"
+  ],
+  "author": {
+    "name": "Alec Thomas",
+    "email": "alec@swapoff.org",
+    "date": "2020-10-27T17:32:34+11:00"
+  },
+  "message": "Revert UsageOnMissing.\n\nThis was breaking UsageOnMissing() when combined with validation of\npositional arguments, in that it was allowing positional arguments to be\nomitted. It also broke UsageOnMissing() somehow so that it did not work.",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 4,
+    "additions": 15,
+    "deletions": 58
+  },
+  "files": [
+    {
+      "path": "context.go",
+      "status": "M",
+      "additions": 7,
+      "deletions": 7,
+      "binary": false
+    },
+    {
+      "path": "error.go",
+      "status": "M",
+      "additions": 0,
+      "deletions": 31,
+      "binary": false
+    },
+    {
+      "path": "kong.go",
+      "status": "M",
+      "additions": 8,
+      "deletions": 12,
+      "binary": false
+    },
+    {
+      "path": "options.go",
+      "status": "M",
+      "additions": 0,
+      "deletions": 8,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/context.go b/context.go\nindex f07f537..42bb76b 100644\n--- a/context.go\n+++ b/context.go\n@@ -683,14 +683,8 @@ func (c *Context) Run(binds ...interface{}) (err error) {\n \tdefer catch(&err)\n \tnode := c.Selected()\n \tif node == nil {\n-\t\tif c.Kong.usageOnMissing {\n-\t\t\treturn c.PrintUsage(false)\n-\t\t}\n \t\treturn fmt.Errorf(\"no command selected\")\n \t}\n-\tif c.Kong.usageOnMissing && isMissingChildError(c.Error) {\n-\t\treturn c.PrintUsage(false)\n-\t}\n \treturn c.RunNode(node, binds...)\n }\n \n@@ -759,7 +753,13 @@ func checkMissingChildren(node *Node) error {\n \t\treturn nil\n \t}\n \n-\treturn newMissingChildError(missing)\n+\tif len(missing) > 5 {\n+\t\tmissing = append(missing[:5], \"...\")\n+\t}\n+\tif len(missing) == 1 {\n+\t\treturn fmt.Errorf(\"expected %s\", missing[0])\n+\t}\n+\treturn fmt.Errorf(\"expected one of %s\", strings.Join(missing, \",  \"))\n }\n \n // If we're missing any positionals and they're required, return an error.\ndiff --git a/error.go b/error.go\nindex 36f512b..30b8858 100644\n--- a/error.go\n+++ b/error.go\n@@ -1,10 +1,5 @@\n package kong\n \n-import (\n-\t\"fmt\"\n-\t\"strings\"\n-)\n-\n // ParseError is the error type returned by Kong.Parse().\n //\n // It contains the parse Context that triggered the error.\n@@ -15,29 +10,3 @@ type ParseError struct {\n \n // Cause returns the original cause of the error.\n func (p *ParseError) Cause() error { return p.error }\n-\n-type missingChildError struct {\n-\tmissing []string\n-}\n-\n-func (m *missingChildError) Error() string {\n-\tif len(m.missing) > 5 {\n-\t\tm.missing = append(m.missing[:5], \"...\")\n-\t}\n-\tif len(m.missing) == 1 {\n-\t\treturn fmt.Sprintf(\"expected %s\", m.missing[0])\n-\t}\n-\treturn fmt.Sprintf(\"expected one of %s\", strings.Join(m.missing, \",  \"))\n-}\n-\n-func newMissingChildError(missing []string) *missingChildError {\n-\treturn &missingChildError{missing}\n-}\n-\n-func isMissingChildError(err error) bool {\n-\tif err == nil {\n-\t\treturn false\n-\t}\n-\t_, ok := err.(*missingChildError)\n-\treturn ok\n-}\ndiff --git a/kong.go b/kong.go\nindex d46915e..b94620a 100644\n--- a/kong.go\n+++ b/kong.go\n@@ -47,14 +47,13 @@ type Kong struct {\n \tresolvers []Resolver\n \tregistry  *Registry\n \n-\tnoDefaultHelp  bool\n-\tusageOnError   bool\n-\tusageOnMissing bool\n-\thelp           HelpPrinter\n-\thelpFormatter  HelpValueFormatter\n-\thelpOptions    HelpOptions\n-\thelpFlag       *Flag\n-\tvars           Vars\n+\tnoDefaultHelp bool\n+\tusageOnError  bool\n+\thelp          HelpPrinter\n+\thelpFormatter HelpValueFormatter\n+\thelpOptions   HelpOptions\n+\thelpFlag      *Flag\n+\tvars          Vars\n \n \t// Set temporarily by Options. These are applied after build().\n \tpostBuildOptions []Option\n@@ -219,10 +218,7 @@ func (k *Kong) Parse(args []string) (ctx *Context, err error) {\n \t\treturn nil, &ParseError{error: err, Context: ctx}\n \t}\n \tif err = ctx.Validate(); err != nil {\n-\t\tif !k.usageOnError || !isMissingChildError(err) {\n-\t\t\treturn nil, &ParseError{error: err, Context: ctx}\n-\t\t}\n-\t\tctx.Error = err\n+\t\treturn nil, &ParseError{error: err, Context: ctx}\n \t}\n \tif err = k.applyHook(ctx, \"AfterApply\"); err != nil {\n \t\treturn nil, &ParseError{error: err, Context: ctx}\ndiff --git a/options.go b/options.go\nindex 1369b6b..5bd36c3 100644\n--- a/options.go\n+++ b/options.go\n@@ -216,14 +216,6 @@ func UsageOnError() Option {\n \t})\n }\n \n-// UsageOnMissing configures Kong to display usage and exit successfully if command is missing a child argument.\n-func UsageOnMissing() Option {\n-\treturn OptionFunc(func(k *Kong) error {\n-\t\tk.usageOnMissing = true\n-\t\treturn nil\n-\t})\n-}\n-\n // ClearResolvers clears all existing resolvers.\n func ClearResolvers() Option {\n \treturn OptionFunc(func(k *Kong) error {\n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    ".gitignore",
+    ".golangci.yml",
+    "COPYING",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/README.md",
+    "_examples/server/console.go",
+    "_examples/server/go.mod",
+    "_examples/server/go.sum",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/main.go",
+    "benchmark_test.go",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "config_test.go",
+    "context.go",
+    "defaults.go",
+    "defaults_test.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "go.mod",
+    "go.sum",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "testdata/file.txt",
+    "util.go",
+    "util_test.go",
+    "visit.go"
+  ],
+  "explanation": {
+    "what": "UsageOnMissing() オプションと、それを支えていた missingChildError 型・isMissingChildError() 判定・関連する context.go / kong.go / options.go の変更をすべて取り除いた。実質的に seq211(PR #109, \"Do not run parent node on missing child err with usageOnMissing option\")の diff を丸ごと打ち消す revert であり、checkMissingChildren は再び fmt.Errorf を直接返す実装に戻っている。",
+    "why": "コミットメッセージに明記されている通り、UsageOnMissing の変更が「必須の positional 引数の検証と組み合わさったときに、その positional 引数の省略を許してしまう」バグを生んでおり、さらに UsageOnMissing 自体も動作しなくなっていたため撤回した。機能追加が既存の検証ロジックと相互作用して壊れることが後から判明し、いったん安全側(revert)に倒した判断とみられる。",
+    "highlights": [
+      { "file": "options.go", "note": "UsageOnMissing() Option 自体を削除。公開APIとして一度追加された機能が丸ごと撤回されている" },
+      { "file": "kong.go", "note": "usageOnMissing フィールドと Parse() 内の分岐を削除し、Validate() 失敗時は常に ParseError を返す元の単純な形に戻した" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

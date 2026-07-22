@@ -1,0 +1,126 @@
+{
+  "seq": 230,
+  "sha": "2a0d7af9c548c9232760abd0cb8722d33526e1ff",
+  "parents": [
+    "541ee3302f17ad4c76e0a98516bb55f84b15d9ff"
+  ],
+  "author": {
+    "name": "Joe Schmitt",
+    "email": "joe@compass.com",
+    "date": "2021-02-18T02:49:07-05:00"
+  },
+  "message": "Add support for negated boolean flags\n\nWill automatically set a boolean Struct field to false if the flag starts with `--no-`, even when the default is `true`.\n\nFor example:\n```\ntype Cmd struct {\n  Output bool `default:\"true\"`\n}\n```\n\nCalling\n```\ncommand\n```\nWill set `Output` to `true`, but\n```\ncommand --no-output\n```\nWill set `Output` to `false`.",
+  "pr": {
+    "number": 146,
+    "title": "Add support for negatable boolean flags",
+    "body": "Adds support for a new `negatable` struct tag, which will automatically set a boolean Struct flag value to `false` if the flag's name starts with `--no-`, even when the default is `true`. This idea is shamelessly stolen from the [`commander` npm library](https://github.com/tj/commander.js#other-option-types-negatable-boolean-and-booleanvalue)\r\n\r\nFor example:\r\n```go\r\ntype Cmd struct {\r\n  Sort bool `default:\"true\",negatable`\r\n}\r\n```\r\n\r\nCalling\r\n```sh\r\ncommand\r\n# or\r\ncommand --sort\r\n```\r\nWill set `Sort` to `true`, but\r\n```sh \r\ncommand --no-sort\r\n```\r\nWill set `Sort` to `false`.\r\n\r\n## Why do this?\r\n\r\nIt avoids the situation of having to do:\r\n```go\r\ntype Cmd struct {\r\n  NoSort bool\r\n}\r\n\r\nfunc (c *Cmd) Run() error {\r\n  if !c.NoSort {\r\n    // Double negations are hard to read!\r\n  }\r\n  return nil\r\n}\r\n```",
+    "url": "https://github.com/alecthomas/kong/pull/146"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 3,
+    "additions": 22,
+    "deletions": 1
+  },
+  "files": [
+    {
+      "path": "context.go",
+      "status": "M",
+      "additions": 8,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "kong_test.go",
+      "status": "M",
+      "additions": 13,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "model.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/context.go b/context.go\nindex 4d24161..9ca3f35 100644\n--- a/context.go\n+++ b/context.go\n@@ -579,6 +579,9 @@ func (c *Context) getValue(value *Value) reflect.Value {\n \t\t}\n \t\tc.values[value] = v\n \t}\n+\tif value.Flag != nil && value.Flag.Negated {\n+\t\tv.SetBool(false)\n+\t}\n \treturn v\n }\n \n@@ -639,15 +642,19 @@ func (c *Context) parseFlag(flags []*Flag, match string) (err error) {\n \tfor _, flag := range flags {\n \t\tlong := \"--\" + flag.Name\n \t\tshort := \"-\" + string(flag.Short)\n+\t\tneg := \"--no-\" + flag.Name\n \t\tcandidates = append(candidates, long)\n \t\tif flag.Short != 0 {\n \t\t\tcandidates = append(candidates, short)\n \t\t}\n-\t\tif short != match && long != match {\n+\t\tif short != match && long != match && neg != match {\n \t\t\tcontinue\n \t\t}\n \t\t// Found a matching flag.\n \t\tc.scan.Pop()\n+\t\tif flag.Value.IsBool() && match == neg {\n+\t\t\tflag.Negated = true\n+\t\t}\n \t\terr := flag.Parse(c.scan, c.getValue(flag.Value))\n \t\tif err != nil {\n \t\t\tif e, ok := errors.Cause(err).(*expectedError); ok && e.token.InferredType().IsAny(FlagToken, ShortFlagToken) {\ndiff --git a/kong_test.go b/kong_test.go\nindex 03ff1d6..e9316fe 100644\n--- a/kong_test.go\n+++ b/kong_test.go\n@@ -356,6 +356,19 @@ func TestTraceErrorPartiallySucceeds(t *testing.T) {\n \trequire.Equal(t, \"one\", ctx.Command())\n }\n \n+func TestNegatedBooleanFlag(t *testing.T) {\n+\tvar cli struct {\n+\t\tCmd struct {\n+\t\t\tFlag bool `kong:\"default='true'\"`\n+\t\t} `kong:\"cmd\"`\n+\t}\n+\n+\tp := mustNew(t, &cli)\n+\t_, err := p.Parse([]string{\"cmd\", \"--no-flag\"})\n+\trequire.NoError(t, err)\n+\trequire.Equal(t, false, cli.Cmd.Flag)\n+}\n+\n type hookContext struct {\n \tcmd    bool\n \tvalues []string\ndiff --git a/model.go b/model.go\nindex c64cab3..8b90acc 100644\n--- a/model.go\n+++ b/model.go\n@@ -227,6 +227,7 @@ type Value struct {\n \tTag          *Tag\n \tTarget       reflect.Value\n \tRequired     bool\n+\tNegated      bool\n \tSet          bool   // Set to true when this value is set through some mechanism.\n \tFormat       string // Formatting directive, if applicable.\n \tPosition     int    // Position (for positional arguments).\n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    ".github/FUNDING.yml",
+    ".gitignore",
+    ".golangci.yml",
+    "COPYING",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/README.md",
+    "_examples/server/console.go",
+    "_examples/server/go.mod",
+    "_examples/server/go.sum",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/main.go",
+    "benchmark_test.go",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "config_test.go",
+    "context.go",
+    "defaults.go",
+    "defaults_test.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "go.mod",
+    "go.sum",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "testdata/file.txt",
+    "util.go",
+    "util_test.go",
+    "visit.go"
+  ],
+  "explanation": {
+    "what": "bool フラグに対して `--no-<name>` という否定形の指定を受け付けるようにした。parseFlag() で候補文字列に `--no-` プレフィックス版を追加し、それにマッチした場合は新設の `Value.Negated` を true にセットする。getValue() では Negated な場合に `SetBool(false)` を強制する。",
+    "why": "PR body によれば Node.js の commander ライブラリの negatable boolean オプションに着想を得たもの。`default:\"true\"` な bool フラグを `NoSort bool` のような二重否定のフィールド名に頼らず `--no-sort` で明示的に無効化できるようにし、可読性の悪い二重否定を避ける狙いがある。なお PR タイトルでは専用の `negatable` タグを導入する案が示されているが、このコミット時点の diff にはタグ判定は見られず、bool フラグ全般に対して `--no-` 接頭辞を自動的に解釈する実装になっている。",
+    "highlights": [
+      { "file": "context.go", "note": "parseFlag() で `--no-` 接頭辞の候補を追加し、一致時に Flag.Negated を立てる" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [
+      { "type": "pr", "number": 146, "url": "https://github.com/alecthomas/kong/pull/146" }
+    ],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

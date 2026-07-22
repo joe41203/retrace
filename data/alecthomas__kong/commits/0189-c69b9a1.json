@@ -1,0 +1,108 @@
+{
+  "seq": 189,
+  "sha": "c69b9a1e8883d999276778e1af26f1cd3ea1e96f",
+  "parents": [
+    "2d809c073bd6f277e56b00338e3d33e055ddfda2"
+  ],
+  "author": {
+    "name": "Freestate17",
+    "email": "daniel.lins.dm@gmail.com",
+    "date": "2020-05-04T18:14:33-04:00"
+  },
+  "message": "added post-build option (#78)\n\n* added post-build option\r\n\r\n* updated PostBuild function description\r\n\r\nCo-authored-by: Daniel Lins <daniel.lins@vidoori.com>",
+  "pr": {
+    "number": 78,
+    "title": "added post-build option",
+    "body": "",
+    "url": "https://github.com/alecthomas/kong/pull/78"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 11,
+    "deletions": 0
+  },
+  "files": [
+    {
+      "path": "options.go",
+      "status": "M",
+      "additions": 11,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/options.go b/options.go\nindex 1464d71..e210d10 100644\n--- a/options.go\n+++ b/options.go\n@@ -61,6 +61,17 @@ func NoDefaultHelp() Option {\n \t})\n }\n \n+// PostBuild provides read/write access to kong.Kong after initial construction of the model is complete but before\n+// parsing occurs.\n+//\n+// This is useful for, e.g., adding short options to flags, updating help, etc.\n+func (k *Kong) PostBuild(fn func(*Kong)error) Option {\n+\treturn OptionFunc(func (k *Kong) error {\n+\t\tk.postBuildOptions = append(k.postBuildOptions, OptionFunc(fn))\n+\t\treturn nil\n+\t})\n+}\n+\n // Name overrides the application name.\n func Name(name string) Option {\n \treturn OptionFunc(func(k *Kong) error {\n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    ".golangci.yml",
+    "COPYING",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/README.md",
+    "_examples/server/console.go",
+    "_examples/server/go.mod",
+    "_examples/server/go.sum",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/main.go",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "config_test.go",
+    "context.go",
+    "defaults.go",
+    "defaults_test.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "go.mod",
+    "go.sum",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "util.go",
+    "util_test.go",
+    "visit.go"
+  ],
+  "explanation": {
+    "what": "options.go に Kong.PostBuild(fn func(*Kong) error) Option メソッドを追加した。呼び出すと Kong の postBuildOptions スライースに OptionFunc(fn) が積まれる。",
+    "why": "PR タイトルは \"added post-build option\" のみで本文は空。コード中のコメントには、モデル構築完了後・パース開始前に Kong への読み書きアクセスを提供し、フラグへの短縮オプション追加やヘルプ更新などに使える、とある。",
+    "highlights": [
+      { "file": "options.go", "note": "PostBuild が k.postBuildOptions に OptionFunc(fn) を追記するだけの薄い Option。実行タイミング(モデル構築後・パース前)はコメントで説明されている。" }
+    ],
+    "langNotes": [
+      { "topic": "Option パターン(Functional Options)", "note": "Kong は Option 型(Kong を受け取り副作用を適用する関数)を可変長引数で受け取る Functional Options パターンを使っている。PostBuild もこのパターンに則り、後から実行したい処理を Option としてキューに積む形になっている。" }
+    ],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [{ "type": "pr", "number": 78, "url": "https://github.com/alecthomas/kong/pull/78" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

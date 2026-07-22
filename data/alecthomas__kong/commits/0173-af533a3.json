@@ -1,0 +1,118 @@
+{
+  "seq": 173,
+  "sha": "af533a38fb593823ca862dd886b7167186eff07e",
+  "parents": [
+    "ada7d7bf11af5fc748972390ce1cb27df451fdcf"
+  ],
+  "author": {
+    "name": "Rene Zbinden",
+    "email": "rene.zbinden@postfinance.ch",
+    "date": "2020-02-18T21:47:05+01:00"
+  },
+  "message": "make HelperOptions CommandTree method exported",
+  "pr": {
+    "number": 58,
+    "title": "make HelperOptions CommandTree method exported",
+    "body": "This closes #56 ",
+    "url": "https://github.com/alecthomas/kong/pull/58"
+  },
+  "linkedIssues": [
+    {
+      "number": 56,
+      "title": "commandTree unexported",
+      "body": "Hi\r\n\r\nTo experiment I tried to create my own `HelpPrinter` by copying `DefaultHelpPrinter` and make some changes.\r\n\r\nThe Problem I have now, is that  [`CommandTree`]( https://github.com/alecthomas/kong/blob/master/help.go#L353) is unexported. Would a PR accepted to change that?\r\n",
+      "url": "https://github.com/alecthomas/kong/issues/56"
+    }
+  ],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 4,
+    "deletions": 4
+  },
+  "files": [
+    {
+      "path": "help.go",
+      "status": "M",
+      "additions": 4,
+      "deletions": 4,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/help.go b/help.go\nindex 0ea9004..8bb67cd 100644\n--- a/help.go\n+++ b/help.go\n@@ -176,7 +176,7 @@ func writeCommandTree(w *helpWriter, node *Node) {\n \t\tif cmd.Hidden {\n \t\t\tcontinue\n \t\t}\n-\t\trows = append(rows, w.commandTree(cmd, \"\")...)\n+\t\trows = append(rows, w.CommandTree(cmd, \"\")...)\n \t\tif i != len(node.Children)-1 {\n \t\t\trows = append(rows, [2]string{\"\", \"\"})\n \t\t}\n@@ -349,8 +349,8 @@ func formatFlag(haveShort bool, flag *Flag) string {\n \treturn flagString\n }\n \n-// commandTree creates a tree with the given node name as root and its children's arguments and sub commands as leaves.\n-func (h *HelpOptions) commandTree(node *Node, prefix string) (rows [][2]string) {\n+// CommandTree creates a tree with the given node name as root and its children's arguments and sub commands as leaves.\n+func (h *HelpOptions) CommandTree(node *Node, prefix string) (rows [][2]string) {\n \tvar nodeName string\n \tswitch node.Type {\n \tdefault:\n@@ -368,7 +368,7 @@ func (h *HelpOptions) commandTree(node *Node, prefix string) (rows [][2]string)\n \t\trows = append(rows, [2]string{prefix + arg.Summary(), arg.Help})\n \t}\n \tfor _, subCmd := range node.Children {\n-\t\trows = append(rows, h.commandTree(subCmd, prefix)...)\n+\t\trows = append(rows, h.CommandTree(subCmd, prefix)...)\n \t}\n \treturn\n }\n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    ".golangci.yml",
+    "COPYING",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/README.md",
+    "_examples/server/console.go",
+    "_examples/server/go.mod",
+    "_examples/server/go.sum",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/main.go",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "config_test.go",
+    "context.go",
+    "defaults.go",
+    "defaults_test.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "go.mod",
+    "go.sum",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "util.go",
+    "util_test.go",
+    "visit.go"
+  ],
+  "explanation": {
+    "what": "help.go の HelpOptions.commandTree メソッドを小文字始まり(非公開)から CommandTree(公開)にリネームした。呼び出し側の writeCommandTree() と再帰呼び出しも合わせて更新している。",
+    "why": "issue #56 で、独自の HelpPrinter を実装しようとした際に DefaultHelpPrinter のコードをコピーする必要があり、その中で使われている commandTree が非公開でアクセスできないという不満が報告されていた。PR本文はこの issue の解決を目的として明記している。",
+    "highlights": [
+      { "file": "help.go", "note": "Go の可視性はエクスポート識別子(大文字始まり)で決まるため、頭文字を大文字にするだけでパッケージ外から呼べるようになる。" }
+    ],
+    "langNotes": [
+      { "topic": "エクスポート識別子", "note": "Go にはアクセス修飾子(public/private)のキーワードがなく、識別子の先頭が大文字かどうかだけでパッケージ外への公開・非公開が決まる。commandTree → CommandTree の変更はこの規則に基づく可視性の変更。" }
+    ],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [
+      { "type": "pr", "number": 58, "url": "https://github.com/alecthomas/kong/pull/58" },
+      { "type": "issue", "number": 56, "url": "https://github.com/alecthomas/kong/issues/56" }
+    ],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

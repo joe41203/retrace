@@ -1,0 +1,172 @@
+{
+  "seq": 331,
+  "sha": "bf0cbf5d7ccdf573efa31446a09f91fa939b17eb",
+  "parents": [
+    "d974d7270ae0502ee5c9336ecbe4c39dcd4661e5"
+  ],
+  "author": {
+    "name": "Alec Thomas",
+    "email": "alec@swapoff.org",
+    "date": "2022-11-22T23:30:10+11:00"
+  },
+  "message": "feat: Embed() option and Context.Call()\n\nThe former allows arbitrary structs to be embedded in the root of the\nCLI, with optional tags.\n\nThe latter allows an arbitrary function to be called using Kong's\nbinding functionality.",
+  "pr": {
+    "number": 344,
+    "title": "feat: Embed() option and Context.Call()",
+    "body": "The former allows arbitrary structs to be embedded in the root of the CLI, with optional tags.\r\n\r\nThe latter allows an arbitrary function to be called using Kong's binding functionality.",
+    "url": "https://github.com/alecthomas/kong/pull/344"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 7,
+    "additions": 126,
+    "deletions": 29
+  },
+  "files": [
+    {
+      "path": "build.go",
+      "status": "M",
+      "additions": 19,
+      "deletions": 20,
+      "binary": false
+    },
+    {
+      "path": "callbacks.go",
+      "status": "M",
+      "additions": 40,
+      "deletions": 3,
+      "binary": false
+    },
+    {
+      "path": "context.go",
+      "status": "M",
+      "additions": 8,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "kong.go",
+      "status": "M",
+      "additions": 24,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "options.go",
+      "status": "M",
+      "additions": 24,
+      "deletions": 4,
+      "binary": false
+    },
+    {
+      "path": "options_test.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "tag.go",
+      "status": "M",
+      "additions": 10,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/build.go b/build.go\nindex 2ab9f21..be7679e 100644\n--- a/build.go\n+++ b/build.go\n@@ -25,7 +25,7 @@ func build(k *Kong, ast interface{}) (app *Application, err error) {\n \t\tseenFlags[flag.Name] = true\n \t}\n \n-\tnode, err := buildNode(k, iv, ApplicationNode, seenFlags)\n+\tnode, err := buildNode(k, iv, ApplicationNode, newEmptyTag(), seenFlags)\n \tif err != nil {\n \t\treturn nil, err\n \t}\n@@ -49,7 +49,7 @@ type flattenedField struct {\n \ttag   *Tag\n }\n \n-func flattenedFields(v reflect.Value) (out []flattenedField, err error) {\n+func flattenedFields(v reflect.Value, ptag *Tag) (out []flattenedField, err error) {\n \tv = reflect.Indirect(v)\n \tfor i := 0; i < v.NumField(); i++ {\n \t\tft := v.Type().Field(i)\n@@ -61,6 +61,15 @@ func flattenedFields(v reflect.Value) (out []flattenedField, err error) {\n \t\tif tag.Ignored {\n \t\t\tcontinue\n \t\t}\n+\t\t// Assign group if it's not already set.\n+\t\tif tag.Group == \"\" {\n+\t\t\ttag.Group = ptag.Group\n+\t\t}\n+\t\t// Accumulate prefixes.\n+\t\ttag.Prefix = ptag.Prefix + tag.Prefix\n+\t\ttag.EnvPrefix = ptag.EnvPrefix + tag.EnvPrefix\n+\t\t// Combine parent vars.\n+\t\ttag.Vars = ptag.Vars.CloneWith(tag.Vars)\n \t\t// Command and embedded structs can be pointers, so we hydrate them now.\n \t\tif (tag.Cmd || tag.Embed) && ft.Type.Kind() == reflect.Ptr {\n \t\t\tfv = reflect.New(ft.Type.Elem()).Elem()\n@@ -68,7 +77,8 @@ func flattenedFields(v reflect.Value) (out []flattenedField, err error) {\n \t\t}\n \t\tif !ft.Anonymous && !tag.Embed {\n \t\t\tif fv.CanSet() {\n-\t\t\t\tout = append(out, flattenedField{field: ft, value: fv, tag: tag})\n+\t\t\t\tfield := flattenedField{field: ft, value: fv, tag: tag}\n+\t\t\t\tout = append(out, field)\n \t\t\t}\n \t\t\tcontinue\n \t\t}\n@@ -78,7 +88,7 @@ func flattenedFields(v reflect.Value) (out []flattenedField, err error) {\n \t\t\tfv = fv.Elem()\n \t\t} else if fv.Type() == reflect.TypeOf(Plugins{}) {\n \t\t\tfor i := 0; i < fv.Len(); i++ {\n-\t\t\t\tfields, ferr := flattenedFields(fv.Index(i).Elem())\n+\t\t\t\tfields, ferr := flattenedFields(fv.Index(i).Elem(), tag)\n \t\t\t\tif ferr != nil {\n \t\t\t\t\treturn nil, ferr\n \t\t\t\t}\n@@ -86,21 +96,10 @@ func flattenedFields(v reflect.Value) (out []flattenedField, err error) {\n \t\t\t}\n \t\t\tcontinue\n \t\t}\n-\t\tsub, err := flattenedFields(fv)\n+\t\tsub, err := flattenedFields(fv, tag)\n \t\tif err != nil {\n \t\t\treturn nil, err\n \t\t}\n-\t\tfor _, subf := range sub {\n-\t\t\t// Assign parent if it's not already set.\n-\t\t\tif subf.tag.Group == \"\" {\n-\t\t\t\tsubf.tag.Group = tag.Group\n-\t\t\t}\n-\t\t\t// Accumulate prefixes.\n-\t\t\tsubf.tag.Prefix = tag.Prefix + subf.tag.Prefix\n-\t\t\tsubf.tag.EnvPrefix = tag.EnvPrefix + subf.tag.EnvPrefix\n-\t\t\t// Combine parent vars.\n-\t\t\tsubf.tag.Vars = tag.Vars.CloneWith(subf.tag.Vars)\n-\t\t}\n \t\tout = append(out, sub...)\n \t}\n \treturn out, nil\n@@ -109,13 +108,13 @@ func flattenedFields(v reflect.Value) (out []flattenedField, err error) {\n // Build a Node in the Kong data model.\n //\n // \"v\" is the value to create the node from, \"typ\" is the output Node type.\n-func buildNode(k *Kong, v reflect.Value, typ NodeType, seenFlags map[string]bool) (*Node, error) {\n+func buildNode(k *Kong, v reflect.Value, typ NodeType, tag *Tag, seenFlags map[string]bool) (*Node, error) {\n \tnode := &Node{\n \t\tType:   typ,\n \t\tTarget: v,\n-\t\tTag:    newEmptyTag(),\n+\t\tTag:    tag,\n \t}\n-\tfields, err := flattenedFields(v)\n+\tfields, err := flattenedFields(v, tag)\n \tif err != nil {\n \t\treturn nil, err\n \t}\n@@ -201,7 +200,7 @@ func validatePositionalArguments(node *Node) error {\n }\n \n func buildChild(k *Kong, node *Node, typ NodeType, v reflect.Value, ft reflect.StructField, fv reflect.Value, tag *Tag, name string, seenFlags map[string]bool) error {\n-\tchild, err := buildNode(k, fv, typ, seenFlags)\n+\tchild, err := buildNode(k, fv, typ, newEmptyTag(), seenFlags)\n \tif err != nil {\n \t\treturn err\n \t}\ndiff --git a/callbacks.go b/callbacks.go\nindex 4e38e17..3a8a45f 100644\n--- a/callbacks.go\n+++ b/callbacks.go\n@@ -74,11 +74,14 @@ func getMethod(value reflect.Value, name string) reflect.Value {\n \treturn method\n }\n \n-func callMethod(name string, v, f reflect.Value, bindings bindings) error {\n+func callFunction(f reflect.Value, bindings bindings) error {\n+\tif f.Kind() != reflect.Func {\n+\t\treturn fmt.Errorf(\"expected function, got %s\", f.Type())\n+\t}\n \tin := []reflect.Value{}\n \tt := f.Type()\n \tif t.NumOut() != 1 || !t.Out(0).Implements(callbackReturnSignature) {\n-\t\treturn fmt.Errorf(\"return value of %T.%s() must implement \\\"error\\\"\", v.Type(), name)\n+\t\treturn fmt.Errorf(\"return value of %s must implement \\\"error\\\"\", t)\n \t}\n \tfor i := 0; i < t.NumIn(); i++ {\n \t\tpt := t.In(i)\n@@ -89,7 +92,7 @@ func callMethod(name string, v, f reflect.Value, bindings bindings) error {\n \t\t\t}\n \t\t\tin = append(in, argv)\n \t\t} else {\n-\t\t\treturn fmt.Errorf(\"couldn't find binding of type %s for parameter %d of %s.%s(), use kong.Bind(%s)\", pt, i, v.Type(), name, pt)\n+\t\t\treturn fmt.Errorf(\"couldn't find binding of type %s for parameter %d of %s(), use kong.Bind(%s)\", pt, i, t, pt)\n \t\t}\n \t}\n \tout := f.Call(in)\n@@ -98,3 +101,37 @@ func callMethod(name string, v, f reflect.Value, bindings bindings) error {\n \t}\n \treturn out[0].Interface().(error) // nolint\n }\n+\n+func callAnyFunction(f reflect.Value, bindings bindings) (out []any, err error) {\n+\tif f.Kind() != reflect.Func {\n+\t\treturn nil, fmt.Errorf(\"expected function, got %s\", f.Type())\n+\t}\n+\tin := []reflect.Value{}\n+\tt := f.Type()\n+\tfor i := 0; i < t.NumIn(); i++ {\n+\t\tpt := t.In(i)\n+\t\tif argf, ok := bindings[pt]; ok {\n+\t\t\targv, err := argf()\n+\t\t\tif err != nil {\n+\t\t\t\treturn nil, err\n+\t\t\t}\n+\t\t\tin = append(in, argv)\n+\t\t} else {\n+\t\t\treturn nil, fmt.Errorf(\"couldn't find binding of type %s for parameter %d of %s(), use kong.Bind(%s)\", pt, i, t, pt)\n+\t\t}\n+\t}\n+\toutv := f.Call(in)\n+\tout = make([]any, len(outv))\n+\tfor i, v := range outv {\n+\t\tout[i] = v.Interface()\n+\t}\n+\treturn out, nil\n+}\n+\n+func callMethod(name string, v, f reflect.Value, bindings bindings) error {\n+\terr := callFunction(f, bindings)\n+\tif err != nil {\n+\t\treturn fmt.Errorf(\"%s.%s(): %w\", v.Type(), name, err)\n+\t}\n+\treturn nil\n+}\ndiff --git a/context.go b/context.go\nindex de43925..de9e408 100644\n--- a/context.go\n+++ b/context.go\n@@ -110,7 +110,7 @@ func (c *Context) Bind(args ...interface{}) {\n //\n // This will typically have to be called like so:\n //\n-//    BindTo(impl, (*MyInterface)(nil))\n+//\tBindTo(impl, (*MyInterface)(nil))\n func (c *Context) BindTo(impl, iface interface{}) {\n \tc.bindings.addTo(impl, iface)\n }\n@@ -719,6 +719,13 @@ func (c *Context) parseFlag(flags []*Flag, match string) (err error) {\n \treturn findPotentialCandidates(match, candidates, \"unknown flag %s\", match)\n }\n \n+// Call an arbitrary function filling arguments with bound values.\n+func (c *Context) Call(fn any, binds ...interface{}) (out []interface{}, err error) {\n+\tfv := reflect.ValueOf(fn)\n+\tbindings := c.Kong.bindings.clone().add(binds...).add(c).merge(c.bindings) //nolint:govet\n+\treturn callAnyFunction(fv, bindings)\n+}\n+\n // RunNode calls the Run() method on an arbitrary node.\n //\n // This is useful in conjunction with Visit(), for dynamically running commands.\ndiff --git a/kong.go b/kong.go\nindex 19e2b85..1ae9188 100644\n--- a/kong.go\n+++ b/kong.go\n@@ -68,6 +68,7 @@ type Kong struct {\n \n \t// Set temporarily by Options. These are applied after build().\n \tpostBuildOptions []Option\n+\tembedded         []embedded\n \tdynamicCommands  []*dynamicCommand\n }\n \n@@ -110,6 +111,25 @@ func New(grammar interface{}, options ...Option) (*Kong, error) {\n \tk.Model = model\n \tk.Model.HelpFlag = k.helpFlag\n \n+\t// Embed any embedded structs.\n+\tfor _, embed := range k.embedded {\n+\t\ttag, err := parseTagString(strings.Join(embed.tags, \" \")) //nolint:govet\n+\t\tif err != nil {\n+\t\t\treturn nil, err\n+\t\t}\n+\t\ttag.Embed = true\n+\t\tv := reflect.Indirect(reflect.ValueOf(embed.strct))\n+\t\tnode, err := buildNode(k, v, CommandNode, tag, map[string]bool{})\n+\t\tif err != nil {\n+\t\t\treturn nil, err\n+\t\t}\n+\t\tfor _, child := range node.Children {\n+\t\t\tchild.Parent = k.Model.Node\n+\t\t\tk.Model.Children = append(k.Model.Children, child)\n+\t\t}\n+\t\tk.Model.Flags = append(k.Model.Flags, node.Flags...)\n+\t}\n+\n \t// Synthesise command nodes.\n \tfor _, dcmd := range k.dynamicCommands {\n \t\ttag, terr := parseTagString(strings.Join(dcmd.tags, \" \"))\n@@ -188,6 +208,10 @@ func (k *Kong) interpolateValue(value *Value, vars Vars) (err error) {\n \t\tvars = vars.CloneWith(varsContributor.Vars(value))\n \t}\n \n+\tif value.Enum, err = interpolate(value.Enum, vars, nil); err != nil {\n+\t\treturn fmt.Errorf(\"enum for %s: %s\", value.Summary(), err)\n+\t}\n+\n \tupdatedVars := map[string]string{\n \t\t\"default\": value.Default,\n \t\t\"enum\":    value.Enum,\ndiff --git a/options.go b/options.go\nindex 02d33fd..ec724b0 100644\n--- a/options.go\n+++ b/options.go\n@@ -55,6 +55,25 @@ func Exit(exit func(int)) Option {\n \t})\n }\n \n+type embedded struct {\n+\tstrct any\n+\ttags  []string\n+}\n+\n+// Embed a struct into the root of the CLI.\n+//\n+// \"strct\" must be a pointer to a structure.\n+func Embed(strct any, tags ...string) Option {\n+\tt := reflect.TypeOf(strct)\n+\tif t.Kind() != reflect.Ptr || t.Elem().Kind() != reflect.Struct {\n+\t\tpanic(\"kong: Embed() must be called with a pointer to a struct\")\n+\t}\n+\treturn OptionFunc(func(k *Kong) error {\n+\t\tk.embedded = append(k.embedded, embedded{strct, tags})\n+\t\treturn nil\n+\t})\n+}\n+\n type dynamicCommand struct {\n \tname  string\n \thelp  string\n@@ -164,8 +183,8 @@ func Writers(stdout, stderr io.Writer) Option {\n //\n // There are two hook points:\n //\n-// \t\tBeforeApply(...) error\n-//   \tAfterApply(...) error\n+//\t\t\tBeforeApply(...) error\n+//\t  \tAfterApply(...) error\n //\n // Called before validation/assignment, and immediately after validation/assignment, respectively.\n func Bind(args ...interface{}) Option {\n@@ -177,7 +196,7 @@ func Bind(args ...interface{}) Option {\n \n // BindTo allows binding of implementations to interfaces.\n //\n-// \t\tBindTo(impl, (*iface)(nil))\n+//\tBindTo(impl, (*iface)(nil))\n func BindTo(impl, iface interface{}) Option {\n \treturn OptionFunc(func(k *Kong) error {\n \t\tk.bindings.addTo(impl, iface)\n@@ -428,7 +447,8 @@ func siftStrings(ss []string, filter func(s string) bool) []string {\n // Predefined environment variables are skipped.\n //\n // For example:\n-//   --some.value -> PREFIX_SOME_VALUE\n+//\n+//\t--some.value -> PREFIX_SOME_VALUE\n func DefaultEnvars(prefix string) Option {\n \tprocessFlag := func(flag *Flag) {\n \t\tswitch env := flag.Env; {\ndiff --git a/options_test.go b/options_test.go\nindex e79168b..a77853a 100644\n--- a/options_test.go\n+++ b/options_test.go\n@@ -58,7 +58,7 @@ func TestInvalidCallback(t *testing.T) {\n \tp, err := New(&cli, BindTo(impl(\"foo\"), (*iface)(nil)))\n \tassert.NoError(t, err)\n \terr = callMethod(\"method\", reflect.ValueOf(impl(\"??\")), reflect.ValueOf(method), p.bindings)\n-\tassert.EqualError(t, err, `return value of *reflect.rtype.method() must implement \"error\"`)\n+\tassert.EqualError(t, err, `kong.impl.method(): return value of func(kong.iface) string must implement \"error\"`)\n }\n \n type zrror struct{}\ndiff --git a/tag.go b/tag.go\nindex b471613..6a94b2d 100644\n--- a/tag.go\n+++ b/tag.go\n@@ -44,6 +44,16 @@ type Tag struct {\n \titems map[string][]string\n }\n \n+func (t *Tag) String() string {\n+\tout := []string{}\n+\tfor key, list := range t.items {\n+\t\tfor _, value := range list {\n+\t\t\tout = append(out, fmt.Sprintf(\"%s:%q\", key, value))\n+\t\t}\n+\t}\n+\treturn strings.Join(out, \" \")\n+}\n+\n type tagChars struct {\n \tsep, quote, assign rune\n }\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/FUNDING.yml",
+    ".github/workflows/ci.yml",
+    ".gitignore",
+    ".golangci.yml",
+    "COPYING",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/README.md",
+    "_examples/server/console.go",
+    "_examples/server/go.mod",
+    "_examples/server/go.sum",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/commandstring/main.go",
+    "_examples/shell/help/README.md",
+    "_examples/shell/help/main.go",
+    "benchmark_test.go",
+    "bin/.go-1.19.1.pkg",
+    "bin/.golangci-lint-1.46.2.pkg",
+    "bin/README.hermit.md",
+    "bin/activate-hermit",
+    "bin/go",
+    "bin/gofmt",
+    "bin/golangci-lint",
+    "bin/hermit",
+    "bin/hermit.hcl",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "config_test.go",
+    "context.go",
+    "defaults.go",
+    "defaults_test.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "go.mod",
+    "go.sum",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "helpwrap1.18_test.go",
+    "helpwrap1.19_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_linux_test.go",
+    "mapper_test.go",
+    "mapper_windows_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "testdata/file.txt",
+    "util.go",
+    "util_test.go",
+    "visit.go"
+  ],
+  "explanation": {
+    "what": "Embed() オプションと Context.Call() を追加した。Embed() は任意の struct をタグ付きでルート CLI に埋め込めるようにし、build.go の flattenedFields()/buildNode() に親タグ(ptag)を引き回す形に改修してグループ・プレフィックス・envPrefix・vars の継承ロジックを再帰前処理へ移した。Context.Call() は callbacks.go に新設した callAnyFunction() を使い、Kong のバインディング機構で解決した引数で任意の関数を呼び出し、戻り値をそのまま []any で返す。",
+    "why": "PR本文に明記されている通り、Embed() は「任意の struct をオプションのタグ付きで CLI のルートに埋め込む」ため、Context.Call() は「Kong のバインディング機能を使って任意の関数を呼び出す」ための機能追加。従来 buildNode() はコマンド用ノードにのみタグを持てたが、ルート構造体自体にも Embed 経由で独立した struct をタグ付きで足せるようにする設計変更。",
+    "highlights": [
+      { "file": "options.go", "note": "Embed() の定義。struct へのポインタであることを reflect でチェックしてから k.embedded に積む" },
+      { "file": "context.go", "note": "Context.Call() の実装。callAnyFunction() でバインディングを解決して任意関数を呼ぶ" },
+      { "file": "build.go", "note": "flattenedFields/buildNode に親タグ(ptag)を渡す形に変更し、Group/Prefix/EnvPrefix/Vars の継承をループ内で処理" }
+    ],
+    "langNotes": [
+      { "topic": "Embed() オプション", "note": "kong.Embed(strct, tags...) で任意の構造体ポインタを CLI のルートに合流させる。埋め込み対象は reflect でポインタ+構造体であることを検証し、New() 実行時にその子ノードを Model.Children にマージする。" },
+      { "topic": "Context.Call()", "note": "Kong の bindings(型ごとに登録された値解決関数)を使って、reflect 経由で任意の関数の引数を埋めて呼び出すヘルパー。BeforeApply 等のフックと同じ仕組みを、フック以外の任意関数にも開放したもの。" }
+    ],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [{ "type": "pr", "number": 344, "url": "https://github.com/alecthomas/kong/pull/344" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

@@ -1,0 +1,102 @@
+{
+  "seq": 129,
+  "sha": "aedca401da0a1524d7efff77ab7335fe83ca0a40",
+  "parents": [
+    "010e3134caf2080c1b97ea8b1f751e700e2b1222"
+  ],
+  "author": {
+    "name": "Alec Thomas",
+    "email": "alec@swapoff.org",
+    "date": "2018-11-14T10:01:45+11:00"
+  },
+  "message": "Hide sub-tree when parent is hidden.",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 5,
+    "deletions": 5
+  },
+  "files": [
+    {
+      "path": "help.go",
+      "status": "M",
+      "additions": 4,
+      "deletions": 4,
+      "binary": false
+    },
+    {
+      "path": "model.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/help.go b/help.go\nindex 52b6580..d640efb 100644\n--- a/help.go\n+++ b/help.go\n@@ -67,7 +67,7 @@ func printApp(w *helpWriter, app *Application) {\n \tif !w.NoAppSummary {\n \t\tw.Printf(\"Usage: %s%s\", app.Name, app.Summary())\n \t}\n-\tprintNodeDetail(w, app.Node)\n+\tprintNodeDetail(w, app.Node, true)\n \tcmds := app.Leaves(true)\n \tif len(cmds) > 0 && app.HelpFlag != nil {\n \t\tw.Print(\"\")\n@@ -83,14 +83,14 @@ func printCommand(w *helpWriter, app *Application, cmd *Command) {\n \tif !w.NoAppSummary {\n \t\tw.Printf(\"Usage: %s %s\", app.Name, cmd.Summary())\n \t}\n-\tprintNodeDetail(w, cmd)\n+\tprintNodeDetail(w, cmd, false)\n \tif w.Summary && app.HelpFlag != nil {\n \t\tw.Print(\"\")\n \t\tw.Printf(`Run \"%s --help\" for more information.`, cmd.FullPath())\n \t}\n }\n \n-func printNodeDetail(w *helpWriter, node *Node) {\n+func printNodeDetail(w *helpWriter, node *Node, hide bool) {\n \tif node.Help != \"\" {\n \t\tw.Print(\"\")\n \t\tw.Wrap(node.Help)\n@@ -112,7 +112,7 @@ func printNodeDetail(w *helpWriter, node *Node) {\n \t\tw.Print(\"Flags:\")\n \t\twriteFlags(w.Indent(), flags)\n \t}\n-\tcmds := node.Leaves(true)\n+\tcmds := node.Leaves(hide)\n \tif len(cmds) > 0 {\n \t\tw.Print(\"\")\n \t\tw.Print(\"Commands:\")\ndiff --git a/model.go b/model.go\nindex 761a022..b5a613d 100644\n--- a/model.go\n+++ b/model.go\n@@ -113,7 +113,7 @@ func (n *Node) Leaves(hide bool) (out []*Node) {\n \t\t}\n \t\tif node, ok := nd.(*Node); ok {\n \t\t\tif hide && node.Hidden {\n-\t\t\t\treturn next(nil)\n+\t\t\t\treturn nil\n \t\t\t}\n \t\t\tif len(node.Children) == 0 && node.Type != ApplicationNode {\n \t\t\t\tout = append(out, node)\n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    ".golangci.yml",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/console.go",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/main.go",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "context.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "go.mod",
+    "go.sum",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "util.go",
+    "util_test.go",
+    "visit.go"
+  ],
+  "explanation": {
+    "what": "Node.Leaves(hide bool) 内で、hidden なノードに遭遇した際に next(nil) を呼んで子孫の走査を継続していた処理を、単に nil を返して探索そのものを打ち切るよう変更した。help.go 側では printNodeDetail に hide bool 引数を追加し、printApp からの呼び出しは true(隠す)、printCommand からの呼び出しは false(隠さない)を渡すようにした。",
+    "why": "コミットメッセージ \"Hide sub-tree when parent is hidden.\" が示す通り、隠しコマンドの配下にあるサブコマンド群がヘルプの一覧に紛れ込んでしまう問題への対処。next(nil) では単に「このノード自身」を除外するだけで子孫の走査は続いてしまっていたため、hidden ノード以下のサブツリーを丸ごと除外するよう修正したと考えられる。",
+    "highlights": [
+      { "file": "model.go", "note": "next(nil) から nil への変更が、hidden ノード配下の探索を打ち切る挙動の違いを生んでいる" },
+      { "file": "help.go", "note": "printNodeDetail に hide 引数を追加し、アプリ全体のヘルプ(printApp)とコマンド単位のヘルプ(printCommand)で hidden 扱いを切り替えている" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

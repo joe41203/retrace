@@ -1,0 +1,91 @@
+{
+  "seq": 67,
+  "sha": "662ace41c50c29ec87018a0c2699f6a86b10abb9",
+  "parents": [
+    "ecf21e4cc9913703b433126e8a71a9dbb49a7048"
+  ],
+  "author": {
+    "name": "Alec Thomas",
+    "email": "alec@swapoff.org",
+    "date": "2018-06-13T22:58:53+10:00"
+  },
+  "message": "Move separator defaulting back into Tag.",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 3,
+    "additions": 7,
+    "deletions": 9
+  },
+  "files": [
+    {
+      "path": "mapper.go",
+      "status": "M",
+      "additions": 0,
+      "deletions": 6,
+      "binary": false
+    },
+    {
+      "path": "resolver.go",
+      "status": "M",
+      "additions": 0,
+      "deletions": 3,
+      "binary": false
+    },
+    {
+      "path": "tag.go",
+      "status": "M",
+      "additions": 7,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/mapper.go b/mapper.go\nindex dcbacd0..e37ca27 100644\n--- a/mapper.go\n+++ b/mapper.go\n@@ -234,9 +234,6 @@ func mapDecoder(d *Registry) MapperFunc {\n \t\t}\n \t\tel := target.Type()\n \t\tsep := ctx.Value.Tag.Sep\n-\t\tif sep == 0 {\n-\t\t\tsep = '='\n-\t\t}\n \t\ttoken := ctx.Scan.PopValue(\"map\")\n \t\tparts := SplitEscaped(token, sep)\n \t\tif len(parts) != 2 {\n@@ -267,9 +264,6 @@ func sliceDecoder(d *Registry) MapperFunc {\n \treturn func(ctx *DecodeContext, target reflect.Value) error {\n \t\tel := target.Type().Elem()\n \t\tsep := ctx.Value.Tag.Sep\n-\t\tif sep == 0 {\n-\t\t\tsep = ','\n-\t\t}\n \t\tvar childScanner *Scanner\n \t\tif ctx.Value.Flag != nil {\n \t\t\t// If decoding a flag, we need an argument.\ndiff --git a/resolver.go b/resolver.go\nindex fd5a02d..5c89a18 100755\n--- a/resolver.go\n+++ b/resolver.go\n@@ -27,9 +27,6 @@ func JSON(r io.Reader) (ResolverFunc, error) {\n \t\t\treturn \"\", nil\n \t\t}\n \t\tsep := flag.Tag.Sep\n-\t\tif sep == 0 {\n-\t\t\tsep = ','\n-\t\t}\n \t\tvalue, err := jsonDecodeValue(sep, raw)\n \t\tif err != nil {\n \t\t\treturn \"\", err\ndiff --git a/tag.go b/tag.go\nindex 1573806..1351471 100644\n--- a/tag.go\n+++ b/tag.go\n@@ -130,6 +130,13 @@ func parseTag(fv reflect.Value, ft reflect.StructField) *Tag {\n \tt.Hidden = t.Has(\"hidden\")\n \tt.Format, _ = t.Get(\"format\")\n \tt.Sep, _ = t.GetRune(\"sep\")\n+\tif t.Sep == 0 {\n+\t\tif fv.Kind() == reflect.Map {\n+\t\t\tt.Sep = '='\n+\t\t} else {\n+\t\t\tt.Sep = ','\n+\t\t}\n+\t}\n \tt.PlaceHolder, _ = t.Get(\"placeholder\")\n \tif t.PlaceHolder == \"\" {\n \t\tt.PlaceHolder = strings.ToUpper(dashedString(fv.Type().Name()))\n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    ".golangci.yml",
+    "README.md",
+    "_examples/shell/main.go",
+    "build.go",
+    "camelcase.go",
+    "context.go",
+    "doc.go",
+    "global.go",
+    "global_test.go",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "tokentype_string.go"
+  ],
+  "explanation": {
+    "what": "mapDecoder・sliceDecoder・JSON resolver がそれぞれ個別に持っていた「sep が未指定(0)なら '=' または ',' をデフォルト値にする」というフォールバック処理を削除し、tag.go の parseTag() 内でフィールド種別(Map かどうか)を見て一箇所で Tag.Sep を確定させるように戻した。",
+    "why": "おそらく、直前のコミットで map サポートを追加した際に sep のデフォルト決定ロジックを各 decoder 側に分散させてしまっていたのを、コミットメッセージの通り Tag 側に集約し直す整理と考えられる。同じ判定が mapper.go・resolver.go の複数箇所に重複していたための巻き戻しとみられる。",
+    "highlights": [
+      { "file": "tag.go", "note": "parseTag() で fv.Kind() == reflect.Map かどうかにより Sep のデフォルトを '=' か ',' に決定" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "inferred",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

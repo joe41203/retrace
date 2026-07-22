@@ -1,0 +1,133 @@
+{
+  "seq": 372,
+  "sha": "38e5c6198ed71153d8d3dc77d0ef7d75b19b679a",
+  "parents": [
+    "2ab5733f117949ba9d1e24c1123d9c977d1808e6"
+  ],
+  "author": {
+    "name": "Alex Broad",
+    "email": "46813168+alex-broad@users.noreply.github.com",
+    "date": "2024-05-27T12:02:24+01:00"
+  },
+  "message": "Update help example to use vars (#429)",
+  "pr": {
+    "number": 429,
+    "title": "Update help example to use vars",
+    "body": "Fixes #426 ",
+    "url": "https://github.com/alecthomas/kong/pull/429"
+  },
+  "linkedIssues": [
+    {
+      "number": 426,
+      "title": "Help() Interface on flags seemingly unused?",
+      "body": "In the shell example code you provide an example of defining a `Help()` function on a flag:\r\n\r\n```go\r\ntype flagWithHelp bool\r\n\r\nfunc (f *flagWithHelp) Help() string {\r\n\treturn \"🏁 additional flag help\"\r\n}\r\n```\r\n\r\nBut this doesn't appear to be displayed at any point when running the code:\r\n\r\n```bash\r\n$ go run . --help\r\nUsage: help <command> [flags]\r\n\r\nAn app demonstrating HelpProviders\r\n\r\nFlags:\r\n  -h, --help    Show context-sensitive help.\r\n      --flag    Regular flag help\r\n\r\nCommands:\r\n  echo <msg>    Regular argument help\r\n\r\nRun \"help <command> --help\" for more information on a command.\r\n```\r\n\r\nMy use case is I have enough text for the help that I'd like to supply it through a `Help()` function instead of in the struct tag, but the function never seems to be used :(",
+      "url": "https://github.com/alecthomas/kong/issues/426"
+    }
+  ],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 7,
+    "deletions": 4
+  },
+  "files": [
+    {
+      "path": "_examples/shell/help/main.go",
+      "status": "M",
+      "additions": 7,
+      "deletions": 4,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/_examples/shell/help/main.go b/_examples/shell/help/main.go\nindex 56b8ce6..4d1d154 100644\n--- a/_examples/shell/help/main.go\n+++ b/_examples/shell/help/main.go\n@@ -7,14 +7,16 @@ import (\n )\n \n var cli struct {\n-\tFlag flagWithHelp    `help:\"Regular flag help\"`\n+\tFlag flagWithHelp    `help:\"${flag_help}\"`\n \tEcho commandWithHelp `cmd:\"\" help:\"Regular command help\"`\n }\n \n type flagWithHelp bool\n \n-func (f *flagWithHelp) Help() string {\n-\treturn \"🏁 additional flag help\"\n+// See https://github.com/alecthomas/kong?tab=readme-ov-file#variable-interpolation\n+var vars = kong.Vars{\n+\t\"flag_help\": \"Extended flag help that might be too long for directly \" +\n+\t\t\"including in the struct tag field\",\n }\n \n type commandWithHelp struct {\n@@ -41,7 +43,8 @@ func main() {\n \t\tkong.ConfigureHelp(kong.HelpOptions{\n \t\t\tCompact: true,\n \t\t\tSummary: false,\n-\t\t}))\n+\t\t}),\n+\t\tvars)\n \tswitch ctx.Command() {\n \tcase \"echo <msg>\":\n \t\tfmt.Println(cli.Echo.Msg)\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/FUNDING.yml",
+    ".github/workflows/ci.yml",
+    ".gitignore",
+    ".golangci.yml",
+    "COPYING",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/README.md",
+    "_examples/server/console.go",
+    "_examples/server/go.mod",
+    "_examples/server/go.sum",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/commandstring/main.go",
+    "_examples/shell/help/README.md",
+    "_examples/shell/help/main.go",
+    "benchmark_test.go",
+    "bin/.go-1.22.2.pkg",
+    "bin/.golangci-lint-1.55.2.pkg",
+    "bin/README.hermit.md",
+    "bin/activate-hermit",
+    "bin/go",
+    "bin/gofmt",
+    "bin/golangci-lint",
+    "bin/hermit",
+    "bin/hermit.hcl",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "config_test.go",
+    "context.go",
+    "defaults.go",
+    "defaults_test.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "go.mod",
+    "go.sum",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "helpwrap1.18_test.go",
+    "helpwrap1.19_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_linux_test.go",
+    "mapper_test.go",
+    "mapper_windows_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "renovate.json5",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "testdata/file.txt",
+    "util.go",
+    "util_test.go",
+    "visit.go"
+  ],
+  "explanation": {
+    "what": "_examples/shell/help/main.go の flagWithHelp.Help() メソッドによるヘルプ実装例を削除し、kong.Vars による変数展開(${flag_help})を使う例に置き換えた。kong.New() の呼び出しに vars を追加のオプションとして渡している。",
+    "why": "linkedIssues #426 で、struct タグに収まらない長いヘルプ文をフィールドの Help() メソッドで供給しようとしても実際には使われない(表示されない)という報告があった。Help() インターフェースが機能しない例をサンプルコードに残すのは誤解を招くため、既にサポートされている変数展開の仕組みを使うサンプルに差し替えた。",
+    "highlights": [{ "file": "_examples/shell/help/main.go", "note": "Help() メソッド定義を削除し、kong.Vars{\"flag_help\": ...} + help:\"${flag_help}\" に置き換え" }],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "issue",
+    "refs": [
+      { "type": "pr", "number": 429, "url": "https://github.com/alecthomas/kong/pull/429" }
+    ],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

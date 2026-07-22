@@ -1,0 +1,126 @@
+{
+  "seq": 235,
+  "sha": "456575db97b112641945b4f219495d0509e58fc0",
+  "parents": [
+    "d48f4e59c39391c41c761d7b34572ceef3f9172c"
+  ],
+  "author": {
+    "name": "Andrew Haines",
+    "email": "andrew@haines.org.nz",
+    "date": "2021-03-02T05:26:10Z"
+  },
+  "message": "Allow `-` for stdout in path mapper (#147)",
+  "pr": {
+    "number": 147,
+    "title": "Allow `-` for stdout in path mapper",
+    "body": "I passed `-` into a path flag, expecting to be able to special-case it to stdout in my command. Unfortunately it was expanded to an absolute file path and so my command wrote a file called `-` in the current working directory instead.\r\n\r\nThis can obviously be achieved with a custom mapper, but do you think it would it make sense to allow `-` in the path mapper by default?",
+    "url": "https://github.com/alecthomas/kong/pull/147"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 3,
+    "additions": 20,
+    "deletions": 3
+  },
+  "files": [
+    {
+      "path": "README.md",
+      "status": "M",
+      "additions": 2,
+      "deletions": 2,
+      "binary": false
+    },
+    {
+      "path": "mapper.go",
+      "status": "M",
+      "additions": 3,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "mapper_test.go",
+      "status": "M",
+      "additions": 15,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/README.md b/README.md\nindex 78341a1..47bd1cb 100644\n--- a/README.md\n+++ b/README.md\n@@ -385,8 +385,8 @@ function `NamedMapper(name, mapper)`.\n \n | Name              | Description\n |-------------------|---------------------------------------------------\n-| `path`            | A path. ~ expansion is applied.\n-| `existingfile`    | An existing file. ~ expansion is applied. `-` is accepted for stdin.\n+| `path`            | A path. ~ expansion is applied. `-` is accepted for stdout, and will be passed unaltered.\n+| `existingfile`    | An existing file. ~ expansion is applied. `-` is accepted for stdin, and will be passed unaltered.\n | `existingdir`     | An existing directory. ~ expansion is applied.\n | `counter`         | Increment a numeric field. Useful for `-vvv`. Can accept `-s`, `--long` or `--long=N`.\n \ndiff --git a/mapper.go b/mapper.go\nindex 183ec09..7eb77fb 100644\n--- a/mapper.go\n+++ b/mapper.go\n@@ -554,7 +554,9 @@ func pathMapper(r *Registry) MapperFunc {\n \t\tif err != nil {\n \t\t\treturn err\n \t\t}\n-\t\tpath = ExpandPath(path)\n+\t\tif path != \"-\" {\n+\t\t\tpath = ExpandPath(path)\n+\t\t}\n \t\ttarget.SetString(path)\n \t\treturn nil\n \t}\ndiff --git a/mapper_test.go b/mapper_test.go\nindex 091322c..a8b84e9 100644\n--- a/mapper_test.go\n+++ b/mapper_test.go\n@@ -378,3 +378,18 @@ func TestFileMapper(t *testing.T) {\n \trequire.NoError(t, err)\n \trequire.Equal(t, os.Stdin, cli.File)\n }\n+\n+func TestPathMapper(t *testing.T) {\n+\tvar cli struct {\n+\t\tPath string `arg:\"\" type:\"path\"`\n+\t}\n+\tp := mustNew(t, &cli)\n+\n+\t_, err := p.Parse([]string{\"/an/absolute/path\"})\n+\trequire.NoError(t, err)\n+\trequire.Equal(t, \"/an/absolute/path\", cli.Path)\n+\n+\t_, err = p.Parse([]string{\"-\"})\n+\trequire.NoError(t, err)\n+\trequire.Equal(t, \"-\", cli.Path)\n+}\n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    ".github/FUNDING.yml",
+    ".gitignore",
+    ".golangci.yml",
+    "COPYING",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/README.md",
+    "_examples/server/console.go",
+    "_examples/server/go.mod",
+    "_examples/server/go.sum",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/main.go",
+    "benchmark_test.go",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "config_test.go",
+    "context.go",
+    "defaults.go",
+    "defaults_test.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "go.mod",
+    "go.sum",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "testdata/file.txt",
+    "util.go",
+    "util_test.go",
+    "visit.go"
+  ],
+  "explanation": {
+    "what": "mapper.go の pathMapper で、値が `\"-\"` の場合は ExpandPath()(絶対パス展開)を適用せず、そのまま文字列としてセットするようにした。README では `path` 型が `-` を「stdout として受け付け、無加工でそのまま渡す」ことを明記し、`existingfile` 型の `-` (stdin用)の説明文言も「無加工でそのまま渡す」に合わせて更新した。TestPathMapper で絶対パスと `-` の両方が意図通り渡ることを確認している。",
+    "why": "PR本文によれば、投稿者が path フラグに `-` を渡して自前のコマンドで stdout として特別扱いしようとしたところ、ExpandPath によってカレントディレクトリに `-` という名前のファイルへの絶対パスに展開されてしまい、意図せずそのファイルへ書き込まれてしまった。既存の `existingfile` 型が `-` を stdin として特別扱いしていたのと同様に、`path` 型でも `-` をそのまま通すことで一貫性を持たせた。",
+    "highlights": [
+      { "file": "mapper.go", "note": "`path != \"-\"` のときだけ ExpandPath を呼ぶガードを追加" }
+    ],
+    "langNotes": [
+      { "topic": "path mapper と \"-\" (stdout/stdin) の慣習", "note": "Unix CLI 慣習で `-` は「標準入出力を使う」を意味することが多い。kong の path/existingfile 型は `~` 展開などのパス加工を自動で行うが、`-` はその加工から除外し呼び出し側のコード(自前ハンドリング)に委ねる、という取り決めがこのコミットで path 型にも揃った。" }
+    ],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [{ "type": "pr", "number": 147, "url": "https://github.com/alecthomas/kong/pull/147" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

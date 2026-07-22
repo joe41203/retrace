@@ -1,0 +1,69 @@
+{
+  "seq": 20,
+  "sha": "d7bb20f297ad7e7692509630bf3dee3547c69286",
+  "parents": [
+    "d1acfab2e695c0b41a5dc279ddf023ca2565daa0"
+  ],
+  "author": {
+    "name": "Alec Thomas",
+    "email": "alec@swapoff.org",
+    "date": "2018-05-19T22:15:14+10:00"
+  },
+  "message": "Factor out duplicate value reset code.",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 11,
+    "deletions": 12
+  },
+  "files": [
+    {
+      "path": "kong.go",
+      "status": "M",
+      "additions": 3,
+      "deletions": 12,
+      "binary": false
+    },
+    {
+      "path": "model.go",
+      "status": "M",
+      "additions": 8,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/kong.go b/kong.go\nindex d03cb5b..0364fd7 100644\n--- a/kong.go\n+++ b/kong.go\n@@ -5,7 +5,6 @@ import (\n \t\"io\"\n \t\"os\"\n \t\"path/filepath\"\n-\t\"reflect\"\n \t\"strings\"\n \t\"text/template\"\n )\n@@ -75,23 +74,15 @@ func (k *Kong) Parse(args []string) (command string, err error) {\n // Recursively reset values to defaults (as specified in the grammar) or the zero value.\n func (k *Kong) reset(node *Node) {\n \tfor _, flag := range node.Flags {\n-\t\tflag.Value.Value.Set(reflect.Zero(flag.Value.Value.Type()))\n-\t\tif flag.Default != \"\" {\n-\t\t\tflag.Decode(Scan(flag.Default))\n-\t\t\tflag.Set = false\n-\t\t}\n+\t\tflag.Value.Reset()\n \t}\n \tfor _, pos := range node.Positional {\n-\t\tpos.Value.Set(reflect.Zero(pos.Value.Type()))\n-\t\tif pos.Default != \"\" {\n-\t\t\tpos.Decode(Scan(pos.Default))\n-\t\t\tpos.Set = false\n-\t\t}\n+\t\tpos.Reset()\n \t}\n \tfor _, branch := range node.Children {\n \t\tif branch.Argument != nil {\n \t\t\targ := branch.Argument.Argument\n-\t\t\targ.Value.Set(reflect.Zero(arg.Value.Type()))\n+\t\t\targ.Reset()\n \t\t\tk.reset(&branch.Argument.Node)\n \t\t} else {\n \t\t\tk.reset(branch.Command)\ndiff --git a/model.go b/model.go\nindex 6a0fcf5..efa27aa 100644\n--- a/model.go\n+++ b/model.go\n@@ -42,6 +42,14 @@ func (v *Value) Decode(scan *Scanner) error {\n \treturn err\n }\n \n+func (v *Value) Reset() {\n+\tv.Value.Set(reflect.Zero(v.Value.Type()))\n+\tif v.Default != \"\" {\n+\t\tv.Decode(Scan(v.Default))\n+\t\tv.Set = false\n+\t}\n+}\n+\n type Positional = Value\n \n type Argument struct {\n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    "README.md",
+    "_examples/shell/main.go",
+    "build.go",
+    "camelcase.go",
+    "decoders.go",
+    "decoders_test.go",
+    "global.go",
+    "help.go",
+    "kong.go",
+    "kong_test.go",
+    "model.go",
+    "options.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tokentype_string.go"
+  ],
+  "explanation": {
+    "what": "Kong.reset() 内でフラグ・位置引数・分岐引数それぞれに個別に書かれていた「ゼロ値へのリセット + デフォルト値のデコード」処理を Value.Reset() メソッドに集約し、reset() 側は各値に対して .Reset() を呼ぶだけに簡素化した。reflect インポートも kong.go から不要になり削除。",
+    "why": "同じロジック(reflect.Zero でのリセットと Default のデコード)が3箇所に重複していたため、Value 型自身にメソッドとして持たせることで重複を排除し、今後リセット処理を変える際の修正箇所を1つにまとめたと考えられる。",
+    "highlights": [
+      { "file": "model.go", "note": "Value.Reset() に reflect.Zero によるリセットと Default デコードをまとめた実装" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

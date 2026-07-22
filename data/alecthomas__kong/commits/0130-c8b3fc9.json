@@ -1,0 +1,124 @@
+{
+  "seq": 130,
+  "sha": "c8b3fc984007f14fabc7e205a761ec671af75ba8",
+  "parents": [
+    "aedca401da0a1524d7efff77ab7335fe83ca0a40"
+  ],
+  "author": {
+    "name": "Alec Thomas",
+    "email": "alec@swapoff.org",
+    "date": "2018-11-21T11:59:53+11:00"
+  },
+  "message": "A few extra fixes and tests.",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 5,
+    "additions": 81,
+    "deletions": 33
+  },
+  "files": [
+    {
+      "path": "config_test.go",
+      "status": "A",
+      "additions": 54,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "kong.go",
+      "status": "M",
+      "additions": 0,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "kong_test.go",
+      "status": "M",
+      "additions": 9,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "options_test.go",
+      "status": "M",
+      "additions": 0,
+      "deletions": 32,
+      "binary": false
+    },
+    {
+      "path": "resolver_test.go",
+      "status": "M",
+      "additions": 18,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/config_test.go b/config_test.go\nnew file mode 100644\nindex 0000000..61d1b2e\n--- /dev/null\n+++ b/config_test.go\n@@ -0,0 +1,54 @@\n+package kong_test\n+\n+import (\n+\t\"encoding/json\"\n+\t\"io/ioutil\"\n+\t\"os\"\n+\t\"testing\"\n+\n+\t\"github.com/alecthomas/kong\"\n+\t\"github.com/stretchr/testify/require\"\n+)\n+\n+func TestMultipleConfigLoading(t *testing.T) {\n+\tvar cli struct {\n+\t\tFlag string `json:\"flag,omitempty\"`\n+\t}\n+\n+\tcli.Flag = \"first\"\n+\tfirst, cleanFirst := makeConfig(t, &cli)\n+\tdefer cleanFirst()\n+\n+\tcli.Flag = \"\"\n+\tsecond, cleanSecond := makeConfig(t, &cli)\n+\tdefer cleanSecond()\n+\n+\tp := mustNew(t, &cli, kong.Configuration(kong.JSON, first, second))\n+\t_, err := p.Parse(nil)\n+\trequire.NoError(t, err)\n+\trequire.Equal(t, \"first\", cli.Flag)\n+}\n+\n+func TestConfigValidation(t *testing.T) {\n+\tvar cli struct {\n+\t\tFlag string `json:\"flag,omitempty\" enum:\"valid\"`\n+\t}\n+\n+\tcli.Flag = \"invalid\"\n+\tconf, cleanConf := makeConfig(t, &cli)\n+\tdefer cleanConf()\n+\n+\tp := mustNew(t, &cli, kong.Configuration(kong.JSON, conf))\n+\t_, err := p.Parse(nil)\n+\trequire.Error(t, err)\n+}\n+\n+func makeConfig(t *testing.T, config interface{}) (path string, cleanup func()) {\n+\tt.Helper()\n+\tw, err := ioutil.TempFile(\"\", \"\")\n+\trequire.NoError(t, err)\n+\tdefer w.Close()\n+\terr = json.NewEncoder(w).Encode(config)\n+\trequire.NoError(t, err)\n+\treturn w.Name(), func() { os.Remove(w.Name()) }\n+}\ndiff --git a/kong.go b/kong.go\nindex 771b820..b4350cd 100644\n--- a/kong.go\n+++ b/kong.go\n@@ -326,7 +326,6 @@ func (k *Kong) FatalIfErrorf(err error, args ...interface{}) {\n \tif err, ok := err.(*ParseError); ok && k.usageOnError {\n \t\tfmt.Fprintln(k.Stdout)\n \t\toptions := k.helpOptions\n-\t\toptions.Summary = true\n \t\t_ = k.help(options, err.Context)\n \t}\n \tk.Exit(1)\ndiff --git a/kong_test.go b/kong_test.go\nindex 0e0c064..36bb11c 100644\n--- a/kong_test.go\n+++ b/kong_test.go\n@@ -707,3 +707,12 @@ func TestDefaultValueIsHyphen(t *testing.T) {\n \trequire.NoError(t, err)\n \trequire.Equal(t, \"-\", cli.Flag)\n }\n+\n+func TestDefaultEnumValidated(t *testing.T) {\n+\tvar cli struct {\n+\t\tFlag string `default:\"invalid\" enum:\"valid\"`\n+\t}\n+\tp := mustNew(t, &cli)\n+\t_, err := p.Parse(nil)\n+\trequire.Error(t, err)\n+}\ndiff --git a/options_test.go b/options_test.go\nindex 4612298..5e2da7b 100644\n--- a/options_test.go\n+++ b/options_test.go\n@@ -1,9 +1,6 @@\n package kong\n \n import (\n-\t\"encoding/json\"\n-\t\"io/ioutil\"\n-\t\"os\"\n \t\"reflect\"\n \t\"testing\"\n \n@@ -21,35 +18,6 @@ func TestOptions(t *testing.T) {\n \trequire.Nil(t, p.Exit)\n }\n \n-func TestConfigLoading(t *testing.T) {\n-\tfirst, err := ioutil.TempFile(\"\", \"\")\n-\trequire.NoError(t, err)\n-\tdefer first.Close()\n-\tdefer os.Remove(first.Name())\n-\tsecond, err := ioutil.TempFile(\"\", \"\")\n-\trequire.NoError(t, err)\n-\tdefer second.Close()\n-\tdefer os.Remove(second.Name())\n-\n-\tvar cli struct {\n-\t\tFlag string `json:\"flag,omitempty\"`\n-\t}\n-\n-\tcli.Flag = \"first\"\n-\terr = json.NewEncoder(first).Encode(&cli)\n-\trequire.NoError(t, err)\n-\n-\tcli.Flag = \"\"\n-\terr = json.NewEncoder(second).Encode(&cli)\n-\trequire.NoError(t, err)\n-\n-\tp, err := New(&cli, Configuration(JSON, first.Name(), second.Name()))\n-\trequire.NoError(t, err)\n-\t_, err = p.Parse(nil)\n-\trequire.NoError(t, err)\n-\trequire.Equal(t, \"first\", cli.Flag)\n-}\n-\n type impl string\n \n func (impl) Method() {}\ndiff --git a/resolver_test.go b/resolver_test.go\nindex c23c4f3..1a3f327 100644\n--- a/resolver_test.go\n+++ b/resolver_test.go\n@@ -74,6 +74,24 @@ func TestEnvarsTag(t *testing.T) {\n \trequire.Equal(t, []int{5, 2, 9}, cli.Slice)\n }\n \n+func TestEnvarsWithDefault(t *testing.T) {\n+\tvar cli struct {\n+\t\tFlag string `env:\"KONG_FLAG\" default:\"default\"`\n+\t}\n+\tparser, restoreEnv := newEnvParser(t, &cli, envMap{})\n+\tdefer restoreEnv()\n+\n+\t_, err := parser.Parse(nil)\n+\trequire.NoError(t, err)\n+\trequire.Equal(t, \"default\", cli.Flag)\n+\n+\tparser, restoreEnv = newEnvParser(t, &cli, envMap{\"KONG_FLAG\": \"moo\"})\n+\tdefer restoreEnv()\n+\t_, err = parser.Parse(nil)\n+\trequire.NoError(t, err)\n+\trequire.Equal(t, \"moo\", cli.Flag)\n+}\n+\n func TestJSONBasic(t *testing.T) {\n \tvar cli struct {\n \t\tString          string\n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    ".golangci.yml",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/console.go",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/main.go",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "config_test.go",
+    "context.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "go.mod",
+    "go.sum",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "util.go",
+    "util_test.go",
+    "visit.go"
+  ],
+  "explanation": {
+    "what": "kong.go の FatalIfErrorf でエラー時に options.Summary = true を強制していた行を削除し、複数設定ファイルのロード順を検証する TestMultipleConfigLoading と JSON バリデーション失敗を検証する TestConfigValidation を config_test.go に新設(旧 options_test.go の TestConfigLoading を置き換え)、さらに envar とデフォルト値の併用を検証する TestEnvarsWithDefault、default タグの値が enum の制約に反する場合にエラーになることを検証する TestDefaultEnumValidated を追加した。",
+    "why": "コミットメッセージ \"A few extra fixes and tests.\" の通り、既存の細かな挙動修正とテスト補強をまとめたコミット。options.Summary = true の削除は、おそらくエラー時のヘルプ表示をサマリー固定にせず既存の helpOptions 設定をそのまま使うための修正。",
+    "highlights": [
+      { "file": "kong.go", "note": "FatalIfErrorf でのエラー時ヘルプ表示から options.Summary = true の強制上書きを削除" },
+      { "file": "config_test.go", "note": "options_test.go にあった設定ファイル関連テストを新設の config_test.go に移設し、enum バリデーションのテストケースを追加" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "inferred",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

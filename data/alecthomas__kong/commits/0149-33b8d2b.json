@@ -1,0 +1,105 @@
+{
+  "seq": 149,
+  "sha": "33b8d2b19cff931184e23eff38c3a371948f527d",
+  "parents": [
+    "102a9758446ae67aebac1c20a2fd9ed7f6f23efc"
+  ],
+  "author": {
+    "name": "Alec Thomas",
+    "email": "alec@swapoff.org",
+    "date": "2019-06-21T14:51:44+10:00"
+  },
+  "message": "Quote enum values when displaying errors.",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 10,
+    "deletions": 4
+  },
+  "files": [
+    {
+      "path": "context.go",
+      "status": "M",
+      "additions": 7,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "kong_test.go",
+      "status": "M",
+      "additions": 3,
+      "deletions": 3,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/context.go b/context.go\nindex c63b1ab..c9dae24 100644\n--- a/context.go\n+++ b/context.go\n@@ -3,6 +3,7 @@ package kong\n import (\n \t\"fmt\"\n \t\"reflect\"\n+\t\"sort\"\n \t\"strconv\"\n \t\"strings\"\n \n@@ -135,7 +136,12 @@ func (c *Context) Validate() error {\n \terr := Visit(c.Model, func(node Visitable, next Next) error {\n \t\tif value, ok := node.(*Value); ok {\n \t\t\tif value.Enum != \"\" && !value.EnumMap()[fmt.Sprintf(\"%v\", value.Target.Interface())] {\n-\t\t\t\treturn fmt.Errorf(\"%s must be one of %s but got %q\", value.ShortSummary(), value.Enum, value.Target.Interface())\n+\t\t\t\tenums := []string{}\n+\t\t\t\tfor enum := range value.EnumMap() {\n+\t\t\t\t\tenums = append(enums, fmt.Sprintf(\"%q\", enum))\n+\t\t\t\t}\n+\t\t\t\tsort.Strings(enums)\n+\t\t\t\treturn fmt.Errorf(\"%s must be one of %s but got %q\", value.ShortSummary(), strings.Join(enums, \",\"), value.Target.Interface())\n \t\t\t}\n \t\t}\n \t\treturn next(nil)\ndiff --git a/kong_test.go b/kong_test.go\nindex 11c3171..7f553a8 100644\n--- a/kong_test.go\n+++ b/kong_test.go\n@@ -680,7 +680,7 @@ func TestEnum(t *testing.T) {\n \t\tFlag string `enum:\"a,b,c\"`\n \t}\n \t_, err := mustNew(t, &cli).Parse([]string{\"--flag\", \"d\"})\n-\trequire.EqualError(t, err, \"--flag must be one of a,b,c but got \\\"d\\\"\")\n+\trequire.EqualError(t, err, \"--flag must be one of \\\"a\\\",\\\"b\\\",\\\"c\\\" but got \\\"d\\\"\")\n }\n \n type commandWithHook struct {\n@@ -734,7 +734,7 @@ func TestDefaultEnumValidated(t *testing.T) {\n \t}\n \tp := mustNew(t, &cli)\n \t_, err := p.Parse(nil)\n-\trequire.EqualError(t, err, \"--flag must be one of valid but got \\\"invalid\\\"\")\n+\trequire.EqualError(t, err, \"--flag must be one of \\\"valid\\\" but got \\\"invalid\\\"\")\n }\n \n func TestEnvarEnumValidated(t *testing.T) {\n@@ -747,5 +747,5 @@ func TestEnvarEnumValidated(t *testing.T) {\n \t}\n \tp := mustNew(t, &cli)\n \t_, err := p.Parse(nil)\n-\trequire.EqualError(t, err, \"--flag must be one of valid but got \\\"invalid\\\"\")\n+\trequire.EqualError(t, err, \"--flag must be one of \\\"valid\\\" but got \\\"invalid\\\"\")\n }\n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    ".golangci.yml",
+    "COPYING",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/console.go",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/main.go",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "config_test.go",
+    "context.go",
+    "defaults.go",
+    "defaults_test.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "go.mod",
+    "go.sum",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "util.go",
+    "util_test.go",
+    "visit.go"
+  ],
+  "explanation": {
+    "what": "context.go の Validate() で enum バリデーションのエラーメッセージを改良し、許容される値の一覧を \"a,b,c\" のようなカンマ区切りの生文字列ではなく、EnumMap() のキーを sort.Strings でソートしたうえで各値をダブルクォートで囲んだ \"\\\"a\\\",\\\"b\\\",\\\"c\\\"\" 形式で表示するようにした。",
+    "why": "おそらく、値どうしの区切りが分かりにくい・空白を含む値が読みにくいといった、直前のコミット(seq148)で enum バリデーションのタイミングを直した際に見つかった表示上の粗さを詰めるための改善と考えられる。EnumMap() は map 由来のため順序が不定になるので、表示を安定させるために sort.Strings でソートしている点も実装上のポイント。",
+    "highlights": [
+      { "file": "context.go", "note": "EnumMap() のキーをソートしてから \\\"a\\\",\\\"b\\\" 形式に整形" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "inferred",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

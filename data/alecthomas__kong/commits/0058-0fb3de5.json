@@ -1,0 +1,97 @@
+{
+  "seq": 58,
+  "sha": "0fb3de514f458de89682c0d73491e24f2deba1e0",
+  "parents": [
+    "e9d88d6528a48382ffe1e1a32dba29ad9a818552"
+  ],
+  "author": {
+    "name": "Alec Thomas",
+    "email": "alec@swapoff.org",
+    "date": "2018-06-12T20:54:29+10:00"
+  },
+  "message": "Add a default-enabled EnvResolver for the env tag.",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 4,
+    "additions": 41,
+    "deletions": 8
+  },
+  "files": [
+    {
+      "path": "kong.go",
+      "status": "M",
+      "additions": 7,
+      "deletions": 6,
+      "binary": false
+    },
+    {
+      "path": "options.go",
+      "status": "M",
+      "additions": 7,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "resolver.go",
+      "status": "M",
+      "additions": 16,
+      "deletions": 2,
+      "binary": false
+    },
+    {
+      "path": "resolver_test.go",
+      "status": "M",
+      "additions": 11,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/kong.go b/kong.go\nindex 8db9636..42b9c47 100644\n--- a/kong.go\n+++ b/kong.go\n@@ -52,12 +52,13 @@ type Kong struct {\n // See the README (https://github.com/alecthomas/kong) for usage instructions.\n func New(grammar interface{}, options ...Option) (*Kong, error) {\n \tk := &Kong{\n-\t\tExit:     os.Exit,\n-\t\tStdout:   os.Stdout,\n-\t\tStderr:   os.Stderr,\n-\t\tbefore:   map[reflect.Value]HookFunc{},\n-\t\tregistry: NewRegistry().RegisterDefaults(),\n-\t\thelp:     PrintHelp,\n+\t\tExit:      os.Exit,\n+\t\tStdout:    os.Stdout,\n+\t\tStderr:    os.Stderr,\n+\t\tbefore:    map[reflect.Value]HookFunc{},\n+\t\tregistry:  NewRegistry().RegisterDefaults(),\n+\t\thelp:      PrintHelp,\n+\t\tresolvers: []ResolverFunc{EnvResolver()},\n \t}\n \n \tfor _, option := range options {\ndiff --git a/options.go b/options.go\nindex 7af0c54..17e95cc 100755\n--- a/options.go\n+++ b/options.go\n@@ -97,6 +97,13 @@ func Help(help HelpFunction) Option {\n \t}\n }\n \n+// ClearResolvers clears all existing resolvers.\n+func ClearResolvers() Option {\n+\treturn func(k *Kong) {\n+\t\tk.resolvers = nil\n+\t}\n+}\n+\n // Resolver registers flag resolvers.\n func Resolver(resolvers ...ResolverFunc) Option {\n \treturn func(k *Kong) {\ndiff --git a/resolver.go b/resolver.go\nindex 833b94a..1627b91 100755\n--- a/resolver.go\n+++ b/resolver.go\n@@ -62,8 +62,9 @@ func jsonDecodeValue(sep rune, value interface{}) (string, error) {\n }\n \n // PerFlagEnvResolver automatically determines environment variables based on the name of each flag, transformed to\n-// uppercase and underscored, e.g. `my-flag` -> `MY_FLAG` The environment variable key can be overridden with the `env`\n-// tag.\n+// uppercase and underscored, e.g. `my-flag` -> `MY_FLAG`.\n+//\n+// The environment variable key can be overridden with the `env:\"<name>\"` tag.\n func PerFlagEnvResolver(prefix string) ResolverFunc {\n \treturn func(context *Context, parent *Path, flag *Flag) (string, error) {\n \t\tv, _ := os.LookupEnv(envString(prefix, flag))\n@@ -71,6 +72,19 @@ func PerFlagEnvResolver(prefix string) ResolverFunc {\n \t}\n }\n \n+// EnvResolver resolves flag values using the `env:\"<name>\"` tag. It ignores flags without this tag.\n+//\n+// This resolver is installed by default.\n+func EnvResolver() ResolverFunc {\n+\treturn func(context *Context, parent *Path, flag *Flag) (string, error) {\n+\t\tif flag.Tag.Env == \"\" {\n+\t\t\treturn \"\", nil\n+\t\t}\n+\t\tv, _ := os.LookupEnv(flag.Tag.Env)\n+\t\treturn v, nil\n+\t}\n+}\n+\n func envString(prefix string, flag *Flag) string {\n \tif env, ok := flag.Tag.Get(\"env\"); ok {\n \t\treturn env\ndiff --git a/resolver_test.go b/resolver_test.go\nindex 721cd4e..9ba6831 100755\n--- a/resolver_test.go\n+++ b/resolver_test.go\n@@ -235,3 +235,14 @@ func TestResolverSatisfiesRequired(t *testing.T) {\n \trequire.NoError(t, err)\n \trequire.Equal(t, 1, cli.Int)\n }\n+\n+func TestEnvResolver(t *testing.T) {\n+\tvar cli struct {\n+\t\tInt int `env:\"SOME_ENVAR\"`\n+\t}\n+\trestoreEnv := tempEnv(envMap{\"SOME_ENVAR\": \"12\"})\n+\tdefer restoreEnv()\n+\t_, err := mustNew(t, &cli, Resolver(EnvResolver())).Parse(nil)\n+\trequire.NoError(t, err)\n+\trequire.Equal(t, 12, cli.Int)\n+}\n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    "README.md",
+    "_examples/shell/main.go",
+    "build.go",
+    "camelcase.go",
+    "context.go",
+    "global.go",
+    "global_test.go",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "kong.go",
+    "kong_test.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "tokentype_string.go"
+  ],
+  "explanation": {
+    "what": "`EnvResolver()`という新しいResolverFuncを追加し、`env:\"<name>\"`タグが付いたフラグのみ対応する環境変数からデフォルト値を読み取るようにした。New()内でKong構造体生成時にresolvers初期値として`[]ResolverFunc{EnvResolver()}`をデフォルト登録し、明示的に`Resolver()`Optionで追加しなくても`env`タグを書けば環境変数から値を拾えるようにした。あわせて全resolverをクリアする`ClearResolvers()`Optionも追加した。",
+    "why": "コミットメッセージ「Add a default-enabled EnvResolver for the env tag.」の通り、前コミットで導入したresolver機構のうち環境変数対応をデフォルトで有効にする意図。前コミット(#24)にあった`PerFlagEnvResolver(prefix)`はフラグ名から自動でENV名を推測する方式だったのに対し、`EnvResolver()`は`env`タグの明示指定がある場合のみ動くため、意図しない環境変数の混入を避けつつ標準機能として組み込める。",
+    "highlights": [
+      { "file": "resolver.go", "note": "EnvResolver()の実装。flag.Tag.Envが空なら何もせず、あればos.LookupEnvするだけの単純な仕組み" },
+      { "file": "kong.go", "note": "New()のKong構造体初期化でresolversにEnvResolver()をデフォルト登録" }
+    ],
+    "langNotes": [
+      { "topic": "EnvResolver とデフォルトOption", "note": "Kongでは`env`タグを付けるだけで環境変数からの値供給が有効になる。これは前段のResolver機構(#24)の具体的な組み込み実装で、`os.LookupEnv`という標準ライブラリの単純な関数を使っている。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

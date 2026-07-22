@@ -1,0 +1,73 @@
+{
+  "seq": 25,
+  "sha": "31e1ffaa3bb83362e02b567630e72eaaac858b74",
+  "parents": [
+    "ab5cf7e6ef7323c2c6726612f06181833ed123b4"
+  ],
+  "author": {
+    "name": "Alec Thomas",
+    "email": "alec@swapoff.org",
+    "date": "2018-05-22T00:49:09-04:00"
+  },
+  "message": "Test for options.",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 22,
+    "deletions": 1
+  },
+  "files": [
+    {
+      "path": "options.go",
+      "status": "M",
+      "additions": 4,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "options_test.go",
+      "status": "A",
+      "additions": 18,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/options.go b/options.go\nindex ecabeaf..5a3ed24 100644\n--- a/options.go\n+++ b/options.go\n@@ -36,5 +36,8 @@ func HelpContext(context map[string]interface{}) Option {\n \n // Writers overrides the default writers. Useful for testing or interactive use.\n func Writers(stdout, stderr io.Writer) Option {\n-\treturn func(k *Kong) { k.stdout = stdout }\n+\treturn func(k *Kong) {\n+\t\tk.stdout = stdout\n+\t\tk.stderr = stderr\n+\t}\n }\ndiff --git a/options_test.go b/options_test.go\nnew file mode 100644\nindex 0000000..d6fd419\n--- /dev/null\n+++ b/options_test.go\n@@ -0,0 +1,18 @@\n+package kong\n+\n+import (\n+\t\"testing\"\n+\n+\t\"github.com/stretchr/testify/require\"\n+)\n+\n+func TestOptions(t *testing.T) {\n+\tvar cli struct{}\n+\tp, err := New(&cli, Name(\"name\"), Description(\"description\"), Writers(nil, nil), ExitFunction(nil))\n+\trequire.NoError(t, err)\n+\trequire.Equal(t, \"name\", p.Model.Name)\n+\trequire.Equal(t, \"description\", p.Model.Help)\n+\trequire.Nil(t, p.stdout)\n+\trequire.Nil(t, p.stderr)\n+\trequire.Nil(t, p.terminate)\n+}\n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    "README.md",
+    "_examples/shell/main.go",
+    "build.go",
+    "camelcase.go",
+    "context.go",
+    "decoders.go",
+    "decoders_test.go",
+    "global.go",
+    "help.go",
+    "kong.go",
+    "kong_test.go",
+    "model.go",
+    "options.go",
+    "options_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tokentype_string.go"
+  ],
+  "explanation": {
+    "what": "Writers オプションが stdout だけでなく stderr も差し替えるように options.go を修正し、options_test.go を新規追加して Name/Description/Writers/ExitFunction といった Option 群が Kong 構造体に正しく反映されることを確認するテストを書いた。",
+    "why": "コミットメッセージの通り、既存のオプション機構に対するテストが手薄だったため補ったもの。Writers が stderr を無視していたのはテストを書く過程で見つかった漏れと見られる。",
+    "highlights": [
+      { "file": "options.go", "note": "Writers が k.stderr も更新するよう修正" },
+      { "file": "options_test.go", "note": "New() に複数 Option を渡し、Kong 構造体のフィールドへの反映を検証" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

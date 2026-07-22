@@ -1,0 +1,128 @@
+{
+  "seq": 300,
+  "sha": "ab085f771e5b945f94985a3635c3f28f3bceb802",
+  "parents": [
+    "e49700181c4e78c36c4f6a39ea643c668fc5f4ee"
+  ],
+  "author": {
+    "name": "pyq-lsa",
+    "email": "26353308+pyq-lsa@users.noreply.github.com",
+    "date": "2022-01-29T13:23:26-08:00"
+  },
+  "message": "fix required/xor behavior w/ > 2 flags",
+  "pr": {
+    "number": 267,
+    "title": "fix required/xor behavior w/ > 2 flags",
+    "body": "Adds a check for if the xorGroupSet has been satisfied before building the list of missing flags.  Includes the test described in https://github.com/alecthomas/kong/issues/258.",
+    "url": "https://github.com/alecthomas/kong/pull/267"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 6,
+    "deletions": 2
+  },
+  "files": [
+    {
+      "path": "context.go",
+      "status": "M",
+      "additions": 2,
+      "deletions": 2,
+      "binary": false
+    },
+    {
+      "path": "kong_test.go",
+      "status": "M",
+      "additions": 4,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/context.go b/context.go\nindex 742bc9b..1e26ff5 100644\n--- a/context.go\n+++ b/context.go\n@@ -793,8 +793,8 @@ func checkMissingFlags(flags []*Flag) error {\n \t\t\tmissing = append(missing, flag.Summary())\n \t\t}\n \t}\n-\tfor _, flags := range xorGroup {\n-\t\tif len(flags) > 1 {\n+\tfor xor, flags := range xorGroup {\n+\t\tif !xorGroupSet[xor] && len(flags) > 1 {\n \t\t\tmissing = append(missing, strings.Join(flags, \" or \"))\n \t\t}\n \t}\ndiff --git a/kong_test.go b/kong_test.go\nindex 482775d..e7568b2 100644\n--- a/kong_test.go\n+++ b/kong_test.go\n@@ -932,6 +932,10 @@ func TestXorRequiredMany(t *testing.T) {\n \t_, err := p.Parse([]string{\"--one\"})\n \trequire.NoError(t, err)\n \n+\tp = mustNew(t, &cli)\n+\t_, err = p.Parse([]string{\"--three\"})\n+\trequire.NoError(t, err)\n+\n \tp = mustNew(t, &cli)\n \t_, err = p.Parse([]string{})\n \trequire.EqualError(t, err, \"missing flags: --one or --two or --three\")\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/FUNDING.yml",
+    ".github/workflows/ci.yml",
+    ".gitignore",
+    ".golangci.yml",
+    "COPYING",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/README.md",
+    "_examples/server/console.go",
+    "_examples/server/go.mod",
+    "_examples/server/go.sum",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/main.go",
+    "benchmark_test.go",
+    "bin/.go@latest.pkg",
+    "bin/.golangci-lint-1.42.0.pkg",
+    "bin/README.hermit.md",
+    "bin/activate-hermit",
+    "bin/go",
+    "bin/gofmt",
+    "bin/golangci-lint",
+    "bin/hermit",
+    "bin/hermit.hcl",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "config_test.go",
+    "context.go",
+    "defaults.go",
+    "defaults_test.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "go.mod",
+    "go.sum",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "testdata/file.txt",
+    "util.go",
+    "util_test.go",
+    "visit.go"
+  ],
+  "explanation": {
+    "what": "checkMissingFlags() の xorGroup を走査するループで、そのXORグループがすでにいずれかのフラグ指定によって満たされているか(xorGroupSet[xor])を確認してから「missing」リストに加えるよう修正した。3つ以上のフラグを持つXORグループのテストケースを追加している。",
+    "why": "PR本文の説明どおり、xorGroupSetによる充足判定を挟まずに `len(flags) > 1` だけで missing 判定をしていたため、3つ以上のフラグを持つXORグループでいずれか1つを指定しても残りの2つ以上が「missing」として誤検出される不具合があった。issue #258で報告された事例のテストを追加して修正を検証している。",
+    "highlights": [
+      { "file": "context.go", "note": "!xorGroupSet[xor] && len(flags) > 1 の条件追加が修正の本体" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [
+      { "type": "pr", "number": 267, "url": "https://github.com/alecthomas/kong/pull/267" }
+    ],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

@@ -1,0 +1,84 @@
+{
+  "seq": 72,
+  "sha": "4edc701d6325710e8e6fc7ddac8fc4fd6bab2b9a",
+  "parents": [
+    "653531d6bca5831eca6b82290c7e07e3337b1bf8"
+  ],
+  "author": {
+    "name": "Alec Thomas",
+    "email": "alec@swapoff.org",
+    "date": "2018-06-20T22:36:33+10:00"
+  },
+  "message": "Correctly check for required positionals.",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 39,
+    "deletions": 26
+  },
+  "files": [
+    {
+      "path": "_examples/shell/main.go",
+      "status": "M",
+      "additions": 4,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "context.go",
+      "status": "M",
+      "additions": 35,
+      "deletions": 26,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/_examples/shell/main.go b/_examples/shell/main.go\nindex a479d4c..6998562 100644\n--- a/_examples/shell/main.go\n+++ b/_examples/shell/main.go\n@@ -1,6 +1,8 @@\n package main\n \n import (\n+\t\"fmt\"\n+\n \t\"github.com/alecthomas/kong\"\n )\n \n@@ -24,6 +26,8 @@ func main() {\n \tcmd := kong.Parse(&cli, kong.Description(\"A shell-like example app.\"), kong.HelpOptions(kong.CompactHelp()))\n \tswitch cmd {\n \tcase \"rm\":\n+\t\tfmt.Println(cli.Rm.Paths, cli.Rm.Force)\n+\n \tcase \"ls\":\n \t}\n }\ndiff --git a/context.go b/context.go\nindex 9b26d5f..2d8051e 100644\n--- a/context.go\n+++ b/context.go\n@@ -25,6 +25,21 @@ type Path struct {\n \tResolved bool\n }\n \n+// Node returns the Node associated with this Path, or nil if Path is a non-Node.\n+func (p *Path) Node() *Node {\n+\tswitch {\n+\tcase p.App != nil:\n+\t\treturn &p.App.Node\n+\n+\tcase p.Argument != nil:\n+\t\treturn p.Argument\n+\n+\tcase p.Command != nil:\n+\t\treturn p.Command\n+\t}\n+\treturn nil\n+}\n+\n // Context contains the current parse context.\n type Context struct {\n \tApp   *Kong\n@@ -90,36 +105,30 @@ func (c *Context) Validate() error {\n \t\t}\n \t}\n \t// Check the terminal node.\n-\tpath := c.Path[len(c.Path)-1]\n-\tswitch {\n-\tcase path.App != nil:\n-\t\tif err := checkMissingChildren(&path.App.Node); err != nil {\n-\t\t\treturn err\n-\t\t}\n-\t\tif err := checkMissingPositionals(0, path.App.Positional); err != nil {\n-\t\t\treturn err\n-\t\t}\n+\tnode := c.Selected()\n+\tif node == nil {\n+\t\tnode = &c.App.Model.Node\n+\t}\n \n-\tcase path.Command != nil:\n-\t\tif err := checkMissingChildren(path.Command); err != nil {\n-\t\t\treturn err\n-\t\t}\n-\t\tif err := checkMissingPositionals(0, path.Parent.Positional); err != nil {\n-\t\t\treturn err\n+\t// Find deepest positional argument so we can check if all required positionals have been provided.\n+\tpositionals := 0\n+\tfor _, path := range c.Path {\n+\t\tif path.Positional != nil {\n+\t\t\tpositionals = path.Positional.Position + 1\n \t\t}\n+\t}\n \n-\tcase path.Argument != nil:\n-\t\tvalue := path.Argument.Argument\n-\t\tif value.Required && !value.Set {\n-\t\t\treturn fmt.Errorf(\"%s is required\", path.Argument.Summary())\n-\t\t}\n-\t\tif err := checkMissingChildren(path.Argument); err != nil {\n-\t\t\treturn err\n-\t\t}\n+\tif err := checkMissingChildren(node); err != nil {\n+\t\treturn err\n+\t}\n+\tif err := checkMissingPositionals(positionals, node.Positional); err != nil {\n+\t\treturn err\n+\t}\n \n-\tcase path.Positional != nil:\n-\t\tif err := checkMissingPositionals(path.Positional.Position+1, path.Parent.Positional); err != nil {\n-\t\t\treturn err\n+\tif node.Type == ArgumentNode {\n+\t\tvalue := node.Argument\n+\t\tif value.Required && !value.Set {\n+\t\t\treturn fmt.Errorf(\"%s is required\", node.Summary())\n \t\t}\n \t}\n \treturn nil\n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    ".golangci.yml",
+    "README.md",
+    "_examples/shell/main.go",
+    "build.go",
+    "camelcase.go",
+    "context.go",
+    "doc.go",
+    "global.go",
+    "global_test.go",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "tokentype_string.go"
+  ],
+  "explanation": {
+    "what": "`Context.Validate()` の必須positional引数チェックを書き直した。以前は `Path` の末尾ノードの型(App/Command/Argument/Positional)ごとに分岐して個別にチェックしていたが、`c.Selected()` で終端ノードを取得し、Path全体を走査して「実際に埋まったpositionalの個数」を数えてから一括で `checkMissingPositionals` に渡す方式に変更した。あわせて `Path.Node()` ヘルパーを追加している。",
+    "why": "旧ロジックは分岐ごとに重複した処理を書いており、ネストしたコマンド構造で必須positional引数が正しく検出できないケースがあった。終端ノードの種類による分岐を排し、Path全体からpositionalの充足数を数える単一のロジックに統一することでバグを解消している。",
+    "highlights": [
+      { "file": "context.go", "note": "Validate() が switch分岐から Selected()+ループでの positionals カウントに変わった箇所" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

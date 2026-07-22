@@ -1,0 +1,111 @@
+{
+  "seq": 132,
+  "sha": "886c2d7b01d8c57baabf8dc26fb48264e6ab50dc",
+  "parents": [
+    "59339303b60455c366b1505e35c9d2daf184c5c2"
+  ],
+  "author": {
+    "name": "Alec Thomas",
+    "email": "alec@swapoff.org",
+    "date": "2019-01-12T20:59:24+11:00"
+  },
+  "message": "Better help for maps.",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 3,
+    "additions": 27,
+    "deletions": 17
+  },
+  "files": [
+    {
+      "path": "help_test.go",
+      "status": "M",
+      "additions": 16,
+      "deletions": 16,
+      "binary": false
+    },
+    {
+      "path": "model.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "resolver.go",
+      "status": "M",
+      "additions": 10,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/help_test.go b/help_test.go\nindex d8af552..91068c5 100644\n--- a/help_test.go\n+++ b/help_test.go\n@@ -66,13 +66,13 @@ func TestHelp(t *testing.T) {\n A test app.\n \n Flags:\n-  --help             Show context-sensitive help.\n-  --string=STRING    A string flag.\n-  --bool             A bool flag with very long help that wraps a lot and is\n-                     verbose and is really verbose.\n-  --slice=STR,...    A slice of strings.\n-  --map=KEY=VALUE    A map of strings to ints.\n-  --required         A required flag.\n+  --help                 Show context-sensitive help.\n+  --string=STRING        A string flag.\n+  --bool                 A bool flag with very long help that wraps a lot and is\n+                         verbose and is really verbose.\n+  --slice=STR,...        A slice of strings.\n+  --map=KEY=VALUE;...    A map of strings to ints.\n+  --required             A required flag.\n \n Commands:\n   one --required\n@@ -106,15 +106,15 @@ Sub-sub-arg.\n Detailed help provided through the HelpProvider interface.\n \n Flags:\n-  --help              Show context-sensitive help.\n-  --string=STRING     A string flag.\n-  --bool              A bool flag with very long help that wraps a lot and is\n-                      verbose and is really verbose.\n-  --slice=STR,...     A slice of strings.\n-  --map=KEY=VALUE     A map of strings to ints.\n-  --required          A required flag.\n-\n-  --flag=STRING       Nested flag under two.\n+  --help                 Show context-sensitive help.\n+  --string=STRING        A string flag.\n+  --bool                 A bool flag with very long help that wraps a lot and is\n+                         verbose and is really verbose.\n+  --slice=STR,...        A slice of strings.\n+  --map=KEY=VALUE;...    A map of strings to ints.\n+  --required             A required flag.\n+\n+  --flag=STRING          Nested flag under two.\n   --required-two\n \n   --required-three\ndiff --git a/model.go b/model.go\nindex b5a613d..2915892 100644\n--- a/model.go\n+++ b/model.go\n@@ -357,7 +357,7 @@ func (f *Flag) FormatPlaceHolder() string {\n \t\treturn f.PlaceHolder + tail\n \t}\n \tif f.Value.IsMap() {\n-\t\treturn \"KEY=VALUE\" + tail\n+\t\treturn \"KEY=VALUE;...\"\n \t}\n \treturn strings.ToUpper(f.Name) + tail\n }\ndiff --git a/resolver.go b/resolver.go\nindex 85063d9..353f63a 100644\n--- a/resolver.go\n+++ b/resolver.go\n@@ -70,6 +70,16 @@ func jsonDecodeValue(sep rune, value interface{}) (string, error) {\n \t\t\tout = append(out, sel)\n \t\t}\n \t\treturn JoinEscaped(out, sep), nil\n+\tcase map[string]interface{}:\n+\t\tout := []string{}\n+\t\tfor key, el := range v {\n+\t\t\tsel, err := jsonDecodeValue(sep, el)\n+\t\t\tif err != nil {\n+\t\t\t\treturn \"\", err\n+\t\t\t}\n+\t\t\tout = append(out, fmt.Sprintf(\"%s=%s\", key, sel))\n+\t\t}\n+\t\treturn JoinEscaped(out, ';'), nil\n \tcase bool:\n \t\tif v {\n \t\t\treturn \"true\", nil\n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    ".golangci.yml",
+    "COPYING",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/console.go",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/main.go",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "config_test.go",
+    "context.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "go.mod",
+    "go.sum",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "util.go",
+    "util_test.go",
+    "visit.go"
+  ],
+  "explanation": {
+    "what": "map型フラグのヘルプ表示・プレースホルダを改善した。FormatPlaceHolder()が返すマップ用プレースホルダを\"KEY=VALUE\"から\"KEY=VALUE;...\"(複数ペア指定可能を示すサフィックス)に変更し、それに伴いhelp_test.goの期待出力とヘルプの左カラム幅を調整。加えてresolver.goのjsonDecodeValue()にmap[string]interface{}のケースを追加し、JSON由来の値をkey=valueのセミコロン区切り文字列へエンコードできるようにした。",
+    "why": "おそらくmapフラグが複数のkey=valueペアを受け取れる仕様(先行コミットの\"Support multiple key+value pairs for map flags\")に対し、ヘルプ上のプレースホルダやresolver経由の値変換がまだ追随していなかったための整合対応と見られる。",
+    "highlights": [
+      { "file": "model.go", "note": "FormatPlaceHolder()がmap型のとき\"KEY=VALUE;...\"を返すよう変更" },
+      { "file": "resolver.go", "note": "jsonDecodeValueにmapケースを追加し、セミコロン区切りでエンコード" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "inferred",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

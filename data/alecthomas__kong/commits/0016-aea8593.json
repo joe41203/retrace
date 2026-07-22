@@ -1,0 +1,83 @@
+{
+  "seq": 16,
+  "sha": "aea859372cab0b926ad4e25331273fe740af1997",
+  "parents": [
+    "a9179cd8ec5a1765b33e914af4a503b3f6e08ad6"
+  ],
+  "author": {
+    "name": "Alec Thomas",
+    "email": "alec@swapoff.org",
+    "date": "2018-05-19T20:04:51+10:00"
+  },
+  "message": "Switch to circleci.",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 4,
+    "additions": 15,
+    "deletions": 1
+  },
+  "files": [
+    {
+      "path": ".circleci/config.yml",
+      "status": "A",
+      "additions": 11,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "README.md",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "help.go",
+      "status": "M",
+      "additions": 2,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "kong.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/.circleci/config.yml b/.circleci/config.yml\nnew file mode 100644\nindex 0000000..0813982\n--- /dev/null\n+++ b/.circleci/config.yml\n@@ -0,0 +1,11 @@\n+version: 2\n+jobs:\n+  build:\n+    docker:\n+      - image: circleci/golang:1.10\n+\n+    working_directory: /go/src/github.com/alecthomas/kong\n+    steps:\n+      - checkout\n+      - run: go get -v -t -d ./...\n+      - run: go test -v ./...\ndiff --git a/README.md b/README.md\nindex a6a39b8..5ef36e4 100644\n--- a/README.md\n+++ b/README.md\n@@ -1,4 +1,4 @@\n-# Kong is a command-line parser for Go\n+# Kong is a command-line parser for Go [![CircleCI](https://circleci.com/gh/alecthomas/kong.svg?style=svg&circle-token=477fecac758383bf281453187269b913130f17d2)](https://circleci.com/gh/alecthomas/kong)\n \n It parses a command-line into a struct. eg.\n \ndiff --git a/help.go b/help.go\nindex 6332bef..7066aa8 100644\n--- a/help.go\n+++ b/help.go\n@@ -8,6 +8,8 @@ import (\n const defaultHelp = `{{- with .Application -}}\n usage: {{.Name}}\n \n+{{.Help}}\n+\n {{- end -}}\n `\n \ndiff --git a/kong.go b/kong.go\nindex 22d854c..b150b8e 100644\n--- a/kong.go\n+++ b/kong.go\n@@ -109,6 +109,7 @@ func (k *Kong) applyNode(scan *Scanner, node *Node, flags []*Flag) (command []st\n \t\t\t\t\t}\n \t\t\t\t\targs = append(args, token.Value)\n \t\t\t\t}\n+\t\t\t\t// Note: tokens must be pushed in reverse order.\n \t\t\t\tfor i := range args {\n \t\t\t\t\tscan.PushTyped(args[len(args)-1-i], PositionalArgumentToken)\n \t\t\t\t}\n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    "README.md",
+    "_examples/shell/main.go",
+    "build.go",
+    "camelcase.go",
+    "decoders.go",
+    "decoders_test.go",
+    "global.go",
+    "help.go",
+    "kong.go",
+    "kong_test.go",
+    "model.go",
+    "options.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tokentype_string.go"
+  ],
+  "explanation": {
+    "what": "CI を CircleCI に切り替え、.circleci/config.yml を追加(Go 1.10 イメージで go get → go test を実行)。README にバッジを追加。help.go のデフォルトテンプレートに `{{.Help}}`(アプリ全体の説明文)の出力行を足し、kong.go の PositionalArgumentToken 処理にトークンを逆順に push する旨のコメントを補足した。",
+    "why": "コミットメッセージの通り CI 基盤を CircleCI へ移行することが主目的で、ヘルプテンプレートへの説明文追加とコメント補足は同コミットに含まれた小さな付随修正と見られる。",
+    "highlights": [
+      { "file": ".circleci/config.yml", "note": "Go 1.10 イメージで go get -t -d ./... → go test -v ./... を実行するだけの最小構成" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

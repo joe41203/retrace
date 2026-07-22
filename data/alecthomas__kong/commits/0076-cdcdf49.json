@@ -1,0 +1,123 @@
+{
+  "seq": 76,
+  "sha": "cdcdf49f678926ce07bbe0f94a6b9a176054d4e2",
+  "parents": [
+    "d9c0dd25b19f7831f927868613b278231bbd3a1b"
+  ],
+  "author": {
+    "name": "Alec Thomas",
+    "email": "alec@swapoff.org",
+    "date": "2018-06-21T10:08:01+10:00"
+  },
+  "message": "Display usage information on error.",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 7,
+    "additions": 53,
+    "deletions": 16
+  },
+  "files": [
+    {
+      "path": "README.md",
+      "status": "M",
+      "additions": 2,
+      "deletions": 2,
+      "binary": false
+    },
+    {
+      "path": "_examples/shell/main.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "context.go",
+      "status": "M",
+      "additions": 7,
+      "deletions": 4,
+      "binary": false
+    },
+    {
+      "path": "error.go",
+      "status": "A",
+      "additions": 12,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "kong.go",
+      "status": "M",
+      "additions": 18,
+      "deletions": 9,
+      "binary": false
+    },
+    {
+      "path": "options.go",
+      "status": "M",
+      "additions": 8,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "tag.go",
+      "status": "M",
+      "additions": 5,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/README.md b/README.md\nindex 6aeb048..6758dca 100644\n--- a/README.md\n+++ b/README.md\n@@ -19,7 +19,7 @@\n     1. [`Configuration(loader, paths...)` - load defaults from configuration files](#configurationloader-paths---load-defaults-from-configuration-files)\n     1. [`Resolver(...)` - support for default values from external sources](#resolver---support-for-default-values-from-external-sources)\n     1. [`*Mapper(...)` - customising how the command-line is mapped to Go values](#mapper---customising-how-the-command-line-is-mapped-to-go-values)\n-    1. [`Help(HelpFunc)` - customising help](#helphelpfunc---customising-help)\n+    1. [`HelpOptions(...HelpOption)` and `Help(HelpFunc)` - customising help](#helpoptionshelpoption-and-helphelpfunc---customising-help)\n     1. [`Hook(&field, HookFunc)` - callback hooks to execute when the command-line is parsed](#hookfield-hookfunc---callback-hooks-to-execute-when-the-command-line-is-parsed)\n     1. [Other options](#other-options)\n \n@@ -279,7 +279,7 @@ All builtin Go types (as well as a bunch of useful stdlib types like `time.Time`\n 3. `TypeMapper(reflect.Type, Mapper)`.\n 4. `ValueMapper(interface{}, Mapper)`, passing in a pointer to a field of the grammar.\n \n-### `Help(HelpFunc)` - customising help\n+### `HelpOptions(...HelpOption)` and `Help(HelpFunc)` - customising help\n \n The default help output is usually sufficient, but if it's not, there are two solutions.\n \ndiff --git a/_examples/shell/main.go b/_examples/shell/main.go\nindex 36813ed..46e07f5 100644\n--- a/_examples/shell/main.go\n+++ b/_examples/shell/main.go\n@@ -14,7 +14,7 @@ var cli struct {\n \t\tForce     bool   `help:\"Force removal.\" short:\"f\"`\n \t\tRecursive bool   `help:\"Recursively remove files.\" short:\"r\"`\n \n-\t\tPaths []string `arg:\"\" help:\"Paths to remove.\" type:\"path\"`\n+\t\tPaths []string `arg:\"\" help:\"Paths to remove.\" type:\"path\" name:\"path\"`\n \t} `cmd:\"\" help:\"Remove files.\"`\n \n \tLs struct {\ndiff --git a/context.go b/context.go\nindex 3f22df7..5a56565 100644\n--- a/context.go\n+++ b/context.go\n@@ -43,11 +43,11 @@ func (p *Path) Node() *Node {\n // Context contains the current parse context.\n type Context struct {\n \tApp   *Kong\n-\tPath  []*Path // A trace through parsed nodes.\n-\tError error   // Error that occurred during trace, if any.\n+\tPath  []*Path  // A trace through parsed nodes.\n+\tArgs  []string // Original command-line arguments.\n+\tError error    // Error that occurred during trace, if any.\n \n \tvalues map[*Value]reflect.Value // Temporary values during tracing.\n-\targs   []string\n \tscan   *Scanner\n }\n \n@@ -86,7 +86,7 @@ func (c *Context) Selected() *Node {\n func Trace(k *Kong, args []string) (*Context, error) {\n \tc := &Context{\n \t\tApp:  k,\n-\t\targs: args,\n+\t\tArgs: args,\n \t\tPath: []*Path{\n \t\t\t{App: k.Model, Flags: k.Model.Flags},\n \t\t},\n@@ -461,6 +461,9 @@ func checkMissingChildren(node *Node) error {\n \tif len(missing) == 1 {\n \t\treturn fmt.Errorf(\"%q should be followed by %s\", node.Path(), missing[0])\n \t}\n+\tif len(missing) > 5 {\n+\t\tmissing = append(missing[:5], \"...\")\n+\t}\n \treturn fmt.Errorf(\"%q should be followed by one of %s\", node.Path(), strings.Join(missing, \", \"))\n }\n \ndiff --git a/error.go b/error.go\nnew file mode 100644\nindex 0000000..30b8858\n--- /dev/null\n+++ b/error.go\n@@ -0,0 +1,12 @@\n+package kong\n+\n+// ParseError is the error type returned by Kong.Parse().\n+//\n+// It contains the parse Context that triggered the error.\n+type ParseError struct {\n+\terror\n+\tContext *Context\n+}\n+\n+// Cause returns the original cause of the error.\n+func (p *ParseError) Cause() error { return p.error }\ndiff --git a/kong.go b/kong.go\nindex a0d750e..ed7ff80 100644\n--- a/kong.go\n+++ b/kong.go\n@@ -38,12 +38,13 @@ type Kong struct {\n \tStdout io.Writer\n \tStderr io.Writer\n \n-\tbefore        map[reflect.Value]HookFunc\n-\tresolvers     []ResolverFunc\n-\tregistry      *Registry\n-\tnoDefaultHelp bool\n-\thelp          func(*Context) error\n-\thelpOptions   []HelpOption\n+\tbefore         map[reflect.Value]HookFunc\n+\tresolvers      []ResolverFunc\n+\tregistry       *Registry\n+\tnoDefaultHelp  bool\n+\tnoUsageOnError bool\n+\thelp           func(*Context) error\n+\thelpOptions    []HelpOption\n \n \t// Set temporarily by Options. These are applied after build().\n \tpostBuildOptions []Option\n@@ -133,6 +134,9 @@ func (k *Kong) Help(args []string) error {\n //\n // The returned \"command\" is a space separated path to the final selected command, if any. Commands appear as\n // the command name while positional arguments are the argument name surrounded by \"<argument>\".\n+//\n+// Will return a ParseError if a *semantically* invalid command-line is encountered (as opposed to a syntactically\n+// invalid one, which will report a normal error).\n func (k *Kong) Parse(args []string) (command string, err error) {\n \tdefer catch(&err)\n \tctx, err := Trace(k, args)\n@@ -140,13 +144,13 @@ func (k *Kong) Parse(args []string) (command string, err error) {\n \t\treturn \"\", err\n \t}\n \tif err = k.applyHooks(ctx); err != nil {\n-\t\treturn \"\", err\n+\t\treturn \"\", &ParseError{error: err, Context: ctx}\n \t}\n \tif ctx.Error != nil {\n-\t\treturn \"\", ctx.Error\n+\t\treturn \"\", &ParseError{error: ctx.Error, Context: ctx}\n \t}\n \tif err = ctx.Validate(); err != nil {\n-\t\treturn \"\", err\n+\t\treturn \"\", &ParseError{error: err, Context: ctx}\n \t}\n \treturn ctx.Apply()\n }\n@@ -210,6 +214,11 @@ func (k *Kong) FatalIfErrorf(err error, args ...interface{}) {\n \t\tmsg = fmt.Sprintf(args[0].(string), args[1:]...) + \": \" + err.Error()\n \t}\n \tk.Errorf(\"%s\", msg)\n+\t// Maybe display usage information.\n+\tif err, ok := err.(*ParseError); ok && !k.noUsageOnError {\n+\t\tfmt.Fprintln(k.Stdout)\n+\t\t_ = k.help(err.Context)\n+\t}\n \tk.Exit(1)\n }\n \ndiff --git a/options.go b/options.go\nindex eeb9468..2a4f3ef 100644\n--- a/options.go\n+++ b/options.go\n@@ -132,6 +132,14 @@ func HelpOptions(options ...HelpOption) Option {\n \t}\n }\n \n+// NoUsageOnError configures Kong to NOT display context-sensitive usage if FatalIfErrorf is called with an error.\n+func NoUsageOnError() Option {\n+\treturn func(k *Kong) error {\n+\t\tk.noUsageOnError = true\n+\t\treturn nil\n+\t}\n+}\n+\n // ClearResolvers clears all existing resolvers.\n func ClearResolvers() Option {\n \treturn func(k *Kong) error {\ndiff --git a/tag.go b/tag.go\nindex 594c75a..d07fd2f 100644\n--- a/tag.go\n+++ b/tag.go\n@@ -23,6 +23,7 @@ type Tag struct {\n \tShort       rune\n \tHidden      bool\n \tSep         rune\n+\tEnum        map[string]bool\n \n \t// Storage for all tag keys for arbitrary lookups.\n \titems map[string]string\n@@ -112,6 +113,7 @@ func parseTag(fv reflect.Value, ft reflect.StructField) *Tag {\n \ts, chars := getTagInfo(ft)\n \tt := &Tag{\n \t\titems: parseTagItems(s, chars),\n+\t\tEnum:  map[string]bool{},\n \t}\n \tt.Cmd = t.Has(\"cmd\")\n \tt.Arg = t.Has(\"arg\")\n@@ -141,6 +143,9 @@ func parseTag(fv reflect.Value, ft reflect.StructField) *Tag {\n \tif t.PlaceHolder == \"\" {\n \t\tt.PlaceHolder = strings.ToUpper(dashedString(fv.Type().Name()))\n \t}\n+\tfor _, part := range strings.Split(t.Get(\"enum\"), \",\") {\n+\t\tt.Enum[part] = true\n+\t}\n \n \treturn t\n }\n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    ".golangci.yml",
+    "README.md",
+    "_examples/shell/main.go",
+    "build.go",
+    "camelcase.go",
+    "context.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "tokentype_string.go"
+  ],
+  "explanation": {
+    "what": "解析失敗時に `error.go` の新しい `ParseError` 型(通常の error を埋め込み `Context` を保持)でエラーをラップし、`FatalIfErrorf` がその `Context` を使って使用方法(usage)を表示できるようにした。表示するかどうかは新設の `NoUsageOnError()` オプションで抑制できる。あわせて `Context` に `Args []string`(元のコマンドライン引数)を公開フィールドとして追加し、`Tag` に `Enum map[string]bool` を追加して `enum:\"...\"` タグの値集合を保持できるようにした。",
+    "why": "従来はパースエラー時にエラーメッセージだけが表示され、ユーザーは正しい使い方を確認するために別途 `--help` を打つ必要があった。エラー発生時の `Context` を持ち回ることで、エラー直後にその場でヘルプ相当の使用方法を出せるようにしている。`Enum` タグの追加は今後の値検証(許可された値の集合と照合)を見据えた布石と考えられる。",
+    "highlights": [
+      { "file": "error.go", "note": "ParseError: error を埋め込み(embedding)、Context を保持する新しい型" },
+      { "file": "kong.go", "note": "FatalIfErrorf が *ParseError を型アサーションで判定し、NoUsageOnError でなければ k.help(ctx) を呼ぶ" }
+    ],
+    "langNotes": [
+      { "topic": "struct embedding for error wrapping", "note": "`ParseError` は `error` インターフェースを無名フィールドとして埋め込んでおり、これにより ParseError 自体が error インターフェースを満たしつつ、`Cause()` で元のエラーを取り出せる。Go 1.13 の `errors.Unwrap` 標準化以前によく使われた手動ラッピングの書き方。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

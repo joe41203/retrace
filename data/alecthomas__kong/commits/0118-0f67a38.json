@@ -1,0 +1,102 @@
+{
+  "seq": 118,
+  "sha": "0f67a38060a9e897a1d3023f408557a618472e05",
+  "parents": [
+    "1048bd0448af72f8999a407e3c7494091150b961"
+  ],
+  "author": {
+    "name": "Alec Thomas",
+    "email": "alec@swapoff.org",
+    "date": "2018-09-22T17:09:28+10:00"
+  },
+  "message": "Make FileContentFlag a struct to keep track of the path.",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 8,
+    "deletions": 3
+  },
+  "files": [
+    {
+      "path": "mapper.go",
+      "status": "M",
+      "additions": 6,
+      "deletions": 2,
+      "binary": false
+    },
+    {
+      "path": "mapper_test.go",
+      "status": "M",
+      "additions": 2,
+      "deletions": 1,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/mapper.go b/mapper.go\nindex 15ab88d..96e0185 100644\n--- a/mapper.go\n+++ b/mapper.go\n@@ -465,7 +465,10 @@ func JoinEscaped(s []string, sep rune) string {\n }\n \n // FileContentFlag is a flag value that loads a file's contents into its value.\n-type FileContentFlag []byte\n+type FileContentFlag struct {\n+\tPath string\n+\tData []byte\n+}\n \n func (f *FileContentFlag) Decode(ctx *DecodeContext) error { // nolint: golint\n \tfilename := ctx.Scan.PopValue(\"filename\")\n@@ -473,6 +476,7 @@ func (f *FileContentFlag) Decode(ctx *DecodeContext) error { // nolint: golint\n \tif err != nil {\n \t\treturn fmt.Errorf(\"failed to open %q: %s\", filename, err)\n \t}\n-\t*f = FileContentFlag(data)\n+\tf.Path = filename\n+\tf.Data = data\n \treturn nil\n }\ndiff --git a/mapper_test.go b/mapper_test.go\nindex 6d393ad..04a1d93 100644\n--- a/mapper_test.go\n+++ b/mapper_test.go\n@@ -164,5 +164,6 @@ func TestFileContentFlag(t *testing.T) {\n \tf.Close()\n \t_, err = mustNew(t, &cli).Parse([]string{\"--file\", f.Name()})\n \trequire.NoError(t, err)\n-\trequire.Equal(t, []byte(\"hello world\"), []byte(cli.File))\n+\trequire.Equal(t, []byte(\"hello world\"), cli.File.Data)\n+\trequire.Equal(t, f.Name(), cli.File.Path)\n }\n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    ".golangci.yml",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/console.go",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/main.go",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "context.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "go.mod",
+    "go.sum",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "tokentype_string.go",
+    "util.go",
+    "util_test.go",
+    "visit.go"
+  ],
+  "explanation": {
+    "what": "FileContentFlag を `type FileContentFlag []byte` から `type FileContentFlag struct { Path string; Data []byte }` に変更した。Decode() は読み込んだファイルパスを Path に、内容を Data に格納する。テストも cli.File を []byte として直接比較する形から cli.File.Data / cli.File.Path を個別に検証する形に変更されている。",
+    "why": "コミットメッセージの通り、元の []byte ベースの型では読み込んだファイルのパス情報を保持できなかった。struct にすることで内容(Data)だけでなく由来のパス(Path)も利用側で参照できるようにした。",
+    "highlights": [
+      { "file": "mapper.go", "note": "FileContentFlag の型定義が []byte から Path/Data を持つ struct へ変更された部分" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

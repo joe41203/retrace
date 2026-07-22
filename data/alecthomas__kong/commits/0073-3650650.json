@@ -1,0 +1,84 @@
+{
+  "seq": 73,
+  "sha": "36506509f1bf484cd7570bada63e6b90f1b1173d",
+  "parents": [
+    "4edc701d6325710e8e6fc7ddac8fc4fd6bab2b9a"
+  ],
+  "author": {
+    "name": "Alec Thomas",
+    "email": "alec@swapoff.org",
+    "date": "2018-06-20T22:45:34+10:00"
+  },
+  "message": "Better error reporting for short flags.",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 8,
+    "deletions": 9
+  },
+  "files": [
+    {
+      "path": "_examples/shell/main.go",
+      "status": "M",
+      "additions": 2,
+      "deletions": 2,
+      "binary": false
+    },
+    {
+      "path": "context.go",
+      "status": "M",
+      "additions": 6,
+      "deletions": 7,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/_examples/shell/main.go b/_examples/shell/main.go\nindex 6998562..c6adb52 100644\n--- a/_examples/shell/main.go\n+++ b/_examples/shell/main.go\n@@ -25,8 +25,8 @@ var cli struct {\n func main() {\n \tcmd := kong.Parse(&cli, kong.Description(\"A shell-like example app.\"), kong.HelpOptions(kong.CompactHelp()))\n \tswitch cmd {\n-\tcase \"rm\":\n-\t\tfmt.Println(cli.Rm.Paths, cli.Rm.Force)\n+\tcase \"rm <paths>\":\n+\t\tfmt.Println(cli.Rm.Paths, cli.Rm.Force, cli.Rm.Recursive)\n \n \tcase \"ls\":\n \t}\ndiff --git a/context.go b/context.go\nindex 2d8051e..3f22df7 100644\n--- a/context.go\n+++ b/context.go\n@@ -258,12 +258,12 @@ func (c *Context) trace(node *Node) (err error) { // nolint: gocyclo\n \t\t\tc.scan.PushTyped(token.Value[0:1], ShortFlagToken)\n \n \t\tcase FlagToken:\n-\t\t\tif err := c.matchFlags(flags, func(f *Flag) bool { return f.Name == token.Value }); err != nil {\n+\t\t\tif err := c.parseFlag(flags, \"--\"+token.Value); err != nil {\n \t\t\t\treturn err\n \t\t\t}\n \n \t\tcase ShortFlagToken:\n-\t\t\tif err := c.matchFlags(flags, func(f *Flag) bool { return string(f.Short) == token.Value }); err != nil {\n+\t\t\tif err := c.parseFlag(flags, \"-\"+token.Value); err != nil {\n \t\t\t\treturn err\n \t\t\t}\n \n@@ -404,14 +404,13 @@ func (c *Context) Apply() (string, error) {\n \treturn strings.Join(path, \" \"), nil\n }\n \n-func (c *Context) matchFlags(flags []*Flag, matcher func(f *Flag) bool) (err error) {\n+func (c *Context) parseFlag(flags []*Flag, match string) (err error) {\n \tdefer catch(&err)\n-\ttoken := c.scan.Peek()\n \tfor _, flag := range flags {\n-\t\t// Found a matching flag.\n-\t\tif !matcher(flag) {\n+\t\tif \"-\"+string(flag.Short) != match && \"--\"+flag.Name != match {\n \t\t\tcontinue\n \t\t}\n+\t\t// Found a matching flag.\n \t\tc.scan.Pop()\n \t\terr := flag.Parse(c.scan, c.getValue(flag.Value))\n \t\tif err != nil {\n@@ -420,7 +419,7 @@ func (c *Context) matchFlags(flags []*Flag, matcher func(f *Flag) bool) (err err\n \t\tc.Path = append(c.Path, &Path{Flag: flag})\n \t\treturn nil\n \t}\n-\treturn fmt.Errorf(\"unknown flag --%s\", token.Value)\n+\treturn fmt.Errorf(\"unknown flag %s\", match)\n }\n \n func checkMissingFlags(flags []*Flag) error {\n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    ".golangci.yml",
+    "README.md",
+    "_examples/shell/main.go",
+    "build.go",
+    "camelcase.go",
+    "context.go",
+    "doc.go",
+    "global.go",
+    "global_test.go",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "tokentype_string.go"
+  ],
+  "explanation": {
+    "what": "フラグ解析の内部関数 `matchFlags(flags, matcher func(f *Flag) bool)` を `parseFlag(flags, match string)` に置き換えた。以前は「トークンをpeekしてからmatcher関数で比較」という間接的な作りで、未知フラグのエラーメッセージも常に `--` 付きだったため短縮フラグの場合に誤った表示になっていた。新実装は `-x` / `--xxx` の文字列を直接組み立てて比較し、エラーメッセージもその文字列をそのまま使う。",
+    "why": "コミットメッセージの通り、短縮フラグ(`-f` 等)でエラーになった際に `unknown flag --f` のように誤ったプレフィックスで表示される問題を修正するため。マッチャー関数越しの間接比較をやめて match 文字列を直接扱うことで、エラーメッセージの生成元を一本化している。",
+    "highlights": [
+      { "file": "context.go", "note": "matchFlags→parseFlag への置き換え。エラーメッセージが `match` をそのまま使うようになった" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

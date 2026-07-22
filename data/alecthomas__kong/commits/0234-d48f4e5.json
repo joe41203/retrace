@@ -1,0 +1,117 @@
+{
+  "seq": 234,
+  "sha": "d48f4e59c39391c41c761d7b34572ceef3f9172c",
+  "parents": [
+    "ed24960916047b121e1d823f226c3de011bec981"
+  ],
+  "author": {
+    "name": "Joe Schmitt",
+    "email": "joe@compass.com",
+    "date": "2021-03-01T16:41:31-05:00"
+  },
+  "message": "Add negatable output when using short flag names",
+  "pr": {
+    "number": 146,
+    "title": "Add support for negatable boolean flags",
+    "body": "Adds support for a new `negatable` struct tag, which will automatically set a boolean Struct flag value to `false` if the flag's name starts with `--no-`, even when the default is `true`. This idea is shamelessly stolen from the [`commander` npm library](https://github.com/tj/commander.js#other-option-types-negatable-boolean-and-booleanvalue)\r\n\r\nFor example:\r\n```go\r\ntype Cmd struct {\r\n  Sort bool `default:\"true\",negatable`\r\n}\r\n```\r\n\r\nCalling\r\n```sh\r\ncommand\r\n# or\r\ncommand --sort\r\n```\r\nWill set `Sort` to `true`, but\r\n```sh \r\ncommand --no-sort\r\n```\r\nWill set `Sort` to `false`.\r\n\r\n## Why do this?\r\n\r\nIt avoids the situation of having to do:\r\n```go\r\ntype Cmd struct {\r\n  NoSort bool\r\n}\r\n\r\nfunc (c *Cmd) Run() error {\r\n  if !c.NoSort {\r\n    // Double negations are hard to read!\r\n  }\r\n  return nil\r\n}\r\n```",
+    "url": "https://github.com/alecthomas/kong/pull/146"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 13,
+    "deletions": 9
+  },
+  "files": [
+    {
+      "path": "help.go",
+      "status": "M",
+      "additions": 10,
+      "deletions": 6,
+      "binary": false
+    },
+    {
+      "path": "help_test.go",
+      "status": "M",
+      "additions": 3,
+      "deletions": 3,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/help.go b/help.go\nindex fd2f758..d9f65bf 100644\n--- a/help.go\n+++ b/help.go\n@@ -469,17 +469,21 @@ func formatFlag(haveShort bool, flag *Flag) string {\n \tname := flag.Name\n \tisBool := flag.IsBool()\n \tif flag.Short != 0 {\n-\t\tflagString += fmt.Sprintf(\"-%c, --%s\", flag.Short, name)\n+\t\tif isBool && flag.Tag.Negatable {\n+\t\t\tflagString += fmt.Sprintf(\"-%c, --[no-]%s\", flag.Short, name)\n+\t\t} else {\n+\t\t\tflagString += fmt.Sprintf(\"-%c, --%s\", flag.Short, name)\n+\t\t}\n \t} else {\n-\t\tif haveShort {\n-\t\t\tif isBool && flag.Tag.Negatable {\n+\t\tif isBool && flag.Tag.Negatable {\n+\t\t\tif haveShort {\n \t\t\t\tflagString = fmt.Sprintf(\"    --[no-]%s\", name)\n \t\t\t} else {\n-\t\t\t\tflagString += fmt.Sprintf(\"    --%s\", name)\n+\t\t\t\tflagString = fmt.Sprintf(\"--[no-]%s\", name)\n \t\t\t}\n \t\t} else {\n-\t\t\tif isBool && flag.Tag.Negatable {\n-\t\t\t\tflagString = fmt.Sprintf(\"--[no-]%s\", name)\n+\t\t\tif haveShort {\n+\t\t\t\tflagString += fmt.Sprintf(\"    --%s\", name)\n \t\t\t} else {\n \t\t\t\tflagString += fmt.Sprintf(\"--%s\", name)\n \t\t\t}\ndiff --git a/help_test.go b/help_test.go\nindex 71266b4..aa1a984 100644\n--- a/help_test.go\n+++ b/help_test.go\n@@ -29,7 +29,7 @@ func TestHelp(t *testing.T) {\n \t\tSlice    []string       `help:\"A slice of strings.\" placeholder:\"STR\"`\n \t\tMap      map[string]int `help:\"A map of strings to ints.\"`\n \t\tRequired bool           `required help:\"A required flag.\"`\n-\t\tSort     bool           `negatable help:\"Is sortable or not.\"`\n+\t\tSort     bool           `negatable short:\"s\" help:\"Is sortable or not.\"`\n \n \t\tOne struct {\n \t\t\tFlag string `help:\"Nested flag.\"`\n@@ -76,7 +76,7 @@ Flags:\n       --slice=STR,...        A slice of strings.\n       --map=KEY=VALUE;...    A map of strings to ints.\n       --required             A required flag.\n-      --[no-]sort            Is sortable or not.\n+  -s, --[no-]sort            Is sortable or not.\n \n Commands:\n   one --required\n@@ -117,7 +117,7 @@ Flags:\n       --slice=STR,...        A slice of strings.\n       --map=KEY=VALUE;...    A map of strings to ints.\n       --required             A required flag.\n-      --[no-]sort            Is sortable or not.\n+  -s, --[no-]sort            Is sortable or not.\n \n       --flag=STRING          Nested flag under two.\n       --required-two\n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    ".github/FUNDING.yml",
+    ".gitignore",
+    ".golangci.yml",
+    "COPYING",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/README.md",
+    "_examples/server/console.go",
+    "_examples/server/go.mod",
+    "_examples/server/go.sum",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/main.go",
+    "benchmark_test.go",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "config_test.go",
+    "context.go",
+    "defaults.go",
+    "defaults_test.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "go.mod",
+    "go.sum",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "testdata/file.txt",
+    "util.go",
+    "util_test.go",
+    "visit.go"
+  ],
+  "explanation": {
+    "what": "help.go の formatFlag で、short フラグ(`-s`)を持つ negatable な bool フラグのヘルプ表示が `-s, --sort` のままで `[no-]` が付いていなかったバグを修正し、`-s, --[no-]sort` と表示されるようにした。if/else の分岐構造も isBool && Negatable を先に判定する形に整理した。help_test.go では Sort フィールドに `short:\"s\"` を追加し、期待値を `-s, --[no-]sort` に更新した。",
+    "why": "コミットメッセージの通り、short フラグ名を持つ negatable なフラグでもヘルプに `[no-]` 表記を出すための修正。旧コードは short がある分岐で isBool && Negatable の判定を通っておらず、long のみの分岐にしか negatable 表示ロジックが実装されていなかった。",
+    "highlights": [
+      { "file": "help.go", "note": "short フラグありの分岐にも `--[no-]` 表示ロジックを追加" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [{ "type": "pr", "number": 146, "url": "https://github.com/alecthomas/kong/pull/146" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

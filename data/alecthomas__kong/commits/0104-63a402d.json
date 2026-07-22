@@ -1,0 +1,102 @@
+{
+  "seq": 104,
+  "sha": "63a402d3b2a7c7d58674c0461e3843e5fb4e5b81",
+  "parents": [
+    "37d57a878b1811124d9010289dff0a52c136bf02"
+  ],
+  "author": {
+    "name": "Alec Thomas",
+    "email": "alec@swapoff.org",
+    "date": "2018-09-13T14:47:46+10:00"
+  },
+  "message": "Add BindTo option for binding interface implementations.",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 39,
+    "deletions": 5
+  },
+  "files": [
+    {
+      "path": "options.go",
+      "status": "M",
+      "additions": 10,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "options_test.go",
+      "status": "M",
+      "additions": 29,
+      "deletions": 5,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/options.go b/options.go\nindex f20833a..1bf3218 100644\n--- a/options.go\n+++ b/options.go\n@@ -126,6 +126,16 @@ func Bind(args ...interface{}) OptionFunc {\n \t}\n }\n \n+// BindTo allows binding of implementations to interfaces.\n+//\n+// \t\tBindTo(impl, (*iface)(nil))\n+func BindTo(impl, iface interface{}) OptionFunc {\n+\treturn func(k *Kong) error {\n+\t\tk.bindings[reflect.TypeOf(iface).Elem()] = reflect.ValueOf(impl)\n+\t\treturn nil\n+\t}\n+}\n+\n // Help printer to use.\n func Help(help HelpPrinter) OptionFunc {\n \treturn func(k *Kong) error {\ndiff --git a/options_test.go b/options_test.go\nindex 79af714..4612298 100644\n--- a/options_test.go\n+++ b/options_test.go\n@@ -1,19 +1,18 @@\n-package kong_test\n+package kong\n \n import (\n \t\"encoding/json\"\n \t\"io/ioutil\"\n \t\"os\"\n+\t\"reflect\"\n \t\"testing\"\n \n \t\"github.com/stretchr/testify/require\"\n-\n-\t\"github.com/alecthomas/kong\"\n )\n \n func TestOptions(t *testing.T) {\n \tvar cli struct{}\n-\tp, err := kong.New(&cli, kong.Name(\"name\"), kong.Description(\"description\"), kong.Writers(nil, nil), kong.Exit(nil))\n+\tp, err := New(&cli, Name(\"name\"), Description(\"description\"), Writers(nil, nil), Exit(nil))\n \trequire.NoError(t, err)\n \trequire.Equal(t, \"name\", p.Model.Name)\n \trequire.Equal(t, \"description\", p.Model.Help)\n@@ -44,8 +43,33 @@ func TestConfigLoading(t *testing.T) {\n \terr = json.NewEncoder(second).Encode(&cli)\n \trequire.NoError(t, err)\n \n-\tp := mustNew(t, &cli, kong.Configuration(kong.JSON, first.Name(), second.Name()))\n+\tp, err := New(&cli, Configuration(JSON, first.Name(), second.Name()))\n+\trequire.NoError(t, err)\n \t_, err = p.Parse(nil)\n \trequire.NoError(t, err)\n \trequire.Equal(t, \"first\", cli.Flag)\n }\n+\n+type impl string\n+\n+func (impl) Method() {}\n+\n+func TestBindTo(t *testing.T) {\n+\ttype iface interface {\n+\t\tMethod()\n+\t}\n+\n+\tsaw := \"\"\n+\tmethod := func(i iface) error { // nolint: unparam\n+\t\tsaw = string(i.(impl))\n+\t\treturn nil\n+\t}\n+\n+\tvar cli struct{}\n+\n+\tp, err := New(&cli, BindTo(impl(\"foo\"), (*iface)(nil)))\n+\trequire.NoError(t, err)\n+\terr = callMethod(\"method\", reflect.ValueOf(impl(\"??\")), reflect.ValueOf(method), p.bindings)\n+\trequire.NoError(t, err)\n+\trequire.Equal(t, \"foo\", saw)\n+}\n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    ".golangci.yml",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/console.go",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/main.go",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "context.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "tokentype_string.go",
+    "util.go",
+    "util_test.go"
+  ],
+  "explanation": {
+    "what": "options.go に BindTo(impl, iface interface{}) という新しい Option 関数を追加した。iface に渡した型なしポインタ(例: `(*iface)(nil)`)から reflect.TypeOf(iface).Elem() でインターフェース型を取り出し、k.bindings マップにそのインターフェース型をキーとして impl の reflect.Value を登録する。合わせて options_test.go を package kong(内部テスト)に変更し、TestBindTo で登録した実装が callMethod 経由のフック呼び出しで解決されることを確認している。",
+    "why": "前コミットで struct にインターフェースを埋め込めるようになったが、Bind(...) の既存の仕組みは具体型をキーに束縛するため、フックやRunメソッドの引数がインターフェース型で宣言されている場合には対応できない。おそらく BindTo はインターフェース型をキーに実装を登録できるようにすることで、フック/Run メソッドの引数をインターフェースとして宣言し、実行時に具体的な実装を注入できるようにする狙いとみられる。",
+    "highlights": [
+      { "file": "options.go", "note": "BindTo: `(*iface)(nil)` イディオムでインターフェース型そのものを reflect 経由で取得" },
+      { "file": "options_test.go", "note": "TestBindTo: callMethod で iface 引数に impl が解決されることを検証" }
+    ],
+    "langNotes": [
+      { "topic": "BindTo と型なしポインタによる型指定イディオム", "note": "Go には型そのものを値として渡す構文がないため、`(*iface)(nil)` のように「その型へのポインタの nil 値」を作り reflect.TypeOf(...).Elem() で元の型を取り出すイディオムがよく使われる。BindTo(impl, (*iface)(nil)) はこの手法でインターフェース型をキーにした依存性注入(DI)的な束縛を実現している。" }
+    ],
+    "diagram": null,
+    "evidence": "inferred",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

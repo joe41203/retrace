@@ -1,0 +1,130 @@
+{
+  "seq": 294,
+  "sha": "f5bd1465d89c0555c37984a655ca8a278eced220",
+  "parents": [
+    "88dcc90dde05844cd2b0b5353776429b766e475a"
+  ],
+  "author": {
+    "name": "Mitar",
+    "email": "mitar.git@tnode.com",
+    "date": "2021-12-20T23:26:15+01:00"
+  },
+  "message": "Add ChangeToFlag to allow changing the current working directory.",
+  "pr": {
+    "number": 252,
+    "title": "Add ChangeDirFlag to allow changing the current working directory",
+    "body": "It allows one to do have something like `git -C` does.",
+    "url": "https://github.com/alecthomas/kong/pull/252"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 41,
+    "deletions": 0
+  },
+  "files": [
+    {
+      "path": "util.go",
+      "status": "M",
+      "additions": 19,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "util_test.go",
+      "status": "M",
+      "additions": 22,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/util.go b/util.go\nindex 154aebc..aaf7426 100644\n--- a/util.go\n+++ b/util.go\n@@ -2,6 +2,8 @@ package kong\n \n import (\n \t\"fmt\"\n+\t\"os\"\n+\t\"reflect\"\n )\n \n // ConfigFlag uses the configured (via kong.Configuration(loader)) configuration loader to load configuration\n@@ -33,3 +35,20 @@ func (v VersionFlag) BeforeApply(app *Kong, vars Vars) error {\n \tapp.Exit(0)\n \treturn nil\n }\n+\n+// ChangeDirFlag changes the current working directory to a path specified by a flag\n+// early in the parsing process, changing how other flags resolve relative paths.\n+//\n+// Use this flag to provide a \"git -C\" like functionality.\n+type ChangeDirFlag string\n+\n+// Decode is used to create a side effect of changing the current working directory.\n+func (c ChangeDirFlag) Decode(ctx *DecodeContext) error {\n+\tvar path string\n+\terr := ctx.Scan.PopValueInto(\"string\", &path)\n+\tif err != nil {\n+\t\treturn err\n+\t}\n+\tctx.Value.Target.Set(reflect.ValueOf(ChangeDirFlag(path)))\n+\treturn os.Chdir(path)\n+}\ndiff --git a/util_test.go b/util_test.go\nindex 358f43d..b4a1666 100644\n--- a/util_test.go\n+++ b/util_test.go\n@@ -3,6 +3,7 @@ package kong\n import (\n \t\"io/ioutil\"\n \t\"os\"\n+\t\"path/filepath\"\n \t\"strings\"\n \t\"testing\"\n \n@@ -42,3 +43,24 @@ func TestVersionFlag(t *testing.T) {\n \trequire.Equal(t, \"0.1.1\", strings.TrimSpace(w.String()))\n \trequire.Equal(t, 0, called)\n }\n+\n+func TestChangeDirFlag(t *testing.T) {\n+\tcwd, err := os.Getwd()\n+\trequire.NoError(t, err)\n+\tdefer os.Chdir(cwd) // nolint: errcheck\n+\n+\tdir := t.TempDir()\n+\tfile := filepath.Join(dir, \"out.txt\")\n+\terr = os.WriteFile(file, []byte(\"foobar\"), 0o600)\n+\trequire.NoError(t, err)\n+\n+\tvar cli struct {\n+\t\tChangeDir ChangeDirFlag `short:\"C\"`\n+\t\tPath      string        `arg:\"\" type:\"existingfile\"`\n+\t}\n+\n+\tp := Must(&cli)\n+\t_, err = p.Parse([]string{\"-C\", dir, \"out.txt\"})\n+\trequire.NoError(t, err)\n+\trequire.Equal(t, file, cli.Path)\n+}\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/FUNDING.yml",
+    ".github/workflows/ci.yml",
+    ".gitignore",
+    ".golangci.yml",
+    "COPYING",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/README.md",
+    "_examples/server/console.go",
+    "_examples/server/go.mod",
+    "_examples/server/go.sum",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/main.go",
+    "benchmark_test.go",
+    "bin/.go@latest.pkg",
+    "bin/.golangci-lint-1.42.0.pkg",
+    "bin/README.hermit.md",
+    "bin/activate-hermit",
+    "bin/go",
+    "bin/gofmt",
+    "bin/golangci-lint",
+    "bin/hermit",
+    "bin/hermit.hcl",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "config_test.go",
+    "context.go",
+    "defaults.go",
+    "defaults_test.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "go.mod",
+    "go.sum",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "testdata/file.txt",
+    "util.go",
+    "util_test.go",
+    "visit.go"
+  ],
+  "explanation": {
+    "what": "util.go に ChangeDirFlag という string 型のカスタムフラグ型を追加した。この型は Decode(ctx *DecodeContext) を実装し、フラグ値としてパスを受け取ると os.Chdir でカレントディレクトリを変更する副作用を持つ。",
+    "why": "PR本文の説明どおり、`git -C <path>` のように、後続の相対パス解決の基準ディレクトリを一つのフラグで切り替えたいというユースケースに対応するため。kong はフラグの出現順にパース処理していくため、ChangeDirFlag を早い位置の引数として定義すれば、それ以降の existingfile/existingdir 等の相対パス解決に反映される。",
+    "highlights": [
+      { "file": "util.go", "note": "ChangeDirFlag.Decode() が os.Chdir の副作用を持つ点が読みどころ" }
+    ],
+    "langNotes": [
+      { "topic": "Decode(ctx *DecodeContext) error", "note": "kong ではフラグ/引数の型に Decode メソッドを実装すると、その型専用のパース処理として使われる(mapper のインターフェース実装)。ここでは文字列を受け取るだけでなく os.Chdir という副作用を仕込んでいる点が特徴的。" }
+    ],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [
+      { "type": "pr", "number": 252, "url": "https://github.com/alecthomas/kong/pull/252" }
+    ],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

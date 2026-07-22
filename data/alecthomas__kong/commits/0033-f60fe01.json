@@ -1,0 +1,67 @@
+{
+  "seq": 33,
+  "sha": "f60fe01f089b8528c69c61a0fda16de03c3abca4",
+  "parents": [
+    "d20b44baf4d17b74f6ad6612f1e3b52016c27c02"
+  ],
+  "author": {
+    "name": "Alec Thomas",
+    "email": "alec@swapoff.org",
+    "date": "2018-05-26T16:02:09-04:00"
+  },
+  "message": "Move command/flag accumulation into ParseTrace.",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 54,
+    "deletions": 25
+  },
+  "files": [
+    {
+      "path": "context.go",
+      "status": "M",
+      "additions": 54,
+      "deletions": 25,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/context.go b/context.go\nindex 3715c4b..108873a 100644\n--- a/context.go\n+++ b/context.go\n@@ -9,20 +9,22 @@ import (\n // ParseTrace records the nodes and parsed values from the current command-line.\n type ParseTrace struct {\n \t// One of these will be non-nil.\n+\tApp        *Application\n \tPositional *Value\n \tFlag       *Flag\n \tArgument   *Argument\n \tCommand    *Command\n \n+\t// Flags added by this node.\n+\tFlags []*Flag\n+\n \t// Parsed value for non-commands.\n \tValue reflect.Value\n }\n \n type ParseContext struct {\n-\tTrace   []*ParseTrace // A trace through parsed nodes.\n-\tError   error         // Error that occurred during trace, if any.\n-\tFlags   []*Flag       // Accumulated available flags.\n-\tCommand []string      // Full command path.\n+\tTrace []*ParseTrace // A trace through parsed nodes.\n+\tError error         // Error that occurred during trace, if any.\n \n \tnode *Node // Current node being parsed.\n \n@@ -31,17 +33,48 @@ type ParseContext struct {\n \tscan *Scanner\n }\n \n+// Flags returns the accumulated available flags.\n+func (p *ParseContext) Flags() (flags []*Flag) {\n+\tfor _, trace := range p.Trace {\n+\t\tflags = append(flags, trace.Flags...)\n+\t}\n+\treturn\n+}\n+\n+// Command returns the full command path.\n+func (p *ParseContext) Command() (command []string) {\n+\tfor _, trace := range p.Trace {\n+\t\tswitch {\n+\t\tcase trace.Positional != nil:\n+\t\t\tcommand = append(command, \"<\"+trace.Positional.Name+\">\")\n+\t\tcase trace.Argument != nil:\n+\t\t\tcommand = append(command, \"<\"+trace.Argument.Name+\">\")\n+\t\tcase trace.Command != nil:\n+\t\t\tcommand = append(command, trace.Command.Name)\n+\t\t}\n+\t}\n+\treturn\n+}\n+\n // Trace parses the command-line, validating and collecting matching grammar nodes.\n func Trace(args []string, app *Application) (*ParseContext, error) {\n \tp := &ParseContext{\n \t\tapp:  app,\n \t\targs: args,\n \t}\n+\tp.Trace = append(p.Trace, &ParseTrace{\n+\t\tApp:   app,\n+\t\tFlags: append([]*Flag{}, app.Flags...),\n+\t})\n \terr := p.reset(&p.app.Node)\n \tif err != nil {\n \t\treturn nil, err\n \t}\n \tp.Error = p.trace(&p.app.Node)\n+\tif err = checkMissingFlags(p.Flags()); err != nil {\n+\t\treturn nil, err\n+\t}\n+\n \treturn p, nil\n }\n \n@@ -94,7 +127,7 @@ func (p *ParseContext) reset(node *Node) error {\n func (p *ParseContext) trace(node *Node) (err error) { // nolint: gocyclo\n \tpositional := 0\n \tp.node = node\n-\tp.Flags = append(p.Flags, node.Flags...)\n+\tflags := append(p.Flags(), node.Flags...)\n \n \tfor !p.scan.Peek().IsEOL() {\n \t\ttoken := p.scan.Peek()\n@@ -146,14 +179,14 @@ func (p *ParseContext) trace(node *Node) (err error) { // nolint: gocyclo\n \t\t\tp.scan.PushTyped(token.Value[0:1], ShortFlagToken)\n \n \t\tcase FlagToken:\n-\t\t\tif err := p.matchFlags(func(f *Flag) bool {\n+\t\t\tif err := p.matchFlags(flags, func(f *Flag) bool {\n \t\t\t\treturn f.Name == token.Value\n \t\t\t}); err != nil {\n \t\t\t\treturn err\n \t\t\t}\n \n \t\tcase ShortFlagToken:\n-\t\t\tif err := p.matchFlags(func(f *Flag) bool {\n+\t\t\tif err := p.matchFlags(flags, func(f *Flag) bool {\n \t\t\t\treturn string(f.Name) == token.Value\n \t\t\t}); err != nil {\n \t\t\t\treturn err\n@@ -170,8 +203,7 @@ func (p *ParseContext) trace(node *Node) (err error) { // nolint: gocyclo\n \t\t\t\tif err != nil {\n \t\t\t\t\treturn err\n \t\t\t\t}\n-\t\t\t\tp.Command = append(p.Command, \"<\"+arg.Name+\">\")\n-\t\t\t\tp.Trace = append(p.Trace, &ParseTrace{Positional: arg, Value: value})\n+\t\t\t\tp.Trace = append(p.Trace, &ParseTrace{Positional: arg, Value: value, Flags: node.Flags})\n \t\t\t\tpositional++\n \t\t\t\tbreak\n \t\t\t}\n@@ -182,16 +214,21 @@ func (p *ParseContext) trace(node *Node) (err error) { // nolint: gocyclo\n \t\t\t\tcase branch.Command != nil:\n \t\t\t\t\tif branch.Command.Name == token.Value {\n \t\t\t\t\t\tp.scan.Pop()\n-\t\t\t\t\t\tp.Command = append(p.Command, branch.Command.Name)\n-\t\t\t\t\t\tp.Trace = append(p.Trace, &ParseTrace{Command: branch.Command})\n+\t\t\t\t\t\tp.Trace = append(p.Trace, &ParseTrace{\n+\t\t\t\t\t\t\tCommand: branch.Command,\n+\t\t\t\t\t\t\tFlags:   node.Flags,\n+\t\t\t\t\t\t})\n \t\t\t\t\t\treturn p.trace(branch.Command)\n \t\t\t\t\t}\n \n \t\t\t\tcase branch.Argument != nil:\n \t\t\t\t\targ := branch.Argument.Argument\n \t\t\t\t\tif value, err := arg.Parse(p.scan); err == nil {\n-\t\t\t\t\t\tp.Command = append(p.Command, \"<\"+arg.Name+\">\")\n-\t\t\t\t\t\tp.Trace = append(p.Trace, &ParseTrace{Argument: branch.Argument, Value: value})\n+\t\t\t\t\t\tp.Trace = append(p.Trace, &ParseTrace{\n+\t\t\t\t\t\t\tArgument: branch.Argument,\n+\t\t\t\t\t\t\tValue:    value,\n+\t\t\t\t\t\t\tFlags:    node.Flags,\n+\t\t\t\t\t\t})\n \t\t\t\t\t\treturn p.trace(&branch.Argument.Node)\n \t\t\t\t\t}\n \t\t\t\t}\n@@ -211,10 +248,6 @@ func (p *ParseContext) trace(node *Node) (err error) { // nolint: gocyclo\n \t\treturn err\n \t}\n \n-\tif err := checkMissingFlags(node.Children, p.Flags); err != nil {\n-\t\treturn err\n-\t}\n-\n \treturn nil\n }\n \n@@ -238,11 +271,7 @@ func (p *ParseContext) Apply() (string, error) {\n \treturn strings.Join(path, \" \"), nil\n }\n \n-func checkMissingFlags(children []*Branch, flags []*Flag) error {\n-\t// Only check required missing fields at the last child.\n-\tif len(children) > 0 {\n-\t\treturn nil\n-\t}\n+func checkMissingFlags(flags []*Flag) error {\n \tmissing := []string{}\n \tfor _, flag := range flags {\n \t\tif !flag.Required || flag.Set {\n@@ -295,10 +324,10 @@ func checkMissingPositionals(positional int, values []*Value) error {\n \treturn fmt.Errorf(\"missing positional arguments %s\", strings.Join(missing, \" \"))\n }\n \n-func (p *ParseContext) matchFlags(matcher func(f *Flag) bool) (err error) {\n-\ttoken := p.scan.Peek()\n+func (p *ParseContext) matchFlags(flags []*Flag, matcher func(f *Flag) bool) (err error) {\n \tdefer catch(&err)\n-\tfor _, flag := range p.Flags {\n+\ttoken := p.scan.Peek()\n+\tfor _, flag := range flags {\n \t\t// Found a matching flag.\n \t\tif flag.Name == token.Value {\n \t\t\tp.scan.Pop()\n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    "README.md",
+    "_examples/shell/main.go",
+    "build.go",
+    "camelcase.go",
+    "context.go",
+    "context_test.go",
+    "decoders.go",
+    "decoders_test.go",
+    "global.go",
+    "global_test.go",
+    "help.go",
+    "kong.go",
+    "kong_test.go",
+    "model.go",
+    "options.go",
+    "options_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tokentype_string.go"
+  ],
+  "explanation": {
+    "what": "`ParseContext` が直接持っていた `Flags`・`Command` フィールドを削除し、代わりに `ParseTrace`(各パースステップの記録)に `Flags []*Flag` を持たせ、`Flags()`・`Command()` を `p.Trace` を走査して結果を組み立てるメソッドに変えた。`checkMissingFlags` も全体の `p.Flags()` に対して一括で呼ぶよう `Trace()` 関数側に移動している。",
+    "why": "それまではコマンドツリーを降りるたびに `p.Flags`・`p.Command` へ逐次 append していたため、状態がどのノードで追加されたかの対応が失われていた。各 ParseTrace エントリにその時点で見えていたフラグ集合を持たせることで、後からトレース全体を辿って必要な情報(利用可能フラグ・コマンドパス)を再構成できるようにしたと見られる。",
+    "highlights": [
+      { "file": "context.go", "note": "ParseTrace.Flags の追加と、Flags()/Command() がトレースを走査して合成するメソッドに変わった箇所" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

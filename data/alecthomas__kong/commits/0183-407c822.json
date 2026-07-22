@@ -1,0 +1,124 @@
+{
+  "seq": 183,
+  "sha": "407c8229a6c1426ffdbfb8a628b7c41b3eed81be",
+  "parents": [
+    "860aaac388519c587bd8bb92e674d911b545e3df"
+  ],
+  "author": {
+    "name": "Alec Thomas",
+    "email": "alec@swapoff.org",
+    "date": "2020-04-27T09:06:10+10:00"
+  },
+  "message": "Allow \"-\" as a positional or flag argument.\n\nSee #70.\n\nThere are some more elaborate ideas in that issue, but I think this is\nsufficient for now.",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 4,
+    "additions": 39,
+    "deletions": 19
+  },
+  "files": [
+    {
+      "path": "context.go",
+      "status": "M",
+      "additions": 6,
+      "deletions": 7,
+      "binary": false
+    },
+    {
+      "path": "kong_test.go",
+      "status": "M",
+      "additions": 16,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "scanner.go",
+      "status": "M",
+      "additions": 10,
+      "deletions": 7,
+      "binary": false
+    },
+    {
+      "path": "scanner_test.go",
+      "status": "M",
+      "additions": 7,
+      "deletions": 5,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/context.go b/context.go\nindex 374060e..73086c8 100644\n--- a/context.go\n+++ b/context.go\n@@ -279,6 +279,12 @@ func (c *Context) trace(node *Node) (err error) { // nolint: gocyclo\n \t\t\tcase string:\n \n \t\t\t\tswitch {\n+\t\t\t\tcase v == \"-\":\n+\t\t\t\t\tfallthrough\n+\t\t\t\tdefault: // nolint\n+\t\t\t\t\tc.scan.Pop()\n+\t\t\t\t\tc.scan.PushTyped(token.Value, PositionalArgumentToken)\n+\n \t\t\t\t// Indicates end of parsing. All remaining arguments are treated as positional arguments only.\n \t\t\t\tcase v == \"--\":\n \t\t\t\t\tc.scan.Pop()\n@@ -305,9 +311,6 @@ func (c *Context) trace(node *Node) (err error) { // nolint: gocyclo\n \t\t\t\t\t}\n \t\t\t\t\tc.scan.PushTyped(parts[0], FlagToken)\n \n-\t\t\t\tcase v == \"-\":\n-\t\t\t\t\treturn errors.New(\"expected short flag\")\n-\n \t\t\t\t// Short flag.\n \t\t\t\tcase strings.HasPrefix(v, \"-\"):\n \t\t\t\t\tc.scan.Pop()\n@@ -316,10 +319,6 @@ func (c *Context) trace(node *Node) (err error) { // nolint: gocyclo\n \t\t\t\t\t\tc.scan.PushTyped(tail, ShortFlagTailToken)\n \t\t\t\t\t}\n \t\t\t\t\tc.scan.PushTyped(v[1:2], ShortFlagToken)\n-\n-\t\t\t\tdefault:\n-\t\t\t\t\tc.scan.Pop()\n-\t\t\t\t\tc.scan.PushTyped(token.Value, PositionalArgumentToken)\n \t\t\t\t}\n \t\t\tdefault:\n \t\t\t\tc.scan.Pop()\ndiff --git a/kong_test.go b/kong_test.go\nindex 57f15b6..557894d 100644\n--- a/kong_test.go\n+++ b/kong_test.go\n@@ -863,3 +863,19 @@ func TestMultipleDefaultCommands(t *testing.T) {\n \t_, err := p.Parse([]string{})\n \trequire.EqualError(t, err, \"can't have more than one default command under  <command>\")\n }\n+\n+func TestLoneHpyhen(t *testing.T) {\n+\tvar cli struct {\n+\t\tFlag string\n+\t\tArg  string `arg:\"\" optional:\"\"`\n+\t}\n+\tp := mustNew(t, &cli)\n+\n+\t_, err := p.Parse([]string{\"-\"})\n+\trequire.NoError(t, err)\n+\trequire.Equal(t, \"-\", cli.Arg)\n+\n+\t_, err = p.Parse([]string{\"--flag\", \"-\"})\n+\trequire.NoError(t, err)\n+\trequire.Equal(t, \"-\", cli.Flag)\n+}\ndiff --git a/scanner.go b/scanner.go\nindex d913d07..11b78c3 100644\n--- a/scanner.go\n+++ b/scanner.go\n@@ -78,13 +78,16 @@ func (t TokenType) IsAny(types ...TokenType) bool {\n \n // InferredType tries to infer the type of a token.\n func (t Token) InferredType() TokenType {\n-\tif t.Type == UntypedToken {\n-\t\tif v, ok := t.Value.(string); ok {\n-\t\t\tif strings.HasPrefix(v, \"--\") {\n-\t\t\t\treturn FlagToken\n-\t\t\t} else if strings.HasPrefix(v, \"-\") {\n-\t\t\t\treturn ShortFlagToken\n-\t\t\t}\n+\tif t.Type != UntypedToken {\n+\t\treturn t.Type\n+\t}\n+\tif v, ok := t.Value.(string); ok {\n+\t\tif strings.HasPrefix(v, \"--\") { // nolint: gocritic\n+\t\t\treturn FlagToken\n+\t\t} else if v == \"-\" {\n+\t\t\treturn PositionalArgumentToken\n+\t\t} else if strings.HasPrefix(v, \"-\") {\n+\t\t\treturn ShortFlagToken\n \t\t}\n \t}\n \treturn t.Type\ndiff --git a/scanner_test.go b/scanner_test.go\nindex 9324a18..2b7d8d5 100644\n--- a/scanner_test.go\n+++ b/scanner_test.go\n@@ -7,11 +7,13 @@ import (\n )\n \n func TestScannerTake(t *testing.T) {\n-\ts := Scan(\"a\", \"b\", \"c\")\n-\trequire.Equal(t, s.Pop().Value, \"a\")\n-\trequire.Equal(t, s.Pop().Value, \"b\")\n-\trequire.Equal(t, s.Pop().Value, \"c\")\n-\trequire.Equal(t, s.Pop().Type, EOLToken)\n+\ts := Scan(\"a\", \"b\", \"c\", \"-\")\n+\trequire.Equal(t, \"a\", s.Pop().Value)\n+\trequire.Equal(t, \"b\", s.Pop().Value)\n+\trequire.Equal(t, \"c\", s.Pop().Value)\n+\thyphen := s.Pop()\n+\trequire.Equal(t, PositionalArgumentToken, hyphen.InferredType())\n+\trequire.Equal(t, EOLToken, s.Pop().Type)\n }\n \n func TestScannerPeek(t *testing.T) {\n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    ".golangci.yml",
+    "COPYING",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/README.md",
+    "_examples/server/console.go",
+    "_examples/server/go.mod",
+    "_examples/server/go.sum",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/main.go",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "config_test.go",
+    "context.go",
+    "defaults.go",
+    "defaults_test.go",
+    "doc.go",
+    "env.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "go.mod",
+    "go.sum",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "util.go",
+    "util_test.go",
+    "visit.go"
+  ],
+  "explanation": {
+    "what": "単独のハイフン `-` トークンを、従来のように「短いフラグとして期待するがエラー」扱いにするのではなく、位置引数(PositionalArgumentToken)として扱うよう context.go の trace() と scanner.go の Token.InferredType() を変更した。あわせてテストを追加している。",
+    "why": "コミットメッセージが `-` を位置引数・フラグ引数として許可する対応であるとし、関連issue #70 を参照している。`-` は Unix 慣習で「標準入力/標準出力」を指すプレースホルダとしてよく使われ、既存の `existingfile` 型マッパー等と組み合わせて使えるようにする土台と位置づけられる(#70 にはより大掛かりな案もあるが、このコミットではこの範囲に留めるとメッセージに明記)。",
+    "highlights": [
+      { "file": "scanner.go", "note": "Token.InferredType() で v == \"-\" を PositionalArgumentToken 扱いに分岐させたのが要。" },
+      { "file": "context.go", "note": "trace() 内の case v == \"-\": が \"--\" の手前から default(位置引数扱い)に fallthrough するよう移動。" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

@@ -1,0 +1,131 @@
+{
+  "seq": 289,
+  "sha": "ece1f6d8cb8af2c55567ee397138ff60c9241e53",
+  "parents": [
+    "deebf0b09b7bdda61ec299ab90aaaa341436dd4b"
+  ],
+  "author": {
+    "name": "Mitar",
+    "email": "mitar.git@tnode.com",
+    "date": "2021-12-13T00:02:56+01:00"
+  },
+  "message": "Allow more flexible callback return error type.",
+  "pr": {
+    "number": 251,
+    "title": "Allow more flexible callback return error type",
+    "body": "It should not matter what exactly is the return type, only that `return out[0].Interface().(error)` succeeds, no?",
+    "url": "https://github.com/alecthomas/kong/pull/251"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 47,
+    "deletions": 2
+  },
+  "files": [
+    {
+      "path": "callbacks.go",
+      "status": "M",
+      "additions": 2,
+      "deletions": 2,
+      "binary": false
+    },
+    {
+      "path": "options_test.go",
+      "status": "M",
+      "additions": 45,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/callbacks.go b/callbacks.go\nindex f488395..8b78741 100644\n--- a/callbacks.go\n+++ b/callbacks.go\n@@ -79,8 +79,8 @@ func getMethod(value reflect.Value, name string) reflect.Value {\n func callMethod(name string, v, f reflect.Value, bindings bindings) error {\n \tin := []reflect.Value{}\n \tt := f.Type()\n-\tif t.NumOut() != 1 || t.Out(0) != callbackReturnSignature {\n-\t\treturn fmt.Errorf(\"return value of %T.%s() must be exactly \\\"error\\\"\", v.Type(), name)\n+\tif t.NumOut() != 1 || !t.Out(0).Implements(callbackReturnSignature) {\n+\t\treturn fmt.Errorf(\"return value of %T.%s() must implement \\\"error\\\"\", v.Type(), name)\n \t}\n \tfor i := 0; i < t.NumIn(); i++ {\n \t\tpt := t.In(i)\ndiff --git a/options_test.go b/options_test.go\nindex c48949e..4d401d9 100644\n--- a/options_test.go\n+++ b/options_test.go\n@@ -42,6 +42,51 @@ func TestBindTo(t *testing.T) {\n \trequire.Equal(t, \"foo\", saw)\n }\n \n+func TestInvalidCallback(t *testing.T) {\n+\ttype iface interface {\n+\t\tMethod()\n+\t}\n+\n+\tsaw := \"\"\n+\tmethod := func(i iface) string {\n+\t\tsaw = string(i.(impl))\n+\t\treturn saw\n+\t}\n+\n+\tvar cli struct{}\n+\n+\tp, err := New(&cli, BindTo(impl(\"foo\"), (*iface)(nil)))\n+\trequire.NoError(t, err)\n+\terr = callMethod(\"method\", reflect.ValueOf(impl(\"??\")), reflect.ValueOf(method), p.bindings)\n+\trequire.EqualError(t, err, `return value of *reflect.rtype.method() must implement \"error\"`)\n+}\n+\n+type zrror struct{}\n+\n+func (*zrror) Error() string {\n+\treturn \"error\"\n+}\n+\n+func TestCallbackCustomError(t *testing.T) {\n+\ttype iface interface {\n+\t\tMethod()\n+\t}\n+\n+\tsaw := \"\"\n+\tmethod := func(i iface) *zrror {\n+\t\tsaw = string(i.(impl))\n+\t\treturn nil\n+\t}\n+\n+\tvar cli struct{}\n+\n+\tp, err := New(&cli, BindTo(impl(\"foo\"), (*iface)(nil)))\n+\trequire.NoError(t, err)\n+\terr = callMethod(\"method\", reflect.ValueOf(impl(\"??\")), reflect.ValueOf(method), p.bindings)\n+\trequire.NoError(t, err)\n+\trequire.Equal(t, \"foo\", saw)\n+}\n+\n type bindToProviderCLI struct {\n \tCalled bool\n \tCmd    bindToProviderCmd `cmd:\"\"`\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/FUNDING.yml",
+    ".github/workflows/ci.yml",
+    ".gitignore",
+    ".golangci.yml",
+    "COPYING",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/README.md",
+    "_examples/server/console.go",
+    "_examples/server/go.mod",
+    "_examples/server/go.sum",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/main.go",
+    "benchmark_test.go",
+    "bin/.go@latest.pkg",
+    "bin/.golangci-lint-1.42.0.pkg",
+    "bin/README.hermit.md",
+    "bin/activate-hermit",
+    "bin/go",
+    "bin/gofmt",
+    "bin/golangci-lint",
+    "bin/hermit",
+    "bin/hermit.hcl",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "config_test.go",
+    "context.go",
+    "defaults.go",
+    "defaults_test.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "go.mod",
+    "go.sum",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "testdata/file.txt",
+    "util.go",
+    "util_test.go",
+    "visit.go"
+  ],
+  "explanation": {
+    "what": "callbacks.go の callMethod で、フック・Run() などのコールバックメソッドの戻り値型チェックを `t.Out(0) != callbackReturnSignature`(組み込み error 型との完全一致)から `!t.Out(0).Implements(callbackReturnSignature)`(error インターフェースを実装していれば可)に緩めた。エラーメッセージも「exactly \"error\" でなければならない」から「\"error\" を実装していなければならない」に変更している。テストには独自の *zrror 型(Error() string を実装するだけの型)を戻り値に使うコールバックが問題なく呼べることを示す TestCallbackCustomError を追加した。",
+    "why": "PR本文で著者が「戻り値の型が何であれ `return out[0].Interface().(error)` が成功しさえすればよいはずでは」と述べている通り、組み込みの error 型そのものでなくとも error インターフェースを満たすカスタムエラー型であれば十分に安全に扱えるため、不必要に厳しかった型制約を Go の標準的なインターフェース実装チェックへ緩和した。",
+    "highlights": [
+      { "file": "callbacks.go", "note": "`t.Out(0) != callbackReturnSignature` → `!t.Out(0).Implements(callbackReturnSignature)` の1行が核心" },
+      { "file": "options_test.go", "note": "TestCallbackCustomError で独自エラー型 *zrror を戻り値にしたコールバックの成功例を検証" }
+    ],
+    "langNotes": [
+      { "topic": "reflect.Type.Implements", "note": "reflect.Type.Implements(interfaceType) は、ある型が特定のインターフェースを実装しているかを実行時に判定する。組み込み error 型との一致(==)ではなくこれを使うことで、Error() string を実装する任意のカスタム型を許容できるようになる。" }
+    ],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [
+      { "type": "pr", "number": 251, "url": "https://github.com/alecthomas/kong/pull/251" }
+    ],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

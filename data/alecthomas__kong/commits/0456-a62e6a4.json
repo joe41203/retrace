@@ -1,0 +1,149 @@
+{
+  "seq": 456,
+  "sha": "a62e6a47decf894d12067ece1c46a61c5118a6b4",
+  "parents": [
+    "fbb8c9069246d540aafc1914eee2554aee5252a7"
+  ],
+  "author": {
+    "name": "Mitar",
+    "email": "mitar.git@tnode.com",
+    "date": "2025-09-22T02:43:29-07:00"
+  },
+  "message": "feat: Support variable interpolation in vars (#555)",
+  "pr": {
+    "number": 555,
+    "title": "feat: Support variable interpolation in vars",
+    "body": "Fixes #552.\r\n\r\nIt does it only one iteration, but I think this is enough. Maybe in the future (if somebody asks) we could do it in a loop until nothing is interpolated anymore. But I think this is fine for now.",
+    "url": "https://github.com/alecthomas/kong/pull/555"
+  },
+  "linkedIssues": [
+    {
+      "number": 552,
+      "title": "Support variable interpolation in set",
+      "body": "I have example like:\n\n```go\ntype SAMLProvider struct {\n\tMetadataURL string `default:\"${defaultMetadataURL}\" env:\"METADATA_URL\" help:\"${provider}'s metadata URL.\" placeholder:\"URL\" required:\"\"`\n\tEntityID    string `                                env:\"ENTITY_ID\"    help:\"${provider}'s entity ID.\"    required:\"\"`\n}\n\ntype Providers struct {\n\tMockSAML SAMLProvider `embed:\"\" envprefix:\"MOCK_\" prefix:\"mock.\" set:\"provider=MockSAML\" set:\"defaultMetadataURL=${defaultMockSAMLMetadataURL}\"`\n}\n```\n\nBut it does not work because `set` does not interpolate its value. I think this could be a nice feature which would help with reusability.",
+      "url": "https://github.com/alecthomas/kong/issues/552"
+    }
+  ],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 9,
+    "deletions": 2
+  },
+  "files": [
+    {
+      "path": "kong.go",
+      "status": "M",
+      "additions": 5,
+      "deletions": 2,
+      "binary": false
+    },
+    {
+      "path": "kong_test.go",
+      "status": "M",
+      "additions": 4,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/kong.go b/kong.go\nindex 2334a8a..d5cce11 100644\n--- a/kong.go\n+++ b/kong.go\n@@ -249,8 +249,11 @@ func (k *Kong) interpolateValue(value *Value, vars Vars) (err error) {\n \t\tvars = vars.CloneWith(varsContributor.Vars(value))\n \t}\n \n-\tif value.Enum, err = interpolate(value.Enum, vars, nil); err != nil {\n-\t\treturn fmt.Errorf(\"enum for %s: %s\", value.Summary(), err)\n+\tinitialVars := vars.CloneWith(nil)\n+\tfor n, v := range initialVars {\n+\t\tif vars[n], err = interpolate(v, initialVars, nil); err != nil {\n+\t\t\treturn fmt.Errorf(\"variable %s for %s: %s\", n, value.Summary(), err)\n+\t\t}\n \t}\n \n \tif value.Default, err = interpolate(value.Default, vars, nil); err != nil {\ndiff --git a/kong_test.go b/kong_test.go\nindex 834155d..8f4c753 100644\n--- a/kong_test.go\n+++ b/kong_test.go\n@@ -2452,6 +2452,9 @@ func TestIntEnum(t *testing.T) {\n func TestRecursiveVariableExpansion(t *testing.T) {\n \tvar cli struct {\n \t\tConfig string `type:\"path\" default:\"${config_file}\" help:\"Default: ${default}\"`\n+\t\tEmbed  struct {\n+\t\t\tTest string `help:\"Another name: ${anotherName}\"`\n+\t\t} `embed:\"\" set:\"anotherName=${config_file}\"`\n \t}\n \tk := mustNew(t, &cli, kong.Vars{\"config_file\": \"/etc/config\"}, kong.Exit(func(int) {}))\n \tw := &strings.Builder{}\n@@ -2460,6 +2463,7 @@ func TestRecursiveVariableExpansion(t *testing.T) {\n \t_, err := k.Parse([]string{\"--help\"})\n \tassert.NoError(t, err)\n \tassert.Contains(t, w.String(), \"Default: /etc/config\")\n+\tassert.Contains(t, w.String(), \"Another name: /etc/config\")\n }\n \n type afterRunCLI struct {\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/FUNDING.yml",
+    ".github/workflows/ci.yml",
+    ".gitignore",
+    ".golangci.yml",
+    "COPYING",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/README.md",
+    "_examples/server/console.go",
+    "_examples/server/go.mod",
+    "_examples/server/go.sum",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/commandstring/main.go",
+    "_examples/shell/help/README.md",
+    "_examples/shell/help/main.go",
+    "benchmark_test.go",
+    "bin/.go-1.25.1.pkg",
+    "bin/.golangci-lint-1.64.5.pkg",
+    "bin/.lefthook-1.12.4.pkg",
+    "bin/README.hermit.md",
+    "bin/activate-hermit",
+    "bin/go",
+    "bin/gofmt",
+    "bin/golangci-lint",
+    "bin/hermit",
+    "bin/hermit.hcl",
+    "bin/lefthook",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "config_test.go",
+    "context.go",
+    "defaults.go",
+    "defaults_test.go",
+    "doc.go",
+    "error.go",
+    "exit.go",
+    "global.go",
+    "global_test.go",
+    "go.mod",
+    "go.sum",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "helpwrap1.18_test.go",
+    "helpwrap1.19_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "lefthook.yml",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_linux_test.go",
+    "mapper_test.go",
+    "mapper_windows_test.go",
+    "model.go",
+    "model_test.go",
+    "negatable.go",
+    "options.go",
+    "options_test.go",
+    "renovate.json5",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "testdata/file.txt",
+    "util.go",
+    "util_test.go",
+    "visit.go"
+  ],
+  "explanation": {
+    "what": "`Kong.interpolateValue()` に、`vars`(`set:\"...\"` タグ等で定義される変数群)自体を補間してから `Enum`/`Default`/`Help` の展開に使う処理を追加した。従来は `value.Enum` の補間から始まっていたが、その前段で `vars` の各値を1回だけ相互に `interpolate()` するループを挟んでいる。テストには embed した構造体の `set:\"anotherName=${config_file}\"` から `${anotherName}` を展開するケースが追加された。",
+    "why": "リンクされた issue #552 にある通り、`embed:\"\"` フィールドの `set:\"...\"` タグで定義した変数の値の中で `${defaultMetadataURL}` のように他の変数を参照したいという要望が発端。従来は `set` で設定した値がそのまま使われ、変数展開されていなかったため機能しなかった。PR 本文で作者(Mitar)自身が「1回だけの展開に留めている。多段の再帰展開が必要になったらループ化を検討すればよい」と設計判断を明示している。",
+    "highlights": [
+      { "file": "kong.go", "note": "`initialVars` を作って `vars` 自身を1パスだけ再帰的に補間する追加ロジック" },
+      { "file": "kong_test.go", "note": "embed したフィールドの set タグ経由での変数展開を検証する `TestRecursiveVariableExpansion` の追加ケース" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "issue",
+    "refs": [
+      { "type": "pr", "number": 555, "url": "https://github.com/alecthomas/kong/pull/555" },
+      { "type": "issue", "number": 552, "url": "https://github.com/alecthomas/kong/issues/552" }
+    ],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

@@ -1,0 +1,135 @@
+{
+  "seq": 89,
+  "sha": "a13c5a003978f0b03c92783e93397dced02bd950",
+  "parents": [
+    "1f1e9d0f0f86b9d40cccceb925da84f8333e188b"
+  ],
+  "author": {
+    "name": "Alec Thomas",
+    "email": "alec@swapoff.org",
+    "date": "2018-07-04T22:29:47+10:00"
+  },
+  "message": " Add hook callback methods.\n\n`BeforeHook()` and `AfterHook()` may be implemented on CLI nodes to\ntrigger hooks. Use the `Bind()` option to bind potential arguments.",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 7,
+    "additions": 196,
+    "deletions": 185
+  },
+  "files": [
+    {
+      "path": "README.md",
+      "status": "M",
+      "additions": 39,
+      "deletions": 20,
+      "binary": false
+    },
+    {
+      "path": "callbacks.go",
+      "status": "A",
+      "additions": 55,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "context.go",
+      "status": "M",
+      "additions": 5,
+      "deletions": 65,
+      "binary": false
+    },
+    {
+      "path": "kong.go",
+      "status": "M",
+      "additions": 39,
+      "deletions": 32,
+      "binary": false
+    },
+    {
+      "path": "kong_test.go",
+      "status": "M",
+      "additions": 48,
+      "deletions": 27,
+      "binary": false
+    },
+    {
+      "path": "options.go",
+      "status": "M",
+      "additions": 10,
+      "deletions": 14,
+      "binary": false
+    },
+    {
+      "path": "resolver_test.go",
+      "status": "M",
+      "additions": 0,
+      "deletions": 27,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/README.md b/README.md\nindex 4022a27..3f04f22 100644\n--- a/README.md\n+++ b/README.md\n@@ -10,6 +10,7 @@\n 1. [Command handling](#command-handling)\n     1. [Switch on the command string](#switch-on-the-command-string)\n     1. [Attach a `Run(...) error` method to each command](#attach-a-run-error-method-to-each-command)\n+1. [BeforeHook\\(\\), AfterHook\\(\\) and the Bind\\(\\) option](#beforehook-afterhook-and-the-bind-option)\n 1. [Flags](#flags)\n 1. [Commands and sub-commands](#commands-and-sub-commands)\n 1. [Branching positional arguments](#branching-positional-arguments)\n@@ -26,7 +27,7 @@\n     1. [`Resolver(...)` - support for default values from external sources](#resolver---support-for-default-values-from-external-sources)\n     1. [`*Mapper(...)` - customising how the command-line is mapped to Go values](#mapper---customising-how-the-command-line-is-mapped-to-go-values)\n     1. [`ConfigureHelp(HelpOptions)` and `Help(HelpFunc)` - customising help](#configurehelphelpoptions-and-helphelpfunc---customising-help)\n-    1. [`Hook(&field, HookFunc)` - callback hooks to execute when the command-line is parsed](#hookfield-hookfunc---callback-hooks-to-execute-when-the-command-line-is-parsed)\n+    1. [`Bindings(...)` - bind values for callback hooks anr Run\\(\\) methods](#bindings---bind-values-for-callback-hooks-anr-run-methods)\n     1. [Other options](#other-options)\n \n <!-- /MarkdownTOC -->\n@@ -165,6 +166,8 @@ A more robust approach is to break each command out into their own structs:\n 3. Call `kong.Kong.Parse()` to obtain a `kong.Context`.\n 4. Call `kong.Context.Run(params...)` to call the selected parsed command.\n \n+Note that `Run()` method arguments may also be provided by the `Bind(...)` option (see below).\n+\n There's a full example emulating part of the Docker CLI [here](https://github.com/alecthomas/kong/tree/master/_examples/docker).\n \n eg.\n@@ -207,6 +210,40 @@ func main() {\n \n ```\n \n+## BeforeHook(), AfterHook() and the Bind() option\n+\n+If a node in the grammar has a `BeforeHook(...) error` and/or `AfterHook(...) error` method, those methods will\n+be called before validation/assignment and after validation/assignment, respectively.\n+\n+The `--help` flag is implemented with a `BeforeHook`.\n+\n+Arguments to hooks are provided via the `Bind(...)` option. `*Kong`, `*Context` and `*Path` are also bound.\n+\n+eg.\n+\n+```go\n+// A flag with a hook that, if triggered, will set the debug loggers output to stdout.\n+var debugFlag bool\n+\n+func (d debugFlag) BeforeHook(logger *log.Logger) error {\n+  logger.SetOutput(os.Stdout)\n+  return nil\n+}\n+\n+var cli struct {\n+  Debug debugFlag `help:\"Enable debug logging.\"`\n+}\n+\n+func main() {\n+  // Debug logger going to discard.\n+  logger := log.New(ioutil.Discard, \"\", log.LstdFlags)\n+\n+  ctx := kong.Parse(&cli, kong.Bind(logger))\n+\n+  // ...\n+}\n+```\n+\n ## Flags\n \n Any [mapped](#mapper---customising-how-the-command-line-is-mapped-to-go-values) field in the command structure *not* tagged with `cmd` or `arg` will be a flag. Flags are optional by default.\n@@ -450,26 +487,8 @@ The default help output is usually sufficient, but if not there are two solution\n 1. Use `ConfigureHelp(HelpOptions)` to configure how help is formatted (see [HelpOptions](https://godoc.org/github.com/alecthomas/kong#HelpOptions) for details).\n 2. Custom help can be wired into Kong via the `Help(HelpFunc)` option. The `HelpFunc` is passed a `Context`, which contains the parsed context for the current command-line. See the implementation of `PrintHelp` for an example.\n \n-### `Hook(&field, HookFunc)` - callback hooks to execute when the command-line is parsed\n-\n-Hooks are callback functions that are bound to a node in the command-line and executed at parse time, before structural validation and assignment.\n-\n-eg.\n-\n-```go\n-app := kong.Must(&CLI, kong.Hook(&CLI.Debug, func(ctx *Context, path *Path) error {\n-  log.SetLevel(DEBUG)\n-  return nil\n-}))\n-```\n-\n-Note: it is generally less verbose to use an imperative approach to building command-lines, eg.\n+### `Bindings(...)` - bind values for callback hooks anr Run() methods\n \n-```go\n-if CLI.Debug {\n-  log.SetLevel(DEBUG)\n-}\n-```\n \n But under some circumstances, hooks can be useful.\n \ndiff --git a/callbacks.go b/callbacks.go\nnew file mode 100644\nindex 0000000..351ee48\n--- /dev/null\n+++ b/callbacks.go\n@@ -0,0 +1,55 @@\n+package kong\n+\n+import (\n+\t\"fmt\"\n+\t\"reflect\"\n+)\n+\n+type bindings map[reflect.Type]reflect.Value\n+\n+func (b bindings) add(values ...interface{}) bindings {\n+\tfor _, v := range values {\n+\t\tb[reflect.TypeOf(v)] = reflect.ValueOf(v)\n+\t}\n+\treturn b\n+}\n+\n+// Clone and add values.\n+func (b bindings) clone() bindings {\n+\tout := make(bindings, len(b))\n+\tfor k, v := range b {\n+\t\tout[k] = v\n+\t}\n+\treturn out\n+}\n+\n+func getMethod(value reflect.Value, name string) reflect.Value {\n+\tmethod := value.MethodByName(name)\n+\tif !method.IsValid() {\n+\t\tif value.CanAddr() {\n+\t\t\tmethod = value.Addr().MethodByName(name)\n+\t\t}\n+\t}\n+\treturn method\n+}\n+\n+func callMethod(name string, v, f reflect.Value, bindings bindings) error {\n+\tin := []reflect.Value{}\n+\tt := f.Type()\n+\tif t.NumOut() != 1 || t.Out(0) != callbackReturnSignature {\n+\t\treturn fmt.Errorf(\"return value of %T.%s() must be exactly \\\"error\\\"\", v.Type(), name)\n+\t}\n+\tfor i := 0; i < t.NumIn(); i++ {\n+\t\tpt := t.In(i)\n+\t\tif arg, ok := bindings[pt]; ok {\n+\t\t\tin = append(in, arg)\n+\t\t} else {\n+\t\t\treturn fmt.Errorf(\"couldn't find binding of type %s for parameter %d of %T.%s(), use kong.Bind(%s)\", pt, i, v.Type(), name, pt)\n+\t\t}\n+\t}\n+\tout := f.Call(in)\n+\tif out[0].IsNil() {\n+\t\treturn nil\n+\t}\n+\treturn out[0].Interface().(error)\n+}\ndiff --git a/context.go b/context.go\nindex 8d60d98..76e2c64 100644\n--- a/context.go\n+++ b/context.go\n@@ -475,41 +475,20 @@ func (c *Context) parseFlag(flags []*Flag, match string) (err error) {\n // The target Run() method must exist and have the type signature \"Run(params...) error\".\n func (c *Context) Run(params ...interface{}) (err error) {\n \tdefer catch(&err)\n-\texpectedRunSignature, err := c.validateRun(c.Model.Node, nil)\n-\tif err != nil {\n-\t\treturn err\n-\t}\n-\tif expectedRunSignature.NumIn() != len(params) {\n-\t\treturn fmt.Errorf(\"expected %d params but received %d; does not match target Run() signature of %s\",\n-\t\t\texpectedRunSignature.NumIn(), len(params), expectedRunSignature)\n-\t}\n-\tfor i, param := range params {\n-\t\tif reflect.TypeOf(param) != expectedRunSignature.In(i) {\n-\t\t\treturn fmt.Errorf(\"param %d is of type %s but should be of type %s to match target Run() signature of %s\",\n-\t\t\t\ti, reflect.TypeOf(param), expectedRunSignature.In(i), expectedRunSignature)\n-\t\t}\n-\t}\n \tnode := c.Selected()\n \tif node == nil {\n \t\treturn fmt.Errorf(\"no command selected\")\n \t}\n-\tmethod, err := getRunMethod(node.Target)\n-\tif err != nil {\n-\t\treturn err\n+\tmethod := getMethod(node.Target, \"Run\")\n+\tif !method.IsValid() {\n+\t\treturn fmt.Errorf(\"no Run() method on %s\", node.Target)\n \t}\n \t_, err = c.Apply()\n \tif err != nil {\n \t\treturn err\n \t}\n-\treflectedParams := []reflect.Value{}\n-\tfor _, param := range params {\n-\t\treflectedParams = append(reflectedParams, reflect.ValueOf(param))\n-\t}\n-\tresult := method.Call(reflectedParams)\n-\tif result[0].IsNil() {\n-\t\treturn nil\n-\t}\n-\treturn result[0].Interface().(error)\n+\tbinds := c.Kong.bindings.clone().add(params...).add(c)\n+\treturn callMethod(\"Run\", node.Target, method, binds)\n }\n \n // PrintUsage to Kong's stdout.\n@@ -522,45 +501,6 @@ func (c *Context) PrintUsage(summary bool) error {\n \treturn nil\n }\n \n-// Validate that all commands have Run() methods and that their signatures are the same.\n-func (c *Context) validateRun(node *Node, signature reflect.Type) (reflect.Type, error) {\n-\tif node.Leaf() {\n-\t\tmethod, err := getRunMethod(node.Target)\n-\t\tif err != nil {\n-\t\t\treturn nil, err\n-\t\t}\n-\t\tif signature == nil {\n-\t\t\tsignature = method.Type()\n-\t\t} else if signature != method.Type() {\n-\t\t\treturn nil, fmt.Errorf(\"Run() methods are not consistent on %s, expected %s but got %s\", node.Target.Type(), signature, method.Type())\n-\t\t}\n-\t\tif signature.NumOut() != 1 || signature.Out(0) != expectedRunReturnSignature {\n-\t\t\treturn nil, fmt.Errorf(\"Run() method on %s should return (error)\", node.Target.Type())\n-\t\t}\n-\t}\n-\tfor _, child := range node.Children {\n-\t\tif childSignature, err := c.validateRun(child, signature); err != nil {\n-\t\t\treturn nil, err\n-\t\t} else if signature == nil {\n-\t\t\tsignature = childSignature\n-\t\t}\n-\t}\n-\treturn signature, nil\n-}\n-\n-func getRunMethod(value reflect.Value) (reflect.Value, error) {\n-\tmethod := value.MethodByName(\"Run\")\n-\tif !method.IsValid() {\n-\t\tif value.CanAddr() {\n-\t\t\tmethod = value.Addr().MethodByName(\"Run\")\n-\t\t}\n-\t\tif !method.IsValid() {\n-\t\t\treturn method, fmt.Errorf(\"no Run() method on %s\", value.Type())\n-\t\t}\n-\t}\n-\treturn method, nil\n-}\n-\n func checkMissingFlags(flags []*Flag) error {\n \tmissing := []string{}\n \tfor _, flag := range flags {\ndiff --git a/kong.go b/kong.go\nindex 8ff4bcb..8e3fdce 100644\n--- a/kong.go\n+++ b/kong.go\n@@ -10,7 +10,7 @@ import (\n )\n \n var (\n-\texpectedRunReturnSignature = reflect.TypeOf((*error)(nil)).Elem()\n+\tcallbackReturnSignature = reflect.TypeOf((*error)(nil)).Elem()\n )\n \n // Error reported by Kong.\n@@ -42,7 +42,7 @@ type Kong struct {\n \tStdout io.Writer\n \tStderr io.Writer\n \n-\tbefore    map[reflect.Value]HookFunc\n+\tbindings  bindings\n \tresolvers []ResolverFunc\n \tregistry  *Registry\n \n@@ -65,12 +65,14 @@ func New(grammar interface{}, options ...Option) (*Kong, error) {\n \t\tExit:      os.Exit,\n \t\tStdout:    os.Stdout,\n \t\tStderr:    os.Stderr,\n-\t\tbefore:    map[reflect.Value]HookFunc{},\n \t\tregistry:  NewRegistry().RegisterDefaults(),\n \t\tresolvers: []ResolverFunc{Envars()},\n \t\tvars:      map[string]string{},\n+\t\tbindings:  bindings{},\n \t}\n \n+\toptions = append(options, Bind(k))\n+\n \tfor _, option := range options {\n \t\tif err := option.Apply(k); err != nil {\n \t\t\treturn nil, err\n@@ -155,13 +157,26 @@ func mergeVars(base, extra map[string]string) map[string]string {\n \treturn out\n }\n \n+type helpValue bool\n+\n+func (h helpValue) BeforeHook(ctx *Context) error {\n+\toptions := ctx.Kong.helpOptions\n+\toptions.Summary = false\n+\terr := ctx.Kong.help(options, ctx)\n+\tif err != nil {\n+\t\treturn err\n+\t}\n+\tctx.Kong.Exit(1)\n+\treturn nil\n+}\n+\n // Provide additional builtin flags, if any.\n func (k *Kong) extraFlags() []*Flag {\n \tif k.noDefaultHelp {\n \t\treturn nil\n \t}\n-\thelpValue := false\n-\tvalue := reflect.ValueOf(&helpValue).Elem()\n+\tvar helpTarget helpValue\n+\tvalue := reflect.ValueOf(&helpTarget).Elem()\n \thelpFlag := &Flag{\n \t\tValue: &Value{\n \t\t\tName:   \"help\",\n@@ -172,18 +187,7 @@ func (k *Kong) extraFlags() []*Flag {\n \t\t},\n \t}\n \thelpFlag.Flag = helpFlag\n-\thook := Hook(&helpValue, func(ctx *Context, path *Path) error {\n-\t\toptions := k.helpOptions\n-\t\toptions.Summary = false\n-\t\terr := k.help(options, ctx)\n-\t\tif err != nil {\n-\t\t\treturn err\n-\t\t}\n-\t\tk.Exit(1)\n-\t\treturn nil\n-\t})\n \tk.helpFlag = helpFlag\n-\t_ = hook(k)\n \treturn []*Flag{helpFlag}\n }\n \n@@ -200,45 +204,48 @@ func (k *Kong) Parse(args []string) (ctx *Context, err error) {\n \tif err != nil {\n \t\treturn nil, err\n \t}\n-\tif err = k.applyHooks(ctx); err != nil {\n-\t\treturn nil, &ParseError{error: err, Context: ctx}\n-\t}\n \tif ctx.Error != nil {\n \t\treturn nil, &ParseError{error: ctx.Error, Context: ctx}\n \t}\n+\tif err = k.applyHook(ctx, \"BeforeHook\"); err != nil {\n+\t\treturn nil, &ParseError{error: err, Context: ctx}\n+\t}\n \tif err = ctx.Validate(); err != nil {\n \t\treturn nil, &ParseError{error: err, Context: ctx}\n \t}\n \tif _, err = ctx.Apply(); err != nil {\n \t\treturn nil, &ParseError{error: err, Context: ctx}\n \t}\n+\tif err = k.applyHook(ctx, \"AfterHook\"); err != nil {\n+\t\treturn nil, &ParseError{error: err, Context: ctx}\n+\t}\n \treturn ctx, nil\n }\n \n-func (k *Kong) applyHooks(ctx *Context) error {\n+func (k *Kong) applyHook(ctx *Context, name string) error {\n \tfor _, trace := range ctx.Path {\n-\t\tvar key reflect.Value\n+\t\tvar value reflect.Value\n \t\tswitch {\n \t\tcase trace.App != nil:\n-\t\t\tkey = trace.App.Target\n+\t\t\tvalue = trace.App.Target\n \t\tcase trace.Argument != nil:\n-\t\t\tkey = trace.Argument.Target\n+\t\t\tvalue = trace.Argument.Target\n \t\tcase trace.Command != nil:\n-\t\t\tkey = trace.Command.Target\n+\t\t\tvalue = trace.Command.Target\n \t\tcase trace.Positional != nil:\n-\t\t\tkey = trace.Positional.Target\n+\t\t\tvalue = trace.Positional.Target\n \t\tcase trace.Flag != nil:\n-\t\t\tkey = trace.Flag.Value.Target\n+\t\t\tvalue = trace.Flag.Value.Target\n \t\tdefault:\n \t\t\tpanic(\"unsupported Path\")\n \t\t}\n-\t\tif key.IsValid() {\n-\t\t\tkey = key.Addr()\n+\t\tmethod := getMethod(value, name)\n+\t\tif !method.IsValid() {\n+\t\t\tcontinue\n \t\t}\n-\t\tif hook := k.before[key]; hook != nil {\n-\t\t\tif err := hook(ctx, trace); err != nil {\n-\t\t\t\treturn err\n-\t\t\t}\n+\t\tbinds := k.bindings.clone().add(ctx, trace)\n+\t\tif err := callMethod(name, value, method, binds); err != nil {\n+\t\t\treturn err\n \t\t}\n \t}\n \treturn nil\ndiff --git a/kong_test.go b/kong_test.go\nindex 2f11c40..f67892b 100644\n--- a/kong_test.go\n+++ b/kong_test.go\n@@ -355,43 +355,64 @@ func TestTraceErrorPartiallySucceeds(t *testing.T) {\n \trequire.Equal(t, \"one\", ctx.Command())\n }\n \n+type hookContext struct {\n+\tcmd    bool\n+\tvalues []string\n+}\n+\n+type hookValue string\n+\n+func (h *hookValue) BeforeHook(ctx *hookContext) error {\n+\tctx.values = append(ctx.values, \"before:\"+string(*h))\n+\treturn nil\n+}\n+\n+func (h *hookValue) AfterHook(ctx *hookContext) error {\n+\tctx.values = append(ctx.values, \"after:\"+string(*h))\n+\treturn nil\n+}\n+\n+type hookCmd struct {\n+\tTwo   hookValue `kong:\"arg,optional\"`\n+\tThree hookValue\n+}\n+\n+func (h *hookCmd) BeforeHook(ctx *hookContext) error {\n+\tctx.cmd = true\n+\treturn nil\n+}\n+\n+func (h *hookCmd) AfterHook(ctx *hookContext) error {\n+\tctx.cmd = true\n+\treturn nil\n+}\n+\n func TestHooks(t *testing.T) {\n-\tvar cli struct {\n-\t\tOne struct {\n-\t\t\tTwo   string `kong:\"arg,optional\"`\n-\t\t\tThree string\n-\t\t} `kong:\"cmd\"`\n-\t}\n-\ttype values struct {\n-\t\tone   bool\n-\t\ttwo   string\n-\t\tthree string\n-\t}\n-\thooked := values{}\n \tvar tests = []struct {\n \t\tname   string\n \t\tinput  string\n-\t\tvalues values\n+\t\tvalues hookContext\n \t}{\n-\t\t{\"Command\", \"one\", values{true, \"\", \"\"}},\n-\t\t{\"Arg\", \"one two\", values{true, \"two\", \"\"}},\n-\t\t{\"Flag\", \"one --three=three\", values{true, \"\", \"three\"}},\n-\t\t{\"ArgAndFlag\", \"one two --three=three\", values{true, \"two\", \"three\"}},\n-\t}\n-\tsetOne := func(ctx *kong.Context, path *kong.Path) error { hooked.one = true; return nil }\n-\tsetTwo := func(ctx *kong.Context, path *kong.Path) error { hooked.two = ctx.Value(path).String(); return nil }\n-\tsetThree := func(ctx *kong.Context, path *kong.Path) error { hooked.three = ctx.Value(path).String(); return nil }\n-\tp := mustNew(t, &cli,\n-\t\tkong.Hook(&cli.One, setOne),\n-\t\tkong.Hook(&cli.One.Two, setTwo),\n-\t\tkong.Hook(&cli.One.Three, setThree))\n+\t\t{\"Command\", \"one\", hookContext{true, nil}},\n+\t\t{\"Arg\", \"one two\", hookContext{true, []string{\"before:\", \"after:two\"}}},\n+\t\t{\"Flag\", \"one --three=THREE\", hookContext{true, []string{\"before:\", \"after:THREE\"}}},\n+\t\t{\"ArgAndFlag\", \"one two --three=THREE\", hookContext{true, []string{\"before:\", \"before:\", \"after:two\", \"after:THREE\"}}},\n+\t}\n+\n+\tvar cli struct {\n+\t\tOne hookCmd `cmd:\"\"`\n+\t}\n+\n+\tctx := &hookContext{}\n+\tp := mustNew(t, &cli, kong.Bind(ctx))\n \n \tfor _, test := range tests {\n-\t\thooked = values{}\n+\t\t*ctx = hookContext{}\n+\t\tcli.One = hookCmd{}\n \t\tt.Run(test.name, func(t *testing.T) {\n \t\t\t_, err := p.Parse(strings.Split(test.input, \" \"))\n \t\t\trequire.NoError(t, err)\n-\t\t\trequire.Equal(t, test.values, hooked)\n+\t\t\trequire.Equal(t, &test.values, ctx)\n \t\t})\n \t}\n }\ndiff --git a/options.go b/options.go\nindex 0db6d23..1420f7e 100644\n--- a/options.go\n+++ b/options.go\n@@ -109,24 +109,20 @@ func Writers(stdout, stderr io.Writer) OptionFunc {\n \t}\n }\n \n-// HookFunc is a callback tied to a field of the grammar, called before a value is applied.\n+// Bind binds values for hooks and Run() function arguments.\n //\n-// \"ctx\" is the current parse Context, \"path\" is the Path entry corresponding to the hooked value.\n-type HookFunc func(ctx *Context, path *Path) error\n-\n-// Hook to apply before a command, flag or positional argument is encountered.\n+// Any arguments passed will be available to the receiving hook functions, but may be omitted. Additionally, *Kong and\n+// the current *Context will also be made available.\n //\n-// \"ptr\" is a pointer to a field of the grammar.\n+// There are two hook points:\n //\n-// Note that the hook will be called once for each time the corresponding node is encountered. This means that if a flag\n-// is passed twice, its hook will be called twice.\n-func Hook(ptr interface{}, hook HookFunc) OptionFunc {\n-\tkey := reflect.ValueOf(ptr)\n-\tif key.Kind() != reflect.Ptr {\n-\t\tpanic(\"expected a pointer\")\n-\t}\n+// \t\tBeforeHook(...) error\n+//   \tAfterHook(...) error\n+//\n+// Called before validation/assignment, and immediately after validation/assignment, respectively.\n+func Bind(args ...interface{}) OptionFunc {\n \treturn func(k *Kong) error {\n-\t\tk.before[key] = hook\n+\t\tk.bindings.add(args...)\n \t\treturn nil\n \t}\n }\ndiff --git a/resolver_test.go b/resolver_test.go\nindex 7e16a8d..1caa942 100644\n--- a/resolver_test.go\n+++ b/resolver_test.go\n@@ -125,33 +125,6 @@ func TestJSONBasic(t *testing.T) {\n \trequire.True(t, cli.Bool)\n }\n \n-func TestResolvedValueTriggersHooks(t *testing.T) {\n-\tvar cli struct {\n-\t\tInt int\n-\t}\n-\tresolver := func(context *kong.Context, parent *kong.Path, flag *kong.Flag) (string, error) {\n-\t\tif flag.Name == \"int\" {\n-\t\t\treturn \"1\", nil\n-\t\t}\n-\t\treturn \"\", nil\n-\t}\n-\thooked := 0\n-\tp := mustNew(t, &cli, kong.Resolver(resolver), kong.Hook(&cli.Int, func(ctx *kong.Context, path *kong.Path) error {\n-\t\thooked++\n-\t\treturn nil\n-\t}))\n-\t_, err := p.Parse(nil)\n-\trequire.NoError(t, err)\n-\trequire.Equal(t, 1, cli.Int)\n-\trequire.Equal(t, 1, hooked)\n-\n-\thooked = 0\n-\t_, err = p.Parse([]string{\"--int=2\"})\n-\trequire.NoError(t, err)\n-\trequire.Equal(t, 2, cli.Int)\n-\trequire.Equal(t, 1, hooked)\n-}\n-\n type testUppercaseMapper struct{}\n \n func (testUppercaseMapper) Decode(ctx *kong.DecodeContext, target reflect.Value) error {\n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    ".golangci.yml",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/console.go",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/main.go",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "context.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "tokentype_string.go"
+  ],
+  "explanation": {
+    "what": "旧来の Hook(&field, HookFunc) オプション(グローバルなフィールドポインタとコールバック関数のマップ)を廃止し、grammar 側のノードに BeforeHook(...) error / AfterHook(...) error というメソッドを定義しておくと Kong がパース時に自動で呼び出す方式に置き換えた。呼び出し引数は新設の Bind(...) オプションで登録した任意の値(および *Kong, *Context, *Path)から reflect でシグネチャに合わせて解決される(callbacks.go の bindings / callMethod)。同時に Context.Run() のシグネチャ検証もこの callMethod ベースの仕組みに統合された。",
+    "why": "コミットメッセージにある通り、BeforeHook()/AfterHook() を CLI ノードに実装させ、Bind() で引数候補を登録する方式への転換。これにより、外部からフィールドポインタを渡して関数を紐付ける旧方式より、コマンド構造体自身にメソッドとしてフックを書けるほうが自然でテストしやすいと判断したとおもわれる。ヘルプフラグの実装(--help)も BeforeHook を使うよう書き換えられている。",
+    "highlights": [
+      { "file": "callbacks.go", "note": "bindings(型→値のマップ)と、reflect でメソッドのシグネチャに合わせて引数を解決する callMethod が新設された" },
+      { "file": "kong.go", "note": "applyHooks が applyHook(ctx, \"BeforeHook\"/\"AfterHook\") に置き換わり、helpValue.BeforeHook としてヘルプ表示が実装された" },
+      { "file": "options.go", "note": "Hook(ptr, HookFunc) オプションが廃止され、Bind(args...) がその役割を引き継いだ" }
+    ],
+    "langNotes": [
+      { "topic": "hook callback メソッド(BeforeHook/AfterHook)", "note": "grammar の struct やそのフィールドの型に BeforeHook(...) error / AfterHook(...) error というメソッドを定義しておくと、Kong がパース時にリフレクションでメソッドを探して自動的に呼び出す。引数は Bind() で登録した値の中から型が一致するものを reflect で解決する、いわゆる簡易的な依存性注入(DI)になっている。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

@@ -1,0 +1,125 @@
+{
+  "seq": 167,
+  "sha": "60222fe39710e4b385045a12622180d0d15fbc95",
+  "parents": [
+    "aeb6620dbeae0e376e716aa9d94b2a7985d10530"
+  ],
+  "author": {
+    "name": "Alec Thomas",
+    "email": "alec@swapoff.org",
+    "date": "2020-01-24T20:02:10+11:00"
+  },
+  "message": "Add README + go modules to server example.",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 4,
+    "additions": 93,
+    "deletions": 1
+  },
+  "files": [
+    {
+      "path": "_examples/server/README.md",
+      "status": "A",
+      "additions": 42,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "_examples/server/go.mod",
+      "status": "A",
+      "additions": 15,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "_examples/server/go.sum",
+      "status": "A",
+      "additions": 34,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "_examples/server/main.go",
+      "status": "M",
+      "additions": 2,
+      "deletions": 1,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/_examples/server/README.md b/_examples/server/README.md\nnew file mode 100644\nindex 0000000..8e858bf\n--- /dev/null\n+++ b/_examples/server/README.md\n@@ -0,0 +1,42 @@\n+# An interactive SSH server\n+\n+In addition to command-lines, Kong can be used interactively. This example \n+serves a Kong command-line over SSH.\n+\n+Run with `go run .` then ssh to it like so:\n+\n+```\n+$ ssh -p 6740 127.0.0.1\n+Welcome!\n+> ?\n+\n+Example using Kong for interactive command parsing.\n+\n+Commands:\n+  help [<command> ...]\n+    Show help.\n+\n+  status\n+    Show server status.\n+\n+> status\n+OK\n+> help status\n+\n+Show server status.\n+\n+Flags:\n+  -v, --verbose    Show verbose status information.\n+\n+> status \n+OK\n+> status -v\n+OK\n+> status foo\n+error: unexpected argument foo\n+\n+Show server status.\n+\n+Flags:\n+> ^D\n+```\ndiff --git a/_examples/server/go.mod b/_examples/server/go.mod\nnew file mode 100644\nindex 0000000..11f75cc\n--- /dev/null\n+++ b/_examples/server/go.mod\n@@ -0,0 +1,15 @@\n+module kong_server\n+\n+go 1.13\n+\n+require (\n+\tgithub.com/alecthomas/colour v0.1.0\n+\tgithub.com/alecthomas/kong v0.2.1\n+\tgithub.com/anmitsu/go-shlex v0.0.0-20161002113705-648efa622239 // indirect\n+\tgithub.com/chzyer/readline v0.0.0-20180603132655-2972be24d48e\n+\tgithub.com/gliderlabs/ssh v0.2.2\n+\tgithub.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510\n+\tgithub.com/kr/pty v1.1.8\n+\tgithub.com/mattn/go-isatty v0.0.12 // indirect\n+\tgolang.org/x/crypto v0.0.0-20200117160349-530e935923ad\n+)\ndiff --git a/_examples/server/go.sum b/_examples/server/go.sum\nnew file mode 100644\nindex 0000000..8a2b140\n--- /dev/null\n+++ b/_examples/server/go.sum\n@@ -0,0 +1,34 @@\n+github.com/alecthomas/colour v0.1.0 h1:nOE9rJm6dsZ66RGWYSFrXw461ZIt9A6+nHgL7FRrDUk=\n+github.com/alecthomas/colour v0.1.0/go.mod h1:QO9JBoKquHd+jz9nshCh40fOfO+JzsoXy8qTHF68zU0=\n+github.com/alecthomas/kong v0.2.1 h1:V1tLBhyQBC4rsbXbcOvm3GBaytJSwRNX69fp1WJxbqQ=\n+github.com/alecthomas/kong v0.2.1/go.mod h1:+inYUSluD+p4L8KdviBSgzcqEjUQOfC5fQDRFuc36lI=\n+github.com/anmitsu/go-shlex v0.0.0-20161002113705-648efa622239 h1:kFOfPq6dUM1hTo4JG6LR5AXSUEsOjtdm0kw0FtQtMJA=\n+github.com/anmitsu/go-shlex v0.0.0-20161002113705-648efa622239/go.mod h1:2FmKhYUyUczH0OGQWaF5ceTx0UBShxjsH6f8oGKYe2c=\n+github.com/chzyer/readline v0.0.0-20180603132655-2972be24d48e h1:fY5BOSpyZCqRo5OhCuC+XN+r/bBCmeuuJtjz+bCNIf8=\n+github.com/chzyer/readline v0.0.0-20180603132655-2972be24d48e/go.mod h1:nSuG5e5PlCu98SY8svDHJxuZscDgtXS6KTTbou5AhLI=\n+github.com/creack/pty v1.1.7 h1:6pwm8kMQKCmgUg0ZHTm5+/YvRK0s3THD/28+T6/kk4A=\n+github.com/creack/pty v1.1.7/go.mod h1:lj5s0c3V2DBrqTV7llrYr5NG6My20zk30Fl46Y7DoTY=\n+github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=\n+github.com/gliderlabs/ssh v0.2.2 h1:6zsha5zo/TWhRhwqCD3+EarCAgZ2yN28ipRnGPnwkI0=\n+github.com/gliderlabs/ssh v0.2.2/go.mod h1:U7qILu1NlMHj9FlMhZLlkCdDnU1DBEAqr0aevW3Awn0=\n+github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510 h1:El6M4kTTCOh6aBiKaUGG7oYTSPP8MxqL4YI3kZKwcP4=\n+github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510/go.mod h1:pupxD2MaaD3pAXIBCelhxNneeOaAeabZDe5s4K6zSpQ=\n+github.com/kr/pty v1.1.8 h1:AkaSdXYQOWeaO3neb8EM634ahkXXe3jYbVh/F9lq+GI=\n+github.com/kr/pty v1.1.8/go.mod h1:O1sed60cT9XZ5uDucP5qwvh+TE3NnUj51EiZO/lmSfw=\n+github.com/mattn/go-isatty v0.0.12 h1:wuysRhFDzyxgEmMf5xjvJ2M9dZoWAXNNr5LSBS7uHXY=\n+github.com/mattn/go-isatty v0.0.12/go.mod h1:cbi8OIDigv2wuxKPP5vlRcQ1OAZbq2CE4Kysco4FUpU=\n+github.com/mitchellh/mapstructure v1.1.2/go.mod h1:FVVH3fgwuzCH5S8UJGiWEs2h04kUh9fWfEaFds41c1Y=\n+github.com/pkg/errors v0.8.1 h1:iURUrRGxPUNPdy5/HRSm+Yj6okJ6UtLINN0Q9M4+h3I=\n+github.com/pkg/errors v0.8.1/go.mod h1:bwawxfHBFNV+L2hUp1rHADufV3IMtnDRdf1r5NINEl0=\n+github.com/pmezard/go-difflib v1.0.0/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=\n+github.com/stretchr/testify v1.2.2/go.mod h1:a8OnRcib4nhh0OaRAV+Yts87kKdq0PP7pXfy6kDkUVs=\n+golang.org/x/crypto v0.0.0-20190308221718-c2843e01d9a2/go.mod h1:djNgcEr1/C05ACkg1iLfiJU5Ep61QUkGW8qpdssI0+w=\n+golang.org/x/crypto v0.0.0-20200117160349-530e935923ad h1:Jh8cai0fqIK+f6nG0UgPW5wFk8wmiMhM3AyciDBdtQg=\n+golang.org/x/crypto v0.0.0-20200117160349-530e935923ad/go.mod h1:LzIPMQfyMNhhGPhUkYOs5KpL4U8rLKemX1yGLhDgUto=\n+golang.org/x/net v0.0.0-20190404232315-eb5bcb51f2a3/go.mod h1:t9HGtf8HONx5eT2rtn7q6eTqICYqUVnKs3thJo3Qplg=\n+golang.org/x/sys v0.0.0-20190215142949-d0b11bdaac8a/go.mod h1:STP8DvDyc/dI5b8T5hshtkjS+E42TnysNCUPdjciGhY=\n+golang.org/x/sys v0.0.0-20190412213103-97732733099d h1:+R4KGOnez64A81RvjARKc4UT5/tI9ujCIVX+P5KiHuI=\n+golang.org/x/sys v0.0.0-20190412213103-97732733099d/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=\n+golang.org/x/sys v0.0.0-20200116001909-b77594299b42 h1:vEOn+mP2zCOVzKckCZy6YsCtDblrpj/w7B9nxGNELpg=\n+golang.org/x/sys v0.0.0-20200116001909-b77594299b42/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=\n+golang.org/x/text v0.3.0/go.mod h1:NqM8EUOU14njkJ3fqMW+pc6Ldnwhi/IjpwHt7yyuwOQ=\ndiff --git a/_examples/server/main.go b/_examples/server/main.go\nindex 61b1010..362b04a 100644\n--- a/_examples/server/main.go\n+++ b/_examples/server/main.go\n@@ -23,6 +23,7 @@ type context struct {\n \trl   *readline.Instance\n }\n \n+// Handle a single SSH interactive connection.\n func handle(log *log.Logger, s ssh.Session) error {\n \tlog.Printf(\"New SSH\")\n \tsshPty, _, isPty := s.Pty()\n@@ -132,7 +133,7 @@ func handlerWithError(handle func(log *log.Logger, s ssh.Session) error) ssh.Han\n }\n \n var cli struct {\n-\tHostKey string `type:\"existingfile\" help:\"SSH host key to use.\" default:\"./_examples/server/server_rsa_key\"`\n+\tHostKey string `type:\"existingfile\" help:\"SSH host key to use.\" default:\"server_rsa_key\"`\n \tBind    string `help:\"Bind address for server.\" default:\"127.0.0.1:6740\"`\n }\n \n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    ".golangci.yml",
+    "COPYING",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/README.md",
+    "_examples/server/console.go",
+    "_examples/server/go.mod",
+    "_examples/server/go.sum",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/main.go",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "config_test.go",
+    "context.go",
+    "defaults.go",
+    "defaults_test.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "go.mod",
+    "go.sum",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "util.go",
+    "util_test.go",
+    "visit.go"
+  ],
+  "explanation": {
+    "what": "_examples/server(SSHで対話的にKongコマンドを提供するサンプル)に README.md と go.mod/go.sum を新規追加し、独立した Go module として実行できるようにした。main.go 側は handle() 関数にコメントを足し、HostKey のデフォルト値をリポジトリルート相対パス(`./_examples/server/server_rsa_key`)からサブディレクトリ内で完結するパス(`server_rsa_key`)に修正した。",
+    "why": "おそらく _examples/server をリポジトリ本体の go.mod とは別の module として `go run .` で単独実行できるようにし、README でSSH接続手順を示すことでサンプルの使い勝手を改善する目的だと考えられる。",
+    "highlights": [
+      { "file": "_examples/server/go.mod", "note": "本体とは別モジュールとして依存(ssh, readline 等)を切り離す" },
+      { "file": "_examples/server/README.md", "note": "ssh 接続して対話的にコマンドを叩く手順とサンプル出力" }
+    ],
+    "langNotes": [
+      { "topic": "go.mod (別モジュール化)", "note": "サブディレクトリに独自の go.mod を置くと、そこはリポジトリ本体とは依存関係が独立した別の Go module になる。example 用の依存(サーバ・SSHライブラリ等)を本体の go.mod に混ぜずに済む典型パターン。" }
+    ],
+    "diagram": null,
+    "evidence": "inferred",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

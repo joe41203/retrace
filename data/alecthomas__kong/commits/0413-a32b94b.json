@@ -1,0 +1,227 @@
+{
+  "seq": 413,
+  "sha": "a32b94b70530e64716c954ff2be62d14f26cc7f6",
+  "parents": [
+    "36257680f1d0b7bf1e63c751b2b5e7e8aaa78a2c"
+  ],
+  "author": {
+    "name": "Alec Thomas",
+    "email": "alec@swapoff.org",
+    "date": "2024-12-29T08:10:34+09:00"
+  },
+  "message": "chore: `interface{}` -> `any`",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 16,
+    "additions": 63,
+    "deletions": 63
+  },
+  "files": [
+    {
+      "path": "README.md",
+      "status": "M",
+      "additions": 2,
+      "deletions": 2,
+      "binary": false
+    },
+    {
+      "path": "build.go",
+      "status": "M",
+      "additions": 2,
+      "deletions": 2,
+      "binary": false
+    },
+    {
+      "path": "callbacks.go",
+      "status": "M",
+      "additions": 3,
+      "deletions": 3,
+      "binary": false
+    },
+    {
+      "path": "config_test.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "context.go",
+      "status": "M",
+      "additions": 9,
+      "deletions": 9,
+      "binary": false
+    },
+    {
+      "path": "defaults.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "global.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "help.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "kong.go",
+      "status": "M",
+      "additions": 8,
+      "deletions": 8,
+      "binary": false
+    },
+    {
+      "path": "kong_test.go",
+      "status": "M",
+      "additions": 4,
+      "deletions": 4,
+      "binary": false
+    },
+    {
+      "path": "mapper.go",
+      "status": "M",
+      "additions": 6,
+      "deletions": 6,
+      "binary": false
+    },
+    {
+      "path": "model.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "options.go",
+      "status": "M",
+      "additions": 7,
+      "deletions": 7,
+      "binary": false
+    },
+    {
+      "path": "resolver.go",
+      "status": "M",
+      "additions": 6,
+      "deletions": 6,
+      "binary": false
+    },
+    {
+      "path": "resolver_test.go",
+      "status": "M",
+      "additions": 7,
+      "deletions": 7,
+      "binary": false
+    },
+    {
+      "path": "scanner.go",
+      "status": "M",
+      "additions": 4,
+      "deletions": 4,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/README.md b/README.md\nindex a3d8511..5595a41 100644\n--- a/README.md\n+++ b/README.md\n@@ -648,7 +648,7 @@ normal validation.\n \n ## Modifying Kong's behaviour\n \n-Each Kong parser can be configured via functional options passed to `New(cli interface{}, options...Option)`.\n+Each Kong parser can be configured via functional options passed to `New(cli any, options...Option)`.\n \n The full set of options can be found [here](https://godoc.org/github.com/alecthomas/kong#Option).\n \n@@ -706,7 +706,7 @@ All builtin Go types (as well as a bunch of useful stdlib types like `time.Time`\n 1. `NamedMapper(string, Mapper)` and using the tag key `type:\"<name>\"`.\n 2. `KindMapper(reflect.Kind, Mapper)`.\n 3. `TypeMapper(reflect.Type, Mapper)`.\n-4. `ValueMapper(interface{}, Mapper)`, passing in a pointer to a field of the grammar.\n+4. `ValueMapper(any, Mapper)`, passing in a pointer to a field of the grammar.\n \n ### `ConfigureHelp(HelpOptions)` and `Help(HelpFunc)` - customising help\n \ndiff --git a/build.go b/build.go\nindex 42d30f0..166935b 100644\n--- a/build.go\n+++ b/build.go\n@@ -9,9 +9,9 @@ import (\n // Plugins are dynamically embedded command-line structures.\n //\n // Each element in the Plugins list *must* be a pointer to a structure.\n-type Plugins []interface{}\n+type Plugins []any\n \n-func build(k *Kong, ast interface{}) (app *Application, err error) {\n+func build(k *Kong, ast any) (app *Application, err error) {\n \tv := reflect.ValueOf(ast)\n \tiv := reflect.Indirect(v)\n \tif v.Kind() != reflect.Ptr || iv.Kind() != reflect.Struct {\ndiff --git a/callbacks.go b/callbacks.go\nindex 9733e91..c1fac81 100644\n--- a/callbacks.go\n+++ b/callbacks.go\n@@ -19,7 +19,7 @@ func (b bindings) String() string {\n \treturn \"bindings{\" + strings.Join(out, \", \") + \"}\"\n }\n \n-func (b bindings) add(values ...interface{}) bindings {\n+func (b bindings) add(values ...any) bindings {\n \tfor _, v := range values {\n \t\tv := v\n \t\tb[reflect.TypeOf(v)] = func() (any, error) { return v, nil }\n@@ -27,11 +27,11 @@ func (b bindings) add(values ...interface{}) bindings {\n \treturn b\n }\n \n-func (b bindings) addTo(impl, iface interface{}) {\n+func (b bindings) addTo(impl, iface any) {\n \tb[reflect.TypeOf(iface).Elem()] = func() (any, error) { return impl, nil }\n }\n \n-func (b bindings) addProvider(provider interface{}) error {\n+func (b bindings) addProvider(provider any) error {\n \tpv := reflect.ValueOf(provider)\n \tt := pv.Type()\n \tif t.Kind() != reflect.Func || t.NumOut() != 2 || t.Out(1) != reflect.TypeOf((*error)(nil)).Elem() {\ndiff --git a/config_test.go b/config_test.go\nindex 15d6eec..570f142 100644\n--- a/config_test.go\n+++ b/config_test.go\n@@ -42,7 +42,7 @@ func TestConfigValidation(t *testing.T) {\n \tassert.Error(t, err)\n }\n \n-func makeConfig(t *testing.T, config interface{}) (path string, cleanup func()) {\n+func makeConfig(t *testing.T, config any) (path string, cleanup func()) {\n \tt.Helper()\n \tw, err := os.CreateTemp(\"\", \"\")\n \tassert.NoError(t, err)\ndiff --git a/context.go b/context.go\nindex b840c68..4fd2302 100644\n--- a/context.go\n+++ b/context.go\n@@ -102,7 +102,7 @@ func Trace(k *Kong, args []string) (*Context, error) {\n }\n \n // Bind adds bindings to the Context.\n-func (c *Context) Bind(args ...interface{}) {\n+func (c *Context) Bind(args ...any) {\n \tc.bindings.add(args...)\n }\n \n@@ -111,7 +111,7 @@ func (c *Context) Bind(args ...interface{}) {\n // This will typically have to be called like so:\n //\n //\tBindTo(impl, (*MyInterface)(nil))\n-func (c *Context) BindTo(impl, iface interface{}) {\n+func (c *Context) BindTo(impl, iface any) {\n \tc.bindings.addTo(impl, iface)\n }\n \n@@ -119,7 +119,7 @@ func (c *Context) BindTo(impl, iface interface{}) {\n //\n // This is useful when the Run() function of different commands require different values that may\n // not all be initialisable from the main() function.\n-func (c *Context) BindToProvider(provider interface{}) error {\n+func (c *Context) BindToProvider(provider any) error {\n \treturn c.bindings.addProvider(provider)\n }\n \n@@ -306,7 +306,7 @@ func (c *Context) AddResolver(resolver Resolver) {\n }\n \n // FlagValue returns the set value of a flag if it was encountered and exists, or its default value.\n-func (c *Context) FlagValue(flag *Flag) interface{} {\n+func (c *Context) FlagValue(flag *Flag) any {\n \tfor _, trace := range c.Path {\n \t\tif trace.Flag == flag {\n \t\t\tv, ok := c.values[trace.Flag.Value]\n@@ -572,7 +572,7 @@ func (c *Context) Resolve() error {\n \t\t\t}\n \n \t\t\t// Pick the last resolved value.\n-\t\t\tvar selected interface{}\n+\t\t\tvar selected any\n \t\t\tfor _, resolver := range resolvers {\n \t\t\t\ts, err := resolver.Resolve(c, path, flag)\n \t\t\t\tif err != nil {\n@@ -757,7 +757,7 @@ func (e *unknownFlagError) Unwrap() error { return e.Cause }\n func (e *unknownFlagError) Error() string { return e.Cause.Error() }\n \n // Call an arbitrary function filling arguments with bound values.\n-func (c *Context) Call(fn any, binds ...interface{}) (out []interface{}, err error) {\n+func (c *Context) Call(fn any, binds ...any) (out []any, err error) {\n \tfv := reflect.ValueOf(fn)\n \tbindings := c.Kong.bindings.clone().add(binds...).add(c).merge(c.bindings)\n \treturn callAnyFunction(fv, bindings)\n@@ -769,7 +769,7 @@ func (c *Context) Call(fn any, binds ...interface{}) (out []interface{}, err err\n //\n // Any passed values will be bindable to arguments of the target Run() method. Additionally,\n // all parent nodes in the command structure will be bound.\n-func (c *Context) RunNode(node *Node, binds ...interface{}) (err error) {\n+func (c *Context) RunNode(node *Node, binds ...any) (err error) {\n \ttype targetMethod struct {\n \t\tnode   *Node\n \t\tmethod reflect.Value\n@@ -815,7 +815,7 @@ func (c *Context) RunNode(node *Node, binds ...interface{}) (err error) {\n //\n // Any passed values will be bindable to arguments of the target Run() method. Additionally,\n // all parent nodes in the command structure will be bound.\n-func (c *Context) Run(binds ...interface{}) (err error) {\n+func (c *Context) Run(binds ...any) (err error) {\n \tnode := c.Selected()\n \tif node == nil {\n \t\tif len(c.Path) == 0 {\n@@ -1087,7 +1087,7 @@ func checkAndMissing(paths []*Path) error {\n \treturn nil\n }\n \n-func findPotentialCandidates(needle string, haystack []string, format string, args ...interface{}) error {\n+func findPotentialCandidates(needle string, haystack []string, format string, args ...any) error {\n \tif len(haystack) == 0 {\n \t\treturn fmt.Errorf(format, args...)\n \t}\ndiff --git a/defaults.go b/defaults.go\nindex f6728d7..9489fb3 100644\n--- a/defaults.go\n+++ b/defaults.go\n@@ -1,7 +1,7 @@\n package kong\n \n // ApplyDefaults if they are not already set.\n-func ApplyDefaults(target interface{}, options ...Option) error {\n+func ApplyDefaults(target any, options ...Option) error {\n \tapp, err := New(target, options...)\n \tif err != nil {\n \t\treturn err\ndiff --git a/global.go b/global.go\nindex d4b3cb5..babe1e1 100644\n--- a/global.go\n+++ b/global.go\n@@ -5,7 +5,7 @@ import (\n )\n \n // Parse constructs a new parser and parses the default command-line.\n-func Parse(cli interface{}, options ...Option) *Context {\n+func Parse(cli any, options ...Option) *Context {\n \tparser, err := New(cli, options...)\n \tif err != nil {\n \t\tpanic(err)\ndiff --git a/help.go b/help.go\nindex 26f355d..6363ea2 100644\n--- a/help.go\n+++ b/help.go\n@@ -386,7 +386,7 @@ func newHelpWriter(ctx *Context, options HelpOptions) *helpWriter {\n \treturn w\n }\n \n-func (h *helpWriter) Printf(format string, args ...interface{}) {\n+func (h *helpWriter) Printf(format string, args ...any) {\n \th.Print(fmt.Sprintf(format, args...))\n }\n \ndiff --git a/kong.go b/kong.go\nindex 4f3bea2..b85e145 100644\n--- a/kong.go\n+++ b/kong.go\n@@ -15,7 +15,7 @@ var (\n \tcallbackReturnSignature = reflect.TypeOf((*error)(nil)).Elem()\n )\n \n-func failField(parent reflect.Value, field reflect.StructField, format string, args ...interface{}) error {\n+func failField(parent reflect.Value, field reflect.StructField, format string, args ...any) error {\n \tname := parent.Type().Name()\n \tif name == \"\" {\n \t\tname = \"<anonymous struct>\"\n@@ -24,7 +24,7 @@ func failField(parent reflect.Value, field reflect.StructField, format string, a\n }\n \n // Must creates a new Parser or panics if there is an error.\n-func Must(ast interface{}, options ...Option) *Kong {\n+func Must(ast any, options ...Option) *Kong {\n \tk, err := New(ast, options...)\n \tif err != nil {\n \t\tpanic(err)\n@@ -76,7 +76,7 @@ type Kong struct {\n // New creates a new Kong parser on grammar.\n //\n // See the README (https://github.com/alecthomas/kong) for usage instructions.\n-func New(grammar interface{}, options ...Option) (*Kong, error) {\n+func New(grammar any, options ...Option) (*Kong, error) {\n \tk := &Kong{\n \t\tExit:          os.Exit,\n \t\tStdout:        os.Stdout,\n@@ -401,7 +401,7 @@ func (k *Kong) applyHookToDefaultFlags(ctx *Context, node *Node, name string) er\n \t})\n }\n \n-func formatMultilineMessage(w io.Writer, leaders []string, format string, args ...interface{}) {\n+func formatMultilineMessage(w io.Writer, leaders []string, format string, args ...any) {\n \tlines := strings.Split(strings.TrimRight(fmt.Sprintf(format, args...), \"\\n\"), \"\\n\")\n \tleader := \"\"\n \tfor _, l := range leaders {\n@@ -417,25 +417,25 @@ func formatMultilineMessage(w io.Writer, leaders []string, format string, args .\n }\n \n // Printf writes a message to Kong.Stdout with the application name prefixed.\n-func (k *Kong) Printf(format string, args ...interface{}) *Kong {\n+func (k *Kong) Printf(format string, args ...any) *Kong {\n \tformatMultilineMessage(k.Stdout, []string{k.Model.Name}, format, args...)\n \treturn k\n }\n \n // Errorf writes a message to Kong.Stderr with the application name prefixed.\n-func (k *Kong) Errorf(format string, args ...interface{}) *Kong {\n+func (k *Kong) Errorf(format string, args ...any) *Kong {\n \tformatMultilineMessage(k.Stderr, []string{k.Model.Name, \"error\"}, format, args...)\n \treturn k\n }\n \n // Fatalf writes a message to Kong.Stderr with the application name prefixed then exits with a non-zero status.\n-func (k *Kong) Fatalf(format string, args ...interface{}) {\n+func (k *Kong) Fatalf(format string, args ...any) {\n \tk.Errorf(format, args...)\n \tk.Exit(1)\n }\n \n // FatalIfErrorf terminates with an error message if err != nil.\n-func (k *Kong) FatalIfErrorf(err error, args ...interface{}) {\n+func (k *Kong) FatalIfErrorf(err error, args ...any) {\n \tif err == nil {\n \t\treturn\n \t}\ndiff --git a/kong_test.go b/kong_test.go\nindex 36d4e96..fce739a 100644\n--- a/kong_test.go\n+++ b/kong_test.go\n@@ -14,7 +14,7 @@ import (\n \t\"github.com/alecthomas/kong\"\n )\n \n-func mustNew(t *testing.T, cli interface{}, options ...kong.Option) *kong.Kong {\n+func mustNew(t *testing.T, cli any, options ...kong.Option) *kong.Kong {\n \tt.Helper()\n \toptions = append([]kong.Option{\n \t\tkong.Name(\"test\"),\n@@ -1680,7 +1680,7 @@ func TestOptionReturnsErr(t *testing.T) {\n func TestEnumValidation(t *testing.T) {\n \ttests := []struct {\n \t\tname string\n-\t\tcli  interface{}\n+\t\tcli  any\n \t\tfail bool\n \t}{\n \t\t{\n@@ -1954,7 +1954,7 @@ func TestVersionFlagShouldStillWork(t *testing.T) {\n func TestSliceDecoderHelpfulErrorMsg(t *testing.T) {\n \ttests := []struct {\n \t\tname string\n-\t\tcli  interface{}\n+\t\tcli  any\n \t\targs []string\n \t\terr  string\n \t}{\n@@ -2004,7 +2004,7 @@ func TestSliceDecoderHelpfulErrorMsg(t *testing.T) {\n func TestMapDecoderHelpfulErrorMsg(t *testing.T) {\n \ttests := []struct {\n \t\tname     string\n-\t\tcli      interface{}\n+\t\tcli      any\n \t\targs     []string\n \t\texpected string\n \t}{\ndiff --git a/mapper.go b/mapper.go\nindex 584bb00..db3f24e 100644\n--- a/mapper.go\n+++ b/mapper.go\n@@ -251,7 +251,7 @@ func (r *Registry) RegisterType(typ reflect.Type, mapper Mapper) *Registry {\n }\n \n // RegisterValue registers a Mapper by pointer to the field value.\n-func (r *Registry) RegisterValue(ptr interface{}, mapper Mapper) *Registry {\n+func (r *Registry) RegisterValue(ptr any, mapper Mapper) *Registry {\n \tkey := reflect.ValueOf(ptr)\n \tif key.Kind() != reflect.Ptr {\n \t\tpanic(\"expected a pointer\")\n@@ -473,7 +473,7 @@ func mapDecoder(r *Registry) MapperFunc {\n \t\t\tcase string:\n \t\t\t\tchildScanner = ScanAsType(t.Type, SplitEscaped(v, mapsep)...)\n \n-\t\t\tcase []map[string]interface{}:\n+\t\t\tcase []map[string]any:\n \t\t\t\tfor _, m := range v {\n \t\t\t\t\terr := jsonTranscode(m, target.Addr().Interface())\n \t\t\t\t\tif err != nil {\n@@ -482,7 +482,7 @@ func mapDecoder(r *Registry) MapperFunc {\n \t\t\t\t}\n \t\t\t\treturn nil\n \n-\t\t\tcase map[string]interface{}:\n+\t\t\tcase map[string]any:\n \t\t\t\treturn jsonTranscode(v, target.Addr().Interface())\n \n \t\t\tdefault:\n@@ -548,11 +548,11 @@ func sliceDecoder(r *Registry) MapperFunc {\n \t\t\tcase string:\n \t\t\t\tchildScanner = ScanAsType(t.Type, SplitEscaped(v, sep)...)\n \n-\t\t\tcase []interface{}:\n+\t\t\tcase []any:\n \t\t\t\treturn jsonTranscode(v, target.Addr().Interface())\n \n \t\t\tdefault:\n-\t\t\t\tv = []interface{}{v}\n+\t\t\t\tv = []any{v}\n \t\t\t\treturn jsonTranscode(v, target.Addr().Interface())\n \t\t\t}\n \t\t} else {\n@@ -922,7 +922,7 @@ func (f *FileContentFlag) Decode(ctx *DecodeContext) error { //nolint: revive\n \treturn nil\n }\n \n-func jsonTranscode(in, out interface{}) error {\n+func jsonTranscode(in, out any) error {\n \tdata, err := json.Marshal(in)\n \tif err != nil {\n \t\treturn err\ndiff --git a/model.go b/model.go\nindex 25ffe96..f15e6fb 100644\n--- a/model.go\n+++ b/model.go\n@@ -69,7 +69,7 @@ func (n *Node) Leaf() bool {\n // Find a command/argument/flag by pointer to its field.\n //\n // Returns nil if not found. Panics if ptr is not a pointer.\n-func (n *Node) Find(ptr interface{}) *Node {\n+func (n *Node) Find(ptr any) *Node {\n \tkey := reflect.ValueOf(ptr)\n \tif key.Kind() != reflect.Ptr {\n \t\tpanic(\"expected a pointer\")\ndiff --git a/options.go b/options.go\nindex 3bc991b..6263202 100644\n--- a/options.go\n+++ b/options.go\n@@ -79,7 +79,7 @@ type dynamicCommand struct {\n \thelp  string\n \tgroup string\n \ttags  []string\n-\tcmd   interface{}\n+\tcmd   any\n }\n \n // DynamicCommand registers a dynamically constructed command with the root of the CLI.\n@@ -87,7 +87,7 @@ type dynamicCommand struct {\n // This is useful for command-line structures that are extensible via user-provided plugins.\n //\n // \"tags\" is a list of extra tag strings to parse, in the form <key>:\"<value>\".\n-func DynamicCommand(name, help, group string, cmd interface{}, tags ...string) Option {\n+func DynamicCommand(name, help, group string, cmd any, tags ...string) Option {\n \treturn OptionFunc(func(k *Kong) error {\n \t\tif run := getMethod(reflect.Indirect(reflect.ValueOf(cmd)), \"Run\"); !run.IsValid() {\n \t\t\treturn fmt.Errorf(\"kong: DynamicCommand %q must be a type with a 'Run' method; got %T\", name, cmd)\n@@ -156,7 +156,7 @@ func KindMapper(kind reflect.Kind, mapper Mapper) Option {\n }\n \n // ValueMapper registers a mapper to a field value.\n-func ValueMapper(ptr interface{}, mapper Mapper) Option {\n+func ValueMapper(ptr any, mapper Mapper) Option {\n \treturn OptionFunc(func(k *Kong) error {\n \t\tk.registry.RegisterValue(ptr, mapper)\n \t\treturn nil\n@@ -191,7 +191,7 @@ func Writers(stdout, stderr io.Writer) Option {\n //\t  \tAfterApply(...) error\n //\n // Called before validation/assignment, and immediately after validation/assignment, respectively.\n-func Bind(args ...interface{}) Option {\n+func Bind(args ...any) Option {\n \treturn OptionFunc(func(k *Kong) error {\n \t\tk.bindings.add(args...)\n \t\treturn nil\n@@ -201,7 +201,7 @@ func Bind(args ...interface{}) Option {\n // BindTo allows binding of implementations to interfaces.\n //\n //\tBindTo(impl, (*iface)(nil))\n-func BindTo(impl, iface interface{}) Option {\n+func BindTo(impl, iface any) Option {\n \treturn OptionFunc(func(k *Kong) error {\n \t\tk.bindings.addTo(impl, iface)\n \t\treturn nil\n@@ -212,11 +212,11 @@ func BindTo(impl, iface interface{}) Option {\n //\n // The provider function must have the signature:\n //\n-//\tfunc() (interface{}, error)\n+//\tfunc() (any, error)\n //\n // This is useful when the Run() function of different commands require different values that may\n // not all be initialisable from the main() function.\n-func BindToProvider(provider interface{}) Option {\n+func BindToProvider(provider any) Option {\n \treturn OptionFunc(func(k *Kong) error {\n \t\treturn k.bindings.addProvider(provider)\n \t})\ndiff --git a/resolver.go b/resolver.go\nindex dca4309..29be1b9 100644\n--- a/resolver.go\n+++ b/resolver.go\n@@ -14,15 +14,15 @@ type Resolver interface {\n \tValidate(app *Application) error\n \n \t// Resolve the value for a Flag.\n-\tResolve(context *Context, parent *Path, flag *Flag) (interface{}, error)\n+\tResolve(context *Context, parent *Path, flag *Flag) (any, error)\n }\n \n // ResolverFunc is a convenience type for non-validating Resolvers.\n-type ResolverFunc func(context *Context, parent *Path, flag *Flag) (interface{}, error)\n+type ResolverFunc func(context *Context, parent *Path, flag *Flag) (any, error)\n \n var _ Resolver = ResolverFunc(nil)\n \n-func (r ResolverFunc) Resolve(context *Context, parent *Path, flag *Flag) (interface{}, error) { //nolint: revive\n+func (r ResolverFunc) Resolve(context *Context, parent *Path, flag *Flag) (any, error) { //nolint: revive\n \treturn r(context, parent, flag)\n }\n func (r ResolverFunc) Validate(app *Application) error { return nil } //nolint: revive\n@@ -31,12 +31,12 @@ func (r ResolverFunc) Validate(app *Application) error { return nil } //nolint:\n //\n // Flag names are used as JSON keys indirectly, by tring snake_case and camelCase variants.\n func JSON(r io.Reader) (Resolver, error) {\n-\tvalues := map[string]interface{}{}\n+\tvalues := map[string]any{}\n \terr := json.NewDecoder(r).Decode(&values)\n \tif err != nil {\n \t\treturn nil, err\n \t}\n-\tvar f ResolverFunc = func(context *Context, parent *Path, flag *Flag) (interface{}, error) {\n+\tvar f ResolverFunc = func(context *Context, parent *Path, flag *Flag) (any, error) {\n \t\tname := strings.ReplaceAll(flag.Name, \"-\", \"_\")\n \t\tsnakeCaseName := snakeCase(flag.Name)\n \t\traw, ok := values[name]\n@@ -47,7 +47,7 @@ func JSON(r io.Reader) (Resolver, error) {\n \t\t}\n \t\traw = values\n \t\tfor _, part := range strings.Split(name, \".\") {\n-\t\t\tif values, ok := raw.(map[string]interface{}); ok {\n+\t\t\tif values, ok := raw.(map[string]any); ok {\n \t\t\t\traw, ok = values[part]\n \t\t\t\tif !ok {\n \t\t\t\t\treturn nil, nil\ndiff --git a/resolver_test.go b/resolver_test.go\nindex 5c9eeda..7ce7ec1 100644\n--- a/resolver_test.go\n+++ b/resolver_test.go\n@@ -12,7 +12,7 @@ import (\n \n type envMap map[string]string\n \n-func newEnvParser(t *testing.T, cli interface{}, env envMap, options ...kong.Option) *kong.Kong {\n+func newEnvParser(t *testing.T, cli any, env envMap, options ...kong.Option) *kong.Kong {\n \tt.Helper()\n \tfor name, value := range env {\n \t\tt.Setenv(name, value)\n@@ -275,7 +275,7 @@ func TestResolverWithBool(t *testing.T) {\n \t\tBool bool\n \t}\n \n-\tvar resolver kong.ResolverFunc = func(context *kong.Context, parent *kong.Path, flag *kong.Flag) (interface{}, error) {\n+\tvar resolver kong.ResolverFunc = func(context *kong.Context, parent *kong.Path, flag *kong.Flag) (any, error) {\n \t\tif flag.Name == \"bool\" {\n \t\t\treturn true, nil\n \t\t}\n@@ -294,14 +294,14 @@ func TestLastResolverWins(t *testing.T) {\n \t\tInt []int\n \t}\n \n-\tvar first kong.ResolverFunc = func(context *kong.Context, parent *kong.Path, flag *kong.Flag) (interface{}, error) {\n+\tvar first kong.ResolverFunc = func(context *kong.Context, parent *kong.Path, flag *kong.Flag) (any, error) {\n \t\tif flag.Name == \"int\" {\n \t\t\treturn 1, nil\n \t\t}\n \t\treturn nil, nil\n \t}\n \n-\tvar second kong.ResolverFunc = func(context *kong.Context, parent *kong.Path, flag *kong.Flag) (interface{}, error) {\n+\tvar second kong.ResolverFunc = func(context *kong.Context, parent *kong.Path, flag *kong.Flag) (any, error) {\n \t\tif flag.Name == \"int\" {\n \t\t\treturn 2, nil\n \t\t}\n@@ -318,7 +318,7 @@ func TestResolverSatisfiesRequired(t *testing.T) {\n \tvar cli struct {\n \t\tInt int `required`\n \t}\n-\tvar resolver kong.ResolverFunc = func(context *kong.Context, parent *kong.Path, flag *kong.Flag) (interface{}, error) {\n+\tvar resolver kong.ResolverFunc = func(context *kong.Context, parent *kong.Path, flag *kong.Flag) (any, error) {\n \t\tif flag.Name == \"int\" {\n \t\t\treturn 1, nil\n \t\t}\n@@ -336,7 +336,7 @@ func TestResolverTriggersHooks(t *testing.T) {\n \t\tFlag hookValue\n \t}\n \n-\tvar first kong.ResolverFunc = func(context *kong.Context, parent *kong.Path, flag *kong.Flag) (interface{}, error) {\n+\tvar first kong.ResolverFunc = func(context *kong.Context, parent *kong.Path, flag *kong.Flag) (any, error) {\n \t\tif flag.Name == \"flag\" {\n \t\t\treturn \"one\", nil\n \t\t}\n@@ -355,7 +355,7 @@ type validatingResolver struct {\n }\n \n func (v *validatingResolver) Validate(app *kong.Application) error { return v.err }\n-func (v *validatingResolver) Resolve(context *kong.Context, parent *kong.Path, flag *kong.Flag) (interface{}, error) {\n+func (v *validatingResolver) Resolve(context *kong.Context, parent *kong.Path, flag *kong.Flag) (any, error) {\n \treturn nil, nil\n }\n \ndiff --git a/scanner.go b/scanner.go\nindex c8a8bd6..262d16f 100644\n--- a/scanner.go\n+++ b/scanner.go\n@@ -41,7 +41,7 @@ func (t TokenType) String() string {\n \n // Token created by Scanner.\n type Token struct {\n-\tValue interface{}\n+\tValue any\n \tType  TokenType\n }\n \n@@ -171,7 +171,7 @@ func (s *Scanner) PopValue(context string) (Token, error) {\n // PopValueInto pops a value token into target or returns an error.\n //\n // \"context\" is used to assist the user if the value can not be popped, eg. \"expected <context> value but got <type>\"\n-func (s *Scanner) PopValueInto(context string, target interface{}) error {\n+func (s *Scanner) PopValueInto(context string, target any) error {\n \tt, err := s.PopValue(context)\n \tif err != nil {\n \t\treturn err\n@@ -204,13 +204,13 @@ func (s *Scanner) Peek() Token {\n }\n \n // Push an untyped Token onto the front of the Scanner.\n-func (s *Scanner) Push(arg interface{}) *Scanner {\n+func (s *Scanner) Push(arg any) *Scanner {\n \ts.PushToken(Token{Value: arg})\n \treturn s\n }\n \n // PushTyped pushes a typed token onto the front of the Scanner.\n-func (s *Scanner) PushTyped(arg interface{}, typ TokenType) *Scanner {\n+func (s *Scanner) PushTyped(arg any, typ TokenType) *Scanner {\n \ts.PushToken(Token{Value: arg, Type: typ})\n \treturn s\n }\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/FUNDING.yml",
+    ".github/workflows/ci.yml",
+    ".gitignore",
+    ".golangci.yml",
+    "COPYING",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/README.md",
+    "_examples/server/console.go",
+    "_examples/server/go.mod",
+    "_examples/server/go.sum",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/commandstring/main.go",
+    "_examples/shell/help/README.md",
+    "_examples/shell/help/main.go",
+    "benchmark_test.go",
+    "bin/.go-1.23.4.pkg",
+    "bin/.golangci-lint-1.60.1.pkg",
+    "bin/README.hermit.md",
+    "bin/activate-hermit",
+    "bin/go",
+    "bin/gofmt",
+    "bin/golangci-lint",
+    "bin/hermit",
+    "bin/hermit.hcl",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "config_test.go",
+    "context.go",
+    "defaults.go",
+    "defaults_test.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "go.mod",
+    "go.sum",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "helpwrap1.18_test.go",
+    "helpwrap1.19_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_linux_test.go",
+    "mapper_test.go",
+    "mapper_windows_test.go",
+    "model.go",
+    "model_test.go",
+    "negatable.go",
+    "options.go",
+    "options_test.go",
+    "renovate.json5",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "testdata/file.txt",
+    "util.go",
+    "util_test.go",
+    "visit.go"
+  ],
+  "explanation": {
+    "what": "16ファイルにわたって `interface{}` という記法を `any` に一括置換した。関数シグネチャ(New, Bind, BindTo, Resolve など)、構造体フィールド、README のコード例まで対象になっており、追加63行・削除63行と1対1の機械的な置換になっている。",
+    "why": "any は Go 1.18 で導入された interface{} の型エイリアスで、意味は完全に同一。可読性向上のための整形目的のリファクタで、挙動やAPIの互換性には影響しない。",
+    "highlights": [],
+    "langNotes": [
+      { "topic": "any", "note": "Go 1.18 で追加された組み込みの型エイリアスで `interface{}`(空インターフェース、あらゆる型を受け入れる)と完全に同義。ジェネリクス導入と同時に、より読みやすい記法として標準ライブラリでも広く使われるようになった。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

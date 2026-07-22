@@ -1,0 +1,146 @@
+{
+  "seq": 420,
+  "sha": "9c08a58eb2064527bc5f6f2e1e5f58e116224ea6",
+  "parents": [
+    "042a3258ec7bf7a1834eaaf86d3565a68c1af253"
+  ],
+  "author": {
+    "name": "Abhinav Gupta",
+    "email": "mail@abhinavg.net",
+    "date": "2025-01-28T21:04:52-08:00"
+  },
+  "message": "Support hooks on `embed:\"\"` fields (#493)\n\nRelates to 840220c (#90)\n\nThis change adds support for hooks to be called on fields\nthat are tagged with `embed:\"\"`.\n\n### Use case\n\nIf a command has several subcommands,\nmany (but not all) of which need the same external resource,\nthis allows defining the flag-level inputs for that resource centrally,\nand then using `embed:\"\"` in any command that needs that resource.\n\nFor example, imagine:\n\n```go\ntype githubClientProvider struct {\n    Token string `name:\"github-token\" env:\"GITHUB_TOKEN\"`\n    URL   string `name:\"github-url\" env:\"GITHUB_URL\"`\n}\n\nfunc (g *githubClientProvider) BeforeApply(kctx *kong.Context) error {\n  return kctx.BindToProvider(func() (*github.Client, error) {\n    return github.NewClient(...), nil\n  })\n}\n```\n\nThen, any command that needs GitHub client will add this field,\nany other resource providers it needs,\nand add parameters to its `Run` method to accept those resources:\n\n```go\ntype listUsersCmd struct {\n    GitHub githubClientProvider `embed:\"\"`\n    S3     s3ClientProvider     `embed:\"\"`\n}\n\nfunc (l *listUsersCmd) Run(gh *github.Client, s3 *s3.Client) error {\n    ...\n}\n```\n\n### Alternatives\n\nIt is possible to do the same today if the `*Provider` struct above\nis actually a Go embed instead of a Kong embed, *and* it is exported.\n\n```\ntype GitHubClientProvider struct{ ... }\n\ntype listUsersCmd struct {\n    GithubClientProvider\n    S3ClientProvider\n}\n```\n\nThe difference is whether the struct defining the flags\nis required to be exported or not.",
+  "pr": {
+    "number": 493,
+    "title": "Support hooks on `embed:\"\"` fields",
+    "body": "(I realize that I opened this without discussing the feature first,\nso if you don't think this feature makes sense, feel free to close this PR.\nI've tried to outline the reasoning below.)\n\n---\n\nRelates to 840220c (#90)\n\nThis change adds support for hooks to be called on fields\nthat are tagged with `embed:\"\"`.\n\n### Use case\n\nIf a command has several subcommands,\nmany (but not all) of which need the same external resource,\nthis allows defining the flag-level inputs for that resource centrally,\nallowing subcommands to declare their dependency on these resources\nand use them in their `Run` in a highly composible manner.\n\nFor example, imagine:\n\n```go\ntype githubClientProvider struct {\n    Token string `name:\"github-token\" env:\"GITHUB_TOKEN\"`\n    URL   string `name:\"github-url\" env:\"GITHUB_URL\"`\n}\n\nfunc (g *githubClientProvider) BeforeApply(kctx *kong.Context) error {\n  return kctx.BindToProvider(func() (*github.Client, error) {\n    return github.NewClient(...), nil\n  })\n}\n```\n\nThen, any command that needs GitHub client will add this field,\nany other resource providers it needs,\nand add parameters to its `Run` method to accept those resources:\n\n```go\ntype listUsersCmd struct {\n    GitHub githubClientProvider `embed:\"\"`\n    S3     s3ClientProvider     `embed:\"\"`\n}\n\nfunc (l *listUsersCmd) Run(gh *github.Client, s3 *s3.Client) error {\n    ...\n}\n```\n\n### Alternatives\n\nIt is possible to do the same today if the `*Provider` struct above\nis actually a Go embed instead of a Kong embed, *and* it is exported.\n\n```\ntype GitHubClientProvider struct{ ... }\n\ntype listUsersCmd struct {\n    GithubClientProvider\n    S3ClientProvider\n}\n```\n\nThe difference is whether the struct defining the flags\nis required to be exported or not.\n",
+    "url": "https://github.com/alecthomas/kong/pull/493"
+  },
+  "linkedIssues": [
+    {
+      "number": 90,
+      "title": "Hook ignored on nodes tagged with \"embed\" ",
+      "body": "In the following example I created a struct called `Common` with an `AfterApply` hook.\r\nWhen this structure is embedded using Go struct embedding, the AfterApply hook gets invoked as per Go method discovery rules.\r\n\r\nHowever, if the struct is embedded using the kong embedding (via the `embed` tag), the hook is not invoked.\r\n\r\nI _think_ that would be useful since this allows multiple structures with common flags to be embedded and have each of their hooks invoked. This is currently not possible with Go embedding since it doesn't work if more than one structure (including the containing struct) defines the hook method.\r\n\r\n```\r\npackage main\r\n\r\nimport (\r\n\t\"fmt\"\r\n\r\n\t\"github.com/alecthomas/kong\"\r\n)\r\n\r\ntype Common struct {\r\n\tFoo bool `help:\"FOO\"`\r\n}\r\n\r\nfunc (*Common) AfterApply() error {\r\n\tfmt.Printf(\"called Common.AfterApply\\n\")\r\n\treturn nil\r\n}\r\n\r\nvar CLI struct {\r\n\tRm struct {\r\n\t\tCommon\r\n\r\n\t\tForce     bool `help:\"Force removal.\"`\r\n\t\tRecursive bool `help:\"Recursively remove files.\"`\r\n\r\n\t\tPaths []string `arg name:\"path\" help:\"Paths to remove.\" type:\"path\"`\r\n\t} `cmd help:\"Remove files.\"`\r\n\r\n\tLs struct {\r\n\t\tC Common `embed:\"\"`\r\n\r\n\t\tPaths []string `arg optional name:\"path\" help:\"Paths to list.\" type:\"path\"`\r\n\t} `cmd help:\"List paths.\"`\r\n}\r\n\r\nfunc main() {\r\n\tctx := kong.Parse(&CLI)\r\n\tswitch ctx.Command() {\r\n\tcase \"rm <path>\":\r\n\tcase \"ls\":\r\n\tdefault:\r\n\t\tpanic(ctx.Command())\r\n\t}\r\n}\r\n\r\n```",
+      "url": "https://github.com/alecthomas/kong/issues/90"
+    }
+  ],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 27,
+    "deletions": 2
+  },
+  "files": [
+    {
+      "path": "callbacks.go",
+      "status": "M",
+      "additions": 13,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "kong_test.go",
+      "status": "M",
+      "additions": 14,
+      "deletions": 1,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/callbacks.go b/callbacks.go\nindex c1fac81..e541f5a 100644\n--- a/callbacks.go\n+++ b/callbacks.go\n@@ -80,7 +80,19 @@ func getMethods(value reflect.Value, name string) []reflect.Value {\n \t\tfor i := 0; i < value.NumField(); i++ {\n \t\t\tfield := value.Field(i)\n \t\t\tfieldType := t.Field(i)\n-\t\t\tif fieldType.IsExported() && fieldType.Anonymous {\n+\t\t\tif !fieldType.IsExported() {\n+\t\t\t\tcontinue\n+\t\t\t}\n+\n+\t\t\t// Hooks on exported embedded fields should be called.\n+\t\t\tif fieldType.Anonymous {\n+\t\t\t\treceivers = append(receivers, field)\n+\t\t\t\tcontinue\n+\t\t\t}\n+\n+\t\t\t// Hooks on exported fields that are not exported,\n+\t\t\t// but are tagged with `embed:\"\"` should be called.\n+\t\t\tif _, ok := fieldType.Tag.Lookup(\"embed\"); ok {\n \t\t\t\treceivers = append(receivers, field)\n \t\t\t}\n \t\t}\ndiff --git a/kong_test.go b/kong_test.go\nindex a7c03b2..874b90b 100644\n--- a/kong_test.go\n+++ b/kong_test.go\n@@ -2413,9 +2413,19 @@ func (e *EmbeddedCallback) AfterApply() error {\n \treturn nil\n }\n \n+type taggedEmbeddedCallback struct {\n+\tTagged bool\n+}\n+\n+func (e *taggedEmbeddedCallback) AfterApply() error {\n+\te.Tagged = true\n+\treturn nil\n+}\n+\n type EmbeddedRoot struct {\n \tEmbeddedCallback\n-\tRoot bool\n+\tTagged taggedEmbeddedCallback `embed:\"\"`\n+\tRoot   bool\n }\n \n func (e *EmbeddedRoot) AfterApply() error {\n@@ -2432,6 +2442,9 @@ func TestEmbeddedCallbacks(t *testing.T) {\n \t\tEmbeddedCallback: EmbeddedCallback{\n \t\t\tEmbedded: true,\n \t\t},\n+\t\tTagged: taggedEmbeddedCallback{\n+\t\t\tTagged: true,\n+\t\t},\n \t\tRoot: true,\n \t}\n \tassert.Equal(t, expected, actual)\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/FUNDING.yml",
+    ".github/workflows/ci.yml",
+    ".gitignore",
+    ".golangci.yml",
+    "COPYING",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/README.md",
+    "_examples/server/console.go",
+    "_examples/server/go.mod",
+    "_examples/server/go.sum",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/commandstring/main.go",
+    "_examples/shell/help/README.md",
+    "_examples/shell/help/main.go",
+    "benchmark_test.go",
+    "bin/.go-1.23.4.pkg",
+    "bin/.golangci-lint-1.60.1.pkg",
+    "bin/README.hermit.md",
+    "bin/activate-hermit",
+    "bin/go",
+    "bin/gofmt",
+    "bin/golangci-lint",
+    "bin/hermit",
+    "bin/hermit.hcl",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "config_test.go",
+    "context.go",
+    "defaults.go",
+    "defaults_test.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "go.mod",
+    "go.sum",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "helpwrap1.18_test.go",
+    "helpwrap1.19_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_linux_test.go",
+    "mapper_test.go",
+    "mapper_windows_test.go",
+    "model.go",
+    "model_test.go",
+    "negatable.go",
+    "options.go",
+    "options_test.go",
+    "renovate.json5",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "testdata/file.txt",
+    "util.go",
+    "util_test.go",
+    "visit.go"
+  ],
+  "explanation": {
+    "what": "getMethods() が hook メソッド(AfterApply など)を探索する際、Go の匿名(embedded)フィールドだけでなく、kong の `embed:\"\"` タグが付いた非匿名フィールドも再帰探索の対象に含めるようにした。callbacks.go の分岐を「exported かどうか」「anonymous かどうか」「embed タグを持つかどうか」の3段階に整理し、taggedEmbeddedCallback 型と TestEmbeddedCallbacks の拡張でその両方のケースからフックが呼ばれることを確認している。",
+    "why": "linkedIssues #90 が示す通り、Go の struct embedding で共通の AfterApply フックを複数箇所に持たせようとすると同名メソッドの衝突で使えないため、kong 独自の `embed:\"\"` タグ経由での埋め込みでも同様にフックが呼ばれてほしいという要望への対応。PR本文では、共通のリソースプロバイダ(GitHub クライアント等)を複数コマンドに `embed:\"\"` で注入し、BeforeApply/AfterApply でそのリソースを初期化するユースケースが示されている。",
+    "highlights": [
+      { "file": "callbacks.go", "note": "getMethods() の分岐を anonymous 判定と embed タグ判定に分離した箇所" }
+    ],
+    "langNotes": [
+      { "topic": "struct embedding と kong の embed タグの違い", "note": "Go の匿名フィールド埋め込み(struct embedding)は同名メソッドが複数箇所にあると呼び出しが曖昧になり使えない制約がある。kong はこれとは別に `embed:\"\"` という独自タグを提供しており、名前付き(非匿名)フィールドでも子構造体のフラグ群を親に展開できる。このコミットはフックの呼び出し対象をこの2つの埋め込み方式の両方に広げるもの。" }
+    ],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [
+      { "type": "pr", "number": 493, "url": "https://github.com/alecthomas/kong/pull/493" },
+      { "type": "issue", "number": 90, "url": "https://github.com/alecthomas/kong/issues/90" }
+    ],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

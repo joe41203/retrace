@@ -1,0 +1,111 @@
+{
+  "seq": 225,
+  "sha": "abbc2dfc2c431cfaa69580ab0f01d41c4d05d880",
+  "parents": [
+    "294d1d17177564e4b9c2eed740b0863276c2b596"
+  ],
+  "author": {
+    "name": "Alec Thomas",
+    "email": "alec@swapoff.org",
+    "date": "2021-02-09T15:23:05+11:00"
+  },
+  "message": "More group formatting tweaks.",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 6,
+    "deletions": 10
+  },
+  "files": [
+    {
+      "path": "help.go",
+      "status": "M",
+      "additions": 3,
+      "deletions": 4,
+      "binary": false
+    },
+    {
+      "path": "help_test.go",
+      "status": "M",
+      "additions": 3,
+      "deletions": 6,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/help.go b/help.go\nindex 3cacad1..e107724 100644\n--- a/help.go\n+++ b/help.go\n@@ -151,8 +151,7 @@ func printNodeDetail(w *helpWriter, node *Node, hide bool) {\n \t\t\t\tw.Wrap(group.Metadata.Title)\n \t\t\t}\n \t\t\tif group.Metadata.Description != \"\" {\n-\t\t\t\tw.Print(\"\")\n-\t\t\t\tw.Wrap(group.Metadata.Description)\n+\t\t\t\tw.Indent().Wrap(group.Metadata.Description)\n \t\t\t\tw.Print(\"\")\n \t\t\t}\n \t\t\twriteFlags(w.Indent(), group.Flags)\n@@ -173,8 +172,7 @@ func printNodeDetail(w *helpWriter, node *Node, hide bool) {\n \t\t\t\t\tw.Wrap(group.Metadata.Title)\n \t\t\t\t}\n \t\t\t\tif group.Metadata.Description != \"\" {\n-\t\t\t\t\tw.Print(\"\")\n-\t\t\t\t\tw.Wrap(group.Metadata.Description)\n+\t\t\t\t\tw.Indent().Wrap(group.Metadata.Description)\n \t\t\t\t\tw.Print(\"\")\n \t\t\t\t}\n \n@@ -348,6 +346,7 @@ func (h *helpWriter) Print(text string) {\n \t*h.lines = append(*h.lines, strings.TrimRight(h.indent+text, \" \"))\n }\n \n+// Indent returns a new helpWriter indented by two characters.\n func (h *helpWriter) Indent() *helpWriter {\n \treturn &helpWriter{indent: h.indent + \"  \", lines: h.lines, width: h.width - 2, HelpOptions: h.HelpOptions, helpFormatter: h.helpFormatter}\n }\ndiff --git a/help_test.go b/help_test.go\nindex 440ac34..ca0ab10 100644\n--- a/help_test.go\n+++ b/help_test.go\n@@ -323,8 +323,7 @@ Flags:\n       --free-bool             A non grouped bool flag.\n \n Group title taken from the kong.ExplicitGroups option\n-\n-A group header\n+  A group header\n \n   --grouped-a-string=STRING    A string flag grouped in A.\n   --grouped-a-bool             A bool flag grouped in A.\n@@ -337,8 +336,7 @@ Commands:\n     A non grouped subcommand.\n \n Group title taken from the kong.ExplicitGroups option\n-\n-A group header\n+  A group header\n \n   one thing <arg>\n     subcommand thing\n@@ -383,8 +381,7 @@ Flags:\n       --a-free-string=STRING    A non grouped string flag.\n \n Group title taken from the kong.ExplicitGroups option\n-\n-A group header\n+  A group header\n \n   --grouped-a-string=STRING    A string flag grouped in A.\n   --grouped-a-bool             A bool flag grouped in A.\n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    ".gitignore",
+    ".golangci.yml",
+    "COPYING",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/README.md",
+    "_examples/server/console.go",
+    "_examples/server/go.mod",
+    "_examples/server/go.sum",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/main.go",
+    "benchmark_test.go",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "config_test.go",
+    "context.go",
+    "defaults.go",
+    "defaults_test.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "go.mod",
+    "go.sum",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "testdata/file.txt",
+    "util.go",
+    "util_test.go",
+    "visit.go"
+  ],
+  "explanation": {
+    "what": "Description の表示方法を、前後の空行から `w.Indent().Wrap(...)` によるインデント表示に変更した。あわせて `helpWriter.Indent()` にコメントを追加している。",
+    "why": "コミットメッセージは \"More group formatting tweaks.\" とだけで具体的な理由の記述は無い。おそらく前2コミットで試した空行区切りの見た目を実際に確認した結果、インデントで階層を示す方が読みやすいと判断し、続けて微調整したものと考えられる。",
+    "highlights": [
+      { "file": "help.go", "note": "Description を `w.Indent().Wrap(...)` で一段インデントして表示するよう変更" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "inferred",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

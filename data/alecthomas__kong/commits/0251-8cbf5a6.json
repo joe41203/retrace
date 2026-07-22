@@ -1,0 +1,123 @@
+{
+  "seq": 251,
+  "sha": "8cbf5a6c03a2443e309f3fcf10c27edadd05d578",
+  "parents": [
+    "ff93d67a8d293b03196d3354ece8880975b7b873"
+  ],
+  "author": {
+    "name": "Alec Thomas",
+    "email": "alec@swapoff.org",
+    "date": "2021-06-09T13:10:29+10:00"
+  },
+  "message": "Validate short flags are a single rune.\n\nFixes #175.",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 23,
+    "deletions": 7
+  },
+  "files": [
+    {
+      "path": "tag.go",
+      "status": "M",
+      "additions": 15,
+      "deletions": 7,
+      "binary": false
+    },
+    {
+      "path": "tag_test.go",
+      "status": "M",
+      "additions": 8,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/tag.go b/tag.go\nindex 4d640c9..8c24a9f 100644\n--- a/tag.go\n+++ b/tag.go\n@@ -1,6 +1,7 @@\n package kong\n \n import (\n+\t\"errors\"\n \t\"fmt\"\n \t\"reflect\"\n \t\"strconv\"\n@@ -130,9 +131,12 @@ func parseTag(fv reflect.Value, ft reflect.StructField) *Tag {\n \t\tt.Ignored = true\n \t\treturn t\n \t}\n-\tt := &Tag{\n-\t\titems: parseTagItems(getTagInfo(ft)),\n-\t}\n+\tvar (\n+\t\terr error\n+\t\tt   = &Tag{\n+\t\t\titems: parseTagItems(getTagInfo(ft)),\n+\t\t}\n+\t)\n \tt.Cmd = t.Has(\"cmd\")\n \tt.Arg = t.Has(\"arg\")\n \trequired := t.Has(\"required\")\n@@ -151,7 +155,10 @@ func parseTag(fv reflect.Value, ft reflect.StructField) *Tag {\n \tt.Help = t.Get(\"help\")\n \tt.Type = t.Get(\"type\")\n \tt.Env = t.Get(\"env\")\n-\tt.Short, _ = t.GetRune(\"short\")\n+\tt.Short, err = t.GetRune(\"short\")\n+\tif err != nil && t.Get(\"short\") != \"\" {\n+\t\tfail(\"invalid short flag name %q: %s\", t.Get(\"short\"), err)\n+\t}\n \tt.Hidden = t.Has(\"hidden\")\n \tt.Format = t.Get(\"format\")\n \tt.Sep, _ = t.GetSep(\"sep\", ',')\n@@ -232,9 +239,10 @@ func (t *Tag) GetInt(k string) (int64, error) {\n \n // GetRune parses the given tag as a rune.\n func (t *Tag) GetRune(k string) (rune, error) {\n-\tr, _ := utf8.DecodeRuneInString(t.Get(k))\n-\tif r == utf8.RuneError {\n-\t\treturn 0, fmt.Errorf(\"%v has a rune error\", t.Get(k))\n+\tvalue := t.Get(k)\n+\tr, size := utf8.DecodeRuneInString(value)\n+\tif r == utf8.RuneError || size < len(value) {\n+\t\treturn 0, errors.New(\"invalid rune\")\n \t}\n \treturn r, nil\n }\ndiff --git a/tag_test.go b/tag_test.go\nindex 4da0bd0..ae8c38d 100644\n--- a/tag_test.go\n+++ b/tag_test.go\n@@ -192,3 +192,11 @@ func TestTagAliasesSub(t *testing.T) {\n \trequire.NoError(t, err)\n \trequire.Equal(t, \"arg\", cli.Cmd.SubCmd.Arg)\n }\n+\n+func TestInvalidRuneErrors(t *testing.T) {\n+\tcli := struct {\n+\t\tFlag bool `short:\"invalid\"`\n+\t}{}\n+\t_, err := kong.New(&cli)\n+\trequire.EqualError(t, err, \"invalid short flag name \\\"invalid\\\": invalid rune\")\n+}\n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    ".github/FUNDING.yml",
+    ".gitignore",
+    ".golangci.yml",
+    "COPYING",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/README.md",
+    "_examples/server/console.go",
+    "_examples/server/go.mod",
+    "_examples/server/go.sum",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/main.go",
+    "benchmark_test.go",
+    "bin/.go@latest.pkg",
+    "bin/.golangci-lint-1.40.1.pkg",
+    "bin/README.hermit.md",
+    "bin/activate-hermit",
+    "bin/go",
+    "bin/gofmt",
+    "bin/golangci-lint",
+    "bin/hermit",
+    "bin/hermit.hcl",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "config_test.go",
+    "context.go",
+    "defaults.go",
+    "defaults_test.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "go.mod",
+    "go.sum",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "testdata/file.txt",
+    "util.go",
+    "util_test.go",
+    "visit.go"
+  ],
+  "explanation": {
+    "what": "Tag.GetRune が短縮フラグ名(short タグ)の値を1 rune として厳密に検証するよう変更した。従来はデコード結果を無視(`_`)してエラーを握りつぶしていたが、DecodeRuneInString のデコード後サイズ(size)が元の文字列長と一致しない場合も無効とみなし、parseTag 側でも GetRune のエラーを受け取って `fail()` するようにした。テストとして `short:\"invalid\"` を与えた場合に \"invalid short flag name...\" というエラーになることを確認する TestInvalidRuneErrors を追加している。",
+    "why": "Fixes #175 とあるように、`short:\"ab\"` のような2文字以上の short タグを与えても、DecodeRuneInString が先頭の1文字だけをデコードして成功してしまい、残りの文字列が無視されるバグがあった。これを解消するため、デコードしたrune のバイト長(size)が入力文字列の長さより短ければ「1 runeではない」と判定してエラーを返すように修正した。",
+    "highlights": [
+      { "file": "tag.go", "note": "GetRune が size < len(value) を追加でチェックし、複数文字の short タグを拒否するようになった箇所" }
+    ],
+    "langNotes": [
+      { "topic": "utf8.DecodeRuneInString", "note": "Go の unicode/utf8 パッケージの関数で、文字列先頭の1文字(rune)とそのUTF-8エンコード時のバイト数(size)を返す。sizeが文字列全体の長さと一致しなければ、その文字列が複数runeから成ることを意味する。" }
+    ],
+    "diagram": null,
+    "evidence": "issue",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

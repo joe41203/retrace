@@ -1,0 +1,112 @@
+{
+  "seq": 239,
+  "sha": "57bfb058d5f7c92a56dd8910400a1815e27245fb",
+  "parents": [
+    "0c83d0f8dccfb0a11583d55880857462bb5b5dfb"
+  ],
+  "author": {
+    "name": "Saj Goonatilleke",
+    "email": "sg@redu.cx",
+    "date": "2021-03-18T00:30:42+11:00"
+  },
+  "message": "mapper: correct text/binary typo\n\nFixes a panic when attempting to make use of pointers to types that\nimplement encoding.BinaryUnmarshaler.  e.g.:\n\n    type SomeBinaryFlag struct{}\n\n    func (f *SomeBinaryFlag) UnmarshalBinary(data []byte) error {\n\t    // ...\n\t    return nil\n    }\n\n    var cli struct {\n\t    Binary *SomeBinaryFlag\n    }",
+  "pr": {
+    "number": 155,
+    "title": "mapper: correct text/binary typo (panic)",
+    "body": "I was reading through the source when I found what looked like a small copy-paste error.  Here's a trivial patch.  Thank you for these libraries, Alec.\r\n\r\n`UnmarshalBinary` did seem to work OK on my first test.  It wasn't until I read the source more carefully that I realised the field must be a _pointer_ to a type that implements `UnmarshalBinary` in order to trigger a panic:\r\n\r\n```go\r\npackage main\r\n\r\nimport (\r\n\t\"errors\"\r\n\r\n\t\"github.com/alecthomas/kong\"\r\n)\r\n\r\ntype SomeTextFlag struct{}\r\n\r\nfunc (f *SomeTextFlag) UnmarshalText(text []byte) error {\r\n\treturn errors.New(\"hello from UnmarshalText\")\r\n}\r\n\r\ntype SomeBinaryFlag struct{}\r\n\r\nfunc (f *SomeBinaryFlag) UnmarshalBinary(data []byte) error {\r\n\treturn errors.New(\"hello from UnmarshalBinary\")\r\n}\r\n\r\nvar cli struct {\r\n\tText   *SomeTextFlag\r\n\tBinary *SomeBinaryFlag\r\n}\r\n\r\nfunc main() {\r\n\tkong.Parse(&cli)\r\n}\r\n```\r\n\r\n```\r\n% ./test --binary foo\r\npanic: interface conversion: **main.SomeBinaryFlag is not encoding.BinaryUnmarshaler: missing method UnmarshalBinary [recovered]\r\n        panic: mapper *kong.binaryUnmarshalerAdapter failed to apply to --binary=BINARY: interface conversion: **main.SomeBinaryFlag is not encoding.BinaryUnmarshaler: missing method UnmarshalBinary [recovered]\r\n        panic: mapper *kong.binaryUnmarshalerAdapter failed to apply to --binary=BINARY: interface conversion: **main.SomeBinaryFlag is not encoding.BinaryUnmarshaler: missing method UnmarshalBinary [recovered]\r\n        panic: mapper *kong.binaryUnmarshalerAdapter failed to apply to --binary=BINARY: interface conversion: **main.SomeBinaryFlag is not encoding.BinaryUnmarshaler: missing method UnmarshalBinary\r\n\r\ngoroutine 1 [running]:\r\ngithub.com/alecthomas/kong.catch(0xc000107f10)\r\n        /Users/saj/Documents/src/go/pkg/mod/github.com/alecthomas/kong@v0.2.16/kong.go:383 +0xc5\r\npanic(0x11693a0, 0xc00004c560)\r\n        /usr/local/Cellar/go/1.16.1/libexec/src/runtime/panic.go:965 +0x1b9\r\ngithub.com/alecthomas/kong.catch(0xc000107ae0)\r\n        /Users/saj/Documents/src/go/pkg/mod/github.com/alecthomas/kong@v0.2.16/kong.go:383 +0xc5\r\npanic(0x11693a0, 0xc00004c560)\r\n        /usr/local/Cellar/go/1.16.1/libexec/src/runtime/panic.go:965 +0x1b9\r\ngithub.com/alecthomas/kong.(*Value).Parse.func1(0xc000120160, 0xc000107948)\r\n        /Users/saj/Documents/src/go/pkg/mod/github.com/alecthomas/kong@v0.2.16/model.go:309 +0x246\r\npanic(0x1175d80, 0xc000012960)\r\n        /usr/local/Cellar/go/1.16.1/libexec/src/runtime/panic.go:965 +0x1b9\r\ngithub.com/alecthomas/kong.(*binaryUnmarshalerAdapter).Decode(0x12d3c70, 0xc00004c4e0, 0x1172340, 0xc000010098, 0x196, 0xc00000e198, 0x16)\r\n        /Users/saj/Documents/src/go/pkg/mod/github.com/alecthomas/kong@v0.2.16/mapper.go:90 +0x231\r\ngithub.com/alecthomas/kong.(*Value).Parse(0xc000120160, 0xc00000e120, 0x1172340, 0xc000010098, 0x196, 0x0, 0x0)\r\n        /Users/saj/Documents/src/go/pkg/mod/github.com/alecthomas/kong@v0.2.16/model.go:313 +0xd4\r\ngithub.com/alecthomas/kong.(*Context).parseFlag(0xc000134000, 0xc00000e168, 0x3, 0x3, 0xc000016308, 0x8, 0x0, 0x0)\r\n        /Users/saj/Documents/src/go/pkg/mod/github.com/alecthomas/kong@v0.2.16/context.go:660 +0x385\r\ngithub.com/alecthomas/kong.(*Context).trace(0xc000134000, 0xc00011e0e0, 0x2, 0xc00000e120)\r\n        /Users/saj/Documents/src/go/pkg/mod/github.com/alecthomas/kong@v0.2.16/context.go:398 +0x143d\r\ngithub.com/alecthomas/kong.Trace(0xc00011e000, 0xc0000121c0, 0x2, 0x2, 0xc0000260e0, 0x6, 0xc00004c380)\r\n        /Users/saj/Documents/src/go/pkg/mod/github.com/alecthomas/kong@v0.2.16/context.go:101 +0x1aa\r\ngithub.com/alecthomas/kong.(*Kong).Parse(0xc00011e000, 0xc0000121c0, 0x2, 0x2, 0x0, 0x0, 0x0)\r\n        /Users/saj/Documents/src/go/pkg/mod/github.com/alecthomas/kong@v0.2.16/kong.go:211 +0x8f\r\ngithub.com/alecthomas/kong.Parse(0x11652e0, 0x12a61e0, 0x0, 0x0, 0x0, 0xc0000240b8)\r\n        /Users/saj/Documents/src/go/pkg/mod/github.com/alecthomas/kong@v0.2.16/global.go:13 +0xc8\r\nmain.main()\r\n        /Users/saj/s/stash/shstash-335677514/main.go:27 +0x4a\r\n```",
+    "url": "https://github.com/alecthomas/kong/pull/155"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 1,
+    "deletions": 1
+  },
+  "files": [
+    {
+      "path": "mapper.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/mapper.go b/mapper.go\nindex 7eb77fb..b8447ec 100644\n--- a/mapper.go\n+++ b/mapper.go\n@@ -84,7 +84,7 @@ func (m *binaryUnmarshalerAdapter) Decode(ctx *DecodeContext, target reflect.Val\n \tif err != nil {\n \t\treturn err\n \t}\n-\tif target.Type().Implements(textUnmarshalerType) {\n+\tif target.Type().Implements(binaryUnmarshalerType) {\n \t\treturn target.Interface().(encoding.BinaryUnmarshaler).UnmarshalBinary([]byte(value))\n \t}\n \treturn target.Addr().Interface().(encoding.BinaryUnmarshaler).UnmarshalBinary([]byte(value))\n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    ".github/FUNDING.yml",
+    ".gitignore",
+    ".golangci.yml",
+    "COPYING",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/README.md",
+    "_examples/server/console.go",
+    "_examples/server/go.mod",
+    "_examples/server/go.sum",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/main.go",
+    "benchmark_test.go",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "config_test.go",
+    "context.go",
+    "defaults.go",
+    "defaults_test.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "go.mod",
+    "go.sum",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "testdata/file.txt",
+    "util.go",
+    "util_test.go",
+    "visit.go"
+  ],
+  "explanation": {
+    "what": "mapper.go の binaryUnmarshalerAdapter.Decode で、判定条件が誤って `textUnmarshalerType` を参照していたのを `binaryUnmarshalerType` に修正した1行のコピペミス修正。",
+    "why": "PR本文とコミットメッセージによれば、`encoding.BinaryUnmarshaler` を実装したポインタ型フィールドを使うと、誤った型アサーション(text 用の判定のまま binary の値を扱おうとする)により `interface conversion` パニックが発生していた。PRの投稿者はソースコードを読んでいて偶然この copy-paste ミスを発見し、実際のパニックスタックトレース付きで報告している。",
+    "highlights": [
+      { "file": "mapper.go", "note": "textUnmarshalerType を binaryUnmarshalerType に修正した1行" }
+    ],
+    "langNotes": [
+      { "topic": "encoding.TextUnmarshaler / encoding.BinaryUnmarshaler", "note": "標準ライブラリの encoding パッケージにあるインターフェースで、フラグ値を独自型にデコードする際 kong はまず reflect でこれらのインターフェースを実装しているか(Type().Implements())をチェックしてから対応するメソッドを呼ぶ。このコミットはその判定を binary 用アダプタなのに text 用の型変数で行っていたバグを修正している。" }
+    ],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [{ "type": "pr", "number": 155, "url": "https://github.com/alecthomas/kong/pull/155" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

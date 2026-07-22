@@ -1,0 +1,72 @@
+{
+  "seq": 46,
+  "sha": "d559a6a785d4120c1ea9ed542b361e8f97c9a137",
+  "parents": [
+    "891f8623c1af232a0b09f80fc4a3354edfa3ec07"
+  ],
+  "author": {
+    "name": "Alec Thomas",
+    "email": "alec@swapoff.org",
+    "date": "2018-06-06T18:13:36+10:00"
+  },
+  "message": "Fix display of default value in placeholder.",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 3,
+    "deletions": 3
+  },
+  "files": [
+    {
+      "path": "model.go",
+      "status": "M",
+      "additions": 3,
+      "deletions": 3,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/model.go b/model.go\nindex 64fc799..40e4c74 100644\n--- a/model.go\n+++ b/model.go\n@@ -223,14 +223,14 @@ func (f *Flag) FormatPlaceHolder() string {\n \tif f.Value.IsCumulative() {\n \t\ttail += \", ...\"\n \t}\n-\tif f.PlaceHolder != \"\" {\n-\t\treturn f.PlaceHolder + tail\n-\t}\n \tif f.Default != \"\" {\n \t\tif f.Value.Value.Kind() == reflect.String {\n \t\t\treturn strconv.Quote(f.Default) + tail\n \t\t}\n \t\treturn f.Default + tail\n \t}\n+\tif f.PlaceHolder != \"\" {\n+\t\treturn f.PlaceHolder + tail\n+\t}\n \treturn strings.ToUpper(f.Name) + tail\n }\n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    "README.md",
+    "_examples/shell/main.go",
+    "build.go",
+    "camelcase.go",
+    "context.go",
+    "context_test.go",
+    "global.go",
+    "global_test.go",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "kong.go",
+    "kong_test.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "tokentype_string.go"
+  ],
+  "explanation": {
+    "what": "Flag.FormatPlaceHolder() でのプレースホルダー決定の優先順位を入れ替えた。従来は PlaceHolder タグ→Default値→フィールド名大文字化 の順だったが、Default値→PlaceHolder タグ→フィールド名大文字化 の順にした。",
+    "why": "コミットメッセージ「Fix display of default value in placeholder.」の通り、明示的な PlaceHolder タグがあると default 値がヘルプ表示に出てこない不具合があったとみられる。デフォルト値を先に見るよう順序を変えることで、`--flag=DEFAULTVALUE` のようにデフォルト値がヘルプの型プレースホルダーとして優先的に表示されるようになる。",
+    "highlights": [
+      { "file": "model.go", "note": "FormatPlaceHolder() 内の if ブロックの並び順を入れ替えた1コミット" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

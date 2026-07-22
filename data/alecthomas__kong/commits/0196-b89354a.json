@@ -1,0 +1,122 @@
+{
+  "seq": 196,
+  "sha": "b89354adb0c0af65cda278ddccb0ff860808e8f0",
+  "parents": [
+    "b11ebc500bcc282daebe03fd1ffa7cd3a4736304"
+  ],
+  "author": {
+    "name": "Cam Hutchison",
+    "email": "camh@xdna.net",
+    "date": "2020-06-01T22:27:02+10:00"
+  },
+  "message": "Fix sep:\"none\" and mapsep:\"none\"\n\nAccording to the README.md, a value of `\"none\"` for the `sep` tag (for\nslices) and `mapsep` (for maps) is meant to disable the separator that\nwould allow multiple entries to be added from a single argument.\nHowever, using `\"none\"` just set the separator to the rune `'n'`.\n\nFix the parsing of the tag, and also update `SplitEscaped` to not split\nwith a separator of `-1`.\n\nAdd a new test for the new cases.",
+  "pr": {
+    "number": 85,
+    "title": "Fix sep:\"none\" and mapsep:\"none\"",
+    "body": "According to the README.md, a value of `\"none\"` for the `sep` tag (for\nslices) and `mapsep` (for maps) is meant to disable the separator that\nwould allow multiple entries to be added from a single argument.\nHowever, using `\"none\"` just set the separator to the rune `'n'`.\n\nFix the parsing of the tag, and also update `SplitEscaped` to not split\nwith a separator of `-1`.\n\nAdd a new test for the new cases.",
+    "url": "https://github.com/alecthomas/kong/pull/85"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 3,
+    "additions": 26,
+    "deletions": 10
+  },
+  "files": [
+    {
+      "path": "mapper.go",
+      "status": "M",
+      "additions": 3,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "mapper_test.go",
+      "status": "M",
+      "additions": 13,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "tag.go",
+      "status": "M",
+      "additions": 10,
+      "deletions": 10,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/mapper.go b/mapper.go\nindex d038cb0..8a1944d 100644\n--- a/mapper.go\n+++ b/mapper.go\n@@ -636,6 +636,9 @@ func urlMapper() MapperFunc {\n //\n //     SplitEscaped(`hello\\,there,bob`, ',') == []string{\"hello,there\", \"bob\"}\n func SplitEscaped(s string, sep rune) (out []string) {\n+\tif sep == -1 {\n+\t\treturn []string{s}\n+\t}\n \tescaped := false\n \ttoken := \"\"\n \tfor _, ch := range s {\ndiff --git a/mapper_test.go b/mapper_test.go\nindex 14f06d5..b6d7737 100644\n--- a/mapper_test.go\n+++ b/mapper_test.go\n@@ -130,6 +130,7 @@ func TestDurationMapper(t *testing.T) {\n func TestSplitEscaped(t *testing.T) {\n \trequire.Equal(t, []string{\"a\", \"b\"}, kong.SplitEscaped(\"a,b\", ','))\n \trequire.Equal(t, []string{\"a,b\", \"c\"}, kong.SplitEscaped(`a\\,b,c`, ','))\n+\trequire.Equal(t, []string{\"a,b,c\"}, kong.SplitEscaped(`a,b,c`, -1))\n }\n \n func TestJoinEscaped(t *testing.T) {\n@@ -172,6 +173,18 @@ func TestMapWithDifferentSeparator(t *testing.T) {\n \trequire.Equal(t, map[string]string{\"a\": \"b\", \"c\": \"d\"}, cli.Value)\n }\n \n+func TestMapWithNoSeparator(t *testing.T) {\n+\tvar cli struct {\n+\t\tSlice []string          `sep:\"none\"`\n+\t\tValue map[string]string `mapsep:\"none\"`\n+\t}\n+\tk := mustNew(t, &cli)\n+\t_, err := k.Parse([]string{\"--slice=a,n,c\", \"--value=a=b;n=d\"})\n+\trequire.NoError(t, err)\n+\trequire.Equal(t, []string{\"a,n,c\"}, cli.Slice)\n+\trequire.Equal(t, map[string]string{\"a\": \"b;n=d\"}, cli.Value)\n+}\n+\n func TestURLMapper(t *testing.T) {\n \tvar cli struct {\n \t\tURL *url.URL `arg:\"\"`\ndiff --git a/tag.go b/tag.go\nindex 88380fe..b0d2fe5 100644\n--- a/tag.go\n+++ b/tag.go\n@@ -151,23 +151,23 @@ func parseTag(fv reflect.Value, ft reflect.StructField) *Tag {\n \tt.Short, _ = t.GetRune(\"short\")\n \tt.Hidden = t.Has(\"hidden\")\n \tt.Format = t.Get(\"format\")\n-\tt.Sep, _ = t.GetRune(\"sep\")\n-\tt.MapSep, _ = t.GetRune(\"mapsep\")\n \tt.Group = t.Get(\"group\")\n \tt.Xor = t.Get(\"xor\")\n \tt.Prefix = t.Get(\"prefix\")\n \tt.Embed = t.Has(\"embed\")\n-\tif t.Sep == 0 {\n-\t\tif t.Get(\"sep\") == \"none\" {\n-\t\t\tt.Sep = -1\n-\t\t} else {\n+\tif t.Get(\"sep\") == \"none\" {\n+\t\tt.Sep = -1\n+\t} else {\n+\t\tt.Sep, _ = t.GetRune(\"sep\")\n+\t\tif t.Sep == 0 {\n \t\t\tt.Sep = ','\n \t\t}\n \t}\n-\tif t.MapSep == 0 {\n-\t\tif t.Get(\"mapsep\") == \"none\" {\n-\t\t\tt.MapSep = -1\n-\t\t} else {\n+\tif t.Get(\"mapsep\") == \"none\" {\n+\t\tt.MapSep = -1\n+\t} else {\n+\t\tt.MapSep, _ = t.GetRune(\"mapsep\")\n+\t\tif t.MapSep == 0 {\n \t\t\tt.MapSep = ';'\n \t\t}\n \t}\n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    ".golangci.yml",
+    "COPYING",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/README.md",
+    "_examples/server/console.go",
+    "_examples/server/go.mod",
+    "_examples/server/go.sum",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/main.go",
+    "benchmark_test.go",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "config_test.go",
+    "context.go",
+    "defaults.go",
+    "defaults_test.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "go.mod",
+    "go.sum",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "util.go",
+    "util_test.go",
+    "visit.go"
+  ],
+  "explanation": {
+    "what": "tag.go の parseTag() で sep:\"none\" / mapsep:\"none\" の判定を GetRune() 呼び出しより前に行うよう順序を修正し、\"none\" のときは Sep/MapSep に -1 を設定するようにした。mapper.go の SplitEscaped() には sep == -1 なら分割せず元の文字列をそのまま1要素として返す早期リターンを追加。テストも追加している。",
+    "why": "PR #85 のコミットメッセージが述べる通り、README.md では sep:\"none\" / mapsep:\"none\" は区切りを無効化する仕様のはずが、実装は `t.Get(\"sep\") == \"none\"` の判定より先に `t.GetRune(\"sep\")` を呼んでいたため、\"none\" という文字列の先頭ルーン 'n' がそのまま区切り文字として使われてしまうバグがあった。判定順序を直し、SplitEscaped() 側にも sep=-1(区切りなし)を明示的に扱う分岐を足すことで本来の仕様通りに修正した。",
+    "highlights": [
+      { "file": "tag.go", "note": "\"none\" 判定を GetRune() 呼び出しの前に置くよう if/else の構造を入れ替え" },
+      { "file": "mapper.go", "note": "SplitEscaped() に sep == -1 の早期リターンを追加(区切りなしで1要素として返す)" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [{ "type": "pr", "number": 85, "url": "https://github.com/alecthomas/kong/pull/85" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

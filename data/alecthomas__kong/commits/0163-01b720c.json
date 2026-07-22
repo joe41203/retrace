@@ -1,0 +1,123 @@
+{
+  "seq": 163,
+  "sha": "01b720cb1936eee10fc8e066054a5f5b4e2d9ad1",
+  "parents": [
+    "d4df212f82a7c3f333697e9f1abbb14a95151b5a"
+  ],
+  "author": {
+    "name": "Alec Thomas",
+    "email": "alec@swapoff.org",
+    "date": "2020-01-10T12:15:38+11:00"
+  },
+  "message": "Test and docs for TextUnmarshaler and json.Unmarshaler.",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 4,
+    "additions": 46,
+    "deletions": 4
+  },
+  "files": [
+    {
+      "path": "README.md",
+      "status": "M",
+      "additions": 5,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "go.mod",
+      "status": "M",
+      "additions": 0,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "go.sum",
+      "status": "M",
+      "additions": 0,
+      "deletions": 2,
+      "binary": false
+    },
+    {
+      "path": "mapper_test.go",
+      "status": "M",
+      "additions": 41,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/README.md b/README.md\nindex 50d3a2e..75c8c7e 100644\n--- a/README.md\n+++ b/README.md\n@@ -392,7 +392,11 @@ specifies the element type. For maps, the tag has the format\n <a id=\"markdown-custom-decoders-mappers\" name=\"custom-decoders-mappers\"></a>\n ## Custom decoders (mappers)\n \n-If a field implements the [MapperValue](https://godoc.org/github.com/alecthomas/kong#MapperValue)\n+Any field implementing `encoding.TextUnmarshaler` or `json.Unmarshaler` will use those interfaces\n+for decoding values.\n+\n+For more fine-grained control, if a field implements the\n+[MapperValue](https://godoc.org/github.com/alecthomas/kong#MapperValue)\n interface it will be used to decode arguments into the field.\n \n <a id=\"markdown-supported-tags\" name=\"supported-tags\"></a>\ndiff --git a/go.mod b/go.mod\nindex c6f418f..8bbc12d 100644\n--- a/go.mod\n+++ b/go.mod\n@@ -2,7 +2,6 @@ module github.com/alecthomas/kong\n \n require (\n \tgithub.com/davecgh/go-spew v1.1.1 // indirect\n-\tgithub.com/mitchellh/mapstructure v1.1.2\n \tgithub.com/pkg/errors v0.8.1\n \tgithub.com/pmezard/go-difflib v1.0.0 // indirect\n \tgithub.com/stretchr/testify v1.2.2\ndiff --git a/go.sum b/go.sum\nindex 22a1f3c..c935d68 100644\n--- a/go.sum\n+++ b/go.sum\n@@ -1,7 +1,5 @@\n github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=\n github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=\n-github.com/mitchellh/mapstructure v1.1.2 h1:fmNYVwqnSfB9mZU6OS2O6GsXM+wcskZDuKQzvN1EDeE=\n-github.com/mitchellh/mapstructure v1.1.2/go.mod h1:FVVH3fgwuzCH5S8UJGiWEs2h04kUh9fWfEaFds41c1Y=\n github.com/pkg/errors v0.8.1 h1:iURUrRGxPUNPdy5/HRSm+Yj6okJ6UtLINN0Q9M4+h3I=\n github.com/pkg/errors v0.8.1/go.mod h1:bwawxfHBFNV+L2hUp1rHADufV3IMtnDRdf1r5NINEl0=\n github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZbAQM=\ndiff --git a/mapper_test.go b/mapper_test.go\nindex 12def43..3338cff 100644\n--- a/mapper_test.go\n+++ b/mapper_test.go\n@@ -2,11 +2,13 @@ package kong_test\n \n import (\n \t\"bytes\"\n+\t\"encoding/json\"\n \t\"fmt\"\n \t\"io/ioutil\"\n \t\"net/url\"\n \t\"os\"\n \t\"reflect\"\n+\t\"strings\"\n \t\"testing\"\n \t\"time\"\n \n@@ -28,6 +30,45 @@ func TestValueMapper(t *testing.T) {\n \trequire.Equal(t, \"MOO\", cli.Flag)\n }\n \n+type textUnmarshalerValue string\n+\n+func (m *textUnmarshalerValue) UnmarshalText(text []byte) error {\n+\t*m = textUnmarshalerValue(strings.ToUpper(string(text)))\n+\treturn nil\n+}\n+\n+func TestTextUnmarshaler(t *testing.T) {\n+\tvar cli struct {\n+\t\tValue textUnmarshalerValue\n+\t}\n+\tp := mustNew(t, &cli)\n+\t_, err := p.Parse([]string{\"--value=hello\"})\n+\trequire.NoError(t, err)\n+\trequire.Equal(t, \"HELLO\", string(cli.Value))\n+}\n+\n+type jsonUnmarshalerValue string\n+\n+func (j *jsonUnmarshalerValue) UnmarshalJSON(text []byte) error {\n+\tvar v string\n+\terr := json.Unmarshal(text, &v)\n+\tif err != nil {\n+\t\treturn err\n+\t}\n+\t*j = jsonUnmarshalerValue(strings.ToUpper(v))\n+\treturn nil\n+}\n+\n+func TestJSONUnmarshaler(t *testing.T) {\n+\tvar cli struct {\n+\t\tValue jsonUnmarshalerValue\n+\t}\n+\tp := mustNew(t, &cli)\n+\t_, err := p.Parse([]string{\"--value=hello\"})\n+\trequire.NoError(t, err)\n+\trequire.Equal(t, \"HELLO\", string(cli.Value))\n+}\n+\n func TestNamedMapper(t *testing.T) {\n \tvar cli struct {\n \t\tFlag string `type:\"moo\"`\n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    ".golangci.yml",
+    "COPYING",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/console.go",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/main.go",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "config_test.go",
+    "context.go",
+    "defaults.go",
+    "defaults_test.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "go.mod",
+    "go.sum",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "util.go",
+    "util_test.go",
+    "visit.go"
+  ],
+  "explanation": {
+    "what": "mapper_test.go に encoding.TextUnmarshaler(UnmarshalText)と json.Unmarshaler(UnmarshalJSON)を実装した独自型のテスト(TestTextUnmarshaler, TestJSONUnmarshaler)を追加し、README.md の「Custom decoders (mappers)」節に両インターフェースが自動で使われる旨の説明文を追記した。あわせて go.mod/go.sum から未使用になっていた github.com/mitchellh/mapstructure 依存を削除している。このコミット自体では mapper.go は変更されていない。",
+    "why": "このコミットは既存の(または暗黙の)デコード経路を検証・文書化する回であり、TextUnmarshaler/json.Unmarshaler を明示的にサポートする実装コード(mapper.go 側の型登録)は含まれていない。実装本体は後続コミット(seq168)で追加される。",
+    "highlights": [
+      { "file": "mapper_test.go", "note": "UnmarshalText/UnmarshalJSON を実装した最小の独自型でパーサ経由の値変換を検証するテスト" },
+      { "file": "README.md", "note": "encoding.TextUnmarshaler / json.Unmarshaler が自動的に使われる、という利用者向けの説明を追記" }
+    ],
+    "langNotes": [
+      { "topic": "encoding.TextUnmarshaler", "note": "Go 標準ライブラリの `encoding` パッケージが定義するインターフェースで、`UnmarshalText([]byte) error` を実装する型はテキスト形式からの自己デコード方法を提供できる。Kong はこれを実装した型を検出してコマンドライン引数の値を自動変換する。" },
+      { "topic": "json.Unmarshaler", "note": "`encoding/json` パッケージのインターフェースで `UnmarshalJSON([]byte) error` を実装すると JSON デコード時の挙動をカスタマイズできる。Kong では TextUnmarshaler が無い場合のフォールバックとして利用される。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

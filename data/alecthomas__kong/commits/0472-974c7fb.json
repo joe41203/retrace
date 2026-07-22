@@ -1,0 +1,153 @@
+{
+  "seq": 472,
+  "sha": "974c7fb35e2e92c7e3b4b32a701d423013ba909c",
+  "parents": [
+    "b73962b8de52cf07d397b5a74856ba9340d0eaca"
+  ],
+  "author": {
+    "name": "Charlie Tonneslan",
+    "email": "cst0520@gmail.com",
+    "date": "2026-05-19T07:07:29-04:00"
+  },
+  "message": "support the env tag on positional arguments (#601)\n\nMove env-tag interpolation out of the if value.Flag != nil branch so\npositionals get the same treatment flags already do: env values get\ntheir own ${...} interpolated, the env tag sets the default via\nValue.Reset (which already reads Tag.Envs), and the help template's\n${env} resolves to the first env name.\n\nSigned-off-by: Charlie Tonneslan <cst0520@gmail.com>",
+  "pr": {
+    "number": 601,
+    "title": "Support the env tag on positional arguments (closes #556)",
+    "body": "Took another swing at this per the feedback on #599.\n\nThe previous version just defaulted \\${env} to \\`\\\"\\\"\\` for positionals, which (rightly) only papered over the panic. This version actually supports the \\`env\\` tag on positionals: env-value interpolation runs unconditionally off \\`value.Tag.Envs\\`, the help template's \\`\\${env}\\` resolves to the first env name, and \\`Value.Reset\\` already reads \\`Tag.Envs\\` so an env var fills the positional when it's omitted on argv.\n\n\\`TestPositionalArgWithEnv\\` covers both halves (help interpolation + env-as-default).\n\ncloses #556",
+    "url": "https://github.com/alecthomas/kong/pull/601"
+  },
+  "linkedIssues": [
+    {
+      "number": 556,
+      "title": "Panic with `${env}` in help for positional arguments",
+      "body": "I would like to use `${env}` in the help message of a positional argument. It would make it consistent with my options. When I try to, help in Kong 1.12.1 panics saying \"undefined variable\".\n\nHere is an demo.\n\n## Option with `${env}`\n\n```none\nmodule test\n\ngo 1.25.0\n\nrequire github.com/alecthomas/kong v1.12.1\n```\n\n```go\npackage main\n\nimport (\n\t\"github.com/alecthomas/kong\"\n)\n\nvar cli struct {\n\tFoo string `help:\"Foo (${env})\" env:\"FOO\"`\n}\n\nfunc main() {\n\tctx := kong.Parse(&cli)\n\terr := ctx.Run()\n\tctx.FatalIfErrorf(err)\n}\n```\n\nLet's build and run:\n\n```none\n> go build && ./test -h\nUsage: test [flags]\n\nFlags:\n  -h, --help          Show context-sensitive help.\n      --foo=STRING    Foo (FOO)\n```\n\n## Argument with `${env}`\n\nLet's use `arg:\"\"` to turn `Foo` into a positional argument, leaving everything else unchanged:\n\n```go\npackage main\n\nimport (\n\t\"github.com/alecthomas/kong\"\n)\n\nvar cli struct {\n\tFoo string `arg:\"\" help:\"Foo (${env})\" env:\"FOO\"`\n}\n\nfunc main() {\n\tctx := kong.Parse(&cli)\n\terr := ctx.Run()\n\tctx.FatalIfErrorf(err)\n}\n```\n\nThe program panics:\n\n```none\n> go build && ./test -h\npanic: help for <foo>: undefined variable ${env}\n\ngoroutine 1 [running]:\ngithub.com/alecthomas/kong.Parse({0x598660?, 0x757830?}, {0x0?, 0xc000110068?, 0x0?})\n        /home/dbohdan/go/pkg/mod/github.com/alecthomas/kong@v1.12.1/global.go:11 +0xa5\nmain.main()\n        /tmp/demo/main.go:12 +0x28\n```\n\n## Argument without `${env}`\n\nNow let's remove `${env}` from the description:\n\n```go\npackage main\n\nimport (\n\t\"github.com/alecthomas/kong\"\n)\n\nvar cli struct {\n\tFoo string `arg:\"\" help:\"Foo\" env:\"FOO\"`\n}\n\nfunc main() {\n\tctx := kong.Parse(&cli)\n\terr := ctx.Run()\n\tctx.FatalIfErrorf(err)\n}\n```\n\nIt works again:\n\n```none\n> go build && ./test -h\nUsage: test <foo>\n\nArguments:\n  <foo>    Foo ($FOO)\n\nFlags:\n  -h, --help    Show context-sensitive help.\n```",
+      "url": "https://github.com/alecthomas/kong/issues/556"
+    }
+  ],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 26,
+    "deletions": 11
+  },
+  "files": [
+    {
+      "path": "kong.go",
+      "status": "M",
+      "additions": 10,
+      "deletions": 11,
+      "binary": false
+    },
+    {
+      "path": "kong_test.go",
+      "status": "M",
+      "additions": 16,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/kong.go b/kong.go\nindex ca5c90a..93b0830 100644\n--- a/kong.go\n+++ b/kong.go\n@@ -266,18 +266,17 @@ func (k *Kong) interpolateValue(value *Value, vars Vars) (err error) {\n \t\t\"default\": value.Default,\n \t\t\"enum\":    value.Enum,\n \t}\n-\tif value.Flag != nil {\n-\t\tfor i, env := range value.Flag.Envs {\n-\t\t\tif value.Flag.Envs[i], err = interpolate(env, vars, updatedVars); err != nil {\n-\t\t\t\treturn fmt.Errorf(\"env value for %s: %s\", value.Summary(), err)\n-\t\t\t}\n+\tfor i, env := range value.Tag.Envs {\n+\t\tif value.Tag.Envs[i], err = interpolate(env, vars, updatedVars); err != nil {\n+\t\t\treturn fmt.Errorf(\"env value for %s: %s\", value.Summary(), err)\n \t\t}\n-\t\tvalue.Tag.Envs = value.Flag.Envs\n-\t\tupdatedVars[\"env\"] = \"\"\n-\t\tif len(value.Flag.Envs) != 0 {\n-\t\t\tupdatedVars[\"env\"] = value.Flag.Envs[0]\n-\t\t}\n-\n+\t}\n+\tupdatedVars[\"env\"] = \"\"\n+\tif len(value.Tag.Envs) != 0 {\n+\t\tupdatedVars[\"env\"] = value.Tag.Envs[0]\n+\t}\n+\tif value.Flag != nil {\n+\t\tvalue.Flag.Envs = value.Tag.Envs\n \t\tvalue.Flag.PlaceHolder, err = interpolate(value.Flag.PlaceHolder, vars, updatedVars)\n \t\tif err != nil {\n \t\t\treturn fmt.Errorf(\"placeholder value for %s: %s\", value.Summary(), err)\ndiff --git a/kong_test.go b/kong_test.go\nindex 3eacce5..00add0a 100644\n--- a/kong_test.go\n+++ b/kong_test.go\n@@ -864,6 +864,22 @@ func TestIssue244(t *testing.T) {\n \tassert.Contains(t, w.String(), `Environment variable: CI_PROJECT_ID`)\n }\n \n+func TestPositionalArgWithEnv(t *testing.T) {\n+\ttype Config struct {\n+\t\tFoo string `arg:\"\" env:\"FOO\" help:\"Foo (${env})\"`\n+\t}\n+\t// Help template should interpolate ${env} from the env tag (#556).\n+\t_, err := kong.New(&Config{})\n+\tassert.NoError(t, err)\n+\n+\t// Value should also fill from the env var when the positional is omitted.\n+\tt.Setenv(\"FOO\", \"from-env\")\n+\tvar cli Config\n+\t_, err = mustNew(t, &cli).Parse(nil)\n+\tassert.NoError(t, err)\n+\tassert.Equal(t, \"from-env\", cli.Foo)\n+}\n+\n func TestErrorMissingArgs(t *testing.T) {\n \tvar cli struct {\n \t\tOne string `arg:\"\"`\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/FUNDING.yml",
+    ".github/workflows/ci.yml",
+    ".gitignore",
+    ".golangci.yml",
+    "COPYING",
+    "README.md",
+    "_examples/asciilogo/main.go",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/README.md",
+    "_examples/server/console.go",
+    "_examples/server/go.mod",
+    "_examples/server/go.sum",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/commandstring/main.go",
+    "_examples/shell/help/README.md",
+    "_examples/shell/help/main.go",
+    "benchmark_test.go",
+    "bin/.go-1.26.3.pkg",
+    "bin/.golangci-lint-1.64.5.pkg",
+    "bin/.lefthook-1.13.6.pkg",
+    "bin/README.hermit.md",
+    "bin/activate-hermit",
+    "bin/go",
+    "bin/gofmt",
+    "bin/golangci-lint",
+    "bin/hermit",
+    "bin/hermit.hcl",
+    "bin/lefthook",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "config_test.go",
+    "context.go",
+    "defaults.go",
+    "defaults_test.go",
+    "doc.go",
+    "error.go",
+    "exit.go",
+    "global.go",
+    "global_test.go",
+    "go.mod",
+    "go.sum",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "helpwrap1.18_test.go",
+    "helpwrap1.19_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "lefthook.yml",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_linux_test.go",
+    "mapper_test.go",
+    "mapper_windows_test.go",
+    "model.go",
+    "model_test.go",
+    "negatable.go",
+    "options.go",
+    "options_test.go",
+    "renovate.json5",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "signature_test.go",
+    "tag.go",
+    "tag_test.go",
+    "testdata/file.txt",
+    "util.go",
+    "util_test.go",
+    "visit.go"
+  ],
+  "explanation": {
+    "what": "kong.go の interpolateValue で env タグの ${...} 補間処理を `if value.Flag != nil` ブロックの外に出し、value.Tag.Envs を直接読むように書き換えた。これにより env 名の補間・updatedVars[\"env\"] の設定(ヘルプ文字列内の ${env} が最初の env 名に解決される)が Flag だけでなく位置引数(positional argument)にも適用されるようになった。Flag 固有の PlaceHolder 補間は従来どおり value.Flag != nil のブロック内に残している。kong_test.go に TestPositionalArgWithEnv を追加し、ヘルプの ${env} 補間と、引数省略時に env 変数から値が入ることの両方を検証した。",
+    "why": "issue #556 では、位置引数(arg:\"\")に env タグを付けてヘルプ文字列に ${env} を使うと `panic: undefined variable ${env}` になる不具合が報告されていた。原因は interpolateValue が env 関連の補間ロジックを value.Flag != nil の分岐に閉じ込めており、Flag を持たない位置引数では ${env} が未定義変数のまま扱われていたため。本PRは #599 へのフィードバックを受けた再挑戦で、単に ${env} を空文字にごまかす前バージョンと異なり、位置引数でも env タグを実際に機能させる(値の穴埋めも含む)方向で修正している。",
+    "highlights": [
+      { "file": "kong.go", "note": "interpolateValue: env 補間を value.Flag != nil の外側に移し、Tag.Envs を直接扱う" },
+      { "file": "kong_test.go", "note": "TestPositionalArgWithEnv でヘルプ補間とデフォルト値埋めの両方を確認" }
+    ],
+    "langNotes": [
+      { "topic": "env tag on positional arguments", "note": "Kong では arg:\"\" と env:\"NAME\" を組み合わせると、コマンドライン引数が省略された場合に環境変数から値を補完できる。本コミットまでは Flag(--flag 形式)専用の実装だったため位置引数では機能せず、ヘルプ文字列の ${env} 展開もパニックしていた。" }
+    ],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [
+      { "type": "pr", "number": 601, "url": "https://github.com/alecthomas/kong/pull/601" },
+      { "type": "issue", "number": 556, "url": "https://github.com/alecthomas/kong/issues/556" }
+    ],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

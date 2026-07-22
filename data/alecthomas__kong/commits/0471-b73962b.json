@@ -1,0 +1,151 @@
+{
+  "seq": 471,
+  "sha": "b73962b8de52cf07d397b5a74856ba9340d0eaca",
+  "parents": [
+    "7ee1766153b2ee0f01683824c7e89b127a5022c0"
+  ],
+  "author": {
+    "name": "JinHyuk Sung",
+    "email": "163989462+sjh9714@users.noreply.github.com",
+    "date": "2026-05-19T20:06:06+09:00"
+  },
+  "message": "Fix mixed bare and kong tags (#602)",
+  "pr": {
+    "number": 602,
+    "title": "Fix mixed bare and kong tags",
+    "body": "## Summary\n\nFixes parsing fields that combine bare tags with a `kong:\"...\"` tag.\n\n## What changed\n\n- Added regression coverage for an embedded struct that mixes bare `required`/`xor` tags with `kong:\"predictor=...\"`.\n- Parsed bare field tags and `kong` field tags together instead of choosing only one form.\n- Preserved `kong:\"-\"` ignore behavior and existing bare-only / kong-only tag behavior.\n\n## Why\n\nIssue #558 reports that adding `kong:\"predictor=session-name\"` to a field causes bare tags such as `required:\"\"` and `xor:\"...\"` to be ignored, which contradicts the README statement that both tag forms can coexist.\n\n## Testing\n\n- `go test ./... -run TestBareAndKongTagsCoexist`\n- `go test ./...`\n\nFixes #558\n",
+    "url": "https://github.com/alecthomas/kong/pull/602"
+  },
+  "linkedIssues": [
+    {
+      "number": 558,
+      "title": "bare tags and kong: tags don't work together in an embedded struct",
+      "body": "This particular setup doesn't behave the way I want: https://go.dev/play/p/vYCFMxlM9Lk\n\n(gist in case the playground link ever expires https://gist.github.com/dgunay/3755d6956bc2c35ce11b26961c8fe97b)\n\nI want to be able to reuse the behavior \"either `--name=STRING` or `--pick` are required\", by embedding the struct into other commands. It works, until I add the `kong:\"predictor=session-name\"` tag, then the xor requirement no longer works.\n\nI am able to work around it by changing all the tags to go under a `kong:` tag. Changing the predictor tag to be bare does not work (probably due to some implementation detail of https://github.com/WillAbides/kongplete.)\n\nAnyway, this contradicts the readme: https://github.com/alecthomas/kong/blob/ecee83026aa9af0f2cd9e4897e201c8a2bf2efe4/README.md?plain=1#L566",
+      "url": "https://github.com/alecthomas/kong/issues/558"
+    }
+  ],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 51,
+    "deletions": 7
+  },
+  "files": [
+    {
+      "path": "tag.go",
+      "status": "M",
+      "additions": 19,
+      "deletions": 7,
+      "binary": false
+    },
+    {
+      "path": "tag_test.go",
+      "status": "M",
+      "additions": 32,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/tag.go b/tag.go\nindex 3cfc129..c517af1 100644\n--- a/tag.go\n+++ b/tag.go\n@@ -166,13 +166,25 @@ func parseTagItems(tagString string, chr tagChars) (map[string][]string, error)\n \treturn d, nil\n }\n \n-func getTagInfo(tag reflect.StructTag) (string, tagChars) {\n-\ts, ok := tag.Lookup(\"kong\")\n-\tif ok {\n-\t\treturn s, kongChars\n+func parseStructTagItems(tag reflect.StructTag) (map[string][]string, error) {\n+\titems, err := parseTagItems(string(tag), bareChars)\n+\tif err != nil {\n+\t\treturn nil, err\n \t}\n+\tdelete(items, \"kong\")\n \n-\treturn string(tag), bareChars\n+\tkongTag, ok := tag.Lookup(\"kong\")\n+\tif !ok {\n+\t\treturn items, nil\n+\t}\n+\tkongItems, err := parseTagItems(kongTag, kongChars)\n+\tif err != nil {\n+\t\treturn nil, err\n+\t}\n+\tfor key, value := range kongItems {\n+\t\titems[key] = append(value, items[key]...)\n+\t}\n+\treturn items, nil\n }\n \n func newEmptyTag() *Tag {\n@@ -208,14 +220,14 @@ func parseTag(parent reflect.Value, ft reflect.StructField) (*Tag, error) {\n \t// First use a [Signature] if present\n \tsignatureTag, ok := maybeGetSignature(ft.Type)\n \tif ok {\n-\t\tsignatureItems, err := parseTagItems(getTagInfo(signatureTag))\n+\t\tsignatureItems, err := parseStructTagItems(signatureTag)\n \t\tif err != nil {\n \t\t\treturn nil, err\n \t\t}\n \t\titems = signatureItems\n \t}\n \t// Next overlay the field's tags.\n-\tfieldItems, err := parseTagItems(getTagInfo(ft.Tag))\n+\tfieldItems, err := parseStructTagItems(ft.Tag)\n \tif err != nil {\n \t\treturn nil, err\n \t}\ndiff --git a/tag_test.go b/tag_test.go\nindex f648edc..4f75307 100644\n--- a/tag_test.go\n+++ b/tag_test.go\n@@ -109,6 +109,38 @@ func TestBareTagsWithJsonTag(t *testing.T) {\n \tassert.Equal(t, \"\", cli.Cmd.Arg)\n }\n \n+func TestBareAndKongTagsCoexist(t *testing.T) {\n+\ttype Source struct {\n+\t\tName string `required:\"\" xor:\"source\" kong:\"predictor=session-name\"`\n+\t\tPick bool   `required:\"\" xor:\"source\"`\n+\t}\n+\ttype CLI struct {\n+\t\tSource `embed:\"\"`\n+\t}\n+\n+\tcli := &CLI{}\n+\tp := mustNew(t, cli)\n+\t_, err := p.Parse(nil)\n+\tassert.EqualError(t, err, \"missing flags: --name=STRING or --pick\")\n+\n+\tcli = &CLI{}\n+\tp = mustNew(t, cli)\n+\t_, err = p.Parse([]string{\"--name=session\"})\n+\tassert.NoError(t, err)\n+\tassert.Equal(t, \"session\", cli.Name)\n+\n+\tcli = &CLI{}\n+\tp = mustNew(t, cli)\n+\t_, err = p.Parse([]string{\"--pick\"})\n+\tassert.NoError(t, err)\n+\tassert.True(t, cli.Pick)\n+\n+\tcli = &CLI{}\n+\tp = mustNew(t, cli)\n+\t_, err = p.Parse([]string{\"--name=session\", \"--pick\"})\n+\tassert.EqualError(t, err, \"--name and --pick can't be used together\")\n+}\n+\n func TestManySeps(t *testing.T) {\n \tvar cli struct {\n \t\tArg string `arg    optional    default:\"hi\"`\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/FUNDING.yml",
+    ".github/workflows/ci.yml",
+    ".gitignore",
+    ".golangci.yml",
+    "COPYING",
+    "README.md",
+    "_examples/asciilogo/main.go",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/README.md",
+    "_examples/server/console.go",
+    "_examples/server/go.mod",
+    "_examples/server/go.sum",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/commandstring/main.go",
+    "_examples/shell/help/README.md",
+    "_examples/shell/help/main.go",
+    "benchmark_test.go",
+    "bin/.go-1.26.3.pkg",
+    "bin/.golangci-lint-1.64.5.pkg",
+    "bin/.lefthook-1.13.6.pkg",
+    "bin/README.hermit.md",
+    "bin/activate-hermit",
+    "bin/go",
+    "bin/gofmt",
+    "bin/golangci-lint",
+    "bin/hermit",
+    "bin/hermit.hcl",
+    "bin/lefthook",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "config_test.go",
+    "context.go",
+    "defaults.go",
+    "defaults_test.go",
+    "doc.go",
+    "error.go",
+    "exit.go",
+    "global.go",
+    "global_test.go",
+    "go.mod",
+    "go.sum",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "helpwrap1.18_test.go",
+    "helpwrap1.19_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "lefthook.yml",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_linux_test.go",
+    "mapper_test.go",
+    "mapper_windows_test.go",
+    "model.go",
+    "model_test.go",
+    "negatable.go",
+    "options.go",
+    "options_test.go",
+    "renovate.json5",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "signature_test.go",
+    "tag.go",
+    "tag_test.go",
+    "testdata/file.txt",
+    "util.go",
+    "util_test.go",
+    "visit.go"
+  ],
+  "explanation": {
+    "what": "tag.go の getTagInfo を parseStructTagItems に置き換え、フィールドの bare タグ(`required:\"\"` や `xor:\"...\"` のように kong: を付けない直書き形式)と kong:\"...\" タグを「どちらか一方」ではなく両方パースしてマージするようにした。bare タグ由来の items をベースに、kong タグ側の値を同じキーの先頭へ追加(prepend)する形で合成している。tag_test.go に TestBareAndKongTagsCoexist を追加し、embed 先の構造体で bare の required/xor と kong:\"predictor=...\" が共存するケースを検証している。",
+    "why": "issue #558 が報告した通り、フィールドに kong:\"predictor=session-name\" を追加すると、同じフィールドにある bare な required:\"\" や xor:\"...\" タグが無視され、README が謳う「bare タグと kong タグは共存できる」という説明と矛盾していた。従来の getTagInfo はタグ文字列を kong: の有無で二者択一していたため、この共存が構造的に成り立たなかった。",
+    "highlights": [
+      { "file": "tag.go", "note": "parseStructTagItems が bare 由来 items と kong タグ由来 items を key ごとにマージする箇所" },
+      { "file": "tag_test.go", "note": "TestBareAndKongTagsCoexist: xor 制約と predictor タグの共存を4パターンで検証" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [
+      { "type": "pr", "number": 602, "url": "https://github.com/alecthomas/kong/pull/602" },
+      { "type": "issue", "number": 558, "url": "https://github.com/alecthomas/kong/issues/558" }
+    ],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

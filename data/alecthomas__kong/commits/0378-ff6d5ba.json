@@ -1,0 +1,169 @@
+{
+  "seq": 378,
+  "sha": "ff6d5ba7d577f672bed22e3aac4a235114702f19",
+  "parents": [
+    "5f9c5cc822bdb888a3671c44d4688a6f602ecb90"
+  ],
+  "author": {
+    "name": "Camilla",
+    "email": "Chi@Brachypelma.org",
+    "date": "2024-08-08T08:58:22+02:00"
+  },
+  "message": "Feature: Add xand tag (#442)\n\n* Feat: Add xand group and check for missing\r\n\r\n* Fix: Split and combine err in TestMultiand for consistency\r\n\r\n* Feat: Check missing required flags in xand groups\r\n\r\n* Feat: Handle combined xor and xand\r\n\r\n* Docs: Add info about combined xand and required use\r\n\r\n* Docs: Fix language error in xand description\r\n\r\nCo-authored-by: Stautis <thkrst@gmail.com>\r\n\r\n* Feat: Rename xand to and\r\n\r\n* Refactor: Switch from fmt.Sprintf to err.Error\r\n\r\n* Refactor: Get requiredAndGroup map in separate function\r\n\r\n---------\r\n\r\nCo-authored-by: Stautis <thkrst@gmail.com>",
+  "pr": {
+    "number": 442,
+    "title": "Feature: Add xand tag",
+    "body": "I have added the possibility to add a xand tag.\r\n\r\nIt works similarly to the xor tag, but requires all flags within the xand group to be set.\r\n\r\nI have tried to stay consistent to the style already used, and touch existing functions as little as possible.\r\n\r\nThe one issue I have not handled here which should probably be resolved before merging is the possibility of a user putting two or more flags in the same xor and xand group, which would cause problems. The reason I have not solved this issue is because I was a bit unsure about how you would like to handle it. Should it be up to the user to check for this when testing their application? Or should kong give an error? Do you have a standard for how you handle issues like this?",
+    "url": "https://github.com/alecthomas/kong/pull/442"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 7,
+    "additions": 195,
+    "deletions": 14
+  },
+  "files": [
+    {
+      "path": "README.md",
+      "status": "M",
+      "additions": 3,
+      "deletions": 2,
+      "binary": false
+    },
+    {
+      "path": "build.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "context.go",
+      "status": "M",
+      "additions": 77,
+      "deletions": 2,
+      "binary": false
+    },
+    {
+      "path": "go.sum",
+      "status": "M",
+      "additions": 0,
+      "deletions": 10,
+      "binary": false
+    },
+    {
+      "path": "kong_test.go",
+      "status": "M",
+      "additions": 109,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "model.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "tag.go",
+      "status": "M",
+      "additions": 4,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/README.md b/README.md\nindex 916ca6f..cbe6224 100644\n--- a/README.md\n+++ b/README.md\n@@ -554,7 +554,7 @@ Tags can be in two forms:\n Both can coexist with standard Tag parsing.\n \n | Tag                  | Description                                                                                                                                                                                                                                                                                                                    |\n-| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |\n+|----------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|\n | `cmd:\"\"`             | If present, struct is a command.                                                                                                                                                                                                                                                                                               |\n | `arg:\"\"`             | If present, field is an argument. Required by default.                                                                                                                                                                                                                                                                         |\n | `env:\"X,Y,...\"`      | Specify envars to use for default value. The envs are resolved in the declared order. The first value found is used.                                                                                                                                                                                                           |\n@@ -566,7 +566,7 @@ Both can coexist with standard Tag parsing.\n | `default:\"1\"`        | On a command, make it the default.                                                                                                                                                                                                                                                                                             |\n | `default:\"withargs\"` | On a command, make it the default and allow args/flags from that command                                                                                                                                                                                                                                                       |\n | `short:\"X\"`          | Short name, if flag.                                                                                                                                                                                                                                                                                                           |\n-| `aliases:\"X,Y\"`      | One or more aliases (for cmd or flag).                                                                                                                                                                                                                                                                                                 |\n+| `aliases:\"X,Y\"`      | One or more aliases (for cmd or flag).                                                                                                                                                                                                                                                                                         |\n | `required:\"\"`        | If present, flag/arg is required.                                                                                                                                                                                                                                                                                              |\n | `optional:\"\"`        | If present, flag/arg is optional.                                                                                                                                                                                                                                                                                              |\n | `hidden:\"\"`          | If present, command or flag is hidden.                                                                                                                                                                                                                                                                                         |\n@@ -577,6 +577,7 @@ Both can coexist with standard Tag parsing.\n | `enum:\"X,Y,...\"`     | Set of valid values allowed for this flag. An enum field must be `required` or have a valid `default`.                                                                                                                                                                                                                         |\n | `group:\"X\"`          | Logical group for a flag or command.                                                                                                                                                                                                                                                                                           |\n | `xor:\"X,Y,...\"`      | Exclusive OR groups for flags. Only one flag in the group can be used which is restricted within the same command. When combined with `required`, at least one of the `xor` group will be required.                                                                                                                            |\n+| `and:\"X,Y,...\"`      | Exclsuive AND groups for flags. All flags in the group must be used in the same command. When combined with `required`, all flags in the group will be required.                                                                                                                                                               |\n | `prefix:\"X\"`         | Prefix for all sub-flags.                                                                                                                                                                                                                                                                                                      |\n | `envprefix:\"X\"`      | Envar prefix for all sub-flags.                                                                                                                                                                                                                                                                                                |\n | `set:\"K=V\"`          | Set a variable for expansion by child elements. Multiples can occur.                                                                                                                                                                                                                                                           |\ndiff --git a/build.go b/build.go\nindex aed1f72..18048e0 100644\n--- a/build.go\n+++ b/build.go\n@@ -323,6 +323,7 @@ func buildField(k *Kong, node *Node, v reflect.Value, ft reflect.StructField, fv\n \t\t\tEnvs:        tag.Envs,\n \t\t\tGroup:       buildGroupForKey(k, tag.Group),\n \t\t\tXor:         tag.Xor,\n+\t\t\tAnd:         tag.And,\n \t\t\tHidden:      tag.Hidden,\n \t\t}\n \t\tvalue.Flag = flag\ndiff --git a/context.go b/context.go\nindex 03044ec..f5239c7 100644\n--- a/context.go\n+++ b/context.go\n@@ -259,7 +259,7 @@ func (c *Context) Validate() error { //nolint: gocyclo\n \tif err := checkMissingPositionals(positionals, node.Positional); err != nil {\n \t\treturn err\n \t}\n-\tif err := checkXorDuplicates(c.Path); err != nil {\n+\tif err := checkXorDuplicatedAndAndMissing(c.Path); err != nil {\n \t\treturn err\n \t}\n \n@@ -831,23 +831,35 @@ func (c *Context) PrintUsage(summary bool) error {\n func checkMissingFlags(flags []*Flag) error {\n \txorGroupSet := map[string]bool{}\n \txorGroup := map[string][]string{}\n+\tandGroupSet := map[string]bool{}\n+\tandGroup := map[string][]string{}\n \tmissing := []string{}\n+\tandGroupRequired := getRequiredAndGroupMap(flags)\n \tfor _, flag := range flags {\n+\t\tfor _, and := range flag.And {\n+\t\t\tflag.Required = andGroupRequired[and]\n+\t\t}\n \t\tif flag.Set {\n \t\t\tfor _, xor := range flag.Xor {\n \t\t\t\txorGroupSet[xor] = true\n \t\t\t}\n+\t\t\tfor _, and := range flag.And {\n+\t\t\t\tandGroupSet[and] = true\n+\t\t\t}\n \t\t}\n \t\tif !flag.Required || flag.Set {\n \t\t\tcontinue\n \t\t}\n-\t\tif len(flag.Xor) > 0 {\n+\t\tif len(flag.Xor) > 0 || len(flag.And) > 0 {\n \t\t\tfor _, xor := range flag.Xor {\n \t\t\t\tif xorGroupSet[xor] {\n \t\t\t\t\tcontinue\n \t\t\t\t}\n \t\t\t\txorGroup[xor] = append(xorGroup[xor], flag.Summary())\n \t\t\t}\n+\t\t\tfor _, and := range flag.And {\n+\t\t\t\tandGroup[and] = append(andGroup[and], flag.Summary())\n+\t\t\t}\n \t\t} else {\n \t\t\tmissing = append(missing, flag.Summary())\n \t\t}\n@@ -857,6 +869,11 @@ func checkMissingFlags(flags []*Flag) error {\n \t\t\tmissing = append(missing, strings.Join(flags, \" or \"))\n \t\t}\n \t}\n+\tfor _, flags := range andGroup {\n+\t\tif len(flags) > 1 {\n+\t\t\tmissing = append(missing, strings.Join(flags, \" and \"))\n+\t\t}\n+\t}\n \n \tif len(missing) == 0 {\n \t\treturn nil\n@@ -867,6 +884,18 @@ func checkMissingFlags(flags []*Flag) error {\n \treturn fmt.Errorf(\"missing flags: %s\", strings.Join(missing, \", \"))\n }\n \n+func getRequiredAndGroupMap(flags []*Flag) map[string]bool {\n+\tandGroupRequired := map[string]bool{}\n+\tfor _, flag := range flags {\n+\t\tfor _, and := range flag.And {\n+\t\t\tif flag.Required {\n+\t\t\t\tandGroupRequired[and] = true\n+\t\t\t}\n+\t\t}\n+\t}\n+\treturn andGroupRequired\n+}\n+\n func checkMissingChildren(node *Node) error {\n \tmissing := []string{}\n \n@@ -977,6 +1006,20 @@ func checkPassthroughArg(target reflect.Value) bool {\n \t}\n }\n \n+func checkXorDuplicatedAndAndMissing(paths []*Path) error {\n+\terrs := []string{}\n+\tif err := checkXorDuplicates(paths); err != nil {\n+\t\terrs = append(errs, err.Error())\n+\t}\n+\tif err := checkAndMissing(paths); err != nil {\n+\t\terrs = append(errs, err.Error())\n+\t}\n+\tif len(errs) > 0 {\n+\t\treturn fmt.Errorf(strings.Join(errs, \", \"))\n+\t}\n+\treturn nil\n+}\n+\n func checkXorDuplicates(paths []*Path) error {\n \tfor _, path := range paths {\n \t\tseen := map[string]*Flag{}\n@@ -995,6 +1038,38 @@ func checkXorDuplicates(paths []*Path) error {\n \treturn nil\n }\n \n+func checkAndMissing(paths []*Path) error {\n+\tfor _, path := range paths {\n+\t\tmissingMsgs := []string{}\n+\t\tandGroups := map[string][]*Flag{}\n+\t\tfor _, flag := range path.Flags {\n+\t\t\tfor _, and := range flag.And {\n+\t\t\t\tandGroups[and] = append(andGroups[and], flag)\n+\t\t\t}\n+\t\t}\n+\t\tfor _, flags := range andGroups {\n+\t\t\toneSet := false\n+\t\t\tnotSet := []*Flag{}\n+\t\t\tflagNames := []string{}\n+\t\t\tfor _, flag := range flags {\n+\t\t\t\tflagNames = append(flagNames, flag.Name)\n+\t\t\t\tif flag.Set {\n+\t\t\t\t\toneSet = true\n+\t\t\t\t} else {\n+\t\t\t\t\tnotSet = append(notSet, flag)\n+\t\t\t\t}\n+\t\t\t}\n+\t\t\tif len(notSet) > 0 && oneSet {\n+\t\t\t\tmissingMsgs = append(missingMsgs, fmt.Sprintf(\"--%s must be used together\", strings.Join(flagNames, \" and --\")))\n+\t\t\t}\n+\t\t}\n+\t\tif len(missingMsgs) > 0 {\n+\t\t\treturn fmt.Errorf(\"%s\", strings.Join(missingMsgs, \", \"))\n+\t\t}\n+\t}\n+\treturn nil\n+}\n+\n func findPotentialCandidates(needle string, haystack []string, format string, args ...interface{}) error {\n \tif len(haystack) == 0 {\n \t\treturn fmt.Errorf(format, args...)\ndiff --git a/go.sum b/go.sum\nindex fe9dd12..c65b342 100644\n--- a/go.sum\n+++ b/go.sum\n@@ -1,15 +1,5 @@\n-github.com/alecthomas/assert/v2 v2.4.1 h1:mwPZod/d35nlaCppr6sFP0rbCL05WH9fIo7lvsf47zo=\n-github.com/alecthomas/assert/v2 v2.4.1/go.mod h1:fw5suVxB+wfYJ3291t0hRTqtGzFYdSwstnRQdaQx2DM=\n-github.com/alecthomas/assert/v2 v2.5.0 h1:OJKYg53BQx06/bMRBSPDCO49CbCDNiUQXwdoNrt6x5w=\n-github.com/alecthomas/assert/v2 v2.5.0/go.mod h1:fw5suVxB+wfYJ3291t0hRTqtGzFYdSwstnRQdaQx2DM=\n-github.com/alecthomas/assert/v2 v2.6.0 h1:o3WJwILtexrEUk3cUVal3oiQY2tfgr/FHWiz/v2n4FU=\n-github.com/alecthomas/assert/v2 v2.6.0/go.mod h1:Bze95FyfUr7x34QZrjL+XP+0qgp/zg8yS+TtBj1WA3k=\n-github.com/alecthomas/assert/v2 v2.8.1 h1:YCxnYR6jjpfnEK5AK5SysALKdUEBPGH4Y7As6tBnDw0=\n-github.com/alecthomas/assert/v2 v2.8.1/go.mod h1:Bze95FyfUr7x34QZrjL+XP+0qgp/zg8yS+TtBj1WA3k=\n github.com/alecthomas/assert/v2 v2.10.0 h1:jjRCHsj6hBJhkmhznrCzoNpbA3zqy0fYiUcYZP/GkPY=\n github.com/alecthomas/assert/v2 v2.10.0/go.mod h1:Bze95FyfUr7x34QZrjL+XP+0qgp/zg8yS+TtBj1WA3k=\n-github.com/alecthomas/repr v0.3.0 h1:NeYzUPfjjlqHY4KtzgKJiWd6sVq2eNUPTi34PiFGjY8=\n-github.com/alecthomas/repr v0.3.0/go.mod h1:Fr0507jx4eOXV7AlPV6AVZLYrLIuIeSOWtW57eE/O/4=\n github.com/alecthomas/repr v0.4.0 h1:GhI2A8MACjfegCPVq9f1FLvIBS+DrQ2KQBFZP1iFzXc=\n github.com/alecthomas/repr v0.4.0/go.mod h1:Fr0507jx4eOXV7AlPV6AVZLYrLIuIeSOWtW57eE/O/4=\n github.com/hexops/gotextdiff v1.0.3 h1:gitA9+qJrrTCsiCl7+kh75nPqQt1cx4ZkudSTLoUqJM=\ndiff --git a/kong_test.go b/kong_test.go\nindex f3fb869..0f0bb86 100644\n--- a/kong_test.go\n+++ b/kong_test.go\n@@ -4,6 +4,7 @@ import (\n \t\"bytes\"\n \t\"errors\"\n \t\"fmt\"\n+\t\"sort\"\n \t\"strings\"\n \t\"testing\"\n \n@@ -919,6 +920,21 @@ func TestXor(t *testing.T) {\n \tassert.NoError(t, err)\n }\n \n+func TestAnd(t *testing.T) {\n+\tvar cli struct {\n+\t\tHello bool   `and:\"another\"`\n+\t\tOne   bool   `and:\"group\"`\n+\t\tTwo   string `and:\"group\"`\n+\t}\n+\tp := mustNew(t, &cli)\n+\t_, err := p.Parse([]string{\"--hello\", \"--one\"})\n+\tassert.EqualError(t, err, \"--one and --two must be used together\")\n+\n+\tp = mustNew(t, &cli)\n+\t_, err = p.Parse([]string{\"--one\", \"--two=hi\", \"--hello\"})\n+\tassert.NoError(t, err)\n+}\n+\n func TestXorChild(t *testing.T) {\n \tvar cli struct {\n \t\tOne bool `xor:\"group\"`\n@@ -936,6 +952,23 @@ func TestXorChild(t *testing.T) {\n \tassert.Error(t, err, \"--two and --three can't be used together\")\n }\n \n+func TestAndChild(t *testing.T) {\n+\tvar cli struct {\n+\t\tOne bool `and:\"group\"`\n+\t\tCmd struct {\n+\t\t\tTwo   string `and:\"group\"`\n+\t\t\tThree string `and:\"group\"`\n+\t\t} `cmd`\n+\t}\n+\tp := mustNew(t, &cli)\n+\t_, err := p.Parse([]string{\"--one\", \"cmd\", \"--two=hi\", \"--three=hello\"})\n+\tassert.NoError(t, err)\n+\n+\tp = mustNew(t, &cli)\n+\t_, err = p.Parse([]string{\"--two=hi\", \"cmd\"})\n+\tassert.Error(t, err, \"--two and --three must be used together\")\n+}\n+\n func TestMultiXor(t *testing.T) {\n \tvar cli struct {\n \t\tHello bool   `xor:\"one,two\"`\n@@ -952,6 +985,47 @@ func TestMultiXor(t *testing.T) {\n \tassert.EqualError(t, err, \"--hello and --two can't be used together\")\n }\n \n+func TestMultiAnd(t *testing.T) {\n+\tvar cli struct {\n+\t\tHello bool   `and:\"one,two\"`\n+\t\tOne   bool   `and:\"one\"`\n+\t\tTwo   string `and:\"two\"`\n+\t}\n+\n+\tp := mustNew(t, &cli)\n+\t_, err := p.Parse([]string{\"--hello\"})\n+\t// Split and combine error so messages always will be in the same order\n+\t// when testing\n+\tmissingMsgs := strings.Split(err.Error(), \", \")\n+\tsort.Strings(missingMsgs)\n+\terr = fmt.Errorf(\"%s\", strings.Join(missingMsgs, \", \"))\n+\tassert.EqualError(t, err, \"--hello and --one must be used together, --hello and --two must be used together\")\n+\n+\tp = mustNew(t, &cli)\n+\t_, err = p.Parse([]string{\"--two=foo\"})\n+\tassert.EqualError(t, err, \"--hello and --two must be used together\")\n+}\n+\n+func TestXorAnd(t *testing.T) {\n+\tvar cli struct {\n+\t\tHello bool   `xor:\"one\" and:\"two\"`\n+\t\tOne   bool   `xor:\"one\"`\n+\t\tTwo   string `and:\"two\"`\n+\t}\n+\n+\tp := mustNew(t, &cli)\n+\t_, err := p.Parse([]string{\"--hello\"})\n+\tassert.EqualError(t, err, \"--hello and --two must be used together\")\n+\n+\tp = mustNew(t, &cli)\n+\t_, err = p.Parse([]string{\"--one\"})\n+\tassert.NoError(t, err)\n+\n+\tp = mustNew(t, &cli)\n+\t_, err = p.Parse([]string{\"--hello\", \"--one\"})\n+\tassert.EqualError(t, err, \"--hello and --one can't be used together, --hello and --two must be used together\")\n+}\n+\n func TestXorRequired(t *testing.T) {\n \tvar cli struct {\n \t\tOne   bool `xor:\"one,two\" required:\"\"`\n@@ -972,6 +1046,26 @@ func TestXorRequired(t *testing.T) {\n \tassert.EqualError(t, err, \"missing flags: --four, --one or --three, --one or --two\")\n }\n \n+func TestAndRequired(t *testing.T) {\n+\tvar cli struct {\n+\t\tOne   bool `and:\"one,two\" required:\"\"`\n+\t\tTwo   bool `and:\"one\" required:\"\"`\n+\t\tThree bool `and:\"two\"`\n+\t\tFour  bool `required:\"\"`\n+\t}\n+\tp := mustNew(t, &cli)\n+\t_, err := p.Parse([]string{\"--one\", \"--two\", \"--three\"})\n+\tassert.EqualError(t, err, \"missing flags: --four\")\n+\n+\tp = mustNew(t, &cli)\n+\t_, err = p.Parse([]string{\"--four\"})\n+\tassert.EqualError(t, err, \"missing flags: --one and --three, --one and --two\")\n+\n+\tp = mustNew(t, &cli)\n+\t_, err = p.Parse([]string{})\n+\tassert.EqualError(t, err, \"missing flags: --four, --one and --three, --one and --two\")\n+}\n+\n func TestXorRequiredMany(t *testing.T) {\n \tvar cli struct {\n \t\tOne   bool `xor:\"one\" required:\"\"`\n@@ -991,6 +1085,21 @@ func TestXorRequiredMany(t *testing.T) {\n \tassert.EqualError(t, err, \"missing flags: --one or --two or --three\")\n }\n \n+func TestAndRequiredMany(t *testing.T) {\n+\tvar cli struct {\n+\t\tOne   bool `and:\"one\" required:\"\"`\n+\t\tTwo   bool `and:\"one\" required:\"\"`\n+\t\tThree bool `and:\"one\" required:\"\"`\n+\t}\n+\tp := mustNew(t, &cli)\n+\t_, err := p.Parse([]string{})\n+\tassert.EqualError(t, err, \"missing flags: --one and --two and --three\")\n+\n+\tp = mustNew(t, &cli)\n+\t_, err = p.Parse([]string{\"--three\"})\n+\tassert.EqualError(t, err, \"missing flags: --one and --two\")\n+}\n+\n func TestEnumSequence(t *testing.T) {\n \tvar cli struct {\n \t\tState []string `enum:\"a,b,c\" default:\"a\"`\ndiff --git a/model.go b/model.go\nindex 8d1f82f..3190f3e 100644\n--- a/model.go\n+++ b/model.go\n@@ -405,6 +405,7 @@ type Flag struct {\n \t*Value\n \tGroup       *Group // Logical grouping when displaying. May also be used by configuration loaders to group options logically.\n \tXor         []string\n+\tAnd         []string\n \tPlaceHolder string\n \tEnvs        []string\n \tAliases     []string\ndiff --git a/tag.go b/tag.go\nindex 3e37c19..39be2e3 100644\n--- a/tag.go\n+++ b/tag.go\n@@ -32,6 +32,7 @@ type Tag struct {\n \tEnum        string\n \tGroup       string\n \tXor         []string\n+\tAnd         []string\n \tVars        Vars\n \tPrefix      string // Optional prefix on anonymous structs. All sub-flags will have this prefix.\n \tEnvPrefix   string\n@@ -249,6 +250,9 @@ func hydrateTag(t *Tag, typ reflect.Type) error { //nolint: gocyclo\n \tfor _, xor := range t.GetAll(\"xor\") {\n \t\tt.Xor = append(t.Xor, strings.FieldsFunc(xor, tagSplitFn)...)\n \t}\n+\tfor _, and := range t.GetAll(\"and\") {\n+\t\tt.And = append(t.And, strings.FieldsFunc(and, tagSplitFn)...)\n+\t}\n \tt.Prefix = t.Get(\"prefix\")\n \tt.EnvPrefix = t.Get(\"envprefix\")\n \tt.Embed = t.Has(\"embed\")\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/FUNDING.yml",
+    ".github/workflows/ci.yml",
+    ".gitignore",
+    ".golangci.yml",
+    "COPYING",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/README.md",
+    "_examples/server/console.go",
+    "_examples/server/go.mod",
+    "_examples/server/go.sum",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/commandstring/main.go",
+    "_examples/shell/help/README.md",
+    "_examples/shell/help/main.go",
+    "benchmark_test.go",
+    "bin/.go-1.22.5.pkg",
+    "bin/.golangci-lint-1.55.2.pkg",
+    "bin/README.hermit.md",
+    "bin/activate-hermit",
+    "bin/go",
+    "bin/gofmt",
+    "bin/golangci-lint",
+    "bin/hermit",
+    "bin/hermit.hcl",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "config_test.go",
+    "context.go",
+    "defaults.go",
+    "defaults_test.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "go.mod",
+    "go.sum",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "helpwrap1.18_test.go",
+    "helpwrap1.19_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_linux_test.go",
+    "mapper_test.go",
+    "mapper_windows_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "renovate.json5",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "testdata/file.txt",
+    "util.go",
+    "util_test.go",
+    "visit.go"
+  ],
+  "explanation": {
+    "what": "既存の xor:\"X,Y\" (排他OR)グループタグに対して、and:\"X,Y\" (AND)グループタグを新設した。model.go の Flag / tag.go の Tag に And フィールドを追加し、build.go でタグから読み取って組み立てる。context.go には checkAndMissing(グループ内の一部だけがセットされている場合にエラー)と getRequiredAndGroupMap(グループ内の1つでも required なら全体を required 扱いにする)を追加し、既存の checkXorDuplicates と合わせて checkXorDuplicatedAndAndMissing から両方呼び出すよう再構成した。README にタグ表の説明行を追加し、kong_test.go に一連の TestAnd*系テストを追加している。",
+    "why": "PR本文の通り、xor と対になる「グループ内の全フラグが揃って初めて有効」という制約(and グループ)を宣言的に書けるようにするための機能追加。当初は xand という名前で提案されたが、PRの過程で and にリネームされている(コミットメッセージのサブジェクト行に経緯が残る)。",
+    "highlights": [
+      { "file": "context.go", "note": "checkAndMissing / getRequiredAndGroupMap が and グループの検証ロジックの核" },
+      { "file": "model.go", "note": "Flag.And フィールドの追加でXorと対称な構造にしている" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [{ "type": "pr", "number": 442, "url": "https://github.com/alecthomas/kong/pull/442" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

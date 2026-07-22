@@ -1,0 +1,163 @@
+{
+  "seq": 353,
+  "sha": "7391017a8c704ec44b0acab4e0455ab1e2448806",
+  "parents": [
+    "923c202213fa1414db98f80503a558258cebe8a6"
+  ],
+  "author": {
+    "name": "Abhinav Gupta",
+    "email": "mail@abhinavg.net",
+    "date": "2023-12-10T15:40:40-08:00"
+  },
+  "message": "Drop references to io/ioutil (#403)\n\nio/ioutil has been deprecated for a while.\r\nReplace all uses of it with equivalent APIs.",
+  "pr": {
+    "number": 403,
+    "title": "Drop references to io/ioutil",
+    "body": "io/ioutil has been deprecated for a while.\nReplace all uses of it with equivalent APIs.\n",
+    "url": "https://github.com/alecthomas/kong/pull/403"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 6,
+    "additions": 10,
+    "deletions": 14
+  },
+  "files": [
+    {
+      "path": ".golangci.yml",
+      "status": "M",
+      "additions": 0,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "README.md",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "config_test.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 2,
+      "binary": false
+    },
+    {
+      "path": "mapper.go",
+      "status": "M",
+      "additions": 5,
+      "deletions": 5,
+      "binary": false
+    },
+    {
+      "path": "mapper_test.go",
+      "status": "M",
+      "additions": 2,
+      "deletions": 3,
+      "binary": false
+    },
+    {
+      "path": "util_test.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 2,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/.golangci.yml b/.golangci.yml\nindex 8d62c54..e8980bf 100644\n--- a/.golangci.yml\n+++ b/.golangci.yml\n@@ -76,7 +76,6 @@ issues:\n     - 'bad syntax for struct tag key'\n     - 'bad syntax for struct tag pair'\n     - 'result .* \\(error\\) is always nil'\n-    - 'package io/ioutil is deprecated'\n \n   exclude-rules:\n     # Don't warn on unused parameters.\ndiff --git a/README.md b/README.md\nindex 4110465..ba8275b 100644\n--- a/README.md\n+++ b/README.md\n@@ -330,7 +330,7 @@ var cli struct {\n \n func main() {\n   // Debug logger going to discard.\n-  logger := log.New(ioutil.Discard, \"\", log.LstdFlags)\n+  logger := log.New(io.Discard, \"\", log.LstdFlags)\n \n   ctx := kong.Parse(&cli, kong.Bind(logger))\n \ndiff --git a/config_test.go b/config_test.go\nindex e82a35e..15d6eec 100644\n--- a/config_test.go\n+++ b/config_test.go\n@@ -2,7 +2,6 @@ package kong_test\n \n import (\n \t\"encoding/json\"\n-\t\"io/ioutil\"\n \t\"os\"\n \t\"testing\"\n \n@@ -45,7 +44,7 @@ func TestConfigValidation(t *testing.T) {\n \n func makeConfig(t *testing.T, config interface{}) (path string, cleanup func()) {\n \tt.Helper()\n-\tw, err := ioutil.TempFile(\"\", \"\")\n+\tw, err := os.CreateTemp(\"\", \"\")\n \tassert.NoError(t, err)\n \tdefer w.Close()\n \terr = json.NewEncoder(w).Encode(config)\ndiff --git a/mapper.go b/mapper.go\nindex 622d22a..5675754 100644\n--- a/mapper.go\n+++ b/mapper.go\n@@ -5,7 +5,7 @@ import (\n \t\"encoding/json\"\n \t\"errors\"\n \t\"fmt\"\n-\t\"io/ioutil\"\n+\t\"io\"\n \t\"math/bits\"\n \t\"net/url\"\n \t\"os\"\n@@ -712,9 +712,9 @@ func fileContentMapper(r *Registry) MapperFunc {\n \t\tvar data []byte\n \t\tif path != \"-\" {\n \t\t\tpath = ExpandPath(path)\n-\t\t\tdata, err = ioutil.ReadFile(path) //nolint:gosec\n+\t\t\tdata, err = os.ReadFile(path) //nolint:gosec\n \t\t} else {\n-\t\t\tdata, err = ioutil.ReadAll(os.Stdin)\n+\t\t\tdata, err = io.ReadAll(os.Stdin)\n \t\t}\n \t\tif err != nil {\n \t\t\tif info, statErr := os.Stat(path); statErr == nil && info.IsDir() {\n@@ -884,7 +884,7 @@ func (f *NamedFileContentFlag) Decode(ctx *DecodeContext) error { //nolint: revi\n \t\treturn nil\n \t}\n \tfilename = ExpandPath(filename)\n-\tdata, err := ioutil.ReadFile(filename) //nolint: gosec\n+\tdata, err := os.ReadFile(filename) //nolint: gosec\n \tif err != nil {\n \t\treturn fmt.Errorf(\"failed to open %q: %v\", filename, err)\n \t}\n@@ -908,7 +908,7 @@ func (f *FileContentFlag) Decode(ctx *DecodeContext) error { //nolint: revive\n \t\treturn nil\n \t}\n \tfilename = ExpandPath(filename)\n-\tdata, err := ioutil.ReadFile(filename) //nolint: gosec\n+\tdata, err := os.ReadFile(filename) //nolint: gosec\n \tif err != nil {\n \t\treturn fmt.Errorf(\"failed to open %q: %v\", filename, err)\n \t}\ndiff --git a/mapper_test.go b/mapper_test.go\nindex b1634d1..fc013bb 100644\n--- a/mapper_test.go\n+++ b/mapper_test.go\n@@ -4,7 +4,6 @@ import (\n \t\"bytes\"\n \t\"encoding/json\"\n \t\"fmt\"\n-\t\"io/ioutil\"\n \t\"math\"\n \t\"net/url\"\n \t\"os\"\n@@ -269,7 +268,7 @@ func TestFileContentFlag(t *testing.T) {\n \tvar cli struct {\n \t\tFile kong.FileContentFlag\n \t}\n-\tf, err := ioutil.TempFile(\"\", \"\")\n+\tf, err := os.CreateTemp(\"\", \"\")\n \tassert.NoError(t, err)\n \tdefer os.Remove(f.Name())\n \tfmt.Fprint(f, \"hello world\")\n@@ -283,7 +282,7 @@ func TestNamedFileContentFlag(t *testing.T) {\n \tvar cli struct {\n \t\tFile kong.NamedFileContentFlag\n \t}\n-\tf, err := ioutil.TempFile(\"\", \"\")\n+\tf, err := os.CreateTemp(\"\", \"\")\n \tassert.NoError(t, err)\n \tdefer os.Remove(f.Name())\n \tfmt.Fprint(f, \"hello world\")\ndiff --git a/util_test.go b/util_test.go\nindex e6d9d85..5ec0131 100644\n--- a/util_test.go\n+++ b/util_test.go\n@@ -1,7 +1,6 @@\n package kong\n \n import (\n-\t\"io/ioutil\"\n \t\"os\"\n \t\"path/filepath\"\n \t\"runtime\"\n@@ -17,7 +16,7 @@ func TestConfigFlag(t *testing.T) {\n \t\tFlag   string\n \t}\n \n-\tw, err := ioutil.TempFile(\"\", \"\")\n+\tw, err := os.CreateTemp(\"\", \"\")\n \tassert.NoError(t, err)\n \tdefer os.Remove(w.Name())\n \tw.WriteString(`{\"flag\": \"hello world\"}`) //nolint: errcheck\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/FUNDING.yml",
+    ".github/workflows/ci.yml",
+    ".gitignore",
+    ".golangci.yml",
+    "COPYING",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/README.md",
+    "_examples/server/console.go",
+    "_examples/server/go.mod",
+    "_examples/server/go.sum",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/commandstring/main.go",
+    "_examples/shell/help/README.md",
+    "_examples/shell/help/main.go",
+    "benchmark_test.go",
+    "bin/.go-1.21.5.pkg",
+    "bin/.golangci-lint-1.55.2.pkg",
+    "bin/README.hermit.md",
+    "bin/activate-hermit",
+    "bin/go",
+    "bin/gofmt",
+    "bin/golangci-lint",
+    "bin/hermit",
+    "bin/hermit.hcl",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "config_test.go",
+    "context.go",
+    "defaults.go",
+    "defaults_test.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "go.mod",
+    "go.sum",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "helpwrap1.18_test.go",
+    "helpwrap1.19_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_linux_test.go",
+    "mapper_test.go",
+    "mapper_windows_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "renovate.json5",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "testdata/file.txt",
+    "util.go",
+    "util_test.go",
+    "visit.go"
+  ],
+  "explanation": {
+    "what": "mapper.go・各テストファイル・README.md から io/ioutil の呼び出しを除去し、標準ライブラリの後継APIに置き換えた。ioutil.ReadFile→os.ReadFile、ioutil.ReadAll→io.ReadAll、ioutil.TempFile→os.CreateTemp、ioutil.Discard→io.Discard。あわせて .golangci.yml から io/ioutil 非推奨警告の除外ルールを削除した。",
+    "why": "PR本文に記載の通り、io/ioutil パッケージは Go 1.16 で非推奨化されて久しく、同等のAPIが os/io パッケージに用意されているため置き換えた。lint側の抑制ルールも不要になったため一緒に削除している。",
+    "highlights": [
+      { "file": "mapper.go", "note": "FileContentFlag/NamedFileContentFlag の Decode() 実装がファイル読み込みに os.ReadFile を使うよう変更" }
+    ],
+    "langNotes": [
+      { "topic": "io/ioutil の非推奨化", "note": "Go 1.16 以降、io/ioutil のファイル操作系関数(ReadFile・WriteFile・TempFile 等)は os パッケージへ、ReadAll・Discard 等は io パッケージへ移動・統合された。ioutil 自体はエイリアスとして残るが新規コードでは使わないのが慣例。" }
+    ],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [{ "type": "pr", "number": 403, "url": "https://github.com/alecthomas/kong/pull/403" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

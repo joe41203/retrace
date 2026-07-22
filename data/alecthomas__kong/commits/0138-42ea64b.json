@@ -1,0 +1,103 @@
+{
+  "seq": 138,
+  "sha": "42ea64b1b4884b5435d29a966c27a289a01d0def",
+  "parents": [
+    "2a90ca2ad300aa9820c9cf299ae21fb0385f964c"
+  ],
+  "author": {
+    "name": "Alec Thomas",
+    "email": "alec@swapoff.org",
+    "date": "2019-01-24T17:11:54+11:00"
+  },
+  "message": "Factor out command help into functions.",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 58,
+    "deletions": 29
+  },
+  "files": [
+    {
+      "path": "help.go",
+      "status": "M",
+      "additions": 56,
+      "deletions": 27,
+      "binary": false
+    },
+    {
+      "path": "help_test.go",
+      "status": "M",
+      "additions": 2,
+      "deletions": 2,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/help.go b/help.go\nindex bc4aeba..e1e8ce2 100644\n--- a/help.go\n+++ b/help.go\n@@ -126,38 +126,69 @@ func printNodeDetail(w *helpWriter, node *Node, hide bool) {\n \tcmds := node.Leaves(hide)\n \tif len(cmds) > 0 {\n \t\tw.Print(\"\")\n+\t\tw.Print(\"Commands:\")\n \t\tif w.Tree {\n-\t\t\tw.Print(\"Command Tree:\")\n-\t\t\tiw := w.Indent()\n-\t\t\tvar rows [][2]string\n-\t\t\tfor i, cmd := range node.Children {\n-\t\t\t\trows = append(rows, w.commandTree(cmd, \"\")...)\n-\t\t\t\tif i != len(node.Children)-1 {\n-\t\t\t\t\trows = append(rows, [2]string{\"\", \"\"})\n-\t\t\t\t}\n-\t\t\t}\n-\t\t\twriteTwoColumns(iw, defaultColumnPadding, rows)\n+\t\t\twriteCommandTree(w, node)\n \t\t} else {\n-\t\t\tw.Print(\"Commands:\")\n \t\t\tiw := w.Indent()\n \t\t\tif w.Compact {\n-\t\t\t\trows := [][2]string{}\n-\t\t\t\tfor _, cmd := range cmds {\n-\t\t\t\t\trows = append(rows, [2]string{cmd.Path(), cmd.Help})\n-\t\t\t\t}\n-\t\t\t\twriteTwoColumns(iw, defaultColumnPadding, rows)\n+\t\t\t\twriteCompactCommandList(cmds, iw)\n \t\t\t} else {\n-\t\t\t\tfor i, cmd := range cmds {\n-\t\t\t\t\tprintCommandSummary(iw, cmd)\n-\t\t\t\t\tif i != len(cmds)-1 {\n-\t\t\t\t\t\tiw.Print(\"\")\n-\t\t\t\t\t}\n-\t\t\t\t}\n+\t\t\t\twriteCommandList(cmds, iw)\n \t\t\t}\n \t\t}\n \t}\n }\n \n+func writeCommandList(cmds []*Node, iw *helpWriter) {\n+\tfor i, cmd := range cmds {\n+\t\tprintCommandSummary(iw, cmd)\n+\t\tif i != len(cmds)-1 {\n+\t\t\tiw.Print(\"\")\n+\t\t}\n+\t}\n+}\n+\n+func writeCompactCommandList(cmds []*Node, iw *helpWriter) {\n+\trows := [][2]string{}\n+\tfor _, cmd := range cmds {\n+\t\trows = append(rows, [2]string{cmd.Path(), cmd.Help})\n+\t}\n+\twriteTwoColumns(iw, defaultColumnPadding, rows)\n+}\n+\n+func writeCommandTree(w *helpWriter, node *Node) {\n+\tiw := w.Indent()\n+\trows := make([][2]string, 0, len(node.Children)*2)\n+\tfor i, cmd := range node.Children {\n+\t\trows = append(rows, w.commandTree(cmd, \"\")...)\n+\t\tif i != len(node.Children)-1 {\n+\t\t\trows = append(rows, [2]string{\"\", \"\"})\n+\t\t}\n+\t}\n+\twriteTwoColumns(iw, defaultColumnPadding, rows)\n+}\n+\n+type helpCommandGroup struct {\n+\tName     string\n+\tCommands []*Node\n+}\n+\n+func collectCommandGroups(nodes []*Node) []helpCommandGroup { // nolint: deadcode\n+\tgroups := map[string][]*Node{}\n+\tfor _, node := range nodes {\n+\t\tgroups[node.Group] = append(groups[node.Group], node)\n+\t}\n+\tout := []helpCommandGroup{}\n+\tfor name, nodes := range groups {\n+\t\tif name == \"\" {\n+\t\t\tname = \"Commands\"\n+\t\t}\n+\t\tout = append(out, helpCommandGroup{Name: name, Commands: nodes})\n+\t}\n+\treturn out\n+}\n+\n func printCommandSummary(w *helpWriter, cmd *Command) {\n \tw.Print(cmd.Summary())\n \tif cmd.Help != \"\" {\n@@ -330,20 +361,18 @@ func SpaceIndenter(prefix string) string {\n \treturn prefix + strings.Repeat(\" \", defaultIndent)\n }\n \n-// SpaceIndenter adds line points to every new indent.\n+// LineIndenter adds line points to every new indent.\n func LineIndenter(prefix string) string {\n \tif prefix == \"\" {\n \t\treturn \"- \"\n-\t} else {\n-\t\treturn strings.Repeat(\" \", defaultIndent) + prefix\n \t}\n+\treturn strings.Repeat(\" \", defaultIndent) + prefix\n }\n \n // TreeIndenter adds line points to every new indent and vertical lines to every layer.\n func TreeIndenter(prefix string) string {\n \tif prefix == \"\" {\n \t\treturn \"|- \"\n-\t} else {\n-\t\treturn \"|\" + strings.Repeat(\" \", defaultIndent) + prefix\n \t}\n+\treturn \"|\" + strings.Repeat(\" \", defaultIndent) + prefix\n }\ndiff --git a/help_test.go b/help_test.go\nindex a985bba..fbe4a47 100644\n--- a/help_test.go\n+++ b/help_test.go\n@@ -174,7 +174,7 @@ A test app.\n Flags:\n   --help    Show context-sensitive help.\n \n-Command Tree:\n+Commands:\n   one          subcommand one\n   - thing      subcommand thing\n     - <arg>    argument\n@@ -207,7 +207,7 @@ subcommand one\n Flags:\n   --help    Show context-sensitive help.\n \n-Command Tree:\n+Commands:\n   thing      subcommand thing\n   - <arg>    argument\n \n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    ".golangci.yml",
+    "COPYING",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/console.go",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/main.go",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "config_test.go",
+    "context.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "go.mod",
+    "go.sum",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "util.go",
+    "util_test.go",
+    "visit.go"
+  ],
+  "explanation": {
+    "what": "printNodeDetail()に直書きされていたコマンド一覧・コンパクト一覧・ツリー表示の各ロジックを、writeCommandList()・writeCompactCommandList()・writeCommandTree()という独立した関数に切り出した。またグループ化のためのhelpCommandGroup型とcollectCommandGroups()関数を追加(この時点では未使用)。help_test.goの出力見出しを\"Command Tree:\"から\"Commands:\"に統一している。",
+    "why": "おそらく直前のコマンドツリー機能追加(seq137)でprintNodeDetail()が肥大化・分岐が複雑になったため、可読性のために関数として分離したリファクタリングと見られる。helpCommandGroupの追加はグループ化ヘルプ機能へ向けた先行コードの可能性があるが、この時点では呼び出されておらず用途は明言されていない。",
+    "highlights": [
+      { "file": "help.go", "note": "writeCommandList/writeCompactCommandList/writeCommandTreeへの関数分割" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "inferred",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

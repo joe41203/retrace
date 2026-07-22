@@ -1,0 +1,110 @@
+{
+  "seq": 204,
+  "sha": "cbae65d2271fc930f5968e2dbe83e71f5670ae3a",
+  "parents": [
+    "f410bb770f5fa063d64833701ed9328fdb76f9f7"
+  ],
+  "author": {
+    "name": "Alex Snast",
+    "email": "alexsn@fb.com",
+    "date": "2020-08-24T09:18:10+03:00"
+  },
+  "message": "Make `PostBuild` global.",
+  "pr": {
+    "number": 104,
+    "title": "Make `PostBuild` global.",
+    "body": "`PostBuild` should be a global options instead of being a method of `*kong.Kong`.",
+    "url": "https://github.com/alecthomas/kong/pull/104"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 5,
+    "deletions": 11
+  },
+  "files": [
+    {
+      "path": "options.go",
+      "status": "M",
+      "additions": 5,
+      "deletions": 11,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/options.go b/options.go\nindex 6839ceb..5bd36c3 100644\n--- a/options.go\n+++ b/options.go\n@@ -66,7 +66,7 @@ func NoDefaultHelp() Option {\n // parsing occurs.\n //\n // This is useful for, e.g., adding short options to flags, updating help, etc.\n-func (k *Kong) PostBuild(fn func(*Kong) error) Option {\n+func PostBuild(fn func(*Kong) error) Option {\n \treturn OptionFunc(func(k *Kong) error {\n \t\tk.postBuildOptions = append(k.postBuildOptions, OptionFunc(fn))\n \t\treturn nil\n@@ -75,22 +75,16 @@ func (k *Kong) PostBuild(fn func(*Kong) error) Option {\n \n // Name overrides the application name.\n func Name(name string) Option {\n-\treturn OptionFunc(func(k *Kong) error {\n-\t\tk.postBuildOptions = append(k.postBuildOptions, OptionFunc(func(k *Kong) error {\n-\t\t\tk.Model.Name = name\n-\t\t\treturn nil\n-\t\t}))\n+\treturn PostBuild(func(k *Kong) error {\n+\t\tk.Model.Name = name\n \t\treturn nil\n \t})\n }\n \n // Description sets the application description.\n func Description(description string) Option {\n-\treturn OptionFunc(func(k *Kong) error {\n-\t\tk.postBuildOptions = append(k.postBuildOptions, OptionFunc(func(k *Kong) error {\n-\t\t\tk.Model.Help = description\n-\t\t\treturn nil\n-\t\t}))\n+\treturn PostBuild(func(k *Kong) error {\n+\t\tk.Model.Help = description\n \t\treturn nil\n \t})\n }\n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    ".gitignore",
+    ".golangci.yml",
+    "COPYING",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/README.md",
+    "_examples/server/console.go",
+    "_examples/server/go.mod",
+    "_examples/server/go.sum",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/main.go",
+    "benchmark_test.go",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "config_test.go",
+    "context.go",
+    "defaults.go",
+    "defaults_test.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "go.mod",
+    "go.sum",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "util.go",
+    "util_test.go",
+    "visit.go"
+  ],
+  "explanation": {
+    "what": "options.go の PostBuild をこれまでの *Kong メソッドから、他の Option 関数(Name, Description など)と同じ形のパッケージレベル関数 func PostBuild(fn func(*Kong) error) Option に変更した。Name() と Description() の実装も、内部で postBuildOptions に直接 append していたコードから PostBuild() を呼び出す形に簡略化されている。",
+    "why": "PR の説明にある通り、PostBuild が *kong.Kong のメソッドになっていたため、他の Option(Name, Description, Resolver など)のようにパッケージ関数として自由に組み合わせて使うことができなかった。グローバル関数にすることで Name/Description のような既存 Option の実装からも再利用できるようになり、コードの重複も削減されている。",
+    "highlights": [
+      { "file": "options.go", "note": "PostBuild がメソッドから関数になり、Name/Description がそれを呼ぶだけの薄い実装に変わった" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [
+      { "type": "pr", "number": 104, "url": "https://github.com/alecthomas/kong/pull/104" }
+    ],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

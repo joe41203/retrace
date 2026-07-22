@@ -1,0 +1,136 @@
+{
+  "seq": 71,
+  "sha": "653531d6bca5831eca6b82290c7e07e3337b1bf8",
+  "parents": [
+    "3a2f3eebdd1e95b0ea5104055d22e08169983bc1"
+  ],
+  "author": {
+    "name": "Alec Thomas",
+    "email": "alec@swapoff.org",
+    "date": "2018-06-20T21:51:56+10:00"
+  },
+  "message": "Start making help slightly configurable.",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 9,
+    "additions": 174,
+    "deletions": 78
+  },
+  "files": [
+    {
+      "path": "_examples/shell/main.go",
+      "status": "M",
+      "additions": 10,
+      "deletions": 16,
+      "binary": false
+    },
+    {
+      "path": "context.go",
+      "status": "M",
+      "additions": 0,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "help.go",
+      "status": "M",
+      "additions": 57,
+      "deletions": 23,
+      "binary": false
+    },
+    {
+      "path": "help_test.go",
+      "status": "M",
+      "additions": 19,
+      "deletions": 17,
+      "binary": false
+    },
+    {
+      "path": "kong.go",
+      "status": "M",
+      "additions": 14,
+      "deletions": 5,
+      "binary": false
+    },
+    {
+      "path": "model.go",
+      "status": "M",
+      "additions": 23,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "options.go",
+      "status": "M",
+      "additions": 51,
+      "deletions": 17,
+      "binary": false
+    },
+    {
+      "path": "resolver.go",
+      "status": "M",
+      "additions": 0,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "resolver_test.go",
+      "status": "M",
+      "additions": 0,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/_examples/shell/main.go b/_examples/shell/main.go\nindex f760d49..a479d4c 100644\n--- a/_examples/shell/main.go\n+++ b/_examples/shell/main.go\n@@ -1,15 +1,10 @@\n package main\n \n import (\n-\t\"encoding/json\"\n-\t\"fmt\"\n-\t\"os\"\n-\n \t\"github.com/alecthomas/kong\"\n )\n \n-// nolint: govet\n-var CLI struct {\n+var cli struct {\n \tDebug bool `help:\"Debug mode.\"`\n \n \tRm struct {\n@@ -17,19 +12,18 @@ var CLI struct {\n \t\tForce     bool   `help:\"Force removal.\" short:\"f\"`\n \t\tRecursive bool   `help:\"Recursively remove files.\" short:\"r\"`\n \n-\t\tPaths []string `arg help:\"Paths to remove.\" type:\"path\"`\n-\t} `cmd help:\"Remove files.\"`\n+\t\tPaths []string `arg:\"\" help:\"Paths to remove.\" type:\"path\"`\n+\t} `cmd:\"\" help:\"Remove files.\"`\n \n \tLs struct {\n-\t\tPaths []string `arg optional help:\"Paths to list.\" type:\"path\"`\n-\t} `cmd help:\"List paths.\"`\n+\t\tPaths []string `arg:\"\" optional:\"\" help:\"Paths to list.\" type:\"path\"`\n+\t} `cmd:\"\" help:\"List paths.\"`\n }\n \n func main() {\n-\tapp := kong.Must(&CLI, kong.Description(\"A shell-like example app.\"))\n-\tcmd, err := app.Parse(os.Args[1:])\n-\tapp.FatalIfErrorf(err)\n-\ts, _ := json.Marshal(&CLI)\n-\tfmt.Println(cmd)\n-\tfmt.Println(string(s))\n+\tcmd := kong.Parse(&cli, kong.Description(\"A shell-like example app.\"), kong.HelpOptions(kong.CompactHelp()))\n+\tswitch cmd {\n+\tcase \"rm\":\n+\tcase \"ls\":\n+\t}\n }\ndiff --git a/context.go b/context.go\nold mode 100755\nnew mode 100644\ndiff --git a/help.go b/help.go\nindex 8fe9cc7..5c0ad94 100644\n--- a/help.go\n+++ b/help.go\n@@ -9,28 +9,49 @@ import (\n )\n \n const (\n-\tdefaultIndent = 2\n+\tdefaultIndent        = 2\n+\tdefaultColumnPadding = 4\n )\n \n-// PrintHelp is the default help printer.\n-func PrintHelp(ctx *Context) error {\n-\tw := newHelpWriter(guessWidth(ctx.App.Stdout))\n-\tselected := ctx.Selected()\n-\tif selected == nil {\n-\t\tprintApp(w, ctx.App.Model)\n-\t} else {\n-\t\tprintCommand(w, ctx.App.Model, selected)\n+// HelpOption configures the default help.\n+type HelpOption func(options *helpWriterOptions)\n+\n+// CompactHelp writes help in a more compact form.\n+func CompactHelp() HelpOption {\n+\treturn func(options *helpWriterOptions) {\n+\t\toptions.compact = true\n+\t}\n+}\n+\n+// HelpPrinter returns a HelpFunction configured with the given HelpOptions.\n+func HelpPrinter(options ...HelpOption) HelpFunction {\n+\treturn func(ctx *Context) error {\n+\t\tw := newHelpWriter(guessWidth(ctx.App.Stdout))\n+\t\tfor _, option := range options {\n+\t\t\toption(&w.options)\n+\t\t}\n+\t\tselected := ctx.Selected()\n+\t\tif selected == nil {\n+\t\t\tprintApp(w, ctx.App.Model)\n+\t\t} else {\n+\t\t\tprintCommand(w, ctx.App.Model, selected)\n+\t\t}\n+\t\treturn w.Write(ctx.App.Stdout)\n \t}\n-\treturn w.Write(ctx.App.Stdout)\n }\n \n func printApp(w *helpWriter, app *Application) {\n-\tw.Printf(\"usage: %s\", app.Summary())\n+\tw.Printf(\"Usage: %s\", app.Summary())\n \tprintNodeDetail(w, &app.Node)\n+\tcmds := app.Leaves()\n+\tif len(cmds) > 0 {\n+\t\tw.Print(\"\")\n+\t\tw.Printf(`Run \"%s <command> --help\" for more information on a command.`, app.Name)\n+\t}\n }\n \n func printCommand(w *helpWriter, app *Application, cmd *Command) {\n-\tw.Printf(\"usage: %s %s\", app.Name, cmd.Summary())\n+\tw.Printf(\"Usage: %s %s\", app.Name, cmd.Summary())\n \tprintNodeDetail(w, cmd)\n }\n \n@@ -54,10 +75,18 @@ func printNodeDetail(w *helpWriter, node *Node) {\n \t\tw.Print(\"\")\n \t\tw.Print(\"Commands:\")\n \t\tiw := w.Indent()\n-\t\tfor i, cmd := range cmds {\n-\t\t\tprintCommandSummary(iw, cmd)\n-\t\t\tif i != len(cmds)-1 {\n-\t\t\t\tiw.Print(\"\")\n+\t\tif w.options.compact {\n+\t\t\trows := [][2]string{}\n+\t\t\tfor _, cmd := range cmds {\n+\t\t\t\trows = append(rows, [2]string{cmd.Name, cmd.Help})\n+\t\t\t}\n+\t\t\twriteTwoColumns(iw, defaultColumnPadding, rows)\n+\t\t} else {\n+\t\t\tfor i, cmd := range cmds {\n+\t\t\t\tprintCommandSummary(iw, cmd)\n+\t\t\t\tif i != len(cmds)-1 {\n+\t\t\t\t\tiw.Print(\"\")\n+\t\t\t\t}\n \t\t\t}\n \t\t}\n \t}\n@@ -71,9 +100,14 @@ func printCommandSummary(w *helpWriter, cmd *Command) {\n }\n \n type helpWriter struct {\n-\tindent string\n-\twidth  int\n-\tlines  *[]string\n+\tindent  string\n+\twidth   int\n+\tlines   *[]string\n+\toptions helpWriterOptions\n+}\n+\n+type helpWriterOptions struct {\n+\tcompact bool\n }\n \n func newHelpWriter(width int) *helpWriter {\n@@ -94,7 +128,7 @@ func (h *helpWriter) Print(text string) {\n }\n \n func (h *helpWriter) Indent() *helpWriter {\n-\treturn &helpWriter{indent: h.indent + \"  \", lines: h.lines, width: h.width - 2}\n+\treturn &helpWriter{indent: h.indent + \"  \", lines: h.lines, width: h.width - 2, options: h.options}\n }\n \n func (h *helpWriter) String() string {\n@@ -113,7 +147,7 @@ func (h *helpWriter) Write(w io.Writer) error {\n \n func (h *helpWriter) Wrap(text string) {\n \tw := bytes.NewBuffer(nil)\n-\tdoc.ToText(w, strings.TrimSpace(text), \"\", \"\", h.width)\n+\tdoc.ToText(w, strings.TrimSpace(text), \"\", \"    \", h.width)\n \tfor _, line := range strings.Split(strings.TrimSpace(w.String()), \"\\n\") {\n \t\th.Print(line)\n \t}\n@@ -124,7 +158,7 @@ func writePositionals(w *helpWriter, args []*Positional) {\n \tfor _, arg := range args {\n \t\trows = append(rows, [2]string{arg.Summary(), arg.Help})\n \t}\n-\twriteTwoColumns(w, 2, rows)\n+\twriteTwoColumns(w, defaultColumnPadding, rows)\n }\n \n func writeFlags(w *helpWriter, groups [][]*Flag) {\n@@ -148,7 +182,7 @@ func writeFlags(w *helpWriter, groups [][]*Flag) {\n \t\t\t}\n \t\t}\n \t}\n-\twriteTwoColumns(w, 2, rows)\n+\twriteTwoColumns(w, defaultColumnPadding, rows)\n }\n \n func writeTwoColumns(w *helpWriter, padding int, rows [][2]string) {\ndiff --git a/help_test.go b/help_test.go\nindex 9aa6004..762a95b 100644\n--- a/help_test.go\n+++ b/help_test.go\n@@ -53,18 +53,18 @@ func TestHelp(t *testing.T) {\n \t\t})\n \t\trequire.True(t, exited)\n \t\tt.Log(w.String())\n-\t\trequire.Equal(t, `usage: test-app --required <command>\n+\t\trequire.Equal(t, `Usage: test-app --required <command>\n \n A test app.\n \n Flags:\n-  --help           Show context-sensitive help.\n-  --string=STRING  A string flag.\n-  --bool           A bool flag with very long help that wraps a lot and is\n-                   verbose and is really verbose.\n-  --slice=STR,...  A slice of strings.\n-  --map=KEY=VALUE  A map of strings to ints.\n-  --required       A required flag.\n+  --help             Show context-sensitive help.\n+  --string=STRING    A string flag.\n+  --bool             A bool flag with very long help that wraps a lot and is\n+                     verbose and is really verbose.\n+  --slice=STR,...    A slice of strings.\n+  --map=KEY=VALUE    A map of strings to ints.\n+  --required         A required flag.\n \n Commands:\n   one --required\n@@ -75,6 +75,8 @@ Commands:\n \n   two four --required --required-two\n     Sub-sub-command.\n+\n+Run \"test-app <command> --help\" for more information on a command.\n `, w.String())\n \t})\n \n@@ -87,19 +89,19 @@ Commands:\n \t\t})\n \t\trequire.True(t, exited)\n \t\tt.Log(w.String())\n-\t\trequire.Equal(t, `usage: test-app two <three> --required --required-two --required-three\n+\t\trequire.Equal(t, `Usage: test-app two <three> --required --required-two --required-three\n \n Sub-sub-arg.\n \n Flags:\n-  --string=STRING   A string flag.\n-  --bool            A bool flag with very long help that wraps a lot and is\n-                    verbose and is really verbose.\n-  --slice=STR,...   A slice of strings.\n-  --map=KEY=VALUE   A map of strings to ints.\n-  --required        A required flag.\n-\n-  --flag=STRING     Nested flag under two.\n+  --string=STRING     A string flag.\n+  --bool              A bool flag with very long help that wraps a lot and is\n+                      verbose and is really verbose.\n+  --slice=STR,...     A slice of strings.\n+  --map=KEY=VALUE     A map of strings to ints.\n+  --required          A required flag.\n+\n+  --flag=STRING       Nested flag under two.\n   --required-two\n \n   --required-three\ndiff --git a/kong.go b/kong.go\nindex ec10dfe..a0d750e 100644\n--- a/kong.go\n+++ b/kong.go\n@@ -43,6 +43,7 @@ type Kong struct {\n \tregistry      *Registry\n \tnoDefaultHelp bool\n \thelp          func(*Context) error\n+\thelpOptions   []HelpOption\n \n \t// Set temporarily by Options. These are applied after build().\n \tpostBuildOptions []Option\n@@ -58,12 +59,17 @@ func New(grammar interface{}, options ...Option) (*Kong, error) {\n \t\tStderr:    os.Stderr,\n \t\tbefore:    map[reflect.Value]HookFunc{},\n \t\tregistry:  NewRegistry().RegisterDefaults(),\n-\t\thelp:      PrintHelp,\n \t\tresolvers: []ResolverFunc{Envars()},\n \t}\n \n \tfor _, option := range options {\n-\t\toption(k)\n+\t\tif err := option(k); err != nil {\n+\t\t\treturn nil, err\n+\t\t}\n+\t}\n+\n+\tif k.help == nil {\n+\t\tk.help = HelpPrinter(k.helpOptions...)\n \t}\n \n \tmodel, err := build(k, grammar)\n@@ -74,8 +80,11 @@ func New(grammar interface{}, options ...Option) (*Kong, error) {\n \tk.Model = model\n \n \tfor _, option := range k.postBuildOptions {\n-\t\toption(k)\n+\t\tif err := option(k); err != nil {\n+\t\t\treturn nil, err\n+\t\t}\n \t}\n+\tk.postBuildOptions = nil\n \n \treturn k, nil\n }\n@@ -98,14 +107,14 @@ func (k *Kong) extraFlags() []*Flag {\n \t}\n \thelpFlag.Flag = helpFlag\n \thook := Hook(&helpValue, func(ctx *Context, path *Path) error {\n-\t\terr := PrintHelp(ctx)\n+\t\terr := k.help(ctx)\n \t\tif err != nil {\n \t\t\treturn err\n \t\t}\n \t\tk.Exit(1)\n \t\treturn nil\n \t})\n-\thook(k)\n+\t_ = hook(k)\n \treturn []*Flag{helpFlag}\n }\n \ndiff --git a/model.go b/model.go\nindex cdf5e50..4da7e19 100644\n--- a/model.go\n+++ b/model.go\n@@ -43,6 +43,29 @@ type Node struct {\n \tArgument *Value // Populated when Type is ArgumentNode.\n }\n \n+// Find a command/argument/flag by pointer to its field.\n+//\n+// Returns nil if not found. Panics if ptr is not a pointer.\n+func (n *Node) Find(ptr interface{}) *Node {\n+\tkey := reflect.ValueOf(ptr)\n+\tif key.Kind() != reflect.Ptr {\n+\t\tpanic(\"expected a pointer\")\n+\t}\n+\treturn n.findNode(key)\n+}\n+\n+func (n *Node) findNode(key reflect.Value) *Node {\n+\tif n.Target == key {\n+\t\treturn n\n+\t}\n+\tfor _, child := range n.Children {\n+\t\tif found := child.findNode(key); found != nil {\n+\t\t\treturn found\n+\t\t}\n+\t}\n+\treturn nil\n+}\n+\n // AllFlags returns flags from all ancestor branches encountered.\n func (n *Node) AllFlags() (out [][]*Flag) {\n \tif n.Parent != nil {\ndiff --git a/options.go b/options.go\nold mode 100755\nnew mode 100644\nindex 93d00e9..eeb9468\n--- a/options.go\n+++ b/options.go\n@@ -10,63 +10,84 @@ import (\n )\n \n // An Option applies optional changes to the Kong application.\n-type Option func(k *Kong)\n+type Option func(k *Kong) error\n \n // Exit overrides the function used to terminate. This is useful for testing or interactive use.\n func Exit(exit func(int)) Option {\n-\treturn func(k *Kong) { k.Exit = exit }\n+\treturn func(k *Kong) error {\n+\t\tk.Exit = exit\n+\t\treturn nil\n+\t}\n }\n \n // NoDefaultHelp disables the default help flags.\n func NoDefaultHelp() Option {\n-\treturn func(k *Kong) {\n+\treturn func(k *Kong) error {\n \t\tk.noDefaultHelp = true\n+\t\treturn nil\n \t}\n }\n \n // Name overrides the application name.\n func Name(name string) Option {\n-\treturn func(k *Kong) {\n-\t\tk.postBuildOptions = append(k.postBuildOptions, func(k *Kong) {\n+\treturn func(k *Kong) error {\n+\t\tk.postBuildOptions = append(k.postBuildOptions, func(k *Kong) error {\n \t\t\tk.Model.Name = name\n+\t\t\treturn nil\n \t\t})\n+\t\treturn nil\n \t}\n }\n \n // Description sets the application description.\n func Description(description string) Option {\n-\treturn func(k *Kong) {\n-\t\tk.postBuildOptions = append(k.postBuildOptions, func(k *Kong) {\n+\treturn func(k *Kong) error {\n+\t\tk.postBuildOptions = append(k.postBuildOptions, func(k *Kong) error {\n \t\t\tk.Model.Help = description\n+\t\t\treturn nil\n \t\t})\n+\t\treturn nil\n \t}\n }\n \n // TypeMapper registers a mapper to a type.\n func TypeMapper(typ reflect.Type, mapper Mapper) Option {\n-\treturn func(k *Kong) { k.registry.RegisterType(typ, mapper) }\n+\treturn func(k *Kong) error {\n+\t\tk.registry.RegisterType(typ, mapper)\n+\t\treturn nil\n+\t}\n }\n \n // KindMapper registers a mapper to a kind.\n func KindMapper(kind reflect.Kind, mapper Mapper) Option {\n-\treturn func(k *Kong) { k.registry.RegisterKind(kind, mapper) }\n+\treturn func(k *Kong) error {\n+\t\tk.registry.RegisterKind(kind, mapper)\n+\t\treturn nil\n+\t}\n }\n \n // ValueMapper registers a mapper to a field value.\n func ValueMapper(ptr interface{}, mapper Mapper) Option {\n-\treturn func(k *Kong) { k.registry.RegisterValue(ptr, mapper) }\n+\treturn func(k *Kong) error {\n+\t\tk.registry.RegisterValue(ptr, mapper)\n+\t\treturn nil\n+\t}\n }\n \n // NamedMapper registers a mapper to a name.\n func NamedMapper(name string, mapper Mapper) Option {\n-\treturn func(k *Kong) { k.registry.RegisterName(name, mapper) }\n+\treturn func(k *Kong) error {\n+\t\tk.registry.RegisterName(name, mapper)\n+\t\treturn nil\n+\t}\n }\n \n // Writers overrides the default writers. Useful for testing or interactive use.\n func Writers(stdout, stderr io.Writer) Option {\n-\treturn func(k *Kong) {\n+\treturn func(k *Kong) error {\n \t\tk.Stdout = stdout\n \t\tk.Stderr = stderr\n+\t\treturn nil\n \t}\n }\n \n@@ -84,8 +105,9 @@ func Hook(ptr interface{}, hook HookFunc) Option {\n \tif key.Kind() != reflect.Ptr {\n \t\tpanic(\"expected a pointer\")\n \t}\n-\treturn func(k *Kong) {\n+\treturn func(k *Kong) error {\n \t\tk.before[key] = hook\n+\t\treturn nil\n \t}\n }\n \n@@ -96,22 +118,33 @@ type HelpFunction func(*Context) error\n //\n // Defaults to PrintHelp.\n func Help(help HelpFunction) Option {\n-\treturn func(k *Kong) {\n+\treturn func(k *Kong) error {\n \t\tk.help = help\n+\t\treturn nil\n+\t}\n+}\n+\n+// HelpOptions specifies options for the default help printer, if used.\n+func HelpOptions(options ...HelpOption) Option {\n+\treturn func(k *Kong) error {\n+\t\tk.helpOptions = options\n+\t\treturn nil\n \t}\n }\n \n // ClearResolvers clears all existing resolvers.\n func ClearResolvers() Option {\n-\treturn func(k *Kong) {\n+\treturn func(k *Kong) error {\n \t\tk.resolvers = nil\n+\t\treturn nil\n \t}\n }\n \n // Resolver registers flag resolvers.\n func Resolver(resolvers ...ResolverFunc) Option {\n-\treturn func(k *Kong) {\n+\treturn func(k *Kong) error {\n \t\tk.resolvers = append(k.resolvers, resolvers...)\n+\t\treturn nil\n \t}\n }\n \n@@ -126,7 +159,7 @@ type ConfigurationFunc func(r io.Reader) (ResolverFunc, error)\n //\n // ~ expansion will occur on the provided paths.\n func Configuration(loader ConfigurationFunc, paths ...string) Option {\n-\treturn func(k *Kong) {\n+\treturn func(k *Kong) error {\n \t\tfor _, path := range paths {\n \t\t\tpath = expandPath(path)\n \t\t\tr, err := os.Open(path) // nolint: gas\n@@ -139,6 +172,7 @@ func Configuration(loader ConfigurationFunc, paths ...string) Option {\n \t\t\t}\n \t\t\t_ = r.Close()\n \t\t}\n+\t\treturn nil\n \t}\n }\n \ndiff --git a/resolver.go b/resolver.go\nold mode 100755\nnew mode 100644\ndiff --git a/resolver_test.go b/resolver_test.go\nold mode 100755\nnew mode 100644\n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    ".golangci.yml",
+    "README.md",
+    "_examples/shell/main.go",
+    "build.go",
+    "camelcase.go",
+    "context.go",
+    "doc.go",
+    "global.go",
+    "global_test.go",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "tokentype_string.go"
+  ],
+  "explanation": {
+    "what": "デフォルトのヘルプ出力を `HelpOption` で設定可能にした。`CompactHelp()` を渡すとサブコマンド一覧が2カラムの簡潔な表示になる。あわせて `Option` の型を `func(k *Kong) error` に変更し、Option適用時にエラーを返せるようにした（`New()` 内でエラーチェックを追加）。`kong.Parse()` のグローバル関数と `HelpOptions(...)` を新設し、`_examples/shell/main.go` を新スタイルに書き換えている。",
+    "why": "これまで `PrintHelp` はオプション無しの固定フォーマットだったため、コマンド数が多いアプリでヘルプが冗長になる問題があった。ヘルプの見た目を差し替え可能にしつつ、`Option` 自体をエラー返却可能にすることで、今後 Option 内でのバリデーション（設定ファイル読み込み失敗など）をエラーとして伝播できるようにする地ならしをしている。",
+    "highlights": [
+      { "file": "help.go", "note": "HelpOption/HelpPrinter/CompactHelp の新設。helpWriterOptions を helpWriter に持たせて Indent() でも引き継ぐ" },
+      { "file": "options.go", "note": "Option の型が `func(k *Kong)` から `func(k *Kong) error` に変更され、既存の全 Option がエラー返却対応に書き換わっている" }
+    ],
+    "langNotes": [
+      { "topic": "functional options pattern", "note": "Go でよく使われる「関数を返す関数」で設定を組み立てる手法。`Option func(k *Kong) error` は Kong 構造体を受け取り副作用として設定を書き込むクロージャで、可変長引数 `options ...Option` として `New()` に渡す。ここでは戻り値に error を追加し、設定失敗を呼び出し元に伝えられるようにしている。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

@@ -1,0 +1,101 @@
+{
+  "seq": 128,
+  "sha": "010e3134caf2080c1b97ea8b1f751e700e2b1222",
+  "parents": [
+    "072357f8baca1c8b652e24aaa700b52b2e61f6c1"
+  ],
+  "author": {
+    "name": "Alec Thomas",
+    "email": "alec@swapoff.org",
+    "date": "2018-11-06T14:40:02+11:00"
+  },
+  "message": "Ensure flag defaults (or envars) aren't scanned in as untyped tokens.\n\nThis avoids treating default values starting with \"-\" as flags.",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 12,
+    "deletions": 2
+  },
+  "files": [
+    {
+      "path": "kong_test.go",
+      "status": "M",
+      "additions": 10,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "model.go",
+      "status": "M",
+      "additions": 2,
+      "deletions": 2,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/kong_test.go b/kong_test.go\nindex f767a03..0e0c064 100644\n--- a/kong_test.go\n+++ b/kong_test.go\n@@ -697,3 +697,13 @@ func TestNumericParamErrors(t *testing.T) {\n \t_, err := parser.Parse([]string{\"--name\", \"-10\"})\n \trequire.EqualError(t, err, `expected string value but got \"-10\" (short flag)`)\n }\n+\n+func TestDefaultValueIsHyphen(t *testing.T) {\n+\tvar cli struct {\n+\t\tFlag string `default:\"-\"`\n+\t}\n+\tp := mustNew(t, &cli)\n+\t_, err := p.Parse(nil)\n+\trequire.NoError(t, err)\n+\trequire.Equal(t, \"-\", cli.Flag)\n+}\ndiff --git a/model.go b/model.go\nindex fa6fa0c..761a022 100644\n--- a/model.go\n+++ b/model.go\n@@ -302,7 +302,7 @@ func (v *Value) Reset() error {\n \tif v.Tag.Env != \"\" {\n \t\tenvar := os.Getenv(v.Tag.Env)\n \t\tif envar != \"\" {\n-\t\t\terr := v.Parse(Scan(envar), v.Target)\n+\t\t\terr := v.Parse(ScanFromTokens(Token{Type: FlagValueToken, Value: envar}), v.Target)\n \t\t\tif err != nil {\n \t\t\t\treturn fmt.Errorf(\"%s (from envar %s=%q)\", err, v.Tag.Env, envar)\n \t\t\t}\n@@ -310,7 +310,7 @@ func (v *Value) Reset() error {\n \t\t}\n \t}\n \tif v.Default != \"\" {\n-\t\treturn v.Parse(Scan(v.Default), v.Target)\n+\t\treturn v.Parse(ScanFromTokens(Token{Type: FlagValueToken, Value: v.Default}), v.Target)\n \t}\n \treturn nil\n }\n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    ".golangci.yml",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/console.go",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/main.go",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "context.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "go.mod",
+    "go.sum",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "util.go",
+    "util_test.go",
+    "visit.go"
+  ],
+  "explanation": {
+    "what": "model.go の Value.Reset() で、envar の値やデフォルト値 (v.Default) を Scan(envar) / Scan(v.Default) のように未分類(untyped)のトークンとしてスキャンしていた箇所を、ScanFromTokens(Token{Type: FlagValueToken, Value: ...}) に変更した。これにより値が \"-\" や \"-10\" のようにハイフンで始まっていても、フラグとして誤解釈されなくなる。テストで default:\"-\" のフラグが正しく \"-\" として解釈されることを確認している。",
+    "why": "コミットメッセージ本文 \"This avoids treating default values starting with \\\"-\\\" as flags.\" が明示する通り、環境変数やデフォルト値としてハイフン始まりの文字列(例: ソート順を表す \"-\" や負数)を渡した際に、パーサーがそれをフラグトークンと誤認してしまうバグの修正。",
+    "highlights": [
+      { "file": "model.go", "note": "Scan(...) による自動トークン種別推定をやめ、ScanFromTokens で明示的に FlagValueToken 型を指定することでハイフン始まりの値を値として確定させている" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

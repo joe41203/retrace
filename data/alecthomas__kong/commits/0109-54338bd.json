@@ -1,0 +1,125 @@
+{
+  "seq": 109,
+  "sha": "54338bd8b1835d76e9ed51b085f9a657af7bfb4e",
+  "parents": [
+    "0ba159f97d18d32426a3086ee6b94439731a56d1"
+  ],
+  "author": {
+    "name": "Alec Thomas",
+    "email": "alec@swapoff.org",
+    "date": "2018-09-19T13:23:18+10:00"
+  },
+  "message": "Add an \"embed\" tag.",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 5,
+    "additions": 31,
+    "deletions": 1
+  },
+  "files": [
+    {
+      "path": "README.md",
+      "status": "M",
+      "additions": 1,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "build.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "kong_test.go",
+      "status": "M",
+      "additions": 16,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "tag.go",
+      "status": "M",
+      "additions": 2,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "tag_test.go",
+      "status": "M",
+      "additions": 11,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/README.md b/README.md\nindex 44a7a5d..bb791e5 100644\n--- a/README.md\n+++ b/README.md\n@@ -414,6 +414,7 @@ Tag                    | Description\n `group:\"X\"`            | Logical group for a flag or command.\n `prefix:\"X\"`           | Prefix for all sub-flags.\n `set:\"K=V\"`            | Set a variable for expansion by child elements. Multiples can occur.\n+`embed`                | If present, this field's children will be embedded in the parent. Useful for composition.\n \n <a id=\"markdown-variable-interpolation\" name=\"variable-interpolation\"></a>\n ## Variable interpolation\ndiff --git a/build.go b/build.go\nindex ae1ccf7..0616785 100644\n--- a/build.go\n+++ b/build.go\n@@ -52,7 +52,7 @@ func flattenedFields(v reflect.Value) (out []flattenedField) {\n \t\tif tag.Ignored {\n \t\t\tcontinue\n \t\t}\n-\t\tif ft.Anonymous {\n+\t\tif ft.Anonymous || tag.Embed {\n \t\t\tif fv.Kind() == reflect.Interface {\n \t\t\t\tfv = fv.Elem()\n \t\t\t}\ndiff --git a/kong_test.go b/kong_test.go\nindex 2bd8a7b..450f711 100644\n--- a/kong_test.go\n+++ b/kong_test.go\n@@ -626,3 +626,19 @@ func TestExcludedField(t *testing.T) {\n \t_, err = p.Parse([]string{\"--excluded=foo\"})\n \trequire.Error(t, err)\n }\n+\n+func TestUnnamedFieldEmbeds(t *testing.T) {\n+\ttype Embed struct {\n+\t\tFlag string\n+\t}\n+\tvar cli struct {\n+\t\tOne Embed `prefix:\"one-\" embed:\"\"`\n+\t\tTwo Embed `prefix:\"two-\" embed:\"\"`\n+\t}\n+\tbuf := &strings.Builder{}\n+\tp := mustNew(t, &cli, kong.Writers(buf, buf), kong.Exit(func(int) {}))\n+\t_, err := p.Parse([]string{\"--help\"})\n+\trequire.NoError(t, err)\n+\trequire.Contains(t, buf.String(), `--one-flag=STRING`)\n+\trequire.Contains(t, buf.String(), `--two-flag=STRING`)\n+}\ndiff --git a/tag.go b/tag.go\nindex 7167a9e..a5d7030 100644\n--- a/tag.go\n+++ b/tag.go\n@@ -29,6 +29,7 @@ type Tag struct {\n \tGroup       string\n \tVars        Vars\n \tPrefix      string // Optional prefix on anonymous structs. All sub-flags will have this prefix.\n+\tEmbed       bool\n \n \t// Storage for all tag keys for arbitrary lookups.\n \titems map[string][]string\n@@ -151,6 +152,7 @@ func parseTag(fv reflect.Value, ft reflect.StructField) *Tag {\n \tt.Sep, _ = t.GetRune(\"sep\")\n \tt.Group = t.Get(\"group\")\n \tt.Prefix = t.Get(\"prefix\")\n+\tt.Embed = t.Has(\"embed\")\n \tif t.Sep == 0 {\n \t\tif t.Get(\"sep\") == \"none\" {\n \t\t\tt.Sep = -1\ndiff --git a/tag_test.go b/tag_test.go\nindex 5276788..5f155a2 100644\n--- a/tag_test.go\n+++ b/tag_test.go\n@@ -138,3 +138,14 @@ func TestTagSetOnCommand(t *testing.T) {\n \trequire.NoError(t, err)\n \trequire.Contains(t, buf.String(), `A key from somewhere.`)\n }\n+\n+func TestTagSetOnFlag(t *testing.T) {\n+\tvar cli struct {\n+\t\tFlag string `set:\"where=somewhere\" help:\"A key from ${where}.\"`\n+\t}\n+\tbuf := &strings.Builder{}\n+\tp := mustNew(t, &cli, kong.Writers(buf, buf), kong.Exit(func(int) {}))\n+\t_, err := p.Parse([]string{\"--help\"})\n+\trequire.NoError(t, err)\n+\trequire.Contains(t, buf.String(), `A key from somewhere.`)\n+}\n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    ".golangci.yml",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/console.go",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/main.go",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "context.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "go.mod",
+    "go.sum",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "tokentype_string.go",
+    "util.go",
+    "util_test.go"
+  ],
+  "explanation": {
+    "what": "Tag に Embed bool フィールドを追加し、parseTag で `embed` タグの有無を t.Has(\"embed\") から取得するようにした。flattenedFields の分岐条件を `if ft.Anonymous` から `if ft.Anonymous || tag.Embed` に変え、名前付き(non-anonymous)のフィールドでも `embed:\"\"` タグを付ければ埋め込みと同様にフラット化されるようにした。TestUnnamedFieldEmbeds で、同じ Embed 型を `One`/`Two` という名前付きフィールドとして持ち、それぞれに異なる prefix を付けて別々のフラグ(`--one-flag`, `--two-flag`)として展開できることを確認している。",
+    "why": "Go の無名(embedded)フィールドは型ごとに1つしか持てないため、同じ struct 型を複数回埋め込みたい場合は名前を付けたフィールドにせざるを得ない。おそらく embed タグは名前付きフィールドにも埋め込み相当の展開を許すことで、同一の struct を複数箇所で(prefix タグと組み合わせて)再利用できるようにする狙いとみられる。",
+    "highlights": [
+      { "file": "build.go", "note": "flattenedFields の条件式に tag.Embed を追加し、名前付きフィールドも展開対象にする" },
+      { "file": "kong_test.go", "note": "TestUnnamedFieldEmbeds: 同一型 Embed を One/Two の2フィールドとして prefix 違いで展開" }
+    ],
+    "langNotes": [
+      { "topic": "embed タグと Go の無名フィールド制約", "note": "Go の struct は同じ型を無名(embedded)フィールドとして複数回持つことができない。Kong の embed タグは、名前付きフィールドであっても struct タグ経由でその制約を回避し、同じ struct 型を複数箇所で使い回してフラグを合成できるようにする独自拡張。" }
+    ],
+    "diagram": null,
+    "evidence": "inferred",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

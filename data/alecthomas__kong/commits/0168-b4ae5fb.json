@@ -1,0 +1,124 @@
+{
+  "seq": 168,
+  "sha": "b4ae5fb86e73545c37886286b7e49e58e8dd7fa4",
+  "parents": [
+    "60222fe39710e4b385045a12622180d0d15fbc95"
+  ],
+  "author": {
+    "name": "Alec Thomas",
+    "email": "alec@swapoff.org",
+    "date": "2020-02-01T18:19:03+11:00"
+  },
+  "message": "Correctly support encoding.{TextUnmarshaler,BinaryUnmarsheler}",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 4,
+    "additions": 57,
+    "deletions": 7
+  },
+  "files": [
+    {
+      "path": ".circleci/config.yml",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": ".golangci.yml",
+      "status": "M",
+      "additions": 1,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "mapper.go",
+      "status": "M",
+      "additions": 45,
+      "deletions": 3,
+      "binary": false
+    },
+    {
+      "path": "mapper_test.go",
+      "status": "M",
+      "additions": 10,
+      "deletions": 3,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/.circleci/config.yml b/.circleci/config.yml\nindex d703844..076df0f 100644\n--- a/.circleci/config.yml\n+++ b/.circleci/config.yml\n@@ -12,7 +12,7 @@ jobs:\n           command: |\n             go get -v github.com/jstemmer/go-junit-report\n             go get -v -t -d ./...\n-            curl -sfL https://install.goreleaser.com/github.com/golangci/golangci-lint.sh | bash -s v1.22.2\n+            curl -sfL https://install.goreleaser.com/github.com/golangci/golangci-lint.sh | bash -s v1.23.1\n             mkdir ~/report\n           when: always\n       - run:\ndiff --git a/.golangci.yml b/.golangci.yml\nindex bffbfc7..a5b2806 100644\n--- a/.golangci.yml\n+++ b/.golangci.yml\n@@ -14,6 +14,7 @@ linters:\n     - funlen\n     - gocognit\n     - gomnd\n+    - goprintffuncname\n \n linters-settings:\n   govet:\ndiff --git a/mapper.go b/mapper.go\nindex a2a60e4..1482f1b 100644\n--- a/mapper.go\n+++ b/mapper.go\n@@ -1,6 +1,7 @@\n package kong\n \n import (\n+\t\"encoding\"\n \t\"encoding/json\"\n \t\"io/ioutil\"\n \t\"math/bits\"\n@@ -15,8 +16,10 @@ import (\n )\n \n var (\n-\tmapperValueType = reflect.TypeOf((*MapperValue)(nil)).Elem()\n-\tboolMapperType  = reflect.TypeOf((*BoolMapper)(nil)).Elem()\n+\tmapperValueType       = reflect.TypeOf((*MapperValue)(nil)).Elem()\n+\tboolMapperType        = reflect.TypeOf((*BoolMapper)(nil)).Elem()\n+\ttextUnmarshalerType   = reflect.TypeOf((*encoding.TextUnmarshaler)(nil)).Elem()\n+\tbinaryUnmarshalerType = reflect.TypeOf((*encoding.BinaryUnmarshaler)(nil)).Elem()\n )\n \n // DecodeContext is passed to a Mapper's Decode().\n@@ -57,6 +60,34 @@ func (m *mapperValueAdapter) IsBool() bool {\n \treturn m.isBool\n }\n \n+type textUnmarshalerAdapter struct{}\n+\n+func (m *textUnmarshalerAdapter) Decode(ctx *DecodeContext, target reflect.Value) error {\n+\tvar value string\n+\terr := ctx.Scan.PopValueInto(\"value\", &value)\n+\tif err != nil {\n+\t\treturn err\n+\t}\n+\tif target.Type().Implements(textUnmarshalerType) {\n+\t\treturn target.Interface().(encoding.TextUnmarshaler).UnmarshalText([]byte(value))\n+\t}\n+\treturn target.Addr().Interface().(encoding.TextUnmarshaler).UnmarshalText([]byte(value))\n+}\n+\n+type binaryUnmarshalerAdapter struct{}\n+\n+func (m *binaryUnmarshalerAdapter) Decode(ctx *DecodeContext, target reflect.Value) error {\n+\tvar value string\n+\terr := ctx.Scan.PopValueInto(\"value\", &value)\n+\tif err != nil {\n+\t\treturn err\n+\t}\n+\tif target.Type().Implements(textUnmarshalerType) {\n+\t\treturn target.Interface().(encoding.BinaryUnmarshaler).UnmarshalBinary([]byte(value))\n+\t}\n+\treturn target.Addr().Interface().(encoding.BinaryUnmarshaler).UnmarshalBinary([]byte(value))\n+}\n+\n // A Mapper represents how a field is mapped from command-line values to Go.\n //\n // Mappers can be associated with concrete fields via pointer, reflect.Type, reflect.Kind, or via a \"type\" tag.\n@@ -137,11 +168,22 @@ func (r *Registry) ForType(typ reflect.Type) Mapper {\n \t\t\treturn &mapperValueAdapter{impl.Implements(boolMapperType)}\n \t\t}\n \t}\n+\t// Next, try explicitly registered types.\n \tvar mapper Mapper\n \tvar ok bool\n \tif mapper, ok = r.types[typ]; ok {\n \t\treturn mapper\n-\t} else if mapper, ok = r.kinds[typ.Kind()]; ok {\n+\t}\n+\t// Next try stdlib unmarshaler interfaces.\n+\tfor _, impl := range []reflect.Type{typ, reflect.PtrTo(typ)} {\n+\t\tif impl.Implements(textUnmarshalerType) {\n+\t\t\treturn &textUnmarshalerAdapter{}\n+\t\t} else if impl.Implements(binaryUnmarshalerType) {\n+\t\t\treturn &binaryUnmarshalerAdapter{}\n+\t\t}\n+\t}\n+\t// Finally try registered kinds.\n+\tif mapper, ok = r.kinds[typ.Kind()]; ok {\n \t\treturn mapper\n \t}\n \treturn nil\ndiff --git a/mapper_test.go b/mapper_test.go\nindex 3338cff..e67cfc2 100644\n--- a/mapper_test.go\n+++ b/mapper_test.go\n@@ -30,10 +30,15 @@ func TestValueMapper(t *testing.T) {\n \trequire.Equal(t, \"MOO\", cli.Flag)\n }\n \n-type textUnmarshalerValue string\n+type textUnmarshalerValue int\n \n func (m *textUnmarshalerValue) UnmarshalText(text []byte) error {\n-\t*m = textUnmarshalerValue(strings.ToUpper(string(text)))\n+\ts := string(text)\n+\tif s == \"hello\" {\n+\t\t*m = 10\n+\t} else {\n+\t\treturn fmt.Errorf(\"expected \\\"hello\\\"\")\n+\t}\n \treturn nil\n }\n \n@@ -44,7 +49,9 @@ func TestTextUnmarshaler(t *testing.T) {\n \tp := mustNew(t, &cli)\n \t_, err := p.Parse([]string{\"--value=hello\"})\n \trequire.NoError(t, err)\n-\trequire.Equal(t, \"HELLO\", string(cli.Value))\n+\trequire.Equal(t, 10, int(cli.Value))\n+\t_, err = p.Parse([]string{\"--value=other\"})\n+\trequire.Error(t, err)\n }\n \n type jsonUnmarshalerValue string\n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    ".golangci.yml",
+    "COPYING",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/README.md",
+    "_examples/server/console.go",
+    "_examples/server/go.mod",
+    "_examples/server/go.sum",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/main.go",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "config_test.go",
+    "context.go",
+    "defaults.go",
+    "defaults_test.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "go.mod",
+    "go.sum",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "util.go",
+    "util_test.go",
+    "visit.go"
+  ],
+  "explanation": {
+    "what": "mapper.go に encoding.TextUnmarshaler と encoding.BinaryUnmarshaler を型として認識する仕組みを実装した。textUnmarshalerType/binaryUnmarshalerType という reflect.Type を用意し、textUnmarshalerAdapter/binaryUnmarshalerAdapter という Mapper 実装(Decode メソッド)を追加。Registry.ForType() の解決順を「明示登録された型 → 標準ライブラリの Unmarshaler インターフェース実装 → 登録された kind」の順に変更した。mapper_test.go の textUnmarshalerValue は string から int ベースの型に変え、値が \"hello\" でなければエラーを返すよう改造してエラーパスもテストしている。CI の golangci-lint を v1.23.1 に更新し、linter に goprintffuncname を追加。",
+    "why": "コミットメッセージの \"Correctly support\" が示す通り、以前のコミット(seq163)ではドキュメントとテストだけが先行しており、実際に TextUnmarshaler/BinaryUnmarshaler を検出してデコードに使う実装コードは無かった。このコミットでその実装本体を追加し、ドキュメントと実装を一致させている。",
+    "highlights": [
+      { "file": "mapper.go", "note": "Registry.ForType() のフォールバック順序に「標準ライブラリの Unmarshaler 実装チェック」を割り込ませている" }
+    ],
+    "langNotes": [
+      { "topic": "reflect.Type.Implements", "note": "ある型が特定のインターフェースを満たすかどうかを実行時に reflect 経由で調べる手法。Kong は typ 自体とそのポインタ型 reflect.PtrTo(typ) の両方をチェックしており、値レシーバ/ポインタレシーバどちらで UnmarshalText を実装していても検出できるようにしている。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

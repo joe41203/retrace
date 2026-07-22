@@ -1,0 +1,127 @@
+{
+  "seq": 63,
+  "sha": "29fe92f28634fdac35207c08ec5f74212f391ebc",
+  "parents": [
+    "9db476cc81724c7ec3b005a8496e9229ba020d33"
+  ],
+  "author": {
+    "name": "Alec Thomas",
+    "email": "alec@swapoff.org",
+    "date": "2018-06-13T12:07:35+10:00"
+  },
+  "message": "Only reset grammar when Apply()ing.\n\nAlso add a Kong.Help() function for writing context-sensitive help.",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 8,
+    "additions": 132,
+    "deletions": 88
+  },
+  "files": [
+    {
+      "path": "README.md",
+      "status": "M",
+      "additions": 77,
+      "deletions": 40,
+      "binary": false
+    },
+    {
+      "path": "context.go",
+      "status": "M",
+      "additions": 34,
+      "deletions": 35,
+      "binary": false
+    },
+    {
+      "path": "global_test.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "help_test.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "kong.go",
+      "status": "M",
+      "additions": 14,
+      "deletions": 6,
+      "binary": false
+    },
+    {
+      "path": "kong_test.go",
+      "status": "M",
+      "additions": 2,
+      "deletions": 2,
+      "binary": false
+    },
+    {
+      "path": "options.go",
+      "status": "M",
+      "additions": 2,
+      "deletions": 2,
+      "binary": false
+    },
+    {
+      "path": "options_test.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/README.md b/README.md\nindex 489a28e..aefc505 100644\n--- a/README.md\n+++ b/README.md\n@@ -1,3 +1,4 @@\n+<!-- markdownlint-disable MD013 MD033 -->\n <p align=\"center\"><img width=\"90%\" src=\"kong.png\" /></p>\n \n # Kong is a command-line parser for Go [![CircleCI](https://circleci.com/gh/alecthomas/kong.svg?style=svg&circle-token=477fecac758383bf281453187269b913130f17d2)](https://circleci.com/gh/alecthomas/kong)\n@@ -8,17 +9,20 @@\n 1. [Help](#help)\n 1. [Flags](#flags)\n 1. [Commands and sub-commands](#commands-and-sub-commands)\n+1. [Branching positional arguments](#branching-positional-arguments)\n+1. [Terminating positional arguments](#terminating-positional-arguments)\n 1. [Supported tags](#supported-tags)\n 1. [Modifying Kong's behaviour](#modifying-kongs-behaviour)\n+    1. [`Name(help)` and `Description(help)` - set the application name description](#namehelp-and-descriptionhelp---set-the-application-name-description)\n     1. [`Configuration(loader, paths...)` - load defaults from configuration files](#configurationloader-paths---load-defaults-from-configuration-files)\n     1. [`Resolver(...)` - support for default values from external sources](#resolver---support-for-default-values-from-external-sources)\n     1. [`*Mapper(...)` - customising how the command-line is mapped to Go values](#mapper---customising-how-the-command-line-is-mapped-to-go-values)\n     1. [`Help(HelpFunc)` - customising help](#helphelpfunc---customising-help)\n     1. [`Hook(&field, HookFunc)` - callback hooks to execute when the command-line is parsed](#hookfield-hookfunc---callback-hooks-to-execute-when-the-command-line-is-parsed)\n+    1. [Other options](#other-options)\n \n <!-- /MarkdownTOC -->\n \n-\n ## Introduction\n \n Kong aims to support arbitrarily complex command-line structures with as little developer effort as possible.\n@@ -27,10 +31,8 @@ To achieve that, command-lines are expressed as Go types, with the structure and\n \n For example, the following command-line:\n \n-```\n-shell rm [-f] [-r] <paths> ...\n-shell ls [<paths> ...]\n-```\n+    shell rm [-f] [-r] <paths> ...\n+    shell ls [<paths> ...]\n \n Can be represented by the following command-line structure:\n \n@@ -63,59 +65,78 @@ Help is automatically generated. With no other arguments provided, help will dis\n \n eg.\n \n-```\n-$ shell --help\n-usage: shell <command>\n+    $ shell --help\n+    usage: shell <command>\n \n-A shell-like example app.\n+    A shell-like example app.\n \n-Flags:\n-  --help   Show context-sensitive help.\n-  --debug  Debug mode.\n+    Flags:\n+      --help   Show context-sensitive help.\n+      --debug  Debug mode.\n \n-Commands:\n-  rm <paths> ...\n-    Remove files.\n+    Commands:\n+      rm <paths> ...\n+        Remove files.\n \n-  ls [<paths> ...]\n-    List paths.\n-```\n+      ls [<paths> ...]\n+        List paths.\n \n If a command is provided, the help will show full detail on the command including all available flags.\n \n eg.\n \n-```\n-$ shell --help rm\n-usage: shell rm <paths> ...\n+    $ shell --help rm\n+    usage: shell rm <paths> ...\n \n-Remove files.\n+    Remove files.\n \n-Arguments:\n-  <paths> ...  Paths to remove.\n+    Arguments:\n+      <paths> ...  Paths to remove.\n \n-Flags:\n-      --debug        Debug mode.\n+    Flags:\n+          --debug        Debug mode.\n \n-  -f, --force        Force removal.\n-  -r, --recursive    Recursively remove files.\n-```\n+      -f, --force        Force removal.\n+      -r, --recursive    Recursively remove files.\n \n ## Flags\n \n-Any field in the command structure *not* tagged with `cmd` or `arg` will be a flag. Flags are optional by default.\n+Any [mapped](#mapper---customising-how-the-command-line-is-mapped-to-go-values) field in the command structure *not* tagged with `cmd` or `arg` will be a flag. Flags are optional by default.\n+\n+eg. The command-line `app [--flag=\"foo\"]` can be represented by the following.\n+\n+```go\n+type CLI struct {\n+  Flag string\n+}\n+```\n \n ## Commands and sub-commands\n \n-Kong supports arbitrarily nested commands and positional arguments. Nested structs tagged with `cmd` will be treated as commands.\n+Sub-commands are specified by tagging a struct field with `cmd`. Kong supports arbitrarily nested commands.\n \n-Arguments can also optionally have children, in order to support commands like the following:\n+eg. The following struct represents the CLI structure `command [--flag=\"str\"] sub-command`.\n \n-```\n-app rename <name> to <name>\n+```go\n+type CLI struct {\n+  Command struct {\n+    Flag string\n+\n+    SubCommand struct {\n+    } `cmd`\n+  } `cmd`\n+}\n ```\n \n-This is achieved by tagging a nested struct with `arg`, then including a positional argument field inside that struct with the same name. For example:\n+## Branching positional arguments\n+\n+In addition to sub-commands, structs can also be configured as branching positional arguments.\n+\n+This is achieved by tagging an [unmapped](#mapper---customising-how-the-command-line-is-mapped-to-go-values) nested struct field with `arg`, then including a positional argument field inside that struct _with the same name_. For example, the following command structure:\n+\n+    app rename <name> to <name>\n+\n+Can be represented with the following:\n \n ```go\n var CLI struct {\n@@ -131,8 +152,13 @@ var CLI struct {\n   } `cmd`\n }\n ```\n+\n This looks a little verbose in this contrived example, but typically this will not be the case.\n \n+## Terminating positional arguments\n+\n+If a [mapped type](#mapper---customising-how-the-command-line-is-mapped-to-go-values) is tagged with `arg`,\n+\n ## Supported tags\n \n Tags can be in two forms:\n@@ -147,12 +173,12 @@ Both can coexist with standard Tag parsing.\n | `cmd`                  | If present, struct is a command.            |\n | `arg`                  | If present, field is an argument.           |\n | `env:\"X\"`              | Specify envar to use for default value.\n-| `type:\"X\"`             | Specify named Mapper to use.                |\n+| `name:\"X\"`             | Long name, for overriding field name.       |\n | `help:\"X\"`             | Help text.                                  |\n+| `type:\"X\"`             | Specify named Mapper to use.                |\n | `placeholder:\"X\"`      | Placeholder text.                           |\n | `default:\"X\"`          | Default value.                              |\n | `short:\"X\"`            | Short name, if flag.                        |\n-| `name:\"X\"`             | Long name, for overriding field name.       |\n | `required`             | If present, flag/arg is required.           |\n | `optional`             | If present, flag/arg is optional.           |\n | `hidden`               | If present, flag is hidden.                 |\n@@ -163,7 +189,15 @@ Both can coexist with standard Tag parsing.\n \n Each Kong parser can be configured via functional options passed to `New(cli interface{}, options...Option)`.\n \n-The full set of options can be found in [options.go](https://github.com/alecthomas/kong/blob/master/options.go).\n+The full set of options can be found [here](https://godoc.org/github.com/alecthomas/kong#Option).\n+\n+### `Name(help)` and `Description(help)` - set the application name description\n+\n+Set the application name and/or description.\n+\n+The name of the application will default to the binary name, but can be overridden with `Name(name)`.\n+\n+As with all help in Kong, text will be wrapped to the terminal.\n \n ### `Configuration(loader, paths...)` - load defaults from configuration files\n \n@@ -201,8 +235,7 @@ All builtin Go types (as well as a bunch of useful stdlib types like `time.Time`\n 1. `NamedMapper(string, Mapper)` and using the tag key `type:\"<name>\"`.\n 2. `KindMapper(reflect.Kind, Mapper)`.\n 3. `TypeMapper(reflect.Type, Mapper)`.\n-4.  `ValueMapper(interface{}, Mapper)`, passing in a pointer to a field of the grammar.\n-\n+4. `ValueMapper(interface{}, Mapper)`, passing in a pointer to a field of the grammar.\n \n ### `Help(HelpFunc)` - customising help\n \n@@ -230,3 +263,7 @@ if CLI.Debug {\n ```\n \n But under some circumstances, hooks are the right choice.\n+\n+### Other options\n+\n+The full set of options can be found [here](https://godoc.org/github.com/alecthomas/kong#Option).\ndiff --git a/context.go b/context.go\nindex 20ef8c5..1f39e74 100755\n--- a/context.go\n+++ b/context.go\n@@ -55,6 +55,8 @@ func (c *Context) Selected() *Node {\n // Trace path of \"args\" through the gammar tree.\n //\n // The returned Context will include a Path of all commands, arguments, positionals and flags.\n+//\n+// Note that this will not modify the target grammar. Call Apply() to do so.\n func Trace(k *Kong, args []string) (*Context, error) {\n \tc := &Context{\n \t\tApp:  k,\n@@ -62,17 +64,10 @@ func Trace(k *Kong, args []string) (*Context, error) {\n \t\tPath: []*Path{\n \t\t\t{App: k.Model, Flags: k.Model.Flags, Value: k.Model.Target},\n \t\t},\n-\t}\n-\terr := c.reset(&c.App.Model.Node)\n-\tif err != nil {\n-\t\treturn nil, err\n+\t\tscan: Scan(args...),\n \t}\n \tc.Error = c.trace(&c.App.Model.Node)\n-\terr = c.traceResolvers()\n-\tif err != nil {\n-\t\treturn nil, err\n-\t}\n-\treturn c, nil\n+\treturn c, c.traceResolvers()\n }\n \n // Validate the current context.\n@@ -155,7 +150,6 @@ func (c *Context) FlagValue(flag *Flag) reflect.Value {\n \n // Recursively reset values to defaults (as specified in the grammar) or the zero value.\n func (c *Context) reset(node *Node) error {\n-\tc.scan = Scan(c.args...)\n \tfor _, flag := range node.Flags {\n \t\terr := flag.Value.Reset()\n \t\tif err != nil {\n@@ -310,31 +304,6 @@ func (c *Context) trace(node *Node) (err error) { // nolint: gocyclo\n \treturn nil\n }\n \n-// Apply traced context to the target grammar.\n-func (c *Context) Apply() (string, error) {\n-\tpath := []string{}\n-\n-\tfor _, trace := range c.Path {\n-\t\tswitch {\n-\t\tcase trace.App != nil:\n-\t\tcase trace.Argument != nil:\n-\t\t\tpath = append(path, \"<\"+trace.Argument.Name+\">\")\n-\t\t\ttrace.Argument.Argument.Apply(trace.Value)\n-\t\tcase trace.Command != nil:\n-\t\t\tpath = append(path, trace.Command.Name)\n-\t\tcase trace.Flag != nil:\n-\t\t\ttrace.Flag.Value.Apply(trace.Value)\n-\t\tcase trace.Positional != nil:\n-\t\t\tpath = append(path, \"<\"+trace.Positional.Name+\">\")\n-\t\t\ttrace.Positional.Apply(trace.Value)\n-\t\tdefault:\n-\t\t\tpanic(\"unsupported path ?!\")\n-\t\t}\n-\t}\n-\n-\treturn strings.Join(path, \" \"), nil\n-}\n-\n // Walk through flags from existing nodes in the path.\n func (c *Context) traceResolvers() error {\n \tif len(c.App.resolvers) == 0 {\n@@ -370,6 +339,36 @@ func (c *Context) traceResolvers() error {\n \treturn nil\n }\n \n+// Apply traced context to the target grammar.\n+func (c *Context) Apply() (string, error) {\n+\terr := c.reset(&c.App.Model.Node)\n+\tif err != nil {\n+\t\treturn \"\", err\n+\t}\n+\n+\tpath := []string{}\n+\n+\tfor _, trace := range c.Path {\n+\t\tswitch {\n+\t\tcase trace.App != nil:\n+\t\tcase trace.Argument != nil:\n+\t\t\tpath = append(path, \"<\"+trace.Argument.Name+\">\")\n+\t\t\ttrace.Argument.Argument.Apply(trace.Value)\n+\t\tcase trace.Command != nil:\n+\t\t\tpath = append(path, trace.Command.Name)\n+\t\tcase trace.Flag != nil:\n+\t\t\ttrace.Flag.Value.Apply(trace.Value)\n+\t\tcase trace.Positional != nil:\n+\t\t\tpath = append(path, \"<\"+trace.Positional.Name+\">\")\n+\t\t\ttrace.Positional.Apply(trace.Value)\n+\t\tdefault:\n+\t\t\tpanic(\"unsupported path ?!\")\n+\t\t}\n+\t}\n+\n+\treturn strings.Join(path, \" \"), nil\n+}\n+\n func (c *Context) matchFlags(flags []*Flag, matcher func(f *Flag) bool) (err error) {\n \tdefer catch(&err)\n \ttoken := c.scan.Peek()\ndiff --git a/global_test.go b/global_test.go\nindex e371c62..ed0ee83 100644\n--- a/global_test.go\n+++ b/global_test.go\n@@ -25,7 +25,7 @@ func TestParseHandlingBadBuild(t *testing.T) {\n \t\t}\n \t}()\n \n-\tParse(&cli, ExitFunction(func(_ int) { panic(\"exiting\") }))\n+\tParse(&cli, Exit(func(_ int) { panic(\"exiting\") }))\n \n \trequire.Fail(t, \"we were expecting a panic\")\n }\ndiff --git a/help_test.go b/help_test.go\nindex b1dfffe..5d5e76d 100644\n--- a/help_test.go\n+++ b/help_test.go\n@@ -38,7 +38,7 @@ func TestHelp(t *testing.T) {\n \t\tName(\"test-app\"),\n \t\tDescription(\"A test app.\"),\n \t\tWriters(w, w),\n-\t\tExitFunction(func(int) {\n+\t\tExit(func(int) {\n \t\t\texited = true\n \t\t\tpanic(true) // Panic to fake \"exit\".\n \t\t}),\ndiff --git a/kong.go b/kong.go\nindex dc2fbf3..98ea668 100644\n--- a/kong.go\n+++ b/kong.go\n@@ -108,9 +108,15 @@ func (k *Kong) extraFlags() []*Flag {\n \treturn []*Flag{helpFlag}\n }\n \n-// Trace parses the command-line, validating and collecting matching grammar nodes.\n-func (k *Kong) Trace(args []string) (*Context, error) {\n-\treturn Trace(k, args)\n+// Help writes help for the given args to the stdout io.Writer associated with this Kong.\n+//\n+// See Help() and Writers() for overriding the help function and stdout, respectively.\n+func (k *Kong) Help(args []string) error {\n+\tctx, err := Trace(k, args)\n+\tif err != nil {\n+\t\treturn err\n+\t}\n+\treturn k.help(ctx)\n }\n \n // Parse arguments into target.\n@@ -119,7 +125,7 @@ func (k *Kong) Trace(args []string) (*Context, error) {\n // the command name while positional arguments are the argument name surrounded by \"<argument>\".\n func (k *Kong) Parse(args []string) (command string, err error) {\n \tdefer catch(&err)\n-\tctx, err := k.Trace(args)\n+\tctx, err := Trace(k, args)\n \tif err != nil {\n \t\treturn \"\", err\n \t}\n@@ -165,13 +171,15 @@ func (k *Kong) applyHooks(ctx *Context) error {\n }\n \n // Printf writes a message to Kong.Stdout with the application name prefixed.\n-func (k *Kong) Printf(format string, args ...interface{}) {\n+func (k *Kong) Printf(format string, args ...interface{}) *Kong {\n \tfmt.Fprintf(k.Stdout, k.Model.Name+\": \"+format, args...)\n+\treturn k\n }\n \n // Errorf writes a message to Kong.Stderr with the application name prefixed.\n-func (k *Kong) Errorf(format string, args ...interface{}) {\n+func (k *Kong) Errorf(format string, args ...interface{}) *Kong {\n \tfmt.Fprintf(k.Stderr, k.Model.Name+\": error: \"+format, args...)\n+\treturn k\n }\n \n // FatalIfErrorf terminates with an error message if err != nil.\ndiff --git a/kong_test.go b/kong_test.go\nindex 1835ec4..5a169e4 100644\n--- a/kong_test.go\n+++ b/kong_test.go\n@@ -10,7 +10,7 @@ import (\n func mustNew(t *testing.T, cli interface{}, options ...Option) *Kong {\n \tt.Helper()\n \toptions = append([]Option{\n-\t\tExitFunction(func(int) {\n+\t\tExit(func(int) {\n \t\t\tt.Helper()\n \t\t\tt.Fatalf(\"unexpected exit()\")\n \t\t}),\n@@ -322,7 +322,7 @@ func TestTraceErrorPartiallySucceeds(t *testing.T) {\n \t\t} `kong:\"cmd\"`\n \t}\n \tp := mustNew(t, &cli)\n-\tctx, err := p.Trace([]string{\"one\", \"bad\"})\n+\tctx, err := Trace(p, []string{\"one\", \"bad\"})\n \trequire.NoError(t, err)\n \trequire.Error(t, ctx.Error)\n \trequire.Equal(t, []string{\"one\"}, ctx.Command())\ndiff --git a/options.go b/options.go\nindex db43d7e..93d00e9 100755\n--- a/options.go\n+++ b/options.go\n@@ -12,8 +12,8 @@ import (\n // An Option applies optional changes to the Kong application.\n type Option func(k *Kong)\n \n-// ExitFunction overrides the function used to terminate. This is useful for testing or interactive use.\n-func ExitFunction(exit func(int)) Option {\n+// Exit overrides the function used to terminate. This is useful for testing or interactive use.\n+func Exit(exit func(int)) Option {\n \treturn func(k *Kong) { k.Exit = exit }\n }\n \ndiff --git a/options_test.go b/options_test.go\nindex fed4a81..ffbc521 100644\n--- a/options_test.go\n+++ b/options_test.go\n@@ -11,7 +11,7 @@ import (\n \n func TestOptions(t *testing.T) {\n \tvar cli struct{}\n-\tp, err := New(&cli, Name(\"name\"), Description(\"description\"), Writers(nil, nil), ExitFunction(nil))\n+\tp, err := New(&cli, Name(\"name\"), Description(\"description\"), Writers(nil, nil), Exit(nil))\n \trequire.NoError(t, err)\n \trequire.Equal(t, \"name\", p.Model.Name)\n \trequire.Equal(t, \"description\", p.Model.Help)\n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    ".golangci.yml",
+    "README.md",
+    "_examples/shell/main.go",
+    "build.go",
+    "camelcase.go",
+    "context.go",
+    "doc.go",
+    "global.go",
+    "global_test.go",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "tokentype_string.go"
+  ],
+  "explanation": {
+    "what": "Context.reset() の呼び出しを Trace() 内から Apply() 内へ移動し、コマンドライン解析(トレース)の段階では対象の構造体グラマーを書き換えず、Apply() を呼んだときだけリセットして値を書き込むようにした。あわせて Kong.Trace(args) メソッドを削除しパッケージ関数 Trace(k, args) に統一し、Kong.Help(args) メソッドを新設して文脈に応じたヘルプ出力ができるようにした。README にも Branching/Terminating positional arguments や新オプションの章を追記している。",
+    "why": "コミットメッセージが述べる通り、grammar のリセットは Apply() 時にのみ行うのが目的。従来は Trace() の中で reset していたため、ヘルプ表示など「解析はするが実際に値を適用したくない」用途で意図せず対象構造体がゼロ値に戻ってしまう問題があった。Help() を新設したのもこの分離の直接の帰結で、ヘルプ出力のために Trace するだけなら Apply を呼ばずに済む。",
+    "highlights": [
+      { "file": "context.go", "note": "reset() の呼び出しが Trace() → Apply() へ移動。Trace はもう副作用として対象構造体を書き換えない" },
+      { "file": "kong.go", "note": "Kong.Help(args) を新設。Trace() でパスを求めてから k.help(ctx) を呼ぶだけの薄いラッパー" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

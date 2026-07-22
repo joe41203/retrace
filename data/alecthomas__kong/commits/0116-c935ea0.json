@@ -1,0 +1,109 @@
+{
+  "seq": 116,
+  "sha": "c935ea07dd037f8f3631a5db7ee8c085c16c5f69",
+  "parents": [
+    "c112a076e71fbb5e59d6fbd87e2da60878e3ccc7"
+  ],
+  "author": {
+    "name": "Alec Thomas",
+    "email": "alec@swapoff.org",
+    "date": "2018-09-21T17:10:53+10:00"
+  },
+  "message": "Fix some more Resolver changes.",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 3,
+    "additions": 9,
+    "deletions": 9
+  },
+  "files": [
+    {
+      "path": "kong.go",
+      "status": "M",
+      "additions": 2,
+      "deletions": 2,
+      "binary": false
+    },
+    {
+      "path": "options.go",
+      "status": "M",
+      "additions": 5,
+      "deletions": 5,
+      "binary": false
+    },
+    {
+      "path": "resolver.go",
+      "status": "M",
+      "additions": 2,
+      "deletions": 2,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/kong.go b/kong.go\nindex 5e31009..920e966 100644\n--- a/kong.go\n+++ b/kong.go\n@@ -43,7 +43,7 @@ type Kong struct {\n \tStderr io.Writer\n \n \tbindings  bindings\n-\tloader    ConfigurationFunc\n+\tloader    ConfigurationLoader\n \tresolvers []Resolver\n \tregistry  *Registry\n \n@@ -332,7 +332,7 @@ func (k *Kong) FatalIfErrorf(err error, args ...interface{}) {\n // LoadConfig from path using the loader configured via Configuration(loader).\n //\n // \"path\" will have ~/ expanded.\n-func (k *Kong) LoadConfig(path string) (ResolverFunc, error) {\n+func (k *Kong) LoadConfig(path string) (Resolver, error) {\n \tpath = expandPath(path)\n \tr, err := os.Open(path) // nolint: gas\n \tif err != nil {\ndiff --git a/options.go b/options.go\nindex 140c1e0..bcadf16 100644\n--- a/options.go\n+++ b/options.go\n@@ -188,17 +188,17 @@ func Resolvers(resolvers ...Resolver) OptionFunc {\n \t}\n }\n \n-// ConfigurationFunc is a function that builds a resolver from a file.\n-type ConfigurationFunc func(r io.Reader) (ResolverFunc, error)\n+// ConfigurationLoader is a function that builds a resolver from a file.\n+type ConfigurationLoader func(r io.Reader) (Resolver, error)\n \n // Configuration provides Kong with support for loading defaults from a set of configuration files.\n //\n-// Paths will be opened in order, and \"loader\" will be used to provide a ResolverFunc which is registered with Kong.\n+// Paths will be opened in order, and \"loader\" will be used to provide a Resolver which is registered with Kong.\n //\n-// Note: The JSON function is a ConfigurationFunc.\n+// Note: The JSON function is a ConfigurationLoader.\n //\n // ~ expansion will occur on the provided paths.\n-func Configuration(loader ConfigurationFunc, paths ...string) OptionFunc {\n+func Configuration(loader ConfigurationLoader, paths ...string) OptionFunc {\n \treturn func(k *Kong) error {\n \t\tk.loader = loader\n \t\tfor _, path := range paths {\ndiff --git a/resolver.go b/resolver.go\nindex 5cc92ce..85063d9 100644\n--- a/resolver.go\n+++ b/resolver.go\n@@ -31,13 +31,13 @@ func (r ResolverFunc) Validate(app *Application) error { return nil } //  nolint\n // JSON returns a Resolver that retrieves values from a JSON source.\n //\n // Hyphens in flag names are replaced with underscores.\n-func JSON(r io.Reader) (ResolverFunc, error) {\n+func JSON(r io.Reader) (Resolver, error) {\n \tvalues := map[string]interface{}{}\n \terr := json.NewDecoder(r).Decode(&values)\n \tif err != nil {\n \t\treturn nil, err\n \t}\n-\tf := func(context *Context, parent *Path, flag *Flag) (string, error) {\n+\tvar f ResolverFunc = func(context *Context, parent *Path, flag *Flag) (string, error) {\n \t\tname := strings.Replace(flag.Name, \"-\", \"_\", -1)\n \t\traw, ok := values[name]\n \t\tif !ok {\n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    ".golangci.yml",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/console.go",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/main.go",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "context.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "go.mod",
+    "go.sum",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "tokentype_string.go",
+    "util.go",
+    "util_test.go",
+    "visit.go"
+  ],
+  "explanation": {
+    "what": "直前の Resolver インターフェース化(seq115)に追随し、ConfigurationFunc を ConfigurationLoader にリネームして戻り値を ResolverFunc から Resolver インターフェース型に変更した。Kong.LoadConfig() と JSON() の戻り値型も同様に Resolver に揃えた。",
+    "why": "コミットメッセージ \"Fix some more Resolver changes.\" の通り、seq115 で Resolver をインターフェース化した際に取りこぼした周辺の型(設定ファイルローダー関連)を追って修正する後始末のコミット。",
+    "highlights": [
+      { "file": "options.go", "note": "ConfigurationFunc → ConfigurationLoader へのリネームと戻り値型の変更" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

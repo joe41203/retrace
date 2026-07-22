@@ -1,0 +1,104 @@
+{
+  "seq": 117,
+  "sha": "1048bd0448af72f8999a407e3c7494091150b961",
+  "parents": [
+    "c935ea07dd037f8f3631a5db7ee8c085c16c5f69"
+  ],
+  "author": {
+    "name": "Alec Thomas",
+    "email": "alec@swapoff.org",
+    "date": "2018-09-22T11:13:20+10:00"
+  },
+  "message": "Add a FileContentFlag that loads the contents of a file into a flag\nvalue.",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 32,
+    "deletions": 1
+  },
+  "files": [
+    {
+      "path": "mapper.go",
+      "status": "M",
+      "additions": 15,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "mapper_test.go",
+      "status": "M",
+      "additions": 17,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/mapper.go b/mapper.go\nindex 3f980c2..15ab88d 100644\n--- a/mapper.go\n+++ b/mapper.go\n@@ -2,6 +2,7 @@ package kong\n \n import (\n \t\"fmt\"\n+\t\"io/ioutil\"\n \t\"math/bits\"\n \t\"net/url\"\n \t\"os\"\n@@ -58,7 +59,7 @@ func (m *mapperValueAdapter) IsBool() bool {\n //\n // Mappers can be associated with concrete fields via pointer, reflect.Type, reflect.Kind, or via a \"type\" tag.\n //\n-// Additionally, if a type implements this interface, it will be used.\n+// Additionally, if a type implements the MappverValue interface, it will be used.\n type Mapper interface {\n \t// Decode ctx.Value with ctx.Scanner into target.\n \tDecode(ctx *DecodeContext, target reflect.Value) error\n@@ -462,3 +463,16 @@ func JoinEscaped(s []string, sep rune) string {\n \t}\n \treturn strings.Join(escaped, string(sep))\n }\n+\n+// FileContentFlag is a flag value that loads a file's contents into its value.\n+type FileContentFlag []byte\n+\n+func (f *FileContentFlag) Decode(ctx *DecodeContext) error { // nolint: golint\n+\tfilename := ctx.Scan.PopValue(\"filename\")\n+\tdata, err := ioutil.ReadFile(filename) // nolint: gosec\n+\tif err != nil {\n+\t\treturn fmt.Errorf(\"failed to open %q: %s\", filename, err)\n+\t}\n+\t*f = FileContentFlag(data)\n+\treturn nil\n+}\ndiff --git a/mapper_test.go b/mapper_test.go\nindex 86e3a41..6d393ad 100644\n--- a/mapper_test.go\n+++ b/mapper_test.go\n@@ -1,7 +1,10 @@\n package kong_test\n \n import (\n+\t\"fmt\"\n+\t\"io/ioutil\"\n \t\"net/url\"\n+\t\"os\"\n \t\"reflect\"\n \t\"testing\"\n \t\"time\"\n@@ -149,3 +152,17 @@ func TestMapperValue(t *testing.T) {\n \trequire.NoError(t, err)\n \trequire.Equal(t, \"foo\", cli.Value.decoded)\n }\n+\n+func TestFileContentFlag(t *testing.T) {\n+\tvar cli struct {\n+\t\tFile kong.FileContentFlag\n+\t}\n+\tf, err := ioutil.TempFile(\"\", \"\")\n+\trequire.NoError(t, err)\n+\tdefer os.Remove(f.Name())\n+\tfmt.Fprint(f, \"hello world\")\n+\tf.Close()\n+\t_, err = mustNew(t, &cli).Parse([]string{\"--file\", f.Name()})\n+\trequire.NoError(t, err)\n+\trequire.Equal(t, []byte(\"hello world\"), []byte(cli.File))\n+}\n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    ".golangci.yml",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/console.go",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/main.go",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "context.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "go.mod",
+    "go.sum",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "tokentype_string.go",
+    "util.go",
+    "util_test.go",
+    "visit.go"
+  ],
+  "explanation": {
+    "what": "mapper.go に FileContentFlag という []byte ベースの型を追加した。Decode(ctx) メソッドで ctx.Scan.PopValue(\"filename\") からファイルパスを取り出し、ioutil.ReadFile で内容をまるごと読み込んで自身に代入する。struct のフィールド型を FileContentFlag にするだけで、CLI フラグの値としてファイルパスを受け取りつつ内容を保持できるようになる。",
+    "why": "コミットメッセージの通り、ファイルの中身を直接フラグ値として読み込む機能を追加する目的。既存の path/existingfile/existingdir(seq77)がパス文字列だけを保持するのに対し、FileContentFlag は「パスを受け取って中身をロードする」までを1つの型で完結させている。",
+    "highlights": [
+      { "file": "mapper.go", "note": "FileContentFlag 型の定義と Decode() の実装" }
+    ],
+    "langNotes": [
+      { "topic": "FileContentFlag と Mapper インターフェース", "note": "Decode(ctx *DecodeContext) error を実装する型は kong の Mapper として自動的に認識される(seq87 で追加された「型自身がマッパーになれる」仕組み)。struct タグ無しで型を書くだけでフラグの読み込み方法をカスタマイズできる、Go の「メソッドを持たせるだけでインターフェースを満たす」性質を利用した設計。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

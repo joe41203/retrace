@@ -1,0 +1,96 @@
+{
+  "seq": 81,
+  "sha": "00847157a161b73c542b5602c0aad2a49bf5e0c2",
+  "parents": [
+    "7e022e20b084402ce9e3b3c4f28152725ac3bdfe"
+  ],
+  "author": {
+    "name": "Alec Thomas",
+    "email": "alec@swapoff.org",
+    "date": "2018-06-23T08:11:59+10:00"
+  },
+  "message": "Ensure -- consumes all tokens, not just positional.",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 3,
+    "additions": 22,
+    "deletions": 6
+  },
+  "files": [
+    {
+      "path": "mapper.go",
+      "status": "M",
+      "additions": 3,
+      "deletions": 2,
+      "binary": false
+    },
+    {
+      "path": "mapper_test.go",
+      "status": "M",
+      "additions": 10,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "scanner.go",
+      "status": "M",
+      "additions": 9,
+      "deletions": 4,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/mapper.go b/mapper.go\nindex e6c6ad7..244dcb3 100644\n--- a/mapper.go\n+++ b/mapper.go\n@@ -159,7 +159,8 @@ func (r *Registry) RegisterDefaults() *Registry {\n \t\tRegisterKind(reflect.Float32, floatDecoder(32)).\n \t\tRegisterKind(reflect.Float64, floatDecoder(64)).\n \t\tRegisterKind(reflect.String, MapperFunc(func(ctx *DecodeContext, target reflect.Value) error {\n-\t\t\ttarget.SetString(ctx.Scan.PopValue(\"string\"))\n+\t\t\ttoken := ctx.Scan.PopValue(\"string\")\n+\t\t\ttarget.SetString(token)\n \t\t\treturn nil\n \t\t})).\n \t\tRegisterKind(reflect.Bool, boolMapper{}).\n@@ -294,7 +295,7 @@ func sliceDecoder(r *Registry) MapperFunc {\n \t\t\tchildScanner = Scan(SplitEscaped(ctx.Scan.PopValue(\"list\"), sep)...)\n \t\t} else {\n \t\t\ttokens := ctx.Scan.PopWhile(func(t Token) bool { return t.IsValue() })\n-\t\t\tchildScanner = Scan(tokens...)\n+\t\t\tchildScanner = ScanFromTokens(tokens...)\n \t\t}\n \t\tchildDecoder := r.ForNamedType(ctx.Value.Tag.Type, el)\n \t\tif childDecoder == nil {\ndiff --git a/mapper_test.go b/mapper_test.go\nindex 66fc679..12e982f 100644\n--- a/mapper_test.go\n+++ b/mapper_test.go\n@@ -110,3 +110,13 @@ func TestURLMapper(t *testing.T) {\n \t_, err = p.Parse([]string{\":foo\"})\n \trequire.Error(t, err)\n }\n+\n+func TestSliceConsumesRemainingPositionalArgs(t *testing.T) {\n+\tvar cli struct {\n+\t\tRemainder []string `arg:\"\"`\n+\t}\n+\tp := mustNew(t, &cli)\n+\t_, err := p.Parse([]string{\"--\", \"ls\", \"-lart\"})\n+\trequire.NoError(t, err)\n+\trequire.Equal(t, []string{\"ls\", \"-lart\"}, cli.Remainder)\n+}\ndiff --git a/scanner.go b/scanner.go\nindex 765f3b3..acab5e3 100644\n--- a/scanner.go\n+++ b/scanner.go\n@@ -87,6 +87,11 @@ func Scan(args ...string) *Scanner {\n \treturn s\n }\n \n+// ScanFromTokens creates a new Scanner from a slice of tokens.\n+func ScanFromTokens(tokens ...Token) *Scanner {\n+\treturn &Scanner{args: tokens}\n+}\n+\n // Len returns the number of input arguments.\n func (s *Scanner) Len() int {\n \treturn len(s.args)\n@@ -114,17 +119,17 @@ func (s *Scanner) PopValue(context string) string {\n }\n \n // PopWhile predicate returns true.\n-func (s *Scanner) PopWhile(predicate func(Token) bool) (values []string) {\n+func (s *Scanner) PopWhile(predicate func(Token) bool) (values []Token) {\n \tfor predicate(s.Peek()) {\n-\t\tvalues = append(values, s.Pop().Value)\n+\t\tvalues = append(values, s.Pop())\n \t}\n \treturn\n }\n \n // PopUntil predicate returns true.\n-func (s *Scanner) PopUntil(predicate func(Token) bool) (values []string) {\n+func (s *Scanner) PopUntil(predicate func(Token) bool) (values []Token) {\n \tfor !predicate(s.Peek()) {\n-\t\tvalues = append(values, s.Pop().Value)\n+\t\tvalues = append(values, s.Pop())\n \t}\n \treturn\n }\n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    ".golangci.yml",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/shell/main.go",
+    "build.go",
+    "camelcase.go",
+    "context.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "tokentype_string.go"
+  ],
+  "explanation": {
+    "what": "Scanner.PopWhile / PopUntil の戻り値を []string から []Token に変更し、新設の ScanFromTokens で Token 列からサブスキャナを作れるようにした。sliceDecoder はこの新関数を使うよう更新され、-- の後の残り引数がすべてスライスに吸収されるようになった。",
+    "why": "コミットメッセージの通り、-- 以降はポジショナル引数だけでなくフラグ風トークン(例: -lart)も含めて全トークンを消費すべきだが、従来は PopWhile が Token を string に潰してしまい、Token が持つ種別情報(値かフラグ風か)が失われていた。Token のまま扱うことでこの区別を保持し、スライス側でまとめて再スキャンできるようにしたとおもわれる。",
+    "highlights": [
+      { "file": "scanner.go", "note": "PopWhile/PopUntil の戻り値型が []string → []Token に変わり、ScanFromTokens が新設された" },
+      { "file": "mapper_test.go", "note": "TestSliceConsumesRemainingPositionalArgs が -- ls -lart を丸ごとスライスへ入れることを検証" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

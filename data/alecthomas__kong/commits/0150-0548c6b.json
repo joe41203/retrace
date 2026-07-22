@@ -1,0 +1,98 @@
+{
+  "seq": 150,
+  "sha": "0548c6b1afaea7616098cec708d9bbf49eef2cd6",
+  "parents": [
+    "33b8d2b19cff931184e23eff38c3a371948f527d"
+  ],
+  "author": {
+    "name": "Alec Thomas",
+    "email": "alec@swapoff.org",
+    "date": "2019-07-08T14:11:08+10:00"
+  },
+  "message": "Correctly hide sub-commands.",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 1,
+    "deletions": 1
+  },
+  "files": [
+    {
+      "path": "help.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/help.go b/help.go\nindex d26d300..3b94a8f 100644\n--- a/help.go\n+++ b/help.go\n@@ -94,7 +94,7 @@ func printCommand(w *helpWriter, app *Application, cmd *Command) {\n \tif !w.NoAppSummary {\n \t\tw.Printf(\"Usage: %s %s\", app.Name, cmd.Summary())\n \t}\n-\tprintNodeDetail(w, cmd, false)\n+\tprintNodeDetail(w, cmd, true)\n \tif w.Summary && app.HelpFlag != nil {\n \t\tw.Print(\"\")\n \t\tw.Printf(`Run \"%s --help\" for more information.`, cmd.FullPath())\n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    ".golangci.yml",
+    "COPYING",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/console.go",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/main.go",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "config_test.go",
+    "context.go",
+    "defaults.go",
+    "defaults_test.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "go.mod",
+    "go.sum",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "util.go",
+    "util_test.go",
+    "visit.go"
+  ],
+  "explanation": {
+    "what": "help.go の printCommand で、printNodeDetail 呼び出し時の hideDefault(第3引数)相当のフラグを false から true に変更した。サブコマンドの詳細ヘルプ(`app cmd --help` 相当)を表示する際に、hidden 指定のサブコマンドを一覧に出さないようにする1行修正。",
+    "why": "おそらく、コマンドツリーの一部だけが hidden の場合に、個別コマンドのヘルプ画面(printCommand 経由)ではまだ hidden なサブコマンドが一覧に紛れ込んでしまう表示不具合があり、それを直すための修正と考えられる。",
+    "highlights": [
+      { "file": "help.go", "note": "printNodeDetail(w, cmd, false) → true への1行変更" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "inferred",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

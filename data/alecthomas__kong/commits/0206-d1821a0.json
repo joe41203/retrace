@@ -1,0 +1,126 @@
+{
+  "seq": 206,
+  "sha": "d1821a06667ce31c7b1b7ab387b3421b3382d484",
+  "parents": [
+    "88ecc9c4e977bd29c4b21b3e83ec56045d549328"
+  ],
+  "author": {
+    "name": "hasheddan",
+    "email": "georgedanielmangum@gmail.com",
+    "date": "2020-09-11T15:48:39-05:00"
+  },
+  "message": "Add UsageOnMissing option to Kong\n\nAdds an UsageOnMissing option which configures Kong to omit errors and\ndisplay usage when a command is invalid due to a missing argument. This\ncan be useful if a user wishes for the top-level command to print usage\nwhen no args are supplied, or if they would prefer child commands which\nhave their own subcommands to print usage specific to that command.\n\nSigned-off-by: hasheddan <georgedanielmangum@gmail.com>",
+  "pr": {
+    "number": 108,
+    "title": "Add UsageOnMissing option to Kong",
+    "body": "Adds a UsageOnMissing option which configures Kong to omit errors and\r\ndisplay usage when a command is invalid due to a missing argument. This\r\ncan be useful if a user wishes for the top-level command print usage\r\nwhen no args are supplied, or if they would prefer child commands which\r\nhave their own subcommands to print usage specific to that command.\r\n\r\nSigned-off-by: hasheddan <georgedanielmangum@gmail.com>\r\n\r\nI have provided some examples below when used with `crank` the CLI for @crossplane. Note that they all also have `UsageOnError()` supplied. This demonstrates how `UsageOnMissing()` plays nicely (i.e. no duplicate usage msg) by not returning an error.\r\n\r\n**Top-level command without UsageOnMissing()**\r\n\r\n```\r\n$ crank\r\nUsage: crank <command>\r\n\r\nA tool for building platforms on Crossplane.\r\n\r\nFlags:\r\n  -h, --help    Show context-sensitive help.\r\n\r\nCommands:\r\n  configuration get [<name>]\r\n    Get installed Configurations.\r\n\r\n  configuration create <name> <package>\r\n    Create a Configuration.\r\n\r\n  provider get [<name>]\r\n    Get installed Providers.\r\n\r\n  provider create <name> <package>\r\n    Create a Provider.\r\n\r\n  pkg build [<name>]\r\n    Build a Crossplane package.\r\n\r\n  pkg push [<name>]\r\n    Push a Crossplane package to a registry.\r\n\r\nRun \"crank <command> --help\" for more information on a command.\r\n\r\ncrank: error: expected one of \"configuration\",  \"provider\",  \"pkg\"\r\nexit status 1\r\n\r\n```\r\n\r\n**Top-level command with UsageOnMissing()**\r\n\r\n```\r\n$ crank\r\nUsage: crank <command>\r\n\r\nA tool for building platforms on Crossplane.\r\n\r\nFlags:\r\n  -h, --help    Show context-sensitive help.\r\n\r\nCommands:\r\n  configuration get [<name>]\r\n    Get installed Configurations.\r\n\r\n  configuration create <name> <package>\r\n    Create a Configuration.\r\n\r\n  provider get [<name>]\r\n    Get installed Providers.\r\n\r\n  provider create <name> <package>\r\n    Create a Provider.\r\n\r\n  pkg build [<name>]\r\n    Build a Crossplane package.\r\n\r\n  pkg push [<name>]\r\n    Push a Crossplane package to a registry.\r\n\r\nRun \"crank <command> --help\" for more information on a command.\r\n```\r\n\r\n**Example child command without UsageOnMissing()**\r\n\r\n```\r\n$ crank pkg\r\nUsage: crank pkg <command>\r\n\r\nBuild and publish packages.\r\n\r\nFlags:\r\n  -h, --help    Show context-sensitive help.\r\n\r\nCommands:\r\n  pkg build [<name>]\r\n    Build a Crossplane package.\r\n\r\n  pkg push [<name>]\r\n    Push a Crossplane package to a registry.\r\n\r\ncrank: error: expected one of \"build\",  \"push\"\r\nexit status 1\r\n\r\n```\r\n\r\n**Example child command with UsageOnMissing()**\r\n\r\n```\r\n$ crank pkg\r\nUsage: crank pkg <command>\r\n\r\nBuild and publish packages.\r\n\r\nFlags:\r\n  -h, --help    Show context-sensitive help.\r\n\r\nCommands:\r\n  pkg build [<name>]\r\n    Build a Crossplane package.\r\n\r\n  pkg push [<name>]\r\n    Push a Crossplane package to a registry.\r\n```",
+    "url": "https://github.com/alecthomas/kong/pull/108"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 3,
+    "additions": 22,
+    "deletions": 7
+  },
+  "files": [
+    {
+      "path": "context.go",
+      "status": "M",
+      "additions": 6,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "kong.go",
+      "status": "M",
+      "additions": 8,
+      "deletions": 7,
+      "binary": false
+    },
+    {
+      "path": "options.go",
+      "status": "M",
+      "additions": 8,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/context.go b/context.go\nindex 56efd92..b4d1ee2 100644\n--- a/context.go\n+++ b/context.go\n@@ -187,6 +187,9 @@ func (c *Context) Validate() error { // nolint: gocyclo\n \t}\n \n \tif err := checkMissingChildren(node); err != nil {\n+\t\tif c.Kong.usageOnMissing {\n+\t\t\treturn c.PrintUsage(false)\n+\t\t}\n \t\treturn err\n \t}\n \tif err := checkMissingPositionals(positionals, node.Positional); err != nil {\n@@ -624,6 +627,9 @@ func (c *Context) Run(binds ...interface{}) (err error) {\n \tdefer catch(&err)\n \tnode := c.Selected()\n \tif node == nil {\n+\t\tif c.Kong.usageOnMissing {\n+\t\t\treturn nil\n+\t\t}\n \t\treturn fmt.Errorf(\"no command selected\")\n \t}\n \treturn c.RunNode(node, binds...)\ndiff --git a/kong.go b/kong.go\nindex 3e09f47..21085b2 100644\n--- a/kong.go\n+++ b/kong.go\n@@ -47,13 +47,14 @@ type Kong struct {\n \tresolvers []Resolver\n \tregistry  *Registry\n \n-\tnoDefaultHelp bool\n-\tusageOnError  bool\n-\thelp          HelpPrinter\n-\thelpFormatter HelpValueFormatter\n-\thelpOptions   HelpOptions\n-\thelpFlag      *Flag\n-\tvars          Vars\n+\tnoDefaultHelp  bool\n+\tusageOnError   bool\n+\tusageOnMissing bool\n+\thelp           HelpPrinter\n+\thelpFormatter  HelpValueFormatter\n+\thelpOptions    HelpOptions\n+\thelpFlag       *Flag\n+\tvars           Vars\n \n \t// Set temporarily by Options. These are applied after build().\n \tpostBuildOptions []Option\ndiff --git a/options.go b/options.go\nindex 5bd36c3..1369b6b 100644\n--- a/options.go\n+++ b/options.go\n@@ -216,6 +216,14 @@ func UsageOnError() Option {\n \t})\n }\n \n+// UsageOnMissing configures Kong to display usage and exit successfully if command is missing a child argument.\n+func UsageOnMissing() Option {\n+\treturn OptionFunc(func(k *Kong) error {\n+\t\tk.usageOnMissing = true\n+\t\treturn nil\n+\t})\n+}\n+\n // ClearResolvers clears all existing resolvers.\n func ClearResolvers() Option {\n \treturn OptionFunc(func(k *Kong) error {\n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    ".gitignore",
+    ".golangci.yml",
+    "COPYING",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/README.md",
+    "_examples/server/console.go",
+    "_examples/server/go.mod",
+    "_examples/server/go.sum",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/main.go",
+    "benchmark_test.go",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "config_test.go",
+    "context.go",
+    "defaults.go",
+    "defaults_test.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "go.mod",
+    "go.sum",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "testdata/file.txt",
+    "util.go",
+    "util_test.go",
+    "visit.go"
+  ],
+  "explanation": {
+    "what": "kong.go に usageOnMissing フィールドを追加し、options.go に対応する UsageOnMissing() Option 関数を新設した。context.go では、子コマンド/引数が必須なのに指定されなかった場合(checkMissingChildren のエラー)と、Run() 時に選択されたノードが無い場合に、usageOnMissing が有効なら通常のエラーを返す代わりに使用方法(usage)を表示して正常終了するよう分岐を追加した。",
+    "why": "PR の説明にある通り、これまでは必須のサブコマンドや引数が省略された場合、常にエラーメッセージ付きで usage が表示されていた。しかし、トップレベルコマンドを引数なしで実行したときや、サブコマンドを持つ子コマンドを実行したときに、エラー文言を出さず usage だけを表示して正常終了したいユースケース(コミットの PR 例では crossplane の crank CLI)があったため、この挙動をオプトインできる UsageOnMissing() を追加している。",
+    "highlights": [
+      { "file": "options.go", "note": "UsageOnMissing() は他の Option と同様 OptionFunc で k.usageOnMissing = true を設定するだけ" },
+      { "file": "context.go", "note": "checkMissingChildren と Run() の2箇所で usageOnMissing 分岐が追加されている" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [
+      { "type": "pr", "number": 108, "url": "https://github.com/alecthomas/kong/pull/108" }
+    ],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

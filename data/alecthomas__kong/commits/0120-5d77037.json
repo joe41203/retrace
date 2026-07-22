@@ -1,0 +1,112 @@
+{
+  "seq": 120,
+  "sha": "5d7703774f4e8a9a4cb7c3d031e66771125b8b20",
+  "parents": [
+    "d648254c7dc275186615182711be6c46ee267722"
+  ],
+  "author": {
+    "name": "Alec Thomas",
+    "email": "alec@swapoff.org",
+    "date": "2018-09-23T19:59:25+10:00"
+  },
+  "message": "Validate enums (finally).",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 3,
+    "additions": 24,
+    "deletions": 0
+  },
+  "files": [
+    {
+      "path": "context.go",
+      "status": "M",
+      "additions": 11,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "kong_test.go",
+      "status": "M",
+      "additions": 8,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "model.go",
+      "status": "M",
+      "additions": 5,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/context.go b/context.go\nindex fca1e81..7f67199 100644\n--- a/context.go\n+++ b/context.go\n@@ -119,6 +119,17 @@ func (c *Context) Empty() bool {\n \n // Validate the current context.\n func (c *Context) Validate() error {\n+\terr := Visit(c.Model, func(node Visitable, next Next) error {\n+\t\tif value, ok := node.(*Value); ok {\n+\t\t\tif value.Enum != \"\" && !value.EnumMap()[fmt.Sprintf(\"%v\", value.Target.Interface())] {\n+\t\t\t\treturn fmt.Errorf(\"%s must be one of %s but got %q\", value.Summary(), value.Enum, value.Target.Interface())\n+\t\t\t}\n+\t\t}\n+\t\treturn next(nil)\n+\t})\n+\tif err != nil {\n+\t\treturn err\n+\t}\n \tfor _, resolver := range c.combineResolvers() {\n \t\tif err := resolver.Validate(c.Model); err != nil {\n \t\t\treturn err\ndiff --git a/kong_test.go b/kong_test.go\nindex b3e8d16..5278c54 100644\n--- a/kong_test.go\n+++ b/kong_test.go\n@@ -654,3 +654,11 @@ func TestHooksCalledForDefault(t *testing.T) {\n \trequire.Equal(t, \"default\", string(cli.Flag))\n \trequire.Equal(t, []string{\"before:default\", \"after:default\"}, ctx.values)\n }\n+\n+func TestEnum(t *testing.T) {\n+\tvar cli struct {\n+\t\tFlag string `enum:\"a,b,c\"`\n+\t}\n+\t_, err := mustNew(t, &cli).Parse([]string{\"--flag\", \"d\"})\n+\trequire.EqualError(t, err, \"--flag=STRING must be one of a,b,c but got \\\"\\\"\")\n+}\ndiff --git a/model.go b/model.go\nindex 5b90741..6256379 100644\n--- a/model.go\n+++ b/model.go\n@@ -269,6 +269,11 @@ func (v *Value) IsBool() bool {\n \n // Parse tokens into value, parse, and validate, but do not write to the field.\n func (v *Value) Parse(scan *Scanner, target reflect.Value) error {\n+\tdefer func() {\n+\t\tif err := recover(); err != nil {\n+\t\t\tpanic(fmt.Sprintf(\"mapper %T failed to apply to %s: %s\", v.Mapper, v.Summary(), err))\n+\t\t}\n+\t}()\n \terr := v.Mapper.Decode(&DecodeContext{Value: v, Scan: scan}, target)\n \tif err != nil {\n \t\treturn fmt.Errorf(\"%s: %s\", v.Summary(), err)\n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    ".golangci.yml",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/console.go",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/main.go",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "context.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "go.mod",
+    "go.sum",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "tokentype_string.go",
+    "util.go",
+    "util_test.go",
+    "visit.go"
+  ],
+  "explanation": {
+    "what": "Context.Validate() の冒頭に Visit(c.Model, ...) を追加し、モデル内の全 Value を巡回して enum タグが設定されているフィールドの現在値が EnumMap() に含まれるかを検証するようにした。含まれなければ \"%s must be one of %s but got %q\" というエラーを返す。あわせて Value.Parse() に recover() を追加し、Mapper の Decode 実装が panic した場合でも「どのフィールド・どの Mapper で失敗したか」を含むメッセージに変換してから再 panic するようにした。",
+    "why": "コミットメッセージの \"(finally)\" という言葉から、おそらく enum タグ(struct タグとして以前から存在していたと推測される)に対応するバリデーションが長らく未実装のままだったのを、この時点でようやく追加したものと考えられる。seq111 で導入された Visit の走査基盤を使うことで、ツリー全体を辿るコードを新たに書かずに Validate() へ enum チェックを追加できている。",
+    "highlights": [
+      { "file": "context.go", "note": "Visit() で全 Value を辿り enum タグの値を EnumMap() と照合するバリデーション本体" },
+      { "file": "kong_test.go", "note": "TestEnum: 許可されていない値を渡したときのエラーメッセージを確認するテスト" }
+    ],
+    "langNotes": [
+      { "topic": "enum タグと EnumMap によるバリデーション", "note": "struct タグ `enum:\"a,b,c\"` で許可値を宣言し、Validate() 実行時に現在のフィールド値が EnumMap() のキーに含まれるかを確認する。パース(型変換)とバリデーション(意味的な妥当性チェック)を Parse()/Validate() という別ステップに分ける設計は、この少し前の seq36 で導入された「バリデーションを独立したステップにする」方針の延長線上にある。" }
+    ],
+    "diagram": null,
+    "evidence": "inferred",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

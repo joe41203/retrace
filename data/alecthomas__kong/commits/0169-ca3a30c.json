@@ -1,0 +1,103 @@
+{
+  "seq": 169,
+  "sha": "ca3a30c5f18b04d9818bf8b87accf460ec946de2",
+  "parents": [
+    "b4ae5fb86e73545c37886286b7e49e58e8dd7fa4"
+  ],
+  "author": {
+    "name": "Alec Thomas",
+    "email": "alec@swapoff.org",
+    "date": "2020-02-02T20:21:55+11:00"
+  },
+  "message": "Make HelpOptions into an Option.",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 10,
+    "deletions": 4
+  },
+  "files": [
+    {
+      "path": "help.go",
+      "status": "M",
+      "additions": 10,
+      "deletions": 4,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/help.go b/help.go\nindex 3b94a8f..0f4dfe0 100644\n--- a/help.go\n+++ b/help.go\n@@ -47,6 +47,12 @@ type HelpOptions struct {\n \tIndenter HelpIndenter\n }\n \n+// Apply options to Kong as a configuration option.\n+func (h HelpOptions) Apply(k *Kong) error {\n+\tk.helpOptions = h\n+\treturn nil\n+}\n+\n // HelpProvider can be implemented by commands/args to provide detailed help.\n type HelpProvider interface {\n \t// This string is formatted by go/doc and thus has the same formatting rules.\n@@ -344,7 +350,7 @@ func formatFlag(haveShort bool, flag *Flag) string {\n }\n \n // commandTree creates a tree with the given node name as root and its children's arguments and sub commands as leaves.\n-func (w *HelpOptions) commandTree(node *Node, prefix string) (rows [][2]string) {\n+func (h *HelpOptions) commandTree(node *Node, prefix string) (rows [][2]string) {\n \tvar nodeName string\n \tswitch node.Type {\n \tdefault:\n@@ -353,16 +359,16 @@ func (w *HelpOptions) commandTree(node *Node, prefix string) (rows [][2]string)\n \t\tnodeName += prefix + \"<\" + node.Name + \">\"\n \t}\n \trows = append(rows, [2]string{nodeName, node.Help})\n-\tif w.Indenter == nil {\n+\tif h.Indenter == nil {\n \t\tprefix = SpaceIndenter(prefix)\n \t} else {\n-\t\tprefix = w.Indenter(prefix)\n+\t\tprefix = h.Indenter(prefix)\n \t}\n \tfor _, arg := range node.Positional {\n \t\trows = append(rows, [2]string{prefix + arg.Summary(), arg.Help})\n \t}\n \tfor _, subCmd := range node.Children {\n-\t\trows = append(rows, w.commandTree(subCmd, prefix)...)\n+\t\trows = append(rows, h.commandTree(subCmd, prefix)...)\n \t}\n \treturn\n }\n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    ".golangci.yml",
+    "COPYING",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/README.md",
+    "_examples/server/console.go",
+    "_examples/server/go.mod",
+    "_examples/server/go.sum",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/main.go",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "config_test.go",
+    "context.go",
+    "defaults.go",
+    "defaults_test.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "go.mod",
+    "go.sum",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "util.go",
+    "util_test.go",
+    "visit.go"
+  ],
+  "explanation": {
+    "what": "HelpOptions 構造体に `Apply(k *Kong) error` メソッドを追加し、Kong の Option インターフェースを満たすようにした(内部で k.helpOptions = h を代入するだけ)。これにより HelpOptions{...} の値を直接 kong.New() の可変長オプション引数に渡せるようになる。あわせて commandTree() メソッドのレシーバ名を w から h にリネームしている(挙動に変化なし)。",
+    "why": "コミットメッセージ \"Make HelpOptions into an Option.\" の通り、これまで別経路で設定していたであろう HelpOptions を、他の設定と同じ Option の枠組みに統一し、利用者が一貫した書き方(オプションの可変長引数)で渡せるようにする設計変更だと考えられる。",
+    "highlights": [
+      { "file": "help.go", "note": "HelpOptions.Apply() を追加し Option インターフェースに適合させている" }
+    ],
+    "langNotes": [
+      { "topic": "Option インターフェース (Functional Options 発展形)", "note": "Kong では `Apply(k *Kong) error` を実装する型がすべて Option として kong.New(cli, opts...) に渡せる。関数だけでなく構造体の値でも Option になれるようにすることで、設定値をまとめて渡す構成が自然に書けるようになる。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

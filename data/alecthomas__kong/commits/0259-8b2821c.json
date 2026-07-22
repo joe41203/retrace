@@ -1,0 +1,128 @@
+{
+  "seq": 259,
+  "sha": "8b2821cc246b9bc5581bbe8ca1810c9c69474ca2",
+  "parents": [
+    "247574041d77de7af3aa287c228a3a886f9df6ae"
+  ],
+  "author": {
+    "name": "Evgeny",
+    "email": "ya.zver@gmail.com",
+    "date": "2021-06-21T18:08:43+07:00"
+  },
+  "message": "Added sub objects support in JSON resolver (#178)",
+  "pr": {
+    "number": 178,
+    "title": "Added sub objects support in JSON resolver",
+    "body": "Added support of sub objects to JSON resolver.",
+    "url": "https://github.com/alecthomas/kong/pull/178"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 27,
+    "deletions": 3
+  },
+  "files": [
+    {
+      "path": "resolver.go",
+      "status": "M",
+      "additions": 13,
+      "deletions": 2,
+      "binary": false
+    },
+    {
+      "path": "resolver_test.go",
+      "status": "M",
+      "additions": 14,
+      "deletions": 1,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/resolver.go b/resolver.go\nindex 623a734..2fa626f 100644\n--- a/resolver.go\n+++ b/resolver.go\n@@ -39,8 +39,19 @@ func JSON(r io.Reader) (Resolver, error) {\n \tvar f ResolverFunc = func(context *Context, parent *Path, flag *Flag) (interface{}, error) {\n \t\tname := strings.ReplaceAll(flag.Name, \"-\", \"_\")\n \t\traw, ok := values[name]\n-\t\tif !ok {\n-\t\t\treturn nil, nil\n+\t\tif ok {\n+\t\t\treturn raw, nil\n+\t\t}\n+\t\traw = values\n+\t\tfor _, part := range strings.Split(name, \".\") {\n+\t\t\tif values, ok := raw.(map[string]interface{}); ok {\n+\t\t\t\traw, ok = values[part]\n+\t\t\t\tif !ok {\n+\t\t\t\t\treturn nil, nil\n+\t\t\t\t}\n+\t\t\t} else {\n+\t\t\t\treturn nil, nil\n+\t\t\t}\n \t\t}\n \t\treturn raw, nil\n \t}\ndiff --git a/resolver_test.go b/resolver_test.go\nindex 8e44d24..2606ad4 100644\n--- a/resolver_test.go\n+++ b/resolver_test.go\n@@ -147,18 +147,29 @@ func TestEnv(t *testing.T) {\n }\n \n func TestJSONBasic(t *testing.T) {\n+\ttype Embed struct {\n+\t\tString string\n+\t}\n+\n \tvar cli struct {\n \t\tString          string\n \t\tSlice           []int\n \t\tSliceWithCommas []string\n \t\tBool            bool\n+\n+\t\tOne Embed `prefix:\"one.\" embed:\"\"`\n+\t\tTwo Embed `prefix:\"two.\" embed:\"\"`\n \t}\n \n \tjson := `{\n \t\t\"string\": \"🍕\",\n \t\t\"slice\": [5, 8],\n \t\t\"bool\": true,\n-\t\t\"slice_with_commas\": [\"a,b\", \"c\"]\n+\t\t\"slice_with_commas\": [\"a,b\", \"c\"],\n+\t\t\"one\":{\n+\t\t\t\"string\": \"one value\"\n+\t\t},\n+\t\t\"two.string\": \"two value\"\n \t}`\n \n \tr, err := kong.JSON(strings.NewReader(json))\n@@ -170,6 +181,8 @@ func TestJSONBasic(t *testing.T) {\n \trequire.Equal(t, \"🍕\", cli.String)\n \trequire.Equal(t, []int{5, 8}, cli.Slice)\n \trequire.Equal(t, []string{\"a,b\", \"c\"}, cli.SliceWithCommas)\n+\trequire.Equal(t, \"one value\", cli.One.String)\n+\trequire.Equal(t, \"two value\", cli.Two.String)\n \trequire.True(t, cli.Bool)\n }\n \n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    ".github/FUNDING.yml",
+    ".gitignore",
+    ".golangci.yml",
+    "COPYING",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/README.md",
+    "_examples/server/console.go",
+    "_examples/server/go.mod",
+    "_examples/server/go.sum",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/main.go",
+    "benchmark_test.go",
+    "bin/.go@latest.pkg",
+    "bin/.golangci-lint-1.40.1.pkg",
+    "bin/README.hermit.md",
+    "bin/activate-hermit",
+    "bin/go",
+    "bin/gofmt",
+    "bin/golangci-lint",
+    "bin/hermit",
+    "bin/hermit.hcl",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "config_test.go",
+    "context.go",
+    "defaults.go",
+    "defaults_test.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "go.mod",
+    "go.sum",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "testdata/file.txt",
+    "util.go",
+    "util_test.go",
+    "visit.go"
+  ],
+  "explanation": {
+    "what": "kong.JSON が生成する Resolver を拡張し、フラグ名(ハイフンをアンダースコアに置換したもの)がトップレベルキーとして直接見つからない場合、名前をドット区切りで分解して JSON のネストしたオブジェクトを辿るフォールバックを追加した。途中でキーが見つからない、またはオブジェクトでない値に当たった場合は nil を返す。TestJSONBasic に embed:\"\" + prefix:\"one.\"/\"two.\" のフィールドを追加し、ネストした JSON オブジェクト({\"one\": {\"string\": ...}})とドット区切りのフラットなキー(\"two.string\")の両方を解決できることを確認している。",
+    "why": "PR本文の通り、prefix 付きで embed した構造体のフラグ(例 `one.string`)を JSON 設定ファイルから解決したいという要望に応えるための拡張。従来はトップレベルのキー一致だけを見ていたため、ネストした設定オブジェクトを使えなかった。",
+    "highlights": [
+      { "file": "resolver.go", "note": "トップレベルで見つからない場合に strings.Split(name, \".\") でキーをたどり、map[string]interface{} を再帰的に降りていくフォールバック処理" }
+    ],
+    "langNotes": [
+      { "topic": "JSON resolver のネスト解決", "note": "JSON をデコードすると interface{} の中に map[string]interface{} がネストして入っている(encoding/json のデフォルトの動的表現)。この resolver は型アサーション raw.(map[string]interface{}) を使い、ドット区切りのフラグ名(one.string)に沿ってこのネスト構造を1階層ずつ降りていく。" }
+    ],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [{ "type": "pr", "number": 178, "url": "https://github.com/alecthomas/kong/pull/178" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

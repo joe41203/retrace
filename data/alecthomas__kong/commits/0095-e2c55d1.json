@@ -1,0 +1,89 @@
+{
+  "seq": 95,
+  "sha": "e2c55d143e48ce4cdb027163dc99179a93e6abc0",
+  "parents": [
+    "6fcc190f78f5016c18bb3795b46a990f30ca2f57"
+  ],
+  "author": {
+    "name": "Alec Thomas",
+    "email": "alec@swapoff.org",
+    "date": "2018-08-08T14:45:26+10:00"
+  },
+  "message": "Really don't suggest hidden commands.",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 3,
+    "deletions": 0
+  },
+  "files": [
+    {
+      "path": "context.go",
+      "status": "M",
+      "additions": 3,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/context.go b/context.go\nindex 3a942a8..e0efb3a 100644\n--- a/context.go\n+++ b/context.go\n@@ -524,6 +524,9 @@ func checkMissingChildren(node *Node) error {\n \t\t}\n \t}\n \tfor _, child := range node.Children {\n+\t\tif child.Hidden {\n+\t\t\tcontinue\n+\t\t}\n \t\tif child.Argument != nil {\n \t\t\tif !child.Argument.Required {\n \t\t\t\tcontinue\n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    ".golangci.yml",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/console.go",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/main.go",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "context.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "tokentype_string.go"
+  ],
+  "explanation": {
+    "what": "checkMissingChildren() のループに、child.Hidden な子ノードをスキップする分岐を追加した。",
+    "why": "直前の seq94 でコマンド候補提示から Hidden コマンドを除外したが、必須の子ノード(コマンド/引数)が欠けているかどうかのチェックにはまだ Hidden コマンドが含まれており、隠しコマンドが未指定なだけでエラーになりうる状態が残っていた。件名の \"Really\" が示す通り、前回の修正だけでは不十分だった箇所を追加で塞いだ。",
+    "highlights": [
+      { "file": "context.go", "note": "checkMissingChildren() 内の child.Hidden スキップ" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

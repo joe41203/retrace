@@ -1,0 +1,111 @@
+{
+  "seq": 210,
+  "sha": "5b3fd5476ad18f3bc7df3548bbea529282120585",
+  "parents": [
+    "5cf89d77b1e1a60870058034a6441036a82f8902"
+  ],
+  "author": {
+    "name": "Sven Nebel",
+    "email": "nebel.sven@gmail.com",
+    "date": "2020-10-10T21:03:14+01:00"
+  },
+  "message": "Refactor k.FatalIfErrorf to use k.Fatalf",
+  "pr": {
+    "number": 111,
+    "title": "Refactor k.FatalIfErrorf to use k.Fatalf",
+    "body": "",
+    "url": "https://github.com/alecthomas/kong/pull/111"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 1,
+    "deletions": 2
+  },
+  "files": [
+    {
+      "path": "kong.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 2,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/kong.go b/kong.go\nindex 21085b2..c16b723 100644\n--- a/kong.go\n+++ b/kong.go\n@@ -336,8 +336,7 @@ func (k *Kong) FatalIfErrorf(err error, args ...interface{}) {\n \t\t_ = k.help(options, err.Context)\n \t\tfmt.Fprintln(k.Stdout)\n \t}\n-\tk.Errorf(\"%s\", msg)\n-\tk.Exit(1)\n+\tk.Fatalf(\"%s\", msg)\n }\n \n // LoadConfig from path using the loader configured via Configuration(loader).\n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    ".gitignore",
+    ".golangci.yml",
+    "COPYING",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/README.md",
+    "_examples/server/console.go",
+    "_examples/server/go.mod",
+    "_examples/server/go.sum",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/main.go",
+    "benchmark_test.go",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "config_test.go",
+    "context.go",
+    "defaults.go",
+    "defaults_test.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "go.mod",
+    "go.sum",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "testdata/file.txt",
+    "util.go",
+    "util_test.go",
+    "visit.go"
+  ],
+  "explanation": {
+    "what": "kong.go の Kong.FatalIfErrorf() 内で、これまで k.Errorf(\"%s\", msg) と k.Exit(1) を個別に呼んでいた箇所を、既存の k.Fatalf(\"%s\", msg) 呼び出し1行にまとめた。",
+    "why": "コミットメッセージ・PRタイトルの通り、FatalIfErrorf 内の「エラー出力してから終了する」という処理は Kong に既に用意されている Fatalf() と同じ役割であり、それを使うようリファクタリングして重複コードを削減している。",
+    "highlights": [
+      { "file": "kong.go", "note": "k.Errorf + k.Exit(1) の2行を k.Fatalf の1行に置き換え" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [
+      { "type": "pr", "number": 111, "url": "https://github.com/alecthomas/kong/pull/111" }
+    ],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

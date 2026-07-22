@@ -1,0 +1,143 @@
+{
+  "seq": 308,
+  "sha": "5538b7f045240a29069ac910b749fee38959f1b6",
+  "parents": [
+    "7c6ff10d3388dbc9ec5977785f12e5404b339f09"
+  ],
+  "author": {
+    "name": "pyq-lsa",
+    "email": "26353308+pyq-lsa@users.noreply.github.com",
+    "date": "2022-05-01T13:17:44-07:00"
+  },
+  "message": "change help hook and call Reset later\n\nchange to BeforeResolve hook to catch calls to '--help' earlier;\ncall reset later in Kong.Parse() to allow help hook to get hooked;\nadd test;",
+  "pr": {
+    "number": 298,
+    "title": "fix: always help",
+    "body": "Help fails sometimes due to `kong.Parse()` calling `context.go:Context.Reset()` early in the function; this call to `Context.Reset()` makes subsequent calls to `model.go:Value.Reset()`; `Value.Reset()` calls `Parse` for environment variables and default values; `Parse` in turn calls `Value.Mapper.Decode()`, which executes the resolver; if the resolver fails, then `Parse` fails during `Reset`; originally, `--help` was implemented as a `BeforeApply` hook, but due to the above described call order, it wasn't getting called in some failure conditions; if `Reset` is moved to a later stage in `kong.Parse`, the hook can be called, allowing for usage to be printed.\r\n\r\nInitially opening as a draft, as there may be unintended consequences of moving `Reset` around in `Parse` and changing `--help` to a `BeforeResolve` hook.",
+    "url": "https://github.com/alecthomas/kong/pull/298"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 4,
+    "additions": 24,
+    "deletions": 5
+  },
+  "files": [
+    {
+      "path": "README.md",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "help.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "kong.go",
+      "status": "M",
+      "additions": 3,
+      "deletions": 3,
+      "binary": false
+    },
+    {
+      "path": "kong_test.go",
+      "status": "M",
+      "additions": 19,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/README.md b/README.md\nindex 372db71..40d4c46 100644\n--- a/README.md\n+++ b/README.md\n@@ -248,7 +248,7 @@ func main() {\n \n If a node in the grammar has a `BeforeResolve(...)`, `BeforeApply(...) error` and/or `AfterApply(...) error` method, those methods will be called before validation/assignment and after validation/assignment, respectively.\n \n-The `--help` flag is implemented with a `BeforeApply` hook.\n+The `--help` flag is implemented with a `BeforeResolve` hook.\n \n Arguments to hooks are provided via the `Run(...)` method or `Bind(...)` option. `*Kong`, `*Context` and `*Path` are also bound and finally, hooks can also contribute bindings via `kong.Context.Bind()` and `kong.Context.BindTo()`.\n \ndiff --git a/help.go b/help.go\nindex d65f91c..473df92 100644\n--- a/help.go\n+++ b/help.go\n@@ -16,7 +16,7 @@ const (\n // Help flag.\n type helpValue bool\n \n-func (h helpValue) BeforeApply(ctx *Context) error {\n+func (h helpValue) BeforeResolve(ctx *Context) error {\n \toptions := ctx.Kong.helpOptions\n \toptions.Summary = false\n \terr := ctx.Kong.help(options, ctx)\ndiff --git a/kong.go b/kong.go\nindex eeeaa8c..bea2998 100644\n--- a/kong.go\n+++ b/kong.go\n@@ -251,15 +251,15 @@ func (k *Kong) Parse(args []string) (ctx *Context, err error) {\n \tif ctx.Error != nil {\n \t\treturn nil, &ParseError{error: ctx.Error, Context: ctx}\n \t}\n-\tif err = ctx.Reset(); err != nil {\n-\t\treturn nil, &ParseError{error: err, Context: ctx}\n-\t}\n \tif err = k.applyHook(ctx, \"BeforeResolve\"); err != nil {\n \t\treturn nil, &ParseError{error: err, Context: ctx}\n \t}\n \tif err = ctx.Resolve(); err != nil {\n \t\treturn nil, &ParseError{error: err, Context: ctx}\n \t}\n+\tif err = ctx.Reset(); err != nil {\n+\t\treturn nil, &ParseError{error: err, Context: ctx}\n+\t}\n \tif err = k.applyHook(ctx, \"BeforeApply\"); err != nil {\n \t\treturn nil, &ParseError{error: err, Context: ctx}\n \t}\ndiff --git a/kong_test.go b/kong_test.go\nindex 6ce73f5..9848356 100644\n--- a/kong_test.go\n+++ b/kong_test.go\n@@ -1542,3 +1542,22 @@ func TestPassthroughCmdOnlyStringArgs(t *testing.T) {\n \t_, err := kong.New(&cli)\n \trequire.EqualError(t, err, \"<anonymous struct>.Command: passthrough command command [<args> ...] must contain exactly one positional argument of []string type\")\n }\n+\n+func TestHelpShouldStillWork(t *testing.T) {\n+\ttype CLI struct {\n+\t\tDir string `type:\"existingdir\" default:\"missing-dir\"`\n+\t}\n+\tvar cli CLI\n+\tk := mustNew(t, &cli)\n+\trc := -1 // init nonzero to help assert help hook was called\n+\tk.Exit = func(i int) {\n+\t\trc = i\n+\t}\n+\t_, err := k.Parse([]string{\"--help\"})\n+\t// checking return code validates the help hook was called\n+\trequire.Zero(t, rc)\n+\t// allow for error propagation from other validation (only for the\n+\t// sake of this test, due to the exit function not actually exiting the\n+\t// program; errors will not propagate in the real world).\n+\trequire.Error(t, err)\n+}\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/FUNDING.yml",
+    ".github/workflows/ci.yml",
+    ".gitignore",
+    ".golangci.yml",
+    "COPYING",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/README.md",
+    "_examples/server/console.go",
+    "_examples/server/go.mod",
+    "_examples/server/go.sum",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/main.go",
+    "benchmark_test.go",
+    "bin/.go-1.17.8.pkg",
+    "bin/.golangci-lint-1.42.0.pkg",
+    "bin/README.hermit.md",
+    "bin/activate-hermit",
+    "bin/go",
+    "bin/gofmt",
+    "bin/golangci-lint",
+    "bin/hermit",
+    "bin/hermit.hcl",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "config_test.go",
+    "context.go",
+    "defaults.go",
+    "defaults_test.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "go.mod",
+    "go.sum",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "testdata/file.txt",
+    "util.go",
+    "util_test.go",
+    "visit.go"
+  ],
+  "explanation": {
+    "what": "--help フラグの実装フックを BeforeApply から BeforeResolve に変更し、Kong.Parse() 内で ctx.Reset() を呼ぶタイミングを BeforeResolve フック・Resolve() の後(BeforeApply の直前)に移動した。TestHelpShouldStillWork を追加し、存在しないデフォルトディレクトリを指定した CLI でも --help が正しく機能する(Exit コードが呼ばれる)ことを検証している。",
+    "why": "PR本文によると、従来は Kong.Parse() の早い段階で ctx.Reset() が呼ばれており、これが Value.Reset() 経由で環境変数・デフォルト値の Parse(ひいては resolver)を実行させていた。resolver がエラーを返すと Reset の時点で失敗し、BeforeApply フックとして実装されていた --help が呼ばれないまま終了してしまうケースがあった。Reset を遅らせ、--help を BeforeResolve フックに変えることで、resolver 失敗時でも usage 表示ができるようにした。",
+    "highlights": [
+      { "file": "kong.go", "note": "BeforeResolve → Resolve() → Reset() → BeforeApply の順に並び替え" },
+      { "file": "help.go", "note": "helpValue.BeforeApply が helpValue.BeforeResolve にリネームされ、早い段階で呼ばれるようになった" }
+    ],
+    "langNotes": [
+      { "topic": "BeforeResolve/BeforeApply フック", "note": "kong は構造体に BeforeResolve/BeforeApply/AfterApply などのメソッドを実装すると、パース処理の各段階でそれらを自動的に呼び出す。呼び出し順序を変えることで、どのタイミングでフックが発火するかが変わる。" }
+    ],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [{ "type": "pr", "number": 298, "url": "https://github.com/alecthomas/kong/pull/298" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

@@ -1,0 +1,107 @@
+{
+  "seq": 191,
+  "sha": "1ccbbb9db4097af005cc94810c50a1fb45d337a1",
+  "parents": [
+    "c690640e7149e04c269650f43a75925538c8e310"
+  ],
+  "author": {
+    "name": "Will Roden",
+    "email": "willabides@github.com",
+    "date": "2020-05-15T15:52:24-05:00"
+  },
+  "message": "add benchmark",
+  "pr": {
+    "number": 79,
+    "title": "fix performance issue in interpolation",
+    "body": "I ran across an issue where having a large number of variables to interpolate can significantly slow down `kong.New()`.  In my case I had around 5,000 variables and it took about five seconds to run my program with `--help`.\r\n\r\nThe problem is in `kong.interpolate()`. Because it calls `Vars.CloneWith()` for each field, its complexity is roughly O(n<sup>2</sup>).\r\n\r\nThis PR updates `kong.interpolateValue()` so that `Vars.CloneWith()` is not called in most cases. It will only be called if `value.Tag.Vars` is populated or if interpolation modified value.Enum of value.Default.\r\n\r\nIt also updates `Vars.CloneWith()` to preallocate the output map.\r\n\r\nI added benchmarks to show the performance improvement.  I'm happy for them to be removed before merging if you don't want to keep them around. Their primary purpose is just to show the change in this PR.\r\n\r\nThis is what benchstat shows on my laptop:\r\n\r\n```\r\nname                     old time/op    new time/op    delta\r\n_interpolateValue-8        3.26ms ± 5%    0.00ms ± 1%  -99.96%  (p=0.000 n=10+10)\r\nKong_interpolate/5-8       12.5µs ± 4%     6.8µs ± 8%  -45.32%  (p=0.000 n=10+9)\r\nKong_interpolate/500-8     72.5ms ± 2%     0.5ms ± 4%  -99.35%  (p=0.000 n=9+10)\r\nKong_interpolate/5000-8     7.69s ± 6%     0.01s ± 7%  -99.93%  (p=0.000 n=10+9)\r\n\r\nname                     old alloc/op   new alloc/op   delta\r\n_interpolateValue-8        2.57MB ± 0%    0.00MB ± 0%  -99.98%  (p=0.000 n=10+10)\r\nKong_interpolate/5-8       8.77kB ± 0%    4.01kB ± 0%  -54.23%  (p=0.000 n=10+10)\r\nKong_interpolate/500-8     84.7MB ± 0%     0.3MB ± 0%  -99.65%  (p=0.000 n=10+10)\r\nKong_interpolate/5000-8    6.46GB ± 0%    0.00GB ± 0%  -99.96%  (p=0.000 n=10+9)\r\n\r\nname                     old allocs/op  new allocs/op  delta\r\n_interpolateValue-8           517 ± 0%         3 ± 0%  -99.42%  (p=0.000 n=8+10)\r\nKong_interpolate/5-8         71.0 ± 0%      43.0 ± 0%  -39.44%  (p=0.000 n=10+10)\r\nKong_interpolate/500-8      29.7k ± 0%      2.5k ± 0%  -91.52%  (p=0.000 n=10+10)\r\nKong_interpolate/5000-8      975k ± 0%       25k ± 0%  -97.41%  (p=0.000 n=9+9)\r\n```\r\n",
+    "url": "https://github.com/alecthomas/kong/pull/79"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 79,
+    "deletions": 0
+  },
+  "files": [
+    {
+      "path": "benchmark_test.go",
+      "status": "A",
+      "additions": 79,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/benchmark_test.go b/benchmark_test.go\nnew file mode 100644\nindex 0000000..0fd2469\n--- /dev/null\n+++ b/benchmark_test.go\n@@ -0,0 +1,79 @@\n+package kong\n+\n+import (\n+\t\"fmt\"\n+\t\"strconv\"\n+\t\"testing\"\n+\n+\t\"github.com/stretchr/testify/require\"\n+)\n+\n+func BenchmarkKong_interpolate(b *testing.B) {\n+\tprepareKong := func(t testing.TB, count int) *Kong {\n+\t\tt.Helper()\n+\t\tk := &Kong{\n+\t\t\tvars:     make(Vars, count),\n+\t\t\tregistry: NewRegistry().RegisterDefaults(),\n+\t\t}\n+\t\tfor i := 0; i < count; i++ {\n+\t\t\thelpVar := fmt.Sprintf(\"help_param%d\", i)\n+\t\t\tk.vars[helpVar] = strconv.Itoa(i)\n+\t\t}\n+\t\tgrammar := &struct {\n+\t\t\tParam0 string `help:\"${help_param0}\"`\n+\t\t}{}\n+\t\tmodel, err := build(k, grammar)\n+\t\trequire.NoError(t, err)\n+\t\tfor i := 0; i < count; i++ {\n+\t\t\tmodel.Node.Flags = append(model.Node.Flags, &Flag{\n+\t\t\t\tValue: &Value{\n+\t\t\t\t\tHelp: fmt.Sprintf(\"${help_param%d}\", i),\n+\t\t\t\t\tTag:  newEmptyTag(),\n+\t\t\t\t},\n+\t\t\t})\n+\t\t}\n+\t\tk.Model = model\n+\t\treturn k\n+\t}\n+\n+\tfor _, count := range []int{5, 500, 5000} {\n+\t\tcount := count\n+\t\tb.Run(strconv.Itoa(count), func(b *testing.B) {\n+\t\t\tvar err error\n+\t\t\tk := prepareKong(b, count)\n+\t\t\tfor i := 0; i < b.N; i++ {\n+\t\t\t\terr = k.interpolate(k.Model.Node)\n+\t\t\t}\n+\t\t\trequire.NoError(b, err)\n+\t\t\tb.ReportAllocs()\n+\t\t})\n+\t}\n+}\n+\n+func Benchmark_interpolateValue(b *testing.B) {\n+\tvarsLen := 10000\n+\tk := &Kong{\n+\t\tvars:     make(Vars, 10000),\n+\t\tregistry: NewRegistry().RegisterDefaults(),\n+\t}\n+\tfor i := 0; i < varsLen; i++ {\n+\t\thelpVar := fmt.Sprintf(\"help_param%d\", i)\n+\t\tk.vars[helpVar] = strconv.Itoa(i)\n+\t}\n+\tgrammar := struct {\n+\t\tParam9999 string `kong:\"cmd,help=${help_param9999}\"`\n+\t}{}\n+\tmodel, err := build(k, &grammar)\n+\tif err != nil {\n+\t\tb.FailNow()\n+\t}\n+\tk.Model = model\n+\tflag := k.Model.Flags[0]\n+\tfor i := 0; i < b.N; i++ {\n+\t\terr = k.interpolateValue(flag.Value, k.vars)\n+\t\tif err != nil {\n+\t\t\tb.FailNow()\n+\t\t}\n+\t}\n+\tb.ReportAllocs()\n+}\n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    ".golangci.yml",
+    "COPYING",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/README.md",
+    "_examples/server/console.go",
+    "_examples/server/go.mod",
+    "_examples/server/go.sum",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/main.go",
+    "benchmark_test.go",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "config_test.go",
+    "context.go",
+    "defaults.go",
+    "defaults_test.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "go.mod",
+    "go.sum",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "util.go",
+    "util_test.go",
+    "visit.go"
+  ],
+  "explanation": {
+    "what": "benchmark_test.go を新規追加し、interpolate まわりの性能を計測する2つのベンチマーク(BenchmarkKong_interpolate と Benchmark_interpolateValue)を用意した。変数展開(vars)の数を5・500・5000と変えたケースを含む。",
+    "why": "PR #79 の説明によれば、変数展開に約5000個の変数を使うと `kong.New()` に約5秒かかる性能問題が見つかった。原因は `interpolate()` が各フィールドごとに `Vars.CloneWith()` を呼び出しており計算量がおよそ O(n^2) になっていたこと。このコミットはまず改善前後の効果を測定できるようベンチマークを整備するもので、後続コミット(seq192, seq193)で実際の最適化を行う土台となる。",
+    "highlights": [
+      { "file": "benchmark_test.go", "note": "count=5/500/5000 で kong.interpolate() の実行時間・アロケーションを計測するテーブル駆動ベンチマーク" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [{ "type": "pr", "number": 79, "url": "https://github.com/alecthomas/kong/pull/79" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

@@ -1,0 +1,110 @@
+{
+  "seq": 201,
+  "sha": "e10381694b57f756f68f30cfa5158785f231d618",
+  "parents": [
+    "047801d760cbaf4cc49dc0ae58711a608ec74d04"
+  ],
+  "author": {
+    "name": "Alec Thomas",
+    "email": "alec@swapoff.org",
+    "date": "2020-07-10T13:52:32+10:00"
+  },
+  "message": "Allow unsetting of FileContentFlag values.",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 6,
+    "deletions": 0
+  },
+  "files": [
+    {
+      "path": ".gitignore",
+      "status": "A",
+      "additions": 1,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "mapper.go",
+      "status": "M",
+      "additions": 5,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/.gitignore b/.gitignore\nnew file mode 100644\nindex 0000000..ba077a4\n--- /dev/null\n+++ b/.gitignore\n@@ -0,0 +1 @@\n+bin\ndiff --git a/mapper.go b/mapper.go\nindex b0f99b1..9425fc6 100644\n--- a/mapper.go\n+++ b/mapper.go\n@@ -704,6 +704,11 @@ func (f *FileContentFlag) Decode(ctx *DecodeContext) error { // nolint: golint\n \tif err != nil {\n \t\treturn err\n \t}\n+\t// This allows unsetting of file content flags.\n+\tif filename == \"\" {\n+\t\t*f = nil\n+\t\treturn nil\n+\t}\n \tfilename = ExpandPath(filename)\n \tdata, err := ioutil.ReadFile(filename) // nolint: gosec\n \tif err != nil {\n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    ".gitignore",
+    ".golangci.yml",
+    "COPYING",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/README.md",
+    "_examples/server/console.go",
+    "_examples/server/go.mod",
+    "_examples/server/go.sum",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/main.go",
+    "benchmark_test.go",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "config_test.go",
+    "context.go",
+    "defaults.go",
+    "defaults_test.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "go.mod",
+    "go.sum",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "util.go",
+    "util_test.go",
+    "visit.go"
+  ],
+  "explanation": {
+    "what": "mapper.go の FileContentFlag.Decode() に、フラグ値として空文字列が渡された場合に対象フィールドを nil にリセットして早期 return する分岐を追加した。あわせて .gitignore に bin を追加している。",
+    "why": "FileContentFlag はファイル内容を丸ごとフィールドに読み込むカスタムフラグ型だが、これまでは一度値を設定した後に空文字列で上書き(unset)する手段がなかった。コミットメッセージの通り、空文字列を渡したときにフィールドを nil に戻せるようにすることで、設定ファイルや envar 経由で一旦設定された値を明示的に解除できるようにしている。",
+    "highlights": [
+      { "file": "mapper.go", "note": "filename == \"\" のとき *f = nil で早期 return する追加分岐" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

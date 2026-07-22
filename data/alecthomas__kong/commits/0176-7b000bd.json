@@ -1,0 +1,161 @@
+{
+  "seq": 176,
+  "sha": "7b000bd7759ae608936a140578e2c2310c9f013c",
+  "parents": [
+    "73ecfde9b28305995191db7d69e1c1990c7844e9"
+  ],
+  "author": {
+    "name": "Rene Zbinden",
+    "email": "rene.zbinden@postfinance.ch",
+    "date": "2020-02-21T10:24:19+01:00"
+  },
+  "message": "Add HelpValueFormatter as discussed in #60 (#61)\n\nFixes #60 .",
+  "pr": {
+    "number": 61,
+    "title": "add HelpValueFormatter as discussed in #60",
+    "body": "As discussed in #60 I made the following changes: \r\n\r\n- add `HelpValueFormatter` (with test)\r\n- remove env interpolation",
+    "url": "https://github.com/alecthomas/kong/pull/61"
+  },
+  "linkedIssues": [
+    {
+      "number": 60,
+      "title": "Discussion about Help",
+      "body": "While I was working on custom `HelpPrinter` implementation I realized that I had to copy a lot of code from the `DefaultHelpPrinter` function. And with the newly added interpolation of the `$env` variable, the current `HelpPrinter` function is very close to what I was looking for. To close the gap I would like propose the following changes:\r\n\r\n### 1) Better representation of enum values as placeholder\r\n\r\nFor the following Tags:\r\n```go\r\nStringFlag string `enum:\"a,b,c\" help:\"Help.\"`\r\n```\r\n\r\nI would like to see the following placeholder:\r\n```\r\nFlags:\r\n      --string-flag=a|b|c        Help.\r\n```\r\nAnd if there is a `default` tag:\r\n```go\r\nStringFlag string `enum:\"a,b,c\" help:\"Help.\" default:\"b\"`\r\n```\r\n\r\nMaybe something like this:\r\n```\r\nFlags:\r\n      --string-flag=a|(b)|c        Help.\r\n```\r\nOr maybe even make the selected value bold with [github.com/fatih/color](https://github.com/fatih/color).\r\n\r\n### 2) AutomaticEnv option\r\nAdd a new Option `AutomaticEnv` which would do the following:\r\n\r\nVisit all flags and args and sets the **empty** `env` field tags with the following:\r\n\r\n```go\r\nstrings.ToUpper(app.Model.Name+\"_\"+strings.ReplaceAll(flag.Name,\"-\",\"_\"))\r\n```\r\n\r\nSo a `flag-name` would correspond to `APPNAME_FLAG_NAME` \r\n\r\nLet me know what you think. I am willing to do the implementation if you want.",
+      "url": "https://github.com/alecthomas/kong/issues/60"
+    }
+  ],
+  "stats": {
+    "filesChanged": 7,
+    "additions": 78,
+    "deletions": 60
+  },
+  "files": [
+    {
+      "path": "README.md",
+      "status": "M",
+      "additions": 2,
+      "deletions": 6,
+      "binary": false
+    },
+    {
+      "path": "help.go",
+      "status": "M",
+      "additions": 31,
+      "deletions": 10,
+      "binary": false
+    },
+    {
+      "path": "help_test.go",
+      "status": "M",
+      "additions": 29,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "interpolate.go",
+      "status": "M",
+      "additions": 0,
+      "deletions": 11,
+      "binary": false
+    },
+    {
+      "path": "kong.go",
+      "status": "M",
+      "additions": 8,
+      "deletions": 22,
+      "binary": false
+    },
+    {
+      "path": "kong_test.go",
+      "status": "M",
+      "additions": 0,
+      "deletions": 11,
+      "binary": false
+    },
+    {
+      "path": "options.go",
+      "status": "M",
+      "additions": 8,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/README.md b/README.md\nindex a96c059..315c7a7 100644\n--- a/README.md\n+++ b/README.md\n@@ -27,7 +27,7 @@\n     2. [`Configuration(loader, paths...)` - load defaults from configuration files](#configurationloader-paths---load-defaults-from-configuration-files)\n     3. [`Resolver(...)` - support for default values from external sources](#resolver---support-for-default-values-from-external-sources)\n     4. [`*Mapper(...)` - customising how the command-line is mapped to Go values](#mapper---customising-how-the-command-line-is-mapped-to-go-values)\n-    5. [`ConfigureHelp(HelpOptions)` and `Help(HelpFunc)` - customising help](#configurehelphelpoptions-and-helphelpfunc---customising-help)\n+    5. [`ConfigureHelp(HelpOptions)`, `Help(HelpFunc)` and `HelpFormatter(HelpValueFormatter)` - customising help](#configurehelphelpoptions-and-helphelpfunc---customising-help)\n     6. [`Bind(...)` - bind values for callback hooks and Run() methods](#bind---bind-values-for-callback-hooks-and-run-methods)\n     7. [Other options](#other-options)\n \n@@ -117,10 +117,6 @@ eg.\n       -f, --force        Force removal.\n       -r, --recursive    Recursively remove files.\n \n-For flags with associated environment variables, the variable `${env}` can be\n-interpolated into the help string. In the absence of this variable in the help, \n-\n-\n <a id=\"markdown-command-handling\" name=\"command-handling\"></a>\n ## Command handling\n \n@@ -463,7 +459,6 @@ are defined from the value itself:\n \n     ${default}\n     ${enum}\n-    ${env}\n \n eg.\n \n@@ -546,6 +541,7 @@ The default help output is usually sufficient, but if not there are two solution\n \n 1. Use `ConfigureHelp(HelpOptions)` to configure how help is formatted (see [HelpOptions](https://godoc.org/github.com/alecthomas/kong#HelpOptions) for details).\n 2. Custom help can be wired into Kong via the `Help(HelpFunc)` option. The `HelpFunc` is passed a `Context`, which contains the parsed context for the current command-line. See the implementation of `PrintHelp` for an example.\n+3. Use `HelpFormatter(HelpValueFormatter)` if you want to just customize the help text that is accompanied by flags and arguments.\n \n <a id=\"markdown-bind---bind-values-for-callback-hooks-and-run-methods\" name=\"bind---bind-values-for-callback-hooks-and-run-methods\"></a>\n ### `Bind(...)` - bind values for callback hooks and Run() methods\ndiff --git a/help.go b/help.go\nindex 8bb67cd..4814b1c 100644\n--- a/help.go\n+++ b/help.go\n@@ -65,6 +65,25 @@ type HelpIndenter func(prefix string) string\n // HelpPrinter is used to print context-sensitive help.\n type HelpPrinter func(options HelpOptions, ctx *Context) error\n \n+// HelpValueFormatter is used to format the help text of flags and positional arguments.\n+type HelpValueFormatter func(value *Value) string\n+\n+// DefaultHelpValueFormatter is the default HelpValueFormatter.\n+func DefaultHelpValueFormatter(value *Value) string {\n+\tif value.Tag.Env == \"\" {\n+\t\treturn value.Help\n+\t}\n+\tsuffix := \"($\" + value.Tag.Env + \")\"\n+\tswitch {\n+\tcase strings.HasSuffix(value.Help, \".\"):\n+\t\treturn value.Help[:len(value.Help)-1] + \" \" + suffix + \".\"\n+\tcase value.Help == \"\":\n+\t\treturn suffix\n+\tdefault:\n+\t\treturn value.Help + \" \" + suffix\n+\t}\n+}\n+\n // DefaultHelpPrinter is the default HelpPrinter.\n func DefaultHelpPrinter(options HelpOptions, ctx *Context) error {\n \tif ctx.Empty() {\n@@ -214,19 +233,21 @@ func printCommandSummary(w *helpWriter, cmd *Command) {\n }\n \n type helpWriter struct {\n-\tindent string\n-\twidth  int\n-\tlines  *[]string\n+\tindent        string\n+\twidth         int\n+\tlines         *[]string\n+\thelpFormatter HelpValueFormatter\n \tHelpOptions\n }\n \n func newHelpWriter(ctx *Context, options HelpOptions) *helpWriter {\n \tlines := []string{}\n \tw := &helpWriter{\n-\t\tindent:      \"\",\n-\t\twidth:       guessWidth(ctx.Stdout),\n-\t\tlines:       &lines,\n-\t\tHelpOptions: options,\n+\t\tindent:        \"\",\n+\t\twidth:         guessWidth(ctx.Stdout),\n+\t\tlines:         &lines,\n+\t\thelpFormatter: ctx.Kong.helpFormatter,\n+\t\tHelpOptions:   options,\n \t}\n \treturn w\n }\n@@ -240,7 +261,7 @@ func (h *helpWriter) Print(text string) {\n }\n \n func (h *helpWriter) Indent() *helpWriter {\n-\treturn &helpWriter{indent: h.indent + \"  \", lines: h.lines, width: h.width - 2, HelpOptions: h.HelpOptions}\n+\treturn &helpWriter{indent: h.indent + \"  \", lines: h.lines, width: h.width - 2, HelpOptions: h.HelpOptions, helpFormatter: h.helpFormatter}\n }\n \n func (h *helpWriter) String() string {\n@@ -268,7 +289,7 @@ func (h *helpWriter) Wrap(text string) {\n func writePositionals(w *helpWriter, args []*Positional) {\n \trows := [][2]string{}\n \tfor _, arg := range args {\n-\t\trows = append(rows, [2]string{arg.Summary(), arg.Help})\n+\t\trows = append(rows, [2]string{arg.Summary(), w.helpFormatter(arg)})\n \t}\n \twriteTwoColumns(w, rows)\n }\n@@ -290,7 +311,7 @@ func writeFlags(w *helpWriter, groups [][]*Flag) {\n \t\t}\n \t\tfor _, flag := range group {\n \t\t\tif !flag.Hidden {\n-\t\t\t\trows = append(rows, [2]string{formatFlag(haveShort, flag), flag.Help})\n+\t\t\t\trows = append(rows, [2]string{formatFlag(haveShort, flag), w.helpFormatter(flag.Value)})\n \t\t\t}\n \t\t}\n \t}\ndiff --git a/help_test.go b/help_test.go\nindex fbe4a47..3f6f368 100644\n--- a/help_test.go\n+++ b/help_test.go\n@@ -2,6 +2,7 @@ package kong_test\n \n import (\n \t\"bytes\"\n+\t\"strings\"\n \t\"testing\"\n \n \t\"github.com/stretchr/testify/require\"\n@@ -219,3 +220,31 @@ Commands:\n \t\trequire.Equal(t, expected, w.String())\n \t})\n }\n+\n+func TestEnvarAutoHelp(t *testing.T) {\n+\tvar cli struct {\n+\t\tFlag string `env:\"FLAG\" help:\"A flag.\"`\n+\t}\n+\tw := &strings.Builder{}\n+\tp := mustNew(t, &cli, kong.Writers(w, w), kong.Exit(func(int) {}))\n+\t_, err := p.Parse([]string{\"--help\"})\n+\trequire.NoError(t, err)\n+\trequire.Contains(t, w.String(), \"A flag ($FLAG).\")\n+}\n+\n+func TestCustomHelpFormatter(t *testing.T) {\n+\tvar cli struct {\n+\t\tFlag string `env:\"FLAG\" help:\"A flag.\"`\n+\t}\n+\tw := &strings.Builder{}\n+\tp := mustNew(t, &cli,\n+\t\tkong.Writers(w, w),\n+\t\tkong.Exit(func(int) {}),\n+\t\tkong.HelpFormatter(func(value *kong.Value) string {\n+\t\t\treturn value.Help\n+\t\t}),\n+\t)\n+\t_, err := p.Parse([]string{\"--help\"})\n+\trequire.NoError(t, err)\n+\trequire.Contains(t, w.String(), \"A flag.\")\n+}\ndiff --git a/interpolate.go b/interpolate.go\nindex bbfff54..9de1ff7 100644\n--- a/interpolate.go\n+++ b/interpolate.go\n@@ -7,17 +7,6 @@ import (\n \n var interpolationRegex = regexp.MustCompile(`((?:\\${([[:alpha:]_][[:word:]]*))(?:=([^}]+))?})|(\\$)|([^$]+)`)\n \n-// Returns true if the variable \"v\" is interpolated in \"s\".\n-func interpolationHasVar(s string, v string) bool {\n-\tmatches := interpolationRegex.FindAllStringSubmatch(s, -1)\n-\tfor _, match := range matches {\n-\t\tif name := match[2]; name == v {\n-\t\t\treturn true\n-\t\t}\n-\t}\n-\treturn false\n-}\n-\n // Interpolate variables from vars into s for substrings in the form ${var} or ${var=default}.\n func interpolate(s string, vars map[string]string) (string, error) {\n \tout := \"\"\ndiff --git a/kong.go b/kong.go\nindex 5296ef2..882e4ad 100644\n--- a/kong.go\n+++ b/kong.go\n@@ -50,6 +50,7 @@ type Kong struct {\n \tnoDefaultHelp bool\n \tusageOnError  bool\n \thelp          HelpPrinter\n+\thelpFormatter HelpValueFormatter\n \thelpOptions   HelpOptions\n \thelpFlag      *Flag\n \tvars          Vars\n@@ -63,12 +64,13 @@ type Kong struct {\n // See the README (https://github.com/alecthomas/kong) for usage instructions.\n func New(grammar interface{}, options ...Option) (*Kong, error) {\n \tk := &Kong{\n-\t\tExit:     os.Exit,\n-\t\tStdout:   os.Stdout,\n-\t\tStderr:   os.Stderr,\n-\t\tregistry: NewRegistry().RegisterDefaults(),\n-\t\tvars:     Vars{},\n-\t\tbindings: bindings{},\n+\t\tExit:          os.Exit,\n+\t\tStdout:        os.Stdout,\n+\t\tStderr:        os.Stderr,\n+\t\tregistry:      NewRegistry().RegisterDefaults(),\n+\t\tvars:          Vars{},\n+\t\tbindings:      bindings{},\n+\t\thelpFormatter: DefaultHelpValueFormatter,\n \t}\n \n \toptions = append(options, Bind(k))\n@@ -153,22 +155,6 @@ func (k *Kong) interpolateValue(value *Value, vars Vars) (err error) {\n \t\t\"default\": value.Default,\n \t\t\"enum\":    value.Enum,\n \t})\n-\tif value.Tag.Env != \"\" {\n-\t\tvars[\"env\"] = value.Tag.Env\n-\t\tif !interpolationHasVar(value.Help, \"env\") {\n-\t\t\tsuffix := \"($\" + value.Tag.Env + \")\"\n-\t\t\tswitch {\n-\t\t\tcase strings.HasSuffix(value.Help, \".\"):\n-\t\t\t\tvalue.Help = value.Help[:len(value.Help)-1] + \" \" + suffix + \".\"\n-\n-\t\t\tcase value.Help == \"\":\n-\t\t\t\tvalue.Help += suffix\n-\n-\t\t\tdefault:\n-\t\t\t\tvalue.Help += \" \" + suffix\n-\t\t\t}\n-\t\t}\n-\t}\n \tif value.Help, err = interpolate(value.Help, vars); err != nil {\n \t\treturn fmt.Errorf(\"help for %s: %s\", value.Summary(), err)\n \t}\ndiff --git a/kong_test.go b/kong_test.go\nindex 087252a..b55093a 100644\n--- a/kong_test.go\n+++ b/kong_test.go\n@@ -750,17 +750,6 @@ func TestEnvarEnumValidated(t *testing.T) {\n \trequire.EqualError(t, err, \"--flag must be one of \\\"valid\\\" but got \\\"invalid\\\"\")\n }\n \n-func TestEnvarAutoHelp(t *testing.T) {\n-\tvar cli struct {\n-\t\tFlag string `env:\"FLAG\" help:\"A flag.\"`\n-\t}\n-\tw := &strings.Builder{}\n-\tp := mustNew(t, &cli, kong.Writers(w, w), kong.Exit(func(int) {}))\n-\t_, err := p.Parse([]string{\"--help\"})\n-\trequire.NoError(t, err)\n-\trequire.Contains(t, w.String(), \"A flag ($FLAG).\")\n-}\n-\n func TestXor(t *testing.T) {\n \tvar cli struct {\n \t\tHello bool   `xor:\"another\"`\ndiff --git a/options.go b/options.go\nindex aec7164..1bf5219 100644\n--- a/options.go\n+++ b/options.go\n@@ -158,6 +158,14 @@ func Help(help HelpPrinter) Option {\n \t})\n }\n \n+// HelpFormatter configures how the help text is formatted.\n+func HelpFormatter(helpFormatter HelpValueFormatter) Option {\n+\treturn OptionFunc(func(k *Kong) error {\n+\t\tk.helpFormatter = helpFormatter\n+\t\treturn nil\n+\t})\n+}\n+\n // ConfigureHelp sets the HelpOptions to use for printing help.\n func ConfigureHelp(options HelpOptions) Option {\n \treturn OptionFunc(func(k *Kong) error {\n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    ".golangci.yml",
+    "COPYING",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/README.md",
+    "_examples/server/console.go",
+    "_examples/server/go.mod",
+    "_examples/server/go.sum",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/main.go",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "config_test.go",
+    "context.go",
+    "defaults.go",
+    "defaults_test.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "go.mod",
+    "go.sum",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "util.go",
+    "util_test.go",
+    "visit.go"
+  ],
+  "explanation": {
+    "what": "前コミットで追加した「envタグがあれば自動でヘルプ文に(${ENVVAR})を付け足す」処理(interpolationHasVar と kong.go の分岐)を丸ごと削除し、代わりに HelpValueFormatter という関数型のフックと DefaultHelpValueFormatter(挙動は従来と同じ)、それを差し替える HelpFormatter() オプションを新設した。helpWriter が Kong.helpFormatter を保持し、Flag/Positional のヘルプ文字列を出力する箇所で必ずこのフォーマッタを経由するよう変更している。",
+    "why": "issue #60 で「独自の HelpPrinter を書こうとすると DefaultHelpPrinter のコードをほぼ丸ごとコピーする必要がある。ヘルプ文字列の整形だけをカスタマイズできる差し込み点が欲しい」という要望があり、PR本文もこの issue への対応として HelpValueFormatter の追加と env 自動付与ロジックの削除を明記している。自動付与は固定仕様だったため、フォーマッタとして差し替え可能にすることで同じ挙動をデフォルトにしつつ柔軟性を持たせた。",
+    "highlights": [
+      { "file": "help.go", "note": "HelpValueFormatter は func(value *Value) string という型。DefaultHelpValueFormatter が旧ロジック(env接尾辞付与)をそのまま関数化している。" },
+      { "file": "kong.go", "note": "Kong 構造体に helpFormatter フィールドを追加し、New() でデフォルト値 DefaultHelpValueFormatter をセット。" }
+    ],
+    "langNotes": [
+      { "topic": "関数型によるフック(Strategy パターン)", "note": "Go には第一級関数がありインターフェースの代わりに単一メソッド相当の処理を関数型(HelpValueFormatter)として差し替え可能にする設計がよく使われる。ここでは構造体フィールドに関数を持たせ、デフォルト実装を通常の関数として定義している。" }
+    ],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [
+      { "type": "pr", "number": 61, "url": "https://github.com/alecthomas/kong/pull/61" },
+      { "type": "issue", "number": 60, "url": "https://github.com/alecthomas/kong/issues/60" }
+    ],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

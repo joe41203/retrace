@@ -1,0 +1,101 @@
+{
+  "seq": 172,
+  "sha": "ada7d7bf11af5fc748972390ce1cb27df451fdcf",
+  "parents": [
+    "4667cdb6e429c0096ba33156ca460ffc47801d00"
+  ],
+  "author": {
+    "name": "Alec Thomas",
+    "email": "alec@swapoff.org",
+    "date": "2020-02-18T19:53:41+11:00"
+  },
+  "message": "Fix panic when \"-\" is not followed by a short flag.",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 3,
+    "deletions": 0
+  },
+  "files": [
+    {
+      "path": "context.go",
+      "status": "M",
+      "additions": 3,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/context.go b/context.go\nindex 7114acf..334b855 100644\n--- a/context.go\n+++ b/context.go\n@@ -304,6 +304,9 @@ func (c *Context) trace(node *Node) (err error) { // nolint: gocyclo\n \t\t\t\t\t}\n \t\t\t\t\tc.scan.PushTyped(parts[0], FlagToken)\n \n+\t\t\t\tcase v == \"-\":\n+\t\t\t\t\treturn errors.New(\"expected short flag\")\n+\n \t\t\t\t// Short flag.\n \t\t\t\tcase strings.HasPrefix(v, \"-\"):\n \t\t\t\t\tc.scan.Pop()\n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    ".golangci.yml",
+    "COPYING",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/README.md",
+    "_examples/server/console.go",
+    "_examples/server/go.mod",
+    "_examples/server/go.sum",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/main.go",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "config_test.go",
+    "context.go",
+    "defaults.go",
+    "defaults_test.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "go.mod",
+    "go.sum",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "util.go",
+    "util_test.go",
+    "visit.go"
+  ],
+  "explanation": {
+    "what": "context.go の trace() 内、トークンが \"-\" 単体で来た場合の分岐を追加し、\"expected short flag\" エラーを返すようにした。従来はこのケースが後続の「短フラグ」処理に落ちてしまっていた。",
+    "why": "コミットメッセージから、\"-\" 単体(短フラグの接頭辞が続かない)を渡すとパーサーが panic していたことが読み取れる。おそらく短フラグ分岐がプレフィックス \"-\" の後に最低1文字あることを前提にしており、空文字列に対するインデックスアクセスなどでクラッシュしていたための修正と考えられる。",
+    "highlights": [
+      { "file": "context.go", "note": "switch文に case v == \"-\": を追加し、短フラグ分岐に到達する前にエラーで抜けるようにしている。" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "inferred",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

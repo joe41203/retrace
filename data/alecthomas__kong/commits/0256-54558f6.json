@@ -1,0 +1,145 @@
+{
+  "seq": 256,
+  "sha": "54558f65e86f10a8b26ab2483e7be3d3220eacae",
+  "parents": [
+    "8aa52739ea7891046e5c03d33dd69643ee8572e0"
+  ],
+  "author": {
+    "name": "Alec Thomas",
+    "email": "alec@swapoff.org",
+    "date": "2021-06-21T18:58:44+09:30"
+  },
+  "message": "Allow multiple xor:\"\" groups to be defined.\n\nFixes #113.",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 5,
+    "additions": 32,
+    "deletions": 14
+  },
+  "files": [
+    {
+      "path": "README.md",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "context.go",
+      "status": "M",
+      "additions": 5,
+      "deletions": 6,
+      "binary": false
+    },
+    {
+      "path": "kong_test.go",
+      "status": "M",
+      "additions": 16,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "model.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "tag.go",
+      "status": "M",
+      "additions": 9,
+      "deletions": 6,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/README.md b/README.md\nindex 6339210..e5b4ebe 100644\n--- a/README.md\n+++ b/README.md\n@@ -446,7 +446,7 @@ Tag                    | Description\n `mapsep:\"X\"`           | Separator for maps (defaults to \";\"). May be `none` to disable splitting.\n `enum:\"X,Y,...\"`       | Set of valid values allowed for this flag.\n `group:\"X\"`            | Logical group for a flag or command.\n-`xor:\"X\"`              | Exclusive OR group for flags. Only one flag in the group can be used which is restricted within the same command.\n+`xor:\"X,Y,...\"`        | Exclusive OR groups for flags. Only one flag in the group can be used which is restricted within the same command.\n `prefix:\"X\"`           | Prefix for all sub-flags.\n `set:\"K=V\"`            | Set a variable for expansion by child elements. Multiples can occur.\n `embed:\"\"`             | If present, this field's children will be embedded in the parent. Useful for composition.\ndiff --git a/context.go b/context.go\nindex 1a2ed15..1231009 100644\n--- a/context.go\n+++ b/context.go\n@@ -871,13 +871,12 @@ func checkXorDuplicates(paths []*Path) error {\n \t\t\tif !flag.Set {\n \t\t\t\tcontinue\n \t\t\t}\n-\t\t\tif flag.Xor == \"\" {\n-\t\t\t\tcontinue\n-\t\t\t}\n-\t\t\tif seen[flag.Xor] != nil {\n-\t\t\t\treturn fmt.Errorf(\"--%s and --%s can't be used together\", seen[flag.Xor].Name, flag.Name)\n+\t\t\tfor _, xor := range flag.Xor {\n+\t\t\t\tif seen[xor] != nil {\n+\t\t\t\t\treturn fmt.Errorf(\"--%s and --%s can't be used together\", seen[xor].Name, flag.Name)\n+\t\t\t\t}\n+\t\t\t\tseen[xor] = flag\n \t\t\t}\n-\t\t\tseen[flag.Xor] = flag\n \t\t}\n \t}\n \treturn nil\ndiff --git a/kong_test.go b/kong_test.go\nindex 30dd7a5..d879967 100644\n--- a/kong_test.go\n+++ b/kong_test.go\n@@ -868,6 +868,22 @@ func TestXorChild(t *testing.T) {\n \trequire.Error(t, err, \"--two and --three can't be used together\")\n }\n \n+func TestMultiXor(t *testing.T) {\n+\tvar cli struct {\n+\t\tHello bool   `xor:\"one,two\"`\n+\t\tOne   bool   `xor:\"one\"`\n+\t\tTwo   string `xor:\"two\"`\n+\t}\n+\n+\tp := mustNew(t, &cli)\n+\t_, err := p.Parse([]string{\"--hello\", \"--one\"})\n+\trequire.EqualError(t, err, \"--hello and --one can't be used together\")\n+\n+\tp = mustNew(t, &cli)\n+\t_, err = p.Parse([]string{\"--hello\", \"--two=foo\"})\n+\trequire.EqualError(t, err, \"--hello and --two can't be used together\")\n+}\n+\n func TestEnumSequence(t *testing.T) {\n \tvar cli struct {\n \t\tState []string `enum:\"a,b,c\" default:\"a\"`\ndiff --git a/model.go b/model.go\nindex 928c613..450f61c 100644\n--- a/model.go\n+++ b/model.go\n@@ -377,7 +377,7 @@ type Positional = Value\n type Flag struct {\n \t*Value\n \tGroup       *Group // Logical grouping when displaying. May also be used by configuration loaders to group options logically.\n-\tXor         string\n+\tXor         []string\n \tPlaceHolder string\n \tEnv         string\n \tShort       rune\ndiff --git a/tag.go b/tag.go\nindex 8c24a9f..9ecde85 100644\n--- a/tag.go\n+++ b/tag.go\n@@ -29,7 +29,7 @@ type Tag struct {\n \tMapSep      rune\n \tEnum        string\n \tGroup       string\n-\tXor         string\n+\tXor         []string\n \tVars        Vars\n \tPrefix      string // Optional prefix on anonymous structs. All sub-flags will have this prefix.\n \tEmbed       bool\n@@ -125,6 +125,10 @@ func newEmptyTag() *Tag {\n \treturn &Tag{items: map[string][]string{}}\n }\n \n+func tagSplitFn(r rune) bool {\n+\treturn r == ',' || r == ' '\n+}\n+\n func parseTag(fv reflect.Value, ft reflect.StructField) *Tag {\n \tif ft.Tag.Get(\"kong\") == \"-\" {\n \t\tt := newEmptyTag()\n@@ -164,7 +168,9 @@ func parseTag(fv reflect.Value, ft reflect.StructField) *Tag {\n \tt.Sep, _ = t.GetSep(\"sep\", ',')\n \tt.MapSep, _ = t.GetSep(\"mapsep\", ';')\n \tt.Group = t.Get(\"group\")\n-\tt.Xor = t.Get(\"xor\")\n+\tfor _, xor := range t.GetAll(\"xor\") {\n+\t\tt.Xor = append(t.Xor, strings.FieldsFunc(xor, tagSplitFn)...)\n+\t}\n \tt.Prefix = t.Get(\"prefix\")\n \tt.Embed = t.Has(\"embed\")\n \tnegatable := t.Has(\"negatable\")\n@@ -172,12 +178,9 @@ func parseTag(fv reflect.Value, ft reflect.StructField) *Tag {\n \t\tfail(\"negatable can only be set on booleans\")\n \t}\n \tt.Negatable = negatable\n-\tsplitFn := func(r rune) bool {\n-\t\treturn r == ',' || r == ' '\n-\t}\n \taliases := t.Get(\"aliases\")\n \tif len(aliases) > 0 {\n-\t\tt.Aliases = append(t.Aliases, strings.FieldsFunc(aliases, splitFn)...)\n+\t\tt.Aliases = append(t.Aliases, strings.FieldsFunc(aliases, tagSplitFn)...)\n \t}\n \tt.Vars = Vars{}\n \tfor _, set := range t.GetAll(\"set\") {\n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    ".github/FUNDING.yml",
+    ".gitignore",
+    ".golangci.yml",
+    "COPYING",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/README.md",
+    "_examples/server/console.go",
+    "_examples/server/go.mod",
+    "_examples/server/go.sum",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/main.go",
+    "benchmark_test.go",
+    "bin/.go@latest.pkg",
+    "bin/.golangci-lint-1.40.1.pkg",
+    "bin/README.hermit.md",
+    "bin/activate-hermit",
+    "bin/go",
+    "bin/gofmt",
+    "bin/golangci-lint",
+    "bin/hermit",
+    "bin/hermit.hcl",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "config_test.go",
+    "context.go",
+    "defaults.go",
+    "defaults_test.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "go.mod",
+    "go.sum",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "testdata/file.txt",
+    "util.go",
+    "util_test.go",
+    "visit.go"
+  ],
+  "explanation": {
+    "what": "Flag.Xor と Tag.Xor の型を string から []string に変更し、1つのフラグが複数の xor グループに同時に所属できるようにした。tag.go では GetAll(\"xor\") で `xor:\"a\" xor:\"b\"` のように複数回指定されたタグや、`xor:\"a,b\"` のようにカンマ・スペース区切りで並べた値を tagSplitFn で分割して Xor スライスに追加する。context.go の checkXorDuplicates も、フラグが持つ Xor スライスの各グループごとに重複チェックするループに書き換えられた。TestMultiXor で、あるフラグが2つのxorグループ両方に属し、そのどちらのグループの相手フラグとも同時使用できないことを確認している。",
+    "why": "コミットメッセージの \"Fixes #113\" が示すように、従来は1フラグにつき1つの xor グループしか指定できなかった制約を取り除き、1つのフラグが複数の排他グループに属せるようにする要望に応えたもの。",
+    "highlights": [
+      { "file": "tag.go", "note": "GetAll(\"xor\") + tagSplitFn でカンマ/スペース区切り・複数回指定の両方に対応するパース処理" },
+      { "file": "context.go", "note": "checkXorDuplicates が flag.Xor の各要素をループしてグループごとに衝突を検出する形に変わった" }
+    ],
+    "langNotes": [
+      { "topic": "複数 xor グループ(struct タグの複数値化)", "note": "Kong では struct タグ経由で `xor:\"a,b\"` のように書くと、そのフィールドが xor グループ a と b の両方に属す。実装上は文字列1個だった Tag.Xor / Flag.Xor を []string に変え、重複チェックをグループ単位のループに変更することで対応している。struct タグ自体は文字列なので、複数値の表現はカンマ区切りとタグの複数回出現(GetAll)の2通りをサポートする設計。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

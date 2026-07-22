@@ -1,0 +1,94 @@
+{
+  "seq": 4,
+  "sha": "8f26b130881b003f744a509b050a3f3850412617",
+  "parents": [
+    "1d00dfef7b1cb798caa03b4b395fa44f9dfbc295"
+  ],
+  "author": {
+    "name": "Alec Thomas",
+    "email": "alec@swapoff.org",
+    "date": "2018-05-17T10:40:46+10:00"
+  },
+  "message": "Slice support.",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 6,
+    "additions": 68,
+    "deletions": 26
+  },
+  "files": [
+    {
+      "path": "build.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "decoders.go",
+      "status": "M",
+      "additions": 39,
+      "deletions": 11,
+      "binary": false
+    },
+    {
+      "path": "kong.go",
+      "status": "M",
+      "additions": 12,
+      "deletions": 9,
+      "binary": false
+    },
+    {
+      "path": "kong_test.go",
+      "status": "M",
+      "additions": 10,
+      "deletions": 4,
+      "binary": false
+    },
+    {
+      "path": "model.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "scanner.go",
+      "status": "M",
+      "additions": 5,
+      "deletions": 2,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/build.go b/build.go\nindex 5433358..7a8dccd 100644\n--- a/build.go\n+++ b/build.go\n@@ -85,6 +85,7 @@ func buildNode(v reflect.Value) *Node {\n \t\t\t\tHelp:     help,\n \t\t\t\tDecoder:  decoder,\n \t\t\t\tValue:    fv,\n+\t\t\t\tField:    ft,\n \t\t\t\tRequired: !optional || required,\n \t\t\t}\n \t\t\tif arg {\ndiff --git a/decoders.go b/decoders.go\nindex 1f12605..26ddfca 100644\n--- a/decoders.go\n+++ b/decoders.go\n@@ -4,15 +4,23 @@ import (\n \t\"fmt\"\n \t\"reflect\"\n \t\"strconv\"\n+\t\"strings\"\n )\n \n+type DecoderContext struct {\n+\t// Value being decoded into.\n+\tValue *Value\n+}\n+\n type Decoder interface {\n-\tDecode(scan *Scanner, target reflect.Value) error\n+\tDecode(ctx *DecoderContext, scan *Scanner, target reflect.Value) error\n }\n \n-type DecoderFunc func(scan *Scanner, target reflect.Value) error\n+type DecoderFunc func(ctx *DecoderContext, scan *Scanner, target reflect.Value) error\n \n-func (d DecoderFunc) Decode(scan *Scanner, target reflect.Value) error { return d(scan, target) }\n+func (d DecoderFunc) Decode(ctx *DecoderContext, scan *Scanner, target reflect.Value) error {\n+\treturn d(ctx, scan, target)\n+}\n \n var _ Decoder = DecoderFunc(nil)\n \n@@ -76,6 +84,8 @@ var (\n \tkindDecoders  map[reflect.Kind]KindDecoder\n )\n \n+// DecoderForField finds a decoder for a struct field.\n+//\n func DecoderForField(field reflect.StructField) Decoder {\n \tname, ok := field.Tag.Lookup(\"type\")\n \tif ok {\n@@ -116,7 +126,7 @@ func RegisterDecoder(decoders ...Decoder) {\n }\n \n func init() {\n-\tintDecoder := NewKindDecoder(reflect.Int, func(scan *Scanner, target reflect.Value) error {\n+\tintDecoder := NewKindDecoder(reflect.Int, func(ctx *DecoderContext, scan *Scanner, target reflect.Value) error {\n \t\tn, err := strconv.ParseInt(scan.PopValue(\"int\"), 10, 64)\n \t\tif err != nil {\n \t\t\treturn err\n@@ -124,7 +134,7 @@ func init() {\n \t\ttarget.SetInt(n)\n \t\treturn nil\n \t})\n-\tuintDecoder := NewKindDecoder(reflect.Uint, func(scan *Scanner, target reflect.Value) error {\n+\tuintDecoder := NewKindDecoder(reflect.Uint, func(ctx *DecoderContext, scan *Scanner, target reflect.Value) error {\n \t\tn, err := strconv.ParseUint(scan.PopValue(\"uint\"), 10, 64)\n \t\tif err != nil {\n \t\t\treturn err\n@@ -143,7 +153,7 @@ func init() {\n \t\treflect.Uint16: uintDecoder,\n \t\treflect.Uint32: uintDecoder,\n \t\treflect.Uint64: uintDecoder,\n-\t\treflect.Float32: NewKindDecoder(reflect.Float32, func(scan *Scanner, target reflect.Value) error {\n+\t\treflect.Float32: NewKindDecoder(reflect.Float32, func(ctx *DecoderContext, scan *Scanner, target reflect.Value) error {\n \t\t\tn, err := strconv.ParseFloat(scan.PopValue(\"float\"), 32)\n \t\t\tif err != nil {\n \t\t\t\treturn err\n@@ -151,7 +161,7 @@ func init() {\n \t\t\ttarget.SetFloat(n)\n \t\t\treturn nil\n \t\t}),\n-\t\treflect.Float64: NewKindDecoder(reflect.Float64, func(scan *Scanner, target reflect.Value) error {\n+\t\treflect.Float64: NewKindDecoder(reflect.Float64, func(ctx *DecoderContext, scan *Scanner, target reflect.Value) error {\n \t\t\tn, err := strconv.ParseFloat(scan.PopValue(\"float\"), 64)\n \t\t\tif err != nil {\n \t\t\t\treturn err\n@@ -159,17 +169,35 @@ func init() {\n \t\t\ttarget.SetFloat(n)\n \t\t\treturn nil\n \t\t}),\n-\t\treflect.String: NewKindDecoder(reflect.String, func(scan *Scanner, target reflect.Value) error {\n+\t\treflect.String: NewKindDecoder(reflect.String, func(ctx *DecoderContext, scan *Scanner, target reflect.Value) error {\n \t\t\ttarget.SetString(scan.PopValue(\"string\"))\n \t\t\treturn nil\n \t\t}),\n-\t\treflect.Bool: NewKindDecoder(reflect.Bool, func(scan *Scanner, target reflect.Value) error {\n+\t\treflect.Bool: NewKindDecoder(reflect.Bool, func(ctx *DecoderContext, scan *Scanner, target reflect.Value) error {\n \t\t\ttarget.SetBool(true)\n \t\t\treturn nil\n \t\t}),\n+\t\treflect.Slice: NewKindDecoder(reflect.Slice, func(ctx *DecoderContext, scan *Scanner, target reflect.Value) error {\n+\t\t\tel := target.Type().Elem()\n+\t\t\tsep, ok := ctx.Value.Field.Tag.Lookup(\"sep\")\n+\t\t\tif !ok {\n+\t\t\t\tsep = \",\"\n+\t\t\t}\n+\t\t\tchildScanner := Scan(strings.Split(scan.PopValue(\"slice\"), sep)...)\n+\t\t\tchildDecoder := DecoderForType(el)\n+\t\t\tfor childScanner.Peek().Type != EOLToken {\n+\t\t\t\tchildValue := reflect.New(el).Elem()\n+\t\t\t\terr := childDecoder.Decode(ctx, childScanner, childValue)\n+\t\t\t\tif err != nil {\n+\t\t\t\t\treturn err\n+\t\t\t\t}\n+\t\t\t\ttarget.Set(reflect.Append(target, childValue))\n+\t\t\t}\n+\t\t\treturn nil\n+\t\t}),\n \t}\n }\n \n-var missingDecoder DecoderFunc = func(scan *Scanner, target reflect.Value) error {\n-\treturn fmt.Errorf(\"no decoder for %q (of type %T)\", target.String(), target.Type())\n+var missingDecoder DecoderFunc = func(ctx *DecoderContext, scan *Scanner, target reflect.Value) error {\n+\treturn fmt.Errorf(\"no decoder for %q (of type %T) for field %q\", target.String(), target.Type(), ctx.Value.Field.Name)\n }\ndiff --git a/kong.go b/kong.go\nindex d8ece95..bc04265 100644\n--- a/kong.go\n+++ b/kong.go\n@@ -49,10 +49,9 @@ func (k *Kong) Parse(args []string) (command string, err error) {\n // Recursively reset values to defaults (as specified in the grammar) or the zero value.\n func (k *Kong) reset(node *Node) {\n \tfor _, flag := range node.Flags {\n+\t\tflag.Value.Value.Set(reflect.Zero(flag.Value.Value.Type()))\n \t\tif flag.Default != \"\" {\n-\t\t\tflag.Decoder.Decode(Scan(flag.Default), flag.Value.Value)\n-\t\t} else {\n-\t\t\tflag.Value.Value.Set(reflect.Zero(flag.Value.Value.Type()))\n+\t\t\tflag.Decoder.Decode(&DecoderContext{Value: &flag.Value}, Scan(flag.Default), flag.Value.Value)\n \t\t}\n \t}\n \tfor _, pos := range node.Positional {\n@@ -76,35 +75,39 @@ func (k *Kong) applyNode(scan *Scanner, node *Node) (command []string, err error\n \t\t\tswitch {\n \t\t\t// -- indicates end of parsing. All remaining arguments are treated as positional arguments only.\n \t\t\tcase token.Value == \"--\":\n+\t\t\t\targs := []string{}\n \t\t\t\tfor {\n \t\t\t\t\ttoken = scan.Pop()\n \t\t\t\t\tif token.Type == EOLToken {\n \t\t\t\t\t\tbreak\n \t\t\t\t\t}\n-\t\t\t\t\tscan.PushTyped(token.Value, PositionalArgumentToken)\n+\t\t\t\t\targs = append(args, token.Value)\n+\t\t\t\t}\n+\t\t\t\tfor i := range args {\n+\t\t\t\t\tscan.PushTyped(args[len(args)-1-i], PositionalArgumentToken)\n \t\t\t\t}\n \n \t\t\t// Long flag.\n \t\t\tcase strings.HasPrefix(token.Value, \"--\"):\n \t\t\t\t// Parse it and push the tokens.\n \t\t\t\tparts := strings.SplitN(token.Value[2:], \"=\", 2)\n-\t\t\t\tscan.PushTyped(parts[0], FlagToken)\n \t\t\t\tif len(parts) > 1 {\n \t\t\t\t\tscan.PushTyped(parts[1], FlagValueToken)\n \t\t\t\t}\n+\t\t\t\tscan.PushTyped(parts[0], FlagToken)\n \n \t\t\t\t// Short flag.\n \t\t\tcase strings.HasPrefix(token.Value, \"-\"):\n-\t\t\t\tscan.PushTyped(token.Value[1:2], ShortFlagToken)\n \t\t\t\tscan.PushTyped(token.Value[2:], ShortFlagTailToken)\n+\t\t\t\tscan.PushTyped(token.Value[1:2], ShortFlagToken)\n \n \t\t\tdefault:\n \t\t\t\tscan.PushTyped(token.Value, PositionalArgumentToken)\n \t\t\t}\n \n \t\tcase ShortFlagTailToken:\n-\t\t\tscan.PushTyped(token.Value[0:1], ShortFlagToken)\n \t\t\tscan.PushTyped(token.Value[1:], ShortFlagTailToken)\n+\t\t\tscan.PushTyped(token.Value[0:1], ShortFlagToken)\n \n \t\tcase FlagToken:\n \t\t\tif err := matchFlags(node.Flags, token, scan, func(f *Flag) bool {\n@@ -140,7 +143,7 @@ func (k *Kong) applyNode(scan *Scanner, node *Node) (command []string, err error\n \n \t\t\t\tcase branch.Argument != nil:\n \t\t\t\t\targ := branch.Argument.Argument\n-\t\t\t\t\tif err := arg.Decoder.Decode(scan, arg.Value); err == nil {\n+\t\t\t\t\tif err := arg.Decoder.Decode(&DecoderContext{Value: arg}, scan, arg.Value); err == nil {\n \t\t\t\t\t\tcommand = append(command, \"<\"+arg.Name+\">\")\n \t\t\t\t\t\tcmd, err := k.applyNode(scan, &branch.Argument.Node)\n \t\t\t\t\t\tif err != nil {\n@@ -171,7 +174,7 @@ func matchFlags(flags []*Flag, token Token, scan *Scanner, matcher func(f *Flag)\n \tfor _, flag := range flags {\n \t\t// Found a matching flag.\n \t\tif flag.Name == token.Value {\n-\t\t\terr := flag.Decoder.Decode(scan, flag.Value.Value)\n+\t\t\terr := flag.Decoder.Decode(&DecoderContext{Value: &flag.Value}, scan, flag.Value.Value)\n \t\t\tif err != nil {\n \t\t\t\treturn err\n \t\t\t}\ndiff --git a/kong_test.go b/kong_test.go\nindex d6a5a80..37d40de 100644\n--- a/kong_test.go\n+++ b/kong_test.go\n@@ -1,12 +1,9 @@\n package kong\n \n import (\n-\t\"reflect\"\n \t\"testing\"\n \n \t\"github.com/stretchr/testify/require\"\n-\n-\t\"github.com/alecthomas/repr\"\n )\n \n func mustNew(t *testing.T, cli interface{}) *Kong {\n@@ -41,7 +38,6 @@ func TestArgument(t *testing.T) {\n \t\t} `arg:\"true\"`\n \t}\n \tp := mustNew(t, &cli)\n-\trepr.Println(p.Model, repr.Hide(reflect.Value{}))\n \tcmd, err := p.Parse([]string{\"10\", \"delete\"})\n \trequire.NoError(t, err)\n \trequire.Equal(t, 10, cli.Id.Id)\n@@ -61,3 +57,13 @@ func TestResetWithDefaults(t *testing.T) {\n \trequire.Equal(t, \"\", cli.Flag)\n \trequire.Equal(t, \"default\", cli.FlagWithDefault)\n }\n+\n+func TestSlice(t *testing.T) {\n+\tvar cli struct {\n+\t\tSlice []int\n+\t}\n+\tparser := mustNew(t, &cli)\n+\t_, err := parser.Parse([]string{\"--slice=1,2,3\"})\n+\trequire.NoError(t, err)\n+\trequire.Equal(t, []int{1, 2, 3}, cli.Slice)\n+}\ndiff --git a/model.go b/model.go\nindex 285f3f0..3ec5e0f 100644\n--- a/model.go\n+++ b/model.go\n@@ -24,6 +24,7 @@ type Value struct {\n \tName     string\n \tHelp     string\n \tDecoder  Decoder\n+\tField    reflect.StructField\n \tValue    reflect.Value\n \tRequired bool\n }\ndiff --git a/scanner.go b/scanner.go\nindex 541016b..78c5b3b 100644\n--- a/scanner.go\n+++ b/scanner.go\n@@ -60,18 +60,21 @@ func (t Token) IsValue() bool {\n }\n \n type Scanner struct {\n-\traw  []string\n \targs []Token\n }\n \n func Scan(args ...string) *Scanner {\n-\ts := &Scanner{raw: args}\n+\ts := &Scanner{}\n \tfor _, arg := range args {\n \t\ts.args = append(s.args, Token{Value: arg})\n \t}\n \treturn s\n }\n \n+func (s *Scanner) Len() int {\n+\treturn len(s.args)\n+}\n+\n func (s *Scanner) Pop() Token {\n \tif len(s.args) == 0 {\n \t\treturn Token{Type: EOLToken}\n",
+  "diffTruncated": false,
+  "tree": [
+    "README.md",
+    "_examples/shell/main.go",
+    "build.go",
+    "camelcase.go",
+    "decoders.go",
+    "decoders_test.go",
+    "global.go",
+    "kong.go",
+    "kong_test.go",
+    "model.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tokentype_string.go"
+  ],
+  "explanation": {
+    "what": "Decoder インターフェースに DecoderContext を追加し、Decode(ctx, scan, target) というシグネチャに変更した。DecoderContext は decode 対象の Value(struct フィールド情報を含む)を保持する。この ctx を使って reflect.Slice 用の decoder を新設し、`sep` タグ(デフォルト \",\")でカンマ区切りの値を分割し、要素ごとに再帰的に childDecoder.Decode() を呼んで target にスライス要素を Append する処理を実装した。Value に Field(reflect.StructField)を持たせ、Node.reset() でのデフォルト値適用も DecoderContext 経由に統一した。",
+    "why": "スライス型フィールド(例: `Paths []string`)をカンマ区切り文字列から埋めるには、区切り文字のカスタマイズ(sep タグ)や要素型ごとの decoder 選択など、単純な Decode(input, target) では表現できない文脈情報が必要になる。そのため Decoder のシグネチャに DecoderContext を足し、decode 対象の Value 自体(タグ情報を含む)を渡せるようにしたと考えられる。",
+    "highlights": [
+      { "file": "decoders.go", "note": "reflect.Slice 用 decoder。sep タグで区切り文字を切り替え、要素の decoder を再帰的に呼び出して target に Append していく" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

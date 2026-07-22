@@ -1,0 +1,80 @@
+{
+  "seq": 51,
+  "sha": "c53590086170e89586ccaab7ef07e0a23c34c64a",
+  "parents": [
+    "149a83692db106860b2f405ebc6592ea26fb764d"
+  ],
+  "author": {
+    "name": "Alec Thomas",
+    "email": "alec@swapoff.org",
+    "date": "2018-06-08T13:41:23+10:00"
+  },
+  "message": "Don't apply Options twice. This is less confusing.",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 14,
+    "deletions": 13
+  },
+  "files": [
+    {
+      "path": "kong.go",
+      "status": "M",
+      "additions": 12,
+      "deletions": 4,
+      "binary": false
+    },
+    {
+      "path": "options.go",
+      "status": "M",
+      "additions": 2,
+      "deletions": 9,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/kong.go b/kong.go\nindex 1b84f38..0a8dc0d 100644\n--- a/kong.go\n+++ b/kong.go\n@@ -40,6 +40,10 @@ type Kong struct {\n \tregistry      *Registry\n \tnoDefaultHelp bool\n \thelp          func(*Context) error\n+\n+\t// Set temporarily by Options. These are moved into the Model after build().\n+\tname        string\n+\tdescription string\n }\n \n // New creates a new Kong parser on grammar.\n@@ -63,12 +67,16 @@ func New(grammar interface{}, options ...Option) (*Kong, error) {\n \tif err != nil {\n \t\treturn k, err\n \t}\n-\tmodel.Name = filepath.Base(os.Args[0])\n+\tif k.name == \"\" {\n+\t\tmodel.Name = filepath.Base(os.Args[0])\n+\t} else {\n+\t\tmodel.Name = k.name\n+\t}\n+\tif k.description != \"\" {\n+\t\tmodel.Help = k.description\n+\t}\n \tk.Model = model\n \n-\tfor _, option := range options {\n-\t\toption(k)\n-\t}\n \treturn k, nil\n }\n \ndiff --git a/options.go b/options.go\nindex 7e2a871..7020a0b 100644\n--- a/options.go\n+++ b/options.go\n@@ -6,9 +6,6 @@ import (\n )\n \n // Options apply optional changes to the Kong application.\n-//\n-// Note that Options are applied twice: once just prior to the grammar is constructed and once after. In the\n-// former case, Kong.Application will be nil.\n type Option func(k *Kong)\n \n // ExitFunction overrides the function used to terminate. This is useful for testing or interactive use.\n@@ -26,9 +23,7 @@ func NoDefaultHelp() Option {\n // Name overrides the application name.\n func Name(name string) Option {\n \treturn func(k *Kong) {\n-\t\tif k.Model != nil {\n-\t\t\tk.Model.Name = name\n-\t\t}\n+\t\tk.name = name\n \t}\n }\n \n@@ -55,9 +50,7 @@ func NamedMapper(name string, mapper Mapper) Option {\n // Description sets the application description.\n func Description(description string) Option {\n \treturn func(k *Kong) {\n-\t\tif k.Model != nil {\n-\t\t\tk.Model.Help = description\n-\t\t}\n+\t\tk.description = description\n \t}\n }\n \n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    "README.md",
+    "_examples/shell/main.go",
+    "build.go",
+    "camelcase.go",
+    "context.go",
+    "context_test.go",
+    "global.go",
+    "global_test.go",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "kong.go",
+    "kong_test.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "tokentype_string.go"
+  ],
+  "explanation": {
+    "what": "Kong構造体に一時フィールドname/descriptionを追加し、New()内でOptionの適用を1回だけにした。従来はNew()冒頭でOptionを適用したあとにモデルを構築し、さらに構築後にも同じOptionsループをもう一度実行していたため、Name()やDescription()のようなOptionが二重に評価されていた。",
+    "why": "コミットメッセージ「Don't apply Options twice. This is less confusing.」の通り、Optionが2回呼ばれる挙動が分かりにくさの原因だった。Name/Descriptionはmodel構築(build())が終わった後でないとk.Modelに書き込めないため、Option適用を1回にまとめつつ、name/descriptionだけKong構造体に一時保存してbuild()後にModelへ反映する設計に変更した。",
+    "highlights": [
+      { "file": "kong.go", "note": "Option呼び出しをNew()内で1箇所に集約し、name/descriptionをk.Modelでなくk自身の一時フィールドに保持するよう変更" },
+      { "file": "options.go", "note": "Name()/Description()がk.Model.Xへの直接代入からk.name/k.descriptionへの代入に変わり、二重適用時のnilチェック分岐が不要になった" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

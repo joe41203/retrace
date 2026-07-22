@@ -1,0 +1,89 @@
+{
+  "seq": 1,
+  "sha": "aa1bf9dcb57f6b8f10693cd3ac0fddf5dbbe03fb",
+  "parents": [],
+  "author": {
+    "name": "Alec Thomas",
+    "email": "alec@swapoff.org",
+    "date": "2018-04-10T16:51:06+10:00"
+  },
+  "message": "Initial commit.",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 6,
+    "additions": 237,
+    "deletions": 0
+  },
+  "files": [
+    {
+      "path": "README.md",
+      "status": "A",
+      "additions": 26,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "_examples/shell/main.go",
+      "status": "A",
+      "additions": 20,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "camelcase.go",
+      "status": "A",
+      "additions": 90,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "global.go",
+      "status": "A",
+      "additions": 10,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "kong.go",
+      "status": "A",
+      "additions": 47,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "model.go",
+      "status": "A",
+      "additions": 44,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/README.md b/README.md\nnew file mode 100644\nindex 0000000..a6a39b8\n--- /dev/null\n+++ b/README.md\n@@ -0,0 +1,26 @@\n+# Kong is a command-line parser for Go\n+\n+It parses a command-line into a struct. eg.\n+\n+```go\n+package main\n+\n+import \"github.com/alecthomas/kong\"\n+\n+var CLI struct {\n+  Rm struct {\n+    Force     bool `help:\"Force removal.\"`\n+    Recursive bool `help:\"Recursively remove files.\"`\n+\n+    Paths []string `help:\"Paths to remove.\" type:\"path\"`\n+  } `help:\"Remove files.\"`\n+\n+  Ls struct {\n+    Paths []string `help:\"Paths to list.\" type:\"path\"`\n+  } `help:\"List paths.\"`\n+}\n+\n+func main() {\n+  kong.Parse(&CLI)\n+}\n+```\ndiff --git a/_examples/shell/main.go b/_examples/shell/main.go\nnew file mode 100644\nindex 0000000..352cfec\n--- /dev/null\n+++ b/_examples/shell/main.go\n@@ -0,0 +1,20 @@\n+package main\n+\n+import \"github.com/alecthomas/kong\"\n+\n+var CLI struct {\n+\tRm struct {\n+\t\tForce     bool `help:\"Force removal.\"`\n+\t\tRecursive bool `help:\"Recursively remove files.\"`\n+\n+\t\tPaths []string `help:\"Paths to remove.\" type:\"path\"`\n+\t} `help:\"Remove files.\"`\n+\n+\tLs struct {\n+\t\tPaths []string `help:\"Paths to list.\" type:\"path\"`\n+\t} `help:\"List paths.\"`\n+}\n+\n+func main() {\n+\tkong.Parse(&CLI)\n+}\ndiff --git a/camelcase.go b/camelcase.go\nnew file mode 100644\nindex 0000000..b12d111\n--- /dev/null\n+++ b/camelcase.go\n@@ -0,0 +1,90 @@\n+package kong\n+\n+// NOTE: This code is from https://github.com/fatih/camelcase. MIT license.\n+\n+import (\n+\t\"unicode\"\n+\t\"unicode/utf8\"\n+)\n+\n+// Split splits the camelcase word and returns a list of words. It also\n+// supports digits. Both lower camel case and upper camel case are supported.\n+// For more info please check: http://en.wikipedia.org/wiki/CamelCase\n+//\n+// Examples\n+//\n+//   \"\" =>                     [\"\"]\n+//   \"lowercase\" =>            [\"lowercase\"]\n+//   \"Class\" =>                [\"Class\"]\n+//   \"MyClass\" =>              [\"My\", \"Class\"]\n+//   \"MyC\" =>                  [\"My\", \"C\"]\n+//   \"HTML\" =>                 [\"HTML\"]\n+//   \"PDFLoader\" =>            [\"PDF\", \"Loader\"]\n+//   \"AString\" =>              [\"A\", \"String\"]\n+//   \"SimpleXMLParser\" =>      [\"Simple\", \"XML\", \"Parser\"]\n+//   \"vimRPCPlugin\" =>         [\"vim\", \"RPC\", \"Plugin\"]\n+//   \"GL11Version\" =>          [\"GL\", \"11\", \"Version\"]\n+//   \"99Bottles\" =>            [\"99\", \"Bottles\"]\n+//   \"May5\" =>                 [\"May\", \"5\"]\n+//   \"BFG9000\" =>              [\"BFG\", \"9000\"]\n+//   \"BöseÜberraschung\" =>     [\"Böse\", \"Überraschung\"]\n+//   \"Two  spaces\" =>          [\"Two\", \"  \", \"spaces\"]\n+//   \"BadUTF8\\xe2\\xe2\\xa1\" =>  [\"BadUTF8\\xe2\\xe2\\xa1\"]\n+//\n+// Splitting rules\n+//\n+//  1) If string is not valid UTF-8, return it without splitting as\n+//     single item array.\n+//  2) Assign all unicode characters into one of 4 sets: lower case\n+//     letters, upper case letters, numbers, and all other characters.\n+//  3) Iterate through characters of string, introducing splits\n+//     between adjacent characters that belong to different sets.\n+//  4) Iterate through array of split strings, and if a given string\n+//     is upper case:\n+//       if subsequent string is lower case:\n+//         move last character of upper case string to beginning of\n+//         lower case string\n+func camelCase(src string) (entries []string) {\n+\t// don't split invalid utf8\n+\tif !utf8.ValidString(src) {\n+\t\treturn []string{src}\n+\t}\n+\tentries = []string{}\n+\tvar runes [][]rune\n+\tlastClass := 0\n+\t// split into fields based on class of unicode character\n+\tfor _, r := range src {\n+\t\tvar class int\n+\t\tswitch true {\n+\t\tcase unicode.IsLower(r):\n+\t\t\tclass = 1\n+\t\tcase unicode.IsUpper(r):\n+\t\t\tclass = 2\n+\t\tcase unicode.IsDigit(r):\n+\t\t\tclass = 3\n+\t\tdefault:\n+\t\t\tclass = 4\n+\t\t}\n+\t\tif class == lastClass {\n+\t\t\trunes[len(runes)-1] = append(runes[len(runes)-1], r)\n+\t\t} else {\n+\t\t\trunes = append(runes, []rune{r})\n+\t\t}\n+\t\tlastClass = class\n+\t}\n+\t// handle upper case -> lower case sequences, e.g.\n+\t// \"PDFL\", \"oader\" -> \"PDF\", \"Loader\"\n+\tfor i := 0; i < len(runes)-1; i++ {\n+\t\tif unicode.IsUpper(runes[i][0]) && unicode.IsLower(runes[i+1][0]) {\n+\t\t\trunes[i+1] = append([]rune{runes[i][len(runes[i])-1]}, runes[i+1]...)\n+\t\t\trunes[i] = runes[i][:len(runes[i])-1]\n+\t\t}\n+\t}\n+\t// construct []string from results\n+\tfor _, s := range runes {\n+\t\tif len(s) > 0 {\n+\t\t\tentries = append(entries, string(s))\n+\t\t}\n+\t}\n+\treturn\n+}\ndiff --git a/global.go b/global.go\nnew file mode 100644\nindex 0000000..2acabe9\n--- /dev/null\n+++ b/global.go\n@@ -0,0 +1,10 @@\n+package kong\n+\n+import \"os\"\n+\n+func Parse(cli interface{}) {\n+\tparser, err := New(\"\", \"\", cli)\n+\tparser.FatalIfErrorf(err)\n+\terr = parser.Parse(os.Args[1:])\n+\tparser.FatalIfErrorf(err)\n+}\ndiff --git a/kong.go b/kong.go\nnew file mode 100644\nindex 0000000..0edecac\n--- /dev/null\n+++ b/kong.go\n@@ -0,0 +1,47 @@\n+package kong\n+\n+import (\n+\t\"fmt\"\n+\t\"os\"\n+\t\"path/filepath\"\n+)\n+\n+type Kong struct {\n+\tModel *ApplicationModel\n+\t// Termination function (defaults to os.Exit)\n+\tTerminate func(int)\n+}\n+\n+func New(name, description string, grammar interface{}) (*Kong, error) {\n+\tif name == \"\" {\n+\t\tname = filepath.Base(os.Args[0])\n+\t}\n+\treturn &Kong{\n+\t\tModel: &ApplicationModel{\n+\t\t\tName:        name,\n+\t\t\tDescription: description,\n+\t\t},\n+\t\tTerminate: os.Exit,\n+\t}, nil\n+}\n+\n+// Parse arguments into target.\n+func (k *Kong) Parse(args []string) error {\n+\treturn nil\n+}\n+\n+func (k *Kong) Errorf(format string, args ...interface{}) {\n+\tfmt.Fprintf(os.Stderr, k.Model.Name+\": \"+format, args...)\n+}\n+\n+func (k *Kong) FatalIfErrorf(err error, args ...interface{}) {\n+\tif err == nil {\n+\t\treturn\n+\t}\n+\tmsg := err.Error()\n+\tif len(args) == 0 {\n+\t\tmsg = fmt.Sprintf(args[0].(string), args...) + \": \" + err.Error()\n+\t}\n+\tk.Errorf(\"%s\", msg)\n+\tk.Terminate(1)\n+}\ndiff --git a/model.go b/model.go\nnew file mode 100644\nindex 0000000..d8a5647\n--- /dev/null\n+++ b/model.go\n@@ -0,0 +1,44 @@\n+package kong\n+\n+import \"flag\"\n+\n+type Value = flag.Getter\n+\n+type ApplicationModel struct {\n+\tName        string\n+\tDescription string\n+\n+\tNodeModel\n+}\n+\n+type NodeModel struct {\n+\tGroups []*GroupModel\n+\t// Positional arguments.\n+\tArguments []*ArgumentModel\n+}\n+\n+type GroupModel struct {\n+\t// Flags.\n+\tFlags []*FlagModel\n+\t// Command hierarchy.\n+\tCommands []*CommandModel\n+}\n+\n+type ValueModel struct {\n+\tName  string\n+\tHelp  string\n+\tValue flag.Value\n+}\n+\n+type CommandModel struct {\n+\tNodeModel\n+}\n+\n+type ArgumentModel struct {\n+\tValueModel\n+}\n+\n+type FlagModel struct {\n+\tValueModel\n+\tShort rune\n+}\n",
+  "diffTruncated": false,
+  "tree": [
+    "README.md",
+    "_examples/shell/main.go",
+    "camelcase.go",
+    "global.go",
+    "kong.go",
+    "model.go"
+  ],
+  "explanation": {
+    "what": "kong パッケージの最初の骨格を追加した。README とサンプル(_examples/shell/main.go)で struct タグベースの CLI 定義例を示し、model.go に ApplicationModel/NodeModel/GroupModel/FlagModel などのモデル型、kong.go に New()/Parse()/Errorf()/FatalIfErrorf() を持つ Kong 型、camelcase.go に外部由来のキャメルケース分割関数を置いた。この時点の Parse() は何もせず nil を返すだけのスタブ。",
+    "why": "README のサンプルコードが示す「struct を定義するだけで CLI ができる」という API 形状を先に固め、それを支えるモデル(Application/Node/Group/Flag/Argument)と外形だけのエントリポイントを用意したと考えられる。実処理(タグ読み取り・パース)はまだ実装されておらず、以降のコミットで肉付けされる土台づくりの回。",
+    "highlights": [
+      { "file": "model.go", "note": "ApplicationModel/NodeModel/GroupModel/FlagModel など、CLI 文法を表す木構造の初期形。Value は flag.Getter のエイリアスとして仮置きされている" },
+      { "file": "README.md", "note": "help タグと type タグを使った struct 定義の最初の例。この宣言的スタイルが以降ずっと core API になる" }
+    ],
+    "langNotes": [
+      { "topic": "struct タグ", "note": "Go の struct フィールドには `` `key:\"value\"` `` の形でメタデータ(タグ)を埋め込める。ここでは `help:\"...\"` と `type:\"path\"` が使われており、reflect 経由で実行時に読み取ることを前提にした設計。"
+      }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

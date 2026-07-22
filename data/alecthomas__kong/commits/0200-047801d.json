@@ -1,0 +1,102 @@
+{
+  "seq": 200,
+  "sha": "047801d760cbaf4cc49dc0ae58711a608ec74d04",
+  "parents": [
+    "d480572d75eb82a6052e1eb7d16268983820608f"
+  ],
+  "author": {
+    "name": "Alec Thomas",
+    "email": "alec@swapoff.org",
+    "date": "2020-07-08T21:12:29+10:00"
+  },
+  "message": "Correctly return errors when configuration parsing fails.\n\nFixes #93.",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 8,
+    "deletions": 1
+  },
+  "files": [
+    {
+      "path": "options.go",
+      "status": "M",
+      "additions": 8,
+      "deletions": 1,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/options.go b/options.go\nindex 681dfb9..6839ceb 100644\n--- a/options.go\n+++ b/options.go\n@@ -2,6 +2,7 @@ package kong\n \n import (\n \t\"io\"\n+\t\"os\"\n \t\"os/user\"\n \t\"path/filepath\"\n \t\"reflect\"\n@@ -251,7 +252,13 @@ func Configuration(loader ConfigurationLoader, paths ...string) Option {\n \treturn OptionFunc(func(k *Kong) error {\n \t\tk.loader = loader\n \t\tfor _, path := range paths {\n-\t\t\tresolver, _ := k.LoadConfig(path)\n+\t\t\tif _, err := os.Stat(ExpandPath(path)); os.IsNotExist(err) {\n+\t\t\t\tcontinue\n+\t\t\t}\n+\t\t\tresolver, err := k.LoadConfig(path)\n+\t\t\tif err != nil {\n+\t\t\t\treturn errors.Wrap(err, path)\n+\t\t\t}\n \t\t\tif resolver != nil {\n \t\t\t\tk.resolvers = append(k.resolvers, resolver)\n \t\t\t}\n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    ".golangci.yml",
+    "COPYING",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/README.md",
+    "_examples/server/console.go",
+    "_examples/server/go.mod",
+    "_examples/server/go.sum",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/main.go",
+    "benchmark_test.go",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "config_test.go",
+    "context.go",
+    "defaults.go",
+    "defaults_test.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "go.mod",
+    "go.sum",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "util.go",
+    "util_test.go",
+    "visit.go"
+  ],
+  "explanation": {
+    "what": "options.go の Configuration() オプションで、設定ファイルの読み込みエラーを黙って握りつぶしていた `resolver, _ := k.LoadConfig(path)` を、ファイルが存在しない場合はスキップしつつ、実際のパースエラーは errors.Wrap(err, path) で包んで呼び出し元に返すように変更した。",
+    "why": "コミットメッセージが \"Fixes #93\" と明記する通り、設定ファイルのパースに失敗しても kong.New() がエラーを返さず失敗が見えなくなっていた問題を修正する。os.Stat による存在チェックで「ファイルが無いので読まない」という正常系と、「ファイルはあるがパースに失敗した」というエラー系を区別できるようにしている。",
+    "highlights": [
+      { "file": "options.go", "note": "os.Stat でファイル不在をスキップした上で、LoadConfig() のエラーを errors.Wrap(err, path) して呼び出し元へ伝播" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

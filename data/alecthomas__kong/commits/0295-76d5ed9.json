@@ -1,0 +1,121 @@
+{
+  "seq": 295,
+  "sha": "76d5ed9ac1061ed237f42b2810d0efee10da2a97",
+  "parents": [
+    "f5bd1465d89c0555c37984a655ca8a278eced220"
+  ],
+  "author": {
+    "name": "Mitar",
+    "email": "mitar.git@tnode.com",
+    "date": "2022-01-03T21:28:14+01:00"
+  },
+  "message": "Small improvements to ChangeDirFlag.",
+  "pr": {
+    "number": 261,
+    "title": "Small improvements to ChangeDirFlag",
+    "body": "",
+    "url": "https://github.com/alecthomas/kong/pull/261"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 3,
+    "deletions": 0
+  },
+  "files": [
+    {
+      "path": "util.go",
+      "status": "M",
+      "additions": 3,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/util.go b/util.go\nindex aaf7426..8c114af 100644\n--- a/util.go\n+++ b/util.go\n@@ -40,6 +40,8 @@ func (v VersionFlag) BeforeApply(app *Kong, vars Vars) error {\n // early in the parsing process, changing how other flags resolve relative paths.\n //\n // Use this flag to provide a \"git -C\" like functionality.\n+//\n+// It is not compatible with custom named decoders, e.g., existingdir.\n type ChangeDirFlag string\n \n // Decode is used to create a side effect of changing the current working directory.\n@@ -49,6 +51,7 @@ func (c ChangeDirFlag) Decode(ctx *DecodeContext) error {\n \tif err != nil {\n \t\treturn err\n \t}\n+\tpath = ExpandPath(path)\n \tctx.Value.Target.Set(reflect.ValueOf(ChangeDirFlag(path)))\n \treturn os.Chdir(path)\n }\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/FUNDING.yml",
+    ".github/workflows/ci.yml",
+    ".gitignore",
+    ".golangci.yml",
+    "COPYING",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/README.md",
+    "_examples/server/console.go",
+    "_examples/server/go.mod",
+    "_examples/server/go.sum",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/main.go",
+    "benchmark_test.go",
+    "bin/.go@latest.pkg",
+    "bin/.golangci-lint-1.42.0.pkg",
+    "bin/README.hermit.md",
+    "bin/activate-hermit",
+    "bin/go",
+    "bin/gofmt",
+    "bin/golangci-lint",
+    "bin/hermit",
+    "bin/hermit.hcl",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "config_test.go",
+    "context.go",
+    "defaults.go",
+    "defaults_test.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "go.mod",
+    "go.sum",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "testdata/file.txt",
+    "util.go",
+    "util_test.go",
+    "visit.go"
+  ],
+  "explanation": {
+    "what": "ChangeDirFlag.Decode() で、渡されたパスに ExpandPath(既存のチルダ展開ヘルパー)を通してから os.Chdir するように変更した。あわせて、既存の名前付きデコーダ(existingdir 等)とは互換性が無いことをコメントで明記した。",
+    "why": "PR本文には詳細な説明が無いが、diffから見る限り、おそらく ChangeDirFlag に `~/foo` のようなチルダ付きパスを渡した際にそのまま os.Chdir に渡ると失敗する問題を防ぐため、既存の ExpandPath 処理を再利用したものと考えられる。コメント追加は、ChangeDirFlag 自身が Decode を実装する型であるため、existingdir 等の type タグによる別デコーダとは併用できないという制約を利用者に伝える目的とみられる。",
+    "highlights": [
+      { "file": "util.go", "note": "path = ExpandPath(path) の一行が追加された変更の中心" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "inferred",
+    "refs": [
+      { "type": "pr", "number": 261, "url": "https://github.com/alecthomas/kong/pull/261" }
+    ],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

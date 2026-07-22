@@ -1,0 +1,122 @@
+{
+  "seq": 193,
+  "sha": "7bdb319cf1f9aa59f726effc39b2894212025448",
+  "parents": [
+    "f19cb8c69dc7f9effb9fae67097261e474d8e67f"
+  ],
+  "author": {
+    "name": "Will Roden",
+    "email": "willabides@github.com",
+    "date": "2020-05-15T16:36:04-05:00"
+  },
+  "message": "move CloneWith() call into interpolate()",
+  "pr": {
+    "number": 79,
+    "title": "fix performance issue in interpolation",
+    "body": "I ran across an issue where having a large number of variables to interpolate can significantly slow down `kong.New()`.  In my case I had around 5,000 variables and it took about five seconds to run my program with `--help`.\r\n\r\nThe problem is in `kong.interpolate()`. Because it calls `Vars.CloneWith()` for each field, its complexity is roughly O(n<sup>2</sup>).\r\n\r\nThis PR updates `kong.interpolateValue()` so that `Vars.CloneWith()` is not called in most cases. It will only be called if `value.Tag.Vars` is populated or if interpolation modified value.Enum of value.Default.\r\n\r\nIt also updates `Vars.CloneWith()` to preallocate the output map.\r\n\r\nI added benchmarks to show the performance improvement.  I'm happy for them to be removed before merging if you don't want to keep them around. Their primary purpose is just to show the change in this PR.\r\n\r\nThis is what benchstat shows on my laptop:\r\n\r\n```\r\nname                     old time/op    new time/op    delta\r\n_interpolateValue-8        3.26ms ± 5%    0.00ms ± 1%  -99.96%  (p=0.000 n=10+10)\r\nKong_interpolate/5-8       12.5µs ± 4%     6.8µs ± 8%  -45.32%  (p=0.000 n=10+9)\r\nKong_interpolate/500-8     72.5ms ± 2%     0.5ms ± 4%  -99.35%  (p=0.000 n=9+10)\r\nKong_interpolate/5000-8     7.69s ± 6%     0.01s ± 7%  -99.93%  (p=0.000 n=10+9)\r\n\r\nname                     old alloc/op   new alloc/op   delta\r\n_interpolateValue-8        2.57MB ± 0%    0.00MB ± 0%  -99.98%  (p=0.000 n=10+10)\r\nKong_interpolate/5-8       8.77kB ± 0%    4.01kB ± 0%  -54.23%  (p=0.000 n=10+10)\r\nKong_interpolate/500-8     84.7MB ± 0%     0.3MB ± 0%  -99.65%  (p=0.000 n=10+10)\r\nKong_interpolate/5000-8    6.46GB ± 0%    0.00GB ± 0%  -99.96%  (p=0.000 n=10+9)\r\n\r\nname                     old allocs/op  new allocs/op  delta\r\n_interpolateValue-8           517 ± 0%         3 ± 0%  -99.42%  (p=0.000 n=8+10)\r\nKong_interpolate/5-8         71.0 ± 0%      43.0 ± 0%  -39.44%  (p=0.000 n=10+10)\r\nKong_interpolate/500-8      29.7k ± 0%      2.5k ± 0%  -91.52%  (p=0.000 n=10+10)\r\nKong_interpolate/5000-8      975k ± 0%       25k ± 0%  -97.41%  (p=0.000 n=9+9)\r\n```\r\n",
+    "url": "https://github.com/alecthomas/kong/pull/79"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 3,
+    "additions": 24,
+    "deletions": 14
+  },
+  "files": [
+    {
+      "path": "interpolate.go",
+      "status": "M",
+      "additions": 10,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "interpolate_test.go",
+      "status": "M",
+      "additions": 5,
+      "deletions": 2,
+      "binary": false
+    },
+    {
+      "path": "kong.go",
+      "status": "M",
+      "additions": 9,
+      "deletions": 11,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/interpolate.go b/interpolate.go\nindex 9de1ff7..8c6f742 100644\n--- a/interpolate.go\n+++ b/interpolate.go\n@@ -8,9 +8,18 @@ import (\n var interpolationRegex = regexp.MustCompile(`((?:\\${([[:alpha:]_][[:word:]]*))(?:=([^}]+))?})|(\\$)|([^$]+)`)\n \n // Interpolate variables from vars into s for substrings in the form ${var} or ${var=default}.\n-func interpolate(s string, vars map[string]string) (string, error) {\n+func interpolate(s string, vars Vars, updatedVars map[string]string) (string, error) {\n \tout := \"\"\n \tmatches := interpolationRegex.FindAllStringSubmatch(s, -1)\n+\tif len(matches) == 0 {\n+\t\treturn s, nil\n+\t}\n+\tfor key, val := range updatedVars {\n+\t\tif vars[key] != val {\n+\t\t\tvars = vars.CloneWith(updatedVars)\n+\t\t\tbreak\n+\t\t}\n+\t}\n \tfor _, match := range matches {\n \t\tif name := match[2]; name != \"\" {\n \t\t\tvalue, ok := vars[name]\ndiff --git a/interpolate_test.go b/interpolate_test.go\nindex a2c9df1..38d9266 100644\n--- a/interpolate_test.go\n+++ b/interpolate_test.go\n@@ -10,7 +10,10 @@ func TestInterpolate(t *testing.T) {\n \tvars := map[string]string{\n \t\t\"age\": \"35\",\n \t}\n-\tactual, err := interpolate(\"${name=Bobby Brown} is ${age} years old\", vars)\n+\tupdatedVars := map[string]string{\n+\t\t\"height\": \"180\",\n+\t}\n+\tactual, err := interpolate(\"${name=Bobby Brown} is ${age} years old and ${height} cm tall\", vars, updatedVars)\n \trequire.NoError(t, err)\n-\trequire.Equal(t, `Bobby Brown is 35 years old`, actual)\n+\trequire.Equal(t, `Bobby Brown is 35 years old and 180 cm tall`, actual)\n }\ndiff --git a/kong.go b/kong.go\nindex 6a4b2c5..a17a2f0 100644\n--- a/kong.go\n+++ b/kong.go\n@@ -128,7 +128,7 @@ func (k *Kong) interpolate(node *Node) (err error) {\n \t\tswitch node := node.(type) {\n \t\tcase *Node:\n \t\t\tvars := stack.push(node.Vars())\n-\t\t\tnode.Help, err = interpolate(node.Help, vars)\n+\t\t\tnode.Help, err = interpolate(node.Help, vars, nil)\n \t\t\tif err != nil {\n \t\t\t\treturn fmt.Errorf(\"help for %s: %s\", node.Path(), err)\n \t\t\t}\n@@ -147,19 +147,17 @@ func (k *Kong) interpolateValue(value *Value, vars Vars) (err error) {\n \tif len(value.Tag.Vars) > 0 {\n \t\tvars = vars.CloneWith(value.Tag.Vars)\n \t}\n-\tif value.Default, err = interpolate(value.Default, vars); err != nil {\n+\tif value.Default, err = interpolate(value.Default, vars, nil); err != nil {\n \t\treturn fmt.Errorf(\"default value for %s: %s\", value.Summary(), err)\n \t}\n-\tif value.Enum, err = interpolate(value.Enum, vars); err != nil {\n+\tif value.Enum, err = interpolate(value.Enum, vars, nil); err != nil {\n \t\treturn fmt.Errorf(\"enum value for %s: %s\", value.Summary(), err)\n \t}\n-\tif vars[\"default\"] != value.Default || vars[\"enum\"] != value.Enum {\n-\t\tvars = vars.CloneWith(map[string]string{\n-\t\t\t\"default\": value.Default,\n-\t\t\t\"enum\":    value.Enum,\n-\t\t})\n-\t}\n-\tif value.Help, err = interpolate(value.Help, vars); err != nil {\n+\tvalue.Help, err = interpolate(value.Help, vars, map[string]string{\n+\t\t\"default\": value.Default,\n+\t\t\"enum\":    value.Enum,\n+\t})\n+\tif err != nil {\n \t\treturn fmt.Errorf(\"help for %s: %s\", value.Summary(), err)\n \t}\n \treturn nil\n@@ -346,7 +344,7 @@ func (k *Kong) FatalIfErrorf(err error, args ...interface{}) {\n func (k *Kong) LoadConfig(path string) (Resolver, error) {\n \tvar err error\n \tpath = ExpandPath(path)\n-\tpath, err = interpolate(path, k.vars)\n+\tpath, err = interpolate(path, k.vars, nil)\n \tif err != nil {\n \t\treturn nil, err\n \t}\n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    ".golangci.yml",
+    "COPYING",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/README.md",
+    "_examples/server/console.go",
+    "_examples/server/go.mod",
+    "_examples/server/go.sum",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/main.go",
+    "benchmark_test.go",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "config_test.go",
+    "context.go",
+    "defaults.go",
+    "defaults_test.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "go.mod",
+    "go.sum",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "util.go",
+    "util_test.go",
+    "visit.go"
+  ],
+  "explanation": {
+    "what": "interpolate() のシグネチャに updatedVars map[string]string 引数を追加し、CloneWith() の呼び出し判定(vars が updatedVars と異なる場合のみ複製)を interpolateValue() 側から interpolate() 内部に移動した。あわせて interpolationRegex にマッチしない文字列は早期リターンするようにした。呼び出し側(kong.go の3箇所)は updatedVars に nil または default/enum の map を渡すよう更新。",
+    "why": "PR #79 の続き。前コミットでは interpolateValue() 側で CloneWith() を呼ぶかどうかを判定していたが、その判定ロジックを interpolate() 自身に持たせることで責務を一箇所にまとめ、さらに補間対象の文字列に ${...} が含まれない(matches が空)場合は vars の複製自体を丸ごと省略できるようにした。これによりベンチマークが示す O(n^2) の無駄なコピーをさらに削減する。",
+    "highlights": [
+      { "file": "interpolate.go", "note": "matches が空なら即 return。updatedVars と vars の差分がある場合のみ CloneWith() を呼ぶ" },
+      { "file": "kong.go", "note": "interpolateValue() 内の CloneWith() 判定ロジックを削除し、interpolate() へ updatedVars を渡す形に統一" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [{ "type": "pr", "number": 79, "url": "https://github.com/alecthomas/kong/pull/79" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

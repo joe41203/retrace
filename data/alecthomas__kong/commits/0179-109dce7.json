@@ -1,0 +1,108 @@
+{
+  "seq": 179,
+  "sha": "109dce7ea5d32e63a96a2c234e991ea3ea470e77",
+  "parents": [
+    "b8c82fea7cc495667e6433be35a1fe50bb2e1b60"
+  ],
+  "author": {
+    "name": "Alec Thomas",
+    "email": "alec@swapoff.org",
+    "date": "2020-03-05T11:27:53+11:00"
+  },
+  "message": "Expand variables in config paths.",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 7,
+    "deletions": 2
+  },
+  "files": [
+    {
+      "path": "kong.go",
+      "status": "M",
+      "additions": 6,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "options.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/kong.go b/kong.go\nindex 882e4ad..3a61567 100644\n--- a/kong.go\n+++ b/kong.go\n@@ -338,9 +338,14 @@ func (k *Kong) FatalIfErrorf(err error, args ...interface{}) {\n \n // LoadConfig from path using the loader configured via Configuration(loader).\n //\n-// \"path\" will have ~/ expanded.\n+// \"path\" will have ~ and any variables expanded.\n func (k *Kong) LoadConfig(path string) (Resolver, error) {\n+\tvar err error\n \tpath = ExpandPath(path)\n+\tpath, err = interpolate(path, k.vars)\n+\tif err != nil {\n+\t\treturn nil, err\n+\t}\n \tr, err := os.Open(path) // nolint: gas\n \tif err != nil {\n \t\treturn nil, err\ndiff --git a/options.go b/options.go\nindex 66fd633..1464d71 100644\n--- a/options.go\n+++ b/options.go\n@@ -235,7 +235,7 @@ type ConfigurationLoader func(r io.Reader) (Resolver, error)\n //\n // Note: The JSON function is a ConfigurationLoader.\n //\n-// ~ expansion will occur on the provided paths.\n+// ~ and variable expansion will occur on the provided paths.\n func Configuration(loader ConfigurationLoader, paths ...string) Option {\n \treturn OptionFunc(func(k *Kong) error {\n \t\tk.loader = loader\n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    ".golangci.yml",
+    "COPYING",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/README.md",
+    "_examples/server/console.go",
+    "_examples/server/go.mod",
+    "_examples/server/go.sum",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/main.go",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "config_test.go",
+    "context.go",
+    "defaults.go",
+    "defaults_test.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "go.mod",
+    "go.sum",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "util.go",
+    "util_test.go",
+    "visit.go"
+  ],
+  "explanation": {
+    "what": "Kong.LoadConfig() で設定ファイルパスに対して ExpandPath()(~ 展開)に加えて interpolate(path, k.vars) を通すようにした。Configuration() オプションのドキュメントコメントも「~ expansion」から「~ and variable expansion」に更新している。",
+    "why": "コミットメッセージは \"Expand variables in config paths.\" のみで詳細な経緯は記されていない。おそらく、ヘルプ文字列や enum で既に使えていた ${var} 形式の変数展開を設定ファイルパスにも適用し、環境ごとに異なるパスを Vars 経由で組み立てられるようにする目的だったと考えられる。",
+    "highlights": [
+      { "file": "kong.go", "note": "ExpandPath() → interpolate() の順で2段階の展開を行っている。" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "inferred",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

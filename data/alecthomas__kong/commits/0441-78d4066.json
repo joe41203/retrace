@@ -1,0 +1,162 @@
+{
+  "seq": 441,
+  "sha": "78d4066dabe5432d604eb28ab5376a3ad1708e29",
+  "parents": [
+    "1edf069f4a1ad7499f6d4cc34b1e7af0d06d89b1"
+  ],
+  "author": {
+    "name": "Bob Lail",
+    "email": "lail@squareup.com",
+    "date": "2025-03-21T20:04:20-07:00"
+  },
+  "message": "feat: Allow configuring global hooks via Kong's functional options (#511)\n\nLets you pass `kong.WithBeforeApply` along with a function that supports dynamic bindings to register a `BeforeApply` hook without tying it directly to a node in the schema.\n\nCo-authored-by: Sutina Wipawiwat <swipawiwat@squareup.com>",
+  "pr": {
+    "number": 511,
+    "title": "feat: Allow configuring hooks via Kong's functional options",
+    "body": "Lets you pass `kong.WithBeforeApply` along with a function that supports dynamic bindings to register a `BeforeApply` hook without tying it directly to a node in the schema.\r\n\r\nAlso updates the README.md to [list a table of hooks with their meanings](https://github.com/boblail/kong/tree/lail/register-hooks-via-Options?tab=readme-ov-file#hooks-beforereset-beforeresolve-beforeapply-afterapply).\r\n\r\n",
+    "url": "https://github.com/alecthomas/kong/pull/511"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 5,
+    "additions": 127,
+    "deletions": 5
+  },
+  "files": [
+    {
+      "path": "README.md",
+      "status": "M",
+      "additions": 14,
+      "deletions": 4,
+      "binary": false
+    },
+    {
+      "path": "hooks.go",
+      "status": "M",
+      "additions": 6,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "kong.go",
+      "status": "M",
+      "additions": 14,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "kong_test.go",
+      "status": "M",
+      "additions": 59,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "options.go",
+      "status": "M",
+      "additions": 34,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/README.md b/README.md\nindex 9e1d6cc..9f21cfe 100644\n--- a/README.md\n+++ b/README.md\n@@ -308,10 +308,16 @@ func main() {\n \n ## Hooks: BeforeReset(), BeforeResolve(), BeforeApply(), AfterApply()\n \n-If a node in the CLI, or any of its embedded fields, has a `BeforeReset(...) error`, `BeforeResolve\n-(...) error`, `BeforeApply(...) error` and/or `AfterApply(...) error` method, those\n-methods will be called before values are reset, before validation/assignment,\n-and after validation/assignment, respectively.\n+If a node in the CLI, or any of its embedded fields, implements a `BeforeReset(...) error`, `BeforeResolve\n+(...) error`, `BeforeApply(...) error` and/or `AfterApply(...) error` method, those will be called as Kong\n+resets, resolves, validates, and assigns values to the node.\n+\n+| Hook            | Description                                                                                                 |\n+| --------------- | ----------------------------------------------------------------------------------------------------------- |\n+| `BeforeReset`   | Invoked before values are reset to their defaults (as defined by the grammar) or to zero values             |\n+| `BeforeResolve` | Invoked before resolvers are applied to a node                                                              |\n+| `BeforeApply`   | Invoked before the traced command line arguments are applied to the grammar                                 |\n+| `AfterApply`    | Invoked after command line arguments are applied to the grammar **and validated**`                          |\n \n The `--help` flag is implemented with a `BeforeReset` hook.\n \n@@ -340,6 +346,10 @@ func main() {\n }\n ```\n \n+It's also possible to register these hooks with the functional options\n+`kong.WithBeforeReset`, `kong.WithBeforeResolve`, `kong.WithBeforeApply`, and\n+`kong.WithAfterApply`.\n+\n ##  The Bind() option\n \n Arguments to hooks are provided via the `Run(...)` method or `Bind(...)` option. `*Kong`, `*Context`, `*Path` and parent commands are also bound and finally, hooks can also contribute bindings via `kong.Context.Bind()` and `kong.Context.BindTo()`.\ndiff --git a/hooks.go b/hooks.go\nindex 9fdf24c..e95d21b 100644\n--- a/hooks.go\n+++ b/hooks.go\n@@ -1,5 +1,11 @@\n package kong\n \n+// BeforeReset is a documentation-only interface describing hooks that run before defaults values are applied.\n+type BeforeReset interface {\n+\t// This is not the correct signature - see README for details.\n+\tBeforeReset(args ...any) error\n+}\n+\n // BeforeResolve is a documentation-only interface describing hooks that run before resolvers are applied.\n type BeforeResolve interface {\n \t// This is not the correct signature - see README for details.\ndiff --git a/kong.go b/kong.go\nindex a09b711..4f3901f 100644\n--- a/kong.go\n+++ b/kong.go\n@@ -71,6 +71,8 @@ type Kong struct {\n \tpostBuildOptions []Option\n \tembedded         []embedded\n \tdynamicCommands  []*dynamicCommand\n+\n+\thooks map[string][]reflect.Value\n }\n \n // New creates a new Kong parser on grammar.\n@@ -84,6 +86,7 @@ func New(grammar any, options ...Option) (*Kong, error) {\n \t\tregistry:      NewRegistry().RegisterDefaults(),\n \t\tvars:          Vars{},\n \t\tbindings:      bindings{},\n+\t\thooks:         make(map[string][]reflect.Value),\n \t\thelpFormatter: DefaultHelpValueFormatter,\n \t\tignoreFields:  make([]*regexp.Regexp, 0),\n \t\tflagNamer: func(s string) string {\n@@ -366,7 +369,7 @@ func (k *Kong) applyHook(ctx *Context, name string) error {\n \t\tdefault:\n \t\t\tpanic(\"unsupported Path\")\n \t\t}\n-\t\tfor _, method := range getMethods(value, name) {\n+\t\tfor _, method := range k.getMethods(value, name) {\n \t\t\tbinds := k.bindings.clone()\n \t\t\tbinds.add(ctx, trace)\n \t\t\tbinds.add(trace.Node().Vars().CloneWith(k.vars))\n@@ -380,6 +383,16 @@ func (k *Kong) applyHook(ctx *Context, name string) error {\n \treturn k.applyHookToDefaultFlags(ctx, ctx.Path[0].Node(), name)\n }\n \n+func (k *Kong) getMethods(value reflect.Value, name string) []reflect.Value {\n+\treturn append(\n+\t\t// Identify callbacks by reflecting on value\n+\t\tgetMethods(value, name),\n+\n+\t\t// Identify callbacks that were registered with a kong.Option\n+\t\tk.hooks[name]...,\n+\t)\n+}\n+\n // Call hook on any unset flags with default values.\n func (k *Kong) applyHookToDefaultFlags(ctx *Context, node *Node, name string) error {\n \tif node == nil {\ndiff --git a/kong_test.go b/kong_test.go\nindex 3ea6b5f..f2d315a 100644\n--- a/kong_test.go\n+++ b/kong_test.go\n@@ -588,6 +588,65 @@ func TestHooks(t *testing.T) {\n \t}\n }\n \n+func TestGlobalHooks(t *testing.T) {\n+\tvar cli struct {\n+\t\tOne struct {\n+\t\t\tTwo   string `kong:\"arg,optional\"`\n+\t\t\tThree string\n+\t\t} `cmd:\"\"`\n+\t}\n+\n+\tcalled := []string{}\n+\tlog := func(name string) any {\n+\t\treturn func(value *kong.Path) error {\n+\t\t\tswitch {\n+\t\t\tcase value.App != nil:\n+\t\t\t\tcalled = append(called, fmt.Sprintf(\"%s (app)\", name))\n+\n+\t\t\tcase value.Positional != nil:\n+\t\t\t\tcalled = append(called, fmt.Sprintf(\"%s (arg) %s\", name, value.Positional.Name))\n+\n+\t\t\tcase value.Flag != nil:\n+\t\t\t\tcalled = append(called, fmt.Sprintf(\"%s (flag) %s\", name, value.Flag.Name))\n+\n+\t\t\tcase value.Argument != nil:\n+\t\t\t\tcalled = append(called, fmt.Sprintf(\"%s (arg) %s\", name, value.Argument.Name))\n+\n+\t\t\tcase value.Command != nil:\n+\t\t\t\tcalled = append(called, fmt.Sprintf(\"%s (cmd) %s\", name, value.Command.Name))\n+\t\t\t}\n+\t\t\treturn nil\n+\t\t}\n+\t}\n+\tp := mustNew(t, &cli,\n+\t\tkong.WithBeforeReset(log(\"BeforeReset\")),\n+\t\tkong.WithBeforeResolve(log(\"BeforeResolve\")),\n+\t\tkong.WithBeforeApply(log(\"BeforeApply\")),\n+\t\tkong.WithAfterApply(log(\"AfterApply\")),\n+\t)\n+\n+\t_, err := p.Parse([]string{\"one\", \"two\", \"--three=THREE\"})\n+\tassert.NoError(t, err)\n+\tassert.Equal(t, []string{\n+\t\t\"BeforeReset (app)\",\n+\t\t\"BeforeReset (cmd) one\",\n+\t\t\"BeforeReset (arg) two\",\n+\t\t\"BeforeReset (flag) three\",\n+\t\t\"BeforeResolve (app)\",\n+\t\t\"BeforeResolve (cmd) one\",\n+\t\t\"BeforeResolve (arg) two\",\n+\t\t\"BeforeResolve (flag) three\",\n+\t\t\"BeforeApply (app)\",\n+\t\t\"BeforeApply (cmd) one\",\n+\t\t\"BeforeApply (arg) two\",\n+\t\t\"BeforeApply (flag) three\",\n+\t\t\"AfterApply (app)\",\n+\t\t\"AfterApply (cmd) one\",\n+\t\t\"AfterApply (arg) two\",\n+\t\t\"AfterApply (flag) three\",\n+\t}, called)\n+}\n+\n func TestShort(t *testing.T) {\n \tvar cli struct {\n \t\tBool   bool   `short:\"b\"`\ndiff --git a/options.go b/options.go\nindex d20b2fb..5fe3532 100644\n--- a/options.go\n+++ b/options.go\n@@ -123,6 +123,40 @@ func PostBuild(fn func(*Kong) error) Option {\n \t})\n }\n \n+// WithBeforeReset registers a hook to run before fields values are reset to their defaults\n+// (as specified in the grammar) or to zero values.\n+func WithBeforeReset(fn any) Option {\n+\treturn withHook(\"BeforeReset\", fn)\n+}\n+\n+// WithBeforeResolve registers a hook to run before resolvers are applied.\n+func WithBeforeResolve(fn any) Option {\n+\treturn withHook(\"BeforeResolve\", fn)\n+}\n+\n+// WithBeforeApply registers a hook to run before command line arguments are applied to the grammar.\n+func WithBeforeApply(fn any) Option {\n+\treturn withHook(\"BeforeApply\", fn)\n+}\n+\n+// WithAfterApply registers a hook to run after values are applied to the grammar and validated.\n+func WithAfterApply(fn any) Option {\n+\treturn withHook(\"AfterApply\", fn)\n+}\n+\n+// withHook registers a named hook.\n+func withHook(name string, fn any) Option {\n+\tvalue := reflect.ValueOf(fn)\n+\tif value.Kind() != reflect.Func {\n+\t\tpanic(fmt.Errorf(\"expected function, got %s\", value.Type()))\n+\t}\n+\n+\treturn OptionFunc(func(k *Kong) error {\n+\t\tk.hooks[name] = append(k.hooks[name], value)\n+\t\treturn nil\n+\t})\n+}\n+\n // Name overrides the application name.\n func Name(name string) Option {\n \treturn PostBuild(func(k *Kong) error {\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/FUNDING.yml",
+    ".github/workflows/ci.yml",
+    ".gitignore",
+    ".golangci.yml",
+    "COPYING",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/README.md",
+    "_examples/server/console.go",
+    "_examples/server/go.mod",
+    "_examples/server/go.sum",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/commandstring/main.go",
+    "_examples/shell/help/README.md",
+    "_examples/shell/help/main.go",
+    "benchmark_test.go",
+    "bin/.go-1.24.1.pkg",
+    "bin/.golangci-lint-1.64.5.pkg",
+    "bin/.lefthook-1.11.3.pkg",
+    "bin/README.hermit.md",
+    "bin/activate-hermit",
+    "bin/go",
+    "bin/gofmt",
+    "bin/golangci-lint",
+    "bin/hermit",
+    "bin/hermit.hcl",
+    "bin/lefthook",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "config_test.go",
+    "context.go",
+    "defaults.go",
+    "defaults_test.go",
+    "doc.go",
+    "error.go",
+    "exit.go",
+    "global.go",
+    "global_test.go",
+    "go.mod",
+    "go.sum",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "helpwrap1.18_test.go",
+    "helpwrap1.19_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "lefthook.yml",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_linux_test.go",
+    "mapper_test.go",
+    "mapper_windows_test.go",
+    "model.go",
+    "model_test.go",
+    "negatable.go",
+    "options.go",
+    "options_test.go",
+    "renovate.json5",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "testdata/file.txt",
+    "util.go",
+    "util_test.go",
+    "visit.go"
+  ],
+  "explanation": {
+    "what": "kong.WithBeforeReset / WithBeforeResolve / WithBeforeApply / WithAfterApply という4つの Option 関数を追加した。これらは Kong 構造体に新設した hooks map[string][]reflect.Value フィールドに関数値を登録し、既存の applyHook 内の getMethods 呼び出しを Kong のメソッド k.getMethods に置き換えて、reflect で発見される構造体メソッドのフックと合成して呼び出すようにした。README にも Hooks の一覧表と設定方法を追記している。",
+    "why": "従来 BeforeApply 等のフックはグラフ内のノード(struct)に BeforeApply(...) error のようなメソッドを実装する形でしか登録できず、スキーマ内の特定のノードに紐付ける必要があった。PR説明によれば、動的な bindings を伴う任意の関数をノードに縛られずグローバルに登録したいという要望に応えるための機能で、functional options 経由で登録できるようにした。",
+    "highlights": [
+      { "file": "options.go", "note": "withHook が reflect.ValueOf(fn) で任意の関数を受け取り、Kong.hooks[name] に積む" },
+      { "file": "kong.go", "note": "k.getMethods が reflect 由来のメソッドと Option 経由のフックを append で連結している" }
+    ],
+    "langNotes": [
+      { "topic": "reflect.Value としてのフック格納", "note": "Go では関数も第一級の値として reflect.ValueOf(fn) で reflect.Value に変換でき、後から reflect.Value.Call(...) で動的に呼び出せる。kong はこれを使い、シグネチャの異なる任意のコールバック関数を map に集約している。" }
+    ],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [{ "type": "pr", "number": 511, "url": "https://github.com/alecthomas/kong/pull/511" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

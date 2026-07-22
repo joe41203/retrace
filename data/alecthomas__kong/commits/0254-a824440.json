@@ -1,0 +1,128 @@
+{
+  "seq": 254,
+  "sha": "a8244400e31c71550d75125aaf76d483e54267f9",
+  "parents": [
+    "2d879d20374b5d25e9b2ce969811e8b71358bc9c"
+  ],
+  "author": {
+    "name": "Evgeny",
+    "email": "ya.zver@gmail.com",
+    "date": "2021-06-20T17:27:56+07:00"
+  },
+  "message": "DefaultEnvars option (#177)",
+  "pr": {
+    "number": 177,
+    "title": "Environment option",
+    "body": "Generating environment variable names for flags.\r\n\r\n```go\r\ntype Some {\r\n    Value string\r\n}\r\n\r\ncli := struct {\r\n    Some  Some `prefix:\"some.\" embed:\"\"`\r\n}\r\nkong.Parse(root, kong.Env(\"PREFIX\"))\r\n```\r\n\r\nGenerates:\r\n``    --some.value -> PREFIX_SOME_VALUE\r\n``\r\n\r\n",
+    "url": "https://github.com/alecthomas/kong/pull/177"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 109,
+    "deletions": 2
+  },
+  "files": [
+    {
+      "path": "options.go",
+      "status": "M",
+      "additions": 53,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "resolver_test.go",
+      "status": "M",
+      "additions": 56,
+      "deletions": 2,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/options.go b/options.go\nindex 98620c5..57a8f13 100644\n--- a/options.go\n+++ b/options.go\n@@ -371,3 +371,56 @@ func ExpandPath(path string) string {\n \t}\n \treturn abspath\n }\n+\n+func siftStrings(ss []string, filter func(s string) bool) []string {\n+\ti := 0\n+\tss = append([]string(nil), ss...)\n+\tfor _, s := range ss {\n+\t\tif filter(s) {\n+\t\t\tss[i] = s\n+\t\t\ti++\n+\t\t}\n+\t}\n+\treturn ss[0:i]\n+}\n+\n+// DefaultEnvars option inits environment names for flags.\n+// The name will not generate if tag \"env\" is \"-\".\n+// Predefined environment variables are skipped.\n+//\n+// For example:\n+//   --some.value -> PREFIX_SOME_VALUE\n+func DefaultEnvars(prefix string) Option {\n+\tprocessFlag := func(flag *Flag) {\n+\t\tswitch env := flag.Env; {\n+\t\tcase flag.Name == \"help\":\n+\t\t\treturn\n+\t\tcase env == \"-\":\n+\t\t\tflag.Env = \"\"\n+\t\t\treturn\n+\t\tcase env != \"\":\n+\t\t\treturn\n+\t\t}\n+\t\treplacer := strings.NewReplacer(\"-\", \"_\", \".\", \"_\")\n+\t\tnames := append([]string{prefix}, camelCase(replacer.Replace(flag.Name))...)\n+\t\tnames = siftStrings(names, func(s string) bool { return !(s == \"_\" || strings.TrimSpace(s) == \"\") })\n+\t\tname := strings.ToUpper(strings.Join(names, \"_\"))\n+\t\tflag.Env = name\n+\t\tflag.Value.Tag.Env = name\n+\t}\n+\n+\tvar processNode func(node *Node)\n+\tprocessNode = func(node *Node) {\n+\t\tfor _, flag := range node.Flags {\n+\t\t\tprocessFlag(flag)\n+\t\t}\n+\t\tfor _, node := range node.Children {\n+\t\t\tprocessNode(node)\n+\t\t}\n+\t}\n+\n+\treturn PostBuild(func(k *Kong) error {\n+\t\tprocessNode(k.Model.Node)\n+\t\treturn nil\n+\t})\n+}\ndiff --git a/resolver_test.go b/resolver_test.go\nindex f601544..8e44d24 100644\n--- a/resolver_test.go\n+++ b/resolver_test.go\n@@ -26,10 +26,10 @@ func tempEnv(env envMap) func() {\n \t}\n }\n \n-func newEnvParser(t *testing.T, cli interface{}, env envMap) (*kong.Kong, func()) {\n+func newEnvParser(t *testing.T, cli interface{}, env envMap, options ...kong.Option) (*kong.Kong, func()) {\n \tt.Helper()\n \trestoreEnv := tempEnv(env)\n-\tparser := mustNew(t, cli)\n+\tparser := mustNew(t, cli, options...)\n \treturn parser, restoreEnv\n }\n \n@@ -92,6 +92,60 @@ func TestEnvarsWithDefault(t *testing.T) {\n \trequire.Equal(t, \"moo\", cli.Flag)\n }\n \n+func TestEnv(t *testing.T) {\n+\ttype Embed struct {\n+\t\tFlag string\n+\t}\n+\ttype Cli struct {\n+\t\tOne   Embed `prefix:\"one-\" embed:\"\"`\n+\t\tTwo   Embed `prefix:\"two.\" embed:\"\"`\n+\t\tThree Embed `prefix:\"three_\" embed:\"\"`\n+\t\tFour  Embed `prefix:\"four_\" embed:\"\"`\n+\t\tFive  bool\n+\t\tSix   bool `env:\"-\"`\n+\t}\n+\n+\tvar cli Cli\n+\n+\texpected := Cli{\n+\t\tOne:   Embed{Flag: \"one\"},\n+\t\tTwo:   Embed{Flag: \"two\"},\n+\t\tThree: Embed{Flag: \"three\"},\n+\t\tFour:  Embed{Flag: \"four\"},\n+\t\tFive:  true,\n+\t}\n+\n+\t// With the prefix\n+\tparser, unsetEnvs := newEnvParser(t, &cli, envMap{\n+\t\t\"KONG_ONE_FLAG\":   \"one\",\n+\t\t\"KONG_TWO_FLAG\":   \"two\",\n+\t\t\"KONG_THREE_FLAG\": \"three\",\n+\t\t\"KONG_FOUR_FLAG\":  \"four\",\n+\t\t\"KONG_FIVE\":       \"true\",\n+\t\t\"KONG_SIX\":        \"true\",\n+\t}, kong.DefaultEnvars(\"KONG\"))\n+\tdefer unsetEnvs()\n+\n+\t_, err := parser.Parse(nil)\n+\trequire.NoError(t, err)\n+\trequire.Equal(t, expected, cli)\n+\n+\t// Without the prefix\n+\tparser, unsetEnvs = newEnvParser(t, &cli, envMap{\n+\t\t\"ONE_FLAG\":   \"one\",\n+\t\t\"TWO_FLAG\":   \"two\",\n+\t\t\"THREE_FLAG\": \"three\",\n+\t\t\"FOUR_FLAG\":  \"four\",\n+\t\t\"FIVE\":       \"true\",\n+\t\t\"SIX\":        \"true\",\n+\t}, kong.DefaultEnvars(\"\"))\n+\tdefer unsetEnvs()\n+\n+\t_, err = parser.Parse(nil)\n+\trequire.NoError(t, err)\n+\trequire.Equal(t, expected, cli)\n+}\n+\n func TestJSONBasic(t *testing.T) {\n \tvar cli struct {\n \t\tString          string\n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    ".github/FUNDING.yml",
+    ".gitignore",
+    ".golangci.yml",
+    "COPYING",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/README.md",
+    "_examples/server/console.go",
+    "_examples/server/go.mod",
+    "_examples/server/go.sum",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/main.go",
+    "benchmark_test.go",
+    "bin/.go@latest.pkg",
+    "bin/.golangci-lint-1.40.1.pkg",
+    "bin/README.hermit.md",
+    "bin/activate-hermit",
+    "bin/go",
+    "bin/gofmt",
+    "bin/golangci-lint",
+    "bin/hermit",
+    "bin/hermit.hcl",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "config_test.go",
+    "context.go",
+    "defaults.go",
+    "defaults_test.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "go.mod",
+    "go.sum",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "testdata/file.txt",
+    "util.go",
+    "util_test.go",
+    "visit.go"
+  ],
+  "explanation": {
+    "what": "kong.DefaultEnvars(prefix) という新しい PostBuild オプションを追加した。モデルツリー全体(Node と子孫)を走査し、各 Flag に対して env タグが未指定なら prefix とフラグ名(ドットやハイフンをアンダースコアに置換し camelCase 分解した上で大文字化)から環境変数名を自動生成して Flag.Env / Value.Tag.Env にセットする。ただし `help` フラグや `env:\"-\"` 指定のフラグはスキップする。siftStrings というヘルパーで空文字列やプレースホルダの \"_\" を除去している。",
+    "why": "PR本文にある通り、prefix:\"some.\" embed:\"\" のようなネストしたフラグ構造から `PREFIX_SOME_VALUE` のような環境変数名を自動生成できるようにするための機能追加。手動で各フラグに env タグを書かずに済むようにする狙い。",
+    "highlights": [
+      { "file": "options.go", "note": "DefaultEnvars の実装本体。processFlag/processNode で木を再帰的に走査し Flag.Env を埋める" }
+    ],
+    "langNotes": [
+      { "topic": "PostBuild option", "note": "Kong の Option はモデル構築(build)が完了した後に呼ばれる PostBuild(func(k *Kong) error) を返せる。DefaultEnvars はこれを使い、構築済みの Node ツリーを後から走査してフラグに環境変数名を注入している。" }
+    ],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [{ "type": "pr", "number": 177, "url": "https://github.com/alecthomas/kong/pull/177" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

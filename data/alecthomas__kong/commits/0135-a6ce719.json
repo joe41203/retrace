@@ -1,0 +1,110 @@
+{
+  "seq": 135,
+  "sha": "a6ce719390d3ddafc7c3697367f7599f07cdd653",
+  "parents": [
+    "443709c0bb12422221caa835ae3f9c5d8d6185c6"
+  ],
+  "author": {
+    "name": "Alec Thomas",
+    "email": "alec@swapoff.org",
+    "date": "2019-01-13T21:32:44+11:00"
+  },
+  "message": "Call Run(...) for all parent nodes.\n\nInstead of just the leaf command. Fixes #30.",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 3,
+    "additions": 50,
+    "deletions": 7
+  },
+  "files": [
+    {
+      "path": "README.md",
+      "status": "M",
+      "additions": 4,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "context.go",
+      "status": "M",
+      "additions": 25,
+      "deletions": 5,
+      "binary": false
+    },
+    {
+      "path": "kong_test.go",
+      "status": "M",
+      "additions": 21,
+      "deletions": 2,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/README.md b/README.md\nindex b5ba8a9..68a8afb 100644\n--- a/README.md\n+++ b/README.md\n@@ -166,6 +166,10 @@ A more robust approach is to break each command out into their own structs:\n 3. Call `kong.Kong.Parse()` to obtain a `kong.Context`.\n 4. Call `kong.Context.Run(bindings...)` to call the selected parsed command.\n \n+Once a command node is selected by Kong it will search from that node back to the root. Each\n+encountered command node with a `Run(...) error` will be called in reverse order. This allows\n+sub-trees to be re-used fairly conveniently.\n+\n In addition to values bound with the `kong.Bind(...)` option, any values\n passed through to `kong.Context.Run(...)` are also bindable to the target's\n `Run()` arguments.\ndiff --git a/context.go b/context.go\nindex 2b6dbbb..ab7b397 100644\n--- a/context.go\n+++ b/context.go\n@@ -88,6 +88,10 @@ func (c *Context) Bind(args ...interface{}) {\n }\n \n // BindTo adds a binding to the Context.\n+//\n+// This will typically have to be called like so:\n+//\n+//    BindTo(impl, (*MyInterface)(nil))\n func (c *Context) BindTo(impl, iface interface{}) {\n \tc.bindings[reflect.TypeOf(iface).Elem()] = reflect.ValueOf(impl)\n }\n@@ -493,16 +497,32 @@ func (c *Context) Run(bindings ...interface{}) (err error) {\n \tif node == nil {\n \t\treturn fmt.Errorf(\"no command selected\")\n \t}\n-\tmethod := getMethod(node.Target, \"Run\")\n-\tif !method.IsValid() {\n-\t\treturn fmt.Errorf(\"no Run() method on %s\", node.Target)\n+\ttype targetMethod struct {\n+\t\tnode   *Node\n+\t\tmethod reflect.Value\n+\t}\n+\tmethods := []targetMethod{}\n+\tfor i := 0; node != nil; i, node = i+1, node.Parent {\n+\t\tmethod := getMethod(node.Target, \"Run\")\n+\t\tif method.IsValid() {\n+\t\t\tmethods = append(methods, targetMethod{node, method})\n+\t\t}\n+\t}\n+\tif len(methods) == 0 {\n+\t\treturn fmt.Errorf(\"no Run() method found in hierarchy of %s\", c.Selected().Summary())\n \t}\n \t_, err = c.Apply()\n \tif err != nil {\n \t\treturn err\n \t}\n-\tbinds := c.Kong.bindings.clone().add(bindings...).add(c).merge(c.bindings)\n-\treturn callMethod(\"Run\", node.Target, method, binds)\n+\n+\tfor _, method := range methods {\n+\t\tbinds := c.Kong.bindings.clone().add(bindings...).add(c).merge(c.bindings)\n+\t\tif err = callMethod(\"Run\", method.node.Target, method.method, binds); err != nil {\n+\t\t\treturn err\n+\t\t}\n+\t}\n+\treturn nil\n }\n \n // PrintUsage to Kong's stdout.\ndiff --git a/kong_test.go b/kong_test.go\nindex 36bb11c..a4f5a25 100644\n--- a/kong_test.go\n+++ b/kong_test.go\n@@ -513,9 +513,22 @@ func (c *cmdWithRun) Run(key string) error {\n \treturn nil\n }\n \n+type parentCmdWithRun struct {\n+\tFlag       string\n+\tSubCommand struct {\n+\t\tArg string `arg:\"\"`\n+\t} `cmd:\"\"`\n+}\n+\n+func (p *parentCmdWithRun) Run(key string) error {\n+\tp.SubCommand.Arg += key\n+\treturn nil\n+}\n+\n type grammarWithRun struct {\n-\tOne cmdWithRun `cmd:\"\"`\n-\tTwo cmdWithRun `cmd:\"\"`\n+\tOne   cmdWithRun       `cmd:\"\"`\n+\tTwo   cmdWithRun       `cmd:\"\"`\n+\tThree parentCmdWithRun `cmd:\"\"`\n }\n \n func TestRun(t *testing.T) {\n@@ -532,6 +545,12 @@ func TestRun(t *testing.T) {\n \trequire.NoError(t, err)\n \terr = ctx.Run(\"ERROR\")\n \trequire.Error(t, err)\n+\n+\tctx, err = p.Parse([]string{\"three\", \"sub-command\", \"arg\"})\n+\trequire.NoError(t, err)\n+\terr = ctx.Run(\"ping\")\n+\trequire.NoError(t, err)\n+\trequire.Equal(t, \"argping\", cli.Three.SubCommand.Arg)\n }\n \n func TestInterpolationIntoModel(t *testing.T) {\n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    ".golangci.yml",
+    "COPYING",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/console.go",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/main.go",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "config_test.go",
+    "context.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "go.mod",
+    "go.sum",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "util.go",
+    "util_test.go",
+    "visit.go"
+  ],
+  "explanation": {
+    "what": "Context.Run()を変更し、選択されたリーフコマンドだけでなく、そのノードから親をたどって`Run(...) error`メソッドを持つ全ノードを収集して順に呼び出すようにした。Runメソッドを持つノードが1つも無ければエラーを返す。README.mdにこの挙動(選択ノードから根に向かって遡り、Runを持つ各ノードが逆順に呼ばれる)を追記し、kong_test.goにparentCmdWithRunという親側にもRunを持つテストケースを追加した。",
+    "why": "commit message本文に\"Fixes #30\"とあり、親コマンド構造体のRunを自動的に呼び出せるようにすることでサブツリーの再利用を容易にする意図が読み取れる(#30自体の詳細はこのJSON内のlinkedIssuesには含まれていない)。",
+    "highlights": [
+      { "file": "context.go", "note": "Runを持つノードをnode.Parentを辿って収集し、逆順(leafに近い順)に呼び出すロジック" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

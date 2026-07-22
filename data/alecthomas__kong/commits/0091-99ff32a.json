@@ -1,0 +1,113 @@
+{
+  "seq": 91,
+  "sha": "99ff32a85f460195c7d25c05c3e103199fc1558d",
+  "parents": [
+    "17e855bc47f704c35e04bb3cb7854cf244f31131"
+  ],
+  "author": {
+    "name": "Alec Thomas",
+    "email": "alec@swapoff.org",
+    "date": "2018-07-06T10:44:09+10:00"
+  },
+  "message": "Bind Vars.",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 4,
+    "additions": 46,
+    "deletions": 27
+  },
+  "files": [
+    {
+      "path": "README.md",
+      "status": "M",
+      "additions": 7,
+      "deletions": 5,
+      "binary": false
+    },
+    {
+      "path": "_examples/docker/main.go",
+      "status": "M",
+      "additions": 31,
+      "deletions": 16,
+      "binary": false
+    },
+    {
+      "path": "context.go",
+      "status": "M",
+      "additions": 4,
+      "deletions": 4,
+      "binary": false
+    },
+    {
+      "path": "kong.go",
+      "status": "M",
+      "additions": 4,
+      "deletions": 2,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/README.md b/README.md\nindex 1f4ed1e..f39285c 100644\n--- a/README.md\n+++ b/README.md\n@@ -18,7 +18,7 @@\n 1. [Slices](#slices)\n 1. [Maps](#maps)\n 1. [Custom named decoders](#custom-named-decoders)\n-1. [Custom decoders](#custom-decoders)\n+1. [Custom decoders \\(mappers\\)](#custom-decoders-mappers)\n 1. [Supported tags](#supported-tags)\n 1. [Variable interpolation](#variable-interpolation)\n 1. [Modifying Kong's behaviour](#modifying-kongs-behaviour)\n@@ -162,11 +162,13 @@ This has the advantage that it is convenient, but the downside that if you modif\n A more robust approach is to break each command out into their own structs:\n \n 1. Break leaf commands out into separate structs.\n-2. Attach a `Run(...) error` method to all leaf commands (`Run()` signatures must match).\n+2. Attach a `Run(...) error` method to all leaf commands.\n 3. Call `kong.Kong.Parse()` to obtain a `kong.Context`.\n-4. Call `kong.Context.Run(params...)` to call the selected parsed command.\n+4. Call `kong.Context.Run(bindings...)` to call the selected parsed command.\n \n-Note that `Run()` method arguments may also be provided by the `Bind(...)` option (see below).\n+In addition to values bound with the `kong.Bind(...)` option, any values\n+passed through to `kong.Context.Run(...)` are also bindable to the target's\n+`Run()` arguments.\n \n There's a full example emulating part of the Docker CLI [here](https://github.com/alecthomas/kong/tree/master/_examples/docker).\n \n@@ -362,7 +364,7 @@ specifies the element type. For maps, the tag has the format\n `tag:\"[<key>]:[<value>]\"` where either may be omitted.\n \n \n-## Custom decoders\n+## Custom decoders (mappers)\n \n If a field implements the [MapperValue](https://godoc.org/github.com/alecthomas/kong#MapperValue)\n interface it will be used to decode arguments into the field.\ndiff --git a/_examples/docker/main.go b/_examples/docker/main.go\nindex e678bf4..0fd01f3 100644\n--- a/_examples/docker/main.go\n+++ b/_examples/docker/main.go\n@@ -2,24 +2,36 @@\n package main\n \n import (\n+\t\"fmt\"\n+\n \t\"github.com/alecthomas/kong\"\n )\n \n type Globals struct {\n-\tConfig    string   `help:\"Location of client config files\" default:\"~/.docker\" type:\"path\"`\n-\tDebug     bool     `short:\"D\" help:\"Enable debug mode\"`\n-\tHost      []string `short:\"H\" help:\"Daemon socket(s) to connect to\"`\n-\tLogLevel  string   `short:\"l\" help:\"Set the logging level (debug|info|warn|error|fatal)\" default:\"info\"`\n-\tTLS       bool     `help:\"Use TLS; implied by --tls-verify\"`\n-\tTLSCACert string   `name:\"tls-ca-cert\" help:\"Trust certs signed only by this CA\" default:\"~/.docker/ca.pem\" type:\"path\"`\n-\tTLSCert   string   `help:\"Path to TLS certificate file\" default:\"~/.docker/cert.pem\" type:\"path\"`\n-\tTLSKey    string   `help:\"Path to TLS key file\" default:\"~/.docker/key.pem\" type:\"path\"`\n-\tTLSVerify bool     `help:\"Use TLS and verify the remote\"`\n+\tConfig    string      `help:\"Location of client config files\" default:\"~/.docker\" type:\"path\"`\n+\tDebug     bool        `short:\"D\" help:\"Enable debug mode\"`\n+\tHost      []string    `short:\"H\" help:\"Daemon socket(s) to connect to\"`\n+\tLogLevel  string      `short:\"l\" help:\"Set the logging level (debug|info|warn|error|fatal)\" default:\"info\"`\n+\tTLS       bool        `help:\"Use TLS; implied by --tls-verify\"`\n+\tTLSCACert string      `name:\"tls-ca-cert\" help:\"Trust certs signed only by this CA\" default:\"~/.docker/ca.pem\" type:\"path\"`\n+\tTLSCert   string      `help:\"Path to TLS certificate file\" default:\"~/.docker/cert.pem\" type:\"path\"`\n+\tTLSKey    string      `help:\"Path to TLS key file\" default:\"~/.docker/key.pem\" type:\"path\"`\n+\tTLSVerify bool        `help:\"Use TLS and verify the remote\"`\n+\tVersion   VersionFlag `name:\"version\" help:\"Print version information and quit\"`\n+}\n+\n+type VersionFlag string\n+\n+func (v VersionFlag) Decode(ctx *kong.DecodeContext) error { return nil }\n+func (v VersionFlag) IsBool() bool                         { return true }\n+func (v VersionFlag) BeforeHook(app *kong.Kong, vars kong.Vars) error {\n+\tfmt.Println(vars[\"version\"])\n+\tapp.Exit(0)\n+\treturn nil\n }\n \n type CLI struct {\n \tGlobals\n-\tVersionFlag bool `name:\"version\" help:\"Print version information and quit\"`\n \n \tAttach  AttachCmd  `cmd help:\"Attach local standard input, output, and error streams to a running container\"`\n \tBuild   BuildCmd   `cmd help:\"Build an image from a Dockerfile\"`\n@@ -65,7 +77,12 @@ type CLI struct {\n }\n \n func main() {\n-\tcli := CLI{}\n+\tcli := CLI{\n+\t\tGlobals: Globals{\n+\t\t\tVersion: VersionFlag(\"0.1.1\"),\n+\t\t},\n+\t}\n+\n \tctx := kong.Parse(&cli,\n \t\tkong.Name(\"docker\"),\n \t\tkong.Description(\"A self-sufficient runtime for containers\"),\n@@ -73,11 +90,9 @@ func main() {\n \t\tkong.ConfigureHelp(kong.HelpOptions{\n \t\t\tCompact: true,\n \t\t}),\n-\t\t//\n-\t\tkong.Hook(&cli.VersionFlag, func(ctx *kong.Context, path *kong.Path) error {\n-\t\t\tctx.Printf(\"1.0.0\").Exit(0)\n-\t\t\treturn nil\n-\t\t}))\n+\t\tkong.Vars{\n+\t\t\t\"version\": \"0.0.1\",\n+\t\t})\n \terr := ctx.Run(&cli.Globals)\n \tctx.FatalIfErrorf(err)\n }\ndiff --git a/context.go b/context.go\nindex 76e2c64..0a43daf 100644\n--- a/context.go\n+++ b/context.go\n@@ -470,10 +470,10 @@ func (c *Context) parseFlag(flags []*Flag, match string) (err error) {\n \treturn findPotentialCandidates(match, candidates, \"unknown flag %s\", match)\n }\n \n-// Run executes the corresponding Run(params...) method on the target command selected by the parsed args.\n+// Run executes the Run() method on the selected command, which must exist.\n //\n-// The target Run() method must exist and have the type signature \"Run(params...) error\".\n-func (c *Context) Run(params ...interface{}) (err error) {\n+// Any passed values will be bindable to arguments of the target Run() method.\n+func (c *Context) Run(bindings ...interface{}) (err error) {\n \tdefer catch(&err)\n \tnode := c.Selected()\n \tif node == nil {\n@@ -487,7 +487,7 @@ func (c *Context) Run(params ...interface{}) (err error) {\n \tif err != nil {\n \t\treturn err\n \t}\n-\tbinds := c.Kong.bindings.clone().add(params...).add(c)\n+\tbinds := c.Kong.bindings.clone().add(bindings...).add(c)\n \treturn callMethod(\"Run\", node.Target, method, binds)\n }\n \ndiff --git a/kong.go b/kong.go\nindex 8e3fdce..fb0bbf6 100644\n--- a/kong.go\n+++ b/kong.go\n@@ -51,7 +51,7 @@ type Kong struct {\n \thelp          HelpPrinter\n \thelpOptions   HelpOptions\n \thelpFlag      *Flag\n-\tvars          map[string]string\n+\tvars          Vars\n \n \t// Set temporarily by Options. These are applied after build().\n \tpostBuildOptions []Option\n@@ -67,7 +67,7 @@ func New(grammar interface{}, options ...Option) (*Kong, error) {\n \t\tStderr:    os.Stderr,\n \t\tregistry:  NewRegistry().RegisterDefaults(),\n \t\tresolvers: []ResolverFunc{Envars()},\n-\t\tvars:      map[string]string{},\n+\t\tvars:      Vars{},\n \t\tbindings:  bindings{},\n \t}\n \n@@ -102,6 +102,8 @@ func New(grammar interface{}, options ...Option) (*Kong, error) {\n \t\treturn nil, err\n \t}\n \n+\tk.bindings.add(k.vars)\n+\n \treturn k, nil\n }\n \n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    ".golangci.yml",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/console.go",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/main.go",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "context.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "tokentype_string.go"
+  ],
+  "explanation": {
+    "what": "Kong の内部 vars フィールドの型を素の map[string]string から Vars 型に変更し、New() の最後で k.bindings.add(k.vars) を実行して Vars をバインディング集合に登録するようにした。Context.Run(params...) は Context.Run(bindings...) にリネームされ、doc コメントも「Run() の引数として bindable な値を渡す」という説明に書き換えられている。docker サンプルでは VersionFlag という独自の MapperValue 実装が BeforeHook 内で kong.Vars 経由のバージョン文字列を参照するように変更された。",
+    "why": "seq88 で Vars が Option インターフェースを満たす map 型として導入されていたが、この時点では Vars に登録した値を BeforeHook/Run など呼び出し可能なメソッドの引数として自動注入する経路がなかった。vars を bindings に加えることで、Vars で定義した変数(例: バージョン文字列)を Bind() で渡した値と同じ仕組みでフックや Run() メソッドに渡せるようにしている。",
+    "highlights": [
+      { "file": "kong.go", "note": "k.bindings.add(k.vars) で Vars がバインディング機構に合流する箇所" },
+      { "file": "context.go", "note": "Run(params...) → Run(bindings...) のリネームとコメント変更" }
+    ],
+    "langNotes": [
+      { "topic": "Vars と bindings", "note": "Kong では BeforeHook/Run 等のメソッド引数は reflect ベースの依存注入(bindings)で解決される。Vars(map[string]string 相当の Option)をこの bindings に加えることで、`vars[\"version\"]` のような文字列値も型解決の対象になる。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

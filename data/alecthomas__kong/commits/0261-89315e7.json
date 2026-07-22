@@ -1,0 +1,155 @@
+{
+  "seq": 261,
+  "sha": "89315e74ad0c65a7a7deb246a390ed2888727616",
+  "parents": [
+    "cfbe844aa49f67083998efdce37b7ee1042f41ad"
+  ],
+  "author": {
+    "name": "Cam Hutchison",
+    "email": "camh@xdna.net",
+    "date": "2021-07-12T14:19:37+10:00"
+  },
+  "message": "Allow default commands with cmds/args/flags (#188)\n\n* Move default command validation to build\r\n\r\nMove the validation of default commands - checking if a node has\r\nmultiple default commands or a default command has children - to the\r\nbuild phase rather than tracing. These errors are with the structure of\r\nthe CLI ast and are detectable before parsing the command line.\r\n\r\nAdd a couple of tests for some of the default command error cases.\r\n\r\n* Disallow positional args on a default command\r\n\r\nDo not allow a default command to have positional arguments. The current\r\ncheck is only for branching args, but the error message implies that\r\npositional args are not allowed either. So add a check for positional\r\nargs too, and add a test case for it.\r\n\r\nThis is breaking change to the API but is unlikely to have ill-effect as\r\npositional args on a default command cannot be used without explicitly\r\nnaming the command (i.e. not using it as a default).\r\n\r\n* Allow default commands with cmds/args/flags\r\n\r\nAllow default commands to have sub-commands, args and flags when tagged\r\nwith `default:\"withargs\"`. This makes specifying the name of the\r\ncommand on the CLI completely optional as long as the args to that\r\ncommand are not ambiguous with other commands.",
+  "pr": {
+    "number": 188,
+    "title": "Allow default commands with cmds/args/flags",
+    "body": "Allow default commands to have sub-commands, args and flags when tagged \r\nwith `default:\"withargs\"`. This makes specifying the name of the command\r\non the CLI completely optional as long as the args to that command are not\r\nambiguous with other commands.\r\n\r\nRe-work the validation of the CLI grammar so that the constraints on default\r\ncommands are checked during `build()` and not `trace()` - this seems to be\r\nmore correct and where other parts of the grammar are validated. Also add\r\nsome missing validation for default commands with positional args - only\r\nbranching args were disallowed, but the error message seemed to imply that\r\nall args should be disallowed.",
+    "url": "https://github.com/alecthomas/kong/pull/188"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 6,
+    "additions": 148,
+    "deletions": 43
+  },
+  "files": [
+    {
+      "path": ".golangci.yml",
+      "status": "M",
+      "additions": 1,
+      "deletions": 3,
+      "binary": false
+    },
+    {
+      "path": "README.md",
+      "status": "M",
+      "additions": 2,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "build.go",
+      "status": "M",
+      "additions": 13,
+      "deletions": 10,
+      "binary": false
+    },
+    {
+      "path": "context.go",
+      "status": "M",
+      "additions": 26,
+      "deletions": 27,
+      "binary": false
+    },
+    {
+      "path": "kong_test.go",
+      "status": "M",
+      "additions": 105,
+      "deletions": 2,
+      "binary": false
+    },
+    {
+      "path": "model.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/.golangci.yml b/.golangci.yml\nindex 0f7ad82..f7be904 100644\n--- a/.golangci.yml\n+++ b/.golangci.yml\n@@ -35,15 +35,13 @@ linters:\n     - tagliatelle\n     - thelper\n     - godox\n+    - goconst\n \n linters-settings:\n   govet:\n     check-shadowing: true\n   dupl:\n     threshold: 100\n-  goconst:\n-    min-len: 5\n-    min-occurrences: 3\n   gocyclo:\n     min-complexity: 20\n   exhaustive:\ndiff --git a/README.md b/README.md\nindex 03996db..faae736 100644\n--- a/README.md\n+++ b/README.md\n@@ -302,7 +302,7 @@ type CLI struct {\n }\n ```\n \n-If a sub-command is tagged with `default:\"1\"` it will be selected if there are no further arguments.\n+If a sub-command is tagged with `default:\"1\"` it will be selected if there are no further arguments. If a sub-command is tagged with `default:\"withargs\"` it will be selected even if there are further arguments or flags and those arguments or flags are valid for the sub-command. This allows the user to omit the sub-command name on the CLI if its arguments/flags are not ambiguous with the sibling commands or flags.\n \n ## Branching positional arguments\n \n@@ -435,6 +435,7 @@ Tag                    | Description\n `placeholder:\"X\"`      | Placeholder text.\n `default:\"X\"`          | Default value.\n `default:\"1\"`          | On a command, make it the default.\n+`default:\"withargs\"`   | On a command, make it the default and allow args/flags from that command\n `short:\"X\"`            | Short name, if flag.\n `aliases:\"X,Y\"`        | One or more aliases (for cmd).\n `required:\"\"`          | If present, flag/arg is required.\ndiff --git a/build.go b/build.go\nindex 22f9839..35e9411 100644\n--- a/build.go\n+++ b/build.go\n@@ -141,6 +141,7 @@ func buildNode(k *Kong, v reflect.Value, typ NodeType, seenFlags map[string]bool\n \n func buildChild(k *Kong, node *Node, typ NodeType, v reflect.Value, ft reflect.StructField, fv reflect.Value, tag *Tag, name string, seenFlags map[string]bool) {\n \tchild := buildNode(k, fv, typ, seenFlags)\n+\tchild.Name = name\n \tchild.Tag = tag\n \tchild.Parent = node\n \tchild.Help = tag.Help\n@@ -158,21 +159,23 @@ func buildChild(k *Kong, node *Node, typ NodeType, v reflect.Value, ft reflect.S\n \t\tif len(child.Positional) == 0 {\n \t\t\tfailField(v, ft, \"positional branch must have at least one child positional argument named %q\", name)\n \t\t}\n+\t\tif child.Positional[0].Name != name {\n+\t\t\tfailField(v, ft, \"first field in positional branch must have the same name as the parent field (%s).\", child.Name)\n+\t\t}\n \n-\t\tvalue := child.Positional[0]\n+\t\tchild.Argument = child.Positional[0]\n \t\tchild.Positional = child.Positional[1:]\n \t\tif child.Help == \"\" {\n-\t\t\tchild.Help = value.Help\n+\t\t\tchild.Help = child.Argument.Help\n \t\t}\n-\n-\t\tchild.Name = value.Name\n-\t\tif child.Name != name {\n-\t\t\tfailField(v, ft, \"first field in positional branch must have the same name as the parent field (%s).\", child.Name)\n+\t} else if tag.Default != \"\" {\n+\t\tif node.DefaultCmd != nil {\n+\t\t\tfailField(v, ft, \"can't have more than one default command under %s\", node.Summary())\n \t\t}\n-\n-\t\tchild.Argument = value\n-\t} else {\n-\t\tchild.Name = name\n+\t\tif tag.Default != \"withargs\" && (len(child.Children) > 0 || len(child.Positional) > 0) {\n+\t\t\tfailField(v, ft, \"default command %s must not have subcommands or arguments\", child.Summary())\n+\t\t}\n+\t\tnode.DefaultCmd = child\n \t}\n \tnode.Children = append(node.Children, child)\n \ndiff --git a/context.go b/context.go\nindex ea91e5c..0080b16 100644\n--- a/context.go\n+++ b/context.go\n@@ -343,7 +343,14 @@ func (c *Context) trace(node *Node) (err error) { // nolint: gocyclo\n \tpositional := 0\n \n \tflags := []*Flag{}\n-\tfor _, group := range node.AllFlags(false) {\n+\tflagNode := node\n+\tif node.DefaultCmd != nil && node.DefaultCmd.Tag.Default == \"withargs\" {\n+\t\t// Add flags of the default command if the current node has one\n+\t\t// and that default command allows args / flags without explicitly\n+\t\t// naming the command on the CLI.\n+\t\tflagNode = node.DefaultCmd\n+\t}\n+\tfor _, group := range flagNode.AllFlags(false) {\n \t\tflags = append(flags, group...)\n \t}\n \n@@ -483,6 +490,17 @@ func (c *Context) trace(node *Node) (err error) { // nolint: gocyclo\n \t\t\t\t}\n \t\t\t}\n \n+\t\t\t// If there is a default command that allows args and nothing else\n+\t\t\t// matches, take the branch of the default command\n+\t\t\tif node.DefaultCmd != nil && node.DefaultCmd.Tag.Default == \"withargs\" {\n+\t\t\t\tc.Path = append(c.Path, &Path{\n+\t\t\t\t\tParent:  node,\n+\t\t\t\t\tCommand: node.DefaultCmd,\n+\t\t\t\t\tFlags:   node.DefaultCmd.Flags,\n+\t\t\t\t})\n+\t\t\t\treturn c.trace(node.DefaultCmd)\n+\t\t\t}\n+\n \t\t\treturn findPotentialCandidates(token.String(), candidates, \"unexpected argument %s\", token)\n \t\tdefault:\n \t\t\treturn fmt.Errorf(\"unexpected token %s\", token)\n@@ -499,21 +517,12 @@ func (c *Context) maybeSelectDefault(flags []*Flag, node *Node) error {\n \t\t\treturn nil\n \t\t}\n \t}\n-\tvar defaultNode *Path\n-\tfor _, child := range node.Children {\n-\t\tif child.Type == CommandNode && child.Tag.Default != \"\" {\n-\t\t\tif defaultNode != nil {\n-\t\t\t\treturn fmt.Errorf(\"can't have more than one default command under %s\", node.Summary())\n-\t\t\t}\n-\t\t\tdefaultNode = &Path{\n-\t\t\t\tParent:  child,\n-\t\t\t\tCommand: child,\n-\t\t\t\tFlags:   child.Flags,\n-\t\t\t}\n-\t\t}\n-\t}\n-\tif defaultNode != nil {\n-\t\tc.Path = append(c.Path, defaultNode)\n+\tif node.DefaultCmd != nil {\n+\t\tc.Path = append(c.Path, &Path{\n+\t\t\tParent:  node.DefaultCmd,\n+\t\t\tCommand: node.DefaultCmd,\n+\t\t\tFlags:   node.DefaultCmd.Flags,\n+\t\t})\n \t}\n \treturn nil\n }\n@@ -794,7 +803,6 @@ func checkMissingChildren(node *Node) error {\n \t\tmissing = append(missing, strconv.Quote(strings.Join(missingArgs, \" \")))\n \t}\n \n-\thaveDefault := 0\n \tfor _, child := range node.Children {\n \t\tif child.Hidden {\n \t\t\tcontinue\n@@ -805,19 +813,10 @@ func checkMissingChildren(node *Node) error {\n \t\t\t}\n \t\t\tmissing = append(missing, strconv.Quote(child.Summary()))\n \t\t} else {\n-\t\t\tif child.Tag.Default != \"\" {\n-\t\t\t\tif len(child.Children) > 0 {\n-\t\t\t\t\treturn fmt.Errorf(\"default command %s must not have subcommands or arguments\", child.Summary())\n-\t\t\t\t}\n-\t\t\t\thaveDefault++\n-\t\t\t}\n \t\t\tmissing = append(missing, strconv.Quote(child.Name))\n \t\t}\n \t}\n-\tif haveDefault > 1 {\n-\t\treturn fmt.Errorf(\"more than one default command found under %s\", node.Summary())\n-\t}\n-\tif len(missing) == 0 || haveDefault > 0 {\n+\tif len(missing) == 0 {\n \t\treturn nil\n \t}\n \ndiff --git a/kong_test.go b/kong_test.go\nindex 8418355..33a2c52 100644\n--- a/kong_test.go\n+++ b/kong_test.go\n@@ -1020,9 +1020,112 @@ func TestMultipleDefaultCommands(t *testing.T) {\n \t\tOne struct{} `cmd:\"\" default:\"1\"`\n \t\tTwo struct{} `cmd:\"\" default:\"1\"`\n \t}\n+\t_, err := kong.New(&cli)\n+\trequire.EqualError(t, err, \"<anonymous struct>.Two: can't have more than one default command under  <command>\")\n+}\n+\n+func TestDefaultCommandWithSubCommand(t *testing.T) {\n+\tvar cli struct {\n+\t\tOne struct {\n+\t\t\tTwo struct{} `cmd:\"\"`\n+\t\t} `cmd:\"\" default:\"1\"`\n+\t}\n+\t_, err := kong.New(&cli)\n+\trequire.EqualError(t, err, \"<anonymous struct>.One: default command one <command> must not have subcommands or arguments\")\n+}\n+\n+func TestDefaultCommandWithAllowedSubCommand(t *testing.T) {\n+\tvar cli struct {\n+\t\tOne struct {\n+\t\t\tTwo struct{} `cmd:\"\"`\n+\t\t} `cmd:\"\" default:\"withargs\"`\n+\t}\n \tp := mustNew(t, &cli)\n-\t_, err := p.Parse([]string{})\n-\trequire.EqualError(t, err, \"can't have more than one default command under  <command>\")\n+\tctx, err := p.Parse([]string{\"two\"})\n+\trequire.NoError(t, err)\n+\trequire.Equal(t, \"one two\", ctx.Command())\n+}\n+\n+func TestDefaultCommandWithArgument(t *testing.T) {\n+\tvar cli struct {\n+\t\tOne struct {\n+\t\t\tArg string `arg:\"\"`\n+\t\t} `cmd:\"\" default:\"1\"`\n+\t}\n+\t_, err := kong.New(&cli)\n+\trequire.EqualError(t, err, \"<anonymous struct>.One: default command one <arg> must not have subcommands or arguments\")\n+}\n+\n+func TestDefaultCommandWithAllowedArgument(t *testing.T) {\n+\tvar cli struct {\n+\t\tOne struct {\n+\t\t\tArg  string `arg:\"\"`\n+\t\t\tFlag string\n+\t\t} `cmd:\"\" default:\"withargs\"`\n+\t}\n+\tp := mustNew(t, &cli)\n+\t_, err := p.Parse([]string{\"arg\", \"--flag=value\"})\n+\trequire.NoError(t, err)\n+\trequire.Equal(t, \"arg\", cli.One.Arg)\n+\trequire.Equal(t, \"value\", cli.One.Flag)\n+}\n+\n+func TestDefaultCommandWithBranchingArgument(t *testing.T) {\n+\tvar cli struct {\n+\t\tOne struct {\n+\t\t\tTwo struct {\n+\t\t\t\tTwo string `arg:\"\"`\n+\t\t\t} `arg:\"\"`\n+\t\t} `cmd:\"\" default:\"1\"`\n+\t}\n+\t_, err := kong.New(&cli)\n+\trequire.EqualError(t, err, \"<anonymous struct>.One: default command one <command> must not have subcommands or arguments\")\n+}\n+\n+func TestDefaultCommandWithAllowedBranchingArgument(t *testing.T) {\n+\tvar cli struct {\n+\t\tOne struct {\n+\t\t\tTwo struct {\n+\t\t\t\tTwo  string `arg:\"\"`\n+\t\t\t\tFlag string\n+\t\t\t} `arg:\"\"`\n+\t\t} `cmd:\"\" default:\"withargs\"`\n+\t}\n+\tp := mustNew(t, &cli)\n+\t_, err := p.Parse([]string{\"arg\", \"--flag=value\"})\n+\trequire.NoError(t, err)\n+\trequire.Equal(t, \"arg\", cli.One.Two.Two)\n+\trequire.Equal(t, \"value\", cli.One.Two.Flag)\n+}\n+\n+func TestDefaultCommandPrecedence(t *testing.T) {\n+\tvar cli struct {\n+\t\tTwo struct {\n+\t\t\tArg  string `arg:\"\"`\n+\t\t\tFlag bool\n+\t\t} `cmd:\"\" default:\"withargs\"`\n+\t\tOne struct{} `cmd:\"\"`\n+\t}\n+\tp := mustNew(t, &cli)\n+\n+\t// A named command should take precedence over a default command with arg\n+\tctx, err := p.Parse([]string{\"one\"})\n+\trequire.NoError(t, err)\n+\trequire.Equal(t, \"one\", ctx.Command())\n+\n+\t// An explicitly named command with arg should parse, even if labeled default:\"witharg\"\n+\tctx, err = p.Parse([]string{\"two\", \"arg\"})\n+\trequire.NoError(t, err)\n+\trequire.Equal(t, \"two <arg>\", ctx.Command())\n+\n+\t// An arg to a default command that does not match another command should select the default\n+\tctx, err = p.Parse([]string{\"arg\"})\n+\trequire.NoError(t, err)\n+\trequire.Equal(t, \"two <arg>\", ctx.Command())\n+\n+\t// A flag on a default command should not be valid on a sibling command\n+\t_, err = p.Parse([]string{\"one\", \"--flag\"})\n+\trequire.EqualError(t, err, \"unknown flag --flag\")\n }\n \n func TestLoneHpyhen(t *testing.T) {\ndiff --git a/model.go b/model.go\nindex 450f61c..e0263d7 100644\n--- a/model.go\n+++ b/model.go\n@@ -51,6 +51,7 @@ type Node struct {\n \tFlags      []*Flag\n \tPositional []*Positional\n \tChildren   []*Node\n+\tDefaultCmd *Node\n \tTarget     reflect.Value // Pointer to the value in the grammar that this Node is associated with.\n \tTag        *Tag\n \tAliases    []string\n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    ".github/FUNDING.yml",
+    ".gitignore",
+    ".golangci.yml",
+    "COPYING",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/README.md",
+    "_examples/server/console.go",
+    "_examples/server/go.mod",
+    "_examples/server/go.sum",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/main.go",
+    "benchmark_test.go",
+    "bin/.go@latest.pkg",
+    "bin/.golangci-lint-1.40.1.pkg",
+    "bin/README.hermit.md",
+    "bin/activate-hermit",
+    "bin/go",
+    "bin/gofmt",
+    "bin/golangci-lint",
+    "bin/hermit",
+    "bin/hermit.hcl",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "config_test.go",
+    "context.go",
+    "defaults.go",
+    "defaults_test.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "go.mod",
+    "go.sum",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "testdata/file.txt",
+    "util.go",
+    "util_test.go",
+    "visit.go"
+  ],
+  "explanation": {
+    "what": "デフォルトコマンド(`default:\"1\"`)のバリデーション(重複定義・子コマンド/positional argの禁止)を trace() 実行時から build() 時に移し、新たに `default:\"withargs\"` を追加した。これによりデフォルトコマンドが自身のサブコマンド・引数・フラグを持てるようになり、コマンド名を明示しなくてもそれらの引数/フラグが他のコマンドと曖昧でない限り解釈されるようになった。Node に `DefaultCmd` フィールドを追加し、trace() 側もこの withargs 分岐を辿るよう context.go を書き換えている。",
+    "why": "PR本文によれば、デフォルトコマンドの制約チェックがこれまで trace()(コマンドライン解析時)にあったが、これは CLI の構造(AST)そのものに関する検証であり、パース前の build() 段階で検出できる・他の文法検証もそこで行われている、という理由で build() に移すのがより正しいという設計判断。加えて positional argument を持つデフォルトコマンドの禁止漏れ(分岐引数のみ禁止されていたが、エラーメッセージ上は引数全般が禁止されているように読めた)も同時に修正し、その延長で「引数/フラグ込みのデフォルトコマンド」というユースケースを解禁している。",
+    "highlights": [
+      { "file": "build.go", "note": "デフォルトコマンドの重複・構造チェックが buildChild() に移動し、node.DefaultCmd に子ノードを記録するようになった" },
+      { "file": "context.go", "note": "trace() が node.DefaultCmd を見て、withargs 指定時はデフォルトコマンドの子孫へ解析を継続する" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [{ "type": "pr", "number": 188, "url": "https://github.com/alecthomas/kong/pull/188" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

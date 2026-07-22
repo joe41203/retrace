@@ -1,0 +1,143 @@
+{
+  "seq": 291,
+  "sha": "9c9b8ab50b9228a448af0efa8e039e1125f9756a",
+  "parents": [
+    "fa08e7027c35633d457b29984486873558f46bdd"
+  ],
+  "author": {
+    "name": "Alec Thomas",
+    "email": "alec@swapoff.org",
+    "date": "2021-12-13T18:54:06+11:00"
+  },
+  "message": "More enum fixes.",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 5,
+    "additions": 106,
+    "deletions": 49
+  },
+  "files": [
+    {
+      "path": "README.md",
+      "status": "M",
+      "additions": 43,
+      "deletions": 38,
+      "binary": false
+    },
+    {
+      "path": "go.mod",
+      "status": "M",
+      "additions": 1,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "go.sum",
+      "status": "M",
+      "additions": 2,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "kong_test.go",
+      "status": "M",
+      "additions": 58,
+      "deletions": 11,
+      "binary": false
+    },
+    {
+      "path": "tag.go",
+      "status": "M",
+      "additions": 2,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/README.md b/README.md\nindex a4ce0c3..fa8624c 100644\n--- a/README.md\n+++ b/README.md\n@@ -4,40 +4,42 @@\n # Kong is a command-line parser for Go\n [![](https://godoc.org/github.com/alecthomas/kong?status.svg)](http://godoc.org/github.com/alecthomas/kong) [![CircleCI](https://img.shields.io/circleci/project/github/alecthomas/kong.svg)](https://circleci.com/gh/alecthomas/kong) [![Go Report Card](https://goreportcard.com/badge/github.com/alecthomas/kong)](https://goreportcard.com/report/github.com/alecthomas/kong) [![Slack chat](https://img.shields.io/static/v1?logo=slack&style=flat&label=slack&color=green&message=gophers)](https://gophers.slack.com/messages/CN9DS8YF3)\n \n-<!-- TOC depthfrom:2 updateonsave:true withlinks:true -->\n-\n-- [Introduction](#introduction)\n-- [Help](#help)\n-    - [Help as a user of a Kong application](#help-as-a-user-of-a-kong-application)\n-    - [Defining help in Kong](#defining-help-in-kong)\n-- [Command handling](#command-handling)\n-    - [Switch on the command string](#switch-on-the-command-string)\n-    - [Attach a Run... error method to each command](#attach-a-run-error-method-to-each-command)\n-- [Hooks: BeforeResolve, BeforeApply, AfterApply and the Bind option](#hooks-beforeresolve-beforeapply-afterapply-and-the-bind-option)\n-- [Flags](#flags)\n-- [Commands and sub-commands](#commands-and-sub-commands)\n-- [Branching positional arguments](#branching-positional-arguments)\n-- [Terminating positional arguments](#terminating-positional-arguments)\n-- [Slices](#slices)\n-- [Maps](#maps)\n-- [Custom named decoders](#custom-named-decoders)\n-- [Supported field types](#supported-field-types)\n-- [Custom decoders mappers](#custom-decoders-mappers)\n-- [Supported tags](#supported-tags)\n-- [Plugins](#plugins)\n-- [Dynamic Commands](#dynamic-commands)\n-- [Variable interpolation](#variable-interpolation)\n-- [Validation](#validation)\n-- [Modifying Kong's behaviour](#modifying-kongs-behaviour)\n-    - [Namehelp and Descriptionhelp - set the application name description](#namehelp-and-descriptionhelp---set-the-application-name-description)\n-    - [Configurationloader, paths... - load defaults from configuration files](#configurationloader-paths---load-defaults-from-configuration-files)\n-    - [Resolver... - support for default values from external sources](#resolver---support-for-default-values-from-external-sources)\n-    - [*Mapper... - customising how the command-line is mapped to Go values](#mapper---customising-how-the-command-line-is-mapped-to-go-values)\n-    - [ConfigureHelpHelpOptions and HelpHelpFunc - customising help](#configurehelphelpoptions-and-helphelpfunc---customising-help)\n-    - [Bind... - bind values for callback hooks and Run methods](#bind---bind-values-for-callback-hooks-and-run-methods)\n-    - [Other options](#other-options)\n-\n-<!-- /TOC -->\n+<!-- https://github.com/naokazuterada/MarkdownTOC -->\n+\n+<!-- MarkdownTOC autolink=\"true\" style=\"ordered\" indent=\"    \" -->\n+\n+1. [Introduction](#introduction)\n+1. [Help](#help)\n+    1. [Help as a user of a Kong application](#help-as-a-user-of-a-kong-application)\n+    1. [Defining help in Kong](#defining-help-in-kong)\n+1. [Command handling](#command-handling)\n+    1. [Switch on the command string](#switch-on-the-command-string)\n+    1. [Attach a `Run(...) error` method to each command](#attach-a-run-error-method-to-each-command)\n+1. [Hooks: BeforeResolve\\(\\), BeforeApply\\(\\), AfterApply\\(\\) and the Bind\\(\\) option](#hooks-beforeresolve-beforeapply-afterapply-and-the-bind-option)\n+1. [Flags](#flags)\n+1. [Commands and sub-commands](#commands-and-sub-commands)\n+1. [Branching positional arguments](#branching-positional-arguments)\n+1. [Positional arguments](#positional-arguments)\n+1. [Slices](#slices)\n+1. [Maps](#maps)\n+1. [Custom named decoders](#custom-named-decoders)\n+1. [Supported field types](#supported-field-types)\n+1. [Custom decoders \\(mappers\\)](#custom-decoders-mappers)\n+1. [Supported tags](#supported-tags)\n+1. [Plugins](#plugins)\n+1. [Dynamic Commands](#dynamic-commands)\n+1. [Variable interpolation](#variable-interpolation)\n+1. [Validation](#validation)\n+1. [Modifying Kong's behaviour](#modifying-kongs-behaviour)\n+    1. [`Name(help)` and `Description(help)` - set the application name description](#namehelp-and-descriptionhelp---set-the-application-name-description)\n+    1. [`Configuration(loader, paths...)` - load defaults from configuration files](#configurationloader-paths---load-defaults-from-configuration-files)\n+    1. [`Resolver(...)` - support for default values from external sources](#resolver---support-for-default-values-from-external-sources)\n+    1. [`*Mapper(...)` - customising how the command-line is mapped to Go values](#mapper---customising-how-the-command-line-is-mapped-to-go-values)\n+    1. [`ConfigureHelp(HelpOptions)` and `Help(HelpFunc)` - customising help](#configurehelphelpoptions-and-helphelpfunc---customising-help)\n+    1. [`Bind(...)` - bind values for callback hooks and Run\\(\\) methods](#bind---bind-values-for-callback-hooks-and-run-methods)\n+    1. [Other options](#other-options)\n+\n+<!-- /MarkdownTOC -->\n \n ## Introduction\n \n@@ -333,11 +335,14 @@ var CLI struct {\n \n This looks a little verbose in this contrived example, but typically this will not be the case.\n \n-## Terminating positional arguments\n+## Positional arguments\n \n-If a [mapped type](#mapper---customising-how-the-command-line-is-mapped-to-go-values) is tagged with `arg` it will be treated as the final positional values to be parsed on the command line.\n+If a field is tagged with `arg:\"\"` it will be treated as the final positional\n+value to be parsed on the command line. By default positional arguments are\n+required, but specifying `optional:\"\"` will alter this.\n \n-If a positional argument is a slice, all remaining arguments will be appended to that slice.\n+If a positional argument is a slice, all remaining arguments will be appended\n+to that slice.\n \n ## Slices\n \n@@ -429,7 +434,7 @@ Both can coexist with standard Tag parsing.\n Tag                    | Description\n -----------------------| -------------------------------------------\n `cmd:\"\"`               | If present, struct is a command.\n-`arg:\"\"`               | If present, field is an argument.\n+`arg:\"\"`               | If present, field is an argument. Required by default.\n `env:\"X\"`              | Specify envar to use for default value.\n `name:\"X\"`             | Long name, for overriding field name.\n `help:\"X\"`             | Help text.\ndiff --git a/go.mod b/go.mod\nindex 9362c5c..bdd8bb2 100644\n--- a/go.mod\n+++ b/go.mod\n@@ -1,6 +1,7 @@\n module github.com/alecthomas/kong\n \n require (\n+\tgithub.com/alecthomas/repr v0.0.0-20210801044451-80ca428c5142\n \tgithub.com/davecgh/go-spew v1.1.1 // indirect\n \tgithub.com/pkg/errors v0.9.1\n \tgithub.com/stretchr/testify v1.7.0\ndiff --git a/go.sum b/go.sum\nindex d06ab36..12908f3 100644\n--- a/go.sum\n+++ b/go.sum\n@@ -1,3 +1,5 @@\n+github.com/alecthomas/repr v0.0.0-20210801044451-80ca428c5142 h1:8Uy0oSf5co/NZXje7U1z8Mpep++QJOldL2hs/sBQf48=\n+github.com/alecthomas/repr v0.0.0-20210801044451-80ca428c5142/go.mod h1:2kn6fqh/zIyPLmm3ugklbEi5hg5wS435eygvNfaDQL8=\n github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=\n github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=\n github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=\ndiff --git a/kong_test.go b/kong_test.go\nindex f0844ba..a415946 100644\n--- a/kong_test.go\n+++ b/kong_test.go\n@@ -10,6 +10,7 @@ import (\n \t\"github.com/stretchr/testify/require\"\n \n \t\"github.com/alecthomas/kong\"\n+\t\"github.com/alecthomas/repr\"\n )\n \n func mustNew(t *testing.T, cli interface{}, options ...kong.Option) *kong.Kong {\n@@ -1384,17 +1385,63 @@ func TestOptionReturnsErr(t *testing.T) {\n }\n \n func TestEnumValidation(t *testing.T) {\n-\tvar cli struct {\n-\t\tEnum string `arg:\"\" enum:\"one,two\"`\n+\ttests := []struct {\n+\t\tname string\n+\t\tcli  interface{}\n+\t\tfail bool\n+\t}{\n+\t\t{\n+\t\t\t\"Arg\",\n+\t\t\t&struct {\n+\t\t\t\tEnum string `arg:\"\" enum:\"one,two\"`\n+\t\t\t}{},\n+\t\t\tfalse,\n+\t\t},\n+\t\t{\n+\t\t\t\"RequiredArg\",\n+\t\t\t&struct {\n+\t\t\t\tEnum string `required:\"\" arg:\"\" enum:\"one,two\"`\n+\t\t\t}{},\n+\t\t\tfalse,\n+\t\t},\n+\t\t{\n+\t\t\t\"OptionalArg\",\n+\t\t\t&struct {\n+\t\t\t\tEnum string `optional:\"\" arg:\"\" enum:\"one,two\"`\n+\t\t\t}{},\n+\t\t\ttrue,\n+\t\t},\n+\t\t{\n+\t\t\t\"RepeatedArgs\",\n+\t\t\t&struct {\n+\t\t\t\tEnum []string `arg:\"\" enum:\"one,two\"`\n+\t\t\t}{},\n+\t\t\tfalse,\n+\t\t},\n+\t\t{\n+\t\t\t\"RequiredRepeatedArgs\",\n+\t\t\t&struct {\n+\t\t\t\tEnum []string `required:\"\" arg:\"\" enum:\"one,two\"`\n+\t\t\t}{},\n+\t\t\tfalse,\n+\t\t},\n+\t\t{\n+\t\t\t\"OptionalRepeatedArgs\",\n+\t\t\t&struct {\n+\t\t\t\tEnum []string `optional:\"\" arg:\"\" enum:\"one,two\"`\n+\t\t\t}{},\n+\t\t\tfalse,\n+\t\t},\n \t}\n-\t_, err := kong.New(&cli)\n-\trequire.Error(t, err)\n-}\n-\n-func TestEnumValidationSlice(t *testing.T) {\n-\tvar cli struct {\n-\t\tEnum []string `arg:\"\" enum:\"one,two\"`\n+\tfor _, test := range tests {\n+\t\ttest := test\n+\t\tt.Run(test.name, func(t *testing.T) {\n+\t\t\t_, err := kong.New(test.cli)\n+\t\t\tif test.fail {\n+\t\t\t\trequire.Error(t, err, repr.String(test.cli))\n+\t\t\t} else {\n+\t\t\t\trequire.NoError(t, err, repr.String(test.cli))\n+\t\t\t}\n+\t\t})\n \t}\n-\t_, err := kong.New(&cli)\n-\trequire.NoError(t, err)\n }\ndiff --git a/tag.go b/tag.go\nindex a817c88..9f937d7 100644\n--- a/tag.go\n+++ b/tag.go\n@@ -186,6 +186,8 @@ func hydrateTag(t *Tag, typ reflect.Type) error { // nolint: gocyclo\n \t// Arguments with defaults are always optional.\n \tif t.Arg && t.Default != \"\" {\n \t\tt.Optional = true\n+\t} else if t.Arg && !optional { // Arguments are required unless explicitly made optional.\n+\t\tt.Required = true\n \t}\n \tt.Name = t.Get(\"name\")\n \tt.Help = t.Get(\"help\")\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/FUNDING.yml",
+    ".github/workflows/ci.yml",
+    ".gitignore",
+    ".golangci.yml",
+    "COPYING",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/README.md",
+    "_examples/server/console.go",
+    "_examples/server/go.mod",
+    "_examples/server/go.sum",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/main.go",
+    "benchmark_test.go",
+    "bin/.go@latest.pkg",
+    "bin/.golangci-lint-1.42.0.pkg",
+    "bin/README.hermit.md",
+    "bin/activate-hermit",
+    "bin/go",
+    "bin/gofmt",
+    "bin/golangci-lint",
+    "bin/hermit",
+    "bin/hermit.hcl",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "config_test.go",
+    "context.go",
+    "defaults.go",
+    "defaults_test.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "go.mod",
+    "go.sum",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "testdata/file.txt",
+    "util.go",
+    "util_test.go",
+    "visit.go"
+  ],
+  "explanation": {
+    "what": "tag.go の hydrateTag() で、arg:\"\" タグを持つフィールドはデフォルト値が無い限り自動的に required 扱いになるよう明示するロジックを追加した。あわせて TestEnumValidation を required/optional/slice の組み合わせごとにテーブル駆動でケース分けし、README の Positional arguments 節を更新している。",
+    "why": "直前の seq290 (\"fix: overly enthusiastic validation of tags\") に続く enum/required 判定の続きの修正で、position 引数が required:\"\" を書かなくてもデフォルトで必須になる挙動と、optional:\"\" を明示したときは enum バリデーションを免除する挙動を、テストケースとして網羅的に固めている。",
+    "highlights": [
+      { "file": "tag.go", "note": "t.Arg && !optional の分岐で positional 引数のデフォルト required 化を追加" },
+      { "file": "kong_test.go", "note": "TestEnumValidation がテーブル駆動でRequiredArg/OptionalArg等を網羅" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

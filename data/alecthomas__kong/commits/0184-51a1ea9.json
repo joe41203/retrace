@@ -1,0 +1,102 @@
+{
+  "seq": 184,
+  "sha": "51a1ea979a88383a62d176161b8503a8045cb46c",
+  "parents": [
+    "407c8229a6c1426ffdbfb8a628b7c41b3eed81be"
+  ],
+  "author": {
+    "name": "Alec Thomas",
+    "email": "alec@swapoff.org",
+    "date": "2020-04-27T09:10:44+10:00"
+  },
+  "message": "Ensure \"existingfile\" doesn't choke on \"-\".",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 9,
+    "deletions": 7
+  },
+  "files": [
+    {
+      "path": "mapper.go",
+      "status": "M",
+      "additions": 9,
+      "deletions": 7,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/mapper.go b/mapper.go\nindex 0291184..a605dea 100644\n--- a/mapper.go\n+++ b/mapper.go\n@@ -555,13 +555,15 @@ func existingFileMapper(r *Registry) MapperFunc {\n \t\tif err != nil {\n \t\t\treturn err\n \t\t}\n-\t\tpath = ExpandPath(path)\n-\t\tstat, err := os.Stat(path)\n-\t\tif err != nil {\n-\t\t\treturn err\n-\t\t}\n-\t\tif stat.IsDir() {\n-\t\t\treturn errors.Errorf(\"%q exists but is a directory\", path)\n+\t\tif path != \"-\" {\n+\t\t\tpath = ExpandPath(path)\n+\t\t\tstat, err := os.Stat(path)\n+\t\t\tif err != nil {\n+\t\t\t\treturn err\n+\t\t\t}\n+\t\t\tif stat.IsDir() {\n+\t\t\t\treturn errors.Errorf(\"%q exists but is a directory\", path)\n+\t\t\t}\n \t\t}\n \t\ttarget.SetString(path)\n \t\treturn nil\n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    ".golangci.yml",
+    "COPYING",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/README.md",
+    "_examples/server/console.go",
+    "_examples/server/go.mod",
+    "_examples/server/go.sum",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/main.go",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "config_test.go",
+    "context.go",
+    "defaults.go",
+    "defaults_test.go",
+    "doc.go",
+    "env.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "go.mod",
+    "go.sum",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "util.go",
+    "util_test.go",
+    "visit.go"
+  ],
+  "explanation": {
+    "what": "mapper.go の existingFileMapper で、値が \"-\" のときは ExpandPath や os.Stat によるファイル存在確認をスキップし、そのまま target.SetString(path) するよう修正した。",
+    "why": "おそらく、直前のコミット(seq183)で `-` を位置引数・フラグ値として使えるようにしたが、existingfile 型マッパーはファイルの実在チェックを行うため \"-\" を渡すと(実在しないパスとして)エラーになってしまうためだと考えられる。標準入力を表す `-` という慣習上の値を existingfile でも通せるようにする修正とみられる。",
+    "highlights": [
+      { "file": "mapper.go", "note": "path != \"-\" の条件でファイル存在チェックの分岐を囲った箇所が変更の核。" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "inferred",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

@@ -1,0 +1,74 @@
+{
+  "seq": 11,
+  "sha": "67b1a12059a70651bbe4ef47186e37360e2eab0e",
+  "parents": [
+    "a41bb0e4da6a2c43eeaef85f778f205ef05c2269"
+  ],
+  "author": {
+    "name": "Alec Thomas",
+    "email": "alec@swapoff.org",
+    "date": "2018-05-18T15:39:40+10:00"
+  },
+  "message": "Require cmd:\"\" or arg:\"\" for branching commands/args.",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 3,
+    "additions": 37,
+    "deletions": 32
+  },
+  "files": [
+    {
+      "path": "build.go",
+      "status": "M",
+      "additions": 12,
+      "deletions": 9,
+      "binary": false
+    },
+    {
+      "path": "kong_test.go",
+      "status": "M",
+      "additions": 24,
+      "deletions": 23,
+      "binary": false
+    },
+    {
+      "path": "model.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/build.go b/build.go\nindex ef6798f..d867222 100644\n--- a/build.go\n+++ b/build.go\n@@ -10,7 +10,7 @@ import (\n func build(ast interface{}) (app *Application, err error) {\n \tdefer func() {\n \t\tmsg := recover()\n-\t\tif test, ok := recover().(error); ok {\n+\t\tif test, ok := msg.(error); ok {\n \t\t\tapp = nil\n \t\t\terr = test\n \t\t} else if msg != nil {\n@@ -23,13 +23,16 @@ func build(ast interface{}) (app *Application, err error) {\n \t\treturn nil, fmt.Errorf(\"expected a pointer to a struct but got %T\", ast)\n \t}\n \n-\treturn buildNode(iv), nil\n+\treturn buildNode(iv, true), nil\n }\n \n-func buildNode(v reflect.Value) *Node {\n+func buildNode(v reflect.Value, cmd bool) *Node {\n \tnode := &Node{}\n \tfor i := 0; i < v.NumField(); i++ {\n \t\tft := v.Type().Field(i)\n+\t\tif strings.ToLower(ft.Name[0:1]) == ft.Name[0:1] {\n+\t\t\tcontinue\n+\t\t}\n \t\tfv := v.Field(i)\n \n \t\tname := ft.Tag.Get(\"name\")\n@@ -37,10 +40,7 @@ func buildNode(v reflect.Value) *Node {\n \t\t\tname = strings.ToLower(strings.Join(camelCase(ft.Name), \"-\"))\n \t\t}\n \t\tdecoder := DecoderForField(ft)\n-\t\thelp, ok := ft.Tag.Lookup(\"help\")\n-\t\tif !ok {\n-\t\t\tcontinue\n-\t\t}\n+\t\thelp, _ := ft.Tag.Lookup(\"help\")\n \t\tdflt := ft.Tag.Get(\"default\")\n \t\tplaceholder := ft.Tag.Get(\"placeholder\")\n \t\tif placeholder == \"\" {\n@@ -55,12 +55,15 @@ func buildNode(v reflect.Value) *Node {\n \t\t_, optional := ft.Tag.Lookup(\"optional\")\n \t\t// Force field to be an argument, not a flag.\n \t\t_, arg := ft.Tag.Lookup(\"arg\")\n+\t\tif !cmd {\n+\t\t\t_, cmd = ft.Tag.Lookup(\"cmd\")\n+\t\t}\n \t\tenv := ft.Tag.Get(\"env\")\n \t\tformat := ft.Tag.Get(\"format\")\n \n \t\t// Nested structs are either commands or args.\n-\t\tif ft.Type.Kind() == reflect.Struct && decoder == nil {\n-\t\t\tchild := buildNode(fv)\n+\t\tif ft.Type.Kind() == reflect.Struct && (cmd || arg) {\n+\t\t\tchild := buildNode(fv, false)\n \t\t\tchild.Help = help\n \n \t\t\t// A branching argument. This is a bit hairy, as we let buildNode() do the parsing, then check that\ndiff --git a/kong_test.go b/kong_test.go\nindex 9abbe54..72ec784 100644\n--- a/kong_test.go\n+++ b/kong_test.go\n@@ -17,11 +17,11 @@ func TestArgumentSequence(t *testing.T) {\n \tvar cli struct {\n \t\tUser struct {\n \t\t\tCreate struct {\n-\t\t\t\tID    int    `arg:\"\" help:\"\"`\n-\t\t\t\tFirst string `arg:\"\" help:\"\"`\n-\t\t\t\tLast  string `arg:\"\" help:\"\"`\n-\t\t\t} `help:\"\"`\n-\t\t} `help:\"\"`\n+\t\t\t\tID    int    `arg:\"\"`\n+\t\t\t\tFirst string `arg:\"\"`\n+\t\t\t\tLast  string `arg:\"\"`\n+\t\t\t} `cmd:\"\"`\n+\t\t} `cmd:\"\"`\n \t}\n \tp := mustNew(t, &cli)\n \tcmd, err := p.Parse([]string{\"user\", \"create\", \"10\", \"Alec\", \"Thomas\"})\n@@ -39,21 +39,21 @@ func TestBranchingArgument(t *testing.T) {\n \tvar cli struct {\n \t\tUser struct {\n \t\t\tCreate struct {\n-\t\t\t\tID    string `arg:\"\" help:\"\"`\n-\t\t\t\tFirst string `arg:\"\" help:\"\"`\n-\t\t\t\tLast  string `arg:\"\" help:\"\"`\n-\t\t\t} `help:\"\"`\n+\t\t\t\tID    string `arg:\"\"`\n+\t\t\t\tFirst string `arg:\"\"`\n+\t\t\t\tLast  string `arg:\"\"`\n+\t\t\t} `cmd:\"\"`\n \n \t\t\t// Branching argument.\n \t\t\tID struct {\n-\t\t\t\tID     int      `arg:\"\" help:\"\"`\n-\t\t\t\tFlag   int      `help:\"\"`\n-\t\t\t\tDelete struct{} `help:\"\"`\n+\t\t\t\tID     int `arg:\"\"`\n+\t\t\t\tFlag   int\n+\t\t\t\tDelete struct{} `cmd:\"\"`\n \t\t\t\tRename struct {\n-\t\t\t\t\tTo string `help:\"\"`\n-\t\t\t\t} `help:\"\"`\n-\t\t\t} `arg:\"\" help:\"\"`\n-\t\t} `help:\"Manage users.\"`\n+\t\t\t\t\tTo string\n+\t\t\t\t} `cmd:\"\"`\n+\t\t\t} `arg:\"\"`\n+\t\t} `cmd:\"\"  help:\"User management.\"`\n \t}\n \tp := mustNew(t, &cli)\n \tcmd, err := p.Parse([]string{\"user\", \"10\", \"delete\"})\n@@ -64,8 +64,8 @@ func TestBranchingArgument(t *testing.T) {\n \n func TestResetWithDefaults(t *testing.T) {\n \tvar cli struct {\n-\t\tFlag            string `help:\"\"`\n-\t\tFlagWithDefault string `default:\"default\" help:\"\"`\n+\t\tFlag            string\n+\t\tFlagWithDefault string `default:\"default\" `\n \t}\n \tcli.Flag = \"BLAH\"\n \tcli.FlagWithDefault = \"BLAH\"\n@@ -78,7 +78,7 @@ func TestResetWithDefaults(t *testing.T) {\n \n func TestFlagSlice(t *testing.T) {\n \tvar cli struct {\n-\t\tSlice []int `help:\"\"`\n+\t\tSlice []int\n \t}\n \tparser := mustNew(t, &cli)\n \t_, err := parser.Parse([]string{\"--slice=1,2,3\"})\n@@ -88,8 +88,8 @@ func TestFlagSlice(t *testing.T) {\n \n func TestArgSlice(t *testing.T) {\n \tvar cli struct {\n-\t\tSlice []int `help:\"\" arg:\"\"`\n-\t\tFlag  bool  `help:\"\"`\n+\t\tSlice []int `arg:\"\"`\n+\t\tFlag  bool\n \t}\n \tparser := mustNew(t, &cli)\n \t_, err := parser.Parse([]string{\"1\", \"2\", \"3\", \"--flag\"})\n@@ -100,7 +100,8 @@ func TestArgSlice(t *testing.T) {\n \n func TestUnsupportedfieldErrors(t *testing.T) {\n \tvar cli struct {\n-\t\tKeys map[string]string `help:\"\"`\n+\t\tKeys map[string]string\n \t}\n-\trequire.Panics(t, func() { mustNew(t, &cli) })\n+\t_, err := New(\"\", \"\", &cli)\n+\trequire.Error(t, err)\n }\ndiff --git a/model.go b/model.go\nindex 50be9c2..4512d08 100644\n--- a/model.go\n+++ b/model.go\n@@ -20,6 +20,7 @@ type Node struct {\n \tChildren   []*Branch\n }\n \n+// A Value is either a flag or a variaable positional argument.\n type Value struct {\n \tFlag     bool // True if flag, false if positional argument.\n \tName     string\n",
+  "diffTruncated": false,
+  "tree": [
+    "README.md",
+    "_examples/shell/main.go",
+    "build.go",
+    "camelcase.go",
+    "decoders.go",
+    "decoders_test.go",
+    "global.go",
+    "kong.go",
+    "kong_test.go",
+    "model.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tokentype_string.go"
+  ],
+  "explanation": {
+    "what": "buildNode() が構造体フィールドを走査する際、そのフィールドが cmd タグまたは arg タグを持つ場合のみネスト構造体をブランチ(サブコマンド/分岐引数)として扱うように変更した。あわせて help タグの Lookup 結果を必須にしていたチェックを外し、help なしのフィールドでもパース対象にできるようにした。build.go の `recover().(error)` を一時変数 msg 経由に修正するバグ修正も含む。",
+    "why": "従来は「構造体型かつ decoder が無い」という条件だけでネスト構造体をブランチと誤認していたため、cmd/arg タグの有無に関わらず全てのネスト構造体が暗黙的にサブコマンド化されてしまう問題があった。cmd:\"\" か arg:\"\" を明示させることで、どのフィールドが分岐点になるかをタグで宣言的に制御できるようにしたと考えられる。",
+    "highlights": [
+      { "file": "build.go", "note": "ft.Name の先頭が小文字(非公開フィールド)なら continue、cmd/arg タグの有無でブランチ判定する分岐" },
+      { "file": "kong_test.go", "note": "help:\"\" タグを外した上で cmd:\"\" を明示するテストへの書き換え" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

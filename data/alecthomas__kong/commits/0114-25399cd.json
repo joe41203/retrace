@@ -1,0 +1,95 @@
+{
+  "seq": 114,
+  "sha": "25399cde9e5dc612632fbd594f9f92ce9b3c4a87",
+  "parents": [
+    "3a832f83439002319ba860bfdf2cfe9eff2dc12e"
+  ],
+  "author": {
+    "name": "Alec Thomas",
+    "email": "alec@swapoff.org",
+    "date": "2018-09-21T13:51:11+10:00"
+  },
+  "message": "Fix erroneously \"fixed\" error message.",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 1,
+    "deletions": 1
+  },
+  "files": [
+    {
+      "path": "context.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/context.go b/context.go\nindex a502412..e70af31 100644\n--- a/context.go\n+++ b/context.go\n@@ -552,7 +552,7 @@ func checkMissingChildren(node *Node) error {\n \tif len(missing) == 1 {\n \t\treturn fmt.Errorf(\"expected %s\", missing[0])\n \t}\n-\treturn fmt.Errorf(\"expected %s\", strings.Join(missing, \"  \"))\n+\treturn fmt.Errorf(\"expected one of %s\", strings.Join(missing, \",  \"))\n }\n \n // If we're missing any positionals and they're required, return an error.\n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    ".golangci.yml",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/console.go",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/main.go",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "context.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "go.mod",
+    "go.sum",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "tokentype_string.go",
+    "util.go",
+    "util_test.go",
+    "visit.go"
+  ],
+  "explanation": {
+    "what": "checkMissingChildren のエラーメッセージを \"expected %s\"(区切り文字はスペース2つ)から \"expected one of %s\"(区切り文字はカンマ+スペース2つ)に戻した。seq111 の Visitor 導入コミットで missing==1 のチェック順序と \"expected one of\" 文言が意図せず変わってしまっていたのを修正している。",
+    "why": "コミットメッセージ \"Fix erroneously \\\"fixed\\\" error message.\" の通り、直前(seq111付近)のリファクタで副作用的に壊れたエラー文言を元の意図(複数候補がある場合は \"expected one of ...\" とカンマ区切りで示す)に戻す修正。",
+    "highlights": [
+      { "file": "context.go", "note": "strings.Join の区切り文字とエラーメッセージの接頭辞 \"expected one of\" の修正箇所" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

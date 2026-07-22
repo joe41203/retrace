@@ -1,0 +1,95 @@
+{
+  "seq": 119,
+  "sha": "d648254c7dc275186615182711be6c46ee267722",
+  "parents": [
+    "0f67a38060a9e897a1d3023f408557a618472e05"
+  ],
+  "author": {
+    "name": "Alec Thomas",
+    "email": "alec@swapoff.org",
+    "date": "2018-09-22T21:18:22+10:00"
+  },
+  "message": "Don't blindly SetString.",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 9,
+    "deletions": 0
+  },
+  "files": [
+    {
+      "path": "mapper.go",
+      "status": "M",
+      "additions": 9,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/mapper.go b/mapper.go\nindex 96e0185..322ab46 100644\n--- a/mapper.go\n+++ b/mapper.go\n@@ -368,6 +368,9 @@ func pathMapper(r *Registry) MapperFunc {\n \t\tif target.Kind() == reflect.Slice {\n \t\t\treturn sliceDecoder(r)(ctx, target)\n \t\t}\n+\t\tif target.Kind() != reflect.String {\n+\t\t\treturn fmt.Errorf(\"\\\"path\\\" type must be applied to a string not %s\", target.Type())\n+\t\t}\n \t\tpath := ctx.Scan.PopValue(\"file\")\n \t\tpath = expandPath(path)\n \t\ttarget.SetString(path)\n@@ -380,6 +383,9 @@ func existingFileMapper(r *Registry) MapperFunc {\n \t\tif target.Kind() == reflect.Slice {\n \t\t\treturn sliceDecoder(r)(ctx, target)\n \t\t}\n+\t\tif target.Kind() != reflect.String {\n+\t\t\treturn fmt.Errorf(\"\\\"existingfile\\\" type must be applied to a string not %s\", target.Type())\n+\t\t}\n \t\tpath := ctx.Scan.PopValue(\"file\")\n \t\tpath = expandPath(path)\n \t\tstat, err := os.Stat(path)\n@@ -399,6 +405,9 @@ func existingDirMapper(r *Registry) MapperFunc {\n \t\tif target.Kind() == reflect.Slice {\n \t\t\treturn sliceDecoder(r)(ctx, target)\n \t\t}\n+\t\tif target.Kind() != reflect.String {\n+\t\t\treturn fmt.Errorf(\"\\\"existingdir\\\" must be applied to a string not %s\", target.Type())\n+\t\t}\n \t\tpath := ctx.Scan.PopValue(\"file\")\n \t\tpath = expandPath(path)\n \t\tstat, err := os.Stat(path)\n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    ".golangci.yml",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/console.go",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/main.go",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "context.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "go.mod",
+    "go.sum",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "tokentype_string.go",
+    "util.go",
+    "util_test.go",
+    "visit.go"
+  ],
+  "explanation": {
+    "what": "pathMapper・existingFileMapper・existingDirMapper の3つの Mapper 実装に、target.Kind() が reflect.String でない場合はエラーを返すチェックを追加した。これまではスライス以外なら無条件に target.SetString(path) を呼んでいたため、string 以外の型のフィールドに path/existingfile/existingdir タグを付けると reflect が panic していた。",
+    "why": "コミットメッセージ \"Don't blindly SetString.\" の通り、型チェックをせずに SetString していたことが問題だったと読める。おそらく string 以外の型に誤ってこれらのタグを付けたときに reflect の panic ではなく分かりやすいエラーメッセージを返すための防御的な修正と考えられる。",
+    "highlights": [
+      { "file": "mapper.go", "note": "3つの Mapper 関数それぞれに追加された reflect.String チェックとエラーメッセージ" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "inferred",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

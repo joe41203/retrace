@@ -1,0 +1,119 @@
+{
+  "seq": 156,
+  "sha": "cd3f64f045bb42ea6aa96ae60231e3817380a543",
+  "parents": [
+    "d15c8fca8dfd0f4dba023021118452517cf36d9a"
+  ],
+  "author": {
+    "name": "Alec Thomas",
+    "email": "alec@swapoff.org",
+    "date": "2019-11-13T08:16:32+11:00"
+  },
+  "message": "Support \"yes\", \"1\" and \"true\" for bool values.",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 4,
+    "additions": 17,
+    "deletions": 2
+  },
+  "files": [
+    {
+      "path": ".circleci/config.yml",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": ".golangci.yml",
+      "status": "M",
+      "additions": 3,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "go.mod",
+      "status": "M",
+      "additions": 2,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "mapper.go",
+      "status": "M",
+      "additions": 11,
+      "deletions": 1,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/.circleci/config.yml b/.circleci/config.yml\nindex 035a373..eb50adf 100644\n--- a/.circleci/config.yml\n+++ b/.circleci/config.yml\n@@ -12,7 +12,7 @@ jobs:\n           command: |\n             go get -v github.com/jstemmer/go-junit-report\n             go get -v -t -d ./...\n-            curl -sfL https://install.goreleaser.com/github.com/golangci/golangci-lint.sh | bash -s v1.15.0\n+            curl -sfL https://install.goreleaser.com/github.com/golangci/golangci-lint.sh | bash -s v1.21.0\n             mkdir ~/report\n           when: always\n       - run:\ndiff --git a/.golangci.yml b/.golangci.yml\nindex 0b9ebc2..48925a8 100644\n--- a/.golangci.yml\n+++ b/.golangci.yml\n@@ -10,6 +10,9 @@ linters:\n     - maligned\n     - lll\n     - gochecknoglobals\n+    - wsl\n+    - funlen\n+    - gocognit\n \n linters-settings:\n   govet:\ndiff --git a/go.mod b/go.mod\nindex 757bb09..c6f418f 100644\n--- a/go.mod\n+++ b/go.mod\n@@ -7,3 +7,5 @@ require (\n \tgithub.com/pmezard/go-difflib v1.0.0 // indirect\n \tgithub.com/stretchr/testify v1.2.2\n )\n+\n+go 1.13\ndiff --git a/mapper.go b/mapper.go\nindex 58e45bb..a2a60e4 100644\n--- a/mapper.go\n+++ b/mapper.go\n@@ -217,7 +217,17 @@ func (boolMapper) Decode(ctx *DecodeContext, target reflect.Value) error {\n \t\ttoken := ctx.Scan.Pop()\n \t\tswitch v := token.Value.(type) {\n \t\tcase string:\n-\t\t\ttarget.SetBool(strings.ToLower(v) == \"true\")\n+\t\t\tv = strings.ToLower(v)\n+\t\t\tswitch v {\n+\t\t\tcase \"true\", \"1\", \"yes\":\n+\t\t\t\ttarget.SetBool(true)\n+\n+\t\t\tcase \"false\", \"0\", \"no\":\n+\t\t\t\ttarget.SetBool(false)\n+\n+\t\t\tdefault:\n+\t\t\t\treturn errors.Errorf(\"bool value must be true, 1, yes, false, 0 or no but got %q\", v)\n+\t\t\t}\n \n \t\tcase bool:\n \t\t\ttarget.SetBool(v)\n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    ".golangci.yml",
+    "COPYING",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/console.go",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/main.go",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "config_test.go",
+    "context.go",
+    "defaults.go",
+    "defaults_test.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "go.mod",
+    "go.sum",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "util.go",
+    "util_test.go",
+    "visit.go"
+  ],
+  "explanation": {
+    "what": "boolMapper.Decode で文字列トークンを bool に変換する際、従来は \"true\" のみを true 扱いとしていたのを、\"true\"/\"1\"/\"yes\" を true、\"false\"/\"0\"/\"no\" を false とし、それ以外は明示的にエラーを返すよう変更した。あわせて go.mod に `go 1.13` を追加し、golangci-lint を v1.21.0 に、.golangci.yml に wsl/funlen/gocognit リンターを追加した。",
+    "why": "コミットメッセージの通り、bool 値として \"yes\"/\"1\"/\"true\" のような複数の表記を受け付けるための機能追加。あわせてビルド環境(golangci-lint・go.mod)を最新化している。",
+    "highlights": [
+      { "file": "mapper.go", "note": "boolMapper.Decode の switch で true/false 双方の同義語を判定し、それ以外はエラーメッセージで許容値を列挙する" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

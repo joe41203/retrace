@@ -1,0 +1,109 @@
+{
+  "seq": 198,
+  "sha": "d4822839a2ea5f7d5c8960c8d8479beeecbe2692",
+  "parents": [
+    "f19f1031c032a23ba12f3c18289555547fa9669f"
+  ],
+  "author": {
+    "name": "Cam Hutchison",
+    "email": "camh@xdna.net",
+    "date": "2020-06-02T11:19:45+10:00"
+  },
+  "message": "Add GetSep to simplify Tag initialisation\n\nFactor out some repetition from `parseTag()` into a `GetSep()` method so\nas to simplify `parseTag()` and formalise the semantics of a separator.\n\nThe existing behaviour in corner/error cases has been preserved, but an\nappropriate error is returned (currently ignored) so a future breaking\nchange could be made to handle these conditions.\n\nTests have not been added as the test files are in a separate package to\nthe unit under test, making direct `Tag` construction difficult. Testing\nthrough the exported APIs is already performed in the\n`FormatPlaceHolder()` tests.",
+  "pr": {
+    "number": 85,
+    "title": "Fix sep:\"none\" and mapsep:\"none\"",
+    "body": "According to the README.md, a value of `\"none\"` for the `sep` tag (for\nslices) and `mapsep` (for maps) is meant to disable the separator that\nwould allow multiple entries to be added from a single argument.\nHowever, using `\"none\"` just set the separator to the rune `'n'`.\n\nFix the parsing of the tag, and also update `SplitEscaped` to not split\nwith a separator of `-1`.\n\nAdd a new test for the new cases.",
+    "url": "https://github.com/alecthomas/kong/pull/85"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 22,
+    "deletions": 16
+  },
+  "files": [
+    {
+      "path": "tag.go",
+      "status": "M",
+      "additions": 22,
+      "deletions": 16,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/tag.go b/tag.go\nindex b0d2fe5..4c58517 100644\n--- a/tag.go\n+++ b/tag.go\n@@ -151,26 +151,12 @@ func parseTag(fv reflect.Value, ft reflect.StructField) *Tag {\n \tt.Short, _ = t.GetRune(\"short\")\n \tt.Hidden = t.Has(\"hidden\")\n \tt.Format = t.Get(\"format\")\n+\tt.Sep, _ = t.GetSep(\"sep\", ',')\n+\tt.MapSep, _ = t.GetSep(\"mapsep\", ';')\n \tt.Group = t.Get(\"group\")\n \tt.Xor = t.Get(\"xor\")\n \tt.Prefix = t.Get(\"prefix\")\n \tt.Embed = t.Has(\"embed\")\n-\tif t.Get(\"sep\") == \"none\" {\n-\t\tt.Sep = -1\n-\t} else {\n-\t\tt.Sep, _ = t.GetRune(\"sep\")\n-\t\tif t.Sep == 0 {\n-\t\t\tt.Sep = ','\n-\t\t}\n-\t}\n-\tif t.Get(\"mapsep\") == \"none\" {\n-\t\tt.MapSep = -1\n-\t} else {\n-\t\tt.MapSep, _ = t.GetRune(\"mapsep\")\n-\t\tif t.MapSep == 0 {\n-\t\t\tt.MapSep = ';'\n-\t\t}\n-\t}\n \tt.Vars = Vars{}\n \tfor _, set := range t.GetAll(\"set\") {\n \t\tparts := strings.SplitN(set, \"=\", 2)\n@@ -232,3 +218,23 @@ func (t *Tag) GetRune(k string) (rune, error) {\n \t}\n \treturn r, nil\n }\n+\n+// GetSep parses the given tag as a rune separator, allowing for a default or none.\n+// The separator is returned, or -1 if \"none\" is specified. If the tag value is an\n+// invalid utf8 sequence, the default rune is returned as well as an error. If the\n+// tag value is more than one rune, the first rune is returned as well as an error.\n+func (t *Tag) GetSep(k string, dflt rune) (rune, error) {\n+\ttv := t.Get(k)\n+\tif tv == \"none\" {\n+\t\treturn -1, nil\n+\t} else if tv == \"\" {\n+\t\treturn dflt, nil\n+\t}\n+\tr, size := utf8.DecodeRuneInString(tv)\n+\tif r == utf8.RuneError {\n+\t\treturn dflt, fmt.Errorf(`%v:\"%v\" has a rune error`, k, tv)\n+\t} else if size != len(tv) {\n+\t\treturn r, fmt.Errorf(`%v:\"%v\" is more than a single rune`, k, tv)\n+\t}\n+\treturn r, nil\n+}\n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    ".golangci.yml",
+    "COPYING",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/README.md",
+    "_examples/server/console.go",
+    "_examples/server/go.mod",
+    "_examples/server/go.sum",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/main.go",
+    "benchmark_test.go",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "config_test.go",
+    "context.go",
+    "defaults.go",
+    "defaults_test.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "go.mod",
+    "go.sum",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "util.go",
+    "util_test.go",
+    "visit.go"
+  ],
+  "explanation": {
+    "what": "tag.go の parseTag() 内に散らばっていた sep/mapsep の \"none\" 判定・デフォルト値決定ロジックを Tag.GetSep(k string, dflt rune) メソッドに切り出した。GetSep は \"none\" なら -1、空なら dflt、不正な UTF-8 やルーン2文字以上ならエラーを返す(現状は呼び出し側でエラーは無視)仕様として明文化されている。",
+    "why": "コミットメッセージの通り、seq196/197 で修正した sep/mapsep の \"none\" 処理は parseTag() に直書きされて重複気味だったため、共通メソッドとして抽出し意味を形式化した。テストは追加していない(Tag を直接構築するテストが別パッケージで難しいため)が、既存の FormatPlaceHolder() テストが間接的にこの経路をカバーしている、とメッセージで説明されている。",
+    "highlights": [
+      { "file": "tag.go", "note": "新設の GetSep() が \"none\"→-1、空→デフォルト、不正値→エラー付き既定値、を1メソッドに集約" }
+    ],
+    "langNotes": [
+      { "topic": "utf8.DecodeRuneInString", "note": "Go 標準の unicode/utf8 パッケージで文字列先頭の1ルーン(Unicodeコードポイント)を取り出す。不正なバイト列だと utf8.RuneError を返す。区切り文字をユーザー入力の1文字として安全にパースするための定石。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [{ "type": "pr", "number": 85, "url": "https://github.com/alecthomas/kong/pull/85" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

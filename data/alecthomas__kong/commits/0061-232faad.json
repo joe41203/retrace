@@ -1,0 +1,180 @@
+{
+  "seq": 61,
+  "sha": "232faad0a0251fb8c02780aa82cc0b6cd9d3bda4",
+  "parents": [
+    "a5c97373baa3b8e10176416421eb88145bb5f70a"
+  ],
+  "author": {
+    "name": "Alec Thomas",
+    "email": "alec@swapoff.org",
+    "date": "2018-06-13T10:33:22+10:00"
+  },
+  "message": "Add configuration loading + docs + linter fixes.",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 15,
+    "additions": 218,
+    "deletions": 17
+  },
+  "files": [
+    {
+      "path": ".circleci/config.yml",
+      "status": "M",
+      "additions": 5,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": ".golangci.yml",
+      "status": "A",
+      "additions": 33,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "README.md",
+      "status": "M",
+      "additions": 22,
+      "deletions": 2,
+      "binary": false
+    },
+    {
+      "path": "doc.go",
+      "status": "A",
+      "additions": 30,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "global.go",
+      "status": "M",
+      "additions": 3,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "guesswidth_unix.go",
+      "status": "M",
+      "additions": 2,
+      "deletions": 2,
+      "binary": false
+    },
+    {
+      "path": "kong.go",
+      "status": "M",
+      "additions": 2,
+      "deletions": 2,
+      "binary": false
+    },
+    {
+      "path": "kong_test.go",
+      "status": "M",
+      "additions": 2,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "model.go",
+      "status": "M",
+      "additions": 10,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "options.go",
+      "status": "M",
+      "additions": 50,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "options_test.go",
+      "status": "M",
+      "additions": 31,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "resolver.go",
+      "status": "M",
+      "additions": 4,
+      "deletions": 4,
+      "binary": false
+    },
+    {
+      "path": "resolver_test.go",
+      "status": "M",
+      "additions": 7,
+      "deletions": 6,
+      "binary": false
+    },
+    {
+      "path": "scanner.go",
+      "status": "M",
+      "additions": 10,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "tag.go",
+      "status": "M",
+      "additions": 7,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/.circleci/config.yml b/.circleci/config.yml\nindex f8257b3..7122cbc 100644\n--- a/.circleci/config.yml\n+++ b/.circleci/config.yml\n@@ -12,8 +12,13 @@ jobs:\n           command: |\n             go get -v github.com/jstemmer/go-junit-report\n             go get -v -t -d ./...\n+            curl -sfL https://install.goreleaser.com/github.com/golangci/golangci-lint.sh | bash -s latest\n             mkdir ~/report\n           when: always\n+      - run:\n+          name: Lint\n+          command: |\n+            ./bin/golangci-lint run\n       - run:\n           name: Test\n           command: |\ndiff --git a/.golangci.yml b/.golangci.yml\nnew file mode 100644\nindex 0000000..e500bc5\n--- /dev/null\n+++ b/.golangci.yml\n@@ -0,0 +1,33 @@\n+run:\n+  tests: true\n+\n+output:\n+  print-issued-lines: false\n+\n+linters:\n+  enable-all: true\n+  disable:\n+    - maligned\n+\n+linters-settings:\n+  govet:\n+    check-shadowing: true\n+  gocyclo:\n+    min-complexity: 10\n+  dupl:\n+    threshold: 100\n+  goconst:\n+    min-len: 5\n+    min-occurrences: 3\n+  gocyclo:\n+    min-complexity: 20\n+\n+issues:\n+  max-per-linter: 0\n+  max-same: 0\n+  exclude-use-default: false\n+  exclude:\n+    - '^(G104|G204):'\n+    # Very commonly not checked.\n+    - 'Error return value of .(.*\\.Help|.*\\.MarkFlagRequired|(os\\.)?std(out|err)\\..*|.*Close|.*Flush|os\\.Remove(All)?|.*printf?|os\\.(Un)?Setenv). is not checked'\n+    - 'exported method (.*\\.MarshalJSON|.*\\.UnmarshalJSON) should have comment or be unexported'\ndiff --git a/README.md b/README.md\nindex e96c6fb..ddcce98 100644\n--- a/README.md\n+++ b/README.md\n@@ -10,6 +10,8 @@\n 1. [Commands and sub-commands](#commands-and-sub-commands)\n 1. [Supported tags](#supported-tags)\n 1. [Configuring Kong](#configuring-kong)\n+    1. [`Configuration(loader, paths...)` - load defaults from configuration files](#configurationloader-paths---load-defaults-from-configuration-files)\n+    1. [`Resolver(...)` - support for default values from external sources](#resolver---support-for-default-values-from-external-sources)\n     1. [`*Mapper(...)` - customising how the command-line is mapped to Go values](#mapper---customising-how-the-command-line-is-mapped-to-go-values)\n     1. [`Help(HelpFunc)` - customising help](#helphelpfunc---customising-help)\n     1. [`Hook(&field, HookFunc)` - callback hooks to execute when the command-line is parsed](#hookfield-hookfunc---callback-hooks-to-execute-when-the-command-line-is-parsed)\n@@ -159,7 +161,25 @@ Both can coexist with standard Tag parsing.\n \n ## Configuring Kong\n \n-Each Kong parser can be configured via functional options passed to `New(cli interface{}, options...Option)`. The full set of options can be found in `options.go`.\n+Each Kong parser can be configured via functional options passed to `New(cli interface{}, options...Option)`.\n+\n+The full set of options can be found in [options.go](https://github.com/alecthomas/kong/blob/master/options.go).\n+\n+### `Configuration(loader, paths...)` - load defaults from configuration files\n+\n+This option provides Kong with support for loading defaults from a set of configuration files. Each file is opened, if possible, and the loader called to create a resolver for that file.\n+\n+eg.\n+\n+```go\n+kong.Parse(&cli, kong.Configuration(kong.JSON, \"/etc/myapp.json\", \"~/.myapp.json\"))\n+```\n+\n+### `Resolver(...)` - support for default values from external sources\n+\n+Resolvers are Kong's extension point for providing default values from external sources. As an example, support for environment variables via the `env` tag is provided by a resolver. There's also a builtin resolver for JSON configuration files.\n+\n+Example resolvers can be found in [resolver.go](https://github.com/alecthomas/kong/blob/master/resolver.go).\n \n ### `*Mapper(...)` - customising how the command-line is mapped to Go values\n \n@@ -176,7 +196,7 @@ type Mapper interface {\n }\n ```\n \n-All builtin Go types (as well as a bunch of useful stdlib types like `time.Time`) have mapperss registered by default. Mappers for custom types can be added using `kong.??Mapper(...)` options. Mappers are applied to fields in four ways:\n+All builtin Go types (as well as a bunch of useful stdlib types like `time.Time`) have mappers registered by default. Mappers for custom types can be added using `kong.??Mapper(...)` options. Mappers are applied to fields in four ways:\n \n 1. `NamedMapper(string, Mapper)` and using the tag key `type:\"<name>\"`.\n 2. `KindMapper(reflect.Kind, Mapper)`.\ndiff --git a/doc.go b/doc.go\nnew file mode 100644\nindex 0000000..6d7ca89\n--- /dev/null\n+++ b/doc.go\n@@ -0,0 +1,30 @@\n+// Package kong aims to support arbitrarily complex command-line structures with as little developer effort as possible.\n+//\n+// Here's an example:\n+//\n+//     shell rm [-f] [-r] <paths> ...\n+//     shell ls [<paths> ...]\n+//\n+// This can be represented by the following command-line structure:\n+//\n+//     package main\n+//\n+//     import \"github.com/alecthomas/kong\"\n+//\n+//     var CLI struct {\n+//       Rm struct {\n+//         Force     bool `short:\"f\" help:\"Force removal.\"`\n+//         Recursive bool `short:\"r\" help:\"Recursively remove files.\"`\n+//\n+//         Paths []string `arg help:\"Paths to remove.\" type:\"path\"`\n+//       } `cmd help:\"Remove files.\"`\n+//\n+//       Ls struct {\n+//         Paths []string `arg optional help:\"Paths to list.\" type:\"path\"`\n+//       } `cmd help:\"List paths.\"`\n+//     }\n+//\n+//     func main() {\n+//       kong.Parse(&CLI)\n+//     }\n+package kong\ndiff --git a/global.go b/global.go\nindex 10aaa27..d90d130 100644\n--- a/global.go\n+++ b/global.go\n@@ -19,6 +19,7 @@ func Parse(cli interface{}, options ...Option) string {\n \treturn cmd\n }\n \n+// FatalIfErrorf terminates with an error message if err != nil.\n func FatalIfErrorf(err error, args ...interface{}) {\n \tif App == nil {\n \t\tpanic(\"call kong.Parse() before using kong.FatalIfErrorf()\")\n@@ -26,6 +27,7 @@ func FatalIfErrorf(err error, args ...interface{}) {\n \tApp.FatalIfErrorf(err, args...)\n }\n \n+// Errorf writes a message to Kong.Stderr with the application name prefixed.\n func Errorf(format string, args ...interface{}) {\n \tif App == nil {\n \t\tpanic(\"call kong.Parse() before using kong.Errorf()\")\n@@ -33,6 +35,7 @@ func Errorf(format string, args ...interface{}) {\n \tApp.Errorf(format, args...)\n }\n \n+// Printf writes a message to Kong.Stdout with the application name prefixed.\n func Printf(format string, args ...interface{}) {\n \tif App == nil {\n \t\tpanic(\"call kong.Parse() before using kong.Printf()\")\ndiff --git a/guesswidth_unix.go b/guesswidth_unix.go\nindex fbf7e22..b549ed4 100644\n--- a/guesswidth_unix.go\n+++ b/guesswidth_unix.go\n@@ -26,9 +26,9 @@ func guessWidth(w io.Writer) int {\n \n \t\tif _, _, err := syscall.Syscall6(\n \t\t\tsyscall.SYS_IOCTL,\n-\t\t\tuintptr(fd),\n+\t\t\tuintptr(fd), // nolint: unconvert\n \t\t\tuintptr(syscall.TIOCGWINSZ),\n-\t\t\tuintptr(unsafe.Pointer(&dimensions)),\n+\t\t\tuintptr(unsafe.Pointer(&dimensions)), // nolint: gas\n \t\t\t0, 0, 0,\n \t\t); err == 0 {\n \t\t\treturn int(dimensions[1])\ndiff --git a/kong.go b/kong.go\nindex 42b9c47..dc2fbf3 100644\n--- a/kong.go\n+++ b/kong.go\n@@ -58,7 +58,7 @@ func New(grammar interface{}, options ...Option) (*Kong, error) {\n \t\tbefore:    map[reflect.Value]HookFunc{},\n \t\tregistry:  NewRegistry().RegisterDefaults(),\n \t\thelp:      PrintHelp,\n-\t\tresolvers: []ResolverFunc{EnvResolver()},\n+\t\tresolvers: []ResolverFunc{Envars()},\n \t}\n \n \tfor _, option := range options {\n@@ -123,7 +123,7 @@ func (k *Kong) Parse(args []string) (command string, err error) {\n \tif err != nil {\n \t\treturn \"\", err\n \t}\n-\tif err := k.applyHooks(ctx); err != nil {\n+\tif err = k.applyHooks(ctx); err != nil {\n \t\treturn \"\", err\n \t}\n \tif ctx.Error != nil {\ndiff --git a/kong_test.go b/kong_test.go\nindex 62fbd2d..1835ec4 100644\n--- a/kong_test.go\n+++ b/kong_test.go\n@@ -112,6 +112,7 @@ func TestFlagSliceWithSeparator(t *testing.T) {\n }\n \n func TestArgSlice(t *testing.T) {\n+\t// nolint: govet\n \tvar cli struct {\n \t\tSlice []int `arg`\n \t\tFlag  bool\n@@ -124,6 +125,7 @@ func TestArgSlice(t *testing.T) {\n }\n \n func TestArgSliceWithSeparator(t *testing.T) {\n+\t// nolint: govet\n \tvar cli struct {\n \t\tSlice []string `arg`\n \t\tFlag  bool\ndiff --git a/model.go b/model.go\nindex 809d1d5..fe438c0 100644\n--- a/model.go\n+++ b/model.go\n@@ -7,23 +7,29 @@ import (\n \t\"strings\"\n )\n \n+// Application is the root of the Kong model.\n type Application struct {\n \tNode\n \tHelpFlag *Flag\n }\n \n+// Argument represents a branching positional argument.\n type Argument = Node\n \n+// Command represents a command in the CLI.\n type Command = Node\n \n+// NodeType is an enum representing the type of a Node.\n type NodeType int\n \n+// Node type enumerations.\n const (\n \tApplicationNode NodeType = iota\n \tCommandNode\n \tArgumentNode\n )\n \n+// Node is a branch in the CLI. ie. a command or positional argument.\n type Node struct {\n \tType       NodeType\n \tParent     *Node\n@@ -37,6 +43,7 @@ type Node struct {\n \tArgument *Value // Populated when Type is ArgumentNode.\n }\n \n+// AllFlags returns flags from all ancestor branches encountered.\n func (n *Node) AllFlags() (out [][]*Flag) {\n \tif n.Parent != nil {\n \t\tout = append(out, n.Parent.AllFlags()...)\n@@ -186,6 +193,9 @@ func (v *Value) Apply(value reflect.Value) {\n \tv.Set = true\n }\n \n+// Reset this value to its default, either the zero value or the parsed result of its \"default\" tag.\n+//\n+// Does not include resolvers.\n func (v *Value) Reset() error {\n \tv.Value.Set(reflect.Zero(v.Value.Type()))\n \tif v.Default != \"\" {\ndiff --git a/options.go b/options.go\nindex 17e95cc..db43d7e 100755\n--- a/options.go\n+++ b/options.go\n@@ -2,10 +2,14 @@ package kong\n \n import (\n \t\"io\"\n+\t\"os\"\n+\t\"os/user\"\n+\t\"path/filepath\"\n \t\"reflect\"\n+\t\"strings\"\n )\n \n-// Options apply optional changes to the Kong application.\n+// An Option applies optional changes to the Kong application.\n type Option func(k *Kong)\n \n // ExitFunction overrides the function used to terminate. This is useful for testing or interactive use.\n@@ -110,3 +114,48 @@ func Resolver(resolvers ...ResolverFunc) Option {\n \t\tk.resolvers = append(k.resolvers, resolvers...)\n \t}\n }\n+\n+// ConfigurationFunc is a function that builds a resolver from a file.\n+type ConfigurationFunc func(r io.Reader) (ResolverFunc, error)\n+\n+// Configuration provides Kong with support for loading defaults from a set of configuration files.\n+//\n+// Paths will be opened in order, and \"loader\" will be used to provide a ResolverFunc which is registered with Kong.\n+//\n+// Note: The JSON function is a ConfigurationFunc.\n+//\n+// ~ expansion will occur on the provided paths.\n+func Configuration(loader ConfigurationFunc, paths ...string) Option {\n+\treturn func(k *Kong) {\n+\t\tfor _, path := range paths {\n+\t\t\tpath = expandPath(path)\n+\t\t\tr, err := os.Open(path) // nolint: gas\n+\t\t\tif err != nil {\n+\t\t\t\tcontinue\n+\t\t\t}\n+\t\t\tresolver, err := loader(r)\n+\t\t\tif err == nil {\n+\t\t\t\tk.resolvers = append(k.resolvers, resolver)\n+\t\t\t}\n+\t\t\t_ = r.Close()\n+\t\t}\n+\t}\n+}\n+\n+func expandPath(path string) string {\n+\tif filepath.IsAbs(path) {\n+\t\treturn path\n+\t}\n+\tif strings.HasPrefix(path, \"~/\") {\n+\t\tuser, err := user.Current()\n+\t\tif err != nil {\n+\t\t\treturn path\n+\t\t}\n+\t\treturn filepath.Join(user.HomeDir, path[2:])\n+\t}\n+\tabspath, err := filepath.Abs(path)\n+\tif err != nil {\n+\t\treturn path\n+\t}\n+\treturn abspath\n+}\ndiff --git a/options_test.go b/options_test.go\nindex 61c7de1..fed4a81 100644\n--- a/options_test.go\n+++ b/options_test.go\n@@ -1,6 +1,9 @@\n package kong\n \n import (\n+\t\"encoding/json\"\n+\t\"io/ioutil\"\n+\t\"os\"\n \t\"testing\"\n \n \t\"github.com/stretchr/testify/require\"\n@@ -16,3 +19,31 @@ func TestOptions(t *testing.T) {\n \trequire.Nil(t, p.Stderr)\n \trequire.Nil(t, p.Exit)\n }\n+\n+func TestConfigLoading(t *testing.T) {\n+\tfirst, err := ioutil.TempFile(\"\", \"\")\n+\trequire.NoError(t, err)\n+\tdefer first.Close()\n+\tdefer os.Remove(first.Name())\n+\tsecond, err := ioutil.TempFile(\"\", \"\")\n+\trequire.NoError(t, err)\n+\tdefer second.Close()\n+\tdefer os.Remove(second.Name())\n+\n+\tvar cli struct {\n+\t\tFlag string `json:\"flag,omitempty\"`\n+\t}\n+\n+\tcli.Flag = \"first\"\n+\terr = json.NewEncoder(first).Encode(&cli)\n+\trequire.NoError(t, err)\n+\n+\tcli.Flag = \"\"\n+\terr = json.NewEncoder(second).Encode(&cli)\n+\trequire.NoError(t, err)\n+\n+\tp := mustNew(t, &cli, Configuration(JSON, first.Name(), second.Name()))\n+\t_, err = p.Parse(nil)\n+\trequire.NoError(t, err)\n+\trequire.Equal(t, \"first\", cli.Flag)\n+}\ndiff --git a/resolver.go b/resolver.go\nindex c2495fe..08520ae 100755\n--- a/resolver.go\n+++ b/resolver.go\n@@ -11,10 +11,10 @@ import (\n // ResolverFunc resolves a Flag value from an external source.\n type ResolverFunc func(context *Context, parent *Path, flag *Flag) (string, error)\n \n-// JSONResolver returns a Resolver that retrieves values from a JSON source.\n+// JSON returns a Resolver that retrieves values from a JSON source.\n //\n // Hyphens in flag names are replaced with underscores.\n-func JSONResolver(r io.Reader) (ResolverFunc, error) {\n+func JSON(r io.Reader) (ResolverFunc, error) {\n \tvalues := map[string]interface{}{}\n \terr := json.NewDecoder(r).Decode(&values)\n \tif err != nil {\n@@ -61,10 +61,10 @@ func jsonDecodeValue(sep rune, value interface{}) (string, error) {\n \treturn \"\", fmt.Errorf(\"unsupported JSON value %v (of type %T)\", value, value)\n }\n \n-// EnvResolver resolves flag values using the `env:\"<name>\"` tag. It ignores flags without this tag.\n+// Envars resolves flag values using the `env:\"<name>\"` tag. It ignores flags without this tag.\n //\n // This resolver is installed by default.\n-func EnvResolver() ResolverFunc {\n+func Envars() ResolverFunc {\n \treturn func(context *Context, parent *Path, flag *Flag) (string, error) {\n \t\tif flag.Tag.Env == \"\" {\n \t\t\treturn \"\", nil\ndiff --git a/resolver_test.go b/resolver_test.go\nindex 8e6c5ef..0bd02e1 100755\n--- a/resolver_test.go\n+++ b/resolver_test.go\n@@ -30,7 +30,7 @@ func newEnvParser(t *testing.T, cli interface{}, env envMap) (*Kong, func()) {\n \treturn parser, restoreEnv\n }\n \n-func TestEnvResolverFlagBasic(t *testing.T) {\n+func TestEnvarsFlagBasic(t *testing.T) {\n \tvar cli struct {\n \t\tString string `env:\"KONG_STRING\"`\n \t\tSlice  []int  `env:\"KONG_SLICE\"`\n@@ -47,7 +47,7 @@ func TestEnvResolverFlagBasic(t *testing.T) {\n \trequire.Equal(t, []int{5, 2, 9}, cli.Slice)\n }\n \n-func TestEnvResolverFlagOverride(t *testing.T) {\n+func TestEnvarsFlagOverride(t *testing.T) {\n \tvar cli struct {\n \t\tFlag string `env:\"KONG_FLAG\"`\n \t}\n@@ -59,7 +59,7 @@ func TestEnvResolverFlagOverride(t *testing.T) {\n \trequire.Equal(t, \"hello\", cli.Flag)\n }\n \n-func TestEnvResolverOnlyPopulateUsedBranches(t *testing.T) {\n+func TestEnvarsOnlyPopulateUsedBranches(t *testing.T) {\n \t// nolint\n \tvar cli struct {\n \t\tUnvisitedArg struct {\n@@ -84,7 +84,7 @@ func TestEnvResolverOnlyPopulateUsedBranches(t *testing.T) {\n \trequire.Equal(t, 0, cli.UnvisitedCmd.Int)\n }\n \n-func TestEnvResolverTag(t *testing.T) {\n+func TestEnvarsTag(t *testing.T) {\n \tvar cli struct {\n \t\tSlice []int `env:\"KONG_NUMBERS\"`\n \t}\n@@ -96,7 +96,7 @@ func TestEnvResolverTag(t *testing.T) {\n \trequire.Equal(t, []int{5, 2, 9}, cli.Slice)\n }\n \n-func TestJSONResolverBasic(t *testing.T) {\n+func TestJSONBasic(t *testing.T) {\n \tvar cli struct {\n \t\tString          string\n \t\tSlice           []int\n@@ -111,7 +111,7 @@ func TestJSONResolverBasic(t *testing.T) {\n \t\t\"slice_with_commas\": [\"a,b\", \"c\"]\n \t}`\n \n-\tr, err := JSONResolver(strings.NewReader(json))\n+\tr, err := JSON(strings.NewReader(json))\n \trequire.NoError(t, err)\n \n \tparser := mustNew(t, &cli, Resolver(r))\n@@ -219,6 +219,7 @@ func TestLastResolverWins(t *testing.T) {\n }\n \n func TestResolverSatisfiesRequired(t *testing.T) {\n+\t// nolint: govet\n \tvar cli struct {\n \t\tInt int `required`\n \t}\ndiff --git a/scanner.go b/scanner.go\nindex 583531b..765f3b3 100644\n--- a/scanner.go\n+++ b/scanner.go\n@@ -21,6 +21,7 @@ const (\n \tPositionalArgumentToken // <arg>\n )\n \n+// Token created by Scanner.\n type Token struct {\n \tValue string\n \tType  TokenType\n@@ -42,10 +43,12 @@ func (t Token) String() string {\n \t}\n }\n \n+// IsEOL returns true if this Token is past the end of the line.\n func (t Token) IsEOL() bool {\n \treturn t.Type == EOLToken\n }\n \n+// IsAny returns true if the token's type is any of those provided.\n func (t Token) IsAny(types ...TokenType) bool {\n \tfor _, typ := range types {\n \t\tif t.Type == typ {\n@@ -75,6 +78,7 @@ type Scanner struct {\n \targs []Token\n }\n \n+// Scan creates a new Scanner from args with untyped tokens.\n func Scan(args ...string) *Scanner {\n \ts := &Scanner{}\n \tfor _, arg := range args {\n@@ -83,10 +87,12 @@ func Scan(args ...string) *Scanner {\n \treturn s\n }\n \n+// Len returns the number of input arguments.\n func (s *Scanner) Len() int {\n \treturn len(s.args)\n }\n \n+// Pop the front token off the Scanner.\n func (s *Scanner) Pop() Token {\n \tif len(s.args) == 0 {\n \t\treturn Token{Type: EOLToken}\n@@ -123,6 +129,7 @@ func (s *Scanner) PopUntil(predicate func(Token) bool) (values []string) {\n \treturn\n }\n \n+// Peek at the next Token or return an EOLToken.\n func (s *Scanner) Peek() Token {\n \tif len(s.args) == 0 {\n \t\treturn Token{Type: EOLToken}\n@@ -130,16 +137,19 @@ func (s *Scanner) Peek() Token {\n \treturn s.args[0]\n }\n \n+// Push an untyped Token onto the front of the Scanner.\n func (s *Scanner) Push(arg string) *Scanner {\n \ts.PushToken(Token{Value: arg})\n \treturn s\n }\n \n+// PushTyped pushes a typed token onto the front of the Scanner.\n func (s *Scanner) PushTyped(arg string, typ TokenType) *Scanner {\n \ts.PushToken(Token{Value: arg, Type: typ})\n \treturn s\n }\n \n+// PushToken pushes a preconstructed Token onto the front of the Scanner.\n func (s *Scanner) PushToken(token Token) *Scanner {\n \ts.args = append([]Token{token}, s.args...)\n \treturn s\ndiff --git a/tag.go b/tag.go\nindex fd445c0..17a71e6 100644\n--- a/tag.go\n+++ b/tag.go\n@@ -8,6 +8,7 @@ import (\n \t\"unicode/utf8\"\n )\n \n+// Tag represents the parsed state of Kong tags in a struct field tag.\n type Tag struct {\n \tCmd         bool\n \tArg         bool\n@@ -145,28 +146,34 @@ func parseTag(fv reflect.Value, ft reflect.StructField) *Tag {\n \treturn t\n }\n \n+// Has returns true if the tag contained the given key.\n func (t *Tag) Has(k string) bool {\n \t_, ok := t.items[k]\n \treturn ok\n }\n \n+// Get returns the value of the given tag.\n func (t *Tag) Get(k string) (string, bool) {\n \ts, ok := t.items[k]\n \treturn s, ok\n }\n \n+// GetBool returns true if the given tag looks like a boolean truth string.\n func (t *Tag) GetBool(k string) (bool, error) {\n \treturn strconv.ParseBool(t.items[k])\n }\n \n+// GetFloat parses the given tag as a float64.\n func (t *Tag) GetFloat(k string) (float64, error) {\n \treturn strconv.ParseFloat(t.items[k], 64)\n }\n \n+// GetInt parses the given tag as an int64.\n func (t *Tag) GetInt(k string) (int64, error) {\n \treturn strconv.ParseInt(t.items[k], 10, 64)\n }\n \n+// GetRune parses the given tag as a rune.\n func (t *Tag) GetRune(k string) (rune, error) {\n \tr, _ := utf8.DecodeRuneInString(t.items[k])\n \tif r == utf8.RuneError {\n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    ".golangci.yml",
+    "README.md",
+    "_examples/shell/main.go",
+    "build.go",
+    "camelcase.go",
+    "context.go",
+    "doc.go",
+    "global.go",
+    "global_test.go",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "tokentype_string.go"
+  ],
+  "explanation": {
+    "what": "Configuration(loader, paths...) オプションを追加し、外部設定ファイルから resolver を組み立てて Kong に登録できるようにした。合わせて EnvResolver()/JSONResolver を Envars()/JSON にリネームし、golangci-lint を CI に導入して大量の lint 警告(doc コメント不足・shadowing 等)を修正している。",
+    "why": "既存の Resolver 拡張点(env タグ用の EnvResolver)を一般化し、JSON 設定ファイルからも同じ仕組みでデフォルト値を供給できるようにする狙い。README にも Configuration と Resolver の使い方を追記しており、外部ソースからの値解決という概念をユーザー向けに明文化する意図が読み取れる。golangci-lint 導入は同時に行われた副次的な品質改善。",
+    "highlights": [
+      { "file": "options.go", "note": "Configuration() が paths を順に開き、loader でファイルを ResolverFunc に変換して k.resolvers に追加する" },
+      { "file": "resolver.go", "note": "EnvResolver→Envars、JSONResolver→JSON へのリネームで名前空間を Kong の他の Option 群と揃えている" },
+      { "file": ".golangci.yml", "note": "enable-all な lint 設定を新規追加。以降のコミットで doc コメント付与などが頻発する起点" }
+    ],
+    "langNotes": [
+      { "topic": "ResolverFunc という関数型インターフェース", "note": "Go では `type ResolverFunc func(...) (string, error)` のように関数自体に型名を付け、それをそのままインターフェース的な差し込み点として使う書き方が一般的。Configuration() はファイルごとに ResolverFunc を1つ生成して Kong に登録する。" },
+      { "topic": "golangci-lint (メタリンター)", "note": "govet・golint・gocyclo など複数の Go 静的解析ツールを束ねて一括実行するツール。.golangci.yml でどのリンターを有効化するかや除外パターンを設定する。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

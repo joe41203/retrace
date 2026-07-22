@@ -1,0 +1,124 @@
+{
+  "seq": 232,
+  "sha": "454f2c067ef7c13a4ce665f73d515a39d710b4a2",
+  "parents": [
+    "2fdddc4f51b84086f40a70db3756571d10739de0"
+  ],
+  "author": {
+    "name": "Joe Schmitt",
+    "email": "joe@compass.com",
+    "date": "2021-02-18T11:38:31-05:00"
+  },
+  "message": "Add test case for inverting the negation\n\nNot sure why anyone would do this, but it's covered now.",
+  "pr": {
+    "number": 146,
+    "title": "Add support for negatable boolean flags",
+    "body": "Adds support for a new `negatable` struct tag, which will automatically set a boolean Struct flag value to `false` if the flag's name starts with `--no-`, even when the default is `true`. This idea is shamelessly stolen from the [`commander` npm library](https://github.com/tj/commander.js#other-option-types-negatable-boolean-and-booleanvalue)\r\n\r\nFor example:\r\n```go\r\ntype Cmd struct {\r\n  Sort bool `default:\"true\",negatable`\r\n}\r\n```\r\n\r\nCalling\r\n```sh\r\ncommand\r\n# or\r\ncommand --sort\r\n```\r\nWill set `Sort` to `true`, but\r\n```sh \r\ncommand --no-sort\r\n```\r\nWill set `Sort` to `false`.\r\n\r\n## Why do this?\r\n\r\nIt avoids the situation of having to do:\r\n```go\r\ntype Cmd struct {\r\n  NoSort bool\r\n}\r\n\r\nfunc (c *Cmd) Run() error {\r\n  if !c.NoSort {\r\n    // Double negations are hard to read!\r\n  }\r\n  return nil\r\n}\r\n```",
+    "url": "https://github.com/alecthomas/kong/pull/146"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 3,
+    "additions": 20,
+    "deletions": 5
+  },
+  "files": [
+    {
+      "path": "README.md",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "context.go",
+      "status": "M",
+      "additions": 6,
+      "deletions": 4,
+      "binary": false
+    },
+    {
+      "path": "kong_test.go",
+      "status": "M",
+      "additions": 13,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/README.md b/README.md\nindex ba040c0..78341a1 100644\n--- a/README.md\n+++ b/README.md\n@@ -440,7 +440,7 @@ Tag                    | Description\n `required`             | If present, flag/arg is required.\n `optional`             | If present, flag/arg is optional.\n `hidden`               | If present, command or flag is hidden.\n-`negatable`            | If present on a `bool` field, supports prefixing a flag with `--no-` to set flag to `false`\n+`negatable`            | If present on a `bool` field, supports prefixing a flag with `--no-` to invert the default value\n `format:\"X\"`           | Format for parsing input, if supported.\n `sep:\"X\"`              | Separator for sequences (defaults to \",\"). May be `none` to disable splitting.\n `mapsep:\"X\"`           | Separator for maps (defaults to \";\"). May be `none` to disable splitting.\ndiff --git a/context.go b/context.go\nindex 2c9b791..dcf754a 100644\n--- a/context.go\n+++ b/context.go\n@@ -579,9 +579,6 @@ func (c *Context) getValue(value *Value) reflect.Value {\n \t\t}\n \t\tc.values[value] = v\n \t}\n-\tif value.Flag != nil && value.Flag.Negated {\n-\t\tv.SetBool(false)\n-\t}\n \treturn v\n }\n \n@@ -629,7 +626,12 @@ func (c *Context) Apply() (string, error) {\n \t\t\tpanic(\"unsupported path ?!\")\n \t\t}\n \t\tif value != nil {\n-\t\t\tvalue.Apply(c.getValue(value))\n+\t\t\tv := c.getValue(value)\n+\t\t\tif value.Flag != nil && value.Flag.Negated {\n+\t\t\t\tv.SetBool(!v.Bool())\n+\t\t\t}\n+\n+\t\t\tvalue.Apply(v)\n \t\t}\n \t}\n \ndiff --git a/kong_test.go b/kong_test.go\nindex b7c598f..a25bee2 100644\n--- a/kong_test.go\n+++ b/kong_test.go\n@@ -369,6 +369,19 @@ func TestNegatedBooleanFlag(t *testing.T) {\n \trequire.Equal(t, false, cli.Cmd.Flag)\n }\n \n+func TestInvertedNegatedBooleanFlag(t *testing.T) {\n+\tvar cli struct {\n+\t\tCmd struct {\n+\t\t\tFlag bool `kong:\"default='true',negatable\"`\n+\t\t} `kong:\"cmd\"`\n+\t}\n+\n+\tp := mustNew(t, &cli)\n+\t_, err := p.Parse([]string{\"cmd\", \"--no-flag=false\"})\n+\trequire.NoError(t, err)\n+\trequire.Equal(t, true, cli.Cmd.Flag)\n+}\n+\n func TestInvalidNegatedNonBool(t *testing.T) {\n \tvar cli struct {\n \t\tCmd struct {\n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    ".github/FUNDING.yml",
+    ".gitignore",
+    ".golangci.yml",
+    "COPYING",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/README.md",
+    "_examples/server/console.go",
+    "_examples/server/go.mod",
+    "_examples/server/go.sum",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/main.go",
+    "benchmark_test.go",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "config_test.go",
+    "context.go",
+    "defaults.go",
+    "defaults_test.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "go.mod",
+    "go.sum",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "testdata/file.txt",
+    "util.go",
+    "util_test.go",
+    "visit.go"
+  ],
+  "explanation": {
+    "what": "negatable フラグの意味を「default:true を強制的に false にする」から「デフォルト値を反転する」に修正した。`context.go` の `getValue` から早期の `SetBool(false)` を削除し、`Apply()` 内で `flag.Negated` が立っているときに `v.SetBool(!v.Bool())` と現在値を反転する形に変更。README の説明文言も同様に更新した。",
+    "why": "コミットメッセージで「反転(invert)する側のテストケースを追加した」と述べており、旧実装は `--no-` が付いたら常に false にする挙動だったため、default が false の場合に `--no-` を付けても意味がない、あるいは default true 以外のケースを正しく扱えない問題があったと考えられる。作者自身「Not sure why anyone would do this, but it's covered now」とコメントしており、通常想定しない使い方だが挙動を反転一貫にすることでカバーした。",
+    "highlights": [
+      { "file": "context.go", "note": "SetBool(false) 固定から SetBool(!v.Bool()) への変更で「反転」の意味に修正" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [{ "type": "pr", "number": 146, "url": "https://github.com/alecthomas/kong/pull/146" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

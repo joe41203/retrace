@@ -1,0 +1,131 @@
+{
+  "seq": 274,
+  "sha": "1d48b6f720af3d6d1aafc0de5e07f8c02db2fed8",
+  "parents": [
+    "dd185496866f6d15b0bdc8a047223e3859ad2dac"
+  ],
+  "author": {
+    "name": "Alec Thomas",
+    "email": "alec@swapoff.org",
+    "date": "2021-09-27T16:07:48+10:00"
+  },
+  "message": "Allow Mappers to contribute Vars to interpolation.\n\nSee #218.",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 3,
+    "additions": 39,
+    "deletions": 0
+  },
+  "files": [
+    {
+      "path": "kong.go",
+      "status": "M",
+      "additions": 3,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "mapper.go",
+      "status": "M",
+      "additions": 5,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "mapper_test.go",
+      "status": "M",
+      "additions": 31,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/kong.go b/kong.go\nindex 14f5c2d..d8be43a 100644\n--- a/kong.go\n+++ b/kong.go\n@@ -183,6 +183,9 @@ func (k *Kong) interpolateValue(value *Value, vars Vars) (err error) {\n \tif len(value.Tag.Vars) > 0 {\n \t\tvars = vars.CloneWith(value.Tag.Vars)\n \t}\n+\tif varsContributor, ok := value.Mapper.(VarsContributor); ok {\n+\t\tvars = vars.CloneWith(varsContributor.Vars(value))\n+\t}\n \tif value.Default, err = interpolate(value.Default, vars, nil); err != nil {\n \t\treturn fmt.Errorf(\"default value for %s: %s\", value.Summary(), err)\n \t}\ndiff --git a/mapper.go b/mapper.go\nindex 657b8ee..88fe1a5 100644\n--- a/mapper.go\n+++ b/mapper.go\n@@ -115,6 +115,11 @@ type Mapper interface {\n \tDecode(ctx *DecodeContext, target reflect.Value) error\n }\n \n+// VarsContributor can be implemented by a Mapper to contribute Vars during interpolation.\n+type VarsContributor interface {\n+\tVars(ctx *Value) Vars\n+}\n+\n // A BoolMapper is a Mapper to a value that is a boolean.\n //\n // This is used solely for formatting help.\ndiff --git a/mapper_test.go b/mapper_test.go\nindex 3f9b87a..8263b0d 100644\n--- a/mapper_test.go\n+++ b/mapper_test.go\n@@ -464,3 +464,34 @@ func (t testMapperWithPlaceHolder) Decode(ctx *kong.DecodeContext, target reflec\n func (t testMapperWithPlaceHolder) PlaceHolder(flag *kong.Flag) string {\n \treturn \"/a/b/c\"\n }\n+\n+func TestMapperVarsContributor(t *testing.T) {\n+\tvar cli struct {\n+\t\tFlag string `help:\"Some help with ${avar}\"`\n+\t}\n+\tb := bytes.NewBuffer(nil)\n+\tk := mustNew(\n+\t\tt,\n+\t\t&cli,\n+\t\tkong.Writers(b, b),\n+\t\tkong.ValueMapper(&cli.Flag, testMapperVarsContributor{}),\n+\t\tkong.Exit(func(int) { panic(\"exit\") }),\n+\t)\n+\t// Ensure that --help\n+\trequire.Panics(t, func() {\n+\t\t_, err := k.Parse([]string{\"--help\"})\n+\t\trequire.NoError(t, err)\n+\t})\n+\trequire.Regexp(t, \"--flag=STRING\\\\s+Some help with a var\", b.String())\n+}\n+\n+type testMapperVarsContributor struct{}\n+\n+func (t testMapperVarsContributor) Vars(value *kong.Value) kong.Vars {\n+\treturn kong.Vars{\"avar\": \"a var\"}\n+}\n+\n+func (t testMapperVarsContributor) Decode(ctx *kong.DecodeContext, target reflect.Value) error {\n+\ttarget.SetString(\"hi\")\n+\treturn nil\n+}\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/FUNDING.yml",
+    ".github/workflows/ci.yml",
+    ".gitignore",
+    ".golangci.yml",
+    "COPYING",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/README.md",
+    "_examples/server/console.go",
+    "_examples/server/go.mod",
+    "_examples/server/go.sum",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/main.go",
+    "benchmark_test.go",
+    "bin/.go@latest.pkg",
+    "bin/.golangci-lint-1.42.0.pkg",
+    "bin/README.hermit.md",
+    "bin/activate-hermit",
+    "bin/go",
+    "bin/gofmt",
+    "bin/golangci-lint",
+    "bin/hermit",
+    "bin/hermit.hcl",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "config_test.go",
+    "context.go",
+    "defaults.go",
+    "defaults_test.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "go.mod",
+    "go.sum",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "testdata/file.txt",
+    "util.go",
+    "util_test.go",
+    "visit.go"
+  ],
+  "explanation": {
+    "what": "新しい VarsContributor インターフェース(Vars(ctx *Value) Vars を持つ)を mapper.go に追加し、Value.Mapper がこのインターフェースを実装していれば interpolateValue の中でそのカスタム変数を interpolation 用の Vars にマージするようにした。テストでは help テキストへの補間で contributor が返した変数が反映されることを確認している。",
+    "why": "コミットメッセージに \"See #218.\" とあり、既存の kong.Vars によるタグ間補間だけでは対応できない、Mapper 実装側が動的に補間変数を提供したいというユースケースに応えたものと見られる(#218 自体の本文はこのJSON内には含まれていない)。",
+    "highlights": [
+      { "file": "mapper.go", "note": "VarsContributor インターフェースの新設定義。既存の Mapper インターフェースへの型アサーションで判定される。" },
+      { "file": "kong.go", "note": "interpolateValue 内で value.Mapper.(VarsContributor) の型アサーションが成立した場合にのみ Vars をマージする分岐。" }
+    ],
+    "langNotes": [
+      { "topic": "型アサーションによるオプショナルインターフェース判定", "note": "`value.Mapper.(VarsContributor)` は Go でよく使われる「あるインターフェースが別のより詳細なインターフェースを実装しているか」を実行時に判定するイディオム。ok 変数で成否を受け取り、実装していない Mapper には影響を与えない後方互換な拡張方法になっている。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

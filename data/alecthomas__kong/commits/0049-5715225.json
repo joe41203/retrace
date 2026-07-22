@@ -1,0 +1,72 @@
+{
+  "seq": 49,
+  "sha": "57152253ccef6ecbbdd445de47fc2c83e19b7db7",
+  "parents": [
+    "9cc18722972481cac2e2a89e996a4edc41f72b5e"
+  ],
+  "author": {
+    "name": "Alec Thomas",
+    "email": "alec@swapoff.org",
+    "date": "2018-06-07T20:56:51+10:00"
+  },
+  "message": "Bug.",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 1,
+    "deletions": 1
+  },
+  "files": [
+    {
+      "path": "context.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/context.go b/context.go\nindex e809b86..449cc83 100644\n--- a/context.go\n+++ b/context.go\n@@ -384,7 +384,7 @@ func checkMissingChildren(node *Node) error {\n // If we're missing any positionals and they're required, return an error.\n func checkMissingPositionals(positional int, values []*Value) error {\n \t// All the positionals are in.\n-\tif positional == len(values) {\n+\tif positional >= len(values) {\n \t\treturn nil\n \t}\n \n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    "README.md",
+    "_examples/shell/main.go",
+    "build.go",
+    "camelcase.go",
+    "context.go",
+    "context_test.go",
+    "global.go",
+    "global_test.go",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "kong.go",
+    "kong_test.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "tokentype_string.go"
+  ],
+  "explanation": {
+    "what": "checkMissingPositionals() の必須位置引数チェックの条件を `positional == len(values)` から `positional >= len(values)` に変更した。",
+    "why": "コミットメッセージは「Bug.」のみで具体的な経緯は記載されていないが、おそらく可変長(cumulative)の位置引数で positional のカウントが len(values) を超えるケースがあり、`==` 判定だとそのケースを「まだ足りない」と誤判定してしまうバグだったと考えられる。`>=` にすることで、必要数以上消費した場合も不足なしと正しく扱えるようになる。",
+    "highlights": [
+      { "file": "context.go", "note": "checkMissingPositionals の比較演算子を == から >= に変更した1行差分" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "inferred",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

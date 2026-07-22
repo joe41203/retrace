@@ -1,0 +1,119 @@
+{
+  "seq": 146,
+  "sha": "1076f5ee1f54b8e1a61669b2b3ba64d3985ff71b",
+  "parents": [
+    "9d0bd596117bb0fa7d3766b46f0f90a66b527d0b"
+  ],
+  "author": {
+    "name": "Alec Thomas",
+    "email": "alec@swapoff.org",
+    "date": "2019-06-21T10:07:24+10:00"
+  },
+  "message": "Remove unused return value from PopValueInto.",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 4,
+    "additions": 19,
+    "deletions": 19
+  },
+  "files": [
+    {
+      "path": "mapper.go",
+      "status": "M",
+      "additions": 9,
+      "deletions": 9,
+      "binary": false
+    },
+    {
+      "path": "mapper_test.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "resolver_test.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "scanner.go",
+      "status": "M",
+      "additions": 8,
+      "deletions": 8,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/mapper.go b/mapper.go\nindex 46f13a7..58e45bb 100644\n--- a/mapper.go\n+++ b/mapper.go\n@@ -196,7 +196,7 @@ func (r *Registry) RegisterDefaults() *Registry {\n \t\tRegisterKind(reflect.Float32, floatDecoder(32)).\n \t\tRegisterKind(reflect.Float64, floatDecoder(64)).\n \t\tRegisterKind(reflect.String, MapperFunc(func(ctx *DecodeContext, target reflect.Value) error {\n-\t\t\t_, err := ctx.Scan.PopValueInto(\"string\", target.Addr().Interface())\n+\t\t\terr := ctx.Scan.PopValueInto(\"string\", target.Addr().Interface())\n \t\t\treturn err\n \t\t})).\n \t\tRegisterKind(reflect.Bool, boolMapper{}).\n@@ -235,7 +235,7 @@ func (boolMapper) IsBool() bool { return true }\n func durationDecoder() MapperFunc {\n \treturn func(ctx *DecodeContext, target reflect.Value) error {\n \t\tvar value string\n-\t\tif _, err := ctx.Scan.PopValueInto(\"duration\", &value); err != nil {\n+\t\tif err := ctx.Scan.PopValueInto(\"duration\", &value); err != nil {\n \t\t\treturn err\n \t\t}\n \t\tr, err := time.ParseDuration(value)\n@@ -254,7 +254,7 @@ func timeDecoder() MapperFunc {\n \t\t\tformat = ctx.Value.Format\n \t\t}\n \t\tvar value string\n-\t\tif _, err := ctx.Scan.PopValueInto(\"time\", &value); err != nil {\n+\t\tif err := ctx.Scan.PopValueInto(\"time\", &value); err != nil {\n \t\t\treturn err\n \t\t}\n \t\tt, err := time.Parse(format, value)\n@@ -388,7 +388,7 @@ func mapDecoder(r *Registry) MapperFunc {\n \t\t}\n \t\tfor !childScanner.Peek().IsEOL() {\n \t\t\tvar token string\n-\t\t\t_, err := childScanner.PopValueInto(\"map\", &token)\n+\t\t\terr := childScanner.PopValueInto(\"map\", &token)\n \t\t\tif err != nil {\n \t\t\t\treturn err\n \t\t\t}\n@@ -478,7 +478,7 @@ func pathMapper(r *Registry) MapperFunc {\n \t\t\treturn errors.Errorf(\"\\\"path\\\" type must be applied to a string not %s\", target.Type())\n \t\t}\n \t\tvar path string\n-\t\t_, err := ctx.Scan.PopValueInto(\"file\", &path)\n+\t\terr := ctx.Scan.PopValueInto(\"file\", &path)\n \t\tif err != nil {\n \t\t\treturn err\n \t\t}\n@@ -497,7 +497,7 @@ func existingFileMapper(r *Registry) MapperFunc {\n \t\t\treturn errors.Errorf(\"\\\"existingfile\\\" type must be applied to a string not %s\", target.Type())\n \t\t}\n \t\tvar path string\n-\t\t_, err := ctx.Scan.PopValueInto(\"file\", &path)\n+\t\terr := ctx.Scan.PopValueInto(\"file\", &path)\n \t\tif err != nil {\n \t\t\treturn err\n \t\t}\n@@ -523,7 +523,7 @@ func existingDirMapper(r *Registry) MapperFunc {\n \t\t\treturn errors.Errorf(\"\\\"existingdir\\\" must be applied to a string not %s\", target.Type())\n \t\t}\n \t\tvar path string\n-\t\t_, err := ctx.Scan.PopValueInto(\"file\", &path)\n+\t\terr := ctx.Scan.PopValueInto(\"file\", &path)\n \t\tif err != nil {\n \t\t\treturn err\n \t\t}\n@@ -543,7 +543,7 @@ func existingDirMapper(r *Registry) MapperFunc {\n func urlMapper() MapperFunc {\n \treturn func(ctx *DecodeContext, target reflect.Value) error {\n \t\tvar urlStr string\n-\t\t_, err := ctx.Scan.PopValueInto(\"url\", &urlStr)\n+\t\terr := ctx.Scan.PopValueInto(\"url\", &urlStr)\n \t\tif err != nil {\n \t\t\treturn err\n \t\t}\n@@ -601,7 +601,7 @@ type FileContentFlag []byte\n \n func (f *FileContentFlag) Decode(ctx *DecodeContext) error { // nolint: golint\n \tvar filename string\n-\t_, err := ctx.Scan.PopValueInto(\"filename\", &filename)\n+\terr := ctx.Scan.PopValueInto(\"filename\", &filename)\n \tif err != nil {\n \t\treturn err\n \t}\ndiff --git a/mapper_test.go b/mapper_test.go\nindex a69f36b..12def43 100644\n--- a/mapper_test.go\n+++ b/mapper_test.go\n@@ -140,7 +140,7 @@ type mappedValue struct {\n }\n \n func (m *mappedValue) Decode(ctx *kong.DecodeContext) error {\n-\t_, err := ctx.Scan.PopValueInto(\"mapped\", &m.decoded)\n+\terr := ctx.Scan.PopValueInto(\"mapped\", &m.decoded)\n \treturn err\n }\n \ndiff --git a/resolver_test.go b/resolver_test.go\nindex 8e37aee..fa9f41b 100644\n--- a/resolver_test.go\n+++ b/resolver_test.go\n@@ -123,7 +123,7 @@ type testUppercaseMapper struct{}\n \n func (testUppercaseMapper) Decode(ctx *kong.DecodeContext, target reflect.Value) error {\n \tvar value string\n-\t_, err := ctx.Scan.PopValueInto(\"lowercase\", &value)\n+\terr := ctx.Scan.PopValueInto(\"lowercase\", &value)\n \tif err != nil {\n \t\treturn err\n \t}\ndiff --git a/scanner.go b/scanner.go\nindex b805736..c8c3636 100644\n--- a/scanner.go\n+++ b/scanner.go\n@@ -14,11 +14,11 @@ type TokenType int\n const (\n \tUntypedToken TokenType = iota\n \tEOLToken\n-\tFlagToken               // --<flag>\n-\tFlagValueToken          // =<value>\n-\tShortFlagToken          // -<short>[<tail]\n-\tShortFlagTailToken      // <tail>\n-\tPositionalArgumentToken // <arg>\n+\tFlagToken                // --<flag>\n+\tFlagValueToken           // =<value>\n+\tShortFlagToken           // -<short>[<tail]\n+\tShortFlagTailToken       // <tail>\n+\tPositionalArgumentToken  // <arg>\n )\n \n func (t TokenType) String() string {\n@@ -156,12 +156,12 @@ func (s *Scanner) PopValue(context string) (Token, error) {\n // PopValueInto pops a value token into target or returns an error.\n //\n // \"context\" is used to assist the user if the value can not be popped, eg. \"expected <context> value but got <type>\"\n-func (s *Scanner) PopValueInto(context string, target interface{}) (Token, error) {\n+func (s *Scanner) PopValueInto(context string, target interface{}) error {\n \tt := s.Pop()\n \tif !t.IsValue() {\n-\t\treturn t, errors.Errorf(\"expected %s value but got %q (%s)\", context, t, t.InferredType())\n+\t\treturn errors.Errorf(\"expected %s value but got %q (%s)\", context, t, t.InferredType())\n \t}\n-\treturn t, jsonTranscode(t.Value, target)\n+\treturn jsonTranscode(t.Value, target)\n }\n \n // PopWhile predicate returns true.\n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    ".golangci.yml",
+    "COPYING",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/console.go",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/main.go",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "config_test.go",
+    "context.go",
+    "defaults.go",
+    "defaults_test.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "go.mod",
+    "go.sum",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "util.go",
+    "util_test.go",
+    "visit.go"
+  ],
+  "explanation": {
+    "what": "Scanner.PopValueInto の戻り値を (Token, error) から error のみに変更し、呼び出し側(mapper.go の各デコーダ、mapper_test.go、resolver_test.go)の `_, err := ...` を `err := ...` に一括修正した。",
+    "why": "おそらく、前々コミット(seq141)で PopValueInto に Token を返す戻り値が追加されたものの、実際にはどの呼び出し元も戻り値の Token を使っておらず、常に破棄(`_`)されていたため、使われていない戻り値を削って API をシンプルにする整理と考えられる。",
+    "highlights": [
+      { "file": "scanner.go", "note": "PopValueInto のシグネチャが (Token, error) → error に変更" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "inferred",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

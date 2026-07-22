@@ -1,0 +1,144 @@
+{
+  "seq": 417,
+  "sha": "7ca846736ce870e28be6cbfbfa4e27e2b0609770",
+  "parents": [
+    "b811e322436d3dfb266ea76b2e2a987bbf204a2f"
+  ],
+  "author": {
+    "name": "Abhinav Gupta",
+    "email": "mail@abhinavg.net",
+    "date": "2025-01-03T18:13:14-08:00"
+  },
+  "message": "fix(Context.Run): Don't panic on unselected root node (#484)",
+  "pr": {
+    "number": 484,
+    "title": "fix(Context.Run): Don't panic on unselected root node",
+    "body": "Fixes bug introduced in 2544d3f00855f6857cf121ce04608296b5858e4a.\r\n\r\nThat commit refactored control flow slightly and missed a case\r\nwhere the selected node is an application node but it does not\r\nhave a Run method.\r\n\r\nThe fix was straightforward:\r\nTreat the \"if application node\" code path as a possible way to fill\r\n`node`, and check it again afterwards.\r\n\r\nResolves #483\r\n",
+    "url": "https://github.com/alecthomas/kong/pull/484"
+  },
+  "linkedIssues": [
+    {
+      "number": 483,
+      "title": "panic on Run with no selected nodes",
+      "body": "If there's an application with no nodes selected, instead of returning an error, `Context.Run` panics.\r\nReproduction:\r\n\r\n```go\r\nfunc TestRegression(t *testing.T) {\r\n        var emptyCLI struct{}\r\n        parser, err := kong.New(&emptyCLI)\r\n        assert.NoError(t, err)\r\n\r\n        kctx, err := parser.Parse([]string{})\r\n        assert.NoError(t, err)\r\n\r\n        err = kctx.Run()\r\n        assert.Error(t, err)\r\n        assert.Contains(t, err.Error(), \"no command selected\")\r\n}\r\n```\r\n\r\nThis test passes against v1.2.1 but not against 1.6.0.\r\n`git bisect` indicates that the issue was introduced in 2544d3f00855f6857cf121ce04608296b5858e4a.",
+      "url": "https://github.com/alecthomas/kong/issues/483"
+    }
+  ],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 16,
+    "deletions": 1
+  },
+  "files": [
+    {
+      "path": "context.go",
+      "status": "M",
+      "additions": 3,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "kong_test.go",
+      "status": "M",
+      "additions": 13,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/context.go b/context.go\nindex 4fd2302..b6a56e3 100644\n--- a/context.go\n+++ b/context.go\n@@ -827,7 +827,9 @@ func (c *Context) Run(binds ...any) (err error) {\n \t\t\tif method.IsValid() {\n \t\t\t\tnode = selected\n \t\t\t}\n-\t\t} else {\n+\t\t}\n+\n+\t\tif node == nil {\n \t\t\treturn fmt.Errorf(\"no command selected\")\n \t\t}\n \t}\ndiff --git a/kong_test.go b/kong_test.go\nindex 2f3ab47..a7c03b2 100644\n--- a/kong_test.go\n+++ b/kong_test.go\n@@ -2495,3 +2495,16 @@ func TestPrefixXorIssue343(t *testing.T) {\n \t_, err = kctx.Parse([]string{\"--source-password-file=foo\", \"--source-password=bar\"})\n \tassert.Error(t, err)\n }\n+\n+func TestIssue483EmptyRootNodeNoRun(t *testing.T) {\n+\tvar emptyCLI struct{}\n+\tparser, err := kong.New(&emptyCLI)\n+\tassert.NoError(t, err)\n+\n+\tkctx, err := parser.Parse([]string{})\n+\tassert.NoError(t, err)\n+\n+\terr = kctx.Run()\n+\tassert.Error(t, err)\n+\tassert.Contains(t, err.Error(), \"no command selected\")\n+}\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/FUNDING.yml",
+    ".github/workflows/ci.yml",
+    ".gitignore",
+    ".golangci.yml",
+    "COPYING",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/README.md",
+    "_examples/server/console.go",
+    "_examples/server/go.mod",
+    "_examples/server/go.sum",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/commandstring/main.go",
+    "_examples/shell/help/README.md",
+    "_examples/shell/help/main.go",
+    "benchmark_test.go",
+    "bin/.go-1.23.4.pkg",
+    "bin/.golangci-lint-1.60.1.pkg",
+    "bin/README.hermit.md",
+    "bin/activate-hermit",
+    "bin/go",
+    "bin/gofmt",
+    "bin/golangci-lint",
+    "bin/hermit",
+    "bin/hermit.hcl",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "config_test.go",
+    "context.go",
+    "defaults.go",
+    "defaults_test.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "go.mod",
+    "go.sum",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "helpwrap1.18_test.go",
+    "helpwrap1.19_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_linux_test.go",
+    "mapper_test.go",
+    "mapper_windows_test.go",
+    "model.go",
+    "model_test.go",
+    "negatable.go",
+    "options.go",
+    "options_test.go",
+    "renovate.json5",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "testdata/file.txt",
+    "util.go",
+    "util_test.go",
+    "visit.go"
+  ],
+  "explanation": {
+    "what": "Context.Run() で、ルートノードが選択されておらず Run メソッドも見つからない場合に panic していた不具合を修正した。else 節を if node == nil という独立チェックに変えることで、アプリケーションノード自体に Run メソッドがないケースを正しく検出し「no command selected」エラーを返すようにした。TestIssue483EmptyRootNodeNoRun でサブコマンドを持たない空の CLI に対して Run() がエラーを返すことを確認している。",
+    "why": "PR本文によると、以前のコミット(2544d3f)で制御フローをリファクタした際に、選択されたノードがアプリケーションノードだが Run メソッドを持たないケースの分岐が漏れていた。issue #483 では、この状態で Context.Run() を呼ぶとエラーを返す代わりに panic することが再現手順とともに報告されている。",
+    "highlights": [
+      { "file": "context.go", "note": "else節を独立した if node == nil チェックに変更した1行の修正" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [
+      { "type": "pr", "number": 484, "url": "https://github.com/alecthomas/kong/pull/484" },
+      { "type": "issue", "number": 483, "url": "https://github.com/alecthomas/kong/issues/483" }
+    ],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

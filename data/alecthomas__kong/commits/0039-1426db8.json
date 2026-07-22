@@ -1,0 +1,77 @@
+{
+  "seq": 39,
+  "sha": "1426db8aa017ae8dc83112abd7e54c15ef14d7ef",
+  "parents": [
+    "254fa00e81d96c7a5e60f52e46a228d09484bce2"
+  ],
+  "author": {
+    "name": "Gerald Kaszuba",
+    "email": "gak@gak0.com",
+    "date": "2018-06-01T12:04:35+10:00"
+  },
+  "message": "Added tag test for multiple separators.",
+  "pr": {
+    "number": 21,
+    "title": "Allow \"bare\" tags and moved tag tests into tag_test.go. Fixes #19",
+    "body": "",
+    "url": "https://github.com/alecthomas/kong/pull/21"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 11,
+    "deletions": 0
+  },
+  "files": [
+    {
+      "path": "tag_test.go",
+      "status": "M",
+      "additions": 11,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/tag_test.go b/tag_test.go\nindex 1decec5..8abd904 100644\n--- a/tag_test.go\n+++ b/tag_test.go\n@@ -93,3 +93,14 @@ func TestBareTagsWithJsonTag(t *testing.T) {\n \trequire.Equal(t, \"\\\"'👌'\\\"\", cli.Cmd.Flag)\n \trequire.Equal(t, \"\", cli.Cmd.Arg)\n }\n+\n+func TestManySeps(t *testing.T) {\n+\tvar cli struct {\n+\t\tArg  string `arg    optional    default:\"hi\"`\n+\t}\n+\n+\tp := mustNew(t, &cli)\n+\t_, err := p.Parse([]string{})\n+\trequire.NoError(t, err)\n+\trequire.Equal(t, \"hi\", cli.Arg)\n+}\n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    "README.md",
+    "_examples/shell/main.go",
+    "build.go",
+    "camelcase.go",
+    "context.go",
+    "context_test.go",
+    "decoders.go",
+    "decoders_test.go",
+    "global.go",
+    "global_test.go",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "kong.go",
+    "kong_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "tokentype_string.go"
+  ],
+  "explanation": {
+    "what": "bare tag のパースにおいて、複数の空白がセパレータとして連続しても正しく解釈できることを検証する `TestManySeps` を `tag_test.go` に追加した。プロダクションコードの変更はない。",
+    "why": "おそらく、直前2コミットで導入した bare tag 記法(スペース区切り)は区切り文字の数によっては誤動作しうるため、その回帰を防ぐテストを補ったと考えられる。",
+    "highlights": [],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "inferred",
+    "refs": [
+      { "type": "pr", "number": 21, "url": "https://github.com/alecthomas/kong/pull/21" }
+    ],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

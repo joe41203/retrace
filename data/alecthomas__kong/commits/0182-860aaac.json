@@ -1,0 +1,102 @@
+{
+  "seq": 182,
+  "sha": "860aaac388519c587bd8bb92e674d911b545e3df",
+  "parents": [
+    "fbe8d48e4badf293012666e8d7a9065c0c9e633f"
+  ],
+  "author": {
+    "name": "Alec Thomas",
+    "email": "alec@swapoff.org",
+    "date": "2020-04-26T18:59:44+10:00"
+  },
+  "message": "Allow Run() on arbitrary nodes.\n\nThis is useful for dynamically running commands.",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 17,
+    "deletions": 7
+  },
+  "files": [
+    {
+      "path": "context.go",
+      "status": "M",
+      "additions": 17,
+      "deletions": 7,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/context.go b/context.go\nindex 9e1231a..374060e 100644\n--- a/context.go\n+++ b/context.go\n@@ -567,16 +567,13 @@ func (c *Context) parseFlag(flags []*Flag, match string) (err error) {\n \treturn findPotentialCandidates(match, candidates, \"unknown flag %s\", match)\n }\n \n-// Run executes the Run() method on the selected command, which must exist.\n+// RunNode calls the Run() method on an arbitrary node.\n+//\n+// This is useful in conjunction with Visit(), for dynamically running commands.\n //\n // Any passed values will be bindable to arguments of the target Run() method. Additionally,\n // all parent nodes in the command structure will be bound.\n-func (c *Context) Run(binds ...interface{}) (err error) {\n-\tdefer catch(&err)\n-\tnode := c.Selected()\n-\tif node == nil {\n-\t\treturn fmt.Errorf(\"no command selected\")\n-\t}\n+func (c *Context) RunNode(node *Node, binds ...interface{}) (err error) {\n \ttype targetMethod struct {\n \t\tnode   *Node\n \t\tmethod reflect.Value\n@@ -610,6 +607,19 @@ func (c *Context) Run(binds ...interface{}) (err error) {\n \treturn nil\n }\n \n+// Run executes the Run() method on the selected command, which must exist.\n+//\n+// Any passed values will be bindable to arguments of the target Run() method. Additionally,\n+// all parent nodes in the command structure will be bound.\n+func (c *Context) Run(binds ...interface{}) (err error) {\n+\tdefer catch(&err)\n+\tnode := c.Selected()\n+\tif node == nil {\n+\t\treturn fmt.Errorf(\"no command selected\")\n+\t}\n+\treturn c.RunNode(node, binds...)\n+}\n+\n // PrintUsage to Kong's stdout.\n //\n // If summary is true, a summarised version of the help will be output.\n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    ".golangci.yml",
+    "COPYING",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/README.md",
+    "_examples/server/console.go",
+    "_examples/server/go.mod",
+    "_examples/server/go.sum",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/main.go",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "config_test.go",
+    "context.go",
+    "defaults.go",
+    "defaults_test.go",
+    "doc.go",
+    "env.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "go.mod",
+    "go.sum",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "util.go",
+    "util_test.go",
+    "visit.go"
+  ],
+  "explanation": {
+    "what": "Context.Run() の本体ロジックを Context.RunNode(node *Node, binds ...interface{}) という新関数に切り出し、既存の Run() は c.Selected() で得たノードを RunNode に渡すだけの薄いラッパーにした。",
+    "why": "コミットメッセージに、任意のノードに対して動的にコマンドを実行できるようにするため、とある。従来の Run() は c.Selected()(パース結果として選択されたコマンド)にしか対応できなかったが、Visit() などで得た任意の Node を渡して Run() 相当の処理を行いたいケースに対応する目的とみられる。",
+    "highlights": [
+      { "file": "context.go", "note": "RunNode が本体、Run はそれを呼ぶだけの後方互換ラッパーになった。" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

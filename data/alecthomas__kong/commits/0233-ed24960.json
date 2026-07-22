@@ -1,0 +1,127 @@
+{
+  "seq": 233,
+  "sha": "ed24960916047b121e1d823f226c3de011bec981",
+  "parents": [
+    "454f2c067ef7c13a4ce665f73d515a39d710b4a2"
+  ],
+  "author": {
+    "name": "Joe Schmitt",
+    "email": "joe@compass.com",
+    "date": "2021-02-24T14:13:11-05:00"
+  },
+  "message": "Implement code review feedback",
+  "pr": {
+    "number": 146,
+    "title": "Add support for negatable boolean flags",
+    "body": "Adds support for a new `negatable` struct tag, which will automatically set a boolean Struct flag value to `false` if the flag's name starts with `--no-`, even when the default is `true`. This idea is shamelessly stolen from the [`commander` npm library](https://github.com/tj/commander.js#other-option-types-negatable-boolean-and-booleanvalue)\r\n\r\nFor example:\r\n```go\r\ntype Cmd struct {\r\n  Sort bool `default:\"true\",negatable`\r\n}\r\n```\r\n\r\nCalling\r\n```sh\r\ncommand\r\n# or\r\ncommand --sort\r\n```\r\nWill set `Sort` to `true`, but\r\n```sh \r\ncommand --no-sort\r\n```\r\nWill set `Sort` to `false`.\r\n\r\n## Why do this?\r\n\r\nIt avoids the situation of having to do:\r\n```go\r\ntype Cmd struct {\r\n  NoSort bool\r\n}\r\n\r\nfunc (c *Cmd) Run() error {\r\n  if !c.NoSort {\r\n    // Double negations are hard to read!\r\n  }\r\n  return nil\r\n}\r\n```",
+    "url": "https://github.com/alecthomas/kong/pull/146"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 3,
+    "additions": 17,
+    "deletions": 2
+  },
+  "files": [
+    {
+      "path": "context.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "kong_test.go",
+      "status": "M",
+      "additions": 15,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "tag.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/context.go b/context.go\nindex dcf754a..554e8b1 100644\n--- a/context.go\n+++ b/context.go\n@@ -649,7 +649,7 @@ func (c *Context) parseFlag(flags []*Flag, match string) (err error) {\n \t\tif flag.Short != 0 {\n \t\t\tcandidates = append(candidates, short)\n \t\t}\n-\t\tif short != match && long != match && neg != match {\n+\t\tif short != match && long != match && !(match == neg && flag.Tag.Negatable) {\n \t\t\tcontinue\n \t\t}\n \t\t// Found a matching flag.\ndiff --git a/kong_test.go b/kong_test.go\nindex a25bee2..9163141 100644\n--- a/kong_test.go\n+++ b/kong_test.go\n@@ -382,6 +382,21 @@ func TestInvertedNegatedBooleanFlag(t *testing.T) {\n \trequire.Equal(t, true, cli.Cmd.Flag)\n }\n \n+func TestExistingNoFlag(t *testing.T) {\n+\tvar cli struct {\n+\t\tCmd struct {\n+\t\t\tFlag   bool `kong:\"default='true'\"`\n+\t\t\tNoFlag string\n+\t\t} `kong:\"cmd\"`\n+\t}\n+\n+\tp := mustNew(t, &cli)\n+\t_, err := p.Parse([]string{\"cmd\", \"--no-flag=none\"})\n+\trequire.NoError(t, err)\n+\trequire.Equal(t, true, cli.Cmd.Flag)\n+\trequire.Equal(t, \"none\", cli.Cmd.NoFlag)\n+}\n+\n func TestInvalidNegatedNonBool(t *testing.T) {\n \tvar cli struct {\n \t\tCmd struct {\ndiff --git a/tag.go b/tag.go\nindex e4d9af4..deffd86 100644\n--- a/tag.go\n+++ b/tag.go\n@@ -160,7 +160,7 @@ func parseTag(fv reflect.Value, ft reflect.StructField) *Tag {\n \tt.Prefix = t.Get(\"prefix\")\n \tt.Embed = t.Has(\"embed\")\n \tnegatable := t.Has(\"negatable\")\n-\tif negatable && ft.Type.Name() != \"bool\" {\n+\tif negatable && ft.Type.Kind() != reflect.Bool {\n \t\tfail(\"negatable can only be set on booleans\")\n \t}\n \tt.Negatable = negatable\n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    ".github/FUNDING.yml",
+    ".gitignore",
+    ".golangci.yml",
+    "COPYING",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/README.md",
+    "_examples/server/console.go",
+    "_examples/server/go.mod",
+    "_examples/server/go.sum",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/main.go",
+    "benchmark_test.go",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "config_test.go",
+    "context.go",
+    "defaults.go",
+    "defaults_test.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "go.mod",
+    "go.sum",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "testdata/file.txt",
+    "util.go",
+    "util_test.go",
+    "visit.go"
+  ],
+  "explanation": {
+    "what": "parseFlag のマッチ条件を `short != match && long != match && !(match == neg && flag.Tag.Negatable)` に変更し、`negatable` タグを持たないフラグでは `--no-` を専用構文として扱わないようにした。あわせて `tag.go` の型チェックを `ft.Type.Name() != \"bool\"` から `ft.Type.Kind() != reflect.Bool` に変更し、`type MyBool bool` のような bool の名前付き型でも negatable を許容できるようにした。TestExistingNoFlag で、`--no-flag` という名前の別フラグが実在する場合にそちらが優先されることを検証している。",
+    "why": "コミットメッセージは「Implement code review feedback」とのみ述べており、PRレビューで指摘された2つの問題(negatable でないフラグに `--no-` パターンを誤マッチさせない、bool の基底型を kind で判定する)への対応と読み取れる。",
+    "highlights": [
+      { "file": "context.go", "note": "matchロジックに flag.Tag.Negatable の条件を追加し誤マッチを防止" },
+      { "file": "tag.go", "note": "Type.Name() から Type.Kind() への変更で bool の named type にも対応" }
+    ],
+    "langNotes": [
+      { "topic": "reflect.Kind vs Type.Name", "note": "Go の reflect では `Type.Name()` は型の宣言名(例: \"MyBool\")を返すが、`Type.Kind()` は基底の種類(bool, int など)を返す。`type MyBool bool` のような named type は Name() では \"bool\" と一致しないため、Kind() で判定する方が汎用的。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [{ "type": "pr", "number": 146, "url": "https://github.com/alecthomas/kong/pull/146" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

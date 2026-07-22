@@ -1,0 +1,136 @@
+{
+  "seq": 271,
+  "sha": "74cb5130e341e77335036f9e7db42c1e4c16651b",
+  "parents": [
+    "d0c0180cecfd46203f91b16795cd70156a89b4ba"
+  ],
+  "author": {
+    "name": "Stan Rozenraukh",
+    "email": "stan@stanistan.com",
+    "date": "2021-08-30T16:47:02-04:00"
+  },
+  "message": "Adds Context.BindToProvider (#201)",
+  "pr": {
+    "number": 201,
+    "title": "Adds Context.BindToProvider",
+    "body": "- factoring out other `Bind*` calls to delegate to `bindings`",
+    "url": "https://github.com/alecthomas/kong/pull/201"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 3,
+    "additions": 37,
+    "deletions": 20
+  },
+  "files": [
+    {
+      "path": "callbacks.go",
+      "status": "M",
+      "additions": 26,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "context.go",
+      "status": "M",
+      "additions": 9,
+      "deletions": 2,
+      "binary": false
+    },
+    {
+      "path": "options.go",
+      "status": "M",
+      "additions": 2,
+      "deletions": 18,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/callbacks.go b/callbacks.go\nindex 139a83b..f488395 100644\n--- a/callbacks.go\n+++ b/callbacks.go\n@@ -4,6 +4,8 @@ import (\n \t\"fmt\"\n \t\"reflect\"\n \t\"strings\"\n+\n+\t\"github.com/pkg/errors\"\n )\n \n type bindings map[reflect.Type]func() (reflect.Value, error)\n@@ -24,6 +26,30 @@ func (b bindings) add(values ...interface{}) bindings {\n \treturn b\n }\n \n+func (b bindings) addTo(impl, iface interface{}) {\n+\tvalueOf := reflect.ValueOf(impl)\n+\tb[reflect.TypeOf(iface).Elem()] = func() (reflect.Value, error) { return valueOf, nil }\n+}\n+\n+func (b bindings) addProvider(provider interface{}) error {\n+\tpv := reflect.ValueOf(provider)\n+\tt := pv.Type()\n+\tif t.Kind() != reflect.Func || t.NumIn() != 0 || t.NumOut() != 2 || t.Out(1) != reflect.TypeOf((*error)(nil)).Elem() {\n+\t\treturn errors.Errorf(\"%T must be a function with the signature func()(T, error)\", provider)\n+\t}\n+\trt := pv.Type().Out(0)\n+\tb[rt] = func() (reflect.Value, error) {\n+\t\tout := pv.Call(nil)\n+\t\terrv := out[1]\n+\t\tvar err error\n+\t\tif !errv.IsNil() {\n+\t\t\terr = errv.Interface().(error) // nolint\n+\t\t}\n+\t\treturn out[0], err\n+\t}\n+\treturn nil\n+}\n+\n // Clone and add values.\n func (b bindings) clone() bindings {\n \tout := make(bindings, len(b))\ndiff --git a/context.go b/context.go\nindex 83368d1..21c4bf6 100644\n--- a/context.go\n+++ b/context.go\n@@ -113,8 +113,15 @@ func (c *Context) Bind(args ...interface{}) {\n //\n //    BindTo(impl, (*MyInterface)(nil))\n func (c *Context) BindTo(impl, iface interface{}) {\n-\tvalueOf := reflect.ValueOf(impl)\n-\tc.bindings[reflect.TypeOf(iface).Elem()] = func() (reflect.Value, error) { return valueOf, nil }\n+\tc.bindings.addTo(impl, iface)\n+}\n+\n+// BindToProvider allows binding of provider functions.\n+//\n+// This is useful when the Run() function of different commands require different values that may\n+// not all be initialisable from the main() function.\n+func (c *Context) BindToProvider(provider interface{}) error {\n+\treturn c.bindings.addProvider(provider)\n }\n \n // Value returns the value for a particular path element.\ndiff --git a/options.go b/options.go\nindex 6036d91..2b69a17 100644\n--- a/options.go\n+++ b/options.go\n@@ -180,8 +180,7 @@ func Bind(args ...interface{}) Option {\n // \t\tBindTo(impl, (*iface)(nil))\n func BindTo(impl, iface interface{}) Option {\n \treturn OptionFunc(func(k *Kong) error {\n-\t\tvalueOf := reflect.ValueOf(impl)\n-\t\tk.bindings[reflect.TypeOf(iface).Elem()] = func() (reflect.Value, error) { return valueOf, nil }\n+\t\tk.bindings.addTo(impl, iface)\n \t\treturn nil\n \t})\n }\n@@ -192,22 +191,7 @@ func BindTo(impl, iface interface{}) Option {\n // not all be initialisable from the main() function.\n func BindToProvider(provider interface{}) Option {\n \treturn OptionFunc(func(k *Kong) error {\n-\t\tpv := reflect.ValueOf(provider)\n-\t\tt := pv.Type()\n-\t\tif t.Kind() != reflect.Func || t.NumIn() != 0 || t.NumOut() != 2 || t.Out(1) != reflect.TypeOf((*error)(nil)).Elem() {\n-\t\t\treturn errors.Errorf(\"%T must be a function with the signature func()(T, error)\", provider)\n-\t\t}\n-\t\trt := pv.Type().Out(0)\n-\t\tk.bindings[rt] = func() (reflect.Value, error) {\n-\t\t\tout := pv.Call(nil)\n-\t\t\terrv := out[1]\n-\t\t\tvar err error\n-\t\t\tif !errv.IsNil() {\n-\t\t\t\terr = errv.Interface().(error) // nolint\n-\t\t\t}\n-\t\t\treturn out[0], err\n-\t\t}\n-\t\treturn nil\n+\t\treturn k.bindings.addProvider(provider)\n \t})\n }\n \n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/FUNDING.yml",
+    ".github/workflows/ci.yml",
+    ".gitignore",
+    ".golangci.yml",
+    "COPYING",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/README.md",
+    "_examples/server/console.go",
+    "_examples/server/go.mod",
+    "_examples/server/go.sum",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/main.go",
+    "benchmark_test.go",
+    "bin/.go@latest.pkg",
+    "bin/.golangci-lint-1.42.0.pkg",
+    "bin/README.hermit.md",
+    "bin/activate-hermit",
+    "bin/go",
+    "bin/gofmt",
+    "bin/golangci-lint",
+    "bin/hermit",
+    "bin/hermit.hcl",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "config_test.go",
+    "context.go",
+    "defaults.go",
+    "defaults_test.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "go.mod",
+    "go.sum",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "testdata/file.txt",
+    "util.go",
+    "util_test.go",
+    "visit.go"
+  ],
+  "explanation": {
+    "what": "bindings型に addTo と addProvider という2つのメソッドを新設し、Context.BindTo/BindToProvider と Option版の BindTo/BindToProvider の重複していたロジック(reflect による型登録・provider関数のシグネチャ検証と呼び出し)をそこへ委譲するようにした。あわせて Context に新しく BindToProvider(provider interface{}) error を追加している。",
+    "why": "PR本文に「factoring out other Bind* calls to delegate to bindings」とある通り、Context側とOption側で同じ reflect ロジックが2重に実装されていたのを bindings 側の共通メソッドにまとめる目的。ついでに Context からも provider 関数によるバインドができるようにしている。",
+    "highlights": [
+      { "file": "callbacks.go", "note": "addTo/addProvider が新設された共通ロジック本体。provider は func() (T, error) というシグネチャを reflect で検証している。" },
+      { "file": "context.go", "note": "Context.BindToProvider が新規追加され、addProvider に処理を委譲するだけの薄いラッパーになった。" }
+    ],
+    "langNotes": [
+      { "topic": "reflect.Value / reflect.Type によるシグネチャ検証", "note": "addProvider は reflect.ValueOf(provider).Type() で関数の Kind・引数数・戻り値の型を検証し、条件を満たさなければ errors.Errorf でエラーを返す。Go では関数もインターフェース同様 reflect で型情報を検査でき、汎用的なDIコンテナのような仕組みをリフレクションのみで実現できる。" }
+    ],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [{ "type": "pr", "number": 201, "url": "https://github.com/alecthomas/kong/pull/201" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

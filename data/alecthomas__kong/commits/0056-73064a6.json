@@ -1,0 +1,86 @@
+{
+  "seq": 56,
+  "sha": "73064a687f8c406fd618566b71fd07b7b79f201e",
+  "parents": [
+    "d30421d2b1f23161c25872a154948889358cf135"
+  ],
+  "author": {
+    "name": "Alec Thomas",
+    "email": "alec@swapoff.org",
+    "date": "2018-06-08T15:04:26+10:00"
+  },
+  "message": "Add <command> to help when a sub-command is required.",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 3,
+    "additions": 4,
+    "deletions": 2
+  },
+  "files": [
+    {
+      "path": "_examples/shell/main.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "help_test.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "model.go",
+      "status": "M",
+      "additions": 2,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/_examples/shell/main.go b/_examples/shell/main.go\nindex db30871..f760d49 100644\n--- a/_examples/shell/main.go\n+++ b/_examples/shell/main.go\n@@ -13,7 +13,7 @@ var CLI struct {\n \tDebug bool `help:\"Debug mode.\"`\n \n \tRm struct {\n-\t\tUser      string `help:\"Run as user.\" short:\"u\"`\n+\t\tUser      string `help:\"Run as user.\" short:\"u\" default:\"default\"`\n \t\tForce     bool   `help:\"Force removal.\" short:\"f\"`\n \t\tRecursive bool   `help:\"Recursively remove files.\" short:\"r\"`\n \ndiff --git a/help_test.go b/help_test.go\nindex 83747f1..731bf98 100644\n--- a/help_test.go\n+++ b/help_test.go\n@@ -50,7 +50,7 @@ func TestHelp(t *testing.T) {\n \t\t})\n \t\trequire.True(t, exited)\n \t\tt.Log(w.String())\n-\t\trequire.Equal(t, `usage: test-app --required\n+\t\trequire.Equal(t, `usage: test-app --required <command>\n \n A test app.\n \ndiff --git a/model.go b/model.go\nindex 4f7375d..70f446b 100644\n--- a/model.go\n+++ b/model.go\n@@ -89,6 +89,8 @@ func (n *Node) Summary() string {\n \t}\n \tif len(args) != 0 {\n \t\tsummary += \" \" + strings.Join(args, \" \")\n+\t} else if len(n.Children) > 0 {\n+\t\tsummary += \" <command>\"\n \t}\n \treturn summary\n }\n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    "README.md",
+    "_examples/shell/main.go",
+    "build.go",
+    "camelcase.go",
+    "context.go",
+    "context_test.go",
+    "global.go",
+    "global_test.go",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "kong.go",
+    "kong_test.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "tokentype_string.go"
+  ],
+  "explanation": {
+    "what": "Node.Summary()に、ノードに引数(args)がなくかつ子ノード(サブコマンド)が存在する場合に\"<command>\"をusage文字列へ追加するelse分岐を追加した。あわせてshellの例(_examples/shell/main.go)のUserフラグにdefault:\"default\"タグを付与し、help_test.goの期待usageも更新した。",
+    "why": "コミットメッセージ「Add <command> to help when a sub-command is required.」の通り、直前のコミットで[<flags>]表示を削除した結果、サブコマンドが必須であることがusage行から読み取れなくなっていたため、代わりに<command>という表示を補うことでユーザーがサブコマンドの入力が必要だと分かるようにした。",
+    "highlights": [
+      { "file": "model.go", "note": "Summary()にargsが空かつChildrenが存在する場合の\" <command>\"追加分岐" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

@@ -1,0 +1,142 @@
+{
+  "seq": 317,
+  "sha": "0066abb97338a1de4b69d15ceeb54029970d6305",
+  "parents": [
+    "edc47ebc344998df6a7138f42ccc9a33ffec2420"
+  ],
+  "author": {
+    "name": "Alec Thomas",
+    "email": "alec@swapoff.org",
+    "date": "2022-06-15T20:45:10+10:00"
+  },
+  "message": "fix: Reset() should always be called before anything else",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 4,
+    "additions": 49,
+    "deletions": 42
+  },
+  "files": [
+    {
+      "path": "README.md",
+      "status": "M",
+      "additions": 39,
+      "deletions": 37,
+      "binary": false
+    },
+    {
+      "path": "help.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "kong.go",
+      "status": "M",
+      "additions": 6,
+      "deletions": 3,
+      "binary": false
+    },
+    {
+      "path": "kong_test.go",
+      "status": "M",
+      "additions": 3,
+      "deletions": 1,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/README.md b/README.md\nindex 5d92ef1..5b6667a 100644\n--- a/README.md\n+++ b/README.md\n@@ -8,40 +8,39 @@\n \n <!-- MarkdownTOC autolink=\"true\" style=\"ordered\" indent=\"    \" -->\n \n-- [Kong is a command-line parser for Go](#kong-is-a-command-line-parser-for-go)\n-  - [Introduction](#introduction)\n-  - [Help](#help)\n-    - [Help as a user of a Kong application](#help-as-a-user-of-a-kong-application)\n-    - [Defining help in Kong](#defining-help-in-kong)\n-      - [Showing the _command_'s detailed help](#showing-the-commands-detailed-help)\n-      - [Showing an _argument_'s detailed help](#showing-an-arguments-detailed-help)\n-  - [Command handling](#command-handling)\n-    - [Switch on the command string](#switch-on-the-command-string)\n-    - [Attach a `Run(...) error` method to each command](#attach-a-run-error-method-to-each-command)\n-  - [Hooks: BeforeResolve(), BeforeApply(), AfterApply() and the Bind() option](#hooks-beforeresolve-beforeapply-afterapply-and-the-bind-option)\n-  - [Flags](#flags)\n-  - [Commands and sub-commands](#commands-and-sub-commands)\n-  - [Branching positional arguments](#branching-positional-arguments)\n-  - [Positional arguments](#positional-arguments)\n-  - [Slices](#slices)\n-  - [Maps](#maps)\n-  - [Nested data structure](#nested-data-structure)\n-  - [Custom named decoders](#custom-named-decoders)\n-  - [Supported field types](#supported-field-types)\n-  - [Custom decoders (mappers)](#custom-decoders-mappers)\n-  - [Supported tags](#supported-tags)\n-  - [Plugins](#plugins)\n-  - [Dynamic Commands](#dynamic-commands)\n-  - [Variable interpolation](#variable-interpolation)\n-  - [Validation](#validation)\n-  - [Modifying Kong's behaviour](#modifying-kongs-behaviour)\n-    - [`Name(help)` and `Description(help)` - set the application name description](#namehelp-and-descriptionhelp---set-the-application-name-description)\n-    - [`Configuration(loader, paths...)` - load defaults from configuration files](#configurationloader-paths---load-defaults-from-configuration-files)\n-    - [`Resolver(...)` - support for default values from external sources](#resolver---support-for-default-values-from-external-sources)\n-    - [`*Mapper(...)` - customising how the command-line is mapped to Go values](#mapper---customising-how-the-command-line-is-mapped-to-go-values)\n-    - [`ConfigureHelp(HelpOptions)` and `Help(HelpFunc)` - customising help](#configurehelphelpoptions-and-helphelpfunc---customising-help)\n-    - [`Bind(...)` - bind values for callback hooks and Run() methods](#bind---bind-values-for-callback-hooks-and-run-methods)\n-    - [Other options](#other-options)\n+1. [Introduction](#introduction)\n+1. [Help](#help)\n+    1. [Help as a user of a Kong application](#help-as-a-user-of-a-kong-application)\n+    1. [Defining help in Kong](#defining-help-in-kong)\n+        1. [Showing the _command_'s detailed help](#showing-the-_command_s-detailed-help)\n+        1. [Showing an _argument_'s detailed help](#showing-an-_argument_s-detailed-help)\n+1. [Command handling](#command-handling)\n+    1. [Switch on the command string](#switch-on-the-command-string)\n+    1. [Attach a `Run(...) error` method to each command](#attach-a-run-error-method-to-each-command)\n+1. [Hooks: BeforeReset\\(\\), BeforeResolve\\(\\), BeforeApply\\(\\), AfterApply\\(\\) and the Bind\\(\\) option](#hooks-beforereset-beforeresolve-beforeapply-afterapply-and-the-bind-option)\n+1. [Flags](#flags)\n+1. [Commands and sub-commands](#commands-and-sub-commands)\n+1. [Branching positional arguments](#branching-positional-arguments)\n+1. [Positional arguments](#positional-arguments)\n+1. [Slices](#slices)\n+1. [Maps](#maps)\n+1. [Nested data structure](#nested-data-structure)\n+1. [Custom named decoders](#custom-named-decoders)\n+1. [Supported field types](#supported-field-types)\n+1. [Custom decoders \\(mappers\\)](#custom-decoders-mappers)\n+1. [Supported tags](#supported-tags)\n+1. [Plugins](#plugins)\n+1. [Dynamic Commands](#dynamic-commands)\n+1. [Variable interpolation](#variable-interpolation)\n+1. [Validation](#validation)\n+1. [Modifying Kong's behaviour](#modifying-kongs-behaviour)\n+    1. [`Name(help)` and `Description(help)` - set the application name description](#namehelp-and-descriptionhelp---set-the-application-name-description)\n+    1. [`Configuration(loader, paths...)` - load defaults from configuration files](#configurationloader-paths---load-defaults-from-configuration-files)\n+    1. [`Resolver(...)` - support for default values from external sources](#resolver---support-for-default-values-from-external-sources)\n+    1. [`*Mapper(...)` - customising how the command-line is mapped to Go values](#mapper---customising-how-the-command-line-is-mapped-to-go-values)\n+    1. [`ConfigureHelp(HelpOptions)` and `Help(HelpFunc)` - customising help](#configurehelphelpoptions-and-helphelpfunc---customising-help)\n+    1. [`Bind(...)` - bind values for callback hooks and Run\\(\\) methods](#bind---bind-values-for-callback-hooks-and-run-methods)\n+    1. [Other options](#other-options)\n \n <!-- /MarkdownTOC -->\n \n@@ -302,11 +301,14 @@ func main() {\n \n ```\n \n-## Hooks: BeforeResolve(), BeforeApply(), AfterApply() and the Bind() option\n+## Hooks: BeforeReset(), BeforeResolve(), BeforeApply(), AfterApply() and the Bind() option\n \n-If a node in the grammar has a `BeforeResolve(...)`, `BeforeApply(...) error` and/or `AfterApply(...) error` method, those methods will be called before validation/assignment and after validation/assignment, respectively.\n+If a node in the grammar has a `BeforeReset(...)`, `BeforeResolve\n+(...)`, `BeforeApply(...) error` and/or `AfterApply(...) error` method, those\n+methods will be called before values are reset, before validation/assignment,\n+and after validation/assignment, respectively.\n \n-The `--help` flag is implemented with a `BeforeResolve` hook.\n+The `--help` flag is implemented with a `BeforeReset` hook.\n \n Arguments to hooks are provided via the `Run(...)` method or `Bind(...)` option. `*Kong`, `*Context` and `*Path` are also bound and finally, hooks can also contribute bindings via `kong.Context.Bind()` and `kong.Context.BindTo()`.\n \ndiff --git a/help.go b/help.go\nindex 473df92..b265121 100644\n--- a/help.go\n+++ b/help.go\n@@ -16,7 +16,7 @@ const (\n // Help flag.\n type helpValue bool\n \n-func (h helpValue) BeforeResolve(ctx *Context) error {\n+func (h helpValue) BeforeReset(ctx *Context) error {\n \toptions := ctx.Kong.helpOptions\n \toptions.Summary = false\n \terr := ctx.Kong.help(options, ctx)\ndiff --git a/kong.go b/kong.go\nindex bea2998..6f2af97 100644\n--- a/kong.go\n+++ b/kong.go\n@@ -251,13 +251,16 @@ func (k *Kong) Parse(args []string) (ctx *Context, err error) {\n \tif ctx.Error != nil {\n \t\treturn nil, &ParseError{error: ctx.Error, Context: ctx}\n \t}\n-\tif err = k.applyHook(ctx, \"BeforeResolve\"); err != nil {\n+\tif err = k.applyHook(ctx, \"BeforeReset\"); err != nil {\n \t\treturn nil, &ParseError{error: err, Context: ctx}\n \t}\n-\tif err = ctx.Resolve(); err != nil {\n+\tif err = ctx.Reset(); err != nil {\n \t\treturn nil, &ParseError{error: err, Context: ctx}\n \t}\n-\tif err = ctx.Reset(); err != nil {\n+\tif err = k.applyHook(ctx, \"BeforeResolve\"); err != nil {\n+\t\treturn nil, &ParseError{error: err, Context: ctx}\n+\t}\n+\tif err = ctx.Resolve(); err != nil {\n \t\treturn nil, &ParseError{error: err, Context: ctx}\n \t}\n \tif err = k.applyHook(ctx, \"BeforeApply\"); err != nil {\ndiff --git a/kong_test.go b/kong_test.go\nindex 7549906..0e57f25 100644\n--- a/kong_test.go\n+++ b/kong_test.go\n@@ -1548,12 +1548,14 @@ func TestHelpShouldStillWork(t *testing.T) {\n \t\tDir string `type:\"existingdir\" default:\"missing-dir\"`\n \t}\n \tvar cli CLI\n-\tk := mustNew(t, &cli)\n+\tw := &strings.Builder{}\n+\tk := mustNew(t, &cli, kong.Writers(w, w))\n \trc := -1 // init nonzero to help assert help hook was called\n \tk.Exit = func(i int) {\n \t\trc = i\n \t}\n \t_, err := k.Parse([]string{\"--help\"})\n+\tt.Log(w.String())\n \t// checking return code validates the help hook was called\n \trequire.Zero(t, rc)\n \t// allow for error propagation from other validation (only for the\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/FUNDING.yml",
+    ".github/workflows/ci.yml",
+    ".gitignore",
+    ".golangci.yml",
+    "COPYING",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/README.md",
+    "_examples/server/console.go",
+    "_examples/server/go.mod",
+    "_examples/server/go.sum",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/commandstring/main.go",
+    "_examples/shell/help/README.md",
+    "_examples/shell/help/main.go",
+    "benchmark_test.go",
+    "bin/.go-1.17.8.pkg",
+    "bin/.golangci-lint-1.42.0.pkg",
+    "bin/README.hermit.md",
+    "bin/activate-hermit",
+    "bin/go",
+    "bin/gofmt",
+    "bin/golangci-lint",
+    "bin/hermit",
+    "bin/hermit.hcl",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "config_test.go",
+    "context.go",
+    "defaults.go",
+    "defaults_test.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "go.mod",
+    "go.sum",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_linux_test.go",
+    "mapper_test.go",
+    "mapper_windows_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "testdata/file.txt",
+    "util.go",
+    "util_test.go",
+    "visit.go"
+  ],
+  "explanation": {
+    "what": "kong.go の Parse() 内で、フック呼び出しと ctx.Reset()/ctx.Resolve() の順序を入れ替えた。従来は BeforeResolve フック→ctx.Resolve()→ctx.Reset() の順だったが、新設した BeforeReset フックを最初に呼び、その直後に ctx.Reset() を呼んでから BeforeResolve→ctx.Resolve() を実行する順序に変更した。help.go の helpValue.BeforeResolve メソッドも BeforeReset にリネームしている。README のフック一覧・目次も BeforeReset を含む形に更新した。",
+    "why": "コミットメッセージの通り、Reset()(各値をデフォルト状態に戻す処理)は他の何よりも先に呼ばれるべきだという設計上の原則を明確にするための修正。従来 --help フラグは BeforeResolve フックとして実装されていたため、Reset() より後に評価される可能性があり、ヘルプ表示前の状態に一貫性がなかったと考えられる。BeforeReset を新設して --help をそちらに移すことで、値がリセットされる前にヘルプが割り込まないようにしている。",
+    "highlights": [
+      { "file": "kong.go", "note": "Parse() 内で BeforeReset→Reset→BeforeResolve→Resolve の順に処理する新しいフロー" },
+      { "file": "help.go", "note": "helpValue の実装メソッドが BeforeResolve から BeforeReset に変更(--help はこのフックで動作する)" }
+    ],
+    "langNotes": [
+      { "topic": "hook (BeforeReset/BeforeResolve/BeforeApply)", "note": "Kong は構造体のフィールドやコマンドの型に BeforeReset(ctx) / BeforeResolve(ctx) / BeforeApply(ctx) error などの特定シグネチャのメソッドを実装しておくと、パース処理の各段階で自動的に呼び出す仕組みを持つ。Go の暗黙インターフェースと reflect によるメソッド探索を組み合わせた、フレームワーク側からユーザーコードへのコールバック(フック)機構。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

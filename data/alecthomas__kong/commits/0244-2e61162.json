@@ -1,0 +1,112 @@
+{
+  "seq": 244,
+  "sha": "2e611623a7a9adc6bf0ddb76704b39b95261c21a",
+  "parents": [
+    "8d859b918f7d1de54a0d15e1a01e6dd3b5402dc7"
+  ],
+  "author": {
+    "name": "Alec Thomas",
+    "email": "alec@swapoff.org",
+    "date": "2021-04-18T10:05:26+10:00"
+  },
+  "message": "Don't display placeholder for counters.\n\nFixes #164.",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 24,
+    "deletions": 17
+  },
+  "files": [
+    {
+      "path": "model.go",
+      "status": "M",
+      "additions": 6,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "model_test.go",
+      "status": "M",
+      "additions": 18,
+      "deletions": 16,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/model.go b/model.go\nindex cb0534a..f21dece 100644\n--- a/model.go\n+++ b/model.go\n@@ -305,6 +305,11 @@ func (v *Value) IsBool() bool {\n \treturn v.Target.Kind() == reflect.Bool\n }\n \n+// IsCounter returns true if the value is a counter.\n+func (v *Value) IsCounter() bool {\n+\treturn v.Tag.Type == \"counter\"\n+}\n+\n // Parse tokens into value, parse, and validate, but do not write to the field.\n func (v *Value) Parse(scan *Scanner, target reflect.Value) (err error) {\n \tdefer func() {\n@@ -384,7 +389,7 @@ func (f *Flag) String() string {\n \tif f.Short != 0 {\n \t\tout = fmt.Sprintf(\"-%c, %s\", f.Short, out)\n \t}\n-\tif !f.IsBool() {\n+\tif !f.IsBool() && !f.IsCounter() {\n \t\tout += \"=\" + f.FormatPlaceHolder()\n \t}\n \treturn out\ndiff --git a/model_test.go b/model_test.go\nindex 9910704..0edd1b3 100644\n--- a/model_test.go\n+++ b/model_test.go\n@@ -26,7 +26,7 @@ func TestModelApplicationCommands(t *testing.T) {\n \trequire.Equal(t, []string{\"one two\", \"one three <four>\"}, actual)\n }\n \n-func TestFormatPlaceHolder(t *testing.T) {\n+func TestFlagString(t *testing.T) {\n \tvar cli struct {\n \t\tString                  string\n \t\tDefaultInt              int    `default:\"42\"`\n@@ -41,28 +41,30 @@ func TestFormatPlaceHolder(t *testing.T) {\n \t\tMapNoSep                map[string]string `mapsep:\"none\"`\n \t\tMapDefault              map[string]string `mapsep:\"none\" default:\"hello\"`\n \t\tMapPlaceholder          map[string]string `mapsep:\"none\" placeholder:\"world\"`\n+\t\tCounter                 int               `type:\"counter\"`\n \t}\n \ttests := map[string]string{\n-\t\t\"help\":                      \"HELP\",\n-\t\t\"string\":                    \"STRING\",\n-\t\t\"default-int\":               \"42\",\n-\t\t\"default-str\":               `\"hello\"`,\n-\t\t\"placeholder\":               \"world\",\n-\t\t\"slice-sep\":                 \"SLICE-SEP,...\",\n-\t\t\"slice-no-sep\":              \"SLICE-NO-SEP\",\n-\t\t\"slice-default\":             \"hello,...\",\n-\t\t\"slice-placeholder\":         \"world,...\",\n-\t\t\"slice-default-placeholder\": \"hello,...\",\n-\t\t\"map-sep\":                   \"KEY=VALUE;...\",\n-\t\t\"map-no-sep\":                \"KEY=VALUE\",\n-\t\t\"map-default\":               \"hello\",\n-\t\t\"map-placeholder\":           \"world\",\n+\t\t\"help\":                      \"-h, --help\",\n+\t\t\"string\":                    \"--string=STRING\",\n+\t\t\"default-int\":               \"--default-int=42\",\n+\t\t\"default-str\":               `--default-str=\"hello\"`,\n+\t\t\"placeholder\":               \"--placeholder=world\",\n+\t\t\"slice-sep\":                 \"--slice-sep=SLICE-SEP,...\",\n+\t\t\"slice-no-sep\":              \"--slice-no-sep=SLICE-NO-SEP\",\n+\t\t\"slice-default\":             \"--slice-default=hello,...\",\n+\t\t\"slice-placeholder\":         \"--slice-placeholder=world,...\",\n+\t\t\"slice-default-placeholder\": \"--slice-default-placeholder=hello,...\",\n+\t\t\"map-sep\":                   \"--map-sep=KEY=VALUE;...\",\n+\t\t\"map-no-sep\":                \"--map-no-sep=KEY=VALUE\",\n+\t\t\"map-default\":               \"--map-default=hello\",\n+\t\t\"map-placeholder\":           \"--map-placeholder=world\",\n+\t\t\"counter\":                   \"--counter\",\n \t}\n \n \tp := mustNew(t, &cli)\n \tfor _, flag := range p.Model.Flags {\n \t\twant, ok := tests[flag.Name]\n \t\trequire.Truef(t, ok, \"unknown flag name: %s\", flag.Name)\n-\t\trequire.Equal(t, want, flag.FormatPlaceHolder())\n+\t\trequire.Equal(t, want, flag.String())\n \t}\n }\n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    ".github/FUNDING.yml",
+    ".gitignore",
+    ".golangci.yml",
+    "COPYING",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/README.md",
+    "_examples/server/console.go",
+    "_examples/server/go.mod",
+    "_examples/server/go.sum",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/main.go",
+    "benchmark_test.go",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "config_test.go",
+    "context.go",
+    "defaults.go",
+    "defaults_test.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "go.mod",
+    "go.sum",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "testdata/file.txt",
+    "util.go",
+    "util_test.go",
+    "visit.go"
+  ],
+  "explanation": {
+    "what": "`Value` に `IsCounter()` メソッドを追加し(`Tag.Type == \"counter\"` の判定)、`Flag.String()` のヘルプ表示ロジックで `IsBool()` に加えて `IsCounter()` もチェックしてプレースホルダー(`=VALUE` のような表記)を表示しないようにした。あわせてテスト名を `TestFormatPlaceHolder` から `TestFlagString` に変更し、テスト対象を `FormatPlaceHolder()` から `String()` に切り替えている。",
+    "why": "コミットメッセージに \"Fixes #164\" とあり、counter 型フラグ(`-v -v -v` のように繰り返し指定して回数を数えるフラグ)がブール値同様に単体で完結する値であるにもかかわらず、ヘルプに不要なプレースホルダーが表示されていた不具合を修正するもの。",
+    "highlights": [
+      { "file": "model.go", "note": "IsCounter() を追加し、String() でのプレースホルダー抑制条件に組み込んだ" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

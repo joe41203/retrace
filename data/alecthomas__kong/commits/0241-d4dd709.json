@@ -1,0 +1,146 @@
+{
+  "seq": 241,
+  "sha": "d4dd7094455a32ce628828ec330b98d8d7db6731",
+  "parents": [
+    "49417fe9662c37d6cf6c1d432d4a2ced9753343f"
+  ],
+  "author": {
+    "name": "Franklin \"Snaipe\" Mathieu",
+    "email": "snaipe@arista.com",
+    "date": "2021-04-04T19:30:00+02:00"
+  },
+  "message": "tag: add passthrough for positional arguments\n\nThis new tag tells the parser to stop processing flags after the\npositional argument is encountered.\n\nThis is particularly useful for subcommands that forward their arguments\nto an external program, and makes it possible to implement commands\nlike `kubectl exec` or `docker run`.\n\nFixes #80.",
+  "pr": {
+    "number": 160,
+    "title": "tag: add passthrough for positional arguments",
+    "body": "This new tag tells the parser to stop processing flags after the\r\npositional argument is encountered.\r\n\r\nThis is particularly useful for subcommands that forward their arguments\r\nto an external program, and makes it possible to implement commands\r\nlike `kubectl exec` or `docker run`.",
+    "url": "https://github.com/alecthomas/kong/pull/160"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 6,
+    "additions": 57,
+    "deletions": 12
+  },
+  "files": [
+    {
+      "path": "README.md",
+      "status": "M",
+      "additions": 1,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "build.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "context.go",
+      "status": "M",
+      "additions": 21,
+      "deletions": 12,
+      "binary": false
+    },
+    {
+      "path": "mapper_test.go",
+      "status": "M",
+      "additions": 27,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "model.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "tag.go",
+      "status": "M",
+      "additions": 6,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/README.md b/README.md\nindex 47bd1cb..2d633f3 100644\n--- a/README.md\n+++ b/README.md\n@@ -450,6 +450,7 @@ Tag                    | Description\n `prefix:\"X\"`           | Prefix for all sub-flags.\n `set:\"K=V\"`            | Set a variable for expansion by child elements. Multiples can occur.\n `embed`                | If present, this field's children will be embedded in the parent. Useful for composition.\n+`passthrough`          | If present, this positional argument stops flag parsing when encountered, as if `--` was processed before. Useful for external command wrappers, like `exec`.\n `-`                    | Ignore the field. Useful for adding non-CLI fields to a configuration struct.\n \n ## Plugins\ndiff --git a/build.go b/build.go\nindex 0e3bc5f..4d9081a 100644\n--- a/build.go\n+++ b/build.go\n@@ -195,6 +195,7 @@ func buildField(k *Kong, node *Node, v reflect.Value, ft reflect.StructField, fv\n \t\tTag:          tag,\n \t\tTarget:       fv,\n \t\tEnum:         tag.Enum,\n+\t\tPassthrough:  tag.Passthrough,\n \n \t\t// Flags are optional by default, and args are required by default.\n \t\tRequired: (!tag.Arg && tag.Required) || (tag.Arg && !tag.Optional),\ndiff --git a/context.go b/context.go\nindex 554e8b1..d01abfd 100644\n--- a/context.go\n+++ b/context.go\n@@ -324,6 +324,21 @@ func (c *Context) Reset() error {\n \t})\n }\n \n+func (c *Context) endParsing() {\n+\targs := []string{}\n+\tfor {\n+\t\ttoken := c.scan.Pop()\n+\t\tif token.Type == EOLToken {\n+\t\t\tbreak\n+\t\t}\n+\t\targs = append(args, token.String())\n+\t}\n+\t// Note: tokens must be pushed in reverse order.\n+\tfor i := range args {\n+\t\tc.scan.PushTyped(args[len(args)-1-i], PositionalArgumentToken)\n+\t}\n+}\n+\n func (c *Context) trace(node *Node) (err error) { // nolint: gocyclo\n \tpositional := 0\n \n@@ -349,18 +364,7 @@ func (c *Context) trace(node *Node) (err error) { // nolint: gocyclo\n \t\t\t\t// Indicates end of parsing. All remaining arguments are treated as positional arguments only.\n \t\t\t\tcase v == \"--\":\n \t\t\t\t\tc.scan.Pop()\n-\t\t\t\t\targs := []string{}\n-\t\t\t\t\tfor {\n-\t\t\t\t\t\ttoken = c.scan.Pop()\n-\t\t\t\t\t\tif token.Type == EOLToken {\n-\t\t\t\t\t\t\tbreak\n-\t\t\t\t\t\t}\n-\t\t\t\t\t\targs = append(args, token.String())\n-\t\t\t\t\t}\n-\t\t\t\t\t// Note: tokens must be pushed in reverse order.\n-\t\t\t\t\tfor i := range args {\n-\t\t\t\t\t\tc.scan.PushTyped(args[len(args)-1-i], PositionalArgumentToken)\n-\t\t\t\t\t}\n+\t\t\t\t\tc.endParsing()\n \n \t\t\t\t// Long flag.\n \t\t\t\tcase strings.HasPrefix(v, \"--\"):\n@@ -413,6 +417,11 @@ func (c *Context) trace(node *Node) (err error) { // nolint: gocyclo\n \t\t\t// Ensure we've consumed all positional arguments.\n \t\t\tif positional < len(node.Positional) {\n \t\t\t\targ := node.Positional[positional]\n+\n+\t\t\t\tif arg.Passthrough {\n+\t\t\t\t\tc.endParsing()\n+\t\t\t\t}\n+\n \t\t\t\terr := arg.Parse(c.scan, c.getValue(arg))\n \t\t\t\tif err != nil {\n \t\t\t\t\treturn err\ndiff --git a/mapper_test.go b/mapper_test.go\nindex a8b84e9..4f052f9 100644\n--- a/mapper_test.go\n+++ b/mapper_test.go\n@@ -207,6 +207,33 @@ func TestSliceConsumesRemainingPositionalArgs(t *testing.T) {\n \trequire.Equal(t, []string{\"ls\", \"-lart\"}, cli.Remainder)\n }\n \n+func TestPassthroughStopsParsing(t *testing.T) {\n+\ttype cli struct {\n+\t\tInteractive bool     `short:\"i\"`\n+\t\tImage       string   `arg:\"\"`\n+\t\tArgv        []string `arg:\"\" optional:\"\" passthrough:\"\"`\n+\t}\n+\n+\tvar actual cli\n+\tp := mustNew(t, &actual)\n+\n+\t_, err := p.Parse([]string{\"alpine\", \"sudo\", \"-i\", \"true\"})\n+\trequire.NoError(t, err)\n+\trequire.Equal(t, cli{\n+\t\tInteractive: false,\n+\t\tImage:       \"alpine\",\n+\t\tArgv:        []string{\"sudo\", \"-i\", \"true\"},\n+\t}, actual)\n+\n+\t_, err = p.Parse([]string{\"alpine\", \"-i\", \"sudo\", \"-i\", \"true\"})\n+\trequire.NoError(t, err)\n+\trequire.Equal(t, cli{\n+\t\tInteractive: true,\n+\t\tImage:       \"alpine\",\n+\t\tArgv:        []string{\"sudo\", \"-i\", \"true\"},\n+\t}, actual)\n+}\n+\n type mappedValue struct {\n \tdecoded string\n }\ndiff --git a/model.go b/model.go\nindex d3d1a8f..cb0534a 100644\n--- a/model.go\n+++ b/model.go\n@@ -236,6 +236,7 @@ type Value struct {\n \tSet          bool   // Set to true when this value is set through some mechanism.\n \tFormat       string // Formatting directive, if applicable.\n \tPosition     int    // Position (for positional arguments).\n+\tPassthrough  bool   // Set to true to stop flag parsing when encountered.\n }\n \n // EnumMap returns a map of the enums in this value.\ndiff --git a/tag.go b/tag.go\nindex deffd86..4d640c9 100644\n--- a/tag.go\n+++ b/tag.go\n@@ -34,6 +34,7 @@ type Tag struct {\n \tEmbed       bool\n \tAliases     []string\n \tNegatable   bool\n+\tPassthrough bool\n \n \t// Storage for all tag keys for arbitrary lookups.\n \titems map[string][]string\n@@ -184,6 +185,11 @@ func parseTag(fv reflect.Value, ft reflect.StructField) *Tag {\n \t\tt.PlaceHolder = strings.ToUpper(dashedString(fv.Type().Name()))\n \t}\n \tt.Enum = t.Get(\"enum\")\n+\tpassthrough := t.Has(\"passthrough\")\n+\tif passthrough && !t.Arg {\n+\t\tfail(\"passthrough only makes sense for positional arguments\")\n+\t}\n+\tt.Passthrough = passthrough\n \treturn t\n }\n \n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    ".github/FUNDING.yml",
+    ".gitignore",
+    ".golangci.yml",
+    "COPYING",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/README.md",
+    "_examples/server/console.go",
+    "_examples/server/go.mod",
+    "_examples/server/go.sum",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/main.go",
+    "benchmark_test.go",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "config_test.go",
+    "context.go",
+    "defaults.go",
+    "defaults_test.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "go.mod",
+    "go.sum",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "testdata/file.txt",
+    "util.go",
+    "util_test.go",
+    "visit.go"
+  ],
+  "explanation": {
+    "what": "位置引数(positional argument)に付ける新しい `passthrough` タグを追加した。このタグが付いた引数に到達すると、以降のトークンをすべて `--` を処理したのと同じ扱いにして無条件に位置引数として集約する。実装は `Context.trace()` 内の `--` 処理ロジックを `endParsing()` として切り出し、`passthrough` な引数にも同じ処理を適用する形。`tag.go` では `passthrough` が非 `arg` フィールドに付いた場合に `fail()` でビルド時エラーにするバリデーションも追加している。",
+    "why": "PR本文に、外部プログラムへ引数をそのまま転送するサブコマンド(`kubectl exec` や `docker run` のような)を実装できるようにするためと明記されている。Issue #80 を解消する変更。",
+    "highlights": [
+      { "file": "context.go", "note": "`--` 処理を `endParsing()` に切り出し、`passthrough` な位置引数でも同じ経路を通す" },
+      { "file": "tag.go", "note": "`passthrough` は位置引数(`arg`)にしか意味を持たないため、フラグに付けるとビルド時に fail する" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [{ "type": "pr", "number": 160, "url": "https://github.com/alecthomas/kong/pull/160" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

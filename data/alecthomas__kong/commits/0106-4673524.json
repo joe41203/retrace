@@ -1,0 +1,109 @@
+{
+  "seq": 106,
+  "sha": "467352418f41fd92ab186524df06c1f328beb2c4",
+  "parents": [
+    "9cbf4a5d4b60c69d7d1b53c7a3fde4483ab41b52"
+  ],
+  "author": {
+    "name": "Alec Thomas",
+    "email": "alec@swapoff.org",
+    "date": "2018-09-17T10:25:35+10:00"
+  },
+  "message": "Ignore fields tagged with kong:\"-\".",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 3,
+    "additions": 25,
+    "deletions": 5
+  },
+  "files": [
+    {
+      "path": "build.go",
+      "status": "M",
+      "additions": 4,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "kong_test.go",
+      "status": "M",
+      "additions": 13,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "tag.go",
+      "status": "M",
+      "additions": 8,
+      "deletions": 4,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/build.go b/build.go\nindex bd46907..4a487b9 100644\n--- a/build.go\n+++ b/build.go\n@@ -47,6 +47,9 @@ func flattenedFields(v reflect.Value) (out []flattenedField) {\n \t\tft := v.Type().Field(i)\n \t\tfv := v.Field(i)\n \t\ttag := parseTag(fv, ft)\n+\t\tif tag.Ignored {\n+\t\t\tcontinue\n+\t\t}\n \t\tif ft.Anonymous {\n \t\t\tif fv.Kind() == reflect.Interface {\n \t\t\t\tfv = fv.Elem()\n@@ -68,7 +71,7 @@ func flattenedFields(v reflect.Value) (out []flattenedField) {\n \t\t}\n \t\tout = append(out, flattenedField{field: ft, value: fv, tag: tag})\n \t}\n-\treturn\n+\treturn out\n }\n \n func buildNode(k *Kong, v reflect.Value, typ NodeType, seenFlags map[string]bool) *Node {\ndiff --git a/kong_test.go b/kong_test.go\nindex 3863c9e..2bd8a7b 100644\n--- a/kong_test.go\n+++ b/kong_test.go\n@@ -613,3 +613,16 @@ func TestEmbedInterface(t *testing.T) {\n \trequire.Equal(t, \"foo\", cli.SomeFlag)\n \trequire.Equal(t, \"yes\", cli.TestInterface.(*TestImpl).Flag)\n }\n+\n+func TestExcludedField(t *testing.T) {\n+\tvar cli struct {\n+\t\tFlag     string\n+\t\tExcluded string `kong:\"-\"`\n+\t}\n+\n+\tp := mustNew(t, &cli)\n+\t_, err := p.Parse([]string{\"--flag=foo\"})\n+\trequire.NoError(t, err)\n+\t_, err = p.Parse([]string{\"--excluded=foo\"})\n+\trequire.Error(t, err)\n+}\ndiff --git a/tag.go b/tag.go\nindex 6669194..5ade2f1 100644\n--- a/tag.go\n+++ b/tag.go\n@@ -10,6 +10,7 @@ import (\n \n // Tag represents the parsed state of Kong tags in a struct field tag.\n type Tag struct {\n+\tIgnored     bool // Field is ignored by Kong. ie. kong:\"-\"\n \tCmd         bool\n \tArg         bool\n \tRequired    bool\n@@ -39,7 +40,7 @@ type tagChars struct {\n var kongChars = tagChars{sep: ',', quote: '\\'', assign: '='}\n var bareChars = tagChars{sep: ' ', quote: '\"', assign: ':'}\n \n-func parseTagItems(s string, chr tagChars) map[string]string {\n+func parseTagItems(tagString string, chr tagChars) map[string]string {\n \td := map[string]string{}\n \tkey := []rune{}\n \tvalue := []rune{}\n@@ -53,7 +54,7 @@ func parseTagItems(s string, chr tagChars) map[string]string {\n \t\tinKey = true\n \t}\n \n-\trunes := []rune(s)\n+\trunes := []rune(tagString)\n \tfor idx := 0; idx < len(runes); idx++ {\n \t\tr := runes[idx]\n \t\tnext := rune(0)\n@@ -82,7 +83,7 @@ func parseTagItems(s string, chr tagChars) map[string]string {\n \t\t\t\tif next == chr.sep || eof {\n \t\t\t\t\tcontinue\n \t\t\t\t}\n-\t\t\t\tfail(\"%v has an unexpected char at pos %v\", s, idx)\n+\t\t\t\tfail(\"%v has an unexpected char at pos %v\", tagString, idx)\n \t\t\t} else {\n \t\t\t\tquotes = true\n \t\t\t\tcontinue\n@@ -95,7 +96,7 @@ func parseTagItems(s string, chr tagChars) map[string]string {\n \t\t}\n \t}\n \tif quotes {\n-\t\tfail(\"%v is not quoted properly\", s)\n+\t\tfail(\"%v is not quoted properly\", tagString)\n \t}\n \n \tadd()\n@@ -113,6 +114,9 @@ func getTagInfo(ft reflect.StructField) (string, tagChars) {\n }\n \n func parseTag(fv reflect.Value, ft reflect.StructField) *Tag {\n+\tif ft.Tag.Get(\"kong\") == \"-\" {\n+\t\treturn &Tag{Ignored: true, items: map[string]string{}}\n+\t}\n \ts, chars := getTagInfo(ft)\n \tt := &Tag{\n \t\titems: parseTagItems(s, chars),\n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    ".golangci.yml",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/console.go",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/main.go",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "context.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "tokentype_string.go",
+    "util.go",
+    "util_test.go"
+  ],
+  "explanation": {
+    "what": "Tag に Ignored bool フィールドを追加し、parseTag でフィールドの struct タグが `kong:\"-\"` の場合は他の解析をスキップして Ignored: true の Tag を即座に返すようにした。flattenedFields 側でも tag.Ignored なら continue でそのフィールドをスキップする。TestExcludedField で、`kong:\"-\"` を付けたフィールドは `--excluded` フラグとして認識されない(パースエラーになる)ことを確認している。",
+    "why": "struct の全フィールドが自動的に CLI フラグ化される Kong の設計では、内部状態や CLI に出したくないフィールドを除外する手段が必要になる。encoding/json の `json:\"-\"` に倣った規約で、宣言的にフィールドをオプトアウトできるようにしたとみられる。",
+    "highlights": [
+      { "file": "tag.go", "note": "parseTag: `kong:\"-\"` を最優先でチェックし Ignored な Tag を早期リターン" },
+      { "file": "kong_test.go", "note": "TestExcludedField: kong:\"-\" 付きフィールドがフラグとして生成されないことを確認" }
+    ],
+    "langNotes": [
+      { "topic": "kong:\"-\" によるフィールド除外", "note": "Go の struct タグ文字列内で `-` を値として使い「このフィールドを処理対象から除外する」という規約は encoding/json の `json:\"-\"` などで広く使われる慣習。Kong もこれに倣い、CLI 化したくないフィールドを明示的に無視できるようにしている。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

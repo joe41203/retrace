@@ -1,0 +1,115 @@
+{
+  "seq": 192,
+  "sha": "f19cb8c69dc7f9effb9fae67097261e474d8e67f",
+  "parents": [
+    "1ccbbb9db4097af005cc94810c50a1fb45d337a1"
+  ],
+  "author": {
+    "name": "Will Roden",
+    "email": "willabides@github.com",
+    "date": "2020-05-15T15:54:00-05:00"
+  },
+  "message": "factor CloneWith out of most interpolate cases",
+  "pr": {
+    "number": 79,
+    "title": "fix performance issue in interpolation",
+    "body": "I ran across an issue where having a large number of variables to interpolate can significantly slow down `kong.New()`.  In my case I had around 5,000 variables and it took about five seconds to run my program with `--help`.\r\n\r\nThe problem is in `kong.interpolate()`. Because it calls `Vars.CloneWith()` for each field, its complexity is roughly O(n<sup>2</sup>).\r\n\r\nThis PR updates `kong.interpolateValue()` so that `Vars.CloneWith()` is not called in most cases. It will only be called if `value.Tag.Vars` is populated or if interpolation modified value.Enum of value.Default.\r\n\r\nIt also updates `Vars.CloneWith()` to preallocate the output map.\r\n\r\nI added benchmarks to show the performance improvement.  I'm happy for them to be removed before merging if you don't want to keep them around. Their primary purpose is just to show the change in this PR.\r\n\r\nThis is what benchstat shows on my laptop:\r\n\r\n```\r\nname                     old time/op    new time/op    delta\r\n_interpolateValue-8        3.26ms ± 5%    0.00ms ± 1%  -99.96%  (p=0.000 n=10+10)\r\nKong_interpolate/5-8       12.5µs ± 4%     6.8µs ± 8%  -45.32%  (p=0.000 n=10+9)\r\nKong_interpolate/500-8     72.5ms ± 2%     0.5ms ± 4%  -99.35%  (p=0.000 n=9+10)\r\nKong_interpolate/5000-8     7.69s ± 6%     0.01s ± 7%  -99.93%  (p=0.000 n=10+9)\r\n\r\nname                     old alloc/op   new alloc/op   delta\r\n_interpolateValue-8        2.57MB ± 0%    0.00MB ± 0%  -99.98%  (p=0.000 n=10+10)\r\nKong_interpolate/5-8       8.77kB ± 0%    4.01kB ± 0%  -54.23%  (p=0.000 n=10+10)\r\nKong_interpolate/500-8     84.7MB ± 0%     0.3MB ± 0%  -99.65%  (p=0.000 n=10+10)\r\nKong_interpolate/5000-8    6.46GB ± 0%    0.00GB ± 0%  -99.96%  (p=0.000 n=10+9)\r\n\r\nname                     old allocs/op  new allocs/op  delta\r\n_interpolateValue-8           517 ± 0%         3 ± 0%  -99.42%  (p=0.000 n=8+10)\r\nKong_interpolate/5-8         71.0 ± 0%      43.0 ± 0%  -39.44%  (p=0.000 n=10+10)\r\nKong_interpolate/500-8      29.7k ± 0%      2.5k ± 0%  -91.52%  (p=0.000 n=10+10)\r\nKong_interpolate/5000-8      975k ± 0%       25k ± 0%  -97.41%  (p=0.000 n=9+9)\r\n```\r\n",
+    "url": "https://github.com/alecthomas/kong/pull/79"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 10,
+    "deletions": 6
+  },
+  "files": [
+    {
+      "path": "kong.go",
+      "status": "M",
+      "additions": 9,
+      "deletions": 5,
+      "binary": false
+    },
+    {
+      "path": "options.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/kong.go b/kong.go\nindex 3a61567..6a4b2c5 100644\n--- a/kong.go\n+++ b/kong.go\n@@ -144,17 +144,21 @@ func (k *Kong) interpolate(node *Node) (err error) {\n }\n \n func (k *Kong) interpolateValue(value *Value, vars Vars) (err error) {\n-\tvars = vars.CloneWith(value.Tag.Vars)\n+\tif len(value.Tag.Vars) > 0 {\n+\t\tvars = vars.CloneWith(value.Tag.Vars)\n+\t}\n \tif value.Default, err = interpolate(value.Default, vars); err != nil {\n \t\treturn fmt.Errorf(\"default value for %s: %s\", value.Summary(), err)\n \t}\n \tif value.Enum, err = interpolate(value.Enum, vars); err != nil {\n \t\treturn fmt.Errorf(\"enum value for %s: %s\", value.Summary(), err)\n \t}\n-\tvars = vars.CloneWith(map[string]string{\n-\t\t\"default\": value.Default,\n-\t\t\"enum\":    value.Enum,\n-\t})\n+\tif vars[\"default\"] != value.Default || vars[\"enum\"] != value.Enum {\n+\t\tvars = vars.CloneWith(map[string]string{\n+\t\t\t\"default\": value.Default,\n+\t\t\t\"enum\":    value.Enum,\n+\t\t})\n+\t}\n \tif value.Help, err = interpolate(value.Help, vars); err != nil {\n \t\treturn fmt.Errorf(\"help for %s: %s\", value.Summary(), err)\n \t}\ndiff --git a/options.go b/options.go\nindex 714bbcb..681dfb9 100644\n--- a/options.go\n+++ b/options.go\n@@ -35,7 +35,7 @@ func (v Vars) Apply(k *Kong) error {\n \n // CloneWith clones the current Vars and merges \"vars\" onto the clone.\n func (v Vars) CloneWith(vars Vars) Vars {\n-\tout := Vars{}\n+\tout := make(Vars, len(v)+len(vars))\n \tfor key, value := range v {\n \t\tout[key] = value\n \t}\n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    ".golangci.yml",
+    "COPYING",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/README.md",
+    "_examples/server/console.go",
+    "_examples/server/go.mod",
+    "_examples/server/go.sum",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/main.go",
+    "benchmark_test.go",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "config_test.go",
+    "context.go",
+    "defaults.go",
+    "defaults_test.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "go.mod",
+    "go.sum",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "util.go",
+    "util_test.go",
+    "visit.go"
+  ],
+  "explanation": {
+    "what": "kong.go の interpolateValue() を変更し、value.Tag.Vars が空のときは Vars.CloneWith() の呼び出しをスキップするようにした。また展開後の default/enum が実際に変化した場合のみ2回目の CloneWith() を呼ぶよう条件を追加した。options.go の CloneWith() は出力マップを len(v)+len(vars) で事前確保するよう変更。",
+    "why": "PR #79 の説明の通り、フィールドごとに無条件で CloneWith()(新しい map の確保とコピー)を呼んでいたことが O(n^2) の性能劣化の原因だった。呼び出しを実際に vars が変化するケースだけに絞り込み、map の事前確保でアロケーション回数も減らすことで、直前コミットで追加したベンチマークの数値を改善する。",
+    "highlights": [
+      { "file": "kong.go", "note": "CloneWith() 呼び出しを value.Tag.Vars の有無・default/enum の変化有無で条件分岐" },
+      { "file": "options.go", "note": "CloneWith() の out map を make(Vars, len(v)+len(vars)) で事前確保" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [{ "type": "pr", "number": 79, "url": "https://github.com/alecthomas/kong/pull/79" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

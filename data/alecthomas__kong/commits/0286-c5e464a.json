@@ -1,0 +1,130 @@
+{
+  "seq": 286,
+  "sha": "c5e464a367685ca7f62d00e97d45c91e0240b896",
+  "parents": [
+    "c3703cda7ed1c641e57f986744370b28bbc67bda"
+  ],
+  "author": {
+    "name": "Alec Thomas",
+    "email": "alec@swapoff.org",
+    "date": "2021-12-03T11:47:34+11:00"
+  },
+  "message": "Deprecate HelpFormatter.",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 3,
+    "additions": 13,
+    "deletions": 3
+  },
+  "files": [
+    {
+      "path": "README.md",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "help_test.go",
+      "status": "M",
+      "additions": 2,
+      "deletions": 2,
+      "binary": false
+    },
+    {
+      "path": "options.go",
+      "status": "M",
+      "additions": 10,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/README.md b/README.md\nindex cd4742b..a4ce0c3 100644\n--- a/README.md\n+++ b/README.md\n@@ -599,7 +599,7 @@ The default help output is usually sufficient, but if not there are two solution\n \n 1. Use `ConfigureHelp(HelpOptions)` to configure how help is formatted (see [HelpOptions](https://godoc.org/github.com/alecthomas/kong#HelpOptions) for details).\n 2. Custom help can be wired into Kong via the `Help(HelpFunc)` option. The `HelpFunc` is passed a `Context`, which contains the parsed context for the current command-line. See the implementation of `PrintHelp` for an example.\n-3. Use `HelpFormatter(HelpValueFormatter)` if you want to just customize the help text that is accompanied by flags and arguments.\n+3. Use `ValueFormatter(HelpValueFormatter)` if you want to just customize the help text that is accompanied by flags and arguments.\n 4. Use `Groups([]Group)` if you want to customize group titles or add a header.\n \n ### `Bind(...)` - bind values for callback hooks and Run() methods\ndiff --git a/help_test.go b/help_test.go\nindex d907cc8..e0e9043 100644\n--- a/help_test.go\n+++ b/help_test.go\n@@ -477,7 +477,7 @@ func TestEnvarAutoHelpWithEnvPrefix(t *testing.T) {\n \trequire.Contains(t, w.String(), \"A different flag.\")\n }\n \n-func TestCustomHelpFormatter(t *testing.T) {\n+func TestCustomValueFormatter(t *testing.T) {\n \tvar cli struct {\n \t\tFlag string `env:\"FLAG\" help:\"A flag.\"`\n \t}\n@@ -485,7 +485,7 @@ func TestCustomHelpFormatter(t *testing.T) {\n \tp := mustNew(t, &cli,\n \t\tkong.Writers(w, w),\n \t\tkong.Exit(func(int) {}),\n-\t\tkong.HelpFormatter(func(value *kong.Value) string {\n+\t\tkong.ValueFormatter(func(value *kong.Value) string {\n \t\t\treturn value.Help\n \t\t}),\n \t)\ndiff --git a/options.go b/options.go\nindex 82d71d8..4c240ed 100644\n--- a/options.go\n+++ b/options.go\n@@ -215,6 +215,8 @@ func ShortHelp(shortHelp HelpPrinter) Option {\n }\n \n // HelpFormatter configures how the help text is formatted.\n+//\n+// Deprecated: Use ValueFormatter() instead.\n func HelpFormatter(helpFormatter HelpValueFormatter) Option {\n \treturn OptionFunc(func(k *Kong) error {\n \t\tk.helpFormatter = helpFormatter\n@@ -222,6 +224,14 @@ func HelpFormatter(helpFormatter HelpValueFormatter) Option {\n \t})\n }\n \n+// ValueFormatter configures how the help text is formatted.\n+func ValueFormatter(helpFormatter HelpValueFormatter) Option {\n+\treturn OptionFunc(func(k *Kong) error {\n+\t\tk.helpFormatter = helpFormatter\n+\t\treturn nil\n+\t})\n+}\n+\n // ConfigureHelp sets the HelpOptions to use for printing help.\n func ConfigureHelp(options HelpOptions) Option {\n \treturn OptionFunc(func(k *Kong) error {\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/FUNDING.yml",
+    ".github/workflows/ci.yml",
+    ".gitignore",
+    ".golangci.yml",
+    "COPYING",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/README.md",
+    "_examples/server/console.go",
+    "_examples/server/go.mod",
+    "_examples/server/go.sum",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/main.go",
+    "benchmark_test.go",
+    "bin/.go@latest.pkg",
+    "bin/.golangci-lint-1.42.0.pkg",
+    "bin/README.hermit.md",
+    "bin/activate-hermit",
+    "bin/go",
+    "bin/gofmt",
+    "bin/golangci-lint",
+    "bin/hermit",
+    "bin/hermit.hcl",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "config_test.go",
+    "context.go",
+    "defaults.go",
+    "defaults_test.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "go.mod",
+    "go.sum",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "testdata/file.txt",
+    "util.go",
+    "util_test.go",
+    "visit.go"
+  ],
+  "explanation": {
+    "what": "options.go に新しい Option 関数 ValueFormatter() を追加した。中身は既存の HelpFormatter() と同一で、どちらも内部の同じ `k.helpFormatter` フィールドを設定する。HelpFormatter() のドキュメントコメントに `Deprecated: Use ValueFormatter() instead.` を付与し、README とテスト(TestCustomHelpFormatter → TestCustomValueFormatter)も新名称に合わせて更新した。",
+    "why": "おそらく HelpFormatter という名前が「ヘルプ全体のフォーマッタ」であるかのように誤解を招きやすく、実際には個々の Value(フラグ・引数)のヘルプ文字列だけをカスタマイズするものであるため、より実態に即した ValueFormatter という名前へ移行させる意図と読める。実装を複製した上で旧関数を deprecated 扱いにするのは、既存利用者のコードを壊さずに緩やかに新 API へ誘導する後方互換な移行手法。",
+    "highlights": [
+      { "file": "options.go", "note": "HelpFormatter() は残したまま Deprecated コメントを追加し、ValueFormatter() を新設(実装は同一)" }
+    ],
+    "langNotes": [
+      { "topic": "Deprecated コメント規約", "note": "Go では関数コメントに `Deprecated: ...` という行を書くと、godoc やエディタの補完・lint がこれを検出し利用側に警告を出す。実体は削除せず並存させることで既存コードのビルドを壊さずに移行期間を設けられる。" }
+    ],
+    "diagram": null,
+    "evidence": "inferred",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

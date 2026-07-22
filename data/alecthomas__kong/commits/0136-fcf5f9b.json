@@ -1,0 +1,103 @@
+{
+  "seq": 136,
+  "sha": "fcf5f9bc1a4fc3388f490d77c7477a5681b1f97a",
+  "parents": [
+    "a6ce719390d3ddafc7c3697367f7599f07cdd653"
+  ],
+  "author": {
+    "name": "Matthias Fax",
+    "email": "matthias.fax@gmail.com",
+    "date": "2019-01-19T18:57:21+01:00"
+  },
+  "message": "fix: `hidden` tag is not passed to the flag object\n\nOr is it not supposed to be passed?",
+  "pr": {
+    "number": 31,
+    "title": "fix: `hidden` tag is not passed to the flag object",
+    "body": "Or is it not supposed to be passed?",
+    "url": "https://github.com/alecthomas/kong/pull/31"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 1,
+    "deletions": 0
+  },
+  "files": [
+    {
+      "path": "build.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/build.go b/build.go\nindex 49cc767..829e16e 100644\n--- a/build.go\n+++ b/build.go\n@@ -204,6 +204,7 @@ func buildField(k *Kong, node *Node, v reflect.Value, ft reflect.StructField, fv\n \t\t\tPlaceHolder: tag.PlaceHolder,\n \t\t\tEnv:         tag.Env,\n \t\t\tGroup:       tag.Group,\n+\t\t\tHidden:      tag.Hidden,\n \t\t}\n \t\tvalue.Flag = flag\n \t\tnode.Flags = append(node.Flags, flag)\n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    ".golangci.yml",
+    "COPYING",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/console.go",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/main.go",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "config_test.go",
+    "context.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "go.mod",
+    "go.sum",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "util.go",
+    "util_test.go",
+    "visit.go"
+  ],
+  "explanation": {
+    "what": "build.goのbuildField()内でFlag構造体を組み立てる際、tag.Hiddenの値をFlag.Hiddenフィールドにコピーする1行を追加した。struct tagで`hidden:\"\"`を指定してもこれまでFlagオブジェクトに反映されていなかったバグの修正。",
+    "why": "PR本文で投稿者自身が\"Or is it not supposed to be passed?\"(意図的に渡されていないのか?)と疑問形で問いかけており、hiddenタグがFlagまで伝播していないのは不具合と判断されマージされた。",
+    "highlights": [
+      { "file": "build.go", "note": "Flag{...}構築時にHidden: tag.Hiddenを追加した1行" }
+    ],
+    "langNotes": [
+      { "topic": "hidden タグ", "note": "kongはstruct tagの`hidden:\"\"`でヘルプ非表示のフラグ/コマンドを宣言できる。このコミット以前はタグの値がreflectで読み取られてもFlagモデルの構造体には転記されておらず、ヘルプ表示ロジック側から見ると常に非hidden扱いになっていた。" }
+    ],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [{ "type": "pr", "number": 31, "url": "https://github.com/alecthomas/kong/pull/31" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

@@ -1,0 +1,84 @@
+{
+  "seq": 75,
+  "sha": "d9c0dd25b19f7831f927868613b278231bbd3a1b",
+  "parents": [
+    "39fd1507da34e0c346ff52241a01e89a224f8cc6"
+  ],
+  "author": {
+    "name": "Alec Thomas",
+    "email": "alec@swapoff.org",
+    "date": "2018-06-21T00:04:35+10:00"
+  },
+  "message": "Compact help should display full command.",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 3,
+    "deletions": 2
+  },
+  "files": [
+    {
+      "path": "_examples/shell/main.go",
+      "status": "M",
+      "additions": 2,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "help.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/_examples/shell/main.go b/_examples/shell/main.go\nindex c6adb52..36813ed 100644\n--- a/_examples/shell/main.go\n+++ b/_examples/shell/main.go\n@@ -23,7 +23,8 @@ var cli struct {\n }\n \n func main() {\n-\tcmd := kong.Parse(&cli, kong.Description(\"A shell-like example app.\"), kong.HelpOptions(kong.CompactHelp()))\n+\tcmd := kong.Parse(&cli, kong.Description(\"A shell-like example app.\"),\n+\t\tkong.HelpOptions(kong.CompactHelp()))\n \tswitch cmd {\n \tcase \"rm <paths>\":\n \t\tfmt.Println(cli.Rm.Paths, cli.Rm.Force, cli.Rm.Recursive)\ndiff --git a/help.go b/help.go\nindex 5c0ad94..087d10c 100644\n--- a/help.go\n+++ b/help.go\n@@ -78,7 +78,7 @@ func printNodeDetail(w *helpWriter, node *Node) {\n \t\tif w.options.compact {\n \t\t\trows := [][2]string{}\n \t\t\tfor _, cmd := range cmds {\n-\t\t\t\trows = append(rows, [2]string{cmd.Name, cmd.Help})\n+\t\t\t\trows = append(rows, [2]string{cmd.Path(), cmd.Help})\n \t\t\t}\n \t\t\twriteTwoColumns(iw, defaultColumnPadding, rows)\n \t\t} else {\n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    ".golangci.yml",
+    "README.md",
+    "_examples/shell/main.go",
+    "build.go",
+    "camelcase.go",
+    "context.go",
+    "doc.go",
+    "global.go",
+    "global_test.go",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "tokentype_string.go"
+  ],
+  "explanation": {
+    "what": "コンパクトヘルプでサブコマンド一覧を表示する際、それまで `cmd.Name`(そのコマンド単体の名前)を使っていたのを `cmd.Path()`(親コマンドを含むフルパス)に変更した。例では `rm <paths>` のような表示が意図に合わせて `rm <path>` 相当のフルコマンドパスになる。",
+    "why": "ネストしたサブコマンドの場合、単体名だけでは呼び出し方が分からない(例: 親コマンド配下の `two four` を単に `four` と表示してしまう)ため、実行可能なフルパスを表示する方が利用者にとって親切だという判断。コミット件名がそのまま意図を表している。",
+    "highlights": [
+      { "file": "help.go", "note": "コンパクト表示の行データで cmd.Name から cmd.Path() に変更した1行" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

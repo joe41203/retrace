@@ -1,0 +1,104 @@
+{
+  "seq": 32,
+  "sha": "d20b44baf4d17b74f6ad6612f1e3b52016c27c02",
+  "parents": [
+    "0bb304449c6524b2339555081eb2e4e709d9bb53"
+  ],
+  "author": {
+    "name": "Alec Thomas",
+    "email": "alec@swapoff.org",
+    "date": "2018-05-26T15:32:45-04:00"
+  },
+  "message": "Remove a bunch of duplicate recover code.",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 6,
+    "additions": 58,
+    "deletions": 68
+  },
+  "files": [
+    {
+      "path": "build.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 9,
+      "binary": false
+    },
+    {
+      "path": "context.go",
+      "status": "M",
+      "additions": 20,
+      "deletions": 21,
+      "binary": false
+    },
+    {
+      "path": "context_test.go",
+      "status": "A",
+      "additions": 20,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "help.go",
+      "status": "M",
+      "additions": 6,
+      "deletions": 2,
+      "binary": false
+    },
+    {
+      "path": "kong.go",
+      "status": "M",
+      "additions": 11,
+      "deletions": 23,
+      "binary": false
+    },
+    {
+      "path": "kong_test.go",
+      "status": "M",
+      "additions": 0,
+      "deletions": 13,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/build.go b/build.go\nindex 2eabbf9..f59ef7e 100644\n--- a/build.go\n+++ b/build.go\n@@ -7,15 +7,7 @@ import (\n )\n \n func build(ast interface{}) (app *Application, err error) {\n-\tdefer func() {\n-\t\tmsg := recover()\n-\t\tif test, ok := msg.(error); ok {\n-\t\t\tapp = nil\n-\t\t\terr = test\n-\t\t} else if msg != nil {\n-\t\t\tpanic(msg)\n-\t\t}\n-\t}()\n+\tdefer catch(&err)\n \tv := reflect.ValueOf(ast)\n \tiv := reflect.Indirect(v)\n \tif v.Kind() != reflect.Ptr || iv.Kind() != reflect.Struct {\ndiff --git a/context.go b/context.go\nindex 4047672..3715c4b 100644\n--- a/context.go\n+++ b/context.go\n@@ -19,12 +19,12 @@ type ParseTrace struct {\n }\n \n type ParseContext struct {\n-\tTrace []*ParseTrace // A trace through parsed nodes.\n-\tError error         // Error that occurred during trace, if any.\n+\tTrace   []*ParseTrace // A trace through parsed nodes.\n+\tError   error         // Error that occurred during trace, if any.\n+\tFlags   []*Flag       // Accumulated available flags.\n+\tCommand []string      // Full command path.\n \n-\tcommand []string // Full command path.\n-\tflags   []*Flag  // Accumulated available flags.\n-\tnode    *Node    // Current node being parsed.\n+\tnode *Node // Current node being parsed.\n \n \targs []string\n \tapp  *Application\n@@ -77,9 +77,15 @@ func (p *ParseContext) reset(node *Node) error {\n \t\t\tif err != nil {\n \t\t\t\treturn err\n \t\t\t}\n-\t\t\tp.reset(&branch.Argument.Node)\n+\t\t\terr = p.reset(&branch.Argument.Node)\n+\t\t\tif err != nil {\n+\t\t\t\treturn err\n+\t\t\t}\n \t\t} else {\n-\t\t\tp.reset(branch.Command)\n+\t\t\terr := p.reset(branch.Command)\n+\t\t\tif err != nil {\n+\t\t\t\treturn err\n+\t\t\t}\n \t\t}\n \t}\n \treturn nil\n@@ -88,7 +94,7 @@ func (p *ParseContext) reset(node *Node) error {\n func (p *ParseContext) trace(node *Node) (err error) { // nolint: gocyclo\n \tpositional := 0\n \tp.node = node\n-\tp.flags = append(p.flags, node.Flags...)\n+\tp.Flags = append(p.Flags, node.Flags...)\n \n \tfor !p.scan.Peek().IsEOL() {\n \t\ttoken := p.scan.Peek()\n@@ -164,7 +170,7 @@ func (p *ParseContext) trace(node *Node) (err error) { // nolint: gocyclo\n \t\t\t\tif err != nil {\n \t\t\t\t\treturn err\n \t\t\t\t}\n-\t\t\t\tp.command = append(p.command, \"<\"+arg.Name+\">\")\n+\t\t\t\tp.Command = append(p.Command, \"<\"+arg.Name+\">\")\n \t\t\t\tp.Trace = append(p.Trace, &ParseTrace{Positional: arg, Value: value})\n \t\t\t\tpositional++\n \t\t\t\tbreak\n@@ -176,7 +182,7 @@ func (p *ParseContext) trace(node *Node) (err error) { // nolint: gocyclo\n \t\t\t\tcase branch.Command != nil:\n \t\t\t\t\tif branch.Command.Name == token.Value {\n \t\t\t\t\t\tp.scan.Pop()\n-\t\t\t\t\t\tp.command = append(p.command, branch.Command.Name)\n+\t\t\t\t\t\tp.Command = append(p.Command, branch.Command.Name)\n \t\t\t\t\t\tp.Trace = append(p.Trace, &ParseTrace{Command: branch.Command})\n \t\t\t\t\t\treturn p.trace(branch.Command)\n \t\t\t\t\t}\n@@ -184,7 +190,7 @@ func (p *ParseContext) trace(node *Node) (err error) { // nolint: gocyclo\n \t\t\t\tcase branch.Argument != nil:\n \t\t\t\t\targ := branch.Argument.Argument\n \t\t\t\t\tif value, err := arg.Parse(p.scan); err == nil {\n-\t\t\t\t\t\tp.command = append(p.command, \"<\"+arg.Name+\">\")\n+\t\t\t\t\t\tp.Command = append(p.Command, \"<\"+arg.Name+\">\")\n \t\t\t\t\t\tp.Trace = append(p.Trace, &ParseTrace{Argument: branch.Argument, Value: value})\n \t\t\t\t\t\treturn p.trace(&branch.Argument.Node)\n \t\t\t\t\t}\n@@ -205,7 +211,7 @@ func (p *ParseContext) trace(node *Node) (err error) { // nolint: gocyclo\n \t\treturn err\n \t}\n \n-\tif err := checkMissingFlags(node.Children, p.flags); err != nil {\n+\tif err := checkMissingFlags(node.Children, p.Flags); err != nil {\n \t\treturn err\n \t}\n \n@@ -291,15 +297,8 @@ func checkMissingPositionals(positional int, values []*Value) error {\n \n func (p *ParseContext) matchFlags(matcher func(f *Flag) bool) (err error) {\n \ttoken := p.scan.Peek()\n-\tdefer func() {\n-\t\tmsg := recover()\n-\t\tif test, ok := msg.(Error); ok {\n-\t\t\terr = fmt.Errorf(\"%s %s\", token, test)\n-\t\t} else if msg != nil {\n-\t\t\tpanic(msg)\n-\t\t}\n-\t}()\n-\tfor _, flag := range p.flags {\n+\tdefer catch(&err)\n+\tfor _, flag := range p.Flags {\n \t\t// Found a matching flag.\n \t\tif flag.Name == token.Value {\n \t\t\tp.scan.Pop()\ndiff --git a/context_test.go b/context_test.go\nnew file mode 100644\nindex 0000000..08bd685\n--- /dev/null\n+++ b/context_test.go\n@@ -0,0 +1,20 @@\n+package kong\n+\n+import (\n+\t\"testing\"\n+\n+\t\"github.com/stretchr/testify/require\"\n+)\n+\n+func TestTraceErrorPartiallySucceeds(t *testing.T) {\n+\tvar cli struct {\n+\t\tOne struct {\n+\t\t\tTwo struct {\n+\t\t\t} `kong:\"cmd\"`\n+\t\t} `kong:\"cmd\"`\n+\t}\n+\tp := mustNew(t, &cli)\n+\ttrace, err := Trace([]string{\"one\", \"bad\"}, p.Model)\n+\trequire.NoError(t, err)\n+\trequire.Error(t, trace.Error)\n+}\ndiff --git a/help.go b/help.go\nindex 9df8215..8a92146 100644\n--- a/help.go\n+++ b/help.go\n@@ -18,8 +18,12 @@ usage: {{.Name}}\n \n var defaultHelpTemplate = template.Must(template.New(\"help\").Parse(defaultHelp))\n \n-// WriteHelp to w. If w is nil, the default stdout writer will be used.\n-func (k *Kong) WriteHelp(w io.Writer) error {\n+// WriteHelp to w.\n+//\n+// If w is nil, the default stdout writer will be used.\n+//\n+// If args are provided, help will be written in the context o\n+func (k *Kong) WriteHelp(w io.Writer, args ...interface{}) error {\n \tif w == nil {\n \t\tw = k.stdout\n \t}\ndiff --git a/kong.go b/kong.go\nindex 6498f69..70855ed 100644\n--- a/kong.go\n+++ b/kong.go\n@@ -8,6 +8,7 @@ import (\n \t\"text/template\"\n )\n \n+// Error reported by Kong.\n type Error struct{ msg string }\n \n func (e Error) Error() string { return e.msg }\n@@ -57,14 +58,7 @@ func New(ast interface{}, options ...Option) (*Kong, error) {\n \n // Parse arguments into target.\n func (k *Kong) Parse(args []string) (command string, err error) {\n-\tdefer func() {\n-\t\tmsg := recover()\n-\t\tif test, ok := msg.(Error); ok {\n-\t\t\terr = test\n-\t\t} else if msg != nil {\n-\t\t\tpanic(msg)\n-\t\t}\n-\t}()\n+\tdefer catch(&err)\n \tctx, err := Trace(args, k.Model)\n \tif err != nil {\n \t\treturn \"\", err\n@@ -78,21 +72,6 @@ func (k *Kong) Parse(args []string) (command string, err error) {\n \treturn ctx.Apply()\n }\n \n-// Trace through the command tree.\n-//\n-// The returned context will include a trace of all parsed objects encountered; flags, arguments, commands.\n-func (k *Kong) Trace(args []string) (ctx *ParseContext, err error) {\n-\tdefer func() {\n-\t\tmsg := recover()\n-\t\tif test, ok := msg.(Error); ok {\n-\t\t\terr = test\n-\t\t} else if msg != nil {\n-\t\t\tpanic(msg)\n-\t\t}\n-\t}()\n-\treturn Trace(args, k.Model)\n-}\n-\n func (k *Kong) Errorf(format string, args ...interface{}) {\n \tfmt.Fprintf(os.Stderr, k.Model.Name+\": \"+format, args...)\n }\n@@ -108,3 +87,12 @@ func (k *Kong) FatalIfErrorf(err error, args ...interface{}) {\n \tk.Errorf(\"%s\\n\", msg)\n \tk.terminate(1)\n }\n+\n+func catch(err *error) {\n+\tmsg := recover()\n+\tif test, ok := msg.(Error); ok {\n+\t\t*err = test\n+\t} else if msg != nil {\n+\t\tpanic(msg)\n+\t}\n+}\ndiff --git a/kong_test.go b/kong_test.go\nindex 55f3947..44233d3 100644\n--- a/kong_test.go\n+++ b/kong_test.go\n@@ -352,16 +352,3 @@ func TestDuplicateFlagOnPeerCommandIsOkay(t *testing.T) {\n \t_, err := New(&cli)\n \trequire.NoError(t, err)\n }\n-\n-func TestTraceErrorPartiallySucceeds(t *testing.T) {\n-\tvar cli struct {\n-\t\tOne struct {\n-\t\t\tTwo struct {\n-\t\t\t} `kong:\"cmd\"`\n-\t\t} `kong:\"cmd\"`\n-\t}\n-\tp := mustNew(t, &cli)\n-\ttrace, err := p.Trace([]string{\"one\", \"bad\"})\n-\trequire.NoError(t, err)\n-\trequire.Error(t, trace.Error)\n-}\n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    "README.md",
+    "_examples/shell/main.go",
+    "build.go",
+    "camelcase.go",
+    "context.go",
+    "context_test.go",
+    "decoders.go",
+    "decoders_test.go",
+    "global.go",
+    "global_test.go",
+    "help.go",
+    "kong.go",
+    "kong_test.go",
+    "model.go",
+    "options.go",
+    "options_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tokentype_string.go"
+  ],
+  "explanation": {
+    "what": "`build()`・`Parse()`・`Kong.Trace()` の3箇所にほぼ同じ `recover()` ブロックが重複していたのを、`catch(&err)` という共通ヘルパー関数1つに集約した。また `ParseContext` の非公開フィールド `command`・`flags` を公開フィールド `Command`・`Flags` にリネームし、直前のコミットで追加した `Kong.Trace()` メソッドを削除して `Trace()` パッケージ関数だけに一本化している。",
+    "why": "同じ recover パターンを3箇所に書いていたのは単純な重複であり、`defer catch(&err)` の1行に置き換えることで保守性を上げたと読み取れる。フィールドの公開化は、呼び出し側からトレース結果(どのフラグ・コマンドが解決されたか)を読めるようにする準備と考えられる。",
+    "highlights": [
+      { "file": "kong.go", "note": "catch(err *error) ヘルパー: recover() で Error 型を捕まえてerrに詰め、それ以外はre-panicする共通処理" }
+    ],
+    "langNotes": [
+      { "topic": "panic/recover によるエラー変換", "note": "Go では通常 error を戻り値で伝搬させるが、Kong は構築・パース中の異常系を `panic(Error{...})` で起こし、呼び出し側の `defer` 内 `recover()` で catch して `error` に変換するパターンを使っている。`catch(&err)` はこの recover ロジックを共通化した関数で、名前付き戻り値 `err` のポインタを介して外側の関数の戻り値を書き換えている。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

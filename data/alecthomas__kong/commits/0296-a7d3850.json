@@ -1,0 +1,165 @@
+{
+  "seq": 296,
+  "sha": "a7d3850e8012bb9550b1e8d1ef88391ba0507814",
+  "parents": [
+    "76d5ed9ac1061ed237f42b2810d0efee10da2a97"
+  ],
+  "author": {
+    "name": "Mitar",
+    "email": "mitar.git@tnode.com",
+    "date": "2022-01-04T21:58:56+01:00"
+  },
+  "message": "Cmd can be passthrough now, too.\n\nFixes #253.",
+  "pr": {
+    "number": 262,
+    "title": "Cmd can be passthrough now, too",
+    "body": "Fixes #253.",
+    "url": "https://github.com/alecthomas/kong/pull/262"
+  },
+  "linkedIssues": [
+    {
+      "number": 253,
+      "title": "Unable to fully capture the rest of arguments and pass it through to another command",
+      "body": "So I am trying to implement `exec` pattern, where I have a subtool I want to execute and pass all other arguments to it. Trying `passthrough:\"\"` does not fully work with `--help` flag. I have something like:\r\n\r\n```\r\ntype Commands struct {\r\n\tExec ExecCommand `cmd:\"\" help:\"Run the sub-tool.`\r\n}\r\n\r\ntype ExecCommand struct {\r\n        Arg []string `arg:\"\" optional:\"\" passthrough:\"\" help:\"Arguments passed on to the sub-tool.\"`\r\n}\r\n```\r\n\r\nInside `ExecCommand`'s `Run` I do: `subtool.Main(append([]string{\"subtool\"}, c.Arg...))` to pass all args to the `subtool`'s CLI parsing.\r\n\r\nAnd this does not work. So if I do:\r\n\r\n```\r\ntool exec foobar\r\n```\r\n\r\nit works well, and sub-tool gets `foobar` as an argument.\r\n\r\nBut:\r\n\r\n```\r\ntool exec --help\r\n```\r\n\r\nreturns help of `tool` and not of the sub-tool.\r\n\r\nA workaround is:\r\n\r\n```\r\ntool exec -- --help\r\n```\r\n\r\nwhich does work. But how can I make it work without `--`? I think this might be related to https://github.com/alecthomas/kong/discussions/216 and in general that I would prefer that global flags do not get inherited by the subcommands. So in general `tool --help subcommand` should work and `tool subcommand --help` should not, unless subcommand explicitly defines `--help` flag.\r\n\r\nI tried to move `passthrough:\"\"` to `Exec` itself, but I got panic `passthrough only makes sense for positional arguments`.",
+      "url": "https://github.com/alecthomas/kong/issues/253"
+    }
+  ],
+  "stats": {
+    "filesChanged": 6,
+    "additions": 129,
+    "deletions": 23
+  },
+  "files": [
+    {
+      "path": "README.md",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "build.go",
+      "status": "M",
+      "additions": 20,
+      "deletions": 6,
+      "binary": false
+    },
+    {
+      "path": "context.go",
+      "status": "M",
+      "additions": 14,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "kong_test.go",
+      "status": "M",
+      "additions": 77,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "model.go",
+      "status": "M",
+      "additions": 15,
+      "deletions": 14,
+      "binary": false
+    },
+    {
+      "path": "tag.go",
+      "status": "M",
+      "additions": 2,
+      "deletions": 2,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/README.md b/README.md\nindex de49d9b..e15ef2a 100644\n--- a/README.md\n+++ b/README.md\n@@ -474,7 +474,7 @@ Tag                    | Description\n `envprefix:\"X\"`        | Envar prefix for all sub-flags.\n `set:\"K=V\"`            | Set a variable for expansion by child elements. Multiples can occur.\n `embed:\"\"`             | If present, this field's children will be embedded in the parent. Useful for composition.\n-`passthrough:\"\"`       | If present, this positional argument stops flag parsing when encountered, as if `--` was processed before. Useful for external command wrappers, like `exec`.\n+`passthrough:\"\"`       | If present on a positional argument, it stops flag parsing when encountered, as if `--` was processed before. Useful for external command wrappers, like `exec`. On a command it requires that the command contains only one argument of type `[]string` which is then filled with everything following the command, unparsed.\n `-`                    | Ignore the field. Useful for adding non-CLI fields to a configuration struct. e.g `` `kong:\"-\"` ``\n \n ## Plugins\ndiff --git a/build.go b/build.go\nindex 4d0e2fa..4be5f24 100644\n--- a/build.go\n+++ b/build.go\n@@ -211,14 +211,28 @@ func buildChild(k *Kong, node *Node, typ NodeType, v reflect.Value, ft reflect.S\n \t\tif child.Help == \"\" {\n \t\t\tchild.Help = child.Argument.Help\n \t\t}\n-\t} else if tag.HasDefault {\n-\t\tif node.DefaultCmd != nil {\n-\t\t\treturn failField(v, ft, \"can't have more than one default command under %s\", node.Summary())\n+\t} else {\n+\t\tif tag.HasDefault {\n+\t\t\tif node.DefaultCmd != nil {\n+\t\t\t\treturn failField(v, ft, \"can't have more than one default command under %s\", node.Summary())\n+\t\t\t}\n+\t\t\tif tag.Default != \"withargs\" && (len(child.Children) > 0 || len(child.Positional) > 0) {\n+\t\t\t\treturn failField(v, ft, \"default command %s must not have subcommands or arguments\", child.Summary())\n+\t\t\t}\n+\t\t\tnode.DefaultCmd = child\n \t\t}\n-\t\tif tag.Default != \"withargs\" && (len(child.Children) > 0 || len(child.Positional) > 0) {\n-\t\t\treturn failField(v, ft, \"default command %s must not have subcommands or arguments\", child.Summary())\n+\t\tif tag.Passthrough {\n+\t\t\tif len(child.Children) > 0 || len(child.Flags) > 0 {\n+\t\t\t\treturn failField(v, ft, \"passthrough command %s must not have subcommands or flags\", child.Summary())\n+\t\t\t}\n+\t\t\tif len(child.Positional) != 1 {\n+\t\t\t\treturn failField(v, ft, \"passthrough command %s must contain exactly one positional argument\", child.Summary())\n+\t\t\t}\n+\t\t\tif !checkPassthroughArg(child.Positional[0].Target) {\n+\t\t\t\treturn failField(v, ft, \"passthrough command %s must contain exactly one positional argument of []string type\", child.Summary())\n+\t\t\t}\n+\t\t\tchild.Passthrough = true\n \t\t}\n-\t\tnode.DefaultCmd = child\n \t}\n \tnode.Children = append(node.Children, child)\n \ndiff --git a/context.go b/context.go\nindex 6ad4dd0..de4301a 100644\n--- a/context.go\n+++ b/context.go\n@@ -361,6 +361,10 @@ func (c *Context) trace(node *Node) (err error) { // nolint: gocyclo\n \t\tflags = append(flags, group...)\n \t}\n \n+\tif node.Passthrough {\n+\t\tc.endParsing()\n+\t}\n+\n \tfor !c.scan.Peek().IsEOL() {\n \t\ttoken := c.scan.Peek()\n \t\tswitch token.Type {\n@@ -901,6 +905,16 @@ func checkEnum(value *Value, target reflect.Value) error {\n \t}\n }\n \n+func checkPassthroughArg(target reflect.Value) bool {\n+\ttyp := target.Type()\n+\tswitch typ.Kind() {\n+\tcase reflect.Slice:\n+\t\treturn typ.Elem().Kind() == reflect.String\n+\tdefault:\n+\t\treturn false\n+\t}\n+}\n+\n func checkXorDuplicates(paths []*Path) error {\n \tfor _, path := range paths {\n \t\tseen := map[string]*Flag{}\ndiff --git a/kong_test.go b/kong_test.go\nindex 0594565..482775d 100644\n--- a/kong_test.go\n+++ b/kong_test.go\n@@ -1452,3 +1452,80 @@ func TestEnumValidation(t *testing.T) {\n \t\t})\n \t}\n }\n+\n+func TestPassthroughCmd(t *testing.T) {\n+\ttests := []struct {\n+\t\tname    string\n+\t\targs    []string\n+\t\tflag    string\n+\t\tcmdArgs []string\n+\t}{\n+\t\t{\n+\t\t\t\"Simple\",\n+\t\t\t[]string{\"--flag\", \"foobar\", \"command\", \"something\"},\n+\t\t\t\"foobar\",\n+\t\t\t[]string{\"something\"},\n+\t\t},\n+\t\t{\n+\t\t\t\"DashDash\",\n+\t\t\t[]string{\"--flag\", \"foobar\", \"command\", \"--\", \"something\"},\n+\t\t\t\"foobar\",\n+\t\t\t[]string{\"--\", \"something\"},\n+\t\t},\n+\t\t{\n+\t\t\t\"Flag\",\n+\t\t\t[]string{\"command\", \"--flag\", \"foobar\"},\n+\t\t\t\"\",\n+\t\t\t[]string{\"--flag\", \"foobar\"},\n+\t\t},\n+\t\t{\n+\t\t\t\"FlagAndFlag\",\n+\t\t\t[]string{\"--flag\", \"foobar\", \"command\", \"--flag\", \"foobar\"},\n+\t\t\t\"foobar\",\n+\t\t\t[]string{\"--flag\", \"foobar\"},\n+\t\t},\n+\t\t{\n+\t\t\t\"NoArgs\",\n+\t\t\t[]string{\"--flag\", \"foobar\", \"command\"},\n+\t\t\t\"foobar\",\n+\t\t\t[]string(nil),\n+\t\t},\n+\t}\n+\tfor _, test := range tests {\n+\t\ttest := test\n+\t\tt.Run(test.name, func(t *testing.T) {\n+\t\t\tvar cli struct {\n+\t\t\t\tFlag    string\n+\t\t\t\tCommand struct {\n+\t\t\t\t\tArgs []string `arg:\"\" optional:\"\"`\n+\t\t\t\t} `cmd:\"\" passthrough:\"\"`\n+\t\t\t}\n+\t\t\tp := mustNew(t, &cli)\n+\t\t\t_, err := p.Parse(test.args)\n+\t\t\trequire.NoError(t, err)\n+\t\t\trequire.Equal(t, test.flag, cli.Flag)\n+\t\t\trequire.Equal(t, test.cmdArgs, cli.Command.Args)\n+\t\t})\n+\t}\n+}\n+\n+func TestPassthroughCmdOnlyArgs(t *testing.T) {\n+\tvar cli struct {\n+\t\tCommand struct {\n+\t\t\tFlag string\n+\t\t\tArgs []string `arg:\"\" optional:\"\"`\n+\t\t} `cmd:\"\" passthrough:\"\"`\n+\t}\n+\t_, err := kong.New(&cli)\n+\trequire.EqualError(t, err, \"<anonymous struct>.Command: passthrough command command [<args> ...] must not have subcommands or flags\")\n+}\n+\n+func TestPassthroughCmdOnlyStringArgs(t *testing.T) {\n+\tvar cli struct {\n+\t\tCommand struct {\n+\t\t\tArgs []int `arg:\"\" optional:\"\"`\n+\t\t} `cmd:\"\" passthrough:\"\"`\n+\t}\n+\t_, err := kong.New(&cli)\n+\trequire.EqualError(t, err, \"<anonymous struct>.Command: passthrough command command [<args> ...] must contain exactly one positional argument of []string type\")\n+}\ndiff --git a/model.go b/model.go\nindex a86b510..59c272a 100644\n--- a/model.go\n+++ b/model.go\n@@ -41,20 +41,21 @@ const (\n \n // Node is a branch in the CLI. ie. a command or positional argument.\n type Node struct {\n-\tType       NodeType\n-\tParent     *Node\n-\tName       string\n-\tHelp       string // Short help displayed in summaries.\n-\tDetail     string // Detailed help displayed when describing command/arg alone.\n-\tGroup      *Group\n-\tHidden     bool\n-\tFlags      []*Flag\n-\tPositional []*Positional\n-\tChildren   []*Node\n-\tDefaultCmd *Node\n-\tTarget     reflect.Value // Pointer to the value in the grammar that this Node is associated with.\n-\tTag        *Tag\n-\tAliases    []string\n+\tType        NodeType\n+\tParent      *Node\n+\tName        string\n+\tHelp        string // Short help displayed in summaries.\n+\tDetail      string // Detailed help displayed when describing command/arg alone.\n+\tGroup       *Group\n+\tHidden      bool\n+\tFlags       []*Flag\n+\tPositional  []*Positional\n+\tChildren    []*Node\n+\tDefaultCmd  *Node\n+\tTarget      reflect.Value // Pointer to the value in the grammar that this Node is associated with.\n+\tTag         *Tag\n+\tAliases     []string\n+\tPassthrough bool // Set to true to stop flag parsing when encountered.\n \n \tArgument *Value // Populated when Type is ArgumentNode.\n }\ndiff --git a/tag.go b/tag.go\nindex e4fae67..8e159dd 100644\n--- a/tag.go\n+++ b/tag.go\n@@ -235,8 +235,8 @@ func hydrateTag(t *Tag, typ reflect.Type) error { // nolint: gocyclo\n \t\treturn fmt.Errorf(\"enum value is only valid if it is either required or has a valid default value\")\n \t}\n \tpassthrough := t.Has(\"passthrough\")\n-\tif passthrough && !t.Arg {\n-\t\treturn fmt.Errorf(\"passthrough only makes sense for positional arguments\")\n+\tif passthrough && !t.Arg && !t.Cmd {\n+\t\treturn fmt.Errorf(\"passthrough only makes sense for positional arguments or commands\")\n \t}\n \tt.Passthrough = passthrough\n \treturn nil\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/FUNDING.yml",
+    ".github/workflows/ci.yml",
+    ".gitignore",
+    ".golangci.yml",
+    "COPYING",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/README.md",
+    "_examples/server/console.go",
+    "_examples/server/go.mod",
+    "_examples/server/go.sum",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/main.go",
+    "benchmark_test.go",
+    "bin/.go@latest.pkg",
+    "bin/.golangci-lint-1.42.0.pkg",
+    "bin/README.hermit.md",
+    "bin/activate-hermit",
+    "bin/go",
+    "bin/gofmt",
+    "bin/golangci-lint",
+    "bin/hermit",
+    "bin/hermit.hcl",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "config_test.go",
+    "context.go",
+    "defaults.go",
+    "defaults_test.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "go.mod",
+    "go.sum",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "testdata/file.txt",
+    "util.go",
+    "util_test.go",
+    "visit.go"
+  ],
+  "explanation": {
+    "what": "既存の passthrough:\"\" タグを positional 引数だけでなく cmd:\"\" が付いたコマンドにも付けられるように拡張した。build.go の buildChild() で、passthrough なコマンドはサブコマンド・フラグを持たず []string 型の positional 引数を1つだけ持つことを検証し、Node に新設した Passthrough フィールドに true を設定する。context.go の trace() では、そのノードに到達した時点で endParsing() を呼んで以降のトークンをすべて素通しする。",
+    "why": "リンクされたissue #253の報告によると、`exec` のような外部ツールへの引数委譲パターンで、positional引数に passthrough:\"\" を付けても `tool exec --help` のようなケースでは `--help` がkong自身に解釈されてしまい、サブツールに渡らない問題があった。コマンド自体に passthrough を付けられるようにすることで、そのコマンド配下のトークンを丸ごと通過させ、サブツール側で独自にパースさせられるようにした。",
+    "highlights": [
+      { "file": "context.go", "note": "node.Passthrough が真なら trace() の途中で c.endParsing() を呼ぶ" },
+      { "file": "build.go", "note": "passthrough なコマンドは []string の positional を1つだけ持つ制約を checkPassthroughArg で検証" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "issue",
+    "refs": [
+      { "type": "pr", "number": 262, "url": "https://github.com/alecthomas/kong/pull/262" },
+      { "type": "issue", "number": 253, "url": "https://github.com/alecthomas/kong/issues/253" }
+    ],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

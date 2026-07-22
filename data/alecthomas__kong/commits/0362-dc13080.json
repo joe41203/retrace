@@ -1,0 +1,154 @@
+{
+  "seq": 362,
+  "sha": "dc13080e39e9e4843493f3bf1ae76fe2b57f4ac1",
+  "parents": [
+    "fa9b6369971547774c28a1c971292dacdb5cdb5f"
+  ],
+  "author": {
+    "name": "Dennis Ploeger",
+    "email": "github.dennis@dieploegers.de",
+    "date": "2024-02-27T09:39:21+01:00"
+  },
+  "message": "feat: Add info about optional flags to usage (#416)",
+  "pr": {
+    "number": 416,
+    "title": "feat: Add info about optional flags to usage",
+    "body": "Closes #413 ",
+    "url": "https://github.com/alecthomas/kong/pull/416"
+  },
+  "linkedIssues": [
+    {
+      "number": 413,
+      "title": "Show \"flags-placeholder\" even when no required flags exist",
+      "body": "Currently the usage output only adds required flags to the usage line. Without any required flags this looks like flags can't be given at all.\r\n\r\nMaybe some kind of flags placeholder can be used:\r\n\r\n```\r\nUsage: program [optional flags] <positionals>\r\n```",
+      "url": "https://github.com/alecthomas/kong/issues/413"
+    }
+  ],
+  "stats": {
+    "filesChanged": 4,
+    "additions": 38,
+    "deletions": 28
+  },
+  "files": [
+    {
+      "path": "help_test.go",
+      "status": "M",
+      "additions": 26,
+      "deletions": 26,
+      "binary": false
+    },
+    {
+      "path": "helpwrap1.19_test.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "kong_test.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "model.go",
+      "status": "M",
+      "additions": 10,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/help_test.go b/help_test.go\nindex 8e07aed..38080a3 100644\n--- a/help_test.go\n+++ b/help_test.go\n@@ -51,7 +51,7 @@ func TestHelpOptionalArgs(t *testing.T) {\n \t\tassert.NoError(t, err)\n \t})\n \tassert.True(t, exited)\n-\texpected := `Usage: test-app [<one> [<two>]]\n+\texpected := `Usage: test-app [<one> [<two>]] [flags]\n \n Arguments:\n   [<one>]    One optional arg.\n@@ -105,7 +105,7 @@ func TestHelp(t *testing.T) {\n \t\t\tassert.NoError(t, err)\n \t\t})\n \t\tassert.True(t, exited)\n-\t\texpected := `Usage: test-app --required <command>\n+\t\texpected := `Usage: test-app --required <command> [flags]\n \n A test app.\n \n@@ -120,13 +120,13 @@ Flags:\n   -s, --[no-]sort            Is sortable or not.\n \n Commands:\n-  one --required\n+  one --required [flags]\n     A subcommand.\n \n-  two <three> --required --required-two --required-three\n+  two <three> --required --required-two --required-three [flags]\n     Sub-sub-arg.\n \n-  two four --required --required-two\n+  two four --required --required-two [flags]\n     Sub-sub-command.\n \n Run \"test-app <command> --help\" for more information on a command.\n@@ -144,7 +144,7 @@ Run \"test-app <command> --help\" for more information on a command.\n \t\t\tassert.NoError(t, err)\n \t\t})\n \t\tassert.True(t, exited)\n-\t\texpected := `Usage: test-app two <three> --required --required-two --required-three\n+\t\texpected := `Usage: test-app two <three> --required --required-two --required-three [flags]\n \n Sub-sub-arg.\n \n@@ -215,18 +215,18 @@ func TestFlagsLast(t *testing.T) {\n \t\t\tassert.NoError(t, err)\n \t\t})\n \t\tassert.True(t, exited)\n-\t\texpected := `Usage: test-app --required <command>\n+\t\texpected := `Usage: test-app --required <command> [flags]\n \n A test app.\n \n Commands:\n-  one --required\n+  one --required [flags]\n     A subcommand.\n \n-  two <three> --required --required-two --required-three\n+  two <three> --required --required-two --required-three [flags]\n     Sub-sub-arg.\n \n-  two four --required --required-two\n+  two four --required --required-two [flags]\n     Sub-sub-command.\n \n Flags:\n@@ -253,7 +253,7 @@ Run \"test-app <command> --help\" for more information on a command.\n \t\t\tassert.NoError(t, err)\n \t\t})\n \t\tassert.True(t, exited)\n-\t\texpected := `Usage: test-app two <three> --required --required-two --required-three\n+\t\texpected := `Usage: test-app two <three> --required --required-two --required-three [flags]\n \n Sub-sub-arg.\n \n@@ -320,7 +320,7 @@ func TestHelpTree(t *testing.T) {\n \t\t\tassert.NoError(t, err)\n \t\t})\n \t\tassert.True(t, exited)\n-\t\texpected := `Usage: test-app <command>\n+\t\texpected := `Usage: test-app <command> [flags]\n \n A test app.\n \n@@ -353,7 +353,7 @@ Run \"test-app <command> --help\" for more information on a command.\n \t\t\tassert.NoError(t, err)\n \t\t})\n \t\tassert.True(t, exited)\n-\t\texpected := `Usage: test-app one (un,uno) <command>\n+\t\texpected := `Usage: test-app one (un,uno) <command> [flags]\n \n subcommand one\n \n@@ -414,7 +414,7 @@ func TestHelpCompactNoExpand(t *testing.T) {\n \t\t\tassert.NoError(t, err)\n \t\t})\n \t\tassert.True(t, exited)\n-\t\texpected := `Usage: test-app <command>\n+\t\texpected := `Usage: test-app <command> [flags]\n \n A test app.\n \n@@ -443,7 +443,7 @@ Run \"test-app <command> --help\" for more information on a command.\n \t\t\tassert.NoError(t, err)\n \t\t})\n \t\tassert.True(t, exited)\n-\t\texpected := `Usage: test-app one (un,uno) <command>\n+\t\texpected := `Usage: test-app one (un,uno) <command> [flags]\n \n subcommand one\n \n@@ -607,7 +607,7 @@ func TestAutoGroup(t *testing.T) {\n \t\t}),\n \t)\n \t_, _ = app.Parse([]string{\"--help\", \"two\"})\n-\tassert.Equal(t, `Usage: test two\n+\tassert.Equal(t, `Usage: test two [flags]\n \n A non grouped subcommand.\n \n@@ -691,7 +691,7 @@ func TestHelpGrouping(t *testing.T) {\n \t\t\tassert.True(t, exited)\n \t\t\tassert.NoError(t, err)\n \t\t})\n-\t\texpected := `Usage: test-app <command>\n+\t\texpected := `Usage: test-app <command> [flags]\n \n A test app.\n \n@@ -710,26 +710,26 @@ Group B\n   --grouped-b-string=STRING    A string flag grouped in B.\n \n Commands:\n-  two\n+  two [flags]\n     A non grouped subcommand.\n \n Group title taken from the kong.ExplicitGroups option\n   A group header\n \n-  one thing <arg>\n+  one thing <arg> [flags]\n     subcommand thing\n \n-  one <other>\n+  one <other> [flags]\n     subcommand other\n \n-  three\n+  three [flags]\n     Another subcommand grouped in A.\n \n Group B\n-  one <stuff>\n+  one <stuff> [flags]\n     subcommand stuff\n \n-  four\n+  four [flags]\n     Another subcommand grouped in B.\n \n Run \"test-app <command> --help\" for more information on a command.\n@@ -747,7 +747,7 @@ Run \"test-app <command> --help\" for more information on a command.\n \t\t\tassert.NoError(t, err)\n \t\t\tassert.True(t, exited)\n \t\t})\n-\t\texpected := `Usage: test-app two\n+\t\texpected := `Usage: test-app two [flags]\n \n A non grouped subcommand.\n \n@@ -796,7 +796,7 @@ func TestUsageOnError(t *testing.T) {\n \t_, err := p.Parse([]string{})\n \tp.FatalIfErrorf(err)\n \n-\texpected := `Usage: test --flag=STRING\n+\texpected := `Usage: test --flag=STRING [flags]\n \n Some description.\n \n@@ -824,7 +824,7 @@ func TestShortUsageOnError(t *testing.T) {\n \tassert.Error(t, err)\n \tp.FatalIfErrorf(err)\n \n-\texpected := `Usage: test --flag=STRING\n+\texpected := `Usage: test --flag=STRING [flags]\n Run \"test --help\" for more information.\n \n test: error: missing flags: --flag=STRING\ndiff --git a/helpwrap1.19_test.go b/helpwrap1.19_test.go\nindex 7b52f93..9034e59 100644\n--- a/helpwrap1.19_test.go\n+++ b/helpwrap1.19_test.go\n@@ -32,7 +32,7 @@ func TestCustomWrap(t *testing.T) {\n \n \t_, err := app.Parse([]string{\"--help\"})\n \tassert.NoError(t, err)\n-\texpected := `Usage: test-app\n+\texpected := `Usage: test-app [flags]\n \n A test app.\n \ndiff --git a/kong_test.go b/kong_test.go\nindex 3e71979..bd1ecfa 100644\n--- a/kong_test.go\n+++ b/kong_test.go\n@@ -1576,7 +1576,7 @@ func TestPassthroughCmdOnlyArgs(t *testing.T) {\n \t\t} `cmd:\"\" passthrough:\"\"`\n \t}\n \t_, err := kong.New(&cli)\n-\tassert.EqualError(t, err, \"<anonymous struct>.Command: passthrough command command [<args> ...] must not have subcommands or flags\")\n+\tassert.EqualError(t, err, \"<anonymous struct>.Command: passthrough command command [<args> ...] [flags] must not have subcommands or flags\")\n }\n \n func TestPassthroughCmdOnlyStringArgs(t *testing.T) {\ndiff --git a/model.go b/model.go\nindex 4e59fea..8d1f82f 100644\n--- a/model.go\n+++ b/model.go\n@@ -162,6 +162,16 @@ func (n *Node) Summary() string {\n \t} else if len(n.Children) > 0 {\n \t\tsummary += \" <command>\"\n \t}\n+\tallFlags := n.Flags\n+\tif n.Parent != nil {\n+\t\tallFlags = append(allFlags, n.Parent.Flags...)\n+\t}\n+\tfor _, flag := range allFlags {\n+\t\tif !flag.Required {\n+\t\t\tsummary += \" [flags]\"\n+\t\t\tbreak\n+\t\t}\n+\t}\n \treturn summary\n }\n \n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/FUNDING.yml",
+    ".github/workflows/ci.yml",
+    ".gitignore",
+    ".golangci.yml",
+    "COPYING",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/README.md",
+    "_examples/server/console.go",
+    "_examples/server/go.mod",
+    "_examples/server/go.sum",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/commandstring/main.go",
+    "_examples/shell/help/README.md",
+    "_examples/shell/help/main.go",
+    "benchmark_test.go",
+    "bin/.golangci-lint-1.55.2.pkg",
+    "bin/README.hermit.md",
+    "bin/activate-hermit",
+    "bin/golangci-lint",
+    "bin/hermit",
+    "bin/hermit.hcl",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "config_test.go",
+    "context.go",
+    "defaults.go",
+    "defaults_test.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "go.mod",
+    "go.sum",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "helpwrap1.18_test.go",
+    "helpwrap1.19_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_linux_test.go",
+    "mapper_test.go",
+    "mapper_windows_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "renovate.json5",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "testdata/file.txt",
+    "util.go",
+    "util_test.go",
+    "visit.go"
+  ],
+  "explanation": {
+    "what": "usage 行の Node.Summary() を変更し、必須でないフラグが1つでもあれば末尾に `[flags]` を付けるようにした。テストの期待値(help_test.go 等)を新しい usage 文字列に合わせて一括更新している。",
+    "why": "必須フラグが無い場合、これまでの usage には flags の存在自体が表示されず、フラグを渡せることが利用者に伝わらなかった(issue #413)。`[flags]` プレースホルダーを追加することでオプションフラグの存在を明示する。",
+    "highlights": [
+      { "file": "model.go", "note": "Summary() が自身と親ノードのフラグを合わせて走査し、Required でないものが1つでもあれば `[flags]` を追記" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "issue",
+    "refs": [
+      { "type": "pr", "number": 416, "url": "https://github.com/alecthomas/kong/pull/416" },
+      { "type": "issue", "number": 413, "url": "https://github.com/alecthomas/kong/issues/413" }
+    ],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

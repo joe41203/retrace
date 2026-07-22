@@ -1,0 +1,106 @@
+{
+  "seq": 158,
+  "sha": "a341a59d82867c96d0d1abfa2161bfc8d584dd60",
+  "parents": [
+    "d2286db01b8f6c060046416a0a83a970115c1407"
+  ],
+  "author": {
+    "name": "Alec Thomas",
+    "email": "alec@swapoff.org",
+    "date": "2019-11-20T17:36:53+11:00"
+  },
+  "message": "Don't validate enum values for unused required paths.\n\nFixes #40.",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 39,
+    "deletions": 2
+  },
+  "files": [
+    {
+      "path": "context.go",
+      "status": "M",
+      "additions": 15,
+      "deletions": 2,
+      "binary": false
+    },
+    {
+      "path": "kong_test.go",
+      "status": "M",
+      "additions": 24,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/context.go b/context.go\nindex 80c262f..9baca0e 100644\n--- a/context.go\n+++ b/context.go\n@@ -132,10 +132,10 @@ func (c *Context) Empty() bool {\n }\n \n // Validate the current context.\n-func (c *Context) Validate() error {\n+func (c *Context) Validate() error { // nolint: gocyclo\n \terr := Visit(c.Model, func(node Visitable, next Next) error {\n \t\tif value, ok := node.(*Value); ok {\n-\t\t\tif value.Enum != \"\" {\n+\t\t\tif value.Enum != \"\" && (!value.Required || value.Default != \"\") {\n \t\t\t\tif err := checkEnum(value, value.Target); err != nil {\n \t\t\t\t\treturn err\n \t\t\t\t}\n@@ -152,6 +152,19 @@ func (c *Context) Validate() error {\n \t\t}\n \t}\n \tfor _, path := range c.Path {\n+\t\tvar value *Value\n+\t\tswitch {\n+\t\tcase path.Flag != nil:\n+\t\t\tvalue = path.Flag.Value\n+\n+\t\tcase path.Positional != nil:\n+\t\t\tvalue = path.Positional\n+\t\t}\n+\t\tif value != nil && value.Tag.Enum != \"\" {\n+\t\t\tif err := checkEnum(value, value.Target); err != nil {\n+\t\t\t\treturn err\n+\t\t\t}\n+\t\t}\n \t\tif err := checkMissingFlags(path.Flags); err != nil {\n \t\t\treturn err\n \t\t}\ndiff --git a/kong_test.go b/kong_test.go\nindex b6fcc5f..75a7fcd 100644\n--- a/kong_test.go\n+++ b/kong_test.go\n@@ -791,3 +791,27 @@ func TestEnumSequence(t *testing.T) {\n \trequire.NoError(t, err)\n \trequire.Equal(t, []string{\"a\"}, cli.State)\n }\n+\n+func TestIssue40EnumAcrossCommands(t *testing.T) {\n+\tvar cli struct {\n+\t\tOne struct {\n+\t\t\tOneArg string `arg:\"\" required:\"\"`\n+\t\t} `cmd:\"\"`\n+\t\tTwo struct {\n+\t\t\tTwoArg string `arg:\"\" enum:\"a,b,c\" required:\"\"`\n+\t\t} `cmd:\"\"`\n+\t\tThree struct {\n+\t\t\tThreeArg string `arg:\"\" optional:\"\" default:\"a\" enum:\"a,b,c\"`\n+\t\t} `cmd:\"\"`\n+\t}\n+\n+\tp := mustNew(t, &cli)\n+\t_, err := p.Parse([]string{\"one\", \"two\"})\n+\trequire.NoError(t, err)\n+\t_, err = p.Parse([]string{\"two\", \"d\"})\n+\trequire.Error(t, err)\n+\t_, err = p.Parse([]string{\"three\", \"d\"})\n+\trequire.Error(t, err)\n+\t_, err = p.Parse([]string{\"three\", \"c\"})\n+\trequire.NoError(t, err)\n+}\n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    ".golangci.yml",
+    "COPYING",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/console.go",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/main.go",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "config_test.go",
+    "context.go",
+    "defaults.go",
+    "defaults_test.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "go.mod",
+    "go.sum",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "util.go",
+    "util_test.go",
+    "visit.go"
+  ],
+  "explanation": {
+    "what": "Validate() の enum チェック条件を、必須(Required)かつ default が空の値については enum 検証をスキップするよう変更した。加えて c.Path をループする箇所で、まだ選択されていない Flag/Positional の enum も明示的にチェックするコードを追加した。",
+    "why": "コミットメッセージに \"Fixes #40.\" とあり、必須で値が渡されていない(まだセットされていない)enum フィールドが、実際には使われないコマンドパス上にあるにもかかわらず検証されてエラーになってしまう不具合の修正。",
+    "highlights": [
+      { "file": "context.go", "note": "`value.Enum != \"\" && (!value.Required || value.Default != \"\")` の条件追加で、未セットの必須 enum を検証対象から除外している" },
+      { "file": "kong_test.go", "note": "TestIssue40EnumAcrossCommands が選択されていないサブコマンド配下の enum が誤検証されないことを確認している" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

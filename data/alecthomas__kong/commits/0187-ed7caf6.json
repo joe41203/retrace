@@ -1,0 +1,125 @@
+{
+  "seq": 187,
+  "sha": "ed7caf6841a0418e43c80c98f9f22ce80b437eed",
+  "parents": [
+    "b6ff115b3ecaf0ee827551ace503781d520cb27f"
+  ],
+  "author": {
+    "name": "Alec Thomas",
+    "email": "alec@swapoff.org",
+    "date": "2020-04-30T17:03:21+10:00"
+  },
+  "message": "Revert \"Convert env management to a resolver.\"\n\nThis reverts commit fbe8d48e4badf293012666e8d7a9065c0c9e633f.",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 4,
+    "additions": 11,
+    "deletions": 35
+  },
+  "files": [
+    {
+      "path": "env.go",
+      "status": "D",
+      "additions": 0,
+      "deletions": 21,
+      "binary": false
+    },
+    {
+      "path": "kong.go",
+      "status": "M",
+      "additions": 0,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "kong_test.go",
+      "status": "M",
+      "additions": 0,
+      "deletions": 13,
+      "binary": false
+    },
+    {
+      "path": "model.go",
+      "status": "M",
+      "additions": 11,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/env.go b/env.go\ndeleted file mode 100644\nindex aeee8d3..0000000\n--- a/env.go\n+++ /dev/null\n@@ -1,21 +0,0 @@\n-package kong\n-\n-import (\n-\t\"os\"\n-)\n-\n-// EnvarResolver resolves values from environment variables.\n-//\n-// It is installed by default. Use ClearResolvers() to disable this.\n-func EnvarResolver() Resolver {\n-\treturn ResolverFunc(func(context *Context, parent *Path, flag *Flag) (interface{}, error) {\n-\t\tif flag.Tag.Env == \"\" {\n-\t\t\treturn nil, nil\n-\t\t}\n-\t\tenvar := os.Getenv(flag.Tag.Env)\n-\t\tif envar != \"\" {\n-\t\t\treturn envar, nil\n-\t\t}\n-\t\treturn nil, nil\n-\t})\n-}\ndiff --git a/kong.go b/kong.go\nindex 017cf50..3a61567 100644\n--- a/kong.go\n+++ b/kong.go\n@@ -71,7 +71,6 @@ func New(grammar interface{}, options ...Option) (*Kong, error) {\n \t\tvars:          Vars{},\n \t\tbindings:      bindings{},\n \t\thelpFormatter: DefaultHelpValueFormatter,\n-\t\tresolvers:     []Resolver{EnvarResolver()},\n \t}\n \n \toptions = append(options, Bind(k))\ndiff --git a/kong_test.go b/kong_test.go\nindex 557894d..40731c3 100644\n--- a/kong_test.go\n+++ b/kong_test.go\n@@ -675,19 +675,6 @@ func TestHooksCalledForDefault(t *testing.T) {\n \trequire.Equal(t, []string{\"before:default\", \"after:default\"}, ctx.values)\n }\n \n-func TestHooksCalledForEnv(t *testing.T) {\n-\tvar cli struct {\n-\t\tFlag hookValue `env:\"FLAG\"`\n-\t}\n-\tdefer tempEnv(envMap{\"FLAG\": \"flagged\"})()\n-\n-\tctx := &hookContext{}\n-\t_, err := mustNew(t, &cli, kong.Bind(ctx)).Parse(nil)\n-\trequire.NoError(t, err)\n-\trequire.Equal(t, \"flagged\", string(cli.Flag))\n-\trequire.Equal(t, []string{\"before:\", \"after:flagged\"}, ctx.values)\n-}\n-\n func TestEnum(t *testing.T) {\n \tvar cli struct {\n \t\tFlag string `enum:\"a,b,c\"`\ndiff --git a/model.go b/model.go\nindex c98625c..8023dce 100644\n--- a/model.go\n+++ b/model.go\n@@ -3,6 +3,7 @@ package kong\n import (\n \t\"fmt\"\n \t\"math\"\n+\t\"os\"\n \t\"reflect\"\n \t\"strconv\"\n \t\"strings\"\n@@ -325,6 +326,16 @@ func (v *Value) ApplyDefault() error {\n // Does not include resolvers.\n func (v *Value) Reset() error {\n \tv.Target.Set(reflect.Zero(v.Target.Type()))\n+\tif v.Tag.Env != \"\" {\n+\t\tenvar := os.Getenv(v.Tag.Env)\n+\t\tif envar != \"\" {\n+\t\t\terr := v.Parse(ScanFromTokens(Token{Type: FlagValueToken, Value: envar}), v.Target)\n+\t\t\tif err != nil {\n+\t\t\t\treturn fmt.Errorf(\"%s (from envar %s=%q)\", err, v.Tag.Env, envar)\n+\t\t\t}\n+\t\t\treturn nil\n+\t\t}\n+\t}\n \tif v.Default != \"\" {\n \t\treturn v.Parse(ScanFromTokens(Token{Type: FlagValueToken, Value: v.Default}), v.Target)\n \t}\n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    ".golangci.yml",
+    "COPYING",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/README.md",
+    "_examples/server/console.go",
+    "_examples/server/go.mod",
+    "_examples/server/go.sum",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/main.go",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "config_test.go",
+    "context.go",
+    "defaults.go",
+    "defaults_test.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "go.mod",
+    "go.sum",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "util.go",
+    "util_test.go",
+    "visit.go"
+  ],
+  "explanation": {
+    "what": "seq181(fbe8d48 \"Convert env management to a resolver.\")を revert する。env.go の EnvarResolver() を削除し、kong.go のデフォルト resolvers 登録も外し、model.go の Value.Reset() に os.Getenv による env タグ処理を復元、kong_test.go の TestHooksCalledForEnv も削除した。差分はほぼ seq181 の逆操作。",
+    "why": "コミットメッセージは \"This reverts commit fbe8d48e...\" とのみ記載し、revert 理由自体は本文に書かれていない。env を Resolver 化する変更が何らかの問題を引き起こしたために巻き戻された可能性があるが、その具体的な不具合内容は本コミットのメッセージ・PR・issue のいずれにも記録がない。",
+    "highlights": [
+      { "file": "model.go", "note": "Value.Reset() 内の env タグ処理が復元され、Resolver 経由の解決から直接 os.Getenv する形に戻っている。" },
+      { "file": "env.go", "note": "ファイルごと削除。" }
+    ],
+    "langNotes": [
+      { "topic": "git revert", "note": "Git の revert は対象コミットの変更を打ち消す新しいコミットを作る操作。履歴は残したまま元の状態に戻せるため、force push や履歴書き換えを避けたいチームでよく使われる。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

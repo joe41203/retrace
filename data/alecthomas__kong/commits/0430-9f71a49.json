@@ -1,0 +1,220 @@
+{
+  "seq": 430,
+  "sha": "9f71a497678f07c938979a3a7971ad4ba1b06cd6",
+  "parents": [
+    "cab639ab83b14162986cc0a34700047274514d06"
+  ],
+  "author": {
+    "name": "Abhinav Gupta",
+    "email": "mail@abhinavg.net",
+    "date": "2025-02-16T19:10:57-08:00"
+  },
+  "message": "ci: Test with Go 1.23 and 1.24 (#502)\n\nIn CI, test with Go 1.23 and 1.24,\nand upgrade the Hermit-managed Go and golangci-lint to latest versions.\n\nThe new golangci-lint had a number of warnings and minor issues\nthat were either fixed or opted-out of.",
+  "pr": {
+    "number": 502,
+    "title": "ci: Test with Go 1.23 and 1.24",
+    "body": "In CI, test with Go 1.23 and 1.24,\nand upgrade the Hermit-managed Go and golangci-lint to latest versions.\n\nThe new golangci-lint had a number of warnings and minor issues\nthat were either fixed or opted-out of.\n",
+    "url": "https://github.com/alecthomas/kong/pull/502"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 13,
+    "additions": 24,
+    "deletions": 34
+  },
+  "files": [
+    {
+      "path": ".github/workflows/ci.yml",
+      "status": "M",
+      "additions": 2,
+      "deletions": 2,
+      "binary": false
+    },
+    {
+      "path": ".golangci.yml",
+      "status": "M",
+      "additions": 2,
+      "deletions": 2,
+      "binary": false
+    },
+    {
+      "path": "bin/.go-1.24.0.pkg",
+      "status": "R",
+      "additions": 0,
+      "deletions": 0,
+      "binary": false,
+      "oldPath": "bin/.go-1.23.6.pkg"
+    },
+    {
+      "path": "bin/.golangci-lint-1.64.5.pkg",
+      "status": "R",
+      "additions": 0,
+      "deletions": 0,
+      "binary": false,
+      "oldPath": "bin/.golangci-lint-1.60.1.pkg"
+    },
+    {
+      "path": "bin/go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "bin/gofmt",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "bin/golangci-lint",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "config_test.go",
+      "status": "M",
+      "additions": 6,
+      "deletions": 9,
+      "binary": false
+    },
+    {
+      "path": "help.go",
+      "status": "M",
+      "additions": 2,
+      "deletions": 2,
+      "binary": false
+    },
+    {
+      "path": "help_test.go",
+      "status": "M",
+      "additions": 5,
+      "deletions": 9,
+      "binary": false
+    },
+    {
+      "path": "mapper_test.go",
+      "status": "M",
+      "additions": 2,
+      "deletions": 4,
+      "binary": false
+    },
+    {
+      "path": "resolver.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "util_test.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 2,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/.github/workflows/ci.yml b/.github/workflows/ci.yml\nindex 3396e46..4483d4b 100644\n--- a/.github/workflows/ci.yml\n+++ b/.github/workflows/ci.yml\n@@ -13,7 +13,7 @@ jobs:\n       matrix:\n         # These are the release channels.\n         # Hermit will handle installing the right patch.\n-        go: [\"1.20\", \"1.21\"]\n+        go: [\"1.23\", \"1.24\"]\n     steps:\n       - name: Checkout code\n         uses: actions/checkout@v4\n@@ -35,7 +35,7 @@ jobs:\n       matrix:\n         # These are versions for GitHub's setup-go.\n         # '.x' will pick the latest patch release.\n-        go: [\"1.20.x\", \"1.21.x\"]\n+        go: [\"1.23.x\", \"1.24.x\"]\n     steps:\n       - name: Checkout code\n         uses: actions/checkout@v4\ndiff --git a/.golangci.yml b/.golangci.yml\nindex 3a05633..1eb0b92 100644\n--- a/.golangci.yml\n+++ b/.golangci.yml\n@@ -12,7 +12,6 @@ linters:\n     - wsl\n     - funlen\n     - gocognit\n-    - gomnd\n     - goprintffuncname\n     - paralleltest\n     - nlreturn\n@@ -36,13 +35,14 @@ linters:\n     - nilnil\n     - depguard    # nothing to guard against yet\n     - tagalign    # hurts readability of kong tags\n+    - tenv        # deprecated since v1.64, but not removed yet\n     - mnd\n     - perfsprint\n     - err113\n     - copyloopvar\n     - intrange\n-    - execinquery\n     - nakedret\n+    - recvcheck   # value receivers are intentionally used for copies\n \n linters-settings:\n   govet:\ndiff --git a/bin/.go-1.23.6.pkg b/bin/.go-1.24.0.pkg\nsimilarity index 100%\nrename from bin/.go-1.23.6.pkg\nrename to bin/.go-1.24.0.pkg\ndiff --git a/bin/.golangci-lint-1.60.1.pkg b/bin/.golangci-lint-1.64.5.pkg\nsimilarity index 100%\nrename from bin/.golangci-lint-1.60.1.pkg\nrename to bin/.golangci-lint-1.64.5.pkg\ndiff --git a/bin/go b/bin/go\nindex 8fb1c41..42b4aa3 120000\n--- a/bin/go\n+++ b/bin/go\n@@ -1 +1 @@\n-.go-1.23.6.pkg\n\\ No newline at end of file\n+.go-1.24.0.pkg\n\\ No newline at end of file\ndiff --git a/bin/gofmt b/bin/gofmt\nindex 8fb1c41..42b4aa3 120000\n--- a/bin/gofmt\n+++ b/bin/gofmt\n@@ -1 +1 @@\n-.go-1.23.6.pkg\n\\ No newline at end of file\n+.go-1.24.0.pkg\n\\ No newline at end of file\ndiff --git a/bin/golangci-lint b/bin/golangci-lint\nindex 4857716..1bb9797 120000\n--- a/bin/golangci-lint\n+++ b/bin/golangci-lint\n@@ -1 +1 @@\n-.golangci-lint-1.60.1.pkg\n\\ No newline at end of file\n+.golangci-lint-1.64.5.pkg\n\\ No newline at end of file\ndiff --git a/config_test.go b/config_test.go\nindex 570f142..fd303af 100644\n--- a/config_test.go\n+++ b/config_test.go\n@@ -15,12 +15,10 @@ func TestMultipleConfigLoading(t *testing.T) {\n \t}\n \n \tcli.Flag = \"first\"\n-\tfirst, cleanFirst := makeConfig(t, &cli)\n-\tdefer cleanFirst()\n+\tfirst := makeConfig(t, &cli)\n \n \tcli.Flag = \"\"\n-\tsecond, cleanSecond := makeConfig(t, &cli)\n-\tdefer cleanSecond()\n+\tsecond := makeConfig(t, &cli)\n \n \tp := mustNew(t, &cli, kong.Configuration(kong.JSON, first, second))\n \t_, err := p.Parse(nil)\n@@ -34,20 +32,19 @@ func TestConfigValidation(t *testing.T) {\n \t}\n \n \tcli.Flag = \"invalid\"\n-\tconf, cleanConf := makeConfig(t, &cli)\n-\tdefer cleanConf()\n+\tconf := makeConfig(t, &cli)\n \n \tp := mustNew(t, &cli, kong.Configuration(kong.JSON, conf))\n \t_, err := p.Parse(nil)\n \tassert.Error(t, err)\n }\n \n-func makeConfig(t *testing.T, config any) (path string, cleanup func()) {\n+func makeConfig(t *testing.T, config any) (path string) {\n \tt.Helper()\n-\tw, err := os.CreateTemp(\"\", \"\")\n+\tw, err := os.CreateTemp(t.TempDir(), \"\")\n \tassert.NoError(t, err)\n \tdefer w.Close()\n \terr = json.NewEncoder(w).Encode(config)\n \tassert.NoError(t, err)\n-\treturn w.Name(), func() { os.Remove(w.Name()) }\n+\treturn w.Name()\n }\ndiff --git a/help.go b/help.go\nindex 6363ea2..28290f6 100644\n--- a/help.go\n+++ b/help.go\n@@ -415,7 +415,7 @@ func (h *helpWriter) Write(w io.Writer) error {\n \n func (h *helpWriter) Wrap(text string) {\n \tw := bytes.NewBuffer(nil)\n-\tdoc.ToText(w, strings.TrimSpace(text), \"\", \"    \", h.width)\n+\tdoc.ToText(w, strings.TrimSpace(text), \"\", \"    \", h.width) //nolint:staticcheck // cross-package links not possible\n \tfor _, line := range strings.Split(strings.TrimSpace(w.String()), \"\\n\") {\n \t\th.Print(line)\n \t}\n@@ -470,7 +470,7 @@ func writeTwoColumns(w *helpWriter, rows [][2]string) {\n \n \tfor _, row := range rows {\n \t\tbuf := bytes.NewBuffer(nil)\n-\t\tdoc.ToText(buf, row[1], \"\", strings.Repeat(\" \", defaultIndent), w.width-leftSize-defaultColumnPadding)\n+\t\tdoc.ToText(buf, row[1], \"\", strings.Repeat(\" \", defaultIndent), w.width-leftSize-defaultColumnPadding) //nolint:staticcheck // cross-package links not possible\n \t\tlines := strings.Split(strings.TrimRight(buf.String(), \"\\n\"), \"\\n\")\n \n \t\tline := fmt.Sprintf(\"%-*s\", leftSize, row[0])\ndiff --git a/help_test.go b/help_test.go\nindex e680be2..f8aebab 100644\n--- a/help_test.go\n+++ b/help_test.go\n@@ -83,8 +83,7 @@ func TestHelp(t *testing.T) {\n \n \t\t\tThree threeArg `arg help:\"Sub-sub-arg.\"`\n \n-\t\t\tFour struct {\n-\t\t\t} `cmd help:\"Sub-sub-command.\"`\n+\t\t\tFour struct{} `cmd help:\"Sub-sub-command.\"`\n \t\t} `cmd help:\"Another subcommand.\"`\n \t}\n \n@@ -192,8 +191,7 @@ func TestFlagsLast(t *testing.T) {\n \n \t\t\tThree threeArg `arg help:\"Sub-sub-arg.\"`\n \n-\t\t\tFour struct {\n-\t\t\t} `cmd help:\"Sub-sub-command.\"`\n+\t\t\tFour struct{} `cmd help:\"Sub-sub-command.\"`\n \t\t} `cmd help:\"Another subcommand.\"`\n \t}\n \n@@ -296,8 +294,7 @@ func TestHelpTree(t *testing.T) {\n \t\tTwo struct {\n \t\t\tThree threeArg `arg help:\"Sub-sub-arg.\"`\n \n-\t\t\tFour struct {\n-\t\t\t} `cmd help:\"Sub-sub-command.\" aliases:\"for,fore\"`\n+\t\t\tFour struct{} `cmd help:\"Sub-sub-command.\" aliases:\"for,fore\"`\n \t\t} `cmd help:\"Another subcommand.\"`\n \t}\n \n@@ -390,8 +387,7 @@ func TestHelpCompactNoExpand(t *testing.T) {\n \t\tTwo struct {\n \t\t\tThree threeArg `arg help:\"Sub-sub-arg.\"`\n \n-\t\t\tFour struct {\n-\t\t\t} `cmd help:\"Sub-sub-command.\" aliases:\"for,fore\"`\n+\t\t\tFour struct{} `cmd help:\"Sub-sub-command.\" aliases:\"for,fore\"`\n \t\t} `cmd help:\"Another subcommand.\"`\n \t}\n \n@@ -603,7 +599,7 @@ func TestAutoGroup(t *testing.T) {\n \t\t\tif node, ok := parent.(*kong.Node); ok {\n \t\t\t\treturn &kong.Group{\n \t\t\t\t\tKey:   node.Name,\n-\t\t\t\t\tTitle: strings.Title(node.Name) + \" flags:\",\n+\t\t\t\t\tTitle: strings.Title(node.Name) + \" flags:\", //nolint:staticcheck // strings.Title in test is okay\n \t\t\t\t}\n \t\t\t}\n \t\t\treturn nil\ndiff --git a/mapper_test.go b/mapper_test.go\nindex a6ddbe3..947f836 100644\n--- a/mapper_test.go\n+++ b/mapper_test.go\n@@ -268,9 +268,8 @@ func TestFileContentFlag(t *testing.T) {\n \tvar cli struct {\n \t\tFile kong.FileContentFlag\n \t}\n-\tf, err := os.CreateTemp(\"\", \"\")\n+\tf, err := os.CreateTemp(t.TempDir(), \"\")\n \tassert.NoError(t, err)\n-\tdefer os.Remove(f.Name())\n \tfmt.Fprint(f, \"hello world\")\n \tf.Close()\n \t_, err = mustNew(t, &cli).Parse([]string{\"--file\", f.Name()})\n@@ -282,9 +281,8 @@ func TestNamedFileContentFlag(t *testing.T) {\n \tvar cli struct {\n \t\tFile kong.NamedFileContentFlag\n \t}\n-\tf, err := os.CreateTemp(\"\", \"\")\n+\tf, err := os.CreateTemp(t.TempDir(), \"\")\n \tassert.NoError(t, err)\n-\tdefer os.Remove(f.Name())\n \tfmt.Fprint(f, \"hello world\")\n \tf.Close()\n \t_, err = mustNew(t, &cli).Parse([]string{\"--file\", f.Name()})\ndiff --git a/resolver.go b/resolver.go\nindex 29be1b9..3e37ca7 100644\n--- a/resolver.go\n+++ b/resolver.go\n@@ -63,6 +63,6 @@ func JSON(r io.Reader) (Resolver, error) {\n }\n \n func snakeCase(name string) string {\n-\tname = strings.Join(strings.Split(strings.Title(name), \"-\"), \"\")\n+\tname = strings.Join(strings.Split(strings.Title(name), \"-\"), \"\") //nolint:staticcheck // Unicode punctuation not an issue\n \treturn strings.ToLower(name[:1]) + name[1:]\n }\ndiff --git a/util_test.go b/util_test.go\nindex 5ec0131..78302ef 100644\n--- a/util_test.go\n+++ b/util_test.go\n@@ -16,9 +16,8 @@ func TestConfigFlag(t *testing.T) {\n \t\tFlag   string\n \t}\n \n-\tw, err := os.CreateTemp(\"\", \"\")\n+\tw, err := os.CreateTemp(t.TempDir(), \"\")\n \tassert.NoError(t, err)\n-\tdefer os.Remove(w.Name())\n \tw.WriteString(`{\"flag\": \"hello world\"}`) //nolint: errcheck\n \tw.Close()\n \n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/FUNDING.yml",
+    ".github/workflows/ci.yml",
+    ".gitignore",
+    ".golangci.yml",
+    "COPYING",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/README.md",
+    "_examples/server/console.go",
+    "_examples/server/go.mod",
+    "_examples/server/go.sum",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/commandstring/main.go",
+    "_examples/shell/help/README.md",
+    "_examples/shell/help/main.go",
+    "benchmark_test.go",
+    "bin/.go-1.24.0.pkg",
+    "bin/.golangci-lint-1.64.5.pkg",
+    "bin/.lefthook-1.10.10.pkg",
+    "bin/README.hermit.md",
+    "bin/activate-hermit",
+    "bin/go",
+    "bin/gofmt",
+    "bin/golangci-lint",
+    "bin/hermit",
+    "bin/hermit.hcl",
+    "bin/lefthook",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "config_test.go",
+    "context.go",
+    "defaults.go",
+    "defaults_test.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "go.mod",
+    "go.sum",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "helpwrap1.18_test.go",
+    "helpwrap1.19_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "lefthook.yml",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_linux_test.go",
+    "mapper_test.go",
+    "mapper_windows_test.go",
+    "model.go",
+    "model_test.go",
+    "negatable.go",
+    "options.go",
+    "options_test.go",
+    "renovate.json5",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "testdata/file.txt",
+    "util.go",
+    "util_test.go",
+    "visit.go"
+  ],
+  "explanation": {
+    "what": "CIのテスト対象Goバージョンを1.20/1.21から1.23/1.24へ引き上げ、hermit管理のGo/golangci-lintバイナリも1.24.0/1.64.5へ更新した。新しいgolangci-lintで検出された警告に対応し、.golangci.ymlのgomnd/execinqueryを削除しtenv・recvcheckを除外設定に追加、テストコード側もos.CreateTemp(\"\", \"\")をos.CreateTemp(t.TempDir(), \"\")に置き換えて明示的なdefer os.Remove()を除去するなど細かな修正を行っている。",
+    "why": "PR本文の通り、CIで検証するGoバージョンを最新の2系統(1.23/1.24)に合わせるためのメンテナンス。golangci-lintのバージョンアップに伴い新規に有効化されたルールへの追従が主目的で、機能追加は含まれない。",
+    "highlights": [
+      { "file": "config_test.go", "note": "makeConfig()の戻り値からcleanup funcを削除し、t.TempDir()に任せる形にシグネチャ自体を変えている" }
+    ],
+    "langNotes": [
+      { "topic": "t.TempDir()", "note": "Go 1.15以降のtesting.Tにはt.TempDir()があり、テスト終了時に自動でクリーンアップされる一時ディレクトリを返す。従来のos.CreateTemp(\"\", \"\")+defer os.Remove()という手動クリーンアップより簡潔で、このコミットでは複数のテストファイルがこの書き方に統一されている。" }
+    ],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [
+      { "type": "pr", "number": 502, "url": "https://github.com/alecthomas/kong/pull/502" }
+    ],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

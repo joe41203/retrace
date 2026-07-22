@@ -1,0 +1,100 @@
+{
+  "seq": 101,
+  "sha": "844494faffa09bbcb19f7c36eb55f1270c11fabd",
+  "parents": [
+    "862837e6faa22a2bcdd2822288e438bc3b6a4ef1"
+  ],
+  "author": {
+    "name": "Alec Thomas",
+    "email": "alec@swapoff.org",
+    "date": "2018-09-11T23:57:18+10:00"
+  },
+  "message": "Allow bool flags to be set to true or false explicitly.",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 17,
+    "deletions": 1
+  },
+  "files": [
+    {
+      "path": "kong_test.go",
+      "status": "M",
+      "additions": 11,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "mapper.go",
+      "status": "M",
+      "additions": 6,
+      "deletions": 1,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/kong_test.go b/kong_test.go\nindex f1e8e47..ad0d988 100644\n--- a/kong_test.go\n+++ b/kong_test.go\n@@ -566,3 +566,14 @@ func TestErrorMissingArgs(t *testing.T) {\n \trequire.Error(t, err)\n \trequire.Equal(t, \"expected \\\"<one> <two>\\\"\", err.Error())\n }\n+\n+func TestBoolOverride(t *testing.T) {\n+\tvar cli struct {\n+\t\tFlag bool `default:\"true\"`\n+\t}\n+\tp := mustNew(t, &cli)\n+\t_, err := p.Parse([]string{\"--flag=false\"})\n+\trequire.NoError(t, err)\n+\t_, err = p.Parse([]string{\"--flag\", \"false\"})\n+\trequire.Error(t, err)\n+}\ndiff --git a/mapper.go b/mapper.go\nindex 20d1dac..3f980c2 100644\n--- a/mapper.go\n+++ b/mapper.go\n@@ -211,7 +211,12 @@ func (r *Registry) RegisterDefaults() *Registry {\n type boolMapper struct{}\n \n func (boolMapper) Decode(ctx *DecodeContext, target reflect.Value) error {\n-\ttarget.SetBool(true)\n+\tif ctx.Scan.Peek().Type == FlagValueToken {\n+\t\ttoken := ctx.Scan.Pop()\n+\t\ttarget.SetBool(token.Value == \"true\")\n+\t} else {\n+\t\ttarget.SetBool(true)\n+\t}\n \treturn nil\n }\n func (boolMapper) IsBool() bool { return true }\n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    ".golangci.yml",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/console.go",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/main.go",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "context.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "tokentype_string.go",
+    "util.go",
+    "util_test.go"
+  ],
+  "explanation": {
+    "what": "boolMapper.Decode を変更し、bool フラグの次のトークンが FlagValueToken(=value の形で明示的に与えられた値)であればそれを \"true\"/\"false\" として解釈し、無ければ従来通り true をセットするようにした。TestBoolOverride で `--flag=false` は成功し `--flag false` はエラーになることを確認している。",
+    "why": "bool フラグは通常フラグ名の存在だけで true になるが、default:\"true\" を使うケースなどでは明示的に false へ上書きしたいことがある。おそらく `--flag=false` の `=` 付き形式(FlagValueToken)のときだけ値を読む設計にすることで、`--flag false` のように別トークンの \"false\" を無関係な位置引数として誤解釈させない曖昧さ回避を図ったとみられる。",
+    "highlights": [
+      { "file": "mapper.go", "note": "boolMapper.Decode: FlagValueToken の有無で挙動を分岐" },
+      { "file": "kong_test.go", "note": "TestBoolOverride: `--flag=false` は成功、`--flag false` はエラーになる非対称の仕様を明示" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "inferred",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

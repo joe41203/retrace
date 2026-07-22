@@ -1,0 +1,110 @@
+{
+  "seq": 103,
+  "sha": "37d57a878b1811124d9010289dff0a52c136bf02",
+  "parents": [
+    "fd197e508192f2d22ba66fe34ca5e8fa016df243"
+  ],
+  "author": {
+    "name": "Alec Thomas",
+    "email": "alec@swapoff.org",
+    "date": "2018-09-12T13:18:52+10:00"
+  },
+  "message": "Support for embedding interfaces.",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 3,
+    "additions": 31,
+    "deletions": 1
+  },
+  "files": [
+    {
+      "path": ".golangci.yml",
+      "status": "M",
+      "additions": 2,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "build.go",
+      "status": "M",
+      "additions": 6,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "kong_test.go",
+      "status": "M",
+      "additions": 23,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/.golangci.yml b/.golangci.yml\nindex 8e056c9..bb56945 100644\n--- a/.golangci.yml\n+++ b/.golangci.yml\n@@ -33,3 +33,5 @@ issues:\n     - 'Error return value of .(.*\\.Help|.*\\.MarkFlagRequired|(os\\.)?std(out|err)\\..*|.*Close|.*Flush|os\\.Remove(All)?|.*printf?|os\\.(Un)?Setenv). is not checked'\n     - 'exported method (.*\\.MarshalJSON|.*\\.UnmarshalJSON) should have comment or be unexported'\n     - 'composite literal uses unkeyed fields'\n+    - 'bad syntax for struct tag key'\n+    - 'bad syntax for struct tag pair'\ndiff --git a/build.go b/build.go\nindex 829107c..bd46907 100644\n--- a/build.go\n+++ b/build.go\n@@ -42,17 +42,22 @@ type flattenedField struct {\n }\n \n func flattenedFields(v reflect.Value) (out []flattenedField) {\n+\tv = reflect.Indirect(v)\n \tfor i := 0; i < v.NumField(); i++ {\n \t\tft := v.Type().Field(i)\n \t\tfv := v.Field(i)\n \t\ttag := parseTag(fv, ft)\n \t\tif ft.Anonymous {\n+\t\t\tif fv.Kind() == reflect.Interface {\n+\t\t\t\tfv = fv.Elem()\n+\t\t\t}\n \t\t\tsub := flattenedFields(fv)\n-\t\t\t// Assign parent group to children, if they're not otherwise set.\n \t\t\tfor _, subf := range sub {\n+\t\t\t\t// Assign parent if it's not already set.\n \t\t\t\tif subf.tag.Group == \"\" {\n \t\t\t\t\tsubf.tag.Group = tag.Group\n \t\t\t\t}\n+\t\t\t\t// Accumulate prefixes.\n \t\t\t\tsubf.tag.Prefix = tag.Prefix + subf.tag.Prefix\n \t\t\t}\n \t\t\tout = append(out, sub...)\ndiff --git a/kong_test.go b/kong_test.go\nindex d77b11e..3863c9e 100644\n--- a/kong_test.go\n+++ b/kong_test.go\n@@ -590,3 +590,26 @@ func TestAnonymousPrefix(t *testing.T) {\n \trequire.NoError(t, err)\n \trequire.Equal(t, \"moo\", cli.Flag)\n }\n+\n+type TestInterface interface {\n+\tSomeMethod()\n+}\n+\n+type TestImpl struct {\n+\tFlag string\n+}\n+\n+func (t *TestImpl) SomeMethod() {}\n+\n+func TestEmbedInterface(t *testing.T) {\n+\ttype CLI struct {\n+\t\tSomeFlag string\n+\t\tTestInterface\n+\t}\n+\tcli := &CLI{TestInterface: &TestImpl{}}\n+\tp := mustNew(t, cli)\n+\t_, err := p.Parse([]string{\"--some-flag=foo\", \"--flag=yes\"})\n+\trequire.NoError(t, err)\n+\trequire.Equal(t, \"foo\", cli.SomeFlag)\n+\trequire.Equal(t, \"yes\", cli.TestInterface.(*TestImpl).Flag)\n+}\n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    ".golangci.yml",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/console.go",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/main.go",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "context.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "tokentype_string.go",
+    "util.go",
+    "util_test.go"
+  ],
+  "explanation": {
+    "what": "flattenedFields で v を reflect.Indirect(v) してポインタを剥がすようにし、埋め込みフィールド(Anonymous)の Kind が reflect.Interface の場合は fv.Elem() でインターフェース値の中身(具体的な実装)を取り出してから再帰的に平坦化するようにした。TestEmbedInterface で、struct に interface 型フィールドを無名で埋め込み、その実装が持つフィールドが CLI フラグとして展開されることを確認している。",
+    "why": "それまでは struct の埋め込みしか対応しておらず、埋め込みフィールドがインターフェース型だと reflect.Value.NumField() がインターフェースの Kind に対して呼べず失敗する。おそらくインターフェースを埋め込みつつ実装を実行時に差し替えたいユースケース(後続コミットの BindTo と組み合わせて使われる)に対応するための拡張とみられる。",
+    "highlights": [
+      { "file": "build.go", "note": "fv.Kind() == reflect.Interface で Elem() を呼び具体型に解決してから再帰" },
+      { "file": "kong_test.go", "note": "TestEmbedInterface: TestInterface を埋め込み、実装 TestImpl のフィールドをフラグとして展開" }
+    ],
+    "langNotes": [
+      { "topic": "struct embedding (Anonymous field)", "note": "Go の struct はフィールド名を書かずに型だけを書く「埋め込み」ができ、埋め込んだ型のメソッド・フィールドが外側の struct にあるかのように昇格する。Kong はこれを利用し reflect でフィールドを平坦化して1つのフラグ集合に見せている。" },
+      { "topic": "reflect.Value.Elem() とインターフェース", "note": "reflect.Value の Kind が Interface のとき、Elem() を呼ぶとそのインターフェース変数に実際に格納されている具体型の Value が得られる。ポインタの参照外しにも Elem() を使うため、両者を区別してコードを書く必要がある。" }
+    ],
+    "diagram": null,
+    "evidence": "inferred",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

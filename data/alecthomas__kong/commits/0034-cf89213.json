@@ -1,0 +1,140 @@
+{
+  "seq": 34,
+  "sha": "cf89213e1ef55939f5a956510b4ff94e354e24ec",
+  "parents": [
+    "f60fe01f089b8528c69c61a0fda16de03c3abca4"
+  ],
+  "author": {
+    "name": "Alec Thomas",
+    "email": "alec@swapoff.org",
+    "date": "2018-05-26T17:38:35-04:00"
+  },
+  "message": "Add hook support.",
+  "pr": {
+    "number": 17,
+    "title": "Add hook support.",
+    "body": "",
+    "url": "https://github.com/alecthomas/kong/pull/17"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 10,
+    "additions": 212,
+    "deletions": 121
+  },
+  "files": [
+    {
+      "path": "_examples/shell/main.go",
+      "status": "M",
+      "additions": 9,
+      "deletions": 5,
+      "binary": false
+    },
+    {
+      "path": "build.go",
+      "status": "M",
+      "additions": 5,
+      "deletions": 15,
+      "binary": false
+    },
+    {
+      "path": "context.go",
+      "status": "M",
+      "additions": 21,
+      "deletions": 38,
+      "binary": false
+    },
+    {
+      "path": "context_test.go",
+      "status": "M",
+      "additions": 0,
+      "deletions": 19,
+      "binary": false
+    },
+    {
+      "path": "help.go",
+      "status": "M",
+      "additions": 15,
+      "deletions": 16,
+      "binary": false
+    },
+    {
+      "path": "kong.go",
+      "status": "M",
+      "additions": 90,
+      "deletions": 12,
+      "binary": false
+    },
+    {
+      "path": "kong_test.go",
+      "status": "M",
+      "additions": 65,
+      "deletions": 10,
+      "binary": false
+    },
+    {
+      "path": "model.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "options.go",
+      "status": "M",
+      "additions": 3,
+      "deletions": 3,
+      "binary": false
+    },
+    {
+      "path": "options_test.go",
+      "status": "M",
+      "additions": 3,
+      "deletions": 3,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/_examples/shell/main.go b/_examples/shell/main.go\nindex 9a6e7d0..ebefeae 100644\n--- a/_examples/shell/main.go\n+++ b/_examples/shell/main.go\n@@ -3,25 +3,29 @@ package main\n import (\n \t\"encoding/json\"\n \t\"fmt\"\n+\t\"os\"\n \n \t\"github.com/alecthomas/kong\"\n )\n \n var CLI struct {\n-\tRm struct {\n+\tHelp bool `kong:\"help='Display help.'\"`\n+\tRm   struct {\n \t\tForce     bool `kong:\"help='Force removal.'\"`\n \t\tRecursive bool `kong:\"help='Recursively remove files.'\"`\n \n-\t\tPaths []string `kong:\"help='Paths to remove.',type='path'\"`\n-\t} `kong:\"help='Remove files.'\"`\n+\t\tPaths []string `kong:\"arg,help='Paths to remove.',type='path'\"`\n+\t} `kong:\"cmd,help='Remove files.'\"`\n \n \tLs struct {\n \t\tPaths []string `kong:\"help='Paths to list.',type='path'\"`\n-\t} `kong:\"help='List paths.'\"`\n+\t} `kong:\"cmd,help='List paths.'\"`\n }\n \n func main() {\n-\tcmd := kong.Parse(&CLI)\n+\tapp := kong.Must(&CLI).Hook(&CLI.Help, kong.Help(nil, nil))\n+\tcmd, err := app.Parse(os.Args[1:])\n+\tapp.FatalIfErrorf(err)\n \ts, _ := json.Marshal(&CLI)\n \tfmt.Println(cmd)\n \tfmt.Println(string(s))\ndiff --git a/build.go b/build.go\nindex f59ef7e..8b84ce7 100644\n--- a/build.go\n+++ b/build.go\n@@ -14,23 +14,11 @@ func build(ast interface{}) (app *Application, err error) {\n \t\treturn nil, fmt.Errorf(\"expected a pointer to a struct but got %T\", ast)\n \t}\n \n-\tapp = &Application{\n-\t\t// Synthesize a --help flag.\n-\t\tHelpFlag: &Flag{\n-\t\t\tValue: Value{\n-\t\t\t\tName:    \"help\",\n-\t\t\t\tHelp:    \"Show context-sensitive help.\",\n-\t\t\t\tFlag:    true,\n-\t\t\t\tValue:   reflect.New(reflect.TypeOf(false)).Elem(),\n-\t\t\t\tDecoder: kindDecoders[reflect.Bool],\n-\t\t\t}},\n-\t}\n-\tnode := buildNode(iv, map[string]bool{\"help\": true})\n+\tapp = &Application{}\n+\tnode := buildNode(iv, map[string]bool{})\n \tif len(node.Positional) > 0 && len(node.Children) > 0 {\n \t\treturn nil, fmt.Errorf(\"can't mix positional arguments and branching arguments on %T\", ast)\n \t}\n-\t// Prepend --help flag.\n-\tnode.Flags = append([]*Flag{app.HelpFlag}, node.Flags...)\n \tapp.Node = *node\n \treturn app, nil\n }\n@@ -40,7 +28,9 @@ func dashedString(s string) string {\n }\n \n func buildNode(v reflect.Value, seenFlags map[string]bool) *Node {\n-\tnode := &Node{}\n+\tnode := &Node{\n+\t\tTarget: v,\n+\t}\n \tfor i := 0; i < v.NumField(); i++ {\n \t\tft := v.Type().Field(i)\n \t\tif strings.ToLower(ft.Name[0:1]) == ft.Name[0:1] {\ndiff --git a/context.go b/context.go\nindex 108873a..9b082d5 100644\n--- a/context.go\n+++ b/context.go\n@@ -2,12 +2,13 @@ package kong\n \n import (\n \t\"fmt\"\n+\t\"io\"\n \t\"reflect\"\n \t\"strings\"\n )\n \n-// ParseTrace records the nodes and parsed values from the current command-line.\n-type ParseTrace struct {\n+// Trace records the nodes and parsed values from the current command-line.\n+type Trace struct {\n \t// One of these will be non-nil.\n \tApp        *Application\n \tPositional *Value\n@@ -22,9 +23,12 @@ type ParseTrace struct {\n \tValue reflect.Value\n }\n \n-type ParseContext struct {\n-\tTrace []*ParseTrace // A trace through parsed nodes.\n-\tError error         // Error that occurred during trace, if any.\n+type Context struct {\n+\tTrace []*Trace // A trace through parsed nodes.\n+\tError error    // Error that occurred during trace, if any.\n+\n+\tStdout io.Writer\n+\tStderr io.Writer\n \n \tnode *Node // Current node being parsed.\n \n@@ -34,7 +38,7 @@ type ParseContext struct {\n }\n \n // Flags returns the accumulated available flags.\n-func (p *ParseContext) Flags() (flags []*Flag) {\n+func (p *Context) Flags() (flags []*Flag) {\n \tfor _, trace := range p.Trace {\n \t\tflags = append(flags, trace.Flags...)\n \t}\n@@ -42,7 +46,7 @@ func (p *ParseContext) Flags() (flags []*Flag) {\n }\n \n // Command returns the full command path.\n-func (p *ParseContext) Command() (command []string) {\n+func (p *Context) Command() (command []string) {\n \tfor _, trace := range p.Trace {\n \t\tswitch {\n \t\tcase trace.Positional != nil:\n@@ -56,30 +60,8 @@ func (p *ParseContext) Command() (command []string) {\n \treturn\n }\n \n-// Trace parses the command-line, validating and collecting matching grammar nodes.\n-func Trace(args []string, app *Application) (*ParseContext, error) {\n-\tp := &ParseContext{\n-\t\tapp:  app,\n-\t\targs: args,\n-\t}\n-\tp.Trace = append(p.Trace, &ParseTrace{\n-\t\tApp:   app,\n-\t\tFlags: append([]*Flag{}, app.Flags...),\n-\t})\n-\terr := p.reset(&p.app.Node)\n-\tif err != nil {\n-\t\treturn nil, err\n-\t}\n-\tp.Error = p.trace(&p.app.Node)\n-\tif err = checkMissingFlags(p.Flags()); err != nil {\n-\t\treturn nil, err\n-\t}\n-\n-\treturn p, nil\n-}\n-\n // FlagValue returns the set value of a flag, if it was encountered and exists.\n-func (p *ParseContext) FlagValue(flag *Flag) reflect.Value {\n+func (p *Context) FlagValue(flag *Flag) reflect.Value {\n \tfor _, trace := range p.Trace {\n \t\tif trace.Flag == flag {\n \t\t\treturn trace.Value\n@@ -89,7 +71,7 @@ func (p *ParseContext) FlagValue(flag *Flag) reflect.Value {\n }\n \n // Recursively reset values to defaults (as specified in the grammar) or the zero value.\n-func (p *ParseContext) reset(node *Node) error {\n+func (p *Context) reset(node *Node) error {\n \tp.scan = Scan(p.args...)\n \tfor _, flag := range node.Flags {\n \t\terr := flag.Value.Reset()\n@@ -124,7 +106,7 @@ func (p *ParseContext) reset(node *Node) error {\n \treturn nil\n }\n \n-func (p *ParseContext) trace(node *Node) (err error) { // nolint: gocyclo\n+func (p *Context) trace(node *Node) (err error) { // nolint: gocyclo\n \tpositional := 0\n \tp.node = node\n \tflags := append(p.Flags(), node.Flags...)\n@@ -203,7 +185,7 @@ func (p *ParseContext) trace(node *Node) (err error) { // nolint: gocyclo\n \t\t\t\tif err != nil {\n \t\t\t\t\treturn err\n \t\t\t\t}\n-\t\t\t\tp.Trace = append(p.Trace, &ParseTrace{Positional: arg, Value: value, Flags: node.Flags})\n+\t\t\t\tp.Trace = append(p.Trace, &Trace{Positional: arg, Value: value, Flags: node.Flags})\n \t\t\t\tpositional++\n \t\t\t\tbreak\n \t\t\t}\n@@ -214,9 +196,10 @@ func (p *ParseContext) trace(node *Node) (err error) { // nolint: gocyclo\n \t\t\t\tcase branch.Command != nil:\n \t\t\t\t\tif branch.Command.Name == token.Value {\n \t\t\t\t\t\tp.scan.Pop()\n-\t\t\t\t\t\tp.Trace = append(p.Trace, &ParseTrace{\n+\t\t\t\t\t\tp.Trace = append(p.Trace, &Trace{\n \t\t\t\t\t\t\tCommand: branch.Command,\n \t\t\t\t\t\t\tFlags:   node.Flags,\n+\t\t\t\t\t\t\tValue:   branch.Command.Target,\n \t\t\t\t\t\t})\n \t\t\t\t\t\treturn p.trace(branch.Command)\n \t\t\t\t\t}\n@@ -224,7 +207,7 @@ func (p *ParseContext) trace(node *Node) (err error) { // nolint: gocyclo\n \t\t\t\tcase branch.Argument != nil:\n \t\t\t\t\targ := branch.Argument.Argument\n \t\t\t\t\tif value, err := arg.Parse(p.scan); err == nil {\n-\t\t\t\t\t\tp.Trace = append(p.Trace, &ParseTrace{\n+\t\t\t\t\t\tp.Trace = append(p.Trace, &Trace{\n \t\t\t\t\t\t\tArgument: branch.Argument,\n \t\t\t\t\t\t\tValue:    value,\n \t\t\t\t\t\t\tFlags:    node.Flags,\n@@ -252,7 +235,7 @@ func (p *ParseContext) trace(node *Node) (err error) { // nolint: gocyclo\n }\n \n // Apply traced context to the target grammar.\n-func (p *ParseContext) Apply() (string, error) {\n+func (p *Context) Apply() (string, error) {\n \tpath := []string{}\n \tfor _, trace := range p.Trace {\n \t\tswitch {\n@@ -324,7 +307,7 @@ func checkMissingPositionals(positional int, values []*Value) error {\n \treturn fmt.Errorf(\"missing positional arguments %s\", strings.Join(missing, \" \"))\n }\n \n-func (p *ParseContext) matchFlags(flags []*Flag, matcher func(f *Flag) bool) (err error) {\n+func (p *Context) matchFlags(flags []*Flag, matcher func(f *Flag) bool) (err error) {\n \tdefer catch(&err)\n \ttoken := p.scan.Peek()\n \tfor _, flag := range flags {\n@@ -335,7 +318,7 @@ func (p *ParseContext) matchFlags(flags []*Flag, matcher func(f *Flag) bool) (er\n \t\t\tif err != nil {\n \t\t\t\treturn err\n \t\t\t}\n-\t\t\tp.Trace = append(p.Trace, &ParseTrace{Flag: flag, Value: value})\n+\t\t\tp.Trace = append(p.Trace, &Trace{Flag: flag, Value: value})\n \t\t\treturn nil\n \t\t}\n \t}\ndiff --git a/context_test.go b/context_test.go\nindex 08bd685..1af827e 100644\n--- a/context_test.go\n+++ b/context_test.go\n@@ -1,20 +1 @@\n package kong\n-\n-import (\n-\t\"testing\"\n-\n-\t\"github.com/stretchr/testify/require\"\n-)\n-\n-func TestTraceErrorPartiallySucceeds(t *testing.T) {\n-\tvar cli struct {\n-\t\tOne struct {\n-\t\t\tTwo struct {\n-\t\t\t} `kong:\"cmd\"`\n-\t\t} `kong:\"cmd\"`\n-\t}\n-\tp := mustNew(t, &cli)\n-\ttrace, err := Trace([]string{\"one\", \"bad\"}, p.Model)\n-\trequire.NoError(t, err)\n-\trequire.Error(t, trace.Error)\n-}\ndiff --git a/help.go b/help.go\nindex 8a92146..8338ed3 100644\n--- a/help.go\n+++ b/help.go\n@@ -1,7 +1,6 @@\n package kong\n \n import (\n-\t\"io\"\n \t\"text/template\"\n )\n \n@@ -18,20 +17,20 @@ usage: {{.Name}}\n \n var defaultHelpTemplate = template.Must(template.New(\"help\").Parse(defaultHelp))\n \n-// WriteHelp to w.\n-//\n-// If w is nil, the default stdout writer will be used.\n-//\n-// If args are provided, help will be written in the context o\n-func (k *Kong) WriteHelp(w io.Writer, args ...interface{}) error {\n-\tif w == nil {\n-\t\tw = k.stdout\n+// Help returns a Hook that will display help and exit.\n+func Help(tmpl *template.Template, tmplctx map[string]interface{}) Hook {\n+\treturn func(app *Kong, ctx *Context, trace *Trace) error {\n+\t\tmerged := map[string]interface{}{\n+\t\t\t\"Application\": app.Model,\n+\t\t}\n+\t\tfor k, v := range tmplctx {\n+\t\t\tmerged[k] = v\n+\t\t}\n+\t\terr := tmpl.Execute(app.Stdout, merged)\n+\t\tif err != nil {\n+\t\t\treturn err\n+\t\t}\n+\t\tapp.Exit(0)\n+\t\treturn nil\n \t}\n-\tctx := map[string]interface{}{\n-\t\t\"Application\": k.Model,\n-\t}\n-\tfor k, v := range k.helpContext {\n-\t\tctx[k] = v\n-\t}\n-\treturn k.help.Execute(w, ctx)\n }\ndiff --git a/kong.go b/kong.go\nindex 70855ed..d43623b 100644\n--- a/kong.go\n+++ b/kong.go\n@@ -5,9 +5,12 @@ import (\n \t\"io\"\n \t\"os\"\n \t\"path/filepath\"\n+\t\"reflect\"\n \t\"text/template\"\n )\n \n+type Hook func(app *Kong, ctx *Context, trace *Trace) error\n+\n // Error reported by Kong.\n type Error struct{ msg string }\n \n@@ -17,29 +20,39 @@ func fail(format string, args ...interface{}) {\n \tpanic(Error{fmt.Sprintf(format, args...)})\n }\n \n+func Must(ast interface{}, options ...Option) *Kong {\n+\tk, err := New(ast, options...)\n+\tif err != nil {\n+\t\tpanic(err)\n+\t}\n+\treturn k\n+}\n+\n // Kong is the main parser type.\n type Kong struct {\n \tModel *Application\n \t// Termination function (defaults to os.Exit)\n-\tterminate func(int)\n+\tExit func(int)\n \n-\tstdout io.Writer\n-\tstderr io.Writer\n+\tStdout io.Writer\n+\tStderr io.Writer\n \n \thelp        *template.Template\n \thelpContext map[string]interface{}\n \thelpFuncs   template.FuncMap\n+\thooks       map[reflect.Value]Hook\n }\n \n // New creates a new Kong parser into ast.\n func New(ast interface{}, options ...Option) (*Kong, error) {\n \tk := &Kong{\n-\t\tterminate:   os.Exit,\n-\t\tstdout:      os.Stdout,\n-\t\tstderr:      os.Stderr,\n+\t\tExit:        os.Exit,\n+\t\tStdout:      os.Stdout,\n+\t\tStderr:      os.Stderr,\n \t\thelp:        defaultHelpTemplate,\n \t\thelpContext: map[string]interface{}{},\n \t\thelpFuncs:   template.FuncMap{},\n+\t\thooks:       map[reflect.Value]Hook{},\n \t}\n \n \tmodel, err := build(ast)\n@@ -56,26 +69,91 @@ func New(ast interface{}, options ...Option) (*Kong, error) {\n \treturn k, nil\n }\n \n+// Trace parses the command-line, validating and collecting matching grammar nodes.\n+func (k *Kong) Trace(args []string) (*Context, error) {\n+\tp := &Context{\n+\t\tapp:  k.Model,\n+\t\targs: args,\n+\t\tTrace: []*Trace{\n+\t\t\t{App: k.Model, Flags: append([]*Flag{}, k.Model.Flags...), Value: k.Model.Target},\n+\t\t},\n+\t}\n+\terr := p.reset(&p.app.Node)\n+\tif err != nil {\n+\t\treturn nil, err\n+\t}\n+\tp.Error = p.trace(&p.app.Node)\n+\tif err = checkMissingFlags(p.Flags()); err != nil {\n+\t\treturn nil, err\n+\t}\n+\treturn p, nil\n+}\n+\n+// Hook to execute when a command is encountered.\n+func (k *Kong) Hook(ptr interface{}, hook Hook) *Kong {\n+\tk.hooks[reflect.ValueOf(ptr)] = hook\n+\treturn k\n+}\n+\n // Parse arguments into target.\n+//\n+// The returned \"command\" is a space separated path to the final selected command, if any. Commands appear as\n+// the command name while positional arguments are the argument name surrounded by \"<argument>\".\n func (k *Kong) Parse(args []string) (command string, err error) {\n \tdefer catch(&err)\n-\tctx, err := Trace(args, k.Model)\n+\tctx, err := k.Trace(args)\n \tif err != nil {\n \t\treturn \"\", err\n \t}\n+\tif err := k.applyHooks(ctx); err != nil {\n+\t\treturn \"\", err\n+\t}\n \tif ctx.Error != nil {\n \t\treturn \"\", ctx.Error\n \t}\n-\tif value := ctx.FlagValue(k.Model.HelpFlag); value.IsValid() && value.Bool() {\n-\t\treturn \"\", nil\n-\t}\n \treturn ctx.Apply()\n }\n \n+func (k *Kong) applyHooks(ctx *Context) error {\n+\tfor _, trace := range ctx.Trace {\n+\t\tvar key reflect.Value\n+\t\tswitch {\n+\t\tcase trace.App != nil:\n+\t\t\tkey = trace.App.Target\n+\t\tcase trace.Argument != nil:\n+\t\t\tkey = trace.Argument.Target\n+\t\tcase trace.Command != nil:\n+\t\t\tkey = trace.Command.Target\n+\t\tcase trace.Positional != nil:\n+\t\t\tkey = trace.Positional.Value\n+\t\tcase trace.Flag != nil:\n+\t\t\tkey = trace.Flag.Value.Value\n+\t\tdefault:\n+\t\t\tpanic(\"unsupported Trace\")\n+\t\t}\n+\t\tif key.IsValid() {\n+\t\t\tkey = key.Addr()\n+\t\t}\n+\t\tif hook := k.hooks[key]; hook != nil {\n+\t\t\tif err := hook(k, ctx, trace); err != nil {\n+\t\t\t\treturn err\n+\t\t\t}\n+\t\t}\n+\t}\n+\treturn nil\n+}\n+\n+// Printf writes a message to Kong.Stdout with the application name prefixed.\n+func (k *Kong) Printf(format string, args ...interface{}) {\n+\tfmt.Fprintf(k.Stdout, k.Model.Name+\": \"+format, args...)\n+}\n+\n+// Errorf writes a message to Kong.Stderr with the application name prefixed.\n func (k *Kong) Errorf(format string, args ...interface{}) {\n-\tfmt.Fprintf(os.Stderr, k.Model.Name+\": \"+format, args...)\n+\tfmt.Fprintf(k.Stderr, k.Model.Name+\": \"+format, args...)\n }\n \n+// FatalIfError terminates with an error message if err != nil.\n func (k *Kong) FatalIfErrorf(err error, args ...interface{}) {\n \tif err == nil {\n \t\treturn\n@@ -85,7 +163,7 @@ func (k *Kong) FatalIfErrorf(err error, args ...interface{}) {\n \t\tmsg = fmt.Sprintf(args[0].(string), args...) + \": \" + err.Error()\n \t}\n \tk.Errorf(\"%s\\n\", msg)\n-\tk.terminate(1)\n+\tk.Exit(1)\n }\n \n func catch(err *error) {\ndiff --git a/kong_test.go b/kong_test.go\nindex 44233d3..cdfa1a9 100644\n--- a/kong_test.go\n+++ b/kong_test.go\n@@ -1,6 +1,7 @@\n package kong\n \n import (\n+\t\"strings\"\n \t\"testing\"\n \n \t\"github.com/stretchr/testify/require\"\n@@ -311,16 +312,6 @@ func TestInvalidDefaultErrors(t *testing.T) {\n \trequire.Error(t, err)\n }\n \n-func TestHelp(t *testing.T) {\n-\tvar cli struct {\n-\t\tFlag string\n-\t}\n-\tp := mustNew(t, &cli)\n-\t_, err := p.Parse([]string{\"--flag=hello\", \"--help\"})\n-\trequire.NoError(t, err)\n-\trequire.NotEqual(t, \"hello\", cli.Flag)\n-}\n-\n func TestCommandMissingTagIsInvalid(t *testing.T) {\n \tvar cli struct {\n \t\tOne struct{}\n@@ -352,3 +343,67 @@ func TestDuplicateFlagOnPeerCommandIsOkay(t *testing.T) {\n \t_, err := New(&cli)\n \trequire.NoError(t, err)\n }\n+\n+func TestTraceErrorPartiallySucceeds(t *testing.T) {\n+\tvar cli struct {\n+\t\tOne struct {\n+\t\t\tTwo struct {\n+\t\t\t} `kong:\"cmd\"`\n+\t\t} `kong:\"cmd\"`\n+\t}\n+\tp := mustNew(t, &cli)\n+\ttrace, err := p.Trace([]string{\"one\", \"bad\"})\n+\trequire.NoError(t, err)\n+\trequire.Error(t, trace.Error)\n+\trequire.Equal(t, []string{\"one\"}, trace.Command())\n+}\n+\n+func TestHooks(t *testing.T) {\n+\tvar cli struct {\n+\t\tOne struct {\n+\t\t\tTwo   string `kong:\"arg,optional\"`\n+\t\t\tThree string\n+\t\t} `kong:\"cmd\"`\n+\t}\n+\ttype values struct {\n+\t\tone   bool\n+\t\ttwo   string\n+\t\tthree string\n+\t}\n+\thooked := values{}\n+\tvar tests = []struct {\n+\t\tname   string\n+\t\tinput  string\n+\t\tvalues values\n+\t}{\n+\t\t{\"Command\", \"one\", values{true, \"\", \"\"}},\n+\t\t{\"Arg\", \"one two\", values{true, \"two\", \"\"}},\n+\t\t{\"Flag\", \"one --three=three\", values{true, \"\", \"three\"}},\n+\t\t{\"ArgAndFlag\", \"one two --three=three\", values{true, \"two\", \"three\"}},\n+\t}\n+\tp := mustNew(t, &cli).\n+\t\tHook(&cli.One, func(app *Kong, ctx *Context, trace *Trace) error {\n+\t\t\thooked.one = true\n+\t\t\treturn nil\n+\t\t}).\n+\t\tHook(&cli.One.Two, func(app *Kong, ctx *Context, trace *Trace) error {\n+\t\t\thooked.two = trace.Value.String()\n+\t\t\treturn nil\n+\t\t}).\n+\t\tHook(&cli.One.Three, func(app *Kong, ctx *Context, trace *Trace) error {\n+\t\t\thooked.three = trace.Value.String()\n+\t\t\treturn nil\n+\t\t})\n+\n+\tfor _, test := range tests {\n+\t\thooked = values{}\n+\t\tt.Run(test.name, func(t *testing.T) {\n+\t\t\t_, err := p.Parse(strings.Split(test.input, \" \"))\n+\t\t\trequire.NoError(t, err)\n+\t\t\trequire.Equal(t, test.values, hooked)\n+\t\t})\n+\t}\n+}\n+\n+func TestHelp(t *testing.T) {\n+}\ndiff --git a/model.go b/model.go\nindex 32fb206..4e70f8d 100644\n--- a/model.go\n+++ b/model.go\n@@ -21,6 +21,7 @@ type Node struct {\n \tFlags      []*Flag\n \tPositional []*Value\n \tChildren   []*Branch\n+\tTarget     reflect.Value\n }\n \n // A Value is either a flag or a variable positional argument.\ndiff --git a/options.go b/options.go\nindex 5a3ed24..17ef158 100644\n--- a/options.go\n+++ b/options.go\n@@ -9,7 +9,7 @@ type Option func(k *Kong)\n \n // ExitFunction overrides the function used to terminate. This is useful for testing or interactive use.\n func ExitFunction(exit func(int)) Option {\n-\treturn func(k *Kong) { k.terminate = exit }\n+\treturn func(k *Kong) { k.Exit = exit }\n }\n \n // Name overrides the application name.\n@@ -37,7 +37,7 @@ func HelpContext(context map[string]interface{}) Option {\n // Writers overrides the default writers. Useful for testing or interactive use.\n func Writers(stdout, stderr io.Writer) Option {\n \treturn func(k *Kong) {\n-\t\tk.stdout = stdout\n-\t\tk.stderr = stderr\n+\t\tk.Stdout = stdout\n+\t\tk.Stderr = stderr\n \t}\n }\ndiff --git a/options_test.go b/options_test.go\nindex d6fd419..61c7de1 100644\n--- a/options_test.go\n+++ b/options_test.go\n@@ -12,7 +12,7 @@ func TestOptions(t *testing.T) {\n \trequire.NoError(t, err)\n \trequire.Equal(t, \"name\", p.Model.Name)\n \trequire.Equal(t, \"description\", p.Model.Help)\n-\trequire.Nil(t, p.stdout)\n-\trequire.Nil(t, p.stderr)\n-\trequire.Nil(t, p.terminate)\n+\trequire.Nil(t, p.Stdout)\n+\trequire.Nil(t, p.Stderr)\n+\trequire.Nil(t, p.Exit)\n }\n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    "README.md",
+    "_examples/shell/main.go",
+    "build.go",
+    "camelcase.go",
+    "context.go",
+    "context_test.go",
+    "decoders.go",
+    "decoders_test.go",
+    "global.go",
+    "global_test.go",
+    "help.go",
+    "kong.go",
+    "kong_test.go",
+    "model.go",
+    "options.go",
+    "options_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tokentype_string.go"
+  ],
+  "explanation": {
+    "what": "パース対象の struct フィールド(コマンド・引数・フラグ)に紐づく値のポインタをキーとして任意のコールバック `Hook` を登録できる `Kong.Hook(ptr, hook)` を追加した。あわせて `ParseTrace` を `Trace` にリネームし、各 `Trace` エントリが `Value reflect.Value` を持つよう整理。`Parse()` の中で `applyHooks(ctx)` を呼び、トレース済みの各要素(App/Command/Argument/Positional/Flag)に対応する reflect.Value のアドレスをキーに登録済み hook を探して実行する。--help フラグの扱いも `Help()` という Hook 関数に置き換えられ、`_examples/shell/main.go` で `.Hook(&CLI.Help, kong.Help(nil, nil))` という形で使われている。",
+    "why": "--help のようにパース結果を見て何らかの副作用(ヘルプ表示して終了する等)を起こしたい処理を、Kong 本体の特別扱いではなく利用者が任意のフィールドに対して差し込める汎用の仕組みとして切り出す狙いだったと見られる。これによりヘルプ表示は「hookの一種」として実装でき、他の用途にも同じ仕組みを転用できるようになる。",
+    "highlights": [
+      { "file": "kong.go", "note": "applyHooks: Trace の各エントリから対象フィールドの reflect.Value を取り出しアドレスをキーに hooks map を引く処理" },
+      { "file": "help.go", "note": "Help() が独立した関数に変わり、テンプレート実行後に app.Exit(0) を呼ぶ Hook として実装されている" }
+    ],
+    "langNotes": [
+      { "topic": "reflect.Value をマップキーにする Hook 登録", "note": "`k.hooks` は `map[reflect.Value]Hook` で、struct のフィールドへのポインタ(`&CLI.Help` など)を reflect.ValueOf したものをキーにしている。フィールドのアドレスさえ分かれば、パース結果からそのフィールドが登場した Trace エントリを引き当てて対応する Hook を発火できる、という設計。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [
+      { "type": "pr", "number": 17, "url": "https://github.com/alecthomas/kong/pull/17" }
+    ],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

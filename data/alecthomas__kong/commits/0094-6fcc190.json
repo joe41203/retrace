@@ -1,0 +1,89 @@
+{
+  "seq": 94,
+  "sha": "6fcc190f78f5016c18bb3795b46a990f30ca2f57",
+  "parents": [
+    "856d62e28a90921ac7b399478165fec1a0353eda"
+  ],
+  "author": {
+    "name": "Alec Thomas",
+    "email": "alec@swapoff.org",
+    "date": "2018-08-08T14:42:56+10:00"
+  },
+  "message": "Don't suggest hidden commands.",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 1,
+    "deletions": 1
+  },
+  "files": [
+    {
+      "path": "context.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/context.go b/context.go\nindex 0a43daf..3a942a8 100644\n--- a/context.go\n+++ b/context.go\n@@ -307,7 +307,7 @@ func (c *Context) trace(node *Node) (err error) { // nolint: gocyclo\n \n \t\t\t// After positional arguments have been consumed, check commands next...\n \t\t\tfor _, branch := range node.Children {\n-\t\t\t\tif branch.Type == CommandNode {\n+\t\t\t\tif branch.Type == CommandNode && !branch.Hidden {\n \t\t\t\t\tcandidates = append(candidates, branch.Name)\n \t\t\t\t}\n \t\t\t\tif branch.Type == CommandNode && branch.Name == token.Value {\n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    ".golangci.yml",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/console.go",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/main.go",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "context.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "tokentype_string.go"
+  ],
+  "explanation": {
+    "what": "context.go の trace() 内で、次に来うるコマンド名の候補(candidates)を集める処理に `!branch.Hidden` の条件を追加し、Hidden なコマンドが候補一覧に含まれないようにした。",
+    "why": "Hidden フラグを持つコマンドは help やユーザー向けの候補提示から隠すためのものだが、この時点では未知のコマンド名を入力した際の「もしかして」候補提示に隠しコマンドが混ざってしまっていたため、除外するよう修正した。",
+    "highlights": [
+      { "file": "context.go", "note": "候補収集ループへの !branch.Hidden 条件の追加" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

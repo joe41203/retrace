@@ -1,0 +1,120 @@
+{
+  "seq": 247,
+  "sha": "1f5bbd5559a96d148bd973938fa463661322f2a5",
+  "parents": [
+    "b3bdeb18e2d24173dd8828677048a21e13725dfe"
+  ],
+  "author": {
+    "name": "Mary Fesenko",
+    "email": "m.fesenko17@gmail.com",
+    "date": "2021-05-22T13:50:50+02:00"
+  },
+  "message": "Fix issue with negatable flag being negated twice (#171)",
+  "pr": {
+    "number": 171,
+    "title": "Fix issue with negatable flag being negated twice",
+    "body": "Fixes https://github.com/alecthomas/kong/issues/170\r\n\r\nThe logic of negating boolean flag value was added inside [Context.Apply()](https://github.com/alecthomas/kong/blob/master/context.go#L640) method, which is executed both for `Parse` and `Run` calls. This led to the negated flag value being parsed properly, but being negated again during the call to `Run`.",
+    "url": "https://github.com/alecthomas/kong/pull/171"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 62,
+    "deletions": 26
+  },
+  "files": [
+    {
+      "path": "context.go",
+      "status": "M",
+      "additions": 6,
+      "deletions": 6,
+      "binary": false
+    },
+    {
+      "path": "kong_test.go",
+      "status": "M",
+      "additions": 56,
+      "deletions": 20,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/context.go b/context.go\nindex d01abfd..d132b7d 100644\n--- a/context.go\n+++ b/context.go\n@@ -635,12 +635,7 @@ func (c *Context) Apply() (string, error) {\n \t\t\tpanic(\"unsupported path ?!\")\n \t\t}\n \t\tif value != nil {\n-\t\t\tv := c.getValue(value)\n-\t\t\tif value.Flag != nil && value.Flag.Negated {\n-\t\t\t\tv.SetBool(!v.Bool())\n-\t\t\t}\n-\n-\t\t\tvalue.Apply(v)\n+\t\t\tvalue.Apply(c.getValue(value))\n \t\t}\n \t}\n \n@@ -673,6 +668,11 @@ func (c *Context) parseFlag(flags []*Flag, match string) (err error) {\n \t\t\t}\n \t\t\treturn err\n \t\t}\n+\t\tif flag.Negated {\n+\t\t\tvalue := c.getValue(flag.Value)\n+\t\t\tvalue.SetBool(!value.Bool())\n+\t\t\tflag.Value.Apply(value)\n+\t\t}\n \t\tc.Path = append(c.Path, &Path{Flag: flag})\n \t\treturn nil\n \t}\ndiff --git a/kong_test.go b/kong_test.go\nindex 2f333b7..6dec560 100644\n--- a/kong_test.go\n+++ b/kong_test.go\n@@ -356,30 +356,66 @@ func TestTraceErrorPartiallySucceeds(t *testing.T) {\n \trequire.Equal(t, \"one\", ctx.Command())\n }\n \n-func TestNegatedBooleanFlag(t *testing.T) {\n-\tvar cli struct {\n-\t\tCmd struct {\n-\t\t\tFlag bool `kong:\"default='true',negatable\"`\n-\t\t} `kong:\"cmd\"`\n-\t}\n+type commandWithNegatableFlag struct {\n+\tFlag bool `kong:\"default='true',negatable\"`\n+\tran  bool\n+}\n \n-\tp := mustNew(t, &cli)\n-\t_, err := p.Parse([]string{\"cmd\", \"--no-flag\"})\n-\trequire.NoError(t, err)\n-\trequire.Equal(t, false, cli.Cmd.Flag)\n+func (c *commandWithNegatableFlag) Run() error {\n+\tc.ran = true\n+\treturn nil\n }\n \n-func TestInvertedNegatedBooleanFlag(t *testing.T) {\n-\tvar cli struct {\n-\t\tCmd struct {\n-\t\t\tFlag bool `kong:\"default='true',negatable\"`\n-\t\t} `kong:\"cmd\"`\n-\t}\n+func TestNegatableFlag(t *testing.T) {\n+\ttests := []struct {\n+\t\tname     string\n+\t\targs     []string\n+\t\texpected bool\n+\t}{\n+\t\t{\n+\t\t\tname:     \"no flag\",\n+\t\t\targs:     []string{\"cmd\"},\n+\t\t\texpected: true,\n+\t\t},\n+\t\t{\n+\t\t\tname:     \"boolean flag\",\n+\t\t\targs:     []string{\"cmd\", \"--flag\"},\n+\t\t\texpected: true,\n+\t\t},\n+\t\t{\n+\t\t\tname:     \"inverted boolean flag\",\n+\t\t\targs:     []string{\"cmd\", \"--flag=false\"},\n+\t\t\texpected: false,\n+\t\t},\n+\t\t{\n+\t\t\tname:     \"negated boolean flag\",\n+\t\t\targs:     []string{\"cmd\", \"--no-flag\"},\n+\t\t\texpected: false,\n+\t\t},\n+\t\t{\n+\t\t\tname:     \"inverted negated boolean flag\",\n+\t\t\targs:     []string{\"cmd\", \"--no-flag=false\"},\n+\t\t\texpected: true,\n+\t\t},\n+\t}\n+\tfor _, tt := range tests {\n+\t\ttt := tt\n+\t\tt.Run(tt.name, func(t *testing.T) {\n+\t\t\tvar cli struct {\n+\t\t\t\tCmd commandWithNegatableFlag `kong:\"cmd\"`\n+\t\t\t}\n+\n+\t\t\tp := mustNew(t, &cli)\n+\t\t\tkctx, err := p.Parse(tt.args)\n+\t\t\trequire.NoError(t, err)\n+\t\t\trequire.Equal(t, tt.expected, cli.Cmd.Flag)\n \n-\tp := mustNew(t, &cli)\n-\t_, err := p.Parse([]string{\"cmd\", \"--no-flag=false\"})\n-\trequire.NoError(t, err)\n-\trequire.Equal(t, true, cli.Cmd.Flag)\n+\t\t\terr = kctx.Run()\n+\t\t\trequire.NoError(t, err)\n+\t\t\trequire.Equal(t, tt.expected, cli.Cmd.Flag)\n+\t\t\trequire.True(t, cli.Cmd.ran)\n+\t\t})\n+\t}\n }\n \n func TestExistingNoFlag(t *testing.T) {\n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    ".github/FUNDING.yml",
+    ".gitignore",
+    ".golangci.yml",
+    "COPYING",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/README.md",
+    "_examples/server/console.go",
+    "_examples/server/go.mod",
+    "_examples/server/go.sum",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/main.go",
+    "benchmark_test.go",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "config_test.go",
+    "context.go",
+    "defaults.go",
+    "defaults_test.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "go.mod",
+    "go.sum",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "testdata/file.txt",
+    "util.go",
+    "util_test.go",
+    "visit.go"
+  ],
+  "explanation": {
+    "what": "`negatable` フラグ(`--no-x` で bool 値を反転させる仕組み)の値反転処理が二重に走っていたバグを修正した。従来は反転ロジックが `Context.Apply()`(`Parse` と `Run` の両方から呼ばれる)の中にあったため、`Parse` で一度正しく反転された値が `Run` 呼び出し時にもう一度反転されてしまっていた。反転処理を、フラグをパースした瞬間に一度だけ行う `parseFlag()` 側に移動し、`Apply()` からは単純に `value.Apply()` を呼ぶだけにした。テストも単発の2ケースから、`Parse` と `Run` の両方を通して期待値を検証するテーブル駆動テストに書き換えている。",
+    "why": "PR本文に、反転ロジックが `Apply()` にあり `Parse`/`Run` の両方から呼ばれるため二重反転が起きていた、という原因分析が明記されている。Issue #170 に対応する修正。",
+    "highlights": [
+      { "file": "context.go", "note": "反転処理を Apply() から parseFlag() に移し、一度だけ反転されるようにした" },
+      { "file": "kong_test.go", "note": "Parse と Run 双方の結果を検証するテーブル駆動テストに書き換え、回帰を防いでいる" }
+    ],
+    "langNotes": [
+      { "topic": "negatable フラグの二重否定バグ", "note": "Kong の `negatable` タグは bool フラグに `--no-x` という反転形を自動生成する。反転(NOT)処理を「値を書き込む箇所」に置くと、その箇所が複数回呼ばれた際に二重否定(結果的に元の値に戻る)が起きる。本コミットは反転処理を「フラグを読み取った1回だけ」の箇所に一本化することで解決している。" }
+    ],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [{ "type": "pr", "number": 171, "url": "https://github.com/alecthomas/kong/pull/171" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

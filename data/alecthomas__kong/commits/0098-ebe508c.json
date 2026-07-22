@@ -1,0 +1,104 @@
+{
+  "seq": 98,
+  "sha": "ebe508cf4619cb5edfe723eed192c91569f732ae",
+  "parents": [
+    "f0bd1294a7fcd0b5a3b4e50b51d5f9c61cf9f3ec"
+  ],
+  "author": {
+    "name": "Alec Thomas",
+    "email": "alec@swapoff.org",
+    "date": "2018-08-14T21:05:21+10:00"
+  },
+  "message": "Fix incorrect error missing for missing required args.",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 3,
+    "additions": 21,
+    "deletions": 2
+  },
+  "files": [
+    {
+      "path": "context.go",
+      "status": "M",
+      "additions": 7,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "help.go",
+      "status": "M",
+      "additions": 2,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "kong_test.go",
+      "status": "M",
+      "additions": 12,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/context.go b/context.go\nindex e0efb3a..2661e68 100644\n--- a/context.go\n+++ b/context.go\n@@ -518,11 +518,17 @@ func checkMissingFlags(flags []*Flag) error {\n \n func checkMissingChildren(node *Node) error {\n \tmissing := []string{}\n+\n+\tmissingArgs := []string{}\n \tfor _, arg := range node.Positional {\n \t\tif arg.Required && !arg.Set {\n-\t\t\tmissing = append(missing, strconv.Quote(arg.Summary()))\n+\t\t\tmissingArgs = append(missingArgs, arg.Summary())\n \t\t}\n \t}\n+\tif len(missingArgs) > 0 {\n+\t\tmissing = append(missing, strconv.Quote(strings.Join(missingArgs, \" \")))\n+\t}\n+\n \tfor _, child := range node.Children {\n \t\tif child.Hidden {\n \t\t\tcontinue\ndiff --git a/help.go b/help.go\nindex abee58d..21b6de7 100644\n--- a/help.go\n+++ b/help.go\n@@ -71,7 +71,8 @@ func printCommand(w *helpWriter, app *Application, cmd *Command) {\n \t}\n \tprintNodeDetail(w, cmd)\n \tif w.Summary && app.HelpFlag != nil {\n-\t\tw.Printf(`Run \"%s %s --help\" for more information.`, app.Name, cmd.FullPath())\n+\t\tw.Print(\"\")\n+\t\tw.Printf(`Run \"%s --help\" for more information.`, cmd.FullPath())\n \t}\n }\n \ndiff --git a/kong_test.go b/kong_test.go\nindex f67892b..f937b21 100644\n--- a/kong_test.go\n+++ b/kong_test.go\n@@ -554,3 +554,15 @@ func TestInterpolationIntoModel(t *testing.T) {\n \trequire.Equal(t, map[string]bool{\"a\": true, \"b\": true, \"c\": true, \"d\": true}, flag.EnumMap())\n \trequire.Equal(t, \"One of a,b\", flag2.Help)\n }\n+\n+func TestErrorMissingArgs(t *testing.T) {\n+\tvar cli struct {\n+\t\tOne string `arg:\"\"`\n+\t\tTwo string `arg:\"\"`\n+\t}\n+\n+\tp := mustNew(t, &cli)\n+\t_, err := p.Parse(nil)\n+\trequire.Error(t, err)\n+\trequire.Equal(t, \"expected \\\"<one> <two>\\\"\", err.Error())\n+}\n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    ".golangci.yml",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/console.go",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/main.go",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "context.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "tokentype_string.go"
+  ],
+  "explanation": {
+    "what": "checkMissingChildren() で、必須の位置引数(positional)が複数欠けている場合にそれぞれ個別の引用符付き文字列として missing に積んでいた処理を、missingArgs にまとめてから1つの引用符付き文字列(スペース区切り)として追加するように変更した。あわせて help.go の printCommand() でサマリー表示時のメッセージを `Run \"%s %s --help\"` から空行+`Run \"%s --help\"`(cmd.FullPath() を使用)に変更している。テストとして TestErrorMissingArgs を追加し、`expected \"<one> <two>\"` という1つのエラーメッセージになることを検証している。",
+    "why": "件名が示す通り、必須引数が複数欠けている場合に生成されるエラーメッセージが誤っていた(おそらく `\"<one>\", \"<two>\"` のように別々の引用符付き文字列として列挙され不自然だった)ため、`<one> <two>` のように1つの引用符でまとめて期待される引数列として表示するよう修正した。",
+    "highlights": [
+      { "file": "context.go", "note": "missingArgs を1つの文字列にまとめてから追加する変更" },
+      { "file": "kong_test.go", "note": "TestErrorMissingArgs で期待メッセージ \"expected \\\"<one> <two>\\\"\" を検証" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

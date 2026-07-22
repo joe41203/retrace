@@ -1,0 +1,141 @@
+{
+  "seq": 151,
+  "sha": "f830198fcdee5d78df30c3451a583c0a56ebbb32",
+  "parents": [
+    "0548c6b1afaea7616098cec708d9bbf49eef2cd6"
+  ],
+  "author": {
+    "name": "gak",
+    "email": "gak@gak0.com",
+    "date": "2019-07-20T20:31:04+10:00"
+  },
+  "message": "XOR groups for flags. (#35)",
+  "pr": {
+    "number": 35,
+    "title": "XOR groups for flags.",
+    "body": "Prevents more than one flag from being used at once within an xor group:\r\n```\r\n\tvar cli struct {\r\n\t\tOne   bool   `xor:\"group\"`\r\n\t\tTwo   string `xor:\"group\"`\r\n\t}\r\n```",
+    "url": "https://github.com/alecthomas/kong/pull/35"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 6,
+    "additions": 59,
+    "deletions": 0
+  },
+  "files": [
+    {
+      "path": "README.md",
+      "status": "M",
+      "additions": 1,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "build.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "context.go",
+      "status": "M",
+      "additions": 22,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "kong_test.go",
+      "status": "M",
+      "additions": 32,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "model.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "tag.go",
+      "status": "M",
+      "additions": 2,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/README.md b/README.md\nindex 68a8afb..356044b 100644\n--- a/README.md\n+++ b/README.md\n@@ -403,6 +403,7 @@ Tag                    | Description\n `sep:\"X\"`              | Separator for sequences (defaults to \",\"). May be `none` to disable splitting.\n `enum:\"X,Y,...\"`       | Set of valid values allowed for this flag.\n `group:\"X\"`            | Logical group for a flag or command.\n+`xor:\"X\"`              | Exclusive OR group for flags. Only one flag in the group can be used which is restricted within the same command.\n `prefix:\"X\"`           | Prefix for all sub-flags.\n `set:\"K=V\"`            | Set a variable for expansion by child elements. Multiples can occur.\n `embed`                | If present, this field's children will be embedded in the parent. Useful for composition.\ndiff --git a/build.go b/build.go\nindex e87393f..c629275 100644\n--- a/build.go\n+++ b/build.go\n@@ -202,6 +202,7 @@ func buildField(k *Kong, node *Node, v reflect.Value, ft reflect.StructField, fv\n \t\t\tPlaceHolder: tag.PlaceHolder,\n \t\t\tEnv:         tag.Env,\n \t\t\tGroup:       tag.Group,\n+\t\t\tXor:         tag.Xor,\n \t\t\tHidden:      tag.Hidden,\n \t\t}\n \t\tvalue.Flag = flag\ndiff --git a/context.go b/context.go\nindex c9dae24..1b11f20 100644\n--- a/context.go\n+++ b/context.go\n@@ -179,6 +179,9 @@ func (c *Context) Validate() error {\n \tif err := checkMissingPositionals(positionals, node.Positional); err != nil {\n \t\treturn err\n \t}\n+\tif err := checkXorDuplicates(c.Path); err != nil {\n+\t\treturn err\n+\t}\n \n \tif node.Type == ArgumentNode {\n \t\tvalue := node.Argument\n@@ -643,6 +646,25 @@ func checkMissingPositionals(positional int, values []*Value) error {\n \treturn fmt.Errorf(\"missing positional arguments %s\", strings.Join(missing, \" \"))\n }\n \n+func checkXorDuplicates(paths []*Path) error {\n+\tfor _, path := range paths {\n+\t\tseen := map[string]*Flag{}\n+\t\tfor _, flag := range path.Flags {\n+\t\t\tif !flag.Set {\n+\t\t\t\tcontinue\n+\t\t\t}\n+\t\t\tif flag.Xor == \"\" {\n+\t\t\t\tcontinue\n+\t\t\t}\n+\t\t\tif seen[flag.Xor] != nil {\n+\t\t\t\treturn fmt.Errorf(\"--%s and --%s can't be used together\", seen[flag.Xor].Name, flag.Name)\n+\t\t\t}\n+\t\t\tseen[flag.Xor] = flag\n+\t\t}\n+\t}\n+\treturn nil\n+}\n+\n func findPotentialCandidates(needle string, haystack []string, format string, args ...interface{}) error {\n \tif len(haystack) == 0 {\n \t\treturn fmt.Errorf(format, args...)\ndiff --git a/kong_test.go b/kong_test.go\nindex 7f553a8..03fd2cb 100644\n--- a/kong_test.go\n+++ b/kong_test.go\n@@ -749,3 +749,35 @@ func TestEnvarEnumValidated(t *testing.T) {\n \t_, err := p.Parse(nil)\n \trequire.EqualError(t, err, \"--flag must be one of \\\"valid\\\" but got \\\"invalid\\\"\")\n }\n+\n+func TestXor(t *testing.T) {\n+\tvar cli struct {\n+\t\tHello bool   `xor:\"another\"`\n+\t\tOne   bool   `xor:\"group\"`\n+\t\tTwo   string `xor:\"group\"`\n+\t}\n+\tp := mustNew(t, &cli)\n+\t_, err := p.Parse([]string{\"--hello\", \"--one\", \"--two=hi\"})\n+\trequire.EqualError(t, err, \"--one and --two can't be used together\")\n+\n+\tp = mustNew(t, &cli)\n+\t_, err = p.Parse([]string{\"--one\", \"--hello\"})\n+\trequire.NoError(t, err)\n+}\n+\n+func TestXorChild(t *testing.T) {\n+\tvar cli struct {\n+\t\tOne bool `xor:\"group\"`\n+\t\tCmd struct {\n+\t\t\tTwo   string `xor:\"group\"`\n+\t\t\tThree string `xor:\"group\"`\n+\t\t} `cmd`\n+\t}\n+\tp := mustNew(t, &cli)\n+\t_, err := p.Parse([]string{\"--one\", \"cmd\", \"--two=hi\"})\n+\trequire.NoError(t, err)\n+\n+\tp = mustNew(t, &cli)\n+\t_, err = p.Parse([]string{\"--two=hi\", \"cmd\", \"--three\"})\n+\trequire.Error(t, err, \"--two and --three can't be used together\")\n+}\ndiff --git a/model.go b/model.go\nindex 0fda877..8023dce 100644\n--- a/model.go\n+++ b/model.go\n@@ -351,6 +351,7 @@ type Positional = Value\n type Flag struct {\n \t*Value\n \tGroup       string // Logical grouping when displaying. May also be used by configuration loaders to group options logically.\n+\tXor         string\n \tPlaceHolder string\n \tEnv         string\n \tShort       rune\ndiff --git a/tag.go b/tag.go\nindex a5d7030..a642e99 100644\n--- a/tag.go\n+++ b/tag.go\n@@ -27,6 +27,7 @@ type Tag struct {\n \tSep         rune\n \tEnum        string\n \tGroup       string\n+\tXor         string\n \tVars        Vars\n \tPrefix      string // Optional prefix on anonymous structs. All sub-flags will have this prefix.\n \tEmbed       bool\n@@ -151,6 +152,7 @@ func parseTag(fv reflect.Value, ft reflect.StructField) *Tag {\n \tt.Format = t.Get(\"format\")\n \tt.Sep, _ = t.GetRune(\"sep\")\n \tt.Group = t.Get(\"group\")\n+\tt.Xor = t.Get(\"xor\")\n \tt.Prefix = t.Get(\"prefix\")\n \tt.Embed = t.Has(\"embed\")\n \tif t.Sep == 0 {\n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    ".golangci.yml",
+    "COPYING",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/console.go",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/main.go",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "config_test.go",
+    "context.go",
+    "defaults.go",
+    "defaults_test.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "go.mod",
+    "go.sum",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "util.go",
+    "util_test.go",
+    "visit.go"
+  ],
+  "explanation": {
+    "what": "flag/tag に `xor:\"X\"` を追加し、同じ xor グループに属する複数のフラグが同時に(値を伴って)指定されるとパースエラーになるようにした。model.Flag と Tag に Xor フィールドを追加し、context.go の Validate() から checkXorDuplicates を呼んでコマンドパスごとにグループ内の重複 Set を検出する。",
+    "why": "PR本文にある通り、同じ xor グループ内で複数フラグが同時に使われるのを防ぐための機能。例として bool の One と string の Two を同じ `xor:\"group\"` に属させ、両方セットされたらエラーにするユースケースが挙げられている。",
+    "highlights": [
+      { "file": "context.go", "note": "checkXorDuplicates が Path ごとに Flag.Xor をキーにした map で Set 済みフラグの重複を検出する" },
+      { "file": "kong_test.go", "note": "TestXor と TestXorChild で同一コマンド内・親子コマンド間のxor挙動を確認している" }
+    ],
+    "langNotes": [
+      { "topic": "XOR groups", "note": "struct タグ `xor:\"group名\"` で複数のフラグを排他グループにまとめる Kong 独自の仕組み。同じグループ名を持つフラグが2つ以上 Set されるとパースエラーになる。" }
+    ],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [{ "type": "pr", "number": 35, "url": "https://github.com/alecthomas/kong/pull/35" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

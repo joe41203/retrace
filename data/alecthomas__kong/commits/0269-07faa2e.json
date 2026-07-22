@@ -1,0 +1,141 @@
+{
+  "seq": 269,
+  "sha": "07faa2e0d05733dfffa4ec075fea7cf68fb8676c",
+  "parents": [
+    "dd904ce961393639cccb2e2b5fc1e12312c95e5d"
+  ],
+  "author": {
+    "name": "Daniel Selans",
+    "email": "daniel.selans@gmail.com",
+    "date": "2021-08-27T22:41:08-07:00"
+  },
+  "message": "Add ability to ignore fields that match given regex pattern(s) (#199)",
+  "pr": {
+    "number": 199,
+    "title": "Add ability to ignore fields that match given regex pattern(s)",
+    "body": "@alecthomas this adds functionality to allow kong to ignore fields that match a certain pattern.\r\n\r\nI needed this in order to be able to ensure that kong does not parse fields like `XXX_` that are automatically generated via protoc.\r\n\r\nThe regexp is kind of a big hammer but since this is for CLI generation, I figure the perf hit is OK. LMK.",
+    "url": "https://github.com/alecthomas/kong/pull/199"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 4,
+    "additions": 111,
+    "deletions": 11
+  },
+  "files": [
+    {
+      "path": "build.go",
+      "status": "M",
+      "additions": 9,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "kong.go",
+      "status": "M",
+      "additions": 14,
+      "deletions": 11,
+      "binary": false
+    },
+    {
+      "path": "kong_test.go",
+      "status": "M",
+      "additions": 62,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "options.go",
+      "status": "M",
+      "additions": 26,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/build.go b/build.go\nindex 374897c..85e18dc 100644\n--- a/build.go\n+++ b/build.go\n@@ -24,6 +24,7 @@ func build(k *Kong, ast interface{}) (app *Application, err error) {\n \tfor _, flag := range extraFlags {\n \t\tseenFlags[flag.Name] = true\n \t}\n+\n \tnode, err := buildNode(k, iv, ApplicationNode, seenFlags)\n \tif err != nil {\n \t\treturn nil, err\n@@ -112,7 +113,15 @@ func buildNode(k *Kong, v reflect.Value, typ NodeType, seenFlags map[string]bool\n \tif err != nil {\n \t\treturn nil, err\n \t}\n+\n+MAIN:\n \tfor _, field := range fields {\n+\t\tfor _, r := range k.ignoreFieldsRegex {\n+\t\t\tif r.MatchString(v.Type().Name() + \".\" + field.field.Name) {\n+\t\t\t\tcontinue MAIN\n+\t\t\t}\n+\t\t}\n+\n \t\tft := field.field\n \t\tfv := field.value\n \ndiff --git a/kong.go b/kong.go\nindex dd4b966..14f5c2d 100644\n--- a/kong.go\n+++ b/kong.go\n@@ -6,6 +6,7 @@ import (\n \t\"os\"\n \t\"path/filepath\"\n \t\"reflect\"\n+\t\"regexp\"\n \t\"strings\"\n )\n \n@@ -48,10 +49,11 @@ type Kong struct {\n \tStdout io.Writer\n \tStderr io.Writer\n \n-\tbindings  bindings\n-\tloader    ConfigurationLoader\n-\tresolvers []Resolver\n-\tregistry  *Registry\n+\tbindings          bindings\n+\tloader            ConfigurationLoader\n+\tresolvers         []Resolver\n+\tregistry          *Registry\n+\tignoreFieldsRegex []*regexp.Regexp\n \n \tnoDefaultHelp bool\n \tusageOnError  usageOnError\n@@ -73,13 +75,14 @@ type Kong struct {\n // See the README (https://github.com/alecthomas/kong) for usage instructions.\n func New(grammar interface{}, options ...Option) (*Kong, error) {\n \tk := &Kong{\n-\t\tExit:          os.Exit,\n-\t\tStdout:        os.Stdout,\n-\t\tStderr:        os.Stderr,\n-\t\tregistry:      NewRegistry().RegisterDefaults(),\n-\t\tvars:          Vars{},\n-\t\tbindings:      bindings{},\n-\t\thelpFormatter: DefaultHelpValueFormatter,\n+\t\tExit:              os.Exit,\n+\t\tStdout:            os.Stdout,\n+\t\tStderr:            os.Stderr,\n+\t\tregistry:          NewRegistry().RegisterDefaults(),\n+\t\tvars:              Vars{},\n+\t\tbindings:          bindings{},\n+\t\thelpFormatter:     DefaultHelpValueFormatter,\n+\t\tignoreFieldsRegex: make([]*regexp.Regexp, 0),\n \t}\n \n \toptions = append(options, Bind(k))\ndiff --git a/kong_test.go b/kong_test.go\nindex ca8bafe..7d80d40 100644\n--- a/kong_test.go\n+++ b/kong_test.go\n@@ -1297,3 +1297,65 @@ func TestHydratePointerCommands(t *testing.T) {\n \trequire.NoError(t, err)\n \trequire.Equal(t, &cmd{Flag: true}, cli.Cmd)\n }\n+\n+// nolint\n+type testIgnoreFields struct {\n+\tFoo struct {\n+\t\tBar bool\n+\t\tSub struct {\n+\t\t\tSubFlag1     bool `kong:\"name=subflag1\"`\n+\t\t\tXXX_SubFlag2 bool `kong:\"name=subflag2\"`\n+\t\t} `kong:\"cmd\"`\n+\t} `kong:\"cmd\"`\n+\tXXX_Baz struct {\n+\t\tBoo bool\n+\t} `kong:\"cmd,name=baz\"`\n+}\n+\n+func TestIgnoreRegex(t *testing.T) {\n+\tcli := testIgnoreFields{}\n+\n+\tk, err := kong.New(&cli, kong.IgnoreFieldsRegex(`.*\\.XXX_.+`))\n+\trequire.NoError(t, err)\n+\n+\t_, err = k.Parse([]string{\"foo\", \"sub\"})\n+\trequire.NoError(t, err)\n+\n+\t_, err = k.Parse([]string{\"foo\", \"sub\", \"--subflag1\"})\n+\trequire.NoError(t, err)\n+\n+\t_, err = k.Parse([]string{\"foo\", \"sub\", \"--subflag2\"})\n+\trequire.Error(t, err)\n+\trequire.Contains(t, err.Error(), \"unknown flag --subflag2\")\n+\n+\t_, err = k.Parse([]string{\"baz\"})\n+\trequire.Error(t, err)\n+\trequire.Contains(t, err.Error(), \"unexpected argument baz\")\n+}\n+\n+// Verify that passing a nil regex will work\n+func TestIgnoreRegexEmpty(t *testing.T) {\n+\tcli := testIgnoreFields{}\n+\n+\t_, err := kong.New(&cli, kong.IgnoreFieldsRegex(\"\"))\n+\trequire.Error(t, err)\n+\trequire.Contains(t, \"regex input cannot be empty\", err.Error())\n+}\n+\n+type optionWithErr struct{}\n+\n+func (o *optionWithErr) Apply(k *kong.Kong) error {\n+\treturn errors.New(\"option returned err\")\n+}\n+\n+func TestOptionReturnsErr(t *testing.T) {\n+\tcli := struct {\n+\t\tTest bool\n+\t}{}\n+\n+\toptWithError := &optionWithErr{}\n+\n+\t_, err := kong.New(cli, optWithError)\n+\trequire.Error(t, err)\n+\trequire.Equal(t, \"option returned err\", err.Error())\n+}\ndiff --git a/options.go b/options.go\nindex aec57d6..6036d91 100644\n--- a/options.go\n+++ b/options.go\n@@ -6,6 +6,7 @@ import (\n \t\"os/user\"\n \t\"path/filepath\"\n \t\"reflect\"\n+\t\"regexp\"\n \t\"strings\"\n \n \t\"github.com/pkg/errors\"\n@@ -319,6 +320,31 @@ func Resolvers(resolvers ...Resolver) Option {\n \t})\n }\n \n+// IgnoreFieldsRegex will cause kong.New() to skip field names that match any\n+// of the provided regex patterns. This is useful if you are not able to add a\n+// kong=\"-\" struct tag to a struct/element before the call to New.\n+//\n+// Example: When referencing protoc generated structs, you will likely want to\n+// ignore/skip XXX_* fields.\n+func IgnoreFieldsRegex(regexes ...string) Option {\n+\treturn OptionFunc(func(k *Kong) error {\n+\t\tfor _, r := range regexes {\n+\t\t\tif r == \"\" {\n+\t\t\t\treturn errors.New(\"regex input cannot be empty\")\n+\t\t\t}\n+\n+\t\t\tre, err := regexp.Compile(r)\n+\t\t\tif err != nil {\n+\t\t\t\treturn errors.Wrap(err, \"unable to compile regex\")\n+\t\t\t}\n+\n+\t\t\tk.ignoreFieldsRegex = append(k.ignoreFieldsRegex, re)\n+\t\t}\n+\n+\t\treturn nil\n+\t})\n+}\n+\n // ConfigurationLoader is a function that builds a resolver from a file.\n type ConfigurationLoader func(r io.Reader) (Resolver, error)\n \n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/FUNDING.yml",
+    ".github/workflows/ci.yml",
+    ".gitignore",
+    ".golangci.yml",
+    "COPYING",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/README.md",
+    "_examples/server/console.go",
+    "_examples/server/go.mod",
+    "_examples/server/go.sum",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/main.go",
+    "benchmark_test.go",
+    "bin/.go@latest.pkg",
+    "bin/.golangci-lint-1.42.0.pkg",
+    "bin/README.hermit.md",
+    "bin/activate-hermit",
+    "bin/go",
+    "bin/gofmt",
+    "bin/golangci-lint",
+    "bin/hermit",
+    "bin/hermit.hcl",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "config_test.go",
+    "context.go",
+    "defaults.go",
+    "defaults_test.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "go.mod",
+    "go.sum",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "testdata/file.txt",
+    "util.go",
+    "util_test.go",
+    "visit.go"
+  ],
+  "explanation": {
+    "what": "`kong.IgnoreFieldsRegex(regexes ...string)` オプションを追加した。指定した正規表現のいずれかに `<StructName>.<FieldName>` がマッチするフィールドは、buildNode() のフィールド走査時に丸ごとスキップ(ラベル付き continue で MAIN ループを継続)されるようになる。",
+    "why": "PR本文の通り、protoc が生成する struct には `XXX_` から始まるフィールドが自動付与されることがあり、そうしたフィールドに個別に `kong:\"-\"` タグを付けられない(生成コードを書き換えられない)場面で、パターンで一括除外したいというユースケースに対応するための機能追加。",
+    "highlights": [
+      { "file": "build.go", "note": "buildNode() のフィールドループに MAIN ラベルを付け、ignoreFieldsRegex にマッチしたフィールドを continue MAIN でスキップ" },
+      { "file": "options.go", "note": "IgnoreFieldsRegex は空文字列や不正な正規表現を Option 適用時にエラーとして返す" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [{ "type": "pr", "number": 199, "url": "https://github.com/alecthomas/kong/pull/199" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

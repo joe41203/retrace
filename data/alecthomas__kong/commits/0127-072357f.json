@@ -1,0 +1,110 @@
+{
+  "seq": 127,
+  "sha": "072357f8baca1c8b652e24aaa700b52b2e61f6c1",
+  "parents": [
+    "e474873f84e1644430a53476ea2fdd1bd2084ef9"
+  ],
+  "author": {
+    "name": "Alec Thomas",
+    "email": "alec@swapoff.org",
+    "date": "2018-11-06T11:37:26+11:00"
+  },
+  "message": "Make ExpandPath public.",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 3,
+    "additions": 9,
+    "deletions": 6
+  },
+  "files": [
+    {
+      "path": "kong.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "mapper.go",
+      "status": "M",
+      "additions": 4,
+      "deletions": 4,
+      "binary": false
+    },
+    {
+      "path": "options.go",
+      "status": "M",
+      "additions": 4,
+      "deletions": 1,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/kong.go b/kong.go\nindex 408cf44..771b820 100644\n--- a/kong.go\n+++ b/kong.go\n@@ -336,7 +336,7 @@ func (k *Kong) FatalIfErrorf(err error, args ...interface{}) {\n //\n // \"path\" will have ~/ expanded.\n func (k *Kong) LoadConfig(path string) (Resolver, error) {\n-\tpath = expandPath(path)\n+\tpath = ExpandPath(path)\n \tr, err := os.Open(path) // nolint: gas\n \tif err != nil {\n \t\treturn nil, err\ndiff --git a/mapper.go b/mapper.go\nindex 8bd7d00..d99eda9 100644\n--- a/mapper.go\n+++ b/mapper.go\n@@ -372,7 +372,7 @@ func pathMapper(r *Registry) MapperFunc {\n \t\t\treturn fmt.Errorf(\"\\\"path\\\" type must be applied to a string not %s\", target.Type())\n \t\t}\n \t\tpath := ctx.Scan.PopValue(\"file\")\n-\t\tpath = expandPath(path)\n+\t\tpath = ExpandPath(path)\n \t\ttarget.SetString(path)\n \t\treturn nil\n \t}\n@@ -387,7 +387,7 @@ func existingFileMapper(r *Registry) MapperFunc {\n \t\t\treturn fmt.Errorf(\"\\\"existingfile\\\" type must be applied to a string not %s\", target.Type())\n \t\t}\n \t\tpath := ctx.Scan.PopValue(\"file\")\n-\t\tpath = expandPath(path)\n+\t\tpath = ExpandPath(path)\n \t\tstat, err := os.Stat(path)\n \t\tif err != nil {\n \t\t\treturn err\n@@ -409,7 +409,7 @@ func existingDirMapper(r *Registry) MapperFunc {\n \t\t\treturn fmt.Errorf(\"\\\"existingdir\\\" must be applied to a string not %s\", target.Type())\n \t\t}\n \t\tpath := ctx.Scan.PopValue(\"file\")\n-\t\tpath = expandPath(path)\n+\t\tpath = ExpandPath(path)\n \t\tstat, err := os.Stat(path)\n \t\tif err != nil {\n \t\t\treturn err\n@@ -477,7 +477,7 @@ func JoinEscaped(s []string, sep rune) string {\n type FileContentFlag []byte\n \n func (f *FileContentFlag) Decode(ctx *DecodeContext) error { // nolint: golint\n-\tfilename := expandPath(ctx.Scan.PopValue(\"filename\"))\n+\tfilename := ExpandPath(ctx.Scan.PopValue(\"filename\"))\n \tdata, err := ioutil.ReadFile(filename) // nolint: gosec\n \tif err != nil {\n \t\treturn fmt.Errorf(\"failed to open %q: %s\", filename, err)\ndiff --git a/options.go b/options.go\nindex bcadf16..7cdcfbe 100644\n--- a/options.go\n+++ b/options.go\n@@ -211,7 +211,10 @@ func Configuration(loader ConfigurationLoader, paths ...string) OptionFunc {\n \t}\n }\n \n-func expandPath(path string) string {\n+// ExpandPath is a helper function to expand a relative or home-relative path to an absolute path.\n+//\n+// eg. ~/.someconf -> /home/alec/.someconf\n+func ExpandPath(path string) string {\n \tif filepath.IsAbs(path) {\n \t\treturn path\n \t}\n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    ".golangci.yml",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/console.go",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/main.go",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "context.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "go.mod",
+    "go.sum",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "util.go",
+    "util_test.go",
+    "visit.go"
+  ],
+  "explanation": {
+    "what": "options.go の非公開関数 expandPath を公開関数 ExpandPath にリネームし、doc コメント (\"ExpandPath is a helper function to expand a relative or home-relative path to an absolute path.\") を追加した。kong.go の LoadConfig、mapper.go の pathMapper/existingFileMapper/existingDirMapper/FileContentFlag.Decode の呼び出し箇所も全て新名称に置き換えている。",
+    "why": "おそらく、~/ 展開ロジックをライブラリ利用者が自分の独自 mapper やコマンド実装から再利用できるようにするための公開 API 化と考えられる。コミットメッセージ・diff からは利用者側の要望の記述はないが、単なるリネーム以上の意味(exported にする)を持つ変更であることは diff から明らか。",
+    "highlights": [
+      { "file": "options.go", "note": "expandPath → ExpandPath へのリネームと godoc コメントの追加。Go の慣習で大文字始まりの識別子はパッケージ外から参照可能になる" }
+    ],
+    "langNotes": [
+      { "topic": "エクスポートされた識別子 (exported identifier)", "note": "Go には public/private のキーワードがなく、識別子の先頭が大文字かどうかでパッケージ外への公開・非公開が決まる。expandPath → ExpandPath のリネームだけで、この関数が kong パッケージの利用者からも呼び出せる公開 API になる。" }
+    ],
+    "diagram": null,
+    "evidence": "inferred",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

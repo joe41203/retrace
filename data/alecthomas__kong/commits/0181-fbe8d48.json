@@ -1,0 +1,127 @@
+{
+  "seq": 181,
+  "sha": "fbe8d48e4badf293012666e8d7a9065c0c9e633f",
+  "parents": [
+    "a77a484f6ac3d269e950845b891b00ace53a5120"
+  ],
+  "author": {
+    "name": "Alec Thomas",
+    "email": "alec@swapoff.org",
+    "date": "2020-04-16T22:19:21+10:00"
+  },
+  "message": "Convert env management to a resolver.\n\nThis ensures that hooks correctly detect when values are set via\nenvironment variables. Fixes #73.",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 4,
+    "additions": 35,
+    "deletions": 11
+  },
+  "files": [
+    {
+      "path": "env.go",
+      "status": "A",
+      "additions": 21,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "kong.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "kong_test.go",
+      "status": "M",
+      "additions": 13,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "model.go",
+      "status": "M",
+      "additions": 0,
+      "deletions": 11,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/env.go b/env.go\nnew file mode 100644\nindex 0000000..aeee8d3\n--- /dev/null\n+++ b/env.go\n@@ -0,0 +1,21 @@\n+package kong\n+\n+import (\n+\t\"os\"\n+)\n+\n+// EnvarResolver resolves values from environment variables.\n+//\n+// It is installed by default. Use ClearResolvers() to disable this.\n+func EnvarResolver() Resolver {\n+\treturn ResolverFunc(func(context *Context, parent *Path, flag *Flag) (interface{}, error) {\n+\t\tif flag.Tag.Env == \"\" {\n+\t\t\treturn nil, nil\n+\t\t}\n+\t\tenvar := os.Getenv(flag.Tag.Env)\n+\t\tif envar != \"\" {\n+\t\t\treturn envar, nil\n+\t\t}\n+\t\treturn nil, nil\n+\t})\n+}\ndiff --git a/kong.go b/kong.go\nindex 3a61567..017cf50 100644\n--- a/kong.go\n+++ b/kong.go\n@@ -71,6 +71,7 @@ func New(grammar interface{}, options ...Option) (*Kong, error) {\n \t\tvars:          Vars{},\n \t\tbindings:      bindings{},\n \t\thelpFormatter: DefaultHelpValueFormatter,\n+\t\tresolvers:     []Resolver{EnvarResolver()},\n \t}\n \n \toptions = append(options, Bind(k))\ndiff --git a/kong_test.go b/kong_test.go\nindex b55093a..57f15b6 100644\n--- a/kong_test.go\n+++ b/kong_test.go\n@@ -675,6 +675,19 @@ func TestHooksCalledForDefault(t *testing.T) {\n \trequire.Equal(t, []string{\"before:default\", \"after:default\"}, ctx.values)\n }\n \n+func TestHooksCalledForEnv(t *testing.T) {\n+\tvar cli struct {\n+\t\tFlag hookValue `env:\"FLAG\"`\n+\t}\n+\tdefer tempEnv(envMap{\"FLAG\": \"flagged\"})()\n+\n+\tctx := &hookContext{}\n+\t_, err := mustNew(t, &cli, kong.Bind(ctx)).Parse(nil)\n+\trequire.NoError(t, err)\n+\trequire.Equal(t, \"flagged\", string(cli.Flag))\n+\trequire.Equal(t, []string{\"before:\", \"after:flagged\"}, ctx.values)\n+}\n+\n func TestEnum(t *testing.T) {\n \tvar cli struct {\n \t\tFlag string `enum:\"a,b,c\"`\ndiff --git a/model.go b/model.go\nindex 8023dce..c98625c 100644\n--- a/model.go\n+++ b/model.go\n@@ -3,7 +3,6 @@ package kong\n import (\n \t\"fmt\"\n \t\"math\"\n-\t\"os\"\n \t\"reflect\"\n \t\"strconv\"\n \t\"strings\"\n@@ -326,16 +325,6 @@ func (v *Value) ApplyDefault() error {\n // Does not include resolvers.\n func (v *Value) Reset() error {\n \tv.Target.Set(reflect.Zero(v.Target.Type()))\n-\tif v.Tag.Env != \"\" {\n-\t\tenvar := os.Getenv(v.Tag.Env)\n-\t\tif envar != \"\" {\n-\t\t\terr := v.Parse(ScanFromTokens(Token{Type: FlagValueToken, Value: envar}), v.Target)\n-\t\t\tif err != nil {\n-\t\t\t\treturn fmt.Errorf(\"%s (from envar %s=%q)\", err, v.Tag.Env, envar)\n-\t\t\t}\n-\t\t\treturn nil\n-\t\t}\n-\t}\n \tif v.Default != \"\" {\n \t\treturn v.Parse(ScanFromTokens(Token{Type: FlagValueToken, Value: v.Default}), v.Target)\n \t}\n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    ".golangci.yml",
+    "COPYING",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/README.md",
+    "_examples/server/console.go",
+    "_examples/server/go.mod",
+    "_examples/server/go.sum",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/main.go",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "config_test.go",
+    "context.go",
+    "defaults.go",
+    "defaults_test.go",
+    "doc.go",
+    "env.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "go.mod",
+    "go.sum",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "util.go",
+    "util_test.go",
+    "visit.go"
+  ],
+  "explanation": {
+    "what": "環境変数(`env:\"...\"`タグ)からのフラグ値取得を、Value.Reset() 内に直書きされていた os.Getenv 呼び出しから、新設の env.go の EnvarResolver() に置き換えた。Kong 構築時に resolvers スライスへ EnvarResolver() をデフォルト登録し、model.go 側の env 参照処理は削除している。",
+    "why": "コミットメッセージに、hook が環境変数由来の値設定を正しく検知できるようにするためとある。Resolver は Kong の値解決の共通経路であり hook から観測可能だが、Value.Reset() 内で直接 os.Getenv していた従来経路は hook の検知対象外だったため、Resolver 化して両者を統一する狙い。Fixes #73。",
+    "highlights": [
+      { "file": "env.go", "note": "新設。EnvarResolver() は flag.Tag.Env が空なら何もせず、環境変数が設定されていればその文字列を返す ResolverFunc。" },
+      { "file": "kong.go", "note": "New() 内で resolvers: []Resolver{EnvarResolver()} をデフォルト設定に追加。" },
+      { "file": "model.go", "note": "Value.Reset() から os.Getenv による env タグ処理を削除(Resolver 側に責務移動)。" }
+    ],
+    "langNotes": [
+      { "topic": "Resolver interface / ResolverFunc", "note": "Kong の Resolver は「フラグの値をどこから解決するか」を抽象化する仕組み。ResolverFunc は関数を Resolver インターフェースに適合させるアダプタで、Go でよく使われる「関数型に Do 相当のメソッドを生やしてインターフェース満たす」パターン(http.HandlerFunc と同型)。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

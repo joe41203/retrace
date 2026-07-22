@@ -1,0 +1,121 @@
+{
+  "seq": 208,
+  "sha": "259d19076d5cf65e8ee4a896880ceb5fb1874bdb",
+  "parents": [
+    "067f0e835f65f0d552a025a160f5fcfafe97fe7f"
+  ],
+  "author": {
+    "name": "Alec Thomas",
+    "email": "alec@swapoff.org",
+    "date": "2020-09-16T15:50:50+10:00"
+  },
+  "message": "Add support for plugins.",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 3,
+    "additions": 102,
+    "deletions": 48
+  },
+  "files": [
+    {
+      "path": "README.md",
+      "status": "M",
+      "additions": 53,
+      "deletions": 31,
+      "binary": false
+    },
+    {
+      "path": "build.go",
+      "status": "M",
+      "additions": 28,
+      "deletions": 17,
+      "binary": false
+    },
+    {
+      "path": "kong_test.go",
+      "status": "M",
+      "additions": 21,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/README.md b/README.md\nindex e38778f..3dea00e 100644\n--- a/README.md\n+++ b/README.md\n@@ -4,34 +4,36 @@\n # Kong is a command-line parser for Go\n [![](https://godoc.org/github.com/alecthomas/kong?status.svg)](http://godoc.org/github.com/alecthomas/kong) [![CircleCI](https://img.shields.io/circleci/project/github/alecthomas/kong.svg)](https://circleci.com/gh/alecthomas/kong) [![Go Report Card](https://goreportcard.com/badge/github.com/alecthomas/kong)](https://goreportcard.com/report/github.com/alecthomas/kong) [![Slack chat](https://img.shields.io/static/v1?logo=slack&style=flat&label=slack&color=green&message=gophers)](https://gophers.slack.com/messages/CN9DS8YF3)\n \n-[TOC levels=2-3 numbered]: # \"#### Table of Contents\"\n-\n-#### Table of Contents\n-1. [Introduction](#introduction)\n-1. [Help](#help)\n-1. [Command handling](#command-handling)\n-   1. [Switch on the command string](#switch-on-the-command-string)\n-   1. [Attach a `Run(...) error` method to each command](#attach-a-run-error-method-to-each-command)\n-1. [Hooks: BeforeResolve(), BeforeApply(), AfterApply() and the Bind() option](#hooks-beforeresolve-beforeapply-afterapply-and-the-bind-option)\n-1. [Flags](#flags)\n-1. [Commands and sub-commands](#commands-and-sub-commands)\n-1. [Branching positional arguments](#branching-positional-arguments)\n-1. [Terminating positional arguments](#terminating-positional-arguments)\n-1. [Slices](#slices)\n-1. [Maps](#maps)\n-1. [Custom named decoders](#custom-named-decoders)\n-1. [Custom decoders (mappers)](#custom-decoders-mappers)\n-1. [Supported tags](#supported-tags)\n-1. [Variable interpolation](#variable-interpolation)\n-1. [Modifying Kong's behaviour](#modifying-kongs-behaviour)\n-   1. [`Name(help)` and `Description(help)` - set the application name description](#namehelp-and-descriptionhelp---set-the-application-name-description)\n-   1. [`Configuration(loader, paths...)` - load defaults from configuration files](#configurationloader-paths---load-defaults-from-configuration-files)\n-   1. [`Resolver(...)` - support for default values from external sources](#resolver---support-for-default-values-from-external-sources)\n-   1. [`*Mapper(...)` - customising how the command-line is mapped to Go values](#mapper---customising-how-the-command-line-is-mapped-to-go-values)\n-   1. [`ConfigureHelp(HelpOptions)` and `Help(HelpFunc)` - customising help](#configurehelphelpoptions-and-helphelpfunc---customising-help)\n-   1. [`Bind(...)` - bind values for callback hooks and Run() methods](#bind---bind-values-for-callback-hooks-and-run-methods)\n-   1. [Other options](#other-options)\n-\n+<!-- TOC depthFrom:2 updateOnSave:true withLinks:true -->\n+\n+- [Introduction](#introduction)\n+- [Help](#help)\n+- [Command handling](#command-handling)\n+    - [Switch on the command string](#switch-on-the-command-string)\n+    - [Attach a `Run(...) error` method to each command](#attach-a-run-error-method-to-each-command)\n+- [Hooks: BeforeResolve(), BeforeApply(), AfterApply() and the Bind() option](#hooks-beforeresolve-beforeapply-afterapply-and-the-bind-option)\n+- [Flags](#flags)\n+- [Commands and sub-commands](#commands-and-sub-commands)\n+- [Branching positional arguments](#branching-positional-arguments)\n+- [Terminating positional arguments](#terminating-positional-arguments)\n+- [Slices](#slices)\n+- [Maps](#maps)\n+- [Custom named decoders](#custom-named-decoders)\n+- [Supported field types](#supported-field-types)\n+- [Custom decoders (mappers)](#custom-decoders-mappers)\n+- [Supported tags](#supported-tags)\n+- [Plugins](#plugins)\n+- [Variable interpolation](#variable-interpolation)\n+- [Modifying Kong's behaviour](#modifying-kongs-behaviour)\n+    - [`Name(help)` and `Description(help)` - set the application name description](#namehelp-and-descriptionhelp---set-the-application-name-description)\n+    - [`Configuration(loader, paths...)` - load defaults from configuration files](#configurationloader-paths---load-defaults-from-configuration-files)\n+    - [`Resolver(...)` - support for default values from external sources](#resolver---support-for-default-values-from-external-sources)\n+    - [`*Mapper(...)` - customising how the command-line is mapped to Go values](#mapper---customising-how-the-command-line-is-mapped-to-go-values)\n+    - [`ConfigureHelp(HelpOptions)` and `Help(HelpFunc)` - customising help](#configurehelphelpoptions-and-helphelpfunc---customising-help)\n+    - [`Bind(...)` - bind values for callback hooks and Run() methods](#bind---bind-values-for-callback-hooks-and-run-methods)\n+    - [Other options](#other-options)\n+\n+<!-- /TOC -->\n \n ## Introduction\n \n@@ -370,11 +372,11 @@ Kong includes a number of builtin custom type mappers. These can be used by\n specifying the tag `type:\"<type>\"`. They are registered with the option\n function `NamedMapper(name, mapper)`.\n \n-| Name              | Description                             \n+| Name              | Description\n |-------------------|---------------------------------------------------\n-| `path`            | A path. ~ expansion is applied.          \n+| `path`            | A path. ~ expansion is applied.\n | `existingfile`    | An existing file. ~ expansion is applied. `-` is accepted for stdin.\n-| `existingdir`     | An existing directory. ~ expansion is applied.   \n+| `existingdir`     | An existing directory. ~ expansion is applied.\n | `counter`         | Increment a numeric field. Useful for `-vvv`. Can accept `-s`, `--long` or `--long=N`.\n \n \n@@ -437,6 +439,26 @@ Tag                    | Description\n `embed`                | If present, this field's children will be embedded in the parent. Useful for composition.\n `-`                    | Ignore the field. Useful for adding non-CLI fields to a configuration struct.\n \n+## Plugins\n+\n+Kong CLI's can be extended by embedding the `kong.Plugin` type and populating it with pointers to Kong annotated structs. For example:\n+\n+```go\n+var pluginOne struct {\n+  PluginOneFlag string\n+}\n+var pluginTwo struct {\n+  PluginTwoFlag string\n+}\n+var cli struct {\n+  BaseFlag string\n+  kong.Plugins\n+}\n+cli.Plugins = kong.Plugins{&pluginOne, &pluginTwo}\n+```\n+\n+Additionally if an interface type is embedded, it can also be populated with a Kong annotated struct.\n+\n ## Variable interpolation\n \n Kong supports limited variable interpolation into help strings, enum lists and\ndiff --git a/build.go b/build.go\nindex 70fed36..9135b4d 100644\n--- a/build.go\n+++ b/build.go\n@@ -6,6 +6,11 @@ import (\n \t\"strings\"\n )\n \n+// Plugins are dynamically embedded command-line structures.\n+//\n+// Each element in the Plugins list *must* be a pointer to a structure.\n+type Plugins []interface{}\n+\n func build(k *Kong, ast interface{}) (app *Application, err error) {\n \tdefer catch(&err)\n \tv := reflect.ValueOf(ast)\n@@ -50,28 +55,34 @@ func flattenedFields(v reflect.Value) (out []flattenedField) {\n \t\tif tag.Ignored {\n \t\t\tcontinue\n \t\t}\n-\t\tif ft.Anonymous || tag.Embed {\n-\t\t\tif fv.Kind() == reflect.Interface {\n-\t\t\t\tfv = fv.Elem()\n-\t\t\t}\n-\t\t\tsub := flattenedFields(fv)\n-\t\t\tfor _, subf := range sub {\n-\t\t\t\t// Assign parent if it's not already set.\n-\t\t\t\tif subf.tag.Group == \"\" {\n-\t\t\t\t\tsubf.tag.Group = tag.Group\n-\t\t\t\t}\n-\t\t\t\t// Accumulate prefixes.\n-\t\t\t\tsubf.tag.Prefix = tag.Prefix + subf.tag.Prefix\n-\t\t\t\t// Combine parent vars.\n-\t\t\t\tsubf.tag.Vars = tag.Vars.CloneWith(subf.tag.Vars)\n+\t\tif !ft.Anonymous && !tag.Embed {\n+\t\t\tif fv.CanSet() {\n+\t\t\t\tout = append(out, flattenedField{field: ft, value: fv, tag: tag})\n \t\t\t}\n-\t\t\tout = append(out, sub...)\n \t\t\tcontinue\n \t\t}\n-\t\tif !fv.CanSet() {\n+\n+\t\t// Embedded type.\n+\t\tif fv.Kind() == reflect.Interface {\n+\t\t\tfv = fv.Elem()\n+\t\t} else if fv.Type() == reflect.TypeOf(Plugins{}) {\n+\t\t\tfor i := 0; i < fv.Len(); i++ {\n+\t\t\t\tout = append(out, flattenedFields(fv.Index(i).Elem())...)\n+\t\t\t}\n \t\t\tcontinue\n \t\t}\n-\t\tout = append(out, flattenedField{field: ft, value: fv, tag: tag})\n+\t\tsub := flattenedFields(fv)\n+\t\tfor _, subf := range sub {\n+\t\t\t// Assign parent if it's not already set.\n+\t\t\tif subf.tag.Group == \"\" {\n+\t\t\t\tsubf.tag.Group = tag.Group\n+\t\t\t}\n+\t\t\t// Accumulate prefixes.\n+\t\t\tsubf.tag.Prefix = tag.Prefix + subf.tag.Prefix\n+\t\t\t// Combine parent vars.\n+\t\t\tsubf.tag.Vars = tag.Vars.CloneWith(subf.tag.Vars)\n+\t\t}\n+\t\tout = append(out, sub...)\n \t}\n \treturn out\n }\ndiff --git a/kong_test.go b/kong_test.go\nindex 6c2097a..8105641 100644\n--- a/kong_test.go\n+++ b/kong_test.go\n@@ -866,3 +866,24 @@ func TestLoneHpyhen(t *testing.T) {\n \trequire.NoError(t, err)\n \trequire.Equal(t, \"-\", cli.Flag)\n }\n+\n+func TestPlugins(t *testing.T) {\n+\tvar pluginOne struct {\n+\t\tOne string\n+\t}\n+\tvar pluginTwo struct {\n+\t\tTwo string\n+\t}\n+\tvar cli struct {\n+\t\tBase string\n+\t\tkong.Plugins\n+\t}\n+\tcli.Plugins = kong.Plugins{&pluginOne, &pluginTwo}\n+\n+\tp := mustNew(t, &cli)\n+\t_, err := p.Parse([]string{\"--base=base\", \"--one=one\", \"--two=two\"})\n+\trequire.NoError(t, err)\n+\trequire.Equal(t, \"base\", cli.Base)\n+\trequire.Equal(t, \"one\", pluginOne.One)\n+\trequire.Equal(t, \"two\", pluginTwo.Two)\n+}\n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    ".gitignore",
+    ".golangci.yml",
+    "COPYING",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/README.md",
+    "_examples/server/console.go",
+    "_examples/server/go.mod",
+    "_examples/server/go.sum",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/main.go",
+    "benchmark_test.go",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "config_test.go",
+    "context.go",
+    "defaults.go",
+    "defaults_test.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "go.mod",
+    "go.sum",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "testdata/file.txt",
+    "util.go",
+    "util_test.go",
+    "visit.go"
+  ],
+  "explanation": {
+    "what": "build.go に Plugins という新しい型(type Plugins []interface{})を追加し、flattenedFields() の埋め込みフィールド処理を拡張した。埋め込みフィールドの型が Plugins であれば、そのスライスの各要素(構造体へのポインタ)に対して再帰的に flattenedFields() を呼び出し、結果をすべて親のフラグ・コマンド集合にマージするようにした。あわせて、埋め込みでないフィールドの扱いを先に判定するよう分岐順序を入れ替えている。README.md に Plugins の使用例と目次を追加し、kong_test.go に TestPlugins を追加した。",
+    "why": "コミットメッセージは \"Add support for plugins.\" のみで背景説明はないが、diff からはおそらく、静的に構造体を埋め込む(embed)方式では実現できない「実行時に決まる構造体の集合をトップレベル CLI にまとめて登録したい」というユースケースに対応するための変更だと考えられる。kong.Plugins フィールドに構造体ポインタのスライスを代入すると、各要素のフィールド・タグがあたかも埋め込みフィールドであるかのように展開され、動的なプラグイン機構を実現できる。",
+    "highlights": [
+      { "file": "build.go", "note": "fv.Type() == reflect.TypeOf(Plugins{}) の分岐で各プラグイン要素を再帰的に flattenedFields() へ渡している" },
+      { "file": "kong_test.go", "note": "TestPlugins が Plugins{&pluginOne, &pluginTwo} という具体的な使い方を示す" }
+    ],
+    "langNotes": [
+      { "topic": "struct embedding と reflect.Value", "note": "Go の struct embedding(匿名フィールド)は静的にしか構成できないが、このコミットはリフレクション(reflect.Value.Elem() で interface{} の中身を取り出す)を使うことで、実行時に決めたポインタのスライスを埋め込みフィールドと同様に扱う仕組みを作っている。" }
+    ],
+    "diagram": null,
+    "evidence": "inferred",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

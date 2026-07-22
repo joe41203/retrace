@@ -1,0 +1,96 @@
+{
+  "seq": 92,
+  "sha": "539214f23ec6f5c1af07afbe5a38f691572f57c8",
+  "parents": [
+    "99ff32a85f460195c7d25c05c3e103199fc1558d"
+  ],
+  "author": {
+    "name": "Alec Thomas",
+    "email": "alec@swapoff.org",
+    "date": "2018-07-26T17:45:12+10:00"
+  },
+  "message": "Add contextual information to mapper errors.",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 5,
+    "deletions": 5
+  },
+  "files": [
+    {
+      "path": "_examples/server/main.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 2,
+      "binary": false
+    },
+    {
+      "path": "model.go",
+      "status": "M",
+      "additions": 4,
+      "deletions": 3,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/_examples/server/main.go b/_examples/server/main.go\nindex f681a25..61b1010 100644\n--- a/_examples/server/main.go\n+++ b/_examples/server/main.go\n@@ -8,12 +8,11 @@ import (\n \t\"os\"\n \t\"strings\"\n \n-\t\"golang.org/x/crypto/ssh/terminal\"\n-\n \t\"github.com/chzyer/readline\"\n \t\"github.com/gliderlabs/ssh\"\n \t\"github.com/google/shlex\"\n \t\"github.com/kr/pty\"\n+\t\"golang.org/x/crypto/ssh/terminal\"\n \n \t\"github.com/alecthomas/colour\"\n \t\"github.com/alecthomas/kong\"\ndiff --git a/model.go b/model.go\nindex 2974c91..38f1d0d 100644\n--- a/model.go\n+++ b/model.go\n@@ -253,10 +253,11 @@ func (v *Value) IsBool() bool {\n // Parse tokens into value, parse, and validate, but do not write to the field.\n func (v *Value) Parse(scan *Scanner, target reflect.Value) error {\n \terr := v.Mapper.Decode(&DecodeContext{Value: v, Scan: scan}, target)\n-\tif err == nil {\n-\t\tv.Set = true\n+\tif err != nil {\n+\t\treturn fmt.Errorf(\"%s: %s\", v.Summary(), err)\n \t}\n-\treturn err\n+\tv.Set = true\n+\treturn nil\n }\n \n // Apply value to field.\n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    ".golangci.yml",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/console.go",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/main.go",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "context.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "tokentype_string.go"
+  ],
+  "explanation": {
+    "what": "Value.Parse() 内で Mapper.Decode() がエラーを返した場合、そのエラーメッセージの前に v.Summary()(フラグ/引数名などの文脈情報)を付与して fmt.Errorf でラップするように変更した。あわせて `err == nil` の分岐を `err != nil` の早期リターンに整理している。",
+    "why": "従来はデコードエラーがそのまま返されるため、どのフラグ・引数でエラーが起きたか利用者には分かりにくかった。エラーメッセージに Summary() を前置することで、複数のフラグ・引数を持つ CLI でもエラー箇所を特定しやすくしている。",
+    "highlights": [
+      { "file": "model.go", "note": "v.Summary() を前置してエラーを再ラップする箇所" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

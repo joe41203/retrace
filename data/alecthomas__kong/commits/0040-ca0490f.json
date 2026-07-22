@@ -1,0 +1,72 @@
+{
+  "seq": 40,
+  "sha": "ca0490fe2ae3cfef8ffafaf3fbfdfde20122de60",
+  "parents": [
+    "1426db8aa017ae8dc83112abd7e54c15ef14d7ef"
+  ],
+  "author": {
+    "name": "Alec Thomas",
+    "email": "alec@swapoff.org",
+    "date": "2018-06-03T07:41:37+10:00"
+  },
+  "message": "Add some helper functions to the models.",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 81,
+    "deletions": 10
+  },
+  "files": [
+    {
+      "path": "model.go",
+      "status": "M",
+      "additions": 81,
+      "deletions": 10,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/model.go b/model.go\nindex bd02c78..f94db84 100644\n--- a/model.go\n+++ b/model.go\n@@ -1,6 +1,7 @@\n package kong\n \n import (\n+\t\"fmt\"\n \t\"reflect\"\n \t\"strconv\"\n \t\"strings\"\n@@ -15,7 +16,7 @@ type Application struct {\n func (a *Application) Leaves() (out []*Node) {\n \tvar walk func(n *Node)\n \twalk = func(n *Node) {\n-\t\tif len(n.Children) == 0 {\n+\t\tif len(n.Children) == 0 && n.Type != ApplicationNode {\n \t\t\tout = append(out, n)\n \t\t}\n \t\tfor _, child := range n.Children {\n@@ -53,6 +54,62 @@ type Node struct {\n \tArgument *Value // Populated when Type is ArgumentNode.\n }\n \n+// Depth of the command from the application root.\n+func (n *Node) Depth() int {\n+\tdepth := 0\n+\tp := n.Parent\n+\tfor p != nil && p.Type != ApplicationNode {\n+\t\tdepth++\n+\t\tp = p.Parent\n+\t}\n+\treturn depth\n+}\n+\n+// Summary help string for the node.\n+func (n *Node) Summary() string {\n+\tsummary := n.Name\n+\tif n.Type == ArgumentNode {\n+\t\tsummary = \"<\" + summary + \">\"\n+\t}\n+\tif flags := n.FlagSummary(); flags != \"\" {\n+\t\tsummary += \" \" + flags\n+\t}\n+\targs := []string{}\n+\tfor _, arg := range n.Positional {\n+\t\tif arg.Required {\n+\t\t\targText := \"<\" + arg.Name + \">\"\n+\t\t\tif arg.IsCumulative() {\n+\t\t\t\targText += \" ...\"\n+\t\t\t}\n+\t\t\targs = append(args, argText)\n+\t\t}\n+\t}\n+\tif len(args) != 0 {\n+\t\tsummary += \" \" + strings.Join(args, \" \")\n+\t}\n+\treturn summary\n+}\n+\n+// FlagSummary for the node.\n+func (n *Node) FlagSummary() string {\n+\trequired := []string{}\n+\tcount := 0\n+\tfor _, flag := range n.Flags {\n+\t\tcount++\n+\t\tif flag.Required {\n+\t\t\tif flag.IsBool() {\n+\t\t\t\trequired = append(required, fmt.Sprintf(\"--%s\", flag.Name))\n+\t\t\t} else {\n+\t\t\t\trequired = append(required, fmt.Sprintf(\"--%s=%s\", flag.Name, flag.FormatPlaceHolder()))\n+\t\t\t}\n+\t\t}\n+\t}\n+\tif count != len(required) {\n+\t\trequired = append(required, \"[<flags>]\")\n+\t}\n+\treturn strings.Join(required, \" \")\n+}\n+\n // Path through ancestors to this Node.\n func (n *Node) Path() (out string) {\n \tif n.Parent != nil {\n@@ -82,6 +139,10 @@ type Value struct {\n \tPosition int    // Position (for positional arguments).\n }\n \n+func (v *Value) IsCumulative() bool {\n+\treturn v.Value.Kind() == reflect.Slice\n+}\n+\n func (v *Value) IsBool() bool {\n \treturn v.Value.Kind() == reflect.Bool\n }\n@@ -125,20 +186,30 @@ type Flag struct {\n \tHidden      bool\n }\n \n+func (f *Flag) String() string {\n+\tout := \"--\" + f.Name\n+\tif f.Short != 0 {\n+\t\tout = fmt.Sprintf(\"-%c, %s\", f.Short, out)\n+\t}\n+\tif !f.IsBool() {\n+\t\tout += \"=\" + f.FormatPlaceHolder()\n+\t}\n+\treturn out\n+}\n+\n func (f *Flag) FormatPlaceHolder() string {\n+\ttail := \"\"\n+\tif f.Value.IsCumulative() {\n+\t\ttail += \", ...\"\n+\t}\n \tif f.PlaceHolder != \"\" {\n-\t\treturn f.PlaceHolder\n+\t\treturn f.PlaceHolder + tail\n \t}\n \tif f.Default != \"\" {\n-\t\tellipsis := \"\"\n-\t\tif len(f.Default) > 1 {\n-\t\t\tellipsis = \"...\"\n-\t\t}\n-\n \t\tif f.Value.Value.Kind() == reflect.String {\n-\t\t\treturn strconv.Quote(f.Default) + ellipsis\n+\t\t\treturn strconv.Quote(f.Default) + tail\n \t\t}\n-\t\treturn f.Default + ellipsis\n+\t\treturn f.Default + tail\n \t}\n-\treturn strings.ToUpper(f.Name)\n+\treturn strings.ToUpper(f.Name) + tail\n }\n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    "README.md",
+    "_examples/shell/main.go",
+    "build.go",
+    "camelcase.go",
+    "context.go",
+    "context_test.go",
+    "decoders.go",
+    "decoders_test.go",
+    "global.go",
+    "global_test.go",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "kong.go",
+    "kong_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "tokentype_string.go"
+  ],
+  "explanation": {
+    "what": "`model.go` の `Node`・`Value`・`Flag` にヘルプ表示向けのヘルパーメソッドを追加した。`Node.Depth()`(ルートからの深さ)、`Node.Summary()`/`Node.FlagSummary()`(使用法の要約文字列生成)、`Value.IsCumulative()`(スライス型かどうか)、`Flag.String()` を新設し、`Flag.FormatPlaceHolder()` はスライス型の場合に `\", ...\"` を付与するよう拡張されている。`Application.Leaves()` は `ApplicationNode` 自体を葉として数えないよう条件を修正した。",
+    "why": "おそらく、直前のバリデーション分離コミットで導入した raymond テンプレートベースのヘルプ生成をさらに作り込む過程で、各ノード・フラグの表示用文字列(usage行やフラグ一覧)を組み立てるための部品を model 層に用意したものと考えられる。",
+    "highlights": [
+      { "file": "model.go", "note": "Node.Summary()/FlagSummary(): 必須フラグ・必須位置引数から usage 相当の要約文字列を組み立てる処理" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "inferred",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

@@ -1,0 +1,81 @@
+{
+  "seq": 80,
+  "sha": "7e022e20b084402ce9e3b3c4f28152725ac3bdfe",
+  "parents": [
+    "a2ec050947ecfaf6012b5f67ab08964244fb2391"
+  ],
+  "author": {
+    "name": "Alec Thomas",
+    "email": "alec@swapoff.org",
+    "date": "2018-06-21T23:22:29+10:00"
+  },
+  "message": "Fix example.",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 3,
+    "deletions": 1
+  },
+  "files": [
+    {
+      "path": "_examples/docker/main.go",
+      "status": "M",
+      "additions": 3,
+      "deletions": 1,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/_examples/docker/main.go b/_examples/docker/main.go\nindex 98269e5..f472230 100644\n--- a/_examples/docker/main.go\n+++ b/_examples/docker/main.go\n@@ -80,6 +80,8 @@ func main() {\n \t\t\tctx.App.Printf(\"1.0.0\").Exit(0)\n \t\t\treturn nil\n \t\t}))\n-\terr := parser.Run(os.Args[1:], \"ofo\")\n+\tctx, err := parser.Parse(os.Args[1:])\n+\tparser.FatalIfErrorf(err)\n+\terr = ctx.Run(&cli.Globals)\n \tparser.FatalIfErrorf(err)\n }\n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    ".golangci.yml",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/shell/main.go",
+    "build.go",
+    "camelcase.go",
+    "context.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "tokentype_string.go"
+  ],
+  "explanation": {
+    "what": "docker example の `main()` を、前コミットで削除された旧 `parser.Run(os.Args[1:], \"ofo\")` 呼び出しのまま残っていたコードから、新しい2段階の呼び出し(`parser.Parse()` でエラーチェックしてから `ctx.Run(&cli.Globals)`)に修正した。",
+    "why": "おそらく、直前の `Context.Run()` 実装コミット(seq79)で API 形状が変わったにもかかわらず、docker example の main() 側の呼び出しが追従できておらずビルドが壊れていたため、その場しのぎの修正として送られたコミットと考えられる。",
+    "highlights": [
+      { "file": "_examples/docker/main.go", "note": "parser.Run(...) の1行呼び出しから Parse()→Run() の2段階呼び出しに変更" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "inferred",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

@@ -1,0 +1,129 @@
+{
+  "seq": 299,
+  "sha": "e49700181c4e78c36c4f6a39ea643c668fc5f4ee",
+  "parents": [
+    "38c56226ba8a6963c7202f05584a7b662dbaf53a"
+  ],
+  "author": {
+    "name": "Denis Titusov",
+    "email": "sescusu@gmail.com",
+    "date": "2022-01-27T12:21:20+03:00"
+  },
+  "message": "fix: Change the application flags order avoiding panics\nThis commit solves issue alecthomas/kong#264",
+  "pr": {
+    "number": 266,
+    "title": "fix: Change the application flags order avoiding panics",
+    "body": "This commit solves issue alecthomas/kong#264\r\n\r\nI've checked this code with my service, the panics are gone.",
+    "url": "https://github.com/alecthomas/kong/pull/266"
+  },
+  "linkedIssues": [
+    {
+      "number": 264,
+      "title": "The application crashes if there are no commands, but there is a custom resolver",
+      "body": "Hi 👋\r\nFirst of all, thank you for your awesome work! The Kong is perfect ❤️\r\n\r\n## What happened\r\n\r\nI ran into the following problem. I have an application with no additional commands. Meanwhile, I have a custom config resolver for `.env` files (`\"github.com/bluegosolutions/kong-dotenv-go\"`, it's the same as in #156). \r\n\r\nHere's a sample of my code:\r\n\r\n```go\r\npackage main\r\n\r\nimport (\r\n    // other imports\r\n\t\"github.com/alecthomas/kong\"\r\n\tdotenv \"github.com/bluegosolutions/kong-dotenv-go\"\r\n)\r\n\r\n// App defines the service and all its configs\r\ntype App struct {\r\n\t// You can pass an .env file as a config: <command_name> --env-file=./.env\r\n\tEnvFile kong.ConfigFlag `kong:\"optional,name=env-file,help='Path to .env file'\"`\r\n\t// HTTP server configurator\r\n\tHTTPServer HTTPServerFlags `kong:\"embed\"`\r\n}\r\n\r\ntype HTTPServerFlags struct {\r\n\tAddress string `kong:\"required,group='HTTP Server',name=http-address,env='HTTP_ADDR',default=':8080',help='The HTTP address <host>:<port> of the main server.'\"`\r\n}\r\n\r\nfunc main() {\r\n\tvar app App\r\n\tctx := kong.Parse(&app, kong.Configuration(dotenv.ENVFile))\r\n\tctx.FatalIfErrorf(ctx.Run())\r\n}\r\n```\r\n\r\nWhen I run the application with environment variables or flags, everything works perfectly. \r\nBut when I run the application with the `--env-file` flag, it crashes with a panic:\r\n\r\n```shell\r\ngo run main.go --env-file=.env\r\n\r\nAPI server listening at: 127.0.0.1:58887\r\ndebugserver-@(#)PROGRAM:LLDB  PROJECT:lldb-1300.0.42.3\r\n for x86_64.\r\nGot a connection, launched process /private/var/folders/df/83mftq9j2rl2tc1z2cxkpxsh0000gq/T/GoLand/___1go_build_gitlab_corp_mail_ru_youla_api_platform_git_v2_cmd_app (pid = 54942).\r\npanic: runtime error: invalid memory address or nil pointer dereference\r\n[signal SIGSEGV: segmentation violation code=0x1 addr=0x0 pc=0x14a402a]\r\n\r\ngoroutine 1 [running]:\r\ngithub.com/alecthomas/kong.(*Context).Run(0xc000046c80, {0x0, 0x0, 0x0})\r\n        /Users/d.titusov/go/pkg/mod/github.com/alecthomas/kong@v0.3.0/context.go:751 +0x10a\r\nmain.main()\r\n        /Users/d.titusov/Projects/youla/platform/cmd/app/main.go:45 +0x15f\r\nExiting.\r\n```\r\n\r\n## My hypothesis as to why this happens\r\n\r\nAs far as I understand, the issue is that kong is trying to run the application from Node 0, when the 0th node is not `ApplicationNode`: https://github.com/alecthomas/kong/blob/3987efba8647711f11290d443e07106f22f7393f/context.go#L750\r\n\r\nThe order of the `ApplicationNode` is changed inside the `Resolve` method:\r\nhttps://github.com/alecthomas/kong/blob/3987efba8647711f11290d443e07106f22f7393f/context.go#L585 \r\n\r\n## How to fix that\r\n\r\nFirst of all, I assume that I could miss something important. There might be a reason why you put original `c.Path` nodes at the end of the `c.Path` slice.\r\n\r\nOtherwise, If this is a bug, I'd be happy to fix it.\r\n\r\nThanks for your help!",
+      "url": "https://github.com/alecthomas/kong/issues/264"
+    }
+  ],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 1,
+    "deletions": 1
+  },
+  "files": [
+    {
+      "path": "context.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/context.go b/context.go\nindex de4301a..742bc9b 100644\n--- a/context.go\n+++ b/context.go\n@@ -582,7 +582,7 @@ func (c *Context) Resolve() error {\n \t\t\t})\n \t\t}\n \t}\n-\tc.Path = append(inserted, c.Path...)\n+\tc.Path = append(c.Path, inserted...)\n \treturn nil\n }\n \n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/FUNDING.yml",
+    ".github/workflows/ci.yml",
+    ".gitignore",
+    ".golangci.yml",
+    "COPYING",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/README.md",
+    "_examples/server/console.go",
+    "_examples/server/go.mod",
+    "_examples/server/go.sum",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/main.go",
+    "benchmark_test.go",
+    "bin/.go@latest.pkg",
+    "bin/.golangci-lint-1.42.0.pkg",
+    "bin/README.hermit.md",
+    "bin/activate-hermit",
+    "bin/go",
+    "bin/gofmt",
+    "bin/golangci-lint",
+    "bin/hermit",
+    "bin/hermit.hcl",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "config_test.go",
+    "context.go",
+    "defaults.go",
+    "defaults_test.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "go.mod",
+    "go.sum",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "testdata/file.txt",
+    "util.go",
+    "util_test.go",
+    "visit.go"
+  ],
+  "explanation": {
+    "what": "Context.Resolve() で、Configuration リゾルバから挿入されたパスノードを c.Path の末尾ではなく先頭に追加していた `append(inserted, c.Path...)` を、末尾に追加する `append(c.Path, inserted...)` に修正した。",
+    "why": "リンクされたissue #264の報告によると、サブコマンドを持たずカスタム resolver(設定ファイルローダー等)だけを使うアプリケーションで、Resolve() が c.Path の先頭に要素を挿入してしまうため、Context.Run() が c.Path[0] を ApplicationNode だと仮定している箇所でnilポインタ参照によるpanicが発生していた。挿入位置を末尾に変えることでApplicationNodeが常に先頭に残るようにし、この前提を壊さないよう修正した。",
+    "highlights": [
+      { "file": "context.go", "note": "append(inserted, c.Path...) → append(c.Path, inserted...) の一行修正がpanicの直接の原因を潰している" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [
+      { "type": "pr", "number": 266, "url": "https://github.com/alecthomas/kong/pull/266" },
+      { "type": "issue", "number": 264, "url": "https://github.com/alecthomas/kong/issues/264" }
+    ],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

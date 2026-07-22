@@ -1,0 +1,164 @@
+{
+  "seq": 361,
+  "sha": "fa9b6369971547774c28a1c971292dacdb5cdb5f",
+  "parents": [
+    "30e84613fe34bbc57e9421303b14af459d845f74"
+  ],
+  "author": {
+    "name": "Prashant Varanasi",
+    "email": "github@prashantv.com",
+    "date": "2024-02-26T16:10:15-08:00"
+  },
+  "message": "Support aliases for flags (#409)\n\nAliases are currently only supported for sub-commands, but they're\r\nuseful for flags as well. E.g., when migrating from an old flag name\r\nto a new flag name, while still supporting the old value.",
+  "pr": {
+    "number": 409,
+    "title": "Support aliases for flags",
+    "body": "Fixes #303\r\n\r\nAliases are currently only supported for sub-commands, but they're useful for flags as well. E.g., when migrating from an old flag name to a new flag name, while still supporting the old value.",
+    "url": "https://github.com/alecthomas/kong/pull/409"
+  },
+  "linkedIssues": [
+    {
+      "number": 303,
+      "title": "Support aliases for all switches",
+      "body": "Currently it seams the `aliases` tag only works for \"commands\", would it be possible to enable it for normal flags as well?\r\n\r\n```go\r\ntype Arg struct {\r\n    TestFlag string `kong:\"aliases='alt-flag'\"\r\n}\r\n```\r\n\r\nThat would let you either run `./cmd --test-flag blah` or `./cmd --alt-flag blah` and in both cases the `TestFlag` field would contain `blah`.  Maybe this is already allowed and I'm just doing it wrong but in testing it says the aliases names are an \"unknown flag\".",
+      "url": "https://github.com/alecthomas/kong/issues/303"
+    }
+  ],
+  "stats": {
+    "filesChanged": 5,
+    "additions": 50,
+    "deletions": 4
+  },
+  "files": [
+    {
+      "path": "README.md",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "build.go",
+      "status": "M",
+      "additions": 8,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "context.go",
+      "status": "M",
+      "additions": 12,
+      "deletions": 3,
+      "binary": false
+    },
+    {
+      "path": "kong_test.go",
+      "status": "M",
+      "additions": 28,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "model.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/README.md b/README.md\nindex ba8275b..22e00f0 100644\n--- a/README.md\n+++ b/README.md\n@@ -566,7 +566,7 @@ Both can coexist with standard Tag parsing.\n | `default:\"1\"`        | On a command, make it the default.                                                                                                                                                                                                                                                                                             |\n | `default:\"withargs\"` | On a command, make it the default and allow args/flags from that command                                                                                                                                                                                                                                                       |\n | `short:\"X\"`          | Short name, if flag.                                                                                                                                                                                                                                                                                                           |\n-| `aliases:\"X,Y\"`      | One or more aliases (for cmd).                                                                                                                                                                                                                                                                                                 |\n+| `aliases:\"X,Y\"`      | One or more aliases (for cmd or flag).                                                                                                                                                                                                                                                                                                 |\n | `required:\"\"`        | If present, flag/arg is required.                                                                                                                                                                                                                                                                                              |\n | `optional:\"\"`        | If present, flag/arg is optional.                                                                                                                                                                                                                                                                                              |\n | `hidden:\"\"`          | If present, command or flag is hidden.                                                                                                                                                                                                                                                                                         |\ndiff --git a/build.go b/build.go\nindex e23c115..a52d90f 100644\n--- a/build.go\n+++ b/build.go\n@@ -296,6 +296,13 @@ func buildField(k *Kong, node *Node, v reflect.Value, ft reflect.StructField, fv\n \t\t\treturn failField(v, ft, \"duplicate flag --%s\", value.Name)\n \t\t}\n \t\tseenFlags[\"--\"+value.Name] = true\n+\t\tfor _, alias := range tag.Aliases {\n+\t\t\taliasFlag := \"--\" + alias\n+\t\t\tif seenFlags[aliasFlag] {\n+\t\t\t\treturn failField(v, ft, \"duplicate flag %s\", aliasFlag)\n+\t\t\t}\n+\t\t\tseenFlags[aliasFlag] = true\n+\t\t}\n \t\tif tag.Short != 0 {\n \t\t\tif seenFlags[\"-\"+string(tag.Short)] {\n \t\t\t\treturn failField(v, ft, \"duplicate short flag -%c\", tag.Short)\n@@ -304,6 +311,7 @@ func buildField(k *Kong, node *Node, v reflect.Value, ft reflect.StructField, fv\n \t\t}\n \t\tflag := &Flag{\n \t\t\tValue:       value,\n+\t\t\tAliases:     tag.Aliases,\n \t\t\tShort:       tag.Short,\n \t\t\tPlaceHolder: tag.PlaceHolder,\n \t\t\tEnvs:        tag.Envs,\ndiff --git a/context.go b/context.go\nindex 4350608..b2bfea6 100644\n--- a/context.go\n+++ b/context.go\n@@ -684,15 +684,24 @@ func flipBoolValue(value reflect.Value) error {\n \n func (c *Context) parseFlag(flags []*Flag, match string) (err error) {\n \tcandidates := []string{}\n+\n \tfor _, flag := range flags {\n \t\tlong := \"--\" + flag.Name\n-\t\tshort := \"-\" + string(flag.Short)\n-\t\tneg := \"--no-\" + flag.Name\n+\t\tmatched := long == match\n \t\tcandidates = append(candidates, long)\n \t\tif flag.Short != 0 {\n+\t\t\tshort := \"-\" + string(flag.Short)\n+\t\t\tmatched = matched || (short == match)\n \t\t\tcandidates = append(candidates, short)\n \t\t}\n-\t\tif short != match && long != match && !(match == neg && flag.Tag.Negatable) {\n+\t\tfor _, alias := range flag.Aliases {\n+\t\t\talias = \"--\" + alias\n+\t\t\tmatched = matched || (alias == match)\n+\t\t\tcandidates = append(candidates, alias)\n+\t\t}\n+\n+\t\tneg := \"--no-\" + flag.Name\n+\t\tif !matched && !(match == neg && flag.Tag.Negatable) {\n \t\t\tcontinue\n \t\t}\n \t\t// Found a matching flag.\ndiff --git a/kong_test.go b/kong_test.go\nindex 650cf2a..3e71979 100644\n--- a/kong_test.go\n+++ b/kong_test.go\n@@ -518,6 +518,16 @@ func TestShort(t *testing.T) {\n \tassert.Equal(t, \"hello\", cli.String)\n }\n \n+func TestAlias(t *testing.T) {\n+\tvar cli struct {\n+\t\tString string `aliases:\"str\"`\n+\t}\n+\tapp := mustNew(t, &cli)\n+\t_, err := app.Parse([]string{\"--str\", \"hello\"})\n+\tassert.NoError(t, err)\n+\tassert.Equal(t, \"hello\", cli.String)\n+}\n+\n func TestDuplicateFlagChoosesLast(t *testing.T) {\n \tvar cli struct {\n \t\tFlag int\n@@ -1321,6 +1331,24 @@ func TestDuplicateShortflags(t *testing.T) {\n \tassert.EqualError(t, err, \"<anonymous struct>.Flag2: duplicate short flag -t\")\n }\n \n+func TestDuplicateAliases(t *testing.T) {\n+\tcli1 := struct {\n+\t\tFlag1 string `aliases:\"flag\"`\n+\t\tFlag2 string `aliases:\"flag\"`\n+\t}{}\n+\t_, err := kong.New(&cli1)\n+\tassert.EqualError(t, err, \"<anonymous struct>.Flag2: duplicate flag --flag\")\n+}\n+\n+func TestDuplicateAliasLong(t *testing.T) {\n+\tcli2 := struct {\n+\t\tFlag  string ``\n+\t\tFlag2 string `aliases:\"flag\"` // duplicates Flag\n+\t}{}\n+\t_, err := kong.New(&cli2)\n+\tassert.EqualError(t, err, \"<anonymous struct>.Flag2: duplicate flag --flag\")\n+}\n+\n func TestDuplicateNestedShortFlags(t *testing.T) {\n \tcli := struct {\n \t\tFlag1 bool `short:\"t\"`\ndiff --git a/model.go b/model.go\nindex eeb547c..4e59fea 100644\n--- a/model.go\n+++ b/model.go\n@@ -397,6 +397,7 @@ type Flag struct {\n \tXor         []string\n \tPlaceHolder string\n \tEnvs        []string\n+\tAliases     []string\n \tShort       rune\n \tHidden      bool\n \tNegated     bool\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/FUNDING.yml",
+    ".github/workflows/ci.yml",
+    ".gitignore",
+    ".golangci.yml",
+    "COPYING",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/README.md",
+    "_examples/server/console.go",
+    "_examples/server/go.mod",
+    "_examples/server/go.sum",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/commandstring/main.go",
+    "_examples/shell/help/README.md",
+    "_examples/shell/help/main.go",
+    "benchmark_test.go",
+    "bin/.golangci-lint-1.55.2.pkg",
+    "bin/README.hermit.md",
+    "bin/activate-hermit",
+    "bin/golangci-lint",
+    "bin/hermit",
+    "bin/hermit.hcl",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "config_test.go",
+    "context.go",
+    "defaults.go",
+    "defaults_test.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "go.mod",
+    "go.sum",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "helpwrap1.18_test.go",
+    "helpwrap1.19_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_linux_test.go",
+    "mapper_test.go",
+    "mapper_windows_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "renovate.json5",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "testdata/file.txt",
+    "util.go",
+    "util_test.go",
+    "visit.go"
+  ],
+  "explanation": {
+    "what": "flag に対しても `aliases:\"X,Y\"` タグを使えるようにした。build.go の buildField でエイリアス名も seenFlags に登録して重複検出し、context.go の parseFlag でエイリアス文字列も候補としてマッチ判定に加えている。",
+    "why": "これまで aliases タグはサブコマンドにしか効かず、flag では「unknown flag」エラーになっていた(issue #303)。古いフラグ名から新しいフラグ名への移行期に旧名も使えるようにしたいという要望が背景で、PR はこの issue を fixes している。",
+    "highlights": [
+      { "file": "context.go", "note": "parseFlag が候補文字列(long/short/alias)を集めて match と突き合わせる形に整理され、alias もここに合流する" },
+      { "file": "build.go", "note": "エイリアス名も seenFlags に登録し、既存フラグ名との重複を \"duplicate flag\" エラーとして検出" }
+    ],
+    "langNotes": [
+      { "topic": "struct tag によるCLI宣言", "note": "kong は Go の struct タグ(例 `aliases:\"str\"`)にCLI文法の情報を埋め込み、reflect でこれを読み取って解析する。このコミットはタグで表現できる語彙を flag にも拡張する変更。" }
+    ],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [
+      { "type": "pr", "number": 409, "url": "https://github.com/alecthomas/kong/pull/409" },
+      { "type": "issue", "number": 303, "url": "https://github.com/alecthomas/kong/issues/303" }
+    ],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

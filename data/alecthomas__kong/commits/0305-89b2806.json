@@ -1,0 +1,207 @@
+{
+  "seq": 305,
+  "sha": "89b2806f6a8a7c0add39f2c0a2081fc315a5fc77",
+  "parents": [
+    "7a635254200602a6de251035c6de8a9259abd8f1"
+  ],
+  "author": {
+    "name": "Denis Titusov",
+    "email": "sescusu@gmail.com",
+    "date": "2022-03-18T10:54:29+03:00"
+  },
+  "message": "Switch to the standard errors API, that was introduced in 1.13 (#273)\n\n* Switch to the standard errors API, that was introduced in 1.13\r\n\r\n* Fix linter errors 🤦‍\r\n\r\n* Remove withStackError\r\n\r\n* fix: freeze go version to 1.17, since 1.18 introduced generics, which are not supported by linters yet\r\n\r\n* fix: freeze go version to 1.17, since 1.18 introduced generics, which are not supported by linters yet",
+  "pr": {
+    "number": 273,
+    "title": "Switch to the standard errors API, that was introduced in 1.13",
+    "body": "",
+    "url": "https://github.com/alecthomas/kong/pull/273"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 13,
+    "additions": 61,
+    "deletions": 65
+  },
+  "files": [
+    {
+      "path": "bin/.go-1.17.pkg",
+      "status": "R",
+      "additions": 0,
+      "deletions": 0,
+      "binary": false,
+      "oldPath": "bin/.go@latest.pkg"
+    },
+    {
+      "path": "bin/go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "bin/gofmt",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "callbacks.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 3,
+      "binary": false
+    },
+    {
+      "path": "context.go",
+      "status": "M",
+      "additions": 8,
+      "deletions": 9,
+      "binary": false
+    },
+    {
+      "path": "error.go",
+      "status": "M",
+      "additions": 2,
+      "deletions": 2,
+      "binary": false
+    },
+    {
+      "path": "go.mod",
+      "status": "M",
+      "additions": 0,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "go.sum",
+      "status": "M",
+      "additions": 0,
+      "deletions": 2,
+      "binary": false
+    },
+    {
+      "path": "kong.go",
+      "status": "M",
+      "additions": 5,
+      "deletions": 3,
+      "binary": false
+    },
+    {
+      "path": "kong_test.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "mapper.go",
+      "status": "M",
+      "additions": 37,
+      "deletions": 35,
+      "binary": false
+    },
+    {
+      "path": "model.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 3,
+      "binary": false
+    },
+    {
+      "path": "options.go",
+      "status": "M",
+      "additions": 4,
+      "deletions": 4,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/bin/.go@latest.pkg b/bin/.go-1.17.pkg\nsimilarity index 100%\nrename from bin/.go@latest.pkg\nrename to bin/.go-1.17.pkg\ndiff --git a/bin/go b/bin/go\nindex 142d6ff..cdc9b02 120000\n--- a/bin/go\n+++ b/bin/go\n@@ -1 +1 @@\n-.go@latest.pkg\n\\ No newline at end of file\n+.go-1.17.pkg\n\\ No newline at end of file\ndiff --git a/bin/gofmt b/bin/gofmt\nindex 142d6ff..cdc9b02 120000\n--- a/bin/gofmt\n+++ b/bin/gofmt\n@@ -1 +1 @@\n-.go@latest.pkg\n\\ No newline at end of file\n+.go-1.17.pkg\n\\ No newline at end of file\ndiff --git a/callbacks.go b/callbacks.go\nindex 8b78741..1cfaccf 100644\n--- a/callbacks.go\n+++ b/callbacks.go\n@@ -4,8 +4,6 @@ import (\n \t\"fmt\"\n \t\"reflect\"\n \t\"strings\"\n-\n-\t\"github.com/pkg/errors\"\n )\n \n type bindings map[reflect.Type]func() (reflect.Value, error)\n@@ -35,7 +33,7 @@ func (b bindings) addProvider(provider interface{}) error {\n \tpv := reflect.ValueOf(provider)\n \tt := pv.Type()\n \tif t.Kind() != reflect.Func || t.NumIn() != 0 || t.NumOut() != 2 || t.Out(1) != reflect.TypeOf((*error)(nil)).Elem() {\n-\t\treturn errors.Errorf(\"%T must be a function with the signature func()(T, error)\", provider)\n+\t\treturn fmt.Errorf(\"%T must be a function with the signature func()(T, error)\", provider)\n \t}\n \trt := pv.Type().Out(0)\n \tb[rt] = func() (reflect.Value, error) {\ndiff --git a/context.go b/context.go\nindex 6d48f5f..45c412a 100644\n--- a/context.go\n+++ b/context.go\n@@ -1,14 +1,13 @@\n package kong\n \n import (\n+\t\"errors\"\n \t\"fmt\"\n \t\"os\"\n \t\"reflect\"\n \t\"sort\"\n \t\"strconv\"\n \t\"strings\"\n-\n-\t\"github.com/pkg/errors\"\n )\n \n // Path records the nodes and parsed values from the current command-line.\n@@ -209,9 +208,8 @@ func (c *Context) Validate() error { // nolint: gocyclo\n \t\t\tdesc = node.Path()\n \t\t}\n \t\tif validate := isValidatable(value); validate != nil {\n-\t\t\terr := validate.Validate()\n-\t\t\tif err != nil {\n-\t\t\t\treturn errors.Wrap(err, desc)\n+\t\t\tif err := validate.Validate(); err != nil {\n+\t\t\t\treturn fmt.Errorf(\"%s: %w\", desc, err)\n \t\t\t}\n \t\t}\n \t}\n@@ -558,7 +556,7 @@ func (c *Context) Resolve() error {\n \t\t\tfor _, resolver := range resolvers {\n \t\t\t\ts, err := resolver.Resolve(c, path, flag)\n \t\t\t\tif err != nil {\n-\t\t\t\t\treturn errors.Wrap(err, flag.ShortSummary())\n+\t\t\t\t\treturn fmt.Errorf(\"%s: %w\", flag.ShortSummary(), err)\n \t\t\t\t}\n \t\t\t\tif s == nil {\n \t\t\t\t\tcontinue\n@@ -683,8 +681,9 @@ func (c *Context) parseFlag(flags []*Flag, match string) (err error) {\n \t\t}\n \t\terr := flag.Parse(c.scan, c.getValue(flag.Value))\n \t\tif err != nil {\n-\t\t\tif e, ok := errors.Cause(err).(*expectedError); ok && e.token.InferredType().IsAny(FlagToken, ShortFlagToken) {\n-\t\t\t\treturn errors.Errorf(\"%s; perhaps try %s=%q?\", err, flag.ShortSummary(), e.token)\n+\t\t\tvar expected *expectedError\n+\t\t\tif errors.As(err, &expected) && expected.token.InferredType().IsAny(FlagToken, ShortFlagToken) {\n+\t\t\t\treturn fmt.Errorf(\"%s; perhaps try %s=%q?\", err.Error(), flag.ShortSummary(), expected.token)\n \t\t\t}\n \t\t\treturn err\n \t\t}\n@@ -888,7 +887,7 @@ func checkEnum(value *Value, target reflect.Value) error {\n \t\treturn nil\n \n \tcase reflect.Map, reflect.Struct:\n-\t\treturn errors.Errorf(\"enum can only be applied to a slice or value\")\n+\t\treturn errors.New(\"enum can only be applied to a slice or value\")\n \n \tdefault:\n \t\tenumSlice := value.EnumSlice()\ndiff --git a/error.go b/error.go\nindex 30b8858..18225ef 100644\n--- a/error.go\n+++ b/error.go\n@@ -8,5 +8,5 @@ type ParseError struct {\n \tContext *Context\n }\n \n-// Cause returns the original cause of the error.\n-func (p *ParseError) Cause() error { return p.error }\n+// Unwrap returns the original cause of the error.\n+func (p *ParseError) Unwrap() error { return p.error }\ndiff --git a/go.mod b/go.mod\nindex bdd8bb2..e5c0722 100644\n--- a/go.mod\n+++ b/go.mod\n@@ -3,7 +3,6 @@ module github.com/alecthomas/kong\n require (\n \tgithub.com/alecthomas/repr v0.0.0-20210801044451-80ca428c5142\n \tgithub.com/davecgh/go-spew v1.1.1 // indirect\n-\tgithub.com/pkg/errors v0.9.1\n \tgithub.com/stretchr/testify v1.7.0\n \tgopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b // indirect\n )\ndiff --git a/go.sum b/go.sum\nindex 12908f3..e787c1f 100644\n--- a/go.sum\n+++ b/go.sum\n@@ -3,8 +3,6 @@ github.com/alecthomas/repr v0.0.0-20210801044451-80ca428c5142/go.mod h1:2kn6fqh/\n github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=\n github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=\n github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=\n-github.com/pkg/errors v0.9.1 h1:FEBLx1zS214owpjy7qsBeixbURkuhQAwrK5UwLGTwt4=\n-github.com/pkg/errors v0.9.1/go.mod h1:bwawxfHBFNV+L2hUp1rHADufV3IMtnDRdf1r5NINEl0=\n github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZbAQM=\n github.com/pmezard/go-difflib v1.0.0/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=\n github.com/stretchr/objx v0.1.0/go.mod h1:HFkY916IF+rwdDfMAkV7OtwuqBVzrE8GR6GFx+wExME=\ndiff --git a/kong.go b/kong.go\nindex 3123dc2..eeeaa8c 100644\n--- a/kong.go\n+++ b/kong.go\n@@ -1,6 +1,7 @@\n package kong\n \n import (\n+\t\"errors\"\n \t\"fmt\"\n \t\"io\"\n \t\"os\"\n@@ -378,13 +379,14 @@ func (k *Kong) FatalIfErrorf(err error, args ...interface{}) {\n \t\tmsg = fmt.Sprintf(args[0].(string), args[1:]...) + \": \" + err.Error()\n \t}\n \t// Maybe display usage information.\n-\tif err, ok := err.(*ParseError); ok {\n+\tvar parseErr *ParseError\n+\tif errors.As(err, &parseErr) {\n \t\tswitch k.usageOnError {\n \t\tcase fullUsage:\n-\t\t\t_ = k.help(k.helpOptions, err.Context)\n+\t\t\t_ = k.help(k.helpOptions, parseErr.Context)\n \t\t\tfmt.Fprintln(k.Stdout)\n \t\tcase shortUsage:\n-\t\t\t_ = k.shortHelp(k.helpOptions, err.Context)\n+\t\t\t_ = k.shortHelp(k.helpOptions, parseErr.Context)\n \t\t\tfmt.Fprintln(k.Stdout)\n \t\t}\n \t}\ndiff --git a/kong_test.go b/kong_test.go\nindex 6e52f5a..6ce73f5 100644\n--- a/kong_test.go\n+++ b/kong_test.go\n@@ -2,11 +2,11 @@ package kong_test\n \n import (\n \t\"bytes\"\n+\t\"errors\"\n \t\"fmt\"\n \t\"strings\"\n \t\"testing\"\n \n-\t\"github.com/pkg/errors\"\n \t\"github.com/stretchr/testify/require\"\n \n \t\"github.com/alecthomas/kong\"\ndiff --git a/mapper.go b/mapper.go\nindex 88fe1a5..139b2df 100644\n--- a/mapper.go\n+++ b/mapper.go\n@@ -3,6 +3,7 @@ package kong\n import (\n \t\"encoding\"\n \t\"encoding/json\"\n+\t\"errors\"\n \t\"fmt\"\n \t\"io/ioutil\"\n \t\"math/bits\"\n@@ -12,8 +13,6 @@ import (\n \t\"strconv\"\n \t\"strings\"\n \t\"time\"\n-\n-\t\"github.com/pkg/errors\"\n )\n \n var (\n@@ -295,14 +294,14 @@ func (boolMapper) Decode(ctx *DecodeContext, target reflect.Value) error {\n \t\t\t\ttarget.SetBool(false)\n \n \t\t\tdefault:\n-\t\t\t\treturn errors.Errorf(\"bool value must be true, 1, yes, false, 0 or no but got %q\", v)\n+\t\t\t\treturn fmt.Errorf(\"bool value must be true, 1, yes, false, 0 or no but got %q\", v)\n \t\t\t}\n \n \t\tcase bool:\n \t\t\ttarget.SetBool(v)\n \n \t\tdefault:\n-\t\t\treturn errors.Errorf(\"expected bool but got %q (%T)\", token.Value, token.Value)\n+\t\t\treturn fmt.Errorf(\"expected bool but got %q (%T)\", token.Value, token.Value)\n \t\t}\n \t} else {\n \t\ttarget.SetBool(true)\n@@ -322,12 +321,12 @@ func durationDecoder() MapperFunc {\n \t\tcase string:\n \t\t\td, err = time.ParseDuration(v)\n \t\t\tif err != nil {\n-\t\t\t\treturn errors.Errorf(\"expected duration but got %q: %s\", v, err)\n+\t\t\t\treturn fmt.Errorf(\"expected duration but got %q: %v\", v, err)\n \t\t\t}\n \t\tcase int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64, float32, float64:\n \t\t\td = reflect.ValueOf(v).Convert(reflect.TypeOf(time.Duration(0))).Interface().(time.Duration) // nolint: forcetypeassert\n \t\tdefault:\n-\t\t\treturn errors.Errorf(\"expected duration but got %q\", v)\n+\t\t\treturn fmt.Errorf(\"expected duration but got %q\", v)\n \t\t}\n \t\ttarget.Set(reflect.ValueOf(d))\n \t\treturn nil\n@@ -368,11 +367,11 @@ func intDecoder(bits int) MapperFunc { // nolint: dupl\n \t\t\tsv = fmt.Sprintf(\"%v\", v)\n \n \t\tdefault:\n-\t\t\treturn errors.Errorf(\"expected an int but got %q (%T)\", t, t.Value)\n+\t\t\treturn fmt.Errorf(\"expected an int but got %q (%T)\", t, t.Value)\n \t\t}\n \t\tn, err := strconv.ParseInt(sv, 10, bits)\n \t\tif err != nil {\n-\t\t\treturn errors.Errorf(\"expected a valid %d bit int but got %q\", bits, sv)\n+\t\t\treturn fmt.Errorf(\"expected a valid %d bit int but got %q\", bits, sv)\n \t\t}\n \t\ttarget.SetInt(n)\n \t\treturn nil\n@@ -394,11 +393,11 @@ func uintDecoder(bits int) MapperFunc { // nolint: dupl\n \t\t\tsv = fmt.Sprintf(\"%v\", v)\n \n \t\tdefault:\n-\t\t\treturn errors.Errorf(\"expected an int but got %q (%T)\", t, t.Value)\n+\t\t\treturn fmt.Errorf(\"expected an int but got %q (%T)\", t, t.Value)\n \t\t}\n \t\tn, err := strconv.ParseUint(sv, 10, bits)\n \t\tif err != nil {\n-\t\t\treturn errors.Errorf(\"expected a valid %d bit uint but got %q\", bits, sv)\n+\t\t\treturn fmt.Errorf(\"expected a valid %d bit uint but got %q\", bits, sv)\n \t\t}\n \t\ttarget.SetUint(n)\n \t\treturn nil\n@@ -415,7 +414,7 @@ func floatDecoder(bits int) MapperFunc {\n \t\tcase string:\n \t\t\tn, err := strconv.ParseFloat(v, bits)\n \t\t\tif err != nil {\n-\t\t\t\treturn errors.Errorf(\"expected a float but got %q (%T)\", t, t.Value)\n+\t\t\t\treturn fmt.Errorf(\"expected a float but got %q (%T)\", t, t.Value)\n \t\t\t}\n \t\t\ttarget.SetFloat(n)\n \n@@ -429,7 +428,7 @@ func floatDecoder(bits int) MapperFunc {\n \t\t\ttarget.Set(reflect.ValueOf(v))\n \n \t\tdefault:\n-\t\t\treturn errors.Errorf(\"expected an int but got %q (%T)\", t, t.Value)\n+\t\t\treturn fmt.Errorf(\"expected an int but got %q (%T)\", t, t.Value)\n \t\t}\n \t\treturn nil\n \t}\n@@ -447,7 +446,7 @@ func mapDecoder(r *Registry) MapperFunc {\n \t\t\tt := ctx.Scan.Pop()\n \t\t\t// If decoding a flag, we need an argument.\n \t\t\tif t.IsEOL() {\n-\t\t\t\treturn errors.Errorf(\"unexpected EOL\")\n+\t\t\t\treturn errors.New(\"unexpected EOL\")\n \t\t\t}\n \t\t\tswitch v := t.Value.(type) {\n \t\t\tcase string:\n@@ -457,7 +456,7 @@ func mapDecoder(r *Registry) MapperFunc {\n \t\t\t\tfor _, m := range v {\n \t\t\t\t\terr := jsonTranscode(m, target.Addr().Interface())\n \t\t\t\t\tif err != nil {\n-\t\t\t\t\t\treturn errors.WithStack(err)\n+\t\t\t\t\t\treturn err\n \t\t\t\t\t}\n \t\t\t\t}\n \t\t\t\treturn nil\n@@ -466,7 +465,7 @@ func mapDecoder(r *Registry) MapperFunc {\n \t\t\t\treturn jsonTranscode(v, target.Addr().Interface())\n \n \t\t\tdefault:\n-\t\t\t\treturn errors.Errorf(\"invalid map value %q (of type %T)\", t, t.Value)\n+\t\t\t\treturn fmt.Errorf(\"invalid map value %q (of type %T)\", t, t.Value)\n \t\t\t}\n \t\t} else {\n \t\t\ttokens := ctx.Scan.PopWhile(func(t Token) bool { return t.IsValue() })\n@@ -480,7 +479,7 @@ func mapDecoder(r *Registry) MapperFunc {\n \t\t\t}\n \t\t\tparts := strings.SplitN(token, \"=\", 2)\n \t\t\tif len(parts) != 2 {\n-\t\t\t\treturn errors.Errorf(\"expected \\\"<key>=<value>\\\" but got %q\", token)\n+\t\t\t\treturn fmt.Errorf(\"expected \\\"<key>=<value>\\\" but got %q\", token)\n \t\t\t}\n \t\t\tkey, value := parts[0], parts[1]\n \n@@ -488,7 +487,7 @@ func mapDecoder(r *Registry) MapperFunc {\n \t\t\tif typ := ctx.Value.Tag.Type; typ != \"\" {\n \t\t\t\tparts := strings.Split(typ, \":\")\n \t\t\t\tif len(parts) != 2 {\n-\t\t\t\t\treturn errors.Errorf(\"type:\\\"\\\" on map field must be in the form \\\"[<keytype>]:[<valuetype>]\\\"\")\n+\t\t\t\t\treturn errors.New(\"type:\\\"\\\" on map field must be in the form \\\"[<keytype>]:[<valuetype>]\\\"\")\n \t\t\t\t}\n \t\t\t\tkeyTypeName, valueTypeName = parts[0], parts[1]\n \t\t\t}\n@@ -497,14 +496,14 @@ func mapDecoder(r *Registry) MapperFunc {\n \t\t\tkeyDecoder := r.ForNamedType(keyTypeName, el.Key())\n \t\t\tkeyValue := reflect.New(el.Key()).Elem()\n \t\t\tif err := keyDecoder.Decode(ctx.WithScanner(keyScanner), keyValue); err != nil {\n-\t\t\t\treturn errors.Errorf(\"invalid map key %q\", key)\n+\t\t\t\treturn fmt.Errorf(\"invalid map key %q\", key)\n \t\t\t}\n \n \t\t\tvalueScanner := Scan(value)\n \t\t\tvalueDecoder := r.ForNamedType(valueTypeName, el.Elem())\n \t\t\tvalueValue := reflect.New(el.Elem()).Elem()\n \t\t\tif err := valueDecoder.Decode(ctx.WithScanner(valueScanner), valueValue); err != nil {\n-\t\t\t\treturn errors.Errorf(\"invalid map value %q\", value)\n+\t\t\t\treturn fmt.Errorf(\"invalid map value %q\", value)\n \t\t\t}\n \n \t\t\ttarget.SetMapIndex(keyValue, valueValue)\n@@ -522,7 +521,7 @@ func sliceDecoder(r *Registry) MapperFunc {\n \t\t\tt := ctx.Scan.Pop()\n \t\t\t// If decoding a flag, we need an argument.\n \t\t\tif t.IsEOL() {\n-\t\t\t\treturn errors.Errorf(\"unexpected EOL\")\n+\t\t\t\treturn errors.New(\"unexpected EOL\")\n \t\t\t}\n \t\t\tswitch v := t.Value.(type) {\n \t\t\tcase string:\n@@ -541,13 +540,13 @@ func sliceDecoder(r *Registry) MapperFunc {\n \t\t}\n \t\tchildDecoder := r.ForNamedType(ctx.Value.Tag.Type, el)\n \t\tif childDecoder == nil {\n-\t\t\treturn errors.Errorf(\"no mapper for element type of %s\", target.Type())\n+\t\t\treturn fmt.Errorf(\"no mapper for element type of %s\", target.Type())\n \t\t}\n \t\tfor !childScanner.Peek().IsEOL() {\n \t\t\tchildValue := reflect.New(el).Elem()\n \t\t\terr := childDecoder.Decode(ctx.WithScanner(childScanner), childValue)\n \t\t\tif err != nil {\n-\t\t\t\treturn errors.WithStack(err)\n+\t\t\t\treturn err\n \t\t\t}\n \t\t\ttarget.Set(reflect.Append(target, childValue))\n \t\t}\n@@ -561,7 +560,7 @@ func pathMapper(r *Registry) MapperFunc {\n \t\t\treturn sliceDecoder(r)(ctx, target)\n \t\t}\n \t\tif target.Kind() != reflect.String {\n-\t\t\treturn errors.Errorf(\"\\\"path\\\" type must be applied to a string not %s\", target.Type())\n+\t\t\treturn fmt.Errorf(\"\\\"path\\\" type must be applied to a string not %s\", target.Type())\n \t\t}\n \t\tvar path string\n \t\terr := ctx.Scan.PopValueInto(\"file\", &path)\n@@ -607,7 +606,7 @@ func existingFileMapper(r *Registry) MapperFunc {\n \t\t\treturn sliceDecoder(r)(ctx, target)\n \t\t}\n \t\tif target.Kind() != reflect.String {\n-\t\t\treturn errors.Errorf(\"\\\"existingfile\\\" type must be applied to a string not %s\", target.Type())\n+\t\t\treturn fmt.Errorf(\"\\\"existingfile\\\" type must be applied to a string not %s\", target.Type())\n \t\t}\n \t\tvar path string\n \t\terr := ctx.Scan.PopValueInto(\"file\", &path)\n@@ -621,7 +620,7 @@ func existingFileMapper(r *Registry) MapperFunc {\n \t\t\t\treturn err\n \t\t\t}\n \t\t\tif stat.IsDir() {\n-\t\t\t\treturn errors.Errorf(\"%q exists but is a directory\", path)\n+\t\t\t\treturn fmt.Errorf(\"%q exists but is a directory\", path)\n \t\t\t}\n \t\t}\n \t\ttarget.SetString(path)\n@@ -635,7 +634,7 @@ func existingDirMapper(r *Registry) MapperFunc {\n \t\t\treturn sliceDecoder(r)(ctx, target)\n \t\t}\n \t\tif target.Kind() != reflect.String {\n-\t\t\treturn errors.Errorf(\"\\\"existingdir\\\" must be applied to a string not %s\", target.Type())\n+\t\t\treturn fmt.Errorf(\"\\\"existingdir\\\" must be applied to a string not %s\", target.Type())\n \t\t}\n \t\tvar path string\n \t\terr := ctx.Scan.PopValueInto(\"file\", &path)\n@@ -648,7 +647,7 @@ func existingDirMapper(r *Registry) MapperFunc {\n \t\t\treturn err\n \t\t}\n \t\tif !stat.IsDir() {\n-\t\t\treturn errors.Errorf(\"%q exists but is not a directory\", path)\n+\t\t\treturn fmt.Errorf(\"%q exists but is not a directory\", path)\n \t\t}\n \t\ttarget.SetString(path)\n \t\treturn nil\n@@ -666,7 +665,7 @@ func counterMapper() MapperFunc {\n \t\t\tcase string:\n \t\t\t\tn, err := strconv.ParseInt(v, 10, 64)\n \t\t\t\tif err != nil {\n-\t\t\t\t\treturn errors.Errorf(\"expected a counter but got %q (%T)\", t, t.Value)\n+\t\t\t\t\treturn fmt.Errorf(\"expected a counter but got %q (%T)\", t, t.Value)\n \t\t\t\t}\n \t\t\t\ttarget.SetInt(n)\n \n@@ -674,7 +673,7 @@ func counterMapper() MapperFunc {\n \t\t\t\ttarget.Set(reflect.ValueOf(v))\n \n \t\t\tdefault:\n-\t\t\t\treturn errors.Errorf(\"expected a counter but got %q (%T)\", t, t.Value)\n+\t\t\t\treturn fmt.Errorf(\"expected a counter but got %q (%T)\", t, t.Value)\n \t\t\t}\n \t\t\treturn nil\n \t\t}\n@@ -690,7 +689,7 @@ func counterMapper() MapperFunc {\n \t\t\ttarget.SetFloat(target.Float() + 1)\n \n \t\tdefault:\n-\t\t\treturn errors.Errorf(\"type:\\\"counter\\\" must be used with a numeric field\")\n+\t\t\treturn fmt.Errorf(\"type:\\\"counter\\\" must be used with a numeric field\")\n \t\t}\n \t\treturn nil\n \t}\n@@ -705,7 +704,7 @@ func urlMapper() MapperFunc {\n \t\t}\n \t\turl, err := url.Parse(urlStr)\n \t\tif err != nil {\n-\t\t\treturn errors.WithStack(err)\n+\t\t\treturn err\n \t\t}\n \t\ttarget.Set(reflect.ValueOf(url))\n \t\treturn nil\n@@ -775,7 +774,7 @@ func (f *NamedFileContentFlag) Decode(ctx *DecodeContext) error { // nolint: rev\n \tfilename = ExpandPath(filename)\n \tdata, err := ioutil.ReadFile(filename) // nolint: gosec\n \tif err != nil {\n-\t\treturn errors.Errorf(\"failed to open %q: %s\", filename, err)\n+\t\treturn fmt.Errorf(\"failed to open %q: %v\", filename, err)\n \t}\n \tf.Contents = data\n \tf.Filename = filename\n@@ -799,7 +798,7 @@ func (f *FileContentFlag) Decode(ctx *DecodeContext) error { // nolint: revive\n \tfilename = ExpandPath(filename)\n \tdata, err := ioutil.ReadFile(filename) // nolint: gosec\n \tif err != nil {\n-\t\treturn errors.Errorf(\"failed to open %q: %s\", filename, err)\n+\t\treturn fmt.Errorf(\"failed to open %q: %v\", filename, err)\n \t}\n \t*f = data\n \treturn nil\n@@ -808,7 +807,10 @@ func (f *FileContentFlag) Decode(ctx *DecodeContext) error { // nolint: revive\n func jsonTranscode(in, out interface{}) error {\n \tdata, err := json.Marshal(in)\n \tif err != nil {\n-\t\treturn errors.WithStack(err)\n+\t\treturn err\n+\t}\n+\tif err = json.Unmarshal(data, out); err != nil {\n+\t\treturn fmt.Errorf(\"%#v -> %T: %v\", in, out, err)\n \t}\n-\treturn errors.Wrapf(json.Unmarshal(data, out), \"%#v -> %T\", in, out)\n+\treturn nil\n }\ndiff --git a/model.go b/model.go\nindex d20d864..af2cdaf 100644\n--- a/model.go\n+++ b/model.go\n@@ -7,8 +7,6 @@ import (\n \t\"reflect\"\n \t\"strconv\"\n \t\"strings\"\n-\n-\t\"github.com/pkg/errors\"\n )\n \n // A Visitable component in the model.\n@@ -335,7 +333,7 @@ func (v *Value) Parse(scan *Scanner, target reflect.Value) (err error) {\n \t}\n \terr = v.Mapper.Decode(&DecodeContext{Value: v, Scan: scan}, target)\n \tif err != nil {\n-\t\treturn errors.Wrap(err, v.ShortSummary())\n+\t\treturn fmt.Errorf(\"%s: %w\", v.ShortSummary(), err)\n \t}\n \tv.Set = true\n \treturn nil\ndiff --git a/options.go b/options.go\nindex 7ddb4e3..02d33fd 100644\n--- a/options.go\n+++ b/options.go\n@@ -1,6 +1,8 @@\n package kong\n \n import (\n+\t\"errors\"\n+\t\"fmt\"\n \t\"io\"\n \t\"os\"\n \t\"os/user\"\n@@ -8,8 +10,6 @@ import (\n \t\"reflect\"\n \t\"regexp\"\n \t\"strings\"\n-\n-\t\"github.com/pkg/errors\"\n )\n \n // An Option applies optional changes to the Kong application.\n@@ -344,7 +344,7 @@ func IgnoreFields(regexes ...string) Option {\n \n \t\t\tre, err := regexp.Compile(r)\n \t\t\tif err != nil {\n-\t\t\t\treturn errors.Wrap(err, \"unable to compile regex\")\n+\t\t\t\treturn fmt.Errorf(\"unable to compile regex: %v\", err)\n \t\t\t}\n \n \t\t\tk.ignoreFields = append(k.ignoreFields, re)\n@@ -380,7 +380,7 @@ func Configuration(loader ConfigurationLoader, paths ...string) Option {\n \n \t\t\tresolver, err := k.LoadConfig(path)\n \t\t\tif err != nil {\n-\t\t\t\treturn errors.Wrap(err, path)\n+\t\t\t\treturn fmt.Errorf(\"%s: %v\", path, err)\n \t\t\t}\n \t\t\tif resolver != nil {\n \t\t\t\tk.resolvers = append(k.resolvers, resolver)\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/FUNDING.yml",
+    ".github/workflows/ci.yml",
+    ".gitignore",
+    ".golangci.yml",
+    "COPYING",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/README.md",
+    "_examples/server/console.go",
+    "_examples/server/go.mod",
+    "_examples/server/go.sum",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/main.go",
+    "benchmark_test.go",
+    "bin/.go-1.17.pkg",
+    "bin/.golangci-lint-1.42.0.pkg",
+    "bin/README.hermit.md",
+    "bin/activate-hermit",
+    "bin/go",
+    "bin/gofmt",
+    "bin/golangci-lint",
+    "bin/hermit",
+    "bin/hermit.hcl",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "config_test.go",
+    "context.go",
+    "defaults.go",
+    "defaults_test.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "go.mod",
+    "go.sum",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "testdata/file.txt",
+    "util.go",
+    "util_test.go",
+    "visit.go"
+  ],
+  "explanation": {
+    "what": "サードパーティの github.com/pkg/errors への依存を除去し、Go 1.13 で標準ライブラリに入った errors.Is/errors.As/errors.New と fmt.Errorf の %w 動詞に置き換えた。ParseError.Cause() を Unwrap() にリネームし、errors.Wrap/errors.Errorf/errors.WithStack の呼び出し箇所を context.go・kong.go・mapper.go・model.go・options.go で書き換えている。go.mod/go.sum から pkg/errors を削除し、CI 用の Go バージョンを 1.17 に固定した(1.18 のジェネリクスに linter が未対応のため)。",
+    "why": "コミットメッセージに明記の通り、Go 1.13 で errors パッケージにラップ・アンラップ機構が標準搭載されたため、外部依存の pkg/errors を使い続ける理由がなくなった。あわせて linter エラー修正と、Go 1.18 のジェネリクス導入で linter が対応しきれない問題を避けるための Go バージョン固定も同じコミットに含まれている。",
+    "highlights": [
+      { "file": "error.go", "note": "Cause() → Unwrap() へのリネームで標準 errors.As/errors.Is の対象になる" },
+      { "file": "context.go", "note": "errors.Wrap(err, desc) が fmt.Errorf(\"%s: %w\", desc, err) に置き換わっている" }
+    ],
+    "langNotes": [
+      { "topic": "error wrapping (%w) と Unwrap", "note": "Go 1.13 以降、fmt.Errorf の %w 動詞でエラーをラップでき、errors.Is/errors.As で元のエラーを判定・取り出せる。対象の型に Unwrap() error メソッドを実装しておくことで、この標準の仕組みに載せられる。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [{ "type": "pr", "number": 273, "url": "https://github.com/alecthomas/kong/pull/273" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

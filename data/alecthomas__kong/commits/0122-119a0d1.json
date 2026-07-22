@@ -1,0 +1,102 @@
+{
+  "seq": 122,
+  "sha": "119a0d115be5417a31583d539f7e5010ce490557",
+  "parents": [
+    "f72f53d947e038efbff23ec3ea336460d205c48a"
+  ],
+  "author": {
+    "name": "Alec Thomas",
+    "email": "alec@swapoff.org",
+    "date": "2018-09-27T14:58:03+10:00"
+  },
+  "message": "Ensure context bindings are used for Run().",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 3,
+    "deletions": 2
+  },
+  "files": [
+    {
+      "path": "callbacks.go",
+      "status": "M",
+      "additions": 2,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "context.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/callbacks.go b/callbacks.go\nindex 112d35a..7f4637b 100644\n--- a/callbacks.go\n+++ b/callbacks.go\n@@ -23,10 +23,11 @@ func (b bindings) clone() bindings {\n \treturn out\n }\n \n-func (b bindings) merge(other bindings) {\n+func (b bindings) merge(other bindings) bindings {\n \tfor k, v := range other {\n \t\tb[k] = v\n \t}\n+\treturn b\n }\n \n func getMethod(value reflect.Value, name string) reflect.Value {\ndiff --git a/context.go b/context.go\nindex 201ce16..2b6dbbb 100644\n--- a/context.go\n+++ b/context.go\n@@ -501,7 +501,7 @@ func (c *Context) Run(bindings ...interface{}) (err error) {\n \tif err != nil {\n \t\treturn err\n \t}\n-\tbinds := c.Kong.bindings.clone().add(bindings...).add(c)\n+\tbinds := c.Kong.bindings.clone().add(bindings...).add(c).merge(c.bindings)\n \treturn callMethod(\"Run\", node.Target, method, binds)\n }\n \n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    ".golangci.yml",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/console.go",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/main.go",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "context.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "go.mod",
+    "go.sum",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "tokentype_string.go",
+    "util.go",
+    "util_test.go",
+    "visit.go"
+  ],
+  "explanation": {
+    "what": "前コミットで追加した bindings.merge を戻り値ありの形 (func (b bindings) merge(other bindings) bindings) に変更し、Context.Run() 内の binds 構築チェーン (c.Kong.bindings.clone().add(...).add(c)) の末尾に .merge(c.bindings) を連結した。これにより Run() 呼び出し時にも Context.Bind()/BindTo() で登録した値が引数解決に含まれるようになる。",
+    "why": "直前のコミットで BeforeApply 等のフックには ctx.bindings が反映されたが、コマンドの Run(...) メソッドにはまだ反映されていなかった漏れを塞ぐ修正。件名の \"Ensure context bindings are used for Run()\" の通り、フックで Bind した値を最終的な Run() 実行でも使えるようにする一貫性の修正。",
+    "highlights": [
+      { "file": "context.go", "note": "Run() の binds 構築チェーンに .merge(c.bindings) が追加され、フックが Bind した値が Run() の引数解決対象になる" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

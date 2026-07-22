@@ -1,0 +1,133 @@
+{
+  "seq": 319,
+  "sha": "81070a043b434467613a0d472cb8bf099f23854c",
+  "parents": [
+    "e75e1ca88a47dfec13d46902aff7e93c2bf745d3"
+  ],
+  "author": {
+    "name": "Alec Thomas",
+    "email": "alec@swapoff.org",
+    "date": "2022-06-21T22:35:47+10:00"
+  },
+  "message": "fix: os-specific builds",
+  "pr": {
+    "number": 313,
+    "title": "fix: os-specific builds",
+    "body": "",
+    "url": "https://github.com/alecthomas/kong/pull/313"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 2,
+    "deletions": 2
+  },
+  "files": [
+    {
+      "path": "mapper_linux_test.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "mapper_windows_test.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/mapper_linux_test.go b/mapper_linux_test.go\nindex 2b1d614..6f5c061 100644\n--- a/mapper_linux_test.go\n+++ b/mapper_linux_test.go\n@@ -6,7 +6,7 @@ package kong_test\n import (\n \t\"testing\"\n \n-\trequire \"github.com/alecthomas/assert/v2\"\n+\t\"github.com/alecthomas/assert/v2\"\n )\n \n func TestPathMapper(t *testing.T) {\ndiff --git a/mapper_windows_test.go b/mapper_windows_test.go\nindex f9b092e..2a51fee 100644\n--- a/mapper_windows_test.go\n+++ b/mapper_windows_test.go\n@@ -7,7 +7,7 @@ import (\n \t\"os\"\n \t\"testing\"\n \n-\trequire \"github.com/alecthomas/assert/v2\"\n+\t\"github.com/alecthomas/assert/v2\"\n )\n \n func TestWindowsPathMapper(t *testing.T) {\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/FUNDING.yml",
+    ".github/workflows/ci.yml",
+    ".gitignore",
+    ".golangci.yml",
+    "COPYING",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/README.md",
+    "_examples/server/console.go",
+    "_examples/server/go.mod",
+    "_examples/server/go.sum",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/commandstring/main.go",
+    "_examples/shell/help/README.md",
+    "_examples/shell/help/main.go",
+    "benchmark_test.go",
+    "bin/.go-1.18.3.pkg",
+    "bin/.golangci-lint-1.46.2.pkg",
+    "bin/README.hermit.md",
+    "bin/activate-hermit",
+    "bin/go",
+    "bin/gofmt",
+    "bin/golangci-lint",
+    "bin/hermit",
+    "bin/hermit.hcl",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "config_test.go",
+    "context.go",
+    "defaults.go",
+    "defaults_test.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "go.mod",
+    "go.sum",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_linux_test.go",
+    "mapper_test.go",
+    "mapper_windows_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "testdata/file.txt",
+    "util.go",
+    "util_test.go",
+    "visit.go"
+  ],
+  "explanation": {
+    "what": "mapper_linux_test.go と mapper_windows_test.go の import 文を `require \"github.com/alecthomas/assert/v2\"` から `\"github.com/alecthomas/assert/v2\"`(別名なし)に修正した。直前のコミット(seq318, alecthomas/assert への切り替え)で通常ビルド対象のテストファイルは修正されていたが、OS固有ビルドタグ付きのこの2ファイルは対象漏れで古い別名のままになっていた。",
+    "why": "おそらく直前のコミットで全体を alecthomas/assert に切り替えた際、mapper_linux_test.go と mapper_windows_test.go はビルドタグにより通常のビルド・lint 対象から外れるため見落とされ、import 別名の変換漏れが残っていた。それを追いかけて修正したものと推測される(コミットメッセージ・PR本文に詳細説明はない)。",
+    "highlights": [
+      { "file": "mapper_linux_test.go", "note": "import 別名 require を削除し、他ファイルと同じ assert パッケージ参照に統一" },
+      { "file": "mapper_windows_test.go", "note": "同様の import 修正。ビルドタグにより通常のCIでは検知されにくい変更漏れ箇所だった" }
+    ],
+    "langNotes": [
+      { "topic": "os-specific builds (ファイル名サフィックスによる条件ビルド)", "note": "Go では `_linux.go` や `_windows.go` のようにファイル名にGOOS名のサフィックスを付けると、そのOS向けビルド時にのみコンパイル対象になる(build tags の一種)。このコミットで触れている mapper_linux_test.go / mapper_windows_test.go もこの命名規則により、通常の(サフィックスなしの)ビルドでは見えず、対象OSでのテスト実行時にのみコンパイルされる。" }
+    ],
+    "diagram": null,
+    "evidence": "inferred",
+    "refs": [{ "type": "pr", "number": 313, "url": "https://github.com/alecthomas/kong/pull/313" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

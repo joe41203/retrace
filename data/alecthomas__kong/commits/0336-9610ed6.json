@@ -1,0 +1,206 @@
+{
+  "seq": 336,
+  "sha": "9610ed62d93992d4f13e210ada9fd0917530f079",
+  "parents": [
+    "37e801405f5ee2b18697a7b57130afee254fe0b9"
+  ],
+  "author": {
+    "name": "Denis Titusov",
+    "email": "sescusu@gmail.com",
+    "date": "2023-01-31T22:39:30+03:00"
+  },
+  "message": "feat: support multiple env variables (#349)",
+  "pr": {
+    "number": 349,
+    "title": "feat: support multiple env variables",
+    "body": "Solve #154 ",
+    "url": "https://github.com/alecthomas/kong/pull/349"
+  },
+  "linkedIssues": [
+    {
+      "number": 154,
+      "title": "Support multiple ENV variables",
+      "body": "It would be useful to support multiple ENV variables at once separated by commas.\r\n\r\nExample:\r\n\r\n```go\r\ntype Example struct {\r\n    Port int `env:\"APPLICATION_PORT,PORT\" default:\"8080\"`\r\n}\r\n```\r\n\r\nSo use can provide the port argument with multiple environment variables.\r\n\r\nThank you.",
+      "url": "https://github.com/alecthomas/kong/issues/154"
+    }
+  ],
+  "stats": {
+    "filesChanged": 11,
+    "additions": 149,
+    "deletions": 35
+  },
+  "files": [
+    {
+      "path": "README.md",
+      "status": "M",
+      "additions": 2,
+      "deletions": 2,
+      "binary": false
+    },
+    {
+      "path": "build.go",
+      "status": "M",
+      "additions": 5,
+      "deletions": 3,
+      "binary": false
+    },
+    {
+      "path": "context.go",
+      "status": "M",
+      "additions": 15,
+      "deletions": 7,
+      "binary": false
+    },
+    {
+      "path": "help.go",
+      "status": "M",
+      "additions": 11,
+      "deletions": 2,
+      "binary": false
+    },
+    {
+      "path": "help_test.go",
+      "status": "M",
+      "additions": 48,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "kong.go",
+      "status": "M",
+      "additions": 9,
+      "deletions": 4,
+      "binary": false
+    },
+    {
+      "path": "kong_test.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "model.go",
+      "status": "M",
+      "additions": 11,
+      "deletions": 8,
+      "binary": false
+    },
+    {
+      "path": "options.go",
+      "status": "M",
+      "additions": 6,
+      "deletions": 6,
+      "binary": false
+    },
+    {
+      "path": "resolver_test.go",
+      "status": "M",
+      "additions": 37,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "tag.go",
+      "status": "M",
+      "additions": 4,
+      "deletions": 2,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/README.md b/README.md\nindex 389f006..35b07c6 100644\n--- a/README.md\n+++ b/README.md\n@@ -522,10 +522,10 @@ Tags can be in two forms:\n Both can coexist with standard Tag parsing.\n \n | Tag                  | Description                                                                                                                                                                                                                                                                                                                    |\n-| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |\n+|----------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|\n | `cmd:\"\"`             | If present, struct is a command.                                                                                                                                                                                                                                                                                               |\n | `arg:\"\"`             | If present, field is an argument. Required by default.                                                                                                                                                                                                                                                                         |\n-| `env:\"X\"`            | Specify envar to use for default value.                                                                                                                                                                                                                                                                                        |\n+| `env:\"X,Y,...\"`      | Specify envars to use for default value. The envs are resolved in the declared order. The first value found is used.                                                                                                                                                                                                           |\n | `name:\"X\"`           | Long name, for overriding field name.                                                                                                                                                                                                                                                                                          |\n | `help:\"X\"`           | Help text.                                                                                                                                                                                                                                                                                                                     |\n | `type:\"X\"`           | Specify [named types](#custom-named-decoders) to use.                                                                                                                                                                                                                                                                          |\ndiff --git a/build.go b/build.go\nindex 0a23fd0..e23c115 100644\n--- a/build.go\n+++ b/build.go\n@@ -138,8 +138,10 @@ MAIN:\n \t\t\tname = tag.Prefix + name\n \t\t}\n \n-\t\tif tag.Env != \"\" {\n-\t\t\ttag.Env = tag.EnvPrefix + tag.Env\n+\t\tif len(tag.Envs) != 0 {\n+\t\t\tfor i := range tag.Envs {\n+\t\t\t\ttag.Envs[i] = tag.EnvPrefix + tag.Envs[i]\n+\t\t\t}\n \t\t}\n \n \t\t// Nested structs are either commands or args, unless they implement the Mapper interface.\n@@ -304,7 +306,7 @@ func buildField(k *Kong, node *Node, v reflect.Value, ft reflect.StructField, fv\n \t\t\tValue:       value,\n \t\t\tShort:       tag.Short,\n \t\t\tPlaceHolder: tag.PlaceHolder,\n-\t\t\tEnv:         tag.Env,\n+\t\t\tEnvs:        tag.Envs,\n \t\t\tGroup:       buildGroupForKey(k, tag.Group),\n \t\t\tXor:         tag.Xor,\n \t\t\tHidden:      tag.Hidden,\ndiff --git a/context.go b/context.go\nindex de9e408..0ec10f4 100644\n--- a/context.go\n+++ b/context.go\n@@ -165,16 +165,16 @@ func (c *Context) Validate() error { // nolint: gocyclo\n \terr := Visit(c.Model, func(node Visitable, next Next) error {\n \t\tswitch node := node.(type) {\n \t\tcase *Value:\n-\t\t\t_, ok := os.LookupEnv(node.Tag.Env)\n-\t\t\tif node.Enum != \"\" && (!node.Required || node.HasDefault || (node.Tag.Env != \"\" && ok)) {\n+\t\t\tok := atLeastOneEnvSet(node.Tag.Envs)\n+\t\t\tif node.Enum != \"\" && (!node.Required || node.HasDefault || (len(node.Tag.Envs) != 0 && ok)) {\n \t\t\t\tif err := checkEnum(node, node.Target); err != nil {\n \t\t\t\t\treturn err\n \t\t\t\t}\n \t\t\t}\n \n \t\tcase *Flag:\n-\t\t\t_, ok := os.LookupEnv(node.Tag.Env)\n-\t\t\tif node.Enum != \"\" && (!node.Required || node.HasDefault || (node.Tag.Env != \"\" && ok)) {\n+\t\t\tok := atLeastOneEnvSet(node.Tag.Envs)\n+\t\t\tif node.Enum != \"\" && (!node.Required || node.HasDefault || (len(node.Tag.Envs) != 0 && ok)) {\n \t\t\t\tif err := checkEnum(node.Value, node.Target); err != nil {\n \t\t\t\t\treturn err\n \t\t\t\t}\n@@ -890,9 +890,8 @@ func checkMissingPositionals(positional int, values []*Value) error {\n \tfor ; positional < len(values); positional++ {\n \t\targ := values[positional]\n \t\t// TODO(aat): Fix hardcoding of these env checks all over the place :\\\n-\t\tif arg.Tag.Env != \"\" {\n-\t\t\t_, ok := os.LookupEnv(arg.Tag.Env)\n-\t\t\tif ok {\n+\t\tif len(arg.Tag.Envs) != 0 {\n+\t\t\tif atLeastOneEnvSet(arg.Tag.Envs) {\n \t\t\t\tcontinue\n \t\t\t}\n \t\t}\n@@ -997,3 +996,12 @@ func isValidatable(v reflect.Value) validatable {\n \t}\n \treturn nil\n }\n+\n+func atLeastOneEnvSet(envs []string) bool {\n+\tfor _, env := range envs {\n+\t\tif _, ok := os.LookupEnv(env); ok {\n+\t\t\treturn true\n+\t\t}\n+\t}\n+\treturn false\n+}\ndiff --git a/help.go b/help.go\nindex b265121..4fb7700 100644\n--- a/help.go\n+++ b/help.go\n@@ -86,10 +86,10 @@ type HelpValueFormatter func(value *Value) string\n \n // DefaultHelpValueFormatter is the default HelpValueFormatter.\n func DefaultHelpValueFormatter(value *Value) string {\n-\tif value.Tag.Env == \"\" || HasInterpolatedVar(value.OrigHelp, \"env\") {\n+\tif len(value.Tag.Envs) == 0 || HasInterpolatedVar(value.OrigHelp, \"env\") {\n \t\treturn value.Help\n \t}\n-\tsuffix := \"($\" + value.Tag.Env + \")\"\n+\tsuffix := \"(\" + formatEnvs(value.Tag.Envs) + \")\"\n \tswitch {\n \tcase strings.HasSuffix(value.Help, \".\"):\n \t\treturn value.Help[:len(value.Help)-1] + \" \" + suffix + \".\"\n@@ -567,3 +567,12 @@ func TreeIndenter(prefix string) string {\n \t}\n \treturn \"|\" + strings.Repeat(\" \", defaultIndent) + prefix\n }\n+\n+func formatEnvs(envs []string) string {\n+\tformatted := make([]string, len(envs))\n+\tfor i := range envs {\n+\t\tformatted[i] = \"$\" + envs[i]\n+\t}\n+\n+\treturn strings.Join(formatted, \", \")\n+}\ndiff --git a/help_test.go b/help_test.go\nindex f93084b..2c94660 100644\n--- a/help_test.go\n+++ b/help_test.go\n@@ -472,6 +472,18 @@ func TestEnvarAutoHelp(t *testing.T) {\n \tassert.Contains(t, w.String(), \"A flag ($FLAG).\")\n }\n \n+func TestMultipleEnvarAutoHelp(t *testing.T) {\n+\tvar cli struct {\n+\t\tFlag string `env:\"FLAG1,FLAG2\" help:\"A flag.\"`\n+\t}\n+\tw := &strings.Builder{}\n+\tp := mustNew(t, &cli, kong.Writers(w, w), kong.Exit(func(int) {}))\n+\t_, err := p.Parse([]string{\"--help\"})\n+\tassert.NoError(t, err)\n+\tassert.Contains(t, w.String(), \"A flag ($FLAG1, $FLAG2).\")\n+}\n+\n+//nolint:dupl // false positive\n func TestEnvarAutoHelpWithEnvPrefix(t *testing.T) {\n \ttype Anonymous struct {\n \t\tFlag  string `env:\"FLAG\" help:\"A flag.\"`\n@@ -488,6 +500,24 @@ func TestEnvarAutoHelpWithEnvPrefix(t *testing.T) {\n \tassert.Contains(t, w.String(), \"A different flag.\")\n }\n \n+//nolint:dupl // false positive\n+func TestMultipleEnvarAutoHelpWithEnvPrefix(t *testing.T) {\n+\ttype Anonymous struct {\n+\t\tFlag  string `env:\"FLAG1,FLAG2\" help:\"A flag.\"`\n+\t\tOther string `help:\"A different flag.\"`\n+\t}\n+\tvar cli struct {\n+\t\tAnonymous `envprefix:\"ANON_\"`\n+\t}\n+\tw := &strings.Builder{}\n+\tp := mustNew(t, &cli, kong.Writers(w, w), kong.Exit(func(int) {}))\n+\t_, err := p.Parse([]string{\"--help\"})\n+\tassert.NoError(t, err)\n+\tassert.Contains(t, w.String(), \"A flag ($ANON_FLAG1, $ANON_FLAG2).\")\n+\tassert.Contains(t, w.String(), \"A different flag.\")\n+}\n+\n+//nolint:dupl // false positive\n func TestCustomValueFormatter(t *testing.T) {\n \tvar cli struct {\n \t\tFlag string `env:\"FLAG\" help:\"A flag.\"`\n@@ -505,6 +535,24 @@ func TestCustomValueFormatter(t *testing.T) {\n \tassert.Contains(t, w.String(), \"A flag.\")\n }\n \n+//nolint:dupl // false positive\n+func TestMultipleCustomValueFormatter(t *testing.T) {\n+\tvar cli struct {\n+\t\tFlag string `env:\"FLAG1,FLAG2\" help:\"A flag.\"`\n+\t}\n+\tw := &strings.Builder{}\n+\tp := mustNew(t, &cli,\n+\t\tkong.Writers(w, w),\n+\t\tkong.Exit(func(int) {}),\n+\t\tkong.ValueFormatter(func(value *kong.Value) string {\n+\t\t\treturn value.Help\n+\t\t}),\n+\t)\n+\t_, err := p.Parse([]string{\"--help\"})\n+\tassert.NoError(t, err)\n+\tassert.Contains(t, w.String(), \"A flag.\")\n+}\n+\n func TestAutoGroup(t *testing.T) {\n \tvar cli struct {\n \t\tGroupedAString string `help:\"A string flag grouped in A.\"`\ndiff --git a/kong.go b/kong.go\nindex 70e8906..255633f 100644\n--- a/kong.go\n+++ b/kong.go\n@@ -227,11 +227,16 @@ func (k *Kong) interpolateValue(value *Value, vars Vars) (err error) {\n \t\treturn fmt.Errorf(\"enum value for %s: %s\", value.Summary(), err)\n \t}\n \tif value.Flag != nil {\n-\t\tif value.Flag.Env, err = interpolate(value.Flag.Env, vars, nil); err != nil {\n-\t\t\treturn fmt.Errorf(\"env value for %s: %s\", value.Summary(), err)\n+\t\tfor i, env := range value.Flag.Envs {\n+\t\t\tif value.Flag.Envs[i], err = interpolate(env, vars, nil); err != nil {\n+\t\t\t\treturn fmt.Errorf(\"env value for %s: %s\", value.Summary(), err)\n+\t\t\t}\n+\t\t}\n+\t\tvalue.Tag.Envs = value.Flag.Envs\n+\t\tupdatedVars[\"env\"] = \"\"\n+\t\tif len(value.Flag.Envs) != 0 {\n+\t\t\tupdatedVars[\"env\"] = value.Flag.Envs[0]\n \t\t}\n-\t\tvalue.Tag.Env = value.Flag.Env\n-\t\tupdatedVars[\"env\"] = value.Flag.Env\n \t}\n \tvalue.Help, err = interpolate(value.Help, vars, updatedVars)\n \tif err != nil {\ndiff --git a/kong_test.go b/kong_test.go\nindex 2dd7cd3..72c73cf 100644\n--- a/kong_test.go\n+++ b/kong_test.go\n@@ -665,7 +665,7 @@ func TestInterpolationIntoModel(t *testing.T) {\n \tassert.Equal(t, map[string]bool{\"a\": true, \"b\": true, \"c\": true, \"d\": true}, flag.EnumMap())\n \tassert.Equal(t, []string{\"a\", \"b\", \"c\", \"d\"}, flag.EnumSlice())\n \tassert.Equal(t, \"One of a,b\", flag2.Help)\n-\tassert.Equal(t, \"SAVE_THE_QUEEN\", flag3.Env)\n+\tassert.Equal(t, []string{\"SAVE_THE_QUEEN\"}, flag3.Envs)\n \tassert.Equal(t, \"God SAVE_THE_QUEEN\", flag3.Help)\n }\n \ndiff --git a/model.go b/model.go\nindex 1428965..793cf97 100644\n--- a/model.go\n+++ b/model.go\n@@ -366,14 +366,17 @@ func (v *Value) ApplyDefault() error {\n // Does not include resolvers.\n func (v *Value) Reset() error {\n \tv.Target.Set(reflect.Zero(v.Target.Type()))\n-\tif v.Tag.Env != \"\" {\n-\t\tenvar := os.Getenv(v.Tag.Env)\n-\t\tif envar != \"\" {\n-\t\t\terr := v.Parse(ScanFromTokens(Token{Type: FlagValueToken, Value: envar}), v.Target)\n-\t\t\tif err != nil {\n-\t\t\t\treturn fmt.Errorf(\"%s (from envar %s=%q)\", err, v.Tag.Env, envar)\n+\tif len(v.Tag.Envs) != 0 {\n+\t\tfor _, env := range v.Tag.Envs {\n+\t\t\tenvar := os.Getenv(env)\n+\t\t\t// Parse the first non-empty ENV in the list\n+\t\t\tif envar != \"\" {\n+\t\t\t\terr := v.Parse(ScanFromTokens(Token{Type: FlagValueToken, Value: envar}), v.Target)\n+\t\t\t\tif err != nil {\n+\t\t\t\t\treturn fmt.Errorf(\"%s (from envar %s=%q)\", err, env, envar)\n+\t\t\t\t}\n+\t\t\t\treturn nil\n \t\t\t}\n-\t\t\treturn nil\n \t\t}\n \t}\n \tif v.HasDefault {\n@@ -393,7 +396,7 @@ type Flag struct {\n \tGroup       *Group // Logical grouping when displaying. May also be used by configuration loaders to group options logically.\n \tXor         []string\n \tPlaceHolder string\n-\tEnv         string\n+\tEnvs        []string\n \tShort       rune\n \tHidden      bool\n \tNegated     bool\ndiff --git a/options.go b/options.go\nindex 8633f68..8d2893c 100644\n--- a/options.go\n+++ b/options.go\n@@ -451,21 +451,21 @@ func siftStrings(ss []string, filter func(s string) bool) []string {\n //\t--some.value -> PREFIX_SOME_VALUE\n func DefaultEnvars(prefix string) Option {\n \tprocessFlag := func(flag *Flag) {\n-\t\tswitch env := flag.Env; {\n+\t\tswitch env := flag.Envs; {\n \t\tcase flag.Name == \"help\":\n \t\t\treturn\n-\t\tcase env == \"-\":\n-\t\t\tflag.Env = \"\"\n+\t\tcase len(env) == 1 && env[0] == \"-\":\n+\t\t\tflag.Envs = nil\n \t\t\treturn\n-\t\tcase env != \"\":\n+\t\tcase len(env) > 0:\n \t\t\treturn\n \t\t}\n \t\treplacer := strings.NewReplacer(\"-\", \"_\", \".\", \"_\")\n \t\tnames := append([]string{prefix}, camelCase(replacer.Replace(flag.Name))...)\n \t\tnames = siftStrings(names, func(s string) bool { return !(s == \"_\" || strings.TrimSpace(s) == \"\") })\n \t\tname := strings.ToUpper(strings.Join(names, \"_\"))\n-\t\tflag.Env = name\n-\t\tflag.Value.Tag.Env = name\n+\t\tflag.Envs = append(flag.Envs, name)\n+\t\tflag.Value.Tag.Envs = append(flag.Value.Tag.Envs, name)\n \t}\n \n \tvar processNode func(node *Node)\ndiff --git a/resolver_test.go b/resolver_test.go\nindex 3c4ded0..c1684b6 100644\n--- a/resolver_test.go\n+++ b/resolver_test.go\n@@ -58,6 +58,26 @@ func TestEnvarsFlagBasic(t *testing.T) {\n \tassert.Equal(t, \"foo\", cli.Interp)\n }\n \n+func TestEnvarsFlagMultiple(t *testing.T) {\n+\tvar cli struct {\n+\t\tFirstENVPresent  string `env:\"KONG_TEST1_1,KONG_TEST1_2\"`\n+\t\tSecondENVPresent string `env:\"KONG_TEST2_1,KONG_TEST2_2\"`\n+\t}\n+\tparser, unsetEnvs := newEnvParser(t, &cli,\n+\t\tenvMap{\n+\t\t\t\"KONG_TEST1_1\": \"value1.1\",\n+\t\t\t\"KONG_TEST1_2\": \"value1.2\",\n+\t\t\t\"KONG_TEST2_2\": \"value2.2\",\n+\t\t},\n+\t)\n+\tdefer unsetEnvs()\n+\n+\t_, err := parser.Parse([]string{})\n+\tassert.NoError(t, err)\n+\tassert.Equal(t, \"value1.1\", cli.FirstENVPresent)\n+\tassert.Equal(t, \"value2.2\", cli.SecondENVPresent)\n+}\n+\n func TestEnvarsFlagOverride(t *testing.T) {\n \tvar cli struct {\n \t\tFlag string `env:\"KONG_FLAG\"`\n@@ -97,6 +117,23 @@ func TestEnvarsEnvPrefix(t *testing.T) {\n \tassert.Equal(t, []int{1, 2, 3}, cli.Slice)\n }\n \n+func TestEnvarsEnvPrefixMultiple(t *testing.T) {\n+\ttype Anonymous struct {\n+\t\tSlice1 []int `env:\"NUMBERS1_1,NUMBERS1_2\"`\n+\t\tSlice2 []int `env:\"NUMBERS2_1,NUMBERS2_2\"`\n+\t}\n+\tvar cli struct {\n+\t\tAnonymous `envprefix:\"KONG_\"`\n+\t}\n+\tparser, restoreEnv := newEnvParser(t, &cli, envMap{\"KONG_NUMBERS1_1\": \"1,2,3\", \"KONG_NUMBERS2_2\": \"5,6,7\"})\n+\tdefer restoreEnv()\n+\n+\t_, err := parser.Parse([]string{})\n+\tassert.NoError(t, err)\n+\tassert.Equal(t, []int{1, 2, 3}, cli.Slice1)\n+\tassert.Equal(t, []int{5, 6, 7}, cli.Slice2)\n+}\n+\n func TestEnvarsNestedEnvPrefix(t *testing.T) {\n \ttype NestedAnonymous struct {\n \t\tString string `env:\"STRING\"`\ndiff --git a/tag.go b/tag.go\nindex cac4074..f99059b 100644\n--- a/tag.go\n+++ b/tag.go\n@@ -24,7 +24,7 @@ type Tag struct {\n \tDefault     string\n \tFormat      string\n \tPlaceHolder string\n-\tEnv         string\n+\tEnvs        []string\n \tShort       rune\n \tHidden      bool\n \tSep         rune\n@@ -234,7 +234,9 @@ func hydrateTag(t *Tag, typ reflect.Type) error { // nolint: gocyclo\n \tt.Help = t.Get(\"help\")\n \tt.Type = t.Get(\"type\")\n \tt.TypeName = typeName\n-\tt.Env = t.Get(\"env\")\n+\tfor _, env := range t.GetAll(\"env\") {\n+\t\tt.Envs = append(t.Envs, strings.FieldsFunc(env, tagSplitFn)...)\n+\t}\n \tt.Short, err = t.GetRune(\"short\")\n \tif err != nil && t.Get(\"short\") != \"\" {\n \t\treturn fmt.Errorf(\"invalid short flag name %q: %s\", t.Get(\"short\"), err)\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/FUNDING.yml",
+    ".github/workflows/ci.yml",
+    ".gitignore",
+    ".golangci.yml",
+    "COPYING",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/README.md",
+    "_examples/server/console.go",
+    "_examples/server/go.mod",
+    "_examples/server/go.sum",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/commandstring/main.go",
+    "_examples/shell/help/README.md",
+    "_examples/shell/help/main.go",
+    "benchmark_test.go",
+    "bin/.go-1.19.1.pkg",
+    "bin/.golangci-lint-1.46.2.pkg",
+    "bin/README.hermit.md",
+    "bin/activate-hermit",
+    "bin/go",
+    "bin/gofmt",
+    "bin/golangci-lint",
+    "bin/hermit",
+    "bin/hermit.hcl",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "config_test.go",
+    "context.go",
+    "defaults.go",
+    "defaults_test.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "go.mod",
+    "go.sum",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "helpwrap1.18_test.go",
+    "helpwrap1.19_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_linux_test.go",
+    "mapper_test.go",
+    "mapper_windows_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "testdata/file.txt",
+    "util.go",
+    "util_test.go",
+    "visit.go"
+  ],
+  "explanation": {
+    "what": "env タグに複数の環境変数名をカンマ区切りで指定できるようにした(例: `env:\"FLAG1,FLAG2\"`)。Tag.Env(単一文字列)を Tag.Envs([]string) に、Flag.Env も Flag.Envs に変更し、context.go/model.go/help.go/options.go の該当箇所を全て複数値対応に書き換えた。値の解決は宣言順に最初に見つかった非空の環境変数を採用する atLeastOneEnvSet()/Reset() のループで行う。",
+    "why": "PR本文は issue #154 を解決するためのものと明記している。issue では「1つのフラグに複数の環境変数名を割り当てたい(優先順で最初に見つかったものを使う)」というユースケースが具体的に要望されており、この PR はその通りの挙動を実装している。",
+    "highlights": [
+      { "file": "model.go", "note": "Flag.Env string から Flag.Envs []string への破壊的変更。ヘルプ表示・バリデーション・envar解決の全箇所に波及" },
+      { "file": "context.go", "note": "atLeastOneEnvSet() で複数環境変数のいずれかが設定済みかを判定" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [
+      { "type": "pr", "number": 349, "url": "https://github.com/alecthomas/kong/pull/349" },
+      { "type": "issue", "number": 154, "url": "https://github.com/alecthomas/kong/issues/154" }
+    ],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

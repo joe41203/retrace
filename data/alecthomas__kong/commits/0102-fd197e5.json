@@ -1,0 +1,121 @@
+{
+  "seq": 102,
+  "sha": "fd197e508192f2d22ba66fe34ca5e8fa016df243",
+  "parents": [
+    "844494faffa09bbcb19f7c36eb55f1270c11fabd"
+  ],
+  "author": {
+    "name": "Alec Thomas",
+    "email": "alec@swapoff.org",
+    "date": "2018-09-12T12:17:57+10:00"
+  },
+  "message": "Support for flag prefixing.",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 5,
+    "additions": 40,
+    "deletions": 6
+  },
+  "files": [
+    {
+      "path": "README.md",
+      "status": "M",
+      "additions": 3,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "build.go",
+      "status": "M",
+      "additions": 18,
+      "deletions": 5,
+      "binary": false
+    },
+    {
+      "path": "kong_test.go",
+      "status": "M",
+      "additions": 13,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "model.go",
+      "status": "M",
+      "additions": 2,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "tag.go",
+      "status": "M",
+      "additions": 4,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/README.md b/README.md\nindex 133665c..be44b82 100644\n--- a/README.md\n+++ b/README.md\n@@ -395,7 +395,9 @@ Both can coexist with standard Tag parsing.\n | `hidden`               | If present, command or flag is hidden.      |\n | `format:\"X\"`           | Format for parsing input, if supported.     |\n | `sep:\"X\"`              | Separator for sequences (defaults to \",\"). May be `none` to disable splitting. |\n-| `enum:\"X,Y,...\"`       |\n+| `enum:\"X,Y,...\"`       | Set of valid values allowed for this flag.  |\n+| `group:\"X\"`            | Logical group for a flag or command.        |\n+| `prefix:\"X\"`           | Prefix for all sub-flags.                   |\n \n ## Variable interpolation\n \ndiff --git a/build.go b/build.go\nindex 666025b..829107c 100644\n--- a/build.go\n+++ b/build.go\n@@ -38,20 +38,30 @@ func dashedString(s string) string {\n type flattenedField struct {\n \tfield reflect.StructField\n \tvalue reflect.Value\n+\ttag   *Tag\n }\n \n func flattenedFields(v reflect.Value) (out []flattenedField) {\n \tfor i := 0; i < v.NumField(); i++ {\n \t\tft := v.Type().Field(i)\n \t\tfv := v.Field(i)\n+\t\ttag := parseTag(fv, ft)\n \t\tif ft.Anonymous {\n-\t\t\tout = append(out, flattenedFields(fv)...)\n+\t\t\tsub := flattenedFields(fv)\n+\t\t\t// Assign parent group to children, if they're not otherwise set.\n+\t\t\tfor _, subf := range sub {\n+\t\t\t\tif subf.tag.Group == \"\" {\n+\t\t\t\t\tsubf.tag.Group = tag.Group\n+\t\t\t\t}\n+\t\t\t\tsubf.tag.Prefix = tag.Prefix + subf.tag.Prefix\n+\t\t\t}\n+\t\t\tout = append(out, sub...)\n \t\t\tcontinue\n \t\t}\n \t\tif !fv.CanSet() {\n \t\t\tcontinue\n \t\t}\n-\t\tout = append(out, flattenedField{field: ft, value: fv})\n+\t\tout = append(out, flattenedField{field: ft, value: fv, tag: tag})\n \t}\n \treturn\n }\n@@ -65,11 +75,12 @@ func buildNode(k *Kong, v reflect.Value, typ NodeType, seenFlags map[string]bool\n \t\tft := field.field\n \t\tfv := field.value\n \n-\t\ttag := parseTag(fv, ft)\n-\n+\t\ttag := field.tag\n \t\tname := tag.Name\n \t\tif name == \"\" {\n-\t\t\tname = strings.ToLower(dashedString(ft.Name))\n+\t\t\tname = tag.Prefix + strings.ToLower(dashedString(ft.Name))\n+\t\t} else {\n+\t\t\tname = tag.Prefix + name\n \t\t}\n \n \t\t// Nested structs are either commands or args, unless they implement the Mapper interface.\n@@ -108,6 +119,7 @@ func buildChild(k *Kong, node *Node, typ NodeType, v reflect.Value, ft reflect.S\n \tchild.Parent = node\n \tchild.Help = tag.Help\n \tchild.Hidden = tag.Hidden\n+\tchild.Group = tag.Group\n \n \tif fv.Type().Implements(helpProviderType) {\n \t\tchild.Detail = fv.Interface().(HelpProvider).Help()\n@@ -176,6 +188,7 @@ func buildField(k *Kong, node *Node, v reflect.Value, ft reflect.StructField, fv\n \t\t\tShort:       tag.Short,\n \t\t\tPlaceHolder: tag.PlaceHolder,\n \t\t\tEnv:         tag.Env,\n+\t\t\tGroup:       tag.Group,\n \t\t}\n \t\tvalue.Flag = flag\n \t\tnode.Flags = append(node.Flags, flag)\ndiff --git a/kong_test.go b/kong_test.go\nindex ad0d988..d77b11e 100644\n--- a/kong_test.go\n+++ b/kong_test.go\n@@ -577,3 +577,16 @@ func TestBoolOverride(t *testing.T) {\n \t_, err = p.Parse([]string{\"--flag\", \"false\"})\n \trequire.Error(t, err)\n }\n+\n+func TestAnonymousPrefix(t *testing.T) {\n+\ttype Anonymous struct {\n+\t\tFlag string\n+\t}\n+\tvar cli struct {\n+\t\tAnonymous `prefix:\"anon-\"`\n+\t}\n+\tp := mustNew(t, &cli)\n+\t_, err := p.Parse([]string{\"--anon-flag=moo\"})\n+\trequire.NoError(t, err)\n+\trequire.Equal(t, \"moo\", cli.Flag)\n+}\ndiff --git a/model.go b/model.go\nindex df009ac..db0fa58 100644\n--- a/model.go\n+++ b/model.go\n@@ -37,6 +37,7 @@ type Node struct {\n \tName       string\n \tHelp       string // Short help displayed in summaries.\n \tDetail     string // Detailed help displayed when describing command/arg alone.\n+\tGroup      string\n \tHidden     bool\n \tFlags      []*Flag\n \tPositional []*Positional\n@@ -284,6 +285,7 @@ type Positional = Value\n // A Flag represents a command-line flag.\n type Flag struct {\n \t*Value\n+\tGroup       string // Logical grouping when displaying. May also be used by configuration loaders to group options logically.\n \tPlaceHolder string\n \tEnv         string\n \tShort       rune\ndiff --git a/tag.go b/tag.go\nindex e871f16..6669194 100644\n--- a/tag.go\n+++ b/tag.go\n@@ -25,6 +25,8 @@ type Tag struct {\n \tHidden      bool\n \tSep         rune\n \tEnum        string\n+\tGroup       string\n+\tPrefix      string // Optional prefix on anonymous structs. All sub-flags will have this prefix.\n \n \t// Storage for all tag keys for arbitrary lookups.\n \titems map[string]string\n@@ -137,6 +139,8 @@ func parseTag(fv reflect.Value, ft reflect.StructField) *Tag {\n \tt.Hidden = t.Has(\"hidden\")\n \tt.Format = t.Get(\"format\")\n \tt.Sep, _ = t.GetRune(\"sep\")\n+\tt.Group = t.Get(\"group\")\n+\tt.Prefix = t.Get(\"prefix\")\n \tif t.Sep == 0 {\n \t\tif t.Get(\"sep\") == \"none\" {\n \t\t\tt.Sep = -1\n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    ".golangci.yml",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/console.go",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/main.go",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "context.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "tokentype_string.go",
+    "util.go",
+    "util_test.go"
+  ],
+  "explanation": {
+    "what": "flattenedField に tag フィールドを追加し、struct を再帰的に平坦化する flattenedFields で埋め込みフィールド(Anonymous)を処理する際に、子フィールドの Tag.Group が未設定なら親の Group を継承し、Tag.Prefix を親のものと連結するようにした。新しい `group:\"X\"`(論理グループ)と `prefix:\"X\"`(サブフラグの接頭辞)の2つの struct タグを model.go/tag.go に追加している。",
+    "why": "おそらく埋め込み構造体を複数回使い回すとき、フラグ名が衝突する問題を prefix タグで解消し、ヘルプ表示上の分類を group タグで表現できるようにする意図とみられる。TestAnonymousPrefix で `prefix:\"anon-\"` を付けた埋め込み構造体のフラグが `--anon-flag` になることを確認しており、複数の同型構造体を異なる prefix で埋め込んで再利用する設計への布石になっている。",
+    "highlights": [
+      { "file": "build.go", "note": "flattenedFields: 埋め込み構造体の子へ親の Group/Prefix を伝播させる再帰ロジック" },
+      { "file": "kong_test.go", "note": "TestAnonymousPrefix: prefix タグでフラグ名衝突を回避する使用例" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "inferred",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

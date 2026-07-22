@@ -1,0 +1,147 @@
+{
+  "seq": 85,
+  "sha": "1bb0c0b4b20af09ce6609fe1fa4b8eb2187c1a48",
+  "parents": [
+    "6408010083e5612a7b853c0851e4881bb785f24a"
+  ],
+  "author": {
+    "name": "Alec Thomas",
+    "email": "alec@swapoff.org",
+    "date": "2018-06-27T21:07:06+10:00"
+  },
+  "message": "Support limited variable interpolation.\n\nKong supports limited variable interpolation into help strings, enum lists and\ndefault values.\n\nVariables are in the form:\n\n    ${<name>}\n\nVariables are set with the `Vars(map[string]string)` option. Undefined\nvariable references in the grammar will result in an error at construction\ntime.",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 9,
+    "additions": 187,
+    "deletions": 10
+  },
+  "files": [
+    {
+      "path": "README.md",
+      "status": "M",
+      "additions": 38,
+      "deletions": 2,
+      "binary": false
+    },
+    {
+      "path": "build.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "interpolate.go",
+      "status": "A",
+      "additions": 27,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "interpolate_test.go",
+      "status": "A",
+      "additions": 17,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "kong.go",
+      "status": "M",
+      "additions": 59,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "kong_test.go",
+      "status": "M",
+      "additions": 21,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "model.go",
+      "status": "M",
+      "additions": 12,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "options.go",
+      "status": "M",
+      "additions": 10,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "tag.go",
+      "status": "M",
+      "additions": 2,
+      "deletions": 6,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/README.md b/README.md\nindex 1b3a449..257f9a3 100644\n--- a/README.md\n+++ b/README.md\n@@ -18,6 +18,7 @@\n 1. [Maps](#maps)\n 1. [Custom named types](#custom-named-types)\n 1. [Supported tags](#supported-tags)\n+1. [Variable interpolation](#variable-interpolation)\n 1. [Modifying Kong's behaviour](#modifying-kongs-behaviour)\n     1. [`Name(help)` and `Description(help)` - set the application name description](#namehelp-and-descriptionhelp---set-the-application-name-description)\n     1. [`Configuration(loader, paths...)` - load defaults from configuration files](#configurationloader-paths---load-defaults-from-configuration-files)\n@@ -313,8 +314,8 @@ function `NamedMapper(name, mapper)`.\n \n | Name              | Description                                       |\n |-------------------|---------------------------------------------------|\n-| `file`            | A path. ~ expansion is applied.                   |\n-| `existingfile`    | An existing path. ~ expansion is applied.         |\n+| `path`            | A path. ~ expansion is applied.                   |\n+| `existingfile`    | An existing file. ~ expansion is applied.         |\n | `existingdir`     | An existing directory. ~ expansion is applied.    |\n \n \n@@ -348,6 +349,41 @@ Both can coexist with standard Tag parsing.\n | `hidden`               | If present, command or flag is hidden.      |\n | `format:\"X\"`           | Format for parsing input, if supported.     |\n | `sep:\"X\"`              | Separator for sequences (defaults to \",\"). May be `none` to disable splitting. |\n+| `enum:\"X,Y,...\"`       |\n+\n+## Variable interpolation\n+\n+Kong supports limited variable interpolation into help strings, enum lists and\n+default values.\n+\n+Variables are in the form:\n+\n+    ${<name>}\n+\n+Variables are set with the `Vars(map[string]string)` option. Undefined\n+variable references in the grammar will result in an error at construction\n+time.\n+\n+When interpolating into flag or argument help strings, some extra variables\n+are defined from the value itself:\n+\n+    ${default}\n+    ${enum}\n+\n+eg.\n+\n+```go\n+type cli struct {\n+  Config string `type:\"path\" default:\"${config_file}\"`\n+}\n+\n+func main() {\n+  kong.Parse(&cli,\n+    kong.Vars(map[string]string{\n+      \"config_file\": \"~/.app.conf\",\n+    }))\n+}\n+```\n \n ## Modifying Kong's behaviour\n \ndiff --git a/build.go b/build.go\nindex 3bea4ae..e8e36b1 100644\n--- a/build.go\n+++ b/build.go\n@@ -151,6 +151,7 @@ func buildField(k *Kong, node *Node, v reflect.Value, ft reflect.StructField, fv\n \t\tMapper:  mapper,\n \t\tTag:     tag,\n \t\tTarget:  fv,\n+\t\tEnum:    tag.Enum,\n \n \t\t// Flags are optional by default, and args are required by default.\n \t\tRequired: (!tag.Arg && tag.Required) || (tag.Arg && !tag.Optional),\ndiff --git a/interpolate.go b/interpolate.go\nnew file mode 100644\nindex 0000000..296f9a4\n--- /dev/null\n+++ b/interpolate.go\n@@ -0,0 +1,27 @@\n+package kong\n+\n+import (\n+\t\"fmt\"\n+\t\"regexp\"\n+)\n+\n+var interpolationRegex = regexp.MustCompile(`(\\${[[:alpha:]_][[:word:]]*})|(\\$)|([^$]+)`)\n+\n+// Interpolate variables from vars into s for substrings in the form ${var}.\n+func interpolate(s string, vars map[string]string) (string, error) {\n+\tout := \"\"\n+\tmatches := interpolationRegex.FindAllStringSubmatch(s, -1)\n+\tfor _, match := range matches {\n+\t\tif match[1] != \"\" {\n+\t\t\tname := match[1][2 : len(match[1])-1]\n+\t\t\tvalue, ok := vars[name]\n+\t\t\tif !ok {\n+\t\t\t\treturn \"\", fmt.Errorf(\"undefined variable ${%s}\", name)\n+\t\t\t}\n+\t\t\tout += value\n+\t\t} else {\n+\t\t\tout += match[0]\n+\t\t}\n+\t}\n+\treturn out, nil\n+}\ndiff --git a/interpolate_test.go b/interpolate_test.go\nnew file mode 100644\nindex 0000000..f049e38\n--- /dev/null\n+++ b/interpolate_test.go\n@@ -0,0 +1,17 @@\n+package kong\n+\n+import (\n+\t\"testing\"\n+\n+\t\"github.com/stretchr/testify/require\"\n+)\n+\n+func TestInterpolate(t *testing.T) {\n+\tvars := map[string]string{\n+\t\t\"name\": \"Bobby Brown\",\n+\t\t\"age\":  \"35\",\n+\t}\n+\tactual, err := interpolate(\"${name} is ${age} years old\", vars)\n+\trequire.NoError(t, err)\n+\trequire.Equal(t, `Bobby Brown is 35 years old`, actual)\n+}\ndiff --git a/kong.go b/kong.go\nindex 9d2c5ca..0771fe9 100644\n--- a/kong.go\n+++ b/kong.go\n@@ -51,6 +51,7 @@ type Kong struct {\n \thelp          HelpPrinter\n \thelpOptions   HelpOptions\n \thelpFlag      *Flag\n+\tvars          map[string]string\n \n \t// Set temporarily by Options. These are applied after build().\n \tpostBuildOptions []Option\n@@ -67,6 +68,7 @@ func New(grammar interface{}, options ...Option) (*Kong, error) {\n \t\tbefore:    map[reflect.Value]HookFunc{},\n \t\tregistry:  NewRegistry().RegisterDefaults(),\n \t\tresolvers: []ResolverFunc{Envars()},\n+\t\tvars:      map[string]string{},\n \t}\n \n \tfor _, option := range options {\n@@ -88,15 +90,71 @@ func New(grammar interface{}, options ...Option) (*Kong, error) {\n \tk.Model.HelpFlag = k.helpFlag\n \n \tfor _, option := range k.postBuildOptions {\n-\t\tif err := option(k); err != nil {\n+\t\tif err = option(k); err != nil {\n \t\t\treturn nil, err\n \t\t}\n \t}\n \tk.postBuildOptions = nil\n \n+\tif err = k.interpolate(k.Model.Node); err != nil {\n+\t\treturn nil, err\n+\t}\n+\n \treturn k, nil\n }\n \n+// Interpolate variables into model.\n+func (k *Kong) interpolate(node *Node) (err error) {\n+\tnode.Help, err = interpolate(node.Help, k.vars)\n+\tif err != nil {\n+\t\treturn fmt.Errorf(\"help for %s: %s\", node.Path(), err)\n+\t}\n+\tfor _, flag := range node.Flags {\n+\t\tif err = k.interpolateValue(flag.Value); err != nil {\n+\t\t\treturn err\n+\t\t}\n+\t}\n+\tfor _, pos := range node.Positional {\n+\t\tif err = k.interpolateValue(pos); err != nil {\n+\t\t\treturn err\n+\t\t}\n+\t}\n+\tfor _, child := range node.Children {\n+\t\tif err = k.interpolate(child); err != nil {\n+\t\t\treturn err\n+\t\t}\n+\t}\n+\treturn nil\n+}\n+\n+func (k *Kong) interpolateValue(value *Value) (err error) {\n+\tif value.Default, err = interpolate(value.Default, k.vars); err != nil {\n+\t\treturn fmt.Errorf(\"default value for %s: %s\", value.Summary(), err)\n+\t}\n+\tif value.Enum, err = interpolate(value.Enum, k.vars); err != nil {\n+\t\treturn fmt.Errorf(\"enum value for %s: %s\", value.Summary(), err)\n+\t}\n+\tvars := mergeVars(k.vars, map[string]string{\n+\t\t\"default\": value.Default,\n+\t\t\"enum\":    value.Enum,\n+\t})\n+\tif value.Help, err = interpolate(value.Help, vars); err != nil {\n+\t\treturn fmt.Errorf(\"help for %s: %s\", value.Summary(), err)\n+\t}\n+\treturn nil\n+}\n+\n+func mergeVars(base, extra map[string]string) map[string]string {\n+\tout := make(map[string]string, len(base)+len(extra))\n+\tfor k, v := range base {\n+\t\tout[k] = v\n+\t}\n+\tfor k, v := range extra {\n+\t\tout[k] = v\n+\t}\n+\treturn out\n+}\n+\n // Provide additional builtin flags, if any.\n func (k *Kong) extraFlags() []*Flag {\n \tif k.noDefaultHelp {\ndiff --git a/kong_test.go b/kong_test.go\nindex 596833b..90cf24a 100644\n--- a/kong_test.go\n+++ b/kong_test.go\n@@ -512,3 +512,24 @@ func TestRun(t *testing.T) {\n \terr = ctx.Run(\"ERROR\")\n \trequire.Error(t, err)\n }\n+\n+func TestInterpolationIntoModel(t *testing.T) {\n+\tvar cli struct {\n+\t\tFlag    string `default:\"${default}\" help:\"Help, I need ${somebody}\" enum:\"${enum}\"`\n+\t\tEnumRef string `enum:\"a,b\" help:\"One of ${enum}\"`\n+\t}\n+\t_, err := kong.New(&cli)\n+\trequire.Error(t, err)\n+\tp, err := kong.New(&cli, kong.Vars(map[string]string{\n+\t\t\"default\":  \"Some default value.\",\n+\t\t\"somebody\": \"chickens!\",\n+\t\t\"enum\":     \"a,b,c,d\",\n+\t}))\n+\trequire.NoError(t, err)\n+\tflag := p.Model.Flags[1]\n+\tflag2 := p.Model.Flags[2]\n+\trequire.Equal(t, \"Some default value.\", flag.Default)\n+\trequire.Equal(t, \"Help, I need chickens!\", flag.Help)\n+\trequire.Equal(t, map[string]bool{\"a\": true, \"b\": true, \"c\": true, \"d\": true}, flag.EnumMap())\n+\trequire.Equal(t, \"One of a,b\", flag2.Help)\n+}\ndiff --git a/model.go b/model.go\nindex 40c7030..2974c91 100644\n--- a/model.go\n+++ b/model.go\n@@ -185,10 +185,11 @@ func (n *Node) Path() (out string) {\n \n // A Value is either a flag or a variable positional argument.\n type Value struct {\n-\tFlag     *Flag\n+\tFlag     *Flag // Nil if positional argument.\n \tName     string\n \tHelp     string\n \tDefault  string\n+\tEnum     string\n \tMapper   Mapper\n \tTag      *Tag\n \tTarget   reflect.Value\n@@ -198,6 +199,16 @@ type Value struct {\n \tPosition int    // Position (for positional arguments).\n }\n \n+// EnumMap returns a map of the enums in this value.\n+func (v *Value) EnumMap() map[string]bool {\n+\tparts := strings.Split(v.Enum, \",\")\n+\tout := make(map[string]bool, len(parts))\n+\tfor _, part := range parts {\n+\t\tout[strings.TrimSpace(part)] = true\n+\t}\n+\treturn out\n+}\n+\n // Summary returns a human-readable summary of the value.\n func (v *Value) Summary() string {\n \tif v.Flag != nil {\ndiff --git a/options.go b/options.go\nindex ef78f82..4b99281 100644\n--- a/options.go\n+++ b/options.go\n@@ -12,6 +12,16 @@ import (\n // An Option applies optional changes to the Kong application.\n type Option func(k *Kong) error\n \n+// Vars sets the variables to use for interpolation into help strings and default values.\n+//\n+// See README for details.\n+func Vars(vars map[string]string) Option {\n+\treturn func(k *Kong) error {\n+\t\tk.vars = vars\n+\t\treturn nil\n+\t}\n+}\n+\n // Exit overrides the function used to terminate. This is useful for testing or interactive use.\n func Exit(exit func(int)) Option {\n \treturn func(k *Kong) error {\ndiff --git a/tag.go b/tag.go\nindex 2904d44..e871f16 100644\n--- a/tag.go\n+++ b/tag.go\n@@ -24,7 +24,7 @@ type Tag struct {\n \tShort       rune\n \tHidden      bool\n \tSep         rune\n-\tEnum        map[string]bool\n+\tEnum        string\n \n \t// Storage for all tag keys for arbitrary lookups.\n \titems map[string]string\n@@ -114,7 +114,6 @@ func parseTag(fv reflect.Value, ft reflect.StructField) *Tag {\n \ts, chars := getTagInfo(ft)\n \tt := &Tag{\n \t\titems: parseTagItems(s, chars),\n-\t\tEnum:  map[string]bool{},\n \t}\n \tt.Cmd = t.Has(\"cmd\")\n \tt.Arg = t.Has(\"arg\")\n@@ -149,10 +148,7 @@ func parseTag(fv reflect.Value, ft reflect.StructField) *Tag {\n \tif t.PlaceHolder == \"\" {\n \t\tt.PlaceHolder = strings.ToUpper(dashedString(fv.Type().Name()))\n \t}\n-\tfor _, part := range strings.Split(t.Get(\"enum\"), \",\") {\n-\t\tt.Enum[part] = true\n-\t}\n-\n+\tt.Enum = t.Get(\"enum\")\n \treturn t\n }\n \n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    ".golangci.yml",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/console.go",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/main.go",
+    "build.go",
+    "camelcase.go",
+    "context.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "tokentype_string.go"
+  ],
+  "explanation": {
+    "what": "新規ファイル interpolate.go に正規表現ベースの ${name} 形式の変数展開関数 interpolate() を追加し、Kong.New() の構築時に Vars(map[string]string) オプションで渡した変数をヘルプ文字列・enum一覧・デフォルト値に反映する処理(Kong.interpolate / interpolateValue)を組み込んだ。未定義変数の参照は構築時にエラーになる。あわせて Value.Enum を bool マップから文字列に変更し、フィールドごとの ${default}/${enum} という自己参照変数も使えるようにした。",
+    "why": "コミットメッセージにある通り、ヘルプ文字列やデフォルト値・enumリストの中で ${<name>} という形式の変数を使えるようにする機能で、Vars オプションで値を設定し、未定義参照は構築時エラーとすることで早期に誤りを検出できるようにしたとおもわれる。struct タグに直接値を書く代わりに、複数フィールドで共有する値(例: 設定ファイルパスのデフォルト)を一箇所にまとめられる。",
+    "highlights": [
+      { "file": "interpolate.go", "note": "正規表現で ${name} / $ / それ以外に分割して置換する interpolate() の実装" },
+      { "file": "kong.go", "note": "New() の最後に k.interpolate(k.Model.Node) を呼び、Node/Value を再帰的に走査してヘルプ・デフォルト・enumに変数展開を適用" }
+    ],
+    "langNotes": [
+      { "topic": "変数補間(Vars option)", "note": "Vars(map[string]string) で渡したキーを struct タグ内の ${name} という記法に埋め込める。実装は正規表現 FindAllStringSubmatch でトークン化し、未定義キーがあれば New() の時点でエラーを返す設計。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

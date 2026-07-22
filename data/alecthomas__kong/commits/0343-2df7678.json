@@ -1,0 +1,135 @@
+{
+  "seq": 343,
+  "sha": "2df767872e05624514aa384c7df62747c29c751f",
+  "parents": [
+    "93d31e17f429f1df8d21fb62056ac9f840fe4494"
+  ],
+  "author": {
+    "name": "eli",
+    "email": "59039+dropwhile@users.noreply.github.com",
+    "date": "2023-11-12T22:08:13-08:00"
+  },
+  "message": "fix for counter type rendering as INT (#388)\n\ncloses #367",
+  "pr": {
+    "number": 388,
+    "title": "fix for counter type rendering as INT",
+    "body": "closes #367",
+    "url": "https://github.com/alecthomas/kong/pull/388"
+  },
+  "linkedIssues": [
+    {
+      "number": 367,
+      "title": "Counter incorrectly renders value in help",
+      "body": "I have a verbose flag defined something like:\r\n\r\n```go\r\ntype Cmd struct {\r\n  Verbose int `type:\"counter\"`\r\n}\r\n```\r\n\r\nAccording to the [tests](https://github.com/alecthomas/kong/blob/master/model_test.go#L63), the help for this command should render as:\r\n\r\n```\r\n  --verbose\r\n```\r\n\r\nBut it actually renders as:\r\n\r\n```\r\n  --verbose=INT\r\n```\r\n\r\nAfter much digging, I tracked the issue down to [here](https://github.com/alecthomas/kong/blob/master/help.go#L514-L516). This is where the flag is actually rendered in help, as opposed to [Flag.String](https://github.com/alecthomas/kong/blob/master/model.go#L405-L414) which actually appears to be wholly unused when building help.\r\n\r\nWould it be possible to make the help omit the value and avoid users thinking they should specify the value for counters?\r\n\r\nFor the record, I'm using:\r\n- Kong: v0.8.0\r\n- Go v1.20.5",
+      "url": "https://github.com/alecthomas/kong/issues/367"
+    }
+  ],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 2,
+    "deletions": 1
+  },
+  "files": [
+    {
+      "path": "help.go",
+      "status": "M",
+      "additions": 2,
+      "deletions": 1,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/help.go b/help.go\nindex 4fb7700..cf5a912 100644\n--- a/help.go\n+++ b/help.go\n@@ -490,6 +490,7 @@ func formatFlag(haveShort bool, flag *Flag) string {\n \tflagString := \"\"\n \tname := flag.Name\n \tisBool := flag.IsBool()\n+\tisCounter := flag.IsCounter()\n \tif flag.Short != 0 {\n \t\tif isBool && flag.Tag.Negatable {\n \t\t\tflagString += fmt.Sprintf(\"-%c, --[no-]%s\", flag.Short, name)\n@@ -511,7 +512,7 @@ func formatFlag(haveShort bool, flag *Flag) string {\n \t\t\t}\n \t\t}\n \t}\n-\tif !isBool {\n+\tif !isBool && !isCounter {\n \t\tflagString += fmt.Sprintf(\"=%s\", flag.FormatPlaceHolder())\n \t}\n \treturn flagString\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/FUNDING.yml",
+    ".github/workflows/ci.yml",
+    ".gitignore",
+    ".golangci.yml",
+    "COPYING",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/README.md",
+    "_examples/server/console.go",
+    "_examples/server/go.mod",
+    "_examples/server/go.sum",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/commandstring/main.go",
+    "_examples/shell/help/README.md",
+    "_examples/shell/help/main.go",
+    "benchmark_test.go",
+    "bin/.go-1.19.1.pkg",
+    "bin/.golangci-lint-1.46.2.pkg",
+    "bin/README.hermit.md",
+    "bin/activate-hermit",
+    "bin/go",
+    "bin/gofmt",
+    "bin/golangci-lint",
+    "bin/hermit",
+    "bin/hermit.hcl",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "config_test.go",
+    "context.go",
+    "defaults.go",
+    "defaults_test.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "go.mod",
+    "go.sum",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "helpwrap1.18_test.go",
+    "helpwrap1.19_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_linux_test.go",
+    "mapper_test.go",
+    "mapper_windows_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "testdata/file.txt",
+    "util.go",
+    "util_test.go",
+    "visit.go"
+  ],
+  "explanation": {
+    "what": "help.go の formatFlag() に isCounter := flag.IsCounter() を追加し、bool フラグに加えて counter 型のフラグでも `=VALUE` プレースホルダをヘルプ表示から省くようにした(`if !isBool && !isCounter` の条件に変更)。",
+    "why": "リンクされた issue #367 が報告する通り、`type:\"counter\"` を指定したフラグ(例: `Verbose int \\`type:\"counter\"\\``)がヘルプ上で `--verbose=INT` のように誤った値プレースホルダ付きで表示される不具合を修正するもの。counter は `-v -v -v` のように値を取らず繰り返し指定で加算する用途のため、bool と同様に値表示は不要という判断。",
+    "highlights": [
+      { "file": "help.go", "note": "isBool 判定の隣に isCounter を追加し、プレースホルダ抑制条件を拡張" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "issue",
+    "refs": [
+      { "type": "pr", "number": 388, "url": "https://github.com/alecthomas/kong/pull/388" },
+      { "type": "issue", "number": 367, "url": "https://github.com/alecthomas/kong/issues/367" }
+    ],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

@@ -1,0 +1,100 @@
+{
+  "seq": 26,
+  "sha": "ecd369e62284c45f90df134a9a936d71f42508da",
+  "parents": [
+    "31e1ffaa3bb83362e02b567630e72eaaac858b74"
+  ],
+  "author": {
+    "name": "Gerald Kaszuba",
+    "email": "gak@gak0.com",
+    "date": "2018-05-22T23:18:08+10:00"
+  },
+  "message": "Kong tag PR fixes (#12)\n\n* Removed bubbling errors in favour of panic\r\n* Added a test for Parse with a bad build and an arg.\r\n* Removed is() function in favour of a switch with strings\r\n* Collect key and value in parseCSV, reducing complexity.\r\n* Fix in global to not use parser instance on error.\r",
+  "pr": {
+    "number": 12,
+    "title": "Kong tag PR fixes",
+    "body": "A continuation of PR https://github.com/alecthomas/kong/pull/10",
+    "url": "https://github.com/alecthomas/kong/pull/12"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 5,
+    "additions": 80,
+    "deletions": 59
+  },
+  "files": [
+    {
+      "path": "build.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 5,
+      "binary": false
+    },
+    {
+      "path": "global.go",
+      "status": "M",
+      "additions": 6,
+      "deletions": 2,
+      "binary": false
+    },
+    {
+      "path": "global_test.go",
+      "status": "A",
+      "additions": 31,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "kong.go",
+      "status": "M",
+      "additions": 2,
+      "deletions": 5,
+      "binary": false
+    },
+    {
+      "path": "tag.go",
+      "status": "M",
+      "additions": 40,
+      "deletions": 47,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/build.go b/build.go\nindex 2e70d9d..b3299cc 100644\n--- a/build.go\n+++ b/build.go\n@@ -61,11 +61,7 @@ func buildNode(v reflect.Value, seenFlags map[string]bool, cmd bool) *Node {\n \t\t\tname = strings.ToLower(dashedString(ft.Name))\n \t\t}\n \n-\t\ttag, err := parseTag(fv, ft.Tag.Get(\"kong\"))\n-\t\tif err != nil {\n-\t\t\tfail(\"%s\", err)\n-\t\t}\n-\n+\t\ttag := parseTag(fv, ft.Tag.Get(\"kong\"))\n \t\tdecoder := DecoderForField(tag.Type, ft)\n \n \t\tif !cmd {\ndiff --git a/global.go b/global.go\nindex 72544ca..a9fd899 100644\n--- a/global.go\n+++ b/global.go\n@@ -1,11 +1,15 @@\n package kong\n \n-import \"os\"\n+import (\n+\t\"os\"\n+)\n \n // Parse constructs a new parser and parses the default command-line.\n func Parse(cli interface{}, options ...Option) string {\n \tparser, err := New(cli, options...)\n-\tparser.FatalIfErrorf(err)\n+\tif err != nil {\n+\t\tpanic(err)\n+\t}\n \tcmd, err := parser.Parse(os.Args[1:])\n \tparser.FatalIfErrorf(err)\n \treturn cmd\ndiff --git a/global_test.go b/global_test.go\nnew file mode 100644\nindex 0000000..fdc5336\n--- /dev/null\n+++ b/global_test.go\n@@ -0,0 +1,31 @@\n+package kong\n+\n+import (\n+\t\"os\"\n+\t\"testing\"\n+\n+\t\"github.com/stretchr/testify/require\"\n+)\n+\n+func TestParseHandlingBadBuild(t *testing.T) {\n+\tvar cli struct {\n+\t\tEnabled bool `kong:\"unknown\"`\n+\t}\n+\n+\targs := os.Args\n+\tdefer func() {\n+\t\tos.Args = args\n+\t}()\n+\n+\tos.Args = []string{os.Args[0], \"hi\"}\n+\n+\tdefer func() {\n+\t\tif r := recover(); r != nil {\n+\t\t\trequire.Equal(t, Error{msg: \"unknown is an unknown kong key\"}, r)\n+\t\t}\n+\t}()\n+\n+\tParse(&cli, ExitFunction(func(_ int) { panic(\"exiting\") }))\n+\n+\trequire.Fail(t, \"we were expecting a panic\")\n+}\ndiff --git a/kong.go b/kong.go\nindex 1afd862..3df6c09 100644\n--- a/kong.go\n+++ b/kong.go\n@@ -51,6 +51,7 @@ func New(ast interface{}, options ...Option) (*Kong, error) {\n \tfor _, option := range options {\n \t\toption(k)\n \t}\n+\n \treturn k, nil\n }\n \n@@ -75,11 +76,7 @@ func (k *Kong) Parse(args []string) (command string, err error) {\n }\n \n func (k *Kong) Errorf(format string, args ...interface{}) {\n-\tif k.Model != nil {\n-\t\tfmt.Fprintf(os.Stderr, k.Model.Name+\": \"+format, args...)\n-\t} else {\n-\t\tfmt.Fprintf(os.Stderr, format, args...)\n-\t}\n+\tfmt.Fprintf(os.Stderr, k.Model.Name+\": \"+format, args...)\n }\n \n func (k *Kong) FatalIfErrorf(err error, args ...interface{}) {\ndiff --git a/tag.go b/tag.go\nindex acdb5c0..ef10f99 100644\n--- a/tag.go\n+++ b/tag.go\n@@ -1,7 +1,6 @@\n package kong\n \n import (\n-\t\"fmt\"\n \t\"reflect\"\n \t\"strings\"\n \t\"unicode/utf8\"\n@@ -21,19 +20,21 @@ type Tag struct {\n \tShort       rune\n }\n \n-func parseCSV(s string) ([]string, error) {\n-\tnum := 0\n-\tparts := []string{}\n-\tcurrent := []rune{}\n+func parseCSV(s string) map[string]string {\n+\td := map[string]string{}\n+\n+\tkey := []rune{}\n+\tvalue := []rune{}\n+\tquotes := false\n+\tinKey := true\n \n \tadd := func() {\n-\t\tparts = append(parts, string(current))\n-\t\tcurrent = []rune{}\n-\t\tnum++\n+\t\td[string(key)] = string(value)\n+\t\tkey = []rune{}\n+\t\tvalue = []rune{}\n+\t\tinKey = true\n \t}\n \n-\tquotes := false\n-\n \trunes := []rune(s)\n \tfor idx := 0; idx < len(runes); idx++ {\n \t\tr := runes[idx]\n@@ -48,6 +49,10 @@ func parseCSV(s string) ([]string, error) {\n \t\t\tadd()\n \t\t\tcontinue\n \t\t}\n+\t\tif r == '=' && inKey {\n+\t\t\tinKey = false\n+\t\t\tcontinue\n+\t\t}\n \t\tif r == '\\\\' {\n \t\t\tif next == '\\'' {\n \t\t\t\tidx++\n@@ -59,72 +64,60 @@ func parseCSV(s string) ([]string, error) {\n \t\t\t\tif next == ',' || eof {\n \t\t\t\t\tcontinue\n \t\t\t\t}\n-\t\t\t\treturn parts, fmt.Errorf(\"%v has an unexpected char at pos %v\", s, idx)\n+\t\t\t\tfail(\"%v has an unexpected char at pos %v\", s, idx)\n \t\t\t} else {\n \t\t\t\tquotes = true\n \t\t\t\tcontinue\n \t\t\t}\n \t\t}\n-\t\tcurrent = append(current, r)\n+\t\tif inKey {\n+\t\t\tkey = append(key, r)\n+\t\t} else {\n+\t\t\tvalue = append(value, r)\n+\t\t}\n \t}\n \tif quotes {\n-\t\treturn parts, fmt.Errorf(\"%v is not quoted properly\", s)\n+\t\tfail(\"%v is not quoted properly\", s)\n \t}\n \n \tadd()\n \n-\treturn parts, nil\n+\treturn d\n }\n \n-func parseTag(fv reflect.Value, s string) (*Tag, error) {\n+func parseTag(fv reflect.Value, s string) *Tag {\n \tt := &Tag{}\n \tif s == \"\" {\n-\t\treturn t, nil\n+\t\treturn t\n \t}\n \n-\tparts, err := parseCSV(s)\n-\tif err != nil {\n-\t\treturn t, err\n-\t}\n-\n-\tfor _, part := range parts {\n-\t\tis := func(m string) bool { return part == m }\n-\t\tvalue := func(m string) (string, bool) {\n-\t\t\tsplit := strings.SplitN(part, \"=\", 2)\n-\t\t\tif split[0] != m {\n-\t\t\t\treturn \"\", false\n-\t\t\t}\n-\t\t\tif len(split) == 1 {\n-\t\t\t\treturn \"\", true\n-\t\t\t}\n-\t\t\treturn split[1], true\n-\t\t}\n-\n-\t\tif is(\"cmd\") {\n+\tfor k, v := range parseCSV(s) {\n+\t\tswitch k {\n+\t\tcase \"cmd\":\n \t\t\tt.Cmd = true\n-\t\t} else if is(\"arg\") {\n+\t\tcase \"arg\":\n \t\t\tt.Arg = true\n-\t\t} else if is(\"required\") {\n+\t\tcase \"required\":\n \t\t\tt.Required = true\n-\t\t} else if is(\"optional\") {\n+\t\tcase \"optional\":\n \t\t\tt.Optional = true\n-\t\t} else if v, ok := value(\"default\"); ok {\n+\t\tcase \"default\":\n \t\t\tt.Default = v\n-\t\t} else if v, ok := value(\"help\"); ok {\n+\t\tcase \"help\":\n \t\t\tt.Help = v\n-\t\t} else if v, ok := value(\"type\"); ok {\n+\t\tcase \"type\":\n \t\t\tt.Type = v\n-\t\t} else if v, ok := value(\"placeholder\"); ok {\n+\t\tcase \"placeholder\":\n \t\t\tt.Placeholder = v\n-\t\t} else if v, ok := value(\"env\"); ok {\n+\t\tcase \"env\":\n \t\t\tt.Env = v\n-\t\t} else if v, ok := value(\"rune\"); ok {\n+\t\tcase \"rune\":\n \t\t\tt.Short, _ = utf8.DecodeRuneInString(v)\n \t\t\tif t.Short == utf8.RuneError {\n \t\t\t\tt.Short = 0\n \t\t\t}\n-\t\t} else {\n-\t\t\treturn t, fmt.Errorf(\"%v is an unknown kong key\", part)\n+\t\tdefault:\n+\t\t\tfail(\"%v is an unknown kong key\", k)\n \t\t}\n \t}\n \n@@ -132,5 +125,5 @@ func parseTag(fv reflect.Value, s string) (*Tag, error) {\n \t\tt.Placeholder = strings.ToUpper(dashedString(fv.Type().Name()))\n \t}\n \n-\treturn t, nil\n+\treturn t\n }\n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    "README.md",
+    "_examples/shell/main.go",
+    "build.go",
+    "camelcase.go",
+    "context.go",
+    "decoders.go",
+    "decoders_test.go",
+    "global.go",
+    "global_test.go",
+    "help.go",
+    "kong.go",
+    "kong_test.go",
+    "model.go",
+    "options.go",
+    "options_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tokentype_string.go"
+  ],
+  "explanation": {
+    "what": "parseTag のエラー戻り値をやめて panic ベースの fail() に統一し、is()/value() によるタグキー判定を switch 文に書き換えた。parseCSV もキーと値を1パスで同時に収集する実装に変更し、`os.Args` を差し替えてビルド失敗時の挙動を確認する global_test.go を追加。global.go の Parse() は New() のエラー時に parser インスタンスを使わず直接 panic するよう修正した。",
+    "why": "PR本文に、PR #10(kong タグ導入)の続きの修正であると明記されている。タグパース周りのコードをシンプルにし、エラーハンドリングの一貫性(呼び出し元に error を戻すのではなく panic + recover で統一)を高める狙いと考えられる。",
+    "highlights": [
+      { "file": "tag.go", "note": "parseTag/parseCSV がエラー戻り値をやめ fail() による panic に統一" },
+      { "file": "global_test.go", "note": "os.Args を差し替えてビルド失敗時の panic 内容を検証するテスト" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [{ "type": "pr", "number": 12, "url": "https://github.com/alecthomas/kong/pull/12" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

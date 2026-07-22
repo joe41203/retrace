@@ -1,0 +1,77 @@
+{
+  "seq": 38,
+  "sha": "254fa00e81d96c7a5e60f52e46a228d09484bce2",
+  "parents": [
+    "ed123d1c0685a0f70d246c6ff28c2faa125ca682"
+  ],
+  "author": {
+    "name": "Gerald Kaszuba",
+    "email": "gak@gak0.com",
+    "date": "2018-06-01T11:33:33+10:00"
+  },
+  "message": "Better name for `parseCSV` -> `parseTagItems`",
+  "pr": {
+    "number": 21,
+    "title": "Allow \"bare\" tags and moved tag tests into tag_test.go. Fixes #19",
+    "body": "",
+    "url": "https://github.com/alecthomas/kong/pull/21"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 2,
+    "deletions": 2
+  },
+  "files": [
+    {
+      "path": "tag.go",
+      "status": "M",
+      "additions": 2,
+      "deletions": 2,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/tag.go b/tag.go\nindex fe4f874..63646fd 100644\n--- a/tag.go\n+++ b/tag.go\n@@ -33,7 +33,7 @@ type tagChars struct {\n var kongChars = tagChars{sep: ',', quote: '\\'', assign: '='}\n var bareChars = tagChars{sep: ' ', quote: '\"', assign: ':'}\n \n-func parseCSV(s string, chr tagChars) map[string]string {\n+func parseTagItems(s string, chr tagChars) map[string]string {\n \td := map[string]string{}\n \tkey := []rune{}\n \tvalue := []rune{}\n@@ -115,7 +115,7 @@ func parseTag(fv reflect.Value, ft reflect.StructField) *Tag {\n \t\treturn t\n \t}\n \n-\tt.items = parseCSV(s, chars)\n+\tt.items = parseTagItems(s, chars)\n \n \tt.Cmd = t.Has(\"cmd\")\n \tt.Arg = t.Has(\"arg\")\n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    "README.md",
+    "_examples/shell/main.go",
+    "build.go",
+    "camelcase.go",
+    "context.go",
+    "context_test.go",
+    "decoders.go",
+    "decoders_test.go",
+    "global.go",
+    "global_test.go",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "kong.go",
+    "kong_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "tokentype_string.go"
+  ],
+  "explanation": {
+    "what": "前コミットで追加された関数 `parseCSV` を `parseTagItems` にリネームした。処理内容の変更はない。",
+    "why": "コミットメッセージの通り、`parseCSV` という名前が実際の役割(struct タグの項目をキー・値のマップに分解する処理)を表しておらず、CSV(カンマ区切り値)のパースそのものではなくなった(bare tag 対応でスペース区切りも扱うようになった)ことから、より実態に即した名前に改めたもの。",
+    "highlights": [],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [
+      { "type": "pr", "number": 21, "url": "https://github.com/alecthomas/kong/pull/21" }
+    ],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

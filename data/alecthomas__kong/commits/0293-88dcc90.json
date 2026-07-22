@@ -1,0 +1,121 @@
+{
+  "seq": 293,
+  "sha": "88dcc90dde05844cd2b0b5353776429b766e475a",
+  "parents": [
+    "7533b11d0669e164d6a73834e219fa8c759f27f6"
+  ],
+  "author": {
+    "name": "Mitar",
+    "email": "mitar.git@tnode.com",
+    "date": "2021-12-22T16:10:11+01:00"
+  },
+  "message": "Document nested data structure.",
+  "pr": {
+    "number": 257,
+    "title": "Document nested data structure",
+    "body": "See: https://github.com/alecthomas/kong/issues/256\r\n\r\nI made this addition to documentation to make it clearer. I think it is a pretty common use case and it makes it nice to immediatelly see how Kong does it. Because when initially reading README I was like \"nice, they use structs for sub-commands, but, hm, what if you just want a struct\".",
+    "url": "https://github.com/alecthomas/kong/pull/257"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 15,
+    "deletions": 0
+  },
+  "files": [
+    {
+      "path": "README.md",
+      "status": "M",
+      "additions": 15,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/README.md b/README.md\nindex fa8624c..de49d9b 100644\n--- a/README.md\n+++ b/README.md\n@@ -384,6 +384,21 @@ var CLI struct {\n \n For flags, multiple key+value pairs should be separated by `mapsep:\"rune\"` tag (defaults to `;`) eg. `--set=\"key1=value1;key2=value2\"`.\n \n+## Nested data structure\n+\n+Kong support a nested data structure as well with `embed:\"\"`. You can combine `embed:\"\"` with `prefix:\"\"`:\n+\n+```go\n+var CLI struct {\n+  Logging struct {\n+    Level string `enum:\"debug,info,warn,error\" default:\"info\"`\n+    Type string `enum:\"json,console\" default:\"console\"`\n+  } `embed:\"\" prefix:\"logging.\"`\n+}\n+```\n+\n+This configures Kong to accept flags `--logging.level` and `--logging.type`.\n+\n ## Custom named decoders\n \n Kong includes a number of builtin custom type mappers. These can be used by\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/FUNDING.yml",
+    ".github/workflows/ci.yml",
+    ".gitignore",
+    ".golangci.yml",
+    "COPYING",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/README.md",
+    "_examples/server/console.go",
+    "_examples/server/go.mod",
+    "_examples/server/go.sum",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/main.go",
+    "benchmark_test.go",
+    "bin/.go@latest.pkg",
+    "bin/.golangci-lint-1.42.0.pkg",
+    "bin/README.hermit.md",
+    "bin/activate-hermit",
+    "bin/go",
+    "bin/gofmt",
+    "bin/golangci-lint",
+    "bin/hermit",
+    "bin/hermit.hcl",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "config_test.go",
+    "context.go",
+    "defaults.go",
+    "defaults_test.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "go.mod",
+    "go.sum",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "testdata/file.txt",
+    "util.go",
+    "util_test.go",
+    "visit.go"
+  ],
+  "explanation": {
+    "what": "README.md に「Nested data structure」節を追加し、embed:\"\" と prefix:\"\" を組み合わせてネストした struct をフラグ群として展開する使い方をコード例付きで説明した。",
+    "why": "PR本文によると、投稿者はREADMEを初めて読んだ際にKongがサブコマンドにstructを使うことは分かったが、サブコマンド無しで単にネストしたstructとしてフラグをまとめたい場合の書き方が分かりにくかったため、その用途がよくあるケースだと考えてドキュメントを補強した。",
+    "highlights": [
+      { "file": "README.md", "note": "embed:\"\" + prefix:\"\" で --logging.level のようなネストフラグを作る例" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [
+      { "type": "pr", "number": 257, "url": "https://github.com/alecthomas/kong/pull/257" }
+    ],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

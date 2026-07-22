@@ -1,0 +1,172 @@
+{
+  "seq": 288,
+  "sha": "deebf0b09b7bdda61ec299ab90aaaa341436dd4b",
+  "parents": [
+    "32b2f740c921ebddcf8abe1a9f3ce781c25c93c2"
+  ],
+  "author": {
+    "name": "Mitar",
+    "email": "mitar.git@tnode.com",
+    "date": "2021-12-03T00:19:54+01:00"
+  },
+  "message": "Do not add environment variable to help it is already present.\n\nFixes #246.",
+  "pr": {
+    "number": 247,
+    "title": "Do not add environment variable to help it is already present",
+    "body": "Fixes #246.",
+    "url": "https://github.com/alecthomas/kong/pull/247"
+  },
+  "linkedIssues": [
+    {
+      "number": 246,
+      "title": "Default help formatter appends environment variable even when ${env} is inside the help string",
+      "body": "I have the following structure:\r\n\r\n```go\r\ntype Config struct {\r\n\tProject   string `short:\"p\" env:\"CI_PROJECT_ID\" help:\"Environment variable: ${env}\"`\r\n}\r\n```\r\n\r\nAnd the help message I get is:\r\n\r\n```\r\nEnvironment variable: CI_PROJECT_ID ($CI_PROJECT_ID)\r\n```\r\n\r\nBut I would expect it to be:\r\n\r\n```\r\nEnvironment variable: CI_PROJECT_ID\r\n```\r\n\r\nThis issue is a followup to #244.",
+      "url": "https://github.com/alecthomas/kong/issues/246"
+    }
+  ],
+  "stats": {
+    "filesChanged": 7,
+    "additions": 30,
+    "deletions": 5
+  },
+  "files": [
+    {
+      "path": "build.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "help.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "interpolate.go",
+      "status": "M",
+      "additions": 11,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "interpolate_test.go",
+      "status": "M",
+      "additions": 14,
+      "deletions": 3,
+      "binary": false
+    },
+    {
+      "path": "kong.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "kong_test.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "model.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/build.go b/build.go\nindex 3e8be10..0b3e4ab 100644\n--- a/build.go\n+++ b/build.go\n@@ -239,6 +239,7 @@ func buildField(k *Kong, node *Node, v reflect.Value, ft reflect.StructField, fv\n \tvalue := &Value{\n \t\tName:         name,\n \t\tHelp:         tag.Help,\n+\t\tOrigHelp:     tag.Help,\n \t\tDefault:      tag.Default,\n \t\tDefaultValue: reflect.New(fv.Type()).Elem(),\n \t\tMapper:       mapper,\ndiff --git a/help.go b/help.go\nindex ad7cb80..d65f91c 100644\n--- a/help.go\n+++ b/help.go\n@@ -86,7 +86,7 @@ type HelpValueFormatter func(value *Value) string\n \n // DefaultHelpValueFormatter is the default HelpValueFormatter.\n func DefaultHelpValueFormatter(value *Value) string {\n-\tif value.Tag.Env == \"\" {\n+\tif value.Tag.Env == \"\" || HasInterpolatedVar(value.OrigHelp, \"env\") {\n \t\treturn value.Help\n \t}\n \tsuffix := \"($\" + value.Tag.Env + \")\"\ndiff --git a/interpolate.go b/interpolate.go\nindex dceeed0..e811632 100644\n--- a/interpolate.go\n+++ b/interpolate.go\n@@ -7,6 +7,17 @@ import (\n \n var interpolationRegex = regexp.MustCompile(`(\\$\\$)|((?:\\${([[:alpha:]_][[:word:]]*))(?:=([^}]+))?})|(\\$)|([^$]+)`)\n \n+// HasInterpolatedVar returns true if the variable \"v\" is interpolated in \"s\".\n+func HasInterpolatedVar(s string, v string) bool {\n+\tmatches := interpolationRegex.FindAllStringSubmatch(s, -1)\n+\tfor _, match := range matches {\n+\t\tif name := match[3]; name == v {\n+\t\t\treturn true\n+\t\t}\n+\t}\n+\treturn false\n+}\n+\n // Interpolate variables from vars into s for substrings in the form ${var} or ${var=default}.\n func interpolate(s string, vars Vars, updatedVars map[string]string) (string, error) {\n \tout := \"\"\ndiff --git a/interpolate_test.go b/interpolate_test.go\nindex 399d114..927be41 100644\n--- a/interpolate_test.go\n+++ b/interpolate_test.go\n@@ -8,12 +8,23 @@ import (\n \n func TestInterpolate(t *testing.T) {\n \tvars := map[string]string{\n-\t\t\"age\": \"35\",\n+\t\t\"age\":  \"35\",\n+\t\t\"city\": \"Melbourne\",\n \t}\n \tupdatedVars := map[string]string{\n \t\t\"height\": \"180\",\n \t}\n-\tactual, err := interpolate(\"${name=Bobby Brown} is ${age} years old and ${height} cm tall and likes $${AUD}\", vars, updatedVars)\n+\tactual, err := interpolate(\"${name=Bobby Brown} is ${age} years old, ${height} cm tall, lives in ${city=<unknown>}, and likes $${AUD}\", vars, updatedVars)\n \trequire.NoError(t, err)\n-\trequire.Equal(t, `Bobby Brown is 35 years old and 180 cm tall and likes ${AUD}`, actual)\n+\trequire.Equal(t, `Bobby Brown is 35 years old, 180 cm tall, lives in Melbourne, and likes ${AUD}`, actual)\n+}\n+\n+func TestHasInterpolatedVar(t *testing.T) {\n+\tfor _, tag := range []string{\"name\", \"age\", \"height\", \"city\"} {\n+\t\trequire.True(t, HasInterpolatedVar(\"${name=Bobby Brown} is ${age} years old, ${height} cm tall, lives in ${city=<unknown>}, and likes $${AUD}\", tag), tag)\n+\t}\n+\n+\tfor _, tag := range []string{\"name\", \"age\", \"height\", \"AUD\"} {\n+\t\trequire.False(t, HasInterpolatedVar(\"$name $$age {height} $${AUD}\", tag), tag)\n+\t}\n }\ndiff --git a/kong.go b/kong.go\nindex 45ef8b8..a4d230e 100644\n--- a/kong.go\n+++ b/kong.go\n@@ -223,6 +223,7 @@ func (k *Kong) extraFlags() []*Flag {\n \t\tValue: &Value{\n \t\t\tName:         \"help\",\n \t\t\tHelp:         \"Show context-sensitive help.\",\n+\t\t\tOrigHelp:     \"Show context-sensitive help.\",\n \t\t\tTarget:       value,\n \t\t\tTag:          &Tag{},\n \t\t\tMapper:       k.registry.ForValue(value),\ndiff --git a/kong_test.go b/kong_test.go\nindex fc8c40b..4c9d5fb 100644\n--- a/kong_test.go\n+++ b/kong_test.go\n@@ -675,7 +675,7 @@ func TestIssue244(t *testing.T) {\n \tk := mustNew(t, &Config{}, kong.Exit(func(int) {}), kong.Writers(w, w))\n \t_, err := k.Parse([]string{\"--help\"})\n \trequire.NoError(t, err)\n-\trequire.Contains(t, w.String(), `Environment variable: CI_PROJECT_ID ($CI_PROJECT_ID)`)\n+\trequire.Contains(t, w.String(), `Environment variable: CI_PROJECT_ID`)\n }\n \n func TestErrorMissingArgs(t *testing.T) {\ndiff --git a/model.go b/model.go\nindex 2c2991f..5f7f80e 100644\n--- a/model.go\n+++ b/model.go\n@@ -231,6 +231,7 @@ type Value struct {\n \tFlag         *Flag // Nil if positional argument.\n \tName         string\n \tHelp         string\n+\tOrigHelp     string // Original help string, without interpolated variables.\n \tDefault      string\n \tDefaultValue reflect.Value\n \tEnum         string\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/FUNDING.yml",
+    ".github/workflows/ci.yml",
+    ".gitignore",
+    ".golangci.yml",
+    "COPYING",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/README.md",
+    "_examples/server/console.go",
+    "_examples/server/go.mod",
+    "_examples/server/go.sum",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/main.go",
+    "benchmark_test.go",
+    "bin/.go@latest.pkg",
+    "bin/.golangci-lint-1.42.0.pkg",
+    "bin/README.hermit.md",
+    "bin/activate-hermit",
+    "bin/go",
+    "bin/gofmt",
+    "bin/golangci-lint",
+    "bin/hermit",
+    "bin/hermit.hcl",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "config_test.go",
+    "context.go",
+    "defaults.go",
+    "defaults_test.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "go.mod",
+    "go.sum",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "testdata/file.txt",
+    "util.go",
+    "util_test.go",
+    "visit.go"
+  ],
+  "explanation": {
+    "what": "Value に OrigHelp フィールド(補間前のオリジナルの help 文字列)を追加し、新関数 HasInterpolatedVar(s, v) で help 文字列中に `${env}` のような変数参照が既に書かれているかを判定できるようにした。DefaultHelpValueFormatter は、Tag.Env が空、または OrigHelp 内にすでに `${env}` が書かれている場合は末尾への `($ENV_VAR)` 自動付与をスキップするよう変更した。",
+    "why": "issue #246 が報告する通り、help タグの中で既に `${env}` を使って環境変数名を表示しているケースでも、デフォルトのヘルプフォーマッタが機械的に `($ENV_VAR)` を末尾に追加してしまい、`Environment variable: CI_PROJECT_ID ($CI_PROJECT_ID)` のように表示が二重になっていた。ユーザーが明示的に `${env}` を書いている場合は自動追加をしないことで、この重複を解消した。",
+    "highlights": [
+      { "file": "help.go", "note": "`HasInterpolatedVar(value.OrigHelp, \"env\")` の条件追加で自動付与をスキップ" },
+      { "file": "interpolate.go", "note": "HasInterpolatedVar は正規表現マッチの捕捉グループから変数名の有無だけを走査する新規ヘルパー" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "issue",
+    "refs": [
+      { "type": "pr", "number": 247, "url": "https://github.com/alecthomas/kong/pull/247" },
+      { "type": "issue", "number": 246, "url": "https://github.com/alecthomas/kong/issues/246" }
+    ],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

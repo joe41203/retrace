@@ -1,0 +1,62 @@
+{
+  "seq": 2,
+  "sha": "8516c68cc9a45c9a0863ff9618f24902bf23e5ea",
+  "parents": [
+    "aa1bf9dcb57f6b8f10693cd3ac0fddf5dbbe03fb"
+  ],
+  "author": {
+    "name": "Alec Thomas",
+    "email": "alec@swapoff.org",
+    "date": "2018-04-10T21:17:00+10:00"
+  },
+  "message": "Add decoders scaffolding.",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 101,
+    "deletions": 4
+  },
+  "files": [
+    {
+      "path": "decoders.go",
+      "status": "A",
+      "additions": 95,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "kong.go",
+      "status": "M",
+      "additions": 6,
+      "deletions": 4,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/decoders.go b/decoders.go\nnew file mode 100644\nindex 0000000..514b140\n--- /dev/null\n+++ b/decoders.go\n@@ -0,0 +1,95 @@\n+package kong\n+\n+import \"reflect\"\n+\n+type Decoder interface {\n+\tDecode(input string, target reflect.Value) error\n+}\n+\n+type DecoderFunc func(input string, target reflect.Value) error\n+\n+func (d DecoderFunc) Decode(input string, target reflect.Value) error { return d(input, target) }\n+\n+var _ Decoder = DecoderFunc(nil)\n+\n+type TypeDecoder interface {\n+\tType() reflect.Type\n+\tDecoder\n+}\n+\n+func NewTypeDecoder(typ reflect.Type, decoder DecoderFunc) TypeDecoder {\n+\treturn &typeDecoder{typ, decoder}\n+}\n+\n+type typeDecoder struct {\n+\ttyp reflect.Type\n+\tDecoderFunc\n+}\n+\n+func (t *typeDecoder) Type() reflect.Type { return t.typ }\n+\n+var _ TypeDecoder = &typeDecoder{}\n+\n+type KindDecoder interface {\n+\tKind() reflect.Kind\n+\tDecoder\n+}\n+\n+func NewKindDecoder(kind reflect.Kind, decoder DecoderFunc) KindDecoder {\n+\treturn &kindDecoder{kind, decoder}\n+}\n+\n+type kindDecoder struct {\n+\tkind reflect.Kind\n+\tDecoderFunc\n+}\n+\n+func (k *kindDecoder) Kind() reflect.Kind { return k.kind }\n+\n+var _ KindDecoder = &kindDecoder{}\n+\n+type NamedDecoder interface {\n+\tName() string\n+\tDecoder\n+}\n+\n+func NewNamedDecoder(name string, decoder DecoderFunc) NamedDecoder {\n+\treturn &namedDecoder{name, decoder}\n+}\n+\n+type namedDecoder struct {\n+\tname string\n+\tDecoderFunc\n+}\n+\n+func (n *namedDecoder) Name() string { return n.name }\n+\n+var _ NamedDecoder = &namedDecoder{}\n+\n+var (\n+\tnamedDecoders = map[string]NamedDecoder{}\n+\ttypeDecoders  = map[reflect.Type]TypeDecoder{}\n+\tkindDecoders  = map[reflect.Kind]KindDecoder{}\n+)\n+\n+// RegisterDecoder registers decoders.\n+//\n+// Decoders must be one of TypeDecoder, KindDecoder or NamedDecoder.\n+func RegisterDecoder(decoders ...Decoder) {\n+\tfor _, decoder := range decoders {\n+\t\tswitch decoder := decoder.(type) {\n+\t\tcase TypeDecoder:\n+\t\t\ttypeDecoders[decoder.Type()] = decoder\n+\t\tcase KindDecoder:\n+\t\t\tkindDecoders[decoder.Kind()] = decoder\n+\t\tcase NamedDecoder:\n+\t\t\tnamedDecoders[decoder.Name()] = decoder\n+\t\tdefault:\n+\t\t\tpanic(\"unsupported decoder type \" + reflect.TypeOf(decoder).String())\n+\t\t}\n+\t}\n+}\n+\n+func init() {\n+\tRegisterDecoder()\n+}\ndiff --git a/kong.go b/kong.go\nindex 0edecac..7cfbc6c 100644\n--- a/kong.go\n+++ b/kong.go\n@@ -12,15 +12,17 @@ type Kong struct {\n \tTerminate func(int)\n }\n \n+// New creates a new Kong parser into grammar.\n func New(name, description string, grammar interface{}) (*Kong, error) {\n \tif name == \"\" {\n \t\tname = filepath.Base(os.Args[0])\n \t}\n+\tmodel := &ApplicationModel{\n+\t\tName:        name,\n+\t\tDescription: description,\n+\t}\n \treturn &Kong{\n-\t\tModel: &ApplicationModel{\n-\t\t\tName:        name,\n-\t\t\tDescription: description,\n-\t\t},\n+\t\tModel:     model,\n \t\tTerminate: os.Exit,\n \t}, nil\n }\n",
+  "diffTruncated": false,
+  "tree": [
+    "README.md",
+    "_examples/shell/main.go",
+    "camelcase.go",
+    "decoders.go",
+    "global.go",
+    "kong.go",
+    "model.go"
+  ],
+  "explanation": {
+    "what": "decoders.go を新規追加し、Decoder インターフェースと、それを型(TypeDecoder)・種別(KindDecoder)・名前(NamedDecoder)ごとに実装するラッパー型を定義した。RegisterDecoder() で登録し、typeDecoders/kindDecoders/namedDecoders という3種のマップに振り分ける仕組みを作った。まだ具体的な decoder(int/string 等)の登録はなく、init() は空呼び出しのみ。kong.go は New() 内でモデル構築を model 変数に一度受けてから Kong に詰めるよう小さくリファクタしている。",
+    "why": "struct のフィールド型・kind・タグ名それぞれに応じて異なる文字列→値の変換ロジックを差し替え可能にするため、decoder を分類ごとのインターフェースに分けたと考えられる。この抽象化により、後続コミットで int/uint/float/string/bool/slice など具体的な decoder を機械的に追加できるようになる。",
+    "highlights": [
+      { "file": "decoders.go", "note": "TypeDecoder/KindDecoder/NamedDecoder の3分類と RegisterDecoder() による登録の仕組み。以降ずっと使われる decoder 基盤の初出" }
+    ],
+    "langNotes": [
+      { "topic": "reflect.Type / reflect.Kind", "note": "Go の reflect パッケージでは reflect.Type(具体的な型、例: MyStruct)と reflect.Kind(型の種別、例: Struct, Int, Slice)を区別する。KindDecoder は Kind 単位、TypeDecoder は Type 単位で decoder を紐付ける設計。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

@@ -1,0 +1,100 @@
+{
+  "seq": 144,
+  "sha": "8c83948cffcc5d7f5520be2793ba1818380ce82a",
+  "parents": [
+    "7be398e79f699de29248941f53440d8f2f8722c8"
+  ],
+  "author": {
+    "name": "Alec Thomas",
+    "email": "alec@swapoff.org",
+    "date": "2019-06-21T09:51:30+10:00"
+  },
+  "message": "Make most option functions return Option rather than OptionFunc.\n\nThis clarifies the godocs.",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 51,
+    "deletions": 51
+  },
+  "files": [
+    {
+      "path": "options.go",
+      "status": "M",
+      "additions": 51,
+      "deletions": 51,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/options.go b/options.go\nindex 450c34b..aec7164 100644\n--- a/options.go\n+++ b/options.go\n@@ -44,82 +44,82 @@ func (v Vars) CloneWith(vars Vars) Vars {\n }\n \n // Exit overrides the function used to terminate. This is useful for testing or interactive use.\n-func Exit(exit func(int)) OptionFunc {\n-\treturn func(k *Kong) error {\n+func Exit(exit func(int)) Option {\n+\treturn OptionFunc(func(k *Kong) error {\n \t\tk.Exit = exit\n \t\treturn nil\n-\t}\n+\t})\n }\n \n // NoDefaultHelp disables the default help flags.\n-func NoDefaultHelp() OptionFunc {\n-\treturn func(k *Kong) error {\n+func NoDefaultHelp() Option {\n+\treturn OptionFunc(func(k *Kong) error {\n \t\tk.noDefaultHelp = true\n \t\treturn nil\n-\t}\n+\t})\n }\n \n // Name overrides the application name.\n-func Name(name string) OptionFunc {\n-\treturn func(k *Kong) error {\n+func Name(name string) Option {\n+\treturn OptionFunc(func(k *Kong) error {\n \t\tk.postBuildOptions = append(k.postBuildOptions, OptionFunc(func(k *Kong) error {\n \t\t\tk.Model.Name = name\n \t\t\treturn nil\n \t\t}))\n \t\treturn nil\n-\t}\n+\t})\n }\n \n // Description sets the application description.\n-func Description(description string) OptionFunc {\n-\treturn func(k *Kong) error {\n+func Description(description string) Option {\n+\treturn OptionFunc(func(k *Kong) error {\n \t\tk.postBuildOptions = append(k.postBuildOptions, OptionFunc(func(k *Kong) error {\n \t\t\tk.Model.Help = description\n \t\t\treturn nil\n \t\t}))\n \t\treturn nil\n-\t}\n+\t})\n }\n \n // TypeMapper registers a mapper to a type.\n-func TypeMapper(typ reflect.Type, mapper Mapper) OptionFunc {\n-\treturn func(k *Kong) error {\n+func TypeMapper(typ reflect.Type, mapper Mapper) Option {\n+\treturn OptionFunc(func(k *Kong) error {\n \t\tk.registry.RegisterType(typ, mapper)\n \t\treturn nil\n-\t}\n+\t})\n }\n \n // KindMapper registers a mapper to a kind.\n-func KindMapper(kind reflect.Kind, mapper Mapper) OptionFunc {\n-\treturn func(k *Kong) error {\n+func KindMapper(kind reflect.Kind, mapper Mapper) Option {\n+\treturn OptionFunc(func(k *Kong) error {\n \t\tk.registry.RegisterKind(kind, mapper)\n \t\treturn nil\n-\t}\n+\t})\n }\n \n // ValueMapper registers a mapper to a field value.\n-func ValueMapper(ptr interface{}, mapper Mapper) OptionFunc {\n-\treturn func(k *Kong) error {\n+func ValueMapper(ptr interface{}, mapper Mapper) Option {\n+\treturn OptionFunc(func(k *Kong) error {\n \t\tk.registry.RegisterValue(ptr, mapper)\n \t\treturn nil\n-\t}\n+\t})\n }\n \n // NamedMapper registers a mapper to a name.\n-func NamedMapper(name string, mapper Mapper) OptionFunc {\n-\treturn func(k *Kong) error {\n+func NamedMapper(name string, mapper Mapper) Option {\n+\treturn OptionFunc(func(k *Kong) error {\n \t\tk.registry.RegisterName(name, mapper)\n \t\treturn nil\n-\t}\n+\t})\n }\n \n // Writers overrides the default writers. Useful for testing or interactive use.\n-func Writers(stdout, stderr io.Writer) OptionFunc {\n-\treturn func(k *Kong) error {\n+func Writers(stdout, stderr io.Writer) Option {\n+\treturn OptionFunc(func(k *Kong) error {\n \t\tk.Stdout = stdout\n \t\tk.Stderr = stderr\n \t\treturn nil\n-\t}\n+\t})\n }\n \n // Bind binds values for hooks and Run() function arguments.\n@@ -133,61 +133,61 @@ func Writers(stdout, stderr io.Writer) OptionFunc {\n //   \tAfterApply(...) error\n //\n // Called before validation/assignment, and immediately after validation/assignment, respectively.\n-func Bind(args ...interface{}) OptionFunc {\n-\treturn func(k *Kong) error {\n+func Bind(args ...interface{}) Option {\n+\treturn OptionFunc(func(k *Kong) error {\n \t\tk.bindings.add(args...)\n \t\treturn nil\n-\t}\n+\t})\n }\n \n // BindTo allows binding of implementations to interfaces.\n //\n // \t\tBindTo(impl, (*iface)(nil))\n-func BindTo(impl, iface interface{}) OptionFunc {\n-\treturn func(k *Kong) error {\n+func BindTo(impl, iface interface{}) Option {\n+\treturn OptionFunc(func(k *Kong) error {\n \t\tk.bindings[reflect.TypeOf(iface).Elem()] = reflect.ValueOf(impl)\n \t\treturn nil\n-\t}\n+\t})\n }\n \n // Help printer to use.\n-func Help(help HelpPrinter) OptionFunc {\n-\treturn func(k *Kong) error {\n+func Help(help HelpPrinter) Option {\n+\treturn OptionFunc(func(k *Kong) error {\n \t\tk.help = help\n \t\treturn nil\n-\t}\n+\t})\n }\n \n // ConfigureHelp sets the HelpOptions to use for printing help.\n-func ConfigureHelp(options HelpOptions) OptionFunc {\n-\treturn func(k *Kong) error {\n+func ConfigureHelp(options HelpOptions) Option {\n+\treturn OptionFunc(func(k *Kong) error {\n \t\tk.helpOptions = options\n \t\treturn nil\n-\t}\n+\t})\n }\n \n // UsageOnError configures Kong to display context-sensitive usage if FatalIfErrorf is called with an error.\n-func UsageOnError() OptionFunc {\n-\treturn func(k *Kong) error {\n+func UsageOnError() Option {\n+\treturn OptionFunc(func(k *Kong) error {\n \t\tk.usageOnError = true\n \t\treturn nil\n-\t}\n+\t})\n }\n \n // ClearResolvers clears all existing resolvers.\n-func ClearResolvers() OptionFunc {\n-\treturn func(k *Kong) error {\n+func ClearResolvers() Option {\n+\treturn OptionFunc(func(k *Kong) error {\n \t\tk.resolvers = nil\n \t\treturn nil\n-\t}\n+\t})\n }\n \n // Resolvers registers flag resolvers.\n-func Resolvers(resolvers ...Resolver) OptionFunc {\n-\treturn func(k *Kong) error {\n+func Resolvers(resolvers ...Resolver) Option {\n+\treturn OptionFunc(func(k *Kong) error {\n \t\tk.resolvers = append(k.resolvers, resolvers...)\n \t\treturn nil\n-\t}\n+\t})\n }\n \n // ConfigurationLoader is a function that builds a resolver from a file.\n@@ -200,8 +200,8 @@ type ConfigurationLoader func(r io.Reader) (Resolver, error)\n // Note: The JSON function is a ConfigurationLoader.\n //\n // ~ expansion will occur on the provided paths.\n-func Configuration(loader ConfigurationLoader, paths ...string) OptionFunc {\n-\treturn func(k *Kong) error {\n+func Configuration(loader ConfigurationLoader, paths ...string) Option {\n+\treturn OptionFunc(func(k *Kong) error {\n \t\tk.loader = loader\n \t\tfor _, path := range paths {\n \t\t\tresolver, _ := k.LoadConfig(path)\n@@ -210,7 +210,7 @@ func Configuration(loader ConfigurationLoader, paths ...string) OptionFunc {\n \t\t\t}\n \t\t}\n \t\treturn nil\n-\t}\n+\t})\n }\n \n // ExpandPath is a helper function to expand a relative or home-relative path to an absolute path.\n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    ".golangci.yml",
+    "COPYING",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/console.go",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/main.go",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "config_test.go",
+    "context.go",
+    "defaults.go",
+    "defaults_test.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "go.mod",
+    "go.sum",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "util.go",
+    "util_test.go",
+    "visit.go"
+  ],
+  "explanation": {
+    "what": "options.go の Exit・NoDefaultHelp・Name・Description・TypeMapper・KindMapper・ValueMapper・NamedMapper・Writers・Bind・BindTo・Help・ConfigureHelp・UsageOnError・ClearResolvers・Resolvers・Configuration という各オプション関数の戻り値型を OptionFunc から Option インターフェースに変更した。実装自体は変えず、`return func(k *Kong) error {...}` を `return OptionFunc(func(k *Kong) error {...})` に包み直しただけ。",
+    "why": "コミットメッセージの通り、godoc(Go の自動生成ドキュメント)上での見やすさを改善する目的。関数シグネチャに具体型 OptionFunc ではなく公開インターフェース Option を出すことで、利用者に「これは Option を満たす何らかの実装である」という抽象度の高い契約を示せる。",
+    "highlights": [
+      { "file": "options.go", "note": "OptionFunc(func(k *Kong) error {...}) という変換が全関数で機械的に繰り返されている" }
+    ],
+    "langNotes": [
+      { "topic": "OptionFunc アダプタ", "note": "Go でよく使われる「関数を型変換してインターフェースを満たす」イディオム(http.HandlerFunc と同様のパターン)。OptionFunc は関数型に Option インターフェースの Apply 相当メソッドを実装させるためのラッパー型。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

@@ -1,0 +1,105 @@
+{
+  "seq": 142,
+  "sha": "0d256bb68a492b25891e1f7032b8c23c10df4b0e",
+  "parents": [
+    "439c674f7ae06d6568a94c52ef9fd9402f8608bd"
+  ],
+  "author": {
+    "name": "Alec Thomas",
+    "email": "alec@swapoff.org",
+    "date": "2019-06-06T15:22:25+10:00"
+  },
+  "message": "Add a kong.ApplyDefaults() function.",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 30,
+    "deletions": 0
+  },
+  "files": [
+    {
+      "path": "defaults.go",
+      "status": "A",
+      "additions": 11,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "defaults_test.go",
+      "status": "A",
+      "additions": 19,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/defaults.go b/defaults.go\nnew file mode 100644\nindex 0000000..1c9fcc7\n--- /dev/null\n+++ b/defaults.go\n@@ -0,0 +1,11 @@\n+package kong\n+\n+// ApplyDefaults applies defaults to a struct.\n+func ApplyDefaults(target interface{}, options ...Option) error {\n+\tapp, err := New(target, options...)\n+\tif err != nil {\n+\t\treturn err\n+\t}\n+\t_, err = app.Parse(nil)\n+\treturn err\n+}\ndiff --git a/defaults_test.go b/defaults_test.go\nnew file mode 100644\nindex 0000000..9481a05\n--- /dev/null\n+++ b/defaults_test.go\n@@ -0,0 +1,19 @@\n+package kong\n+\n+import (\n+\t\"testing\"\n+\t\"time\"\n+\n+\t\"github.com/stretchr/testify/require\"\n+)\n+\n+func TestApplyDefaults(t *testing.T) {\n+\ttype CLI struct {\n+\t\tStr      string        `default:\"str\"`\n+\t\tDuration time.Duration `default:\"30s\"`\n+\t}\n+\tcli := &CLI{}\n+\terr := ApplyDefaults(cli)\n+\trequire.NoError(t, err)\n+\trequire.Equal(t, &CLI{Str: \"str\", Duration: time.Second * 30}, cli)\n+}\n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    ".golangci.yml",
+    "COPYING",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/console.go",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/main.go",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "config_test.go",
+    "context.go",
+    "defaults.go",
+    "defaults_test.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "go.mod",
+    "go.sum",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "util.go",
+    "util_test.go",
+    "visit.go"
+  ],
+  "explanation": {
+    "what": "新規ファイル defaults.go に kong.ApplyDefaults(target, options...) 関数を追加した。内部で kong.New() して app.Parse(nil)(空引数でのパース)を呼ぶだけの実装で、struct に付与された `default:\"...\"` タグの値をコマンドライン引数なしで target に反映させる。",
+    "why": "おそらく、CLI として実際にコマンドライン引数を解析する用途以外でも、kong の struct タグ(default など)だけを使って設定値のデフォルトを埋めたい需要があったための追加と考えられる。Parse(nil) を使うことで、フラグ解析パスをそのまま流用しつつ「引数が全く無い」状態の挙動としてデフォルト適用を実現している。",
+    "highlights": [
+      { "file": "defaults.go", "note": "New()→Parse(nil) という最小実装。次のコミットで「既に値が設定されている場合は上書きしない」よう改修される" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "inferred",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

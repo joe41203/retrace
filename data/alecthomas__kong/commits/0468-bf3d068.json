@@ -1,0 +1,158 @@
+{
+  "seq": 468,
+  "sha": "bf3d068c302bfbfe5159bb8e7e9fd200f2f77170",
+  "parents": [
+    "14c97a2bfca94fff8da01fef6ceb1fc746303044"
+  ],
+  "author": {
+    "name": "Liam Stanley",
+    "email": "liam@liam.sh",
+    "date": "2026-05-09T05:19:11-06:00"
+  },
+  "message": "feat: add NoAppDescFormat option to HelpOptions (#597)\n\nallows disabling of the go-doc style post-progressing on command output for app descriptions\n\nSigned-off-by: Liam Stanley <liam@liam.sh>",
+  "pr": {
+    "number": 597,
+    "title": "feat: add NoAppDescFormat option to HelpOptions",
+    "body": "### Changes in this PR\r\n\r\nThis PR allows disabling of the go-doc style post-processing on command output for app descriptions, through a new `HelpOptions.NoAppDescFormat` boolean. I decided to only cover the top-level app description, as handling in other places with sub-commands, which may be rendered in other places (like the sub-command list, when called from the root), would potentially break formatting more drastically in unexpected ways.\r\n\r\nI've also added a simple ASCII logo example.\r\n\r\n### Associated Issues\r\n\r\n- closes #376",
+    "url": "https://github.com/alecthomas/kong/pull/597"
+  },
+  "linkedIssues": [
+    {
+      "number": 376,
+      "title": "description newline stripping",
+      "body": "Looks as though description newlines are stripped, which means printing any type of structured output inside of descriptions will break. It looks like this is due to description being added to help, and thus help being passed into the line wrapping functionality causes it to trim those things.\r\n\r\nSome examples of things that I've seen other cli tools have in their \"about/description\":\r\n\r\n- ASCII logo art\r\n- licenses (by themselves I guess don't require non-wrapping, in many scenarios, but do span many lines, and can complicate things if mixed with other description output)\r\n- version/build/author/link info (see example below)\r\n\r\n![](https://cdn.liam.sh/share/2023/08/WindowsTerminal_SexbDPJ09W.png)\r\n\r\nI guess my question is, does this make sense to have as a supported feature? If so, should it be toggleable? E.g. `kong.Description()` and `kong.LongDescription()` or `kong.FormattedDescription()`, maybe (with a warning that it won't obey wrapping?)?",
+      "url": "https://github.com/alecthomas/kong/issues/376"
+    }
+  ],
+  "stats": {
+    "filesChanged": 3,
+    "additions": 124,
+    "deletions": 2
+  },
+  "files": [
+    {
+      "path": "_examples/asciilogo/main.go",
+      "status": "A",
+      "additions": 42,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "help.go",
+      "status": "M",
+      "additions": 12,
+      "deletions": 2,
+      "binary": false
+    },
+    {
+      "path": "help_test.go",
+      "status": "M",
+      "additions": 70,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/_examples/asciilogo/main.go b/_examples/asciilogo/main.go\nnew file mode 100644\nindex 0000000..70dfe90\n--- /dev/null\n+++ b/_examples/asciilogo/main.go\n@@ -0,0 +1,42 @@\n+package main\n+\n+import (\n+\t\"fmt\"\n+\t\"strings\"\n+\n+\t\"github.com/alecthomas/kong\"\n+)\n+\n+const logo = `\n+#   #   ###    #   #    ###\n+#  #   #   #   ##  #   #\n+###    #   #   # # #   #  ##\n+#  #   #   #   #  ##   #   #\n+#   #   ###    #   #    ###`\n+\n+var cli struct {\n+\tQuiet bool `help:\"Suppress non-error output.\"`\n+\n+\tSay struct {\n+\t\tText string `arg:\"\" help:\"Text to echo.\"`\n+\t} `cmd:\"\" help:\"Print text to stdout.\"`\n+}\n+\n+func main() {\n+\tctx := kong.Parse(&cli,\n+\t\tkong.Name(\"kong-logo\"),\n+\t\tkong.Description(strings.TrimSpace(logo)+\"\\n\\n\"+\n+\t\t\t\"Simple example which shows how to disable formatting of\\n\"+\n+\t\t\t\"the description text, to display ASCII art as-is.\"),\n+\t\tkong.UsageOnError(),\n+\t\tkong.ConfigureHelp(kong.HelpOptions{\n+\t\t\tNoAppDescFormat: true,\n+\t\t}),\n+\t)\n+\tswitch ctx.Command() {\n+\tcase \"say <text>\":\n+\t\tif !cli.Quiet {\n+\t\t\tfmt.Println(cli.Say.Text)\n+\t\t}\n+\t}\n+}\ndiff --git a/help.go b/help.go\nindex 6fc5a41..1715caa 100644\n--- a/help.go\n+++ b/help.go\n@@ -61,6 +61,10 @@ type HelpOptions struct {\n \n \t// ValueFormatter is used to format the help text of flags and positional arguments.\n \tValueFormatter HelpValueFormatter\n+\n+\t// NoAppDescFormat skips all formatting of app description text (wrapping, paragraph\n+\t// reflow, newline merging, etc).\n+\tNoAppDescFormat bool\n }\n \n // Apply options to Kong as a configuration option.\n@@ -162,10 +166,16 @@ func printCommand(w *helpWriter, app *Application, cmd *Command) {\n \t}\n }\n \n-func printNodeDetail(w *helpWriter, node *Node, hide bool) {\n+func printNodeDetail(w *helpWriter, node *Node, hide bool) { //nolint:gocyclo\n \tif node.Help != \"\" {\n \t\tw.Print(\"\")\n-\t\tw.Wrap(node.Help)\n+\t\tif w.NoAppDescFormat && node.Parent == nil {\n+\t\t\tfor _, line := range strings.Split(node.Help, \"\\n\") {\n+\t\t\t\tw.Print(line)\n+\t\t\t}\n+\t\t} else {\n+\t\t\tw.Wrap(node.Help)\n+\t\t}\n \t}\n \tif w.Summary {\n \t\treturn\ndiff --git a/help_test.go b/help_test.go\nindex 17a6a55..8d04cff 100644\n--- a/help_test.go\n+++ b/help_test.go\n@@ -872,6 +872,76 @@ func (rootHelpProvider) Help() string {\n \treturn `Detailed help provided by the root HelpProvider.`\n }\n \n+func TestHelpNoAppDescFormat(t *testing.T) {\n+\t// Space-separated text wraps with doc.ToText under a narrow bound; a single\n+\t// unbroken run of characters may not be split.\n+\tlongLine := strings.TrimRight(strings.Repeat(\"alpha \", 18), \" \")\n+\tvar cli struct {\n+\t\tSub struct{} `cmd help:\"row one\\nrow two\"`\n+\t}\n+\n+\tw := bytes.NewBuffer(nil)\n+\texited := false\n+\tapp := mustNew(t, &cli,\n+\t\tkong.Name(\"no-sum-app\"),\n+\t\tkong.Description(\"intro\\n\"+longLine),\n+\t\tkong.HelpOptions{\n+\t\t\tNoAppDescFormat: true,\n+\t\t\tWrapUpperBound:  50,\n+\t\t},\n+\t\tkong.Writers(w, w),\n+\t\tkong.Exit(func(int) {\n+\t\t\texited = true\n+\t\t\tpanic(true)\n+\t\t}),\n+\t)\n+\n+\tpanicsTrue(t, func() {\n+\t\t_, err := app.Parse([]string{\"--help\"})\n+\t\tassert.NoError(t, err)\n+\t})\n+\tassert.True(t, exited)\n+\tout := w.String()\n+\n+\t// App description should preserve newlines and not wrap the long line to fit WrapUpperBound.\n+\tassert.True(t, strings.Contains(out, longLine), \"expected full unwrapped description line in output:\\n%s\", out)\n+\tlines := strings.Split(out, \"\\n\")\n+\tvar sawIntro bool\n+\tfor _, line := range lines {\n+\t\tif line == \"intro\" {\n+\t\t\tsawIntro = true\n+\t\t\tbreak\n+\t\t}\n+\t}\n+\tassert.True(t, sawIntro, \"expected unformatted intro line (no wrap indentation); got:\\n%s\", out)\n+\n+\t// Subcommand summaries still use Wrap; multi-line help tags are reflowed to spaces.\n+\tassert.True(t, strings.Contains(out, \"row one row two\"), out)\n+\n+\t// Control: default formatting wraps the long description so it is not one contiguous 60-char line.\n+\twControl := bytes.NewBuffer(nil)\n+\texitedControl := false\n+\tappControl := mustNew(t, &cli,\n+\t\tkong.Name(\"no-sum-app\"),\n+\t\tkong.Description(\"intro\\n\"+longLine),\n+\t\tkong.HelpOptions{\n+\t\t\tWrapUpperBound: 50,\n+\t\t},\n+\t\tkong.Writers(wControl, wControl),\n+\t\tkong.Exit(func(int) {\n+\t\t\texitedControl = true\n+\t\t\tpanic(true)\n+\t\t}),\n+\t)\n+\tpanicsTrue(t, func() {\n+\t\t_, err := appControl.Parse([]string{\"--help\"})\n+\t\tassert.NoError(t, err)\n+\t})\n+\tassert.True(t, exitedControl)\n+\tcontrolOut := wControl.String()\n+\tassert.False(t, strings.Contains(controlOut, longLine), \"wrapped output should not contain the full description line intact:\\n%s\", controlOut)\n+}\n+\n func TestHelpProviderOnRoot(t *testing.T) {\n \tvar cli rootHelpProvider\n \tw := bytes.NewBuffer(nil)\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/FUNDING.yml",
+    ".github/workflows/ci.yml",
+    ".gitignore",
+    ".golangci.yml",
+    "COPYING",
+    "README.md",
+    "_examples/asciilogo/main.go",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/README.md",
+    "_examples/server/console.go",
+    "_examples/server/go.mod",
+    "_examples/server/go.sum",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/commandstring/main.go",
+    "_examples/shell/help/README.md",
+    "_examples/shell/help/main.go",
+    "benchmark_test.go",
+    "bin/.go-1.25.6.pkg",
+    "bin/.golangci-lint-1.64.5.pkg",
+    "bin/.lefthook-1.13.6.pkg",
+    "bin/README.hermit.md",
+    "bin/activate-hermit",
+    "bin/go",
+    "bin/gofmt",
+    "bin/golangci-lint",
+    "bin/hermit",
+    "bin/hermit.hcl",
+    "bin/lefthook",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "config_test.go",
+    "context.go",
+    "defaults.go",
+    "defaults_test.go",
+    "doc.go",
+    "error.go",
+    "exit.go",
+    "global.go",
+    "global_test.go",
+    "go.mod",
+    "go.sum",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "helpwrap1.18_test.go",
+    "helpwrap1.19_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "lefthook.yml",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_linux_test.go",
+    "mapper_test.go",
+    "mapper_windows_test.go",
+    "model.go",
+    "model_test.go",
+    "negatable.go",
+    "options.go",
+    "options_test.go",
+    "renovate.json5",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "signature_test.go",
+    "tag.go",
+    "tag_test.go",
+    "testdata/file.txt",
+    "util.go",
+    "util_test.go",
+    "visit.go"
+  ],
+  "explanation": {
+    "what": "HelpOptions に NoAppDescFormat という bool フィールドを追加し、これが true かつ対象ノードがルート(node.Parent == nil)の場合、help.go の printNodeDetail は w.Wrap によるワードラップ/整形をせず、node.Help を改行ごとにそのまま w.Print するようにした。ASCII アートやライセンス文など改行を保持したい説明文向けの例として _examples/asciilogo を新規追加し、help_test.go にラップあり/なし双方の出力を比較するテストを追加。",
+    "why": "PR本文とリンクされた issue #376 が示す通り、従来は description が help のワードラップ処理を通るため、ASCIIロゴやバージョン/著者情報などレイアウトを保ちたい複数行テキストが改行を失って崩れてしまっていた。トップレベルのアプリ説明文に限定してこの整形をスキップできるオプションを設け、サブコマンド側の表示崩れリスクは避けている。",
+    "highlights": [
+      { "file": "help.go", "note": "NoAppDescFormat && node.Parent == nil のときだけ改行を保持してそのまま出力する分岐" },
+      { "file": "_examples/asciilogo/main.go", "note": "ASCIIロゴを崩さず表示するための実例" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [
+      { "type": "pr", "number": 597, "url": "https://github.com/alecthomas/kong/pull/597" },
+      { "type": "issue", "number": 376, "url": "https://github.com/alecthomas/kong/issues/376" }
+    ],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

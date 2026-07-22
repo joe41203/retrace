@@ -1,0 +1,125 @@
+{
+  "seq": 43,
+  "sha": "2afd4ba47bfe8a3896b8d1e2e3431a5c8da22375",
+  "parents": [
+    "48af58cefabe5a7ae6429ebc1e3055362f459bbc"
+  ],
+  "author": {
+    "name": "Alec Thomas",
+    "email": "alec@swapoff.org",
+    "date": "2018-06-04T13:25:12+10:00"
+  },
+  "message": "Help!",
+  "pr": {
+    "number": 23,
+    "title": "Help!",
+    "body": "",
+    "url": "https://github.com/alecthomas/kong/pull/23"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 7,
+    "additions": 229,
+    "deletions": 137
+  },
+  "files": [
+    {
+      "path": "context.go",
+      "status": "M",
+      "additions": 14,
+      "deletions": 4,
+      "binary": false
+    },
+    {
+      "path": "help.go",
+      "status": "M",
+      "additions": 124,
+      "deletions": 100,
+      "binary": false
+    },
+    {
+      "path": "help_test.go",
+      "status": "M",
+      "additions": 38,
+      "deletions": 5,
+      "binary": false
+    },
+    {
+      "path": "kong.go",
+      "status": "M",
+      "additions": 12,
+      "deletions": 6,
+      "binary": false
+    },
+    {
+      "path": "kong_test.go",
+      "status": "M",
+      "additions": 6,
+      "deletions": 3,
+      "binary": false
+    },
+    {
+      "path": "model.go",
+      "status": "M",
+      "additions": 20,
+      "deletions": 18,
+      "binary": false
+    },
+    {
+      "path": "options.go",
+      "status": "M",
+      "additions": 15,
+      "deletions": 1,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/context.go b/context.go\nindex 3ff7f4e..6ad15c3 100644\n--- a/context.go\n+++ b/context.go\n@@ -2,7 +2,6 @@ package kong\n \n import (\n \t\"fmt\"\n-\t\"io\"\n \t\"reflect\"\n \t\"strconv\"\n \t\"strings\"\n@@ -31,13 +30,24 @@ type Context struct {\n \tPath  []*Path // A trace through parsed nodes.\n \tError error   // Error that occurred during trace, if any.\n \n-\tStdout io.Writer\n-\tStderr io.Writer\n-\n \targs []string\n \tscan *Scanner\n }\n \n+// Selected command or argument.\n+func (c *Context) Selected() *Node {\n+\tvar selected *Node\n+\tfor _, path := range c.Path {\n+\t\tswitch {\n+\t\tcase path.Command != nil:\n+\t\t\tselected = path.Command\n+\t\tcase path.Argument != nil:\n+\t\t\tselected = path.Argument\n+\t\t}\n+\t}\n+\treturn selected\n+}\n+\n // Trace path of \"args\" through the gammar tree.\n //\n // The returned Context will include a Path of all commands, arguments, positionals and flags.\ndiff --git a/help.go b/help.go\nindex 5c54764..0d6d937 100644\n--- a/help.go\n+++ b/help.go\n@@ -7,130 +7,154 @@ import (\n \t\"io\"\n \t\"reflect\"\n \t\"strings\"\n-\n-\t\"github.com/aymerick/raymond\"\n )\n \n const (\n-\tdefaultIndent   = 2\n-\tdefaultTemplate = `\n-{{#with App}}\n-usage: {{Name}}\n-\n-{{#wrap}}\n-{{Help}}\n-{{/wrap}}\n-\n-Flags:\n-{{#indent}}\n-{{formatFlags Flags}}\n-{{/indent}}\n-\n-{{#if Children}}\n-{{#indent}}\n-{{#each Children}}\n-{{Name}}\n-{{/each}}\n-{{/indent}}\n-{{/if}}\n-{{/with}}\n-`\n+\tdefaultIndent = 2\n )\n \n-var defaultHelpTemplate = raymond.MustParse(strings.TrimSpace(defaultTemplate))\n+func PrintHelp(ctx *Context) error {\n+\tw := newHelpWriter(guessWidth(ctx.App.Stdout))\n+\tselected := ctx.Selected()\n+\tif selected == nil {\n+\t\tprintApp(w, ctx.App.Application)\n+\t} else {\n+\t\tprintCommand(w, ctx.App.Application, selected)\n+\t}\n+\treturn w.Write(ctx.App.Stdout)\n+}\n \n-func init() {\n-\tdefaultHelpTemplate.RegisterHelpers(map[string]interface{}{\n-\t\t\"indent\": func(options *raymond.Options) string {\n-\t\t\tindent, ok := options.HashProp(\"depth\").(int)\n-\t\t\tif !ok {\n-\t\t\t\tindent = 2\n-\t\t\t}\n-\t\t\twidth := options.Data(\"width\").(int)\n-\t\t\tframe := options.NewDataFrame()\n-\t\t\tframe.Set(\"width\", width-indent)\n-\t\t\tindentStr := strings.Repeat(\" \", indent)\n-\t\t\tlines := strings.Split(options.FnData(frame), \"\\n\")\n-\t\t\tfor i, line := range lines {\n-\t\t\t\tlines[i] = indentStr + line\n-\t\t\t}\n-\t\t\treturn strings.Join(lines, \"\\n\")\n-\t\t},\n-\t\t\"formatFlags\": func(flags []*Flag, options *raymond.Options) string {\n-\t\t\trows := [][2]string{}\n-\t\t\thaveShort := false\n-\t\t\tfor _, flag := range flags {\n-\t\t\t\tif flag.Short != 0 {\n-\t\t\t\t\thaveShort = true\n-\t\t\t\t\tbreak\n-\t\t\t\t}\n-\t\t\t}\n-\t\t\tfor _, flag := range flags {\n-\t\t\t\tif !flag.Hidden {\n-\t\t\t\t\trows = append(rows, [2]string{formatFlag(haveShort, flag), flag.Help})\n-\t\t\t\t}\n+func printApp(w *helpWriter, app *Application) {\n+\tw.Printf(\"usage: %s\", app.Summary())\n+\tprintNodeDetail(w, &app.Node)\n+}\n+\n+func printCommand(w *helpWriter, app *Application, cmd *Command) {\n+\tw.Printf(\"usage: %s %s\", app.Name, cmd.Summary())\n+\tprintNodeDetail(w, cmd)\n+}\n+\n+func printNodeDetail(w *helpWriter, node *Node) {\n+\tif node.Help != \"\" {\n+\t\tw.Print(\"\")\n+\t\tw.Wrap(node.Help)\n+\t}\n+\tif len(node.Flags) > 0 {\n+\t\tw.Printf(\"\")\n+\t\tw.Printf(\"Flags:\")\n+\t\twriteFlags(w.Indent(), node.Flags)\n+\t}\n+\tcmds := node.Leaves()\n+\tif len(cmds) > 0 {\n+\t\tw.Print(\"\")\n+\t\tw.Print(\"Commands:\")\n+\t\tiw := w.Indent()\n+\t\tfor i, cmd := range cmds {\n+\t\t\tprintCommandSummary(iw, cmd)\n+\t\t\tif i != len(cmds)-1 {\n+\t\t\t\tiw.Print(\"\")\n \t\t\t}\n-\t\t\tw := bytes.NewBuffer(nil)\n-\t\t\tformatTwoColumns(w, 0, 2, options.Data(\"width\").(int), rows)\n-\t\t\treturn w.String()\n-\t\t},\n-\t\t\"wrap\": func(options *raymond.Options) string {\n-\t\t\tw := bytes.NewBuffer(nil)\n-\t\t\tdoc.ToText(w, options.Fn(), \"\", \"  \", options.Data(\"width\").(int))\n-\t\t\treturn w.String()\n-\t\t},\n-\t})\n-}\n-\n-// Help returns a Before hook that will display help and exit.\n-//\n-// tmpl receives a context with several top-level values, in addition to those passed through tmplctx:\n-// .Context which is of type *Context and .Path which is of type *Path.\n-func Help(tmpl *raymond.Template, tmplctx map[string]interface{}) Before {\n-\treturn func(ctx *Context, path *Path) error {\n-\t\tmerged := map[string]interface{}{\n-\t\t\t\"App\":     ctx.App,\n-\t\t\t\"Context\": ctx,\n-\t\t\t\"Path\":    path,\n-\t\t}\n-\t\tfor k, v := range tmplctx {\n-\t\t\tmerged[k] = v\n \t\t}\n-\t\tframe := raymond.NewDataFrame()\n-\t\tframe.Set(\"width\", guessWidth(ctx.App.Stdout))\n-\t\toutput, err := tmpl.ExecWith(merged, frame)\n+\t}\n+}\n+\n+func printCommandSummary(w *helpWriter, cmd *Command) {\n+\tw.Print(cmd.Summary())\n+\tif cmd.Help != \"\" {\n+\t\tw.Indent().Wrap(cmd.Help)\n+\t}\n+}\n+\n+type helpWriter struct {\n+\tindent string\n+\twidth  int\n+\tlines  *[]string\n+}\n+\n+func newHelpWriter(width int) *helpWriter {\n+\tlines := []string{}\n+\treturn &helpWriter{\n+\t\tindent: \"\",\n+\t\twidth:  width,\n+\t\tlines:  &lines,\n+\t}\n+}\n+\n+func (h *helpWriter) Printf(format string, args ...interface{}) {\n+\th.Print(fmt.Sprintf(format, args...))\n+}\n+\n+func (h *helpWriter) Print(text string) {\n+\t*h.lines = append(*h.lines, strings.TrimRight(h.indent+text, \" \"))\n+}\n+\n+func (h *helpWriter) Indent() *helpWriter {\n+\treturn &helpWriter{indent: h.indent + \"  \", lines: h.lines, width: h.width - 2}\n+}\n+\n+func (h *helpWriter) String() string {\n+\treturn strings.Join(*h.lines, \"\\n\")\n+}\n+\n+func (h *helpWriter) Write(w io.Writer) error {\n+\tfor _, line := range *h.lines {\n+\t\t_, err := io.WriteString(w, line+\"\\n\")\n \t\tif err != nil {\n \t\t\treturn err\n \t\t}\n-\t\tio.WriteString(ctx.App.Stdout, output)\n-\t\tctx.App.Exit(0)\n-\t\treturn nil\n \t}\n+\treturn nil\n }\n \n-func formatTwoColumns(w io.Writer, indent, padding, width int, rows [][2]string) {\n+func (h *helpWriter) Wrap(text string) {\n+\tw := bytes.NewBuffer(nil)\n+\tdoc.ToText(w, strings.TrimSpace(text), \"\", \"\", h.width)\n+\tfor _, line := range strings.Split(strings.TrimSpace(w.String()), \"\\n\") {\n+\t\th.Print(line)\n+\t}\n+}\n+\n+func writeFlags(w *helpWriter, flags []*Flag) {\n+\trows := [][2]string{}\n+\thaveShort := false\n+\tfor _, flag := range flags {\n+\t\tif flag.Short != 0 {\n+\t\t\thaveShort = true\n+\t\t\tbreak\n+\t\t}\n+\t}\n+\tfor _, flag := range flags {\n+\t\tif !flag.Hidden {\n+\t\t\trows = append(rows, [2]string{formatFlag(haveShort, flag), flag.Help})\n+\t\t}\n+\t}\n+\twriteTwoColumns(w, 2, rows)\n+}\n+\n+func writeTwoColumns(w *helpWriter, padding int, rows [][2]string) {\n \t// Find size of first column.\n-\ts := 0\n+\tleftSize := 0\n \tfor _, row := range rows {\n-\t\tif c := len(row[0]); c > s && c < 30 {\n-\t\t\ts = c\n+\t\tif c := len(row[0]); c > leftSize && c < 30 {\n+\t\t\tleftSize = c\n \t\t}\n \t}\n \n-\tindentStr := strings.Repeat(\" \", indent)\n-\toffsetStr := strings.Repeat(\" \", s+padding)\n+\toffsetStr := strings.Repeat(\" \", leftSize+padding)\n \n \tfor _, row := range rows {\n \t\tbuf := bytes.NewBuffer(nil)\n-\t\tdoc.ToText(buf, row[1], \"\", strings.Repeat(\" \", defaultIndent), width-s-padding-indent)\n+\t\tdoc.ToText(buf, row[1], \"\", strings.Repeat(\" \", defaultIndent), w.width-leftSize-padding)\n \t\tlines := strings.Split(strings.TrimRight(buf.String(), \"\\n\"), \"\\n\")\n-\t\tfmt.Fprintf(w, \"%s%-*s%*s\", indentStr, s, row[0], padding, \"\")\n-\t\tif len(row[0]) >= 30 {\n-\t\t\tfmt.Fprintf(w, \"\\n%s%s\", indentStr, offsetStr)\n+\n+\t\tline := fmt.Sprintf(\"%-*s\", leftSize, row[0])\n+\t\tif len(row[0]) < 30 {\n+\t\t\tline += fmt.Sprintf(\"%*s%s\", padding, \"\", lines[0])\n+\t\t\tlines = lines[1:]\n \t\t}\n-\t\tfmt.Fprintf(w, \"%s\\n\", lines[0])\n-\t\tfor _, line := range lines[1:] {\n-\t\t\tfmt.Fprintf(w, \"%s%s%s\\n\", indentStr, offsetStr, line)\n+\t\tw.Print(line)\n+\t\tfor _, line := range lines {\n+\t\t\tw.Printf(\"%s%s\", offsetStr, line)\n \t\t}\n \t}\n }\ndiff --git a/help_test.go b/help_test.go\nindex 2008855..c359536 100644\n--- a/help_test.go\n+++ b/help_test.go\n@@ -2,7 +2,6 @@ package kong\n \n import (\n \t\"bytes\"\n-\t\"fmt\"\n \t\"testing\"\n \n \t\"github.com/stretchr/testify/require\"\n@@ -10,11 +9,16 @@ import (\n \n func TestHelp(t *testing.T) {\n \tvar cli struct {\n-\t\tString string `kong:\"help='A string flag.'\"`\n-\t\tBool   bool   `kong:\"help='A bool flag.'\"`\n+\t\tString string `help:\"A string flag.\"`\n+\t\tBool   bool   `help:\"A bool flag with very long help that wraps a lot and is verbose and is really verbose.\"`\n \n \t\tOne struct {\n-\t\t} `kong:\"cmd\"`\n+\t\t\tFlag string `help:\"Nested flag.\"`\n+\t\t} `cmd help:\"A subcommand.\"`\n+\n+\t\tTwo struct {\n+\t\t\tFlag string `help:\"Nested flag under two.\"`\n+\t\t} `cmd help:\"Another subcommand.\"`\n \t}\n \tw := bytes.NewBuffer(nil)\n \texited := false\n@@ -27,5 +31,34 @@ func TestHelp(t *testing.T) {\n \t_, err := app.Parse([]string{\"--help\"})\n \trequire.NoError(t, err)\n \trequire.True(t, exited)\n-\tfmt.Println(w.String())\n+\trequire.Equal(t, `usage: test-app [<flags>]\n+\n+A test app.\n+\n+Flags:\n+  --help           Show context-sensitive help.\n+  --string=STRING  A string flag.\n+  --bool           A bool flag with very long help that wraps a lot and is\n+                   verbose and is really verbose.\n+\n+Commands:\n+  one [<flags>]\n+    A subcommand.\n+\n+  two [<flags>]\n+    Another subcommand.\n+`, w.String())\n+\n+\texited = false\n+\tw.Truncate(0)\n+\t_, err = app.Parse([]string{\"one\", \"--help\"})\n+\trequire.NoError(t, err)\n+\trequire.True(t, exited)\n+\trequire.Equal(t, `usage: test-app one [<flags>]\n+\n+A subcommand.\n+\n+Flags:\n+  --flag=STRING  Nested flag.\n+`, w.String())\n }\ndiff --git a/kong.go b/kong.go\nindex f27c463..c16adc3 100644\n--- a/kong.go\n+++ b/kong.go\n@@ -8,9 +8,6 @@ import (\n \t\"reflect\"\n )\n \n-// Before is a callback tied to a field of the grammar, called before a value is applied.\n-type Before func(ctx *Context, path *Path) error\n-\n // Error reported by Kong.\n type Error struct{ msg string }\n \n@@ -39,9 +36,10 @@ type Kong struct {\n \tStdout io.Writer\n \tStderr io.Writer\n \n-\tbefore        map[reflect.Value]Before\n+\tbefore        map[reflect.Value]HookFunction\n \tregistry      *Registry\n \tnoDefaultHelp bool\n+\thelp          func(*Context) error\n }\n \n // New creates a new Kong parser on grammar.\n@@ -52,8 +50,9 @@ func New(grammar interface{}, options ...Option) (*Kong, error) {\n \t\tExit:     os.Exit,\n \t\tStdout:   os.Stdout,\n \t\tStderr:   os.Stderr,\n-\t\tbefore:   map[reflect.Value]Before{},\n+\t\tbefore:   map[reflect.Value]HookFunction{},\n \t\tregistry: NewRegistry().RegisterDefaults(),\n+\t\thelp:     PrintHelp,\n \t}\n \n \tfor _, option := range options {\n@@ -89,7 +88,14 @@ func (k *Kong) extraFlags() []*Flag {\n \t\t\tMapper: k.registry.ForValue(value),\n \t\t},\n \t}\n-\thook := Hook(&helpValue, Help(defaultHelpTemplate, nil))\n+\thook := Hook(&helpValue, func(ctx *Context, path *Path) error {\n+\t\terr := PrintHelp(ctx)\n+\t\tif err != nil {\n+\t\t\treturn err\n+\t\t}\n+\t\tk.Exit(1)\n+\t\treturn nil\n+\t})\n \thook(k)\n \treturn []*Flag{helpFlag}\n }\ndiff --git a/kong_test.go b/kong_test.go\nindex 201615c..0c0badf 100644\n--- a/kong_test.go\n+++ b/kong_test.go\n@@ -9,9 +9,12 @@ import (\n \n func mustNew(t *testing.T, cli interface{}, options ...Option) *Kong {\n \tt.Helper()\n-\toptions = append([]Option{ExitFunction(func(int) {\n-\t\tt.Fatalf(\"unexpected exit()\")\n-\t})}, options...)\n+\toptions = append([]Option{\n+\t\tExitFunction(func(int) {\n+\t\t\tt.Helper()\n+\t\t\tt.Fatalf(\"unexpected exit()\")\n+\t\t}),\n+\t}, options...)\n \tparser, err := New(cli, options...)\n \trequire.NoError(t, err)\n \treturn parser\ndiff --git a/model.go b/model.go\nindex 82bcac2..5f15e12 100644\n--- a/model.go\n+++ b/model.go\n@@ -12,23 +12,6 @@ type Application struct {\n \tHelpFlag *Flag\n }\n \n-// Leaves returns the leaf commands/arguments in the command-line grammar.\n-func (a *Application) Leaves() (out []*Node) {\n-\tvar walk func(n *Node)\n-\twalk = func(n *Node) {\n-\t\tif len(n.Children) == 0 && n.Type != ApplicationNode {\n-\t\t\tout = append(out, n)\n-\t\t}\n-\t\tfor _, child := range n.Children {\n-\t\t\tif child.Type == CommandNode || child.Type == ArgumentNode {\n-\t\t\t\twalk(child)\n-\t\t\t}\n-\t\t}\n-\t}\n-\twalk(&a.Node)\n-\treturn\n-}\n-\n type Argument = Node\n \n type Command = Node\n@@ -54,6 +37,25 @@ type Node struct {\n \tArgument *Value // Populated when Type is ArgumentNode.\n }\n \n+// Leaves returns the leaf commands/arguments under Node.\n+func (n *Node) Leaves() (out []*Node) {\n+\tvar walk func(n *Node)\n+\twalk = func(n *Node) {\n+\t\tif len(n.Children) == 0 && n.Type != ApplicationNode {\n+\t\t\tout = append(out, n)\n+\t\t}\n+\t\tfor _, child := range n.Children {\n+\t\t\tif child.Type == CommandNode || child.Type == ArgumentNode {\n+\t\t\t\twalk(child)\n+\t\t\t}\n+\t\t}\n+\t}\n+\tfor _, child := range n.Children {\n+\t\twalk(child)\n+\t}\n+\treturn\n+}\n+\n // Depth of the command from the application root.\n func (n *Node) Depth() int {\n \tdepth := 0\n@@ -67,7 +69,7 @@ func (n *Node) Depth() int {\n \n // Summary help string for the node.\n func (n *Node) Summary() string {\n-\tsummary := n.Name\n+\tsummary := n.Path()\n \tif n.Type == ArgumentNode {\n \t\tsummary = \"<\" + summary + \">\"\n \t}\ndiff --git a/options.go b/options.go\nindex 481b06f..99bfe5b 100644\n--- a/options.go\n+++ b/options.go\n@@ -69,10 +69,13 @@ func Writers(stdout, stderr io.Writer) Option {\n \t}\n }\n \n+// HookFunction is a callback tied to a field of the grammar, called before a value is applied.\n+type HookFunction func(ctx *Context, path *Path) error\n+\n // Hook to aply before a command, flag or positional argument is encountered.\n //\n // \"ptr\" is a pointer to a field of the grammar.\n-func Hook(ptr interface{}, hook Before) Option {\n+func Hook(ptr interface{}, hook HookFunction) Option {\n \tkey := reflect.ValueOf(ptr)\n \tif key.Kind() != reflect.Ptr {\n \t\tpanic(\"expected a pointer\")\n@@ -81,3 +84,14 @@ func Hook(ptr interface{}, hook Before) Option {\n \t\tk.before[key] = hook\n \t}\n }\n+\n+type HelpFunction func(*Context) error\n+\n+// Help function to use.\n+//\n+// Defaults to PrintHelp.\n+func Help(help func(*Context) error) Option {\n+\treturn func(k *Kong) {\n+\t\tk.help = help\n+\t}\n+}\n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    "README.md",
+    "_examples/shell/main.go",
+    "build.go",
+    "camelcase.go",
+    "context.go",
+    "context_test.go",
+    "global.go",
+    "global_test.go",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "kong.go",
+    "kong_test.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "tokentype_string.go"
+  ],
+  "explanation": {
+    "what": "ヘルプ出力を、外部テンプレートエンジン raymond(Handlebars 実装)を使ったテンプレート方式から、Go コードで直接組み立てる helpWriter 方式に全面書き換えした。PrintHelp(ctx) がエントリポイントとなり、選択中のコマンドに応じて printApp/printCommand を呼び分け、フラグ一覧・サブコマンド一覧を2カラムでインデント整形する。あわせて Context に Selected() メソッドを追加し、パースされたパスから末端のコマンド/引数を取得できるようにした。Hook の型名も HookFunction → Before → HookFunction と揺れた末に、ヘルプ関数自体を差し替え可能にする HelpFunction/Help(...) オプションを新設した。",
+    "why": "コミットメッセージは「Help!」のみで具体的な動機は書かれていないが、diff からは raymond テンプレートへの依存(indent/formatFlags/wrap といったカスタムヘルパー関数群)を撤去し、Go 標準の文字列操作だけで完結する自前のヘルプ生成器に置き換えていることが読み取れる。外部テンプレート言語の学習コストや柔軟性の制約を避け、Go コードとしてヘルプの整形ロジック(インデント・折り返し・カラム幅計算)を書けるようにする狙いだったとみられる。",
+    "highlights": [
+      { "file": "help.go", "note": "raymond テンプレートを全廃し、helpWriter(インデント管理・折り返し・2カラム整形を持つ小さなビルダー)に置き換え" },
+      { "file": "context.go", "note": "Context.Selected() を追加。Path をたどって現在選択されているコマンド/引数を返す" },
+      { "file": "options.go", "note": "Help(func(*Context) error) オプションを追加し、デフォルトの PrintHelp を差し替え可能にした" }
+    ],
+    "langNotes": [
+      { "topic": "kong.Parse() 相当のヘルプ生成", "note": "help.go はコマンドラインツールでよくある「usage: ...」「Flags:」「Commands:」形式のヘルプを、テンプレートエンジンではなく Go の文字列操作(strings.Repeat, strings.Split 等)で直接組み立てている。以降のコミットでこの自前ライタが Kong のヘルプ機構の基礎になる。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [
+      { "type": "pr", "number": 23, "url": "https://github.com/alecthomas/kong/pull/23" }
+    ],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

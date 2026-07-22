@@ -1,0 +1,81 @@
+{
+  "seq": 82,
+  "sha": "e756d995c7c62cbdba26e8ababe9493a8963c2e3",
+  "parents": [
+    "00847157a161b73c542b5602c0aad2a49bf5e0c2"
+  ],
+  "author": {
+    "name": "Alec Thomas",
+    "email": "alec@swapoff.org",
+    "date": "2018-06-23T15:02:44+10:00"
+  },
+  "message": "Improve README.",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 38,
+    "deletions": 8
+  },
+  "files": [
+    {
+      "path": "README.md",
+      "status": "M",
+      "additions": 38,
+      "deletions": 8,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/README.md b/README.md\nindex 52e2015..68def7e 100644\n--- a/README.md\n+++ b/README.md\n@@ -8,8 +8,8 @@\n 1. [Introduction](#introduction)\n 1. [Help](#help)\n 1. [Command handling](#command-handling)\n-    1. [Switch on the command string](#switch-on-the-command-string)\n-    1. [Attach a `Run(...) error` method to each command](#attach-a-run-error-method-to-each-command)\n+    1. [1. Switch on the command string](#1-switch-on-the-command-string)\n+    1. [2. Attach a `Run(...) error` method to each command](#2-attach-a-run-error-method-to-each-command)\n 1. [Flags](#flags)\n 1. [Commands and sub-commands](#commands-and-sub-commands)\n 1. [Branching positional arguments](#branching-positional-arguments)\n@@ -115,19 +115,49 @@ eg.\n \n There are two ways to handle commands in Kong.\n \n-### Switch on the command string\n+### 1. Switch on the command string\n \n-When you call `kong.Parse()` it will return a unique string representation of the command. Each command branch in the hierarchy will be a bare word and each branching argument or required positional argument will be the name surrounded by angle brackets.\n+When you call `kong.Parse()` it will return a unique string representation of the command. Each command branch in the hierarchy will be a bare word and each branching argument or required positional argument will be the name surrounded by angle brackets. Here's an example:\n+\n+```go\n+package main\n+\n+import \"github.com/alecthomas/kong\"\n+\n+var CLI struct {\n+  Rm struct {\n+    Force     bool `help:\"Force removal.\"`\n+    Recursive bool `help:\"Recursively remove files.\"`\n+\n+    Paths []string `arg name:\"path\" help:\"Paths to remove.\" type:\"path\"`\n+  } `cmd help:\"Remove files.\"`\n+\n+  Ls struct {\n+    Paths []string `arg optional name:\"path\" help:\"Paths to list.\" type:\"path\"`\n+  } `cmd help:\"List paths.\"`\n+}\n+\n+func main() {\n+  cmd := kong.Parse(&CLI)\n+  switch cmd {\n+  case \"rm <path>\":\n+  case \"ls\":\n+  default:\n+    panic(cmd)\n+  }\n+}\n+```\n \n This has the advantage that it is convenient, but the downside that if you modify your CLI structure, the strings may change. This can be fragile.\n \n-### Attach a `Run(...) error` method to each command\n+### 2. Attach a `Run(...) error` method to each command\n \n A more robust approach is to break each command out into their own structs:\n \n-1. Attach a `Run(...) error` method to all leaf commands (`Run()` signatures must match).\n-2. Call `kong.Kong.Parse()` to obtain a `kong.Context`.\n-3. Call `kong.Context.Run(params...)` to call the selected parsed command.\n+1. Break leaf commands out into separate structs.\n+2. Attach a `Run(...) error` method to all leaf commands (`Run()` signatures must match).\n+3. Call `kong.Kong.Parse()` to obtain a `kong.Context`.\n+4. Call `kong.Context.Run(params...)` to call the selected parsed command.\n \n eg.\n \n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    ".golangci.yml",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/shell/main.go",
+    "build.go",
+    "camelcase.go",
+    "context.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "tokentype_string.go"
+  ],
+  "explanation": {
+    "what": "README の「Command handling」節に番号見出し(1. Switch on the command string / 2. Attach a Run(...) error method)を付け、Run() メソッド方式の説明に完全なコード例を追加した。目次(TOC)のリンクも見出し変更に合わせて更新している。",
+    "why": "コミットメッセージ「Improve README.」の通りで、直前の seq79 で Context.Run() を実装しコマンドディスパッチの2方式(文字列switch / Run()メソッド)が確立したことを受け、両方式を番号付きで並列に説明し具体例を足して読みやすくしたとおもわれる。",
+    "highlights": [
+      { "file": "README.md", "note": "Rm/Ls コマンドの完全なコード例が追加され、cmd.Command() の switch 文の使い方が具体化された" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

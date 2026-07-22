@@ -1,0 +1,118 @@
+{
+  "seq": 227,
+  "sha": "f306ae1529caeb89f707932b499b2b455367f9fe",
+  "parents": [
+    "405b2f4fd9a44c95f00baee2a6e766a32b0e1fa6"
+  ],
+  "author": {
+    "name": "Joe Schmitt",
+    "email": "joe@compass.com",
+    "date": "2021-02-12T11:51:30-05:00"
+  },
+  "message": "Add aliases to tree help output",
+  "pr": {
+    "number": 142,
+    "title": "Add aliases to tree help output",
+    "body": "Couldn't find a good example of how other tools format their command aliases, so just went with putting them in parens:\r\n\r\n```\r\nUsage: test-app <command>\r\n\r\nA test app.\r\n\r\nFlags:\r\n  -h, --help    Show context-sensitive help.\r\n\r\nCommands:\r\n  one (un,uno)         subcommand one\r\n  - thing              subcommand thing\r\n    - <arg>            argument\r\n  - <other>            subcommand other\r\n\r\n  two                  Another subcommand.\r\n  - <three>            Sub-sub-arg.\r\n  - four (for,fore)    Sub-sub-command.\r\n\r\nRun \"test-app <command> --help\" for more information on a command.\r\n```",
+    "url": "https://github.com/alecthomas/kong/pull/142"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 13,
+    "deletions": 10
+  },
+  "files": [
+    {
+      "path": "help.go",
+      "status": "M",
+      "additions": 3,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "help_test.go",
+      "status": "M",
+      "additions": 10,
+      "deletions": 10,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/help.go b/help.go\nindex 2594946..f08f1a1 100644\n--- a/help.go\n+++ b/help.go\n@@ -474,6 +474,9 @@ func (h *HelpOptions) CommandTree(node *Node, prefix string) (rows [][2]string)\n \tswitch node.Type {\n \tdefault:\n \t\tnodeName += prefix + node.Name\n+\t\tif len(node.Aliases) != 0 {\n+\t\t\tnodeName += fmt.Sprintf(\" (%s)\", strings.Join(node.Aliases, \",\"))\n+\t\t}\n \tcase ArgumentNode:\n \t\tnodeName += prefix + \"<\" + node.Name + \">\"\n \t}\ndiff --git a/help_test.go b/help_test.go\nindex c7d5fe0..0f0f2cb 100644\n--- a/help_test.go\n+++ b/help_test.go\n@@ -245,13 +245,13 @@ func TestHelpTree(t *testing.T) {\n \t\t\tOther struct {\n \t\t\t\tOther string `arg help:\"other arg\"`\n \t\t\t} `arg help:\"subcommand other\"`\n-\t\t} `cmd help:\"subcommand one\" group:\"Group A\"` // Groups are ignored in trees\n+\t\t} `cmd help:\"subcommand one\" group:\"Group A\" aliases:\"un,uno\"` // Groups are ignored in trees\n \n \t\tTwo struct {\n \t\t\tThree threeArg `arg help:\"Sub-sub-arg.\"`\n \n \t\t\tFour struct {\n-\t\t\t} `cmd help:\"Sub-sub-command.\"`\n+\t\t\t} `cmd help:\"Sub-sub-command.\" aliases:\"for,fore\"`\n \t\t} `cmd help:\"Another subcommand.\"`\n \t}\n \n@@ -285,14 +285,14 @@ Flags:\n   -h, --help    Show context-sensitive help.\n \n Commands:\n-  one          subcommand one\n-  - thing      subcommand thing\n-    - <arg>    argument\n-  - <other>    subcommand other\n-\n-  two          Another subcommand.\n-  - <three>    Sub-sub-arg.\n-  - four       Sub-sub-command.\n+  one (un,uno)         subcommand one\n+  - thing              subcommand thing\n+    - <arg>            argument\n+  - <other>            subcommand other\n+\n+  two                  Another subcommand.\n+  - <three>            Sub-sub-arg.\n+  - four (for,fore)    Sub-sub-command.\n \n Run \"test-app <command> --help\" for more information on a command.\n `\n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    ".gitignore",
+    ".golangci.yml",
+    "COPYING",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/README.md",
+    "_examples/server/console.go",
+    "_examples/server/go.mod",
+    "_examples/server/go.sum",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/main.go",
+    "benchmark_test.go",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "config_test.go",
+    "context.go",
+    "defaults.go",
+    "defaults_test.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "go.mod",
+    "go.sum",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "testdata/file.txt",
+    "util.go",
+    "util_test.go",
+    "visit.go"
+  ],
+  "explanation": {
+    "what": "ツリー形式のヘルプ出力(`--tree` 相当)で、コマンドにエイリアスがある場合 `one (un,uno)` のように括弧書きで併記するようにした。CommandTree() でノード名を組み立てる際、`node.Aliases` が空でなければカンマ区切りで括弧付きの文字列を追記する。",
+    "why": "PR body によれば、他ツールでのエイリアス表示の一般的な慣習が見当たらなかったため、括弧書きという独自の表現を採用したとのこと。seq221 で導入したエイリアス機能が、通常のコマンド一覧(collectCommandGroups 経由)には反映済みだったが、ツリー表示では抜けていたのを補った形。",
+    "highlights": [
+      { "file": "help.go", "note": "CommandTree() でエイリアスを `(un,uno)` のように括弧付きで名前に追記する箇所" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [
+      { "type": "pr", "number": 142, "url": "https://github.com/alecthomas/kong/pull/142" }
+    ],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

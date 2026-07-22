@@ -1,0 +1,119 @@
+{
+  "seq": 218,
+  "sha": "5a9b3ae0120c481a5e9a25efc2e0848d30a165ab",
+  "parents": [
+    "26524e0cc1c1a8fc4ee1f005f447924d4c3f001e"
+  ],
+  "author": {
+    "name": "Sarah Franc",
+    "email": "sarah.franc@algolia.com",
+    "date": "2020-11-12T00:59:40+01:00"
+  },
+  "message": "Fix return err for PrintUsage",
+  "pr": {
+    "number": 117,
+    "title": "Fix return err for PrintUsage",
+    "body": "`PrintUsage()` returns now the error from the `c.help()` call\r\nFix #116 ",
+    "url": "https://github.com/alecthomas/kong/pull/117"
+  },
+  "linkedIssues": [
+    {
+      "number": 116,
+      "title": "PrintUsage always returns nil, still returns an error to check",
+      "body": "The function **PrintUsage** is prototyped in a way it returns an error, but the source code of it shows that it will be always `nil`.\r\nhttps://github.com/alecthomas/kong/blob/26524e0cc1c1a8fc4ee1f005f447924d4c3f001e/context.go#L694\r\n\r\nSome linters raised the lack of error checking.\r\nI was wondering if you would consider the update of this function with `func (c *Context) PrintUsage(summary bool) {`.\r\n\r\nI'm willing to make the corresponding PR, you can assign it to me.",
+      "url": "https://github.com/alecthomas/kong/issues/116"
+    }
+  ],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 1,
+    "deletions": 2
+  },
+  "files": [
+    {
+      "path": "context.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 2,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/context.go b/context.go\nindex 42bb76b..654de50 100644\n--- a/context.go\n+++ b/context.go\n@@ -694,8 +694,7 @@ func (c *Context) Run(binds ...interface{}) (err error) {\n func (c *Context) PrintUsage(summary bool) error {\n \toptions := c.helpOptions\n \toptions.Summary = summary\n-\t_ = c.help(options, c)\n-\treturn nil\n+\treturn c.help(options, c)\n }\n \n func checkMissingFlags(flags []*Flag) error {\n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    ".gitignore",
+    ".golangci.yml",
+    "COPYING",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/README.md",
+    "_examples/server/console.go",
+    "_examples/server/go.mod",
+    "_examples/server/go.sum",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/main.go",
+    "benchmark_test.go",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "config_test.go",
+    "context.go",
+    "defaults.go",
+    "defaults_test.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "go.mod",
+    "go.sum",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "testdata/file.txt",
+    "util.go",
+    "util_test.go",
+    "visit.go"
+  ],
+  "explanation": {
+    "what": "Context.PrintUsage(summary bool) error の実装を、c.help(options, c) の戻り値を無視して常に nil を返していたものから、その戻り値をそのまま return する形に変更した。差分は1行のみ。",
+    "why": "PR本文と紐づく issue #116 の記述の通り、PrintUsage は error を返す型シグネチャでありながら実装が常に nil を返しており、呼び出し側でエラーチェックしても意味がなく linter からも指摘されていた。help() のエラーを実際に呼び出し元へ伝播させるための修正。",
+    "highlights": [
+      { "file": "context.go", "note": "`_ = c.help(...); return nil` から `return c.help(...)` への1行差分。エラーを握りつぶしていた箇所の是正" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [
+      { "type": "pr", "number": 117, "url": "https://github.com/alecthomas/kong/pull/117" },
+      { "type": "issue", "number": 116, "url": "https://github.com/alecthomas/kong/issues/116" }
+    ],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

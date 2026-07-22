@@ -1,0 +1,79 @@
+{
+  "seq": 55,
+  "sha": "d30421d2b1f23161c25872a154948889358cf135",
+  "parents": [
+    "dd03e4c48a0ee5e63c7d1e9d533ef015f442ce9a"
+  ],
+  "author": {
+    "name": "Alec Thomas",
+    "email": "alec@swapoff.org",
+    "date": "2018-06-08T15:02:14+10:00"
+  },
+  "message": "Get rid of troublesome [<flags>].",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 5,
+    "deletions": 8
+  },
+  "files": [
+    {
+      "path": "help_test.go",
+      "status": "M",
+      "additions": 5,
+      "deletions": 5,
+      "binary": false
+    },
+    {
+      "path": "model.go",
+      "status": "M",
+      "additions": 0,
+      "deletions": 3,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/help_test.go b/help_test.go\nindex c06a9d5..83747f1 100644\n--- a/help_test.go\n+++ b/help_test.go\n@@ -50,7 +50,7 @@ func TestHelp(t *testing.T) {\n \t\t})\n \t\trequire.True(t, exited)\n \t\tt.Log(w.String())\n-\t\trequire.Equal(t, `usage: test-app --required [<flags>]\n+\t\trequire.Equal(t, `usage: test-app --required\n \n A test app.\n \n@@ -62,13 +62,13 @@ Flags:\n   --required       A required flag.\n \n Commands:\n-  one --required [<flags>]\n+  one --required\n     A subcommand.\n \n-  two <three> --required --required-two --required-three [<flags>]\n+  two <three> --required --required-two --required-three\n     Sub-sub-arg.\n \n-  two four --required --required-two [<flags>]\n+  two four --required --required-two\n     Sub-sub-command.\n `, w.String())\n \t})\n@@ -82,7 +82,7 @@ Commands:\n \t\t})\n \t\trequire.True(t, exited)\n \t\tt.Log(w.String())\n-\t\trequire.Equal(t, `usage: test-app two <three> --required --required-two --required-three [<flags>]\n+\t\trequire.Equal(t, `usage: test-app two <three> --required --required-two --required-three\n \n Sub-sub-arg.\n \ndiff --git a/model.go b/model.go\nindex 40e4c74..4f7375d 100644\n--- a/model.go\n+++ b/model.go\n@@ -105,9 +105,6 @@ func (n *Node) FlagSummary() string {\n \t\t\t}\n \t\t}\n \t}\n-\tif count != len(required) {\n-\t\trequired = append(required, \"[<flags>]\")\n-\t}\n \treturn strings.Join(required, \" \")\n }\n \n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    "README.md",
+    "_examples/shell/main.go",
+    "build.go",
+    "camelcase.go",
+    "context.go",
+    "context_test.go",
+    "global.go",
+    "global_test.go",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "kong.go",
+    "kong_test.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "tokentype_string.go"
+  ],
+  "explanation": {
+    "what": "Node.FlagSummary()から、必須フラグ以外にフラグが存在する場合に付加していた\"[<flags>]\"という文字列表示を削除した。ヘルプのusage行から`[<flags>]`が消え、必須フラグのみが表示されるようになる。",
+    "why": "コミットメッセージ「Get rid of troublesome [<flags>].」の通り、この表示が何らかの形で問題(冗長・誤解を招く等)だったための削除と考えられる。何が具体的に troublesome だったかはメッセージからは読み取れない。",
+    "highlights": [
+      { "file": "model.go", "note": "FlagSummary()末尾のrequired != count時に\"[<flags>]\"をappendしていた分岐を丸ごと削除" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

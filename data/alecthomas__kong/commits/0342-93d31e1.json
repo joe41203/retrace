@@ -1,0 +1,156 @@
+{
+  "seq": 342,
+  "sha": "93d31e17f429f1df8d21fb62056ac9f840fe4494",
+  "parents": [
+    "46c03841edae90a3daa987b58623589d47ddf1ba"
+  ],
+  "author": {
+    "name": "Jan Heuermann",
+    "email": "jan@jotaen.net",
+    "date": "2023-10-07T09:15:33+02:00"
+  },
+  "message": "Drop automatic message prefix from command errors (#384)",
+  "pr": {
+    "number": 384,
+    "title": "Drop automatic message prefix from command errors",
+    "body": "Resolves https://github.com/alecthomas/kong/issues/383.\r\n\r\nWith this PR, kong will pass through error messages from commands’ `Run()` methods as is, without wrapping them up or reformatting them.\r\n\r\nThe `callMethod` is obsolete now, its only purpose was the error wrapping. The callers can use `callFunction` directly.",
+    "url": "https://github.com/alecthomas/kong/pull/384"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 5,
+    "additions": 24,
+    "deletions": 15
+  },
+  "files": [
+    {
+      "path": "callbacks.go",
+      "status": "M",
+      "additions": 0,
+      "deletions": 8,
+      "binary": false
+    },
+    {
+      "path": "context.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "kong.go",
+      "status": "M",
+      "additions": 2,
+      "deletions": 2,
+      "binary": false
+    },
+    {
+      "path": "kong_test.go",
+      "status": "M",
+      "additions": 17,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "options_test.go",
+      "status": "M",
+      "additions": 4,
+      "deletions": 4,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/callbacks.go b/callbacks.go\nindex 3a8a45f..8771a3e 100644\n--- a/callbacks.go\n+++ b/callbacks.go\n@@ -127,11 +127,3 @@ func callAnyFunction(f reflect.Value, bindings bindings) (out []any, err error)\n \t}\n \treturn out, nil\n }\n-\n-func callMethod(name string, v, f reflect.Value, bindings bindings) error {\n-\terr := callFunction(f, bindings)\n-\tif err != nil {\n-\t\treturn fmt.Errorf(\"%s.%s(): %w\", v.Type(), name, err)\n-\t}\n-\treturn nil\n-}\ndiff --git a/context.go b/context.go\nindex dddf796..0b41079 100644\n--- a/context.go\n+++ b/context.go\n@@ -762,7 +762,7 @@ func (c *Context) RunNode(node *Node, binds ...interface{}) (err error) {\n \t}\n \n \tfor _, method := range methods {\n-\t\tif err = callMethod(\"Run\", method.node.Target, method.method, method.binds); err != nil {\n+\t\tif err = callFunction(method.method, method.binds); err != nil {\n \t\t\treturn err\n \t\t}\n \t}\ndiff --git a/kong.go b/kong.go\nindex 255633f..c4eda71 100644\n--- a/kong.go\n+++ b/kong.go\n@@ -336,7 +336,7 @@ func (k *Kong) applyHook(ctx *Context, name string) error {\n \t\tbinds.add(ctx, trace)\n \t\tbinds.add(trace.Node().Vars().CloneWith(k.vars))\n \t\tbinds.merge(ctx.bindings)\n-\t\tif err := callMethod(name, value, method, binds); err != nil {\n+\t\tif err := callFunction(method, binds); err != nil {\n \t\t\treturn err\n \t\t}\n \t}\n@@ -364,7 +364,7 @@ func (k *Kong) applyHookToDefaultFlags(ctx *Context, node *Node, name string) er\n \t\t\t\tcontinue\n \t\t\t}\n \t\t\tpath := &Path{Flag: flag}\n-\t\t\tif err := callMethod(name, flag.Target, method, binds.clone().add(path)); err != nil {\n+\t\t\tif err := callFunction(method, binds.clone().add(path)); err != nil {\n \t\t\t\treturn next(err)\n \t\t\t}\n \t\t}\ndiff --git a/kong_test.go b/kong_test.go\nindex 1ef424e..e7a5ba0 100644\n--- a/kong_test.go\n+++ b/kong_test.go\n@@ -641,6 +641,23 @@ func TestRun(t *testing.T) {\n \tassert.Equal(t, \"argping\", cli.Three.SubCommand.Arg)\n }\n \n+type failCmd struct{}\n+\n+func (f failCmd) Run() error {\n+\treturn errors.New(\"this command failed\")\n+}\n+\n+func TestPassesThroughOriginalCommandError(t *testing.T) {\n+\tvar cli struct {\n+\t\tFail failCmd `kong:\"cmd\"`\n+\t}\n+\tp := mustNew(t, &cli)\n+\tctx, _ := p.Parse([]string{\"fail\"})\n+\terr := ctx.Run()\n+\tassert.Error(t, err)\n+\tassert.Equal(t, err.Error(), \"this command failed\")\n+}\n+\n func TestInterpolationIntoModel(t *testing.T) {\n \tvar cli struct {\n \t\tFlag    string `default:\"${default_value}\" help:\"Help, I need ${somebody}\" enum:\"${enum}\"`\ndiff --git a/options_test.go b/options_test.go\nindex 2dbd0ba..bb9cdaa 100644\n--- a/options_test.go\n+++ b/options_test.go\n@@ -38,7 +38,7 @@ func TestBindTo(t *testing.T) {\n \n \tp, err := New(&cli, BindTo(impl(\"foo\"), (*iface)(nil)))\n \tassert.NoError(t, err)\n-\terr = callMethod(\"method\", reflect.ValueOf(impl(\"??\")), reflect.ValueOf(method), p.bindings)\n+\terr = callFunction(reflect.ValueOf(method), p.bindings)\n \tassert.NoError(t, err)\n \tassert.Equal(t, \"foo\", saw)\n }\n@@ -58,8 +58,8 @@ func TestInvalidCallback(t *testing.T) {\n \n \tp, err := New(&cli, BindTo(impl(\"foo\"), (*iface)(nil)))\n \tassert.NoError(t, err)\n-\terr = callMethod(\"method\", reflect.ValueOf(impl(\"??\")), reflect.ValueOf(method), p.bindings)\n-\tassert.EqualError(t, err, `kong.impl.method(): return value of func(kong.iface) string must implement \"error\"`)\n+\terr = callFunction(reflect.ValueOf(method), p.bindings)\n+\tassert.EqualError(t, err, `return value of func(kong.iface) string must implement \"error\"`)\n }\n \n type zrror struct{}\n@@ -83,7 +83,7 @@ func TestCallbackCustomError(t *testing.T) {\n \n \tp, err := New(&cli, BindTo(impl(\"foo\"), (*iface)(nil)))\n \tassert.NoError(t, err)\n-\terr = callMethod(\"method\", reflect.ValueOf(impl(\"??\")), reflect.ValueOf(method), p.bindings)\n+\terr = callFunction(reflect.ValueOf(method), p.bindings)\n \tassert.NoError(t, err)\n \tassert.Equal(t, \"foo\", saw)\n }\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/FUNDING.yml",
+    ".github/workflows/ci.yml",
+    ".gitignore",
+    ".golangci.yml",
+    "COPYING",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/README.md",
+    "_examples/server/console.go",
+    "_examples/server/go.mod",
+    "_examples/server/go.sum",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/commandstring/main.go",
+    "_examples/shell/help/README.md",
+    "_examples/shell/help/main.go",
+    "benchmark_test.go",
+    "bin/.go-1.19.1.pkg",
+    "bin/.golangci-lint-1.46.2.pkg",
+    "bin/README.hermit.md",
+    "bin/activate-hermit",
+    "bin/go",
+    "bin/gofmt",
+    "bin/golangci-lint",
+    "bin/hermit",
+    "bin/hermit.hcl",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "config_test.go",
+    "context.go",
+    "defaults.go",
+    "defaults_test.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "go.mod",
+    "go.sum",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "helpwrap1.18_test.go",
+    "helpwrap1.19_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_linux_test.go",
+    "mapper_test.go",
+    "mapper_windows_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "testdata/file.txt",
+    "util.go",
+    "util_test.go",
+    "visit.go"
+  ],
+  "explanation": {
+    "what": "callbacks.go の callMethod() 関数を削除し、context.go / kong.go の3箇所の呼び出しを callFunction() に置き換えた。callMethod() が担っていたエラーラップ(\"%s.%s(): %w\" 形式のプレフィックス付与)をやめ、Run() メソッドが返すエラーをそのまま素通しするようにした。",
+    "why": "PR本文の通り、kong がコマンドの Run() メソッドのエラーメッセージを勝手にラップ・整形せず、そのまま呼び出し元に渡すための変更。callMethod() の唯一の役割がこのエラーラップだったため、それを取り除いた結果 callFunction() を直接呼べば済むようになり、あわせて不要になった関数を削除している。",
+    "highlights": [
+      { "file": "callbacks.go", "note": "エラーをラップしていた callMethod() 自体を削除" },
+      { "file": "kong_test.go", "note": "コマンドのエラーが素通しされることを確認する新規テスト" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [
+      { "type": "pr", "number": 384, "url": "https://github.com/alecthomas/kong/pull/384" }
+    ],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

@@ -1,0 +1,161 @@
+{
+  "seq": 432,
+  "sha": "3b9af5bdced7d12010db4133bf3d0ef0d1f6c3ee",
+  "parents": [
+    "7f94c902b9e2a7e5b84194d1a4c61ce62ec0361d"
+  ],
+  "author": {
+    "name": "Abhinav Gupta",
+    "email": "mail@abhinavg.net",
+    "date": "2025-02-16T22:44:03-08:00"
+  },
+  "message": "feat: Support singleton providers (#501)\n\n* feat: Support singleton providers\n\nThis change adds support for provider functions that are\nnot reinvoked even if requested by multiple other providers.\nInstead, their value is cached and reused between invocations.\n\nTo make this possible, we change how bindings are stored:\ninstead of just a function reference, we now store a binding object\nwhich records whether the binding is a singleton,\nand records the resolved singleton value (if any).\n\nResolves #500\n\n* refac(bindings): hide singleton status\n\nDon't require callAnyFunction to be aware of\nwhether a binding is a singleton or not.",
+  "pr": {
+    "number": 501,
+    "title": "feat: Support singleton providers",
+    "body": "This change adds support for provider functions that are\r\nnot reinvoked even if requested by multiple other providers.\r\nInstead, their value is cached and reused between invocations.\r\n\r\nTo make this possible, we change how bindings are stored:\r\ninstead of just a function reference, we now store a binding object\r\nwhich records whether the binding is a singleton,\r\nand records the resolved singleton value (if any).\r\n\r\nResolves #500\r\n",
+    "url": "https://github.com/alecthomas/kong/pull/501"
+  },
+  "linkedIssues": [
+    {
+      "number": 500,
+      "title": "BindToProvider: Remember values requested from multiple providers",
+      "body": "I'm creating this issue to discuss a change before I try make the PR.\n\n## Context\n\n[BindToProvider](https://pkg.go.dev/github.com/alecthomas/kong#Context.BindToProvider) takes a function in the form `func(A, B, C, ...) (X, error)` (or without the `error` return), where the arguments of the functions are dependencies of that provider, and the return value is the result.\n\nFor every dependency in the provider, if it's been bound with `kong.Bind` or `kong.BindTo`, the value is used as-is.\nFor values that come from other providers, those providers are invoked recursively, and the resulting value is used.\n\n## Problem\n\nBased on API, I would expect that provided values are singletons. That is, if the value produced by a provider is requested from two other providers, the original provider is only invoked once. \n\nIn terms of code:\n\n```mermaid\ngraph LR\n  NewA[\"func NewA(C) A\"]\n  NewB[\"func NewB(C) B\"]\n  NewA & NewB -->|call| NewC[\"func NewC() C\"]\n```\n\nReproduction:\n\n```go\npackage main\n\nimport (\n\t\"fmt\"\n\n\t\"github.com/alecthomas/kong\"\n)\n\ntype (\n\tConnection struct{}\n\tClientA    struct{ conn *Connection }\n\tClientB    struct{ conn *Connection }\n)\n\nfunc main() {\n\tvar cmd mainCmd\n\tkctx := kong.Parse(&cmd,\n\t\tkong.BindToProvider(func() *Connection {\n\t\t\tfmt.Println(\"opening connection\")\n\t\t\treturn &Connection{}\n\t\t}),\n\t\tkong.BindToProvider(func(conn *Connection) *ClientA { return &ClientA{conn: conn} }),\n\t\tkong.BindToProvider(func(conn *Connection) *ClientB { return &ClientB{conn: conn} }),\n\t)\n\tkctx.FatalIfErrorf(kctx.Run())\n}\n\ntype mainCmd struct{}\n\nfunc (*mainCmd) Run(clientA *ClientA, clientB *ClientB) error {\n\treturn nil\n}\n```\n\nThe following output is expected:\n\n```\n❯ go run .\nopening connection\n```\n\nBut we get:\n\n\n```\n❯ go run .\nopening connection\nopening connection\n```\n\nThere is no de-duplication.\nThe provider for Connection is requested by two providers, and is invoked twice.\n\n## Solution\n\nI _believe_ that this was just an oversight, and that these providers were not intended to be re-invoked like this.\nIn that case, this is just a bug and it should be straightforward to fix: I am happy to provide a fix.\n\nHowever, if this was intended behavior, I'd like to propose an opt-in means of having these values treated as singletons. This could be a `kong.BindOnce()` option.\n",
+      "url": "https://github.com/alecthomas/kong/issues/500"
+    }
+  ],
+  "stats": {
+    "filesChanged": 4,
+    "additions": 140,
+    "deletions": 16
+  },
+  "files": [
+    {
+      "path": "callbacks.go",
+      "status": "M",
+      "additions": 69,
+      "deletions": 9,
+      "binary": false
+    },
+    {
+      "path": "context.go",
+      "status": "M",
+      "additions": 13,
+      "deletions": 4,
+      "binary": false
+    },
+    {
+      "path": "options.go",
+      "status": "M",
+      "additions": 21,
+      "deletions": 3,
+      "binary": false
+    },
+    {
+      "path": "options_test.go",
+      "status": "M",
+      "additions": 37,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/callbacks.go b/callbacks.go\nindex 2a296d0..6096a26 100644\n--- a/callbacks.go\n+++ b/callbacks.go\n@@ -6,10 +6,59 @@ import (\n \t\"strings\"\n )\n \n+// binding is a single binding registered with Kong.\n+type binding struct {\n+\t// fn is a function that returns a value of the target type.\n+\tfn reflect.Value\n+\n+\t// val is a value of the target type.\n+\t// Must be set if done and singleton are true.\n+\tval reflect.Value\n+\n+\t// singleton indicates whether the binding is a singleton.\n+\t// If true, the binding will be resolved once and cached.\n+\tsingleton bool\n+\n+\t// done indicates whether a singleton binding has been resolved.\n+\t// If singleton is false, this field is ignored.\n+\tdone bool\n+}\n+\n+// newValueBinding builds a binding with an already resolved value.\n+func newValueBinding(v reflect.Value) *binding {\n+\treturn &binding{val: v, done: true, singleton: true}\n+}\n+\n+// newFunctionBinding builds a binding with a function\n+// that will return a value of the target type.\n+//\n+// The function signature must be func(...) (T, error) or func(...) T\n+// where parameters are recursively resolved.\n+func newFunctionBinding(f reflect.Value, singleton bool) *binding {\n+\treturn &binding{fn: f, singleton: singleton}\n+}\n+\n+// Get returns the pre-resolved value for the binding,\n+// or false if the binding is not resolved.\n+func (b *binding) Get() (v reflect.Value, ok bool) {\n+\treturn b.val, b.done\n+}\n+\n+// Set sets the value of the binding to the given value,\n+// marking it as resolved.\n+//\n+// If the binding is not a singleton, this method does nothing.\n+func (b *binding) Set(v reflect.Value) {\n+\tif b.singleton {\n+\t\tb.val = v\n+\t\tb.done = true\n+\t}\n+}\n+\n // A map of type to function that returns a value of that type.\n //\n // The function should have the signature func(...) (T, error). Arguments are recursively resolved.\n-type bindings map[reflect.Type]any\n+type bindings map[reflect.Type]*binding\n \n func (b bindings) String() string {\n \tout := []string{}\n@@ -21,17 +70,18 @@ func (b bindings) String() string {\n \n func (b bindings) add(values ...any) bindings {\n \tfor _, v := range values {\n-\t\tv := v\n-\t\tb[reflect.TypeOf(v)] = func() (any, error) { return v, nil }\n+\t\tval := reflect.ValueOf(v)\n+\t\tb[val.Type()] = newValueBinding(val)\n \t}\n \treturn b\n }\n \n func (b bindings) addTo(impl, iface any) {\n-\tb[reflect.TypeOf(iface).Elem()] = func() (any, error) { return impl, nil }\n+\tval := reflect.ValueOf(impl)\n+\tb[reflect.TypeOf(iface).Elem()] = newValueBinding(val)\n }\n \n-func (b bindings) addProvider(provider any) error {\n+func (b bindings) addProvider(provider any, singleton bool) error {\n \tpv := reflect.ValueOf(provider)\n \tt := pv.Type()\n \tif t.Kind() != reflect.Func {\n@@ -47,7 +97,7 @@ func (b bindings) addProvider(provider any) error {\n \t\t}\n \t}\n \trt := pv.Type().Out(0)\n-\tb[rt] = provider\n+\tb[rt] = newFunctionBinding(pv, singleton)\n \treturn nil\n }\n \n@@ -148,19 +198,29 @@ func callAnyFunction(f reflect.Value, bindings bindings) (out []any, err error)\n \tt := f.Type()\n \tfor i := 0; i < t.NumIn(); i++ {\n \t\tpt := t.In(i)\n-\t\targf, ok := bindings[pt]\n+\t\tbinding, ok := bindings[pt]\n \t\tif !ok {\n \t\t\treturn nil, fmt.Errorf(\"couldn't find binding of type %s for parameter %d of %s(), use kong.Bind(%s)\", pt, i, t, pt)\n \t\t}\n+\n+\t\t// Don't need to call the function if the value is already resolved.\n+\t\tif val, ok := binding.Get(); ok {\n+\t\t\tin = append(in, val)\n+\t\t\tcontinue\n+\t\t}\n+\n \t\t// Recursively resolve binding functions.\n-\t\targv, err := callAnyFunction(reflect.ValueOf(argf), bindings)\n+\t\targv, err := callAnyFunction(binding.fn, bindings)\n \t\tif err != nil {\n \t\t\treturn nil, fmt.Errorf(\"%s: %w\", pt, err)\n \t\t}\n \t\tif ferrv := reflect.ValueOf(argv[len(argv)-1]); ferrv.IsValid() && ferrv.Type().Implements(callbackReturnSignature) && !ferrv.IsNil() {\n \t\t\treturn nil, ferrv.Interface().(error) //nolint:forcetypeassert\n \t\t}\n-\t\tin = append(in, reflect.ValueOf(argv[0]))\n+\n+\t\tval := reflect.ValueOf(argv[0])\n+\t\tbinding.Set(val)\n+\t\tin = append(in, val)\n \t}\n \toutv := f.Call(in)\n \tout = make([]any, len(outv))\ndiff --git a/context.go b/context.go\nindex ebf4c31..7b1d482 100644\n--- a/context.go\n+++ b/context.go\n@@ -120,10 +120,19 @@ func (c *Context) BindTo(impl, iface any) {\n // This is useful when the Run() function of different commands require different values that may\n // not all be initialisable from the main() function.\n //\n-// \"provider\" must be a function with the signature func(...) (T, error) or func(...) T, where\n-// ... will be recursively injected with bound values.\n+// \"provider\" must be a function with the signature func(...) (T, error) or func(...) T,\n+// where ... will be recursively injected with bound values.\n func (c *Context) BindToProvider(provider any) error {\n-\treturn c.bindings.addProvider(provider)\n+\treturn c.bindings.addProvider(provider, false /* singleton */)\n+}\n+\n+// BindSingletonProvider allows binding of provider functions.\n+// The provider will be called once and the result cached.\n+//\n+// \"provider\" must be a function with the signature func(...) (T, error) or func(...) T,\n+// where ... will be recursively injected with bound values.\n+func (c *Context) BindSingletonProvider(provider any) error {\n+\treturn c.bindings.addProvider(provider, true /* singleton */)\n }\n \n // Value returns the value for a particular path element.\n@@ -792,7 +801,7 @@ func (c *Context) RunNode(node *Node, binds ...any) (err error) {\n \t\t\t\t\tmethodt := t.Method(i)\n \t\t\t\t\tif strings.HasPrefix(methodt.Name, \"Provide\") {\n \t\t\t\t\t\tmethod := p.Method(i)\n-\t\t\t\t\t\tif err := methodBinds.addProvider(method.Interface()); err != nil {\n+\t\t\t\t\t\tif err := methodBinds.addProvider(method.Interface(), false /* singleton */); err != nil {\n \t\t\t\t\t\t\treturn fmt.Errorf(\"%s.%s: %w\", t.Name(), methodt.Name, err)\n \t\t\t\t\t\t}\n \t\t\t\t\t}\ndiff --git a/options.go b/options.go\nindex 6263202..d20b2fb 100644\n--- a/options.go\n+++ b/options.go\n@@ -210,15 +210,33 @@ func BindTo(impl, iface any) Option {\n \n // BindToProvider binds an injected value to a provider function.\n //\n-// The provider function must have the signature:\n+// The provider function must have one of the following signatures:\n+//\n+//\tfunc(...) (T, error)\n+//\tfunc(...) T\n //\n-//\tfunc() (any, error)\n+// Where arguments to the function are injected by Kong.\n //\n // This is useful when the Run() function of different commands require different values that may\n // not all be initialisable from the main() function.\n func BindToProvider(provider any) Option {\n \treturn OptionFunc(func(k *Kong) error {\n-\t\treturn k.bindings.addProvider(provider)\n+\t\treturn k.bindings.addProvider(provider, false /* singleton */)\n+\t})\n+}\n+\n+// BindSingletonProvider binds an injected value to a provider function.\n+// The provider function must have the signature:\n+//\n+//\tfunc(...) (T, error)\n+//\tfunc(...) T\n+//\n+// Unlike [BindToProvider], the provider function will only be called\n+// at most once, and the result will be cached and reused\n+// across multiple recipients of the injected value.\n+func BindSingletonProvider(provider any) Option {\n+\treturn OptionFunc(func(k *Kong) error {\n+\t\treturn k.bindings.addProvider(provider, true /* singleton */)\n \t})\n }\n \ndiff --git a/options_test.go b/options_test.go\nindex e549475..791cb64 100644\n--- a/options_test.go\n+++ b/options_test.go\n@@ -119,6 +119,43 @@ func TestBindToProvider(t *testing.T) {\n \tassert.True(t, cli.Called)\n }\n \n+func TestBindSingletonProvider(t *testing.T) {\n+\ttype (\n+\t\tConnection struct{}\n+\t\tClientA    struct{ conn *Connection }\n+\t\tClientB    struct{ conn *Connection }\n+\t)\n+\n+\tvar numConnections int\n+\tnewConnection := func() *Connection {\n+\t\tnumConnections++\n+\t\treturn &Connection{}\n+\t}\n+\n+\tvar cli struct{}\n+\tapp, err := New(&cli,\n+\t\tBindSingletonProvider(newConnection),\n+\t\tBindToProvider(func(conn *Connection) *ClientA {\n+\t\t\treturn &ClientA{conn: conn}\n+\t\t}),\n+\t\tBindToProvider(func(conn *Connection) *ClientB {\n+\t\t\treturn &ClientB{conn: conn}\n+\t\t}),\n+\t)\n+\tassert.NoError(t, err)\n+\n+\tctx, err := app.Parse([]string{})\n+\tassert.NoError(t, err)\n+\n+\t_, err = ctx.Call(func(a *ClientA, b *ClientB) {\n+\t\tassert.NotZero(t, a.conn)\n+\t\tassert.NotZero(t, b.conn)\n+\n+\t\tassert.Equal(t, 1, numConnections, \"expected newConnection to be called only once\")\n+\t})\n+\tassert.NoError(t, err)\n+}\n+\n func TestFlagNamer(t *testing.T) {\n \tvar cli struct {\n \t\tSomeFlag string\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/FUNDING.yml",
+    ".github/workflows/ci.yml",
+    ".gitignore",
+    ".golangci.yml",
+    "COPYING",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/README.md",
+    "_examples/server/console.go",
+    "_examples/server/go.mod",
+    "_examples/server/go.sum",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/commandstring/main.go",
+    "_examples/shell/help/README.md",
+    "_examples/shell/help/main.go",
+    "benchmark_test.go",
+    "bin/.go-1.24.0.pkg",
+    "bin/.golangci-lint-1.64.5.pkg",
+    "bin/.lefthook-1.10.10.pkg",
+    "bin/README.hermit.md",
+    "bin/activate-hermit",
+    "bin/go",
+    "bin/gofmt",
+    "bin/golangci-lint",
+    "bin/hermit",
+    "bin/hermit.hcl",
+    "bin/lefthook",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "config_test.go",
+    "context.go",
+    "defaults.go",
+    "defaults_test.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "go.mod",
+    "go.sum",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "helpwrap1.18_test.go",
+    "helpwrap1.19_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "lefthook.yml",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_linux_test.go",
+    "mapper_test.go",
+    "mapper_windows_test.go",
+    "model.go",
+    "model_test.go",
+    "negatable.go",
+    "options.go",
+    "options_test.go",
+    "renovate.json5",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "testdata/file.txt",
+    "util.go",
+    "util_test.go",
+    "visit.go"
+  ],
+  "explanation": {
+    "what": "callbacks.go の bindings 型を `map[reflect.Type]any`(関数そのものを保持)から `map[reflect.Type]*binding` に変更し、binding 構造体に singleton フラグと解決済み値のキャッシュ(val/done)を持たせた。Context.BindSingletonProvider / options.go の BindSingletonProvider を新設し、既存の BindToProvider は singleton=false で従来通り動く。callAnyFunction は binding.Get() で既に解決済みなら再実行せず、そうでなければ呼び出し後に binding.Set() でキャッシュする。",
+    "why": "Issue #500 で報告された通り、BindToProvider で登録した provider 関数は、複数の別 provider から依存として要求されると呼び出し回数分だけ再実行されてしまい、コネクションのような一度だけ生成したい値が重複生成される問題があった。PRはこれを、provider ごとに「一度だけ呼んでキャッシュする」singleton 指定をオプトインできる形で解決している。",
+    "highlights": [
+      { "file": "callbacks.go", "note": "binding 構造体の Get/Set と、値解決済みなら再帰呼び出しをスキップする callAnyFunction の分岐" },
+      { "file": "options_test.go", "note": "TestBindSingletonProvider が numConnections==1 を検証し、意図した重複排除を示す" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "issue",
+    "refs": [
+      { "type": "pr", "number": 501, "url": "https://github.com/alecthomas/kong/pull/501" }
+    ],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

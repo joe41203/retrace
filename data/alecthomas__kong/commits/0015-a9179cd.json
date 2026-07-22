@@ -1,0 +1,90 @@
+{
+  "seq": 15,
+  "sha": "a9179cd8ec5a1765b33e914af4a503b3f6e08ad6",
+  "parents": [
+    "3b21a540942367e362db7c5a3ec9b690ed3a853b"
+  ],
+  "author": {
+    "name": "Gerald Kaszuba",
+    "email": "gak@gak0.com",
+    "date": "2018-05-19T13:58:35+10:00"
+  },
+  "message": "Allow parent flags to be processed #4",
+  "pr": {
+    "number": 5,
+    "title": "Allow parent flags to be processed",
+    "body": "#4",
+    "url": "https://github.com/alecthomas/kong/pull/5"
+  },
+  "linkedIssues": [
+    {
+      "number": 4,
+      "title": "Flags need to be propagated downward",
+      "body": "This is to support parsing of flags at any position after they are first encountered.",
+      "url": "https://github.com/alecthomas/kong/issues/4"
+    }
+  ],
+  "stats": {
+    "filesChanged": 3,
+    "additions": 26,
+    "deletions": 8
+  },
+  "files": [
+    {
+      "path": "kong.go",
+      "status": "M",
+      "additions": 9,
+      "deletions": 7,
+      "binary": false
+    },
+    {
+      "path": "kong_test.go",
+      "status": "M",
+      "additions": 16,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "model.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/kong.go b/kong.go\nindex 7cfe223..22d854c 100644\n--- a/kong.go\n+++ b/kong.go\n@@ -65,7 +65,7 @@ func (k *Kong) Parse(args []string) (command string, err error) {\n \t\t}\n \t}()\n \tk.reset(k.Model)\n-\tcmd, err := k.applyNode(Scan(args...), k.Model)\n+\tcmd, err := k.applyNode(Scan(args...), k.Model, nil)\n \treturn strings.Join(cmd, \" \"), err\n }\n \n@@ -91,8 +91,10 @@ func (k *Kong) reset(node *Node) {\n \t}\n }\n \n-func (k *Kong) applyNode(scan *Scanner, node *Node) (command []string, err error) { // nolint: gocyclo\n+func (k *Kong) applyNode(scan *Scanner, node *Node, flags []*Flag) (command []string, err error) { // nolint: gocyclo\n \tpositional := 0\n+\tflags = append(flags, node.Flags...) // Track all parent flags.\n+\n \tfor token := scan.Pop(); token.Type != EOLToken; token = scan.Pop() {\n \t\tswitch token.Type {\n \t\tcase UntypedToken:\n@@ -120,7 +122,7 @@ func (k *Kong) applyNode(scan *Scanner, node *Node) (command []string, err error\n \t\t\t\t}\n \t\t\t\tscan.PushTyped(parts[0], FlagToken)\n \n-\t\t\t\t// Short flag.\n+\t\t\t// Short flag.\n \t\t\tcase strings.HasPrefix(token.Value, \"-\"):\n \t\t\t\t// Note: tokens must be pushed in reverse order.\n \t\t\t\tscan.PushTyped(token.Value[2:], ShortFlagTailToken)\n@@ -136,14 +138,14 @@ func (k *Kong) applyNode(scan *Scanner, node *Node) (command []string, err error\n \t\t\tscan.PushTyped(token.Value[0:1], ShortFlagToken)\n \n \t\tcase FlagToken:\n-\t\t\tif err := matchFlags(node.Flags, token, scan, func(f *Flag) bool {\n+\t\t\tif err := matchFlags(flags, token, scan, func(f *Flag) bool {\n \t\t\t\treturn f.Name == token.Value\n \t\t\t}); err != nil {\n \t\t\t\treturn nil, err\n \t\t\t}\n \n \t\tcase ShortFlagToken:\n-\t\t\tif err := matchFlags(node.Flags, token, scan, func(f *Flag) bool {\n+\t\t\tif err := matchFlags(flags, token, scan, func(f *Flag) bool {\n \t\t\t\treturn string(f.Name) == token.Value\n \t\t\t}); err != nil {\n \t\t\t\treturn nil, err\n@@ -173,7 +175,7 @@ func (k *Kong) applyNode(scan *Scanner, node *Node) (command []string, err error\n \t\t\t\t\tif branch.Command.Name == token.Value {\n \t\t\t\t\t\tscan.Pop()\n \t\t\t\t\t\tcommand = append(command, branch.Command.Name)\n-\t\t\t\t\t\tcmd, err := k.applyNode(scan, branch.Command)\n+\t\t\t\t\t\tcmd, err := k.applyNode(scan, branch.Command, flags)\n \t\t\t\t\t\tif err != nil {\n \t\t\t\t\t\t\treturn nil, err\n \t\t\t\t\t\t}\n@@ -184,7 +186,7 @@ func (k *Kong) applyNode(scan *Scanner, node *Node) (command []string, err error\n \t\t\t\t\targ := branch.Argument.Argument\n \t\t\t\t\tif err := arg.Decode(scan); err == nil {\n \t\t\t\t\t\tcommand = append(command, \"<\"+arg.Name+\">\")\n-\t\t\t\t\t\tcmd, err := k.applyNode(scan, &branch.Argument.Node)\n+\t\t\t\t\t\tcmd, err := k.applyNode(scan, &branch.Argument.Node, flags)\n \t\t\t\t\t\tif err != nil {\n \t\t\t\t\t\t\treturn nil, err\n \t\t\t\t\t\t}\ndiff --git a/kong_test.go b/kong_test.go\nindex edf7238..35018f3 100644\n--- a/kong_test.go\n+++ b/kong_test.go\n@@ -134,3 +134,19 @@ func TestCantMixPositionalAndBranches(t *testing.T) {\n \t_, err := New(&cli)\n \trequire.Error(t, err)\n }\n+\n+func TestPropagatedFlags(t *testing.T) {\n+\tvar cli struct {\n+\t\tFlag1    string\n+\t\tCommand1 struct {\n+\t\t\tFlag2    bool\n+\t\t\tCommand2 struct{} `cmd:\"\"`\n+\t\t} `cmd:\"\"`\n+\t}\n+\n+\tparser := mustNew(t, &cli)\n+\t_, err := parser.Parse([]string{\"command-1\", \"command-2\", \"--flag-2\", \"--flag-1=moo\"})\n+\trequire.NoError(t, err)\n+\trequire.Equal(t, \"moo\", cli.Flag1)\n+\trequire.Equal(t, true, cli.Command1.Flag2)\n+}\ndiff --git a/model.go b/model.go\nindex 4512d08..e7beda6 100644\n--- a/model.go\n+++ b/model.go\n@@ -20,7 +20,7 @@ type Node struct {\n \tChildren   []*Branch\n }\n \n-// A Value is either a flag or a variaable positional argument.\n+// A Value is either a flag or a variable positional argument.\n type Value struct {\n \tFlag     bool // True if flag, false if positional argument.\n \tName     string\n",
+  "diffTruncated": false,
+  "tree": [
+    "README.md",
+    "_examples/shell/main.go",
+    "build.go",
+    "camelcase.go",
+    "decoders.go",
+    "decoders_test.go",
+    "global.go",
+    "help.go",
+    "kong.go",
+    "kong_test.go",
+    "model.go",
+    "options.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tokentype_string.go"
+  ],
+  "explanation": {
+    "what": "applyNode() に flags []*Flag 引数を追加し、再帰呼び出しのたびに `flags = append(flags, node.Flags...)` で親ノードのフラグを蓄積して子ノードに引き継ぐようにした。FlagToken/ShortFlagToken のマッチングも node.Flags でなく蓄積後の flags に対して行う。テスト TestPropagatedFlags を追加。",
+    "why": "issue #4 に記載の通り、それまではサブコマンドに入ると親コマンドで定義したフラグが認識できなかった。CLI ツールとしては `app --parent-flag sub --sub-flag` のようにどの位置でも親フラグを指定できるべきで、それを実現するためフラグ集合をパース木の深さ方向に伝播させる必要があったため。",
+    "highlights": [
+      { "file": "kong.go", "note": "flags = append(flags, node.Flags...) で親から子へフラグ集合を積み上げていく再帰の伝播" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "issue",
+    "refs": [
+      { "type": "pr", "number": 5, "url": "https://github.com/alecthomas/kong/pull/5" },
+      { "type": "issue", "number": 4, "url": "https://github.com/alecthomas/kong/issues/4" }
+    ],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

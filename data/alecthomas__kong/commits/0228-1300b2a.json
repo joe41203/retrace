@@ -1,0 +1,135 @@
+{
+  "seq": 228,
+  "sha": "1300b2a3bdffaa7cb735c04e68f38c4b930d5906",
+  "parents": [
+    "f306ae1529caeb89f707932b499b2b455367f9fe"
+  ],
+  "author": {
+    "name": "Julia Ogris",
+    "email": "juliao@squareup.com",
+    "date": "2021-02-13T18:37:59+11:00"
+  },
+  "message": "options: Add kong.ShortUsageOnError() option\n\nAdd kong.ShortUsageOnError() option similar to kong.UsageOnError().\nAdd tests for UsageOnError and ShortUsageOnError.\n\nRemove the HelpOption summary reset at the beginning of DefaultHelpPrinter:\n\n\t func DefaultHelpPrinter(options HelpOptions, ctx *Context) error {\n\t-       if ctx.Empty() {\n\t-               options.Summary = false\n\t-       }\n\n⚠️ I'm not really sure what the implications of this are, tests still\nseem to pass, but maybe this has unintended side effects.",
+  "pr": {
+    "number": 143,
+    "title": "options: Add kong.ShortUsageOnError() option",
+    "body": "Add `kong.ShortUsageOnError()` option similar to `kong.UsageOnError()`.\r\nFor a custom short usage message use `kong.ShortHelp(kong.HelpPrinter)`\r\nAdd tests for UsageOnError and ShortUsageOnError.\r\n\r\n",
+    "url": "https://github.com/alecthomas/kong/pull/143"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 4,
+    "additions": 137,
+    "deletions": 6
+  },
+  "files": [
+    {
+      "path": "help.go",
+      "status": "M",
+      "additions": 15,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "help_test.go",
+      "status": "M",
+      "additions": 78,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "kong.go",
+      "status": "M",
+      "additions": 22,
+      "deletions": 5,
+      "binary": false
+    },
+    {
+      "path": "options.go",
+      "status": "M",
+      "additions": 22,
+      "deletions": 1,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/help.go b/help.go\nindex f08f1a1..ab66ab0 100644\n--- a/help.go\n+++ b/help.go\n@@ -87,6 +87,21 @@ func DefaultHelpValueFormatter(value *Value) string {\n \t}\n }\n \n+// DefaultShortHelpPrinter is the default HelpPrinter for short help on error.\n+func DefaultShortHelpPrinter(options HelpOptions, ctx *Context) error {\n+\tw := newHelpWriter(ctx, options)\n+\tcmd := ctx.Selected()\n+\tapp := ctx.Model\n+\tif cmd == nil {\n+\t\tw.Printf(\"Usage: %s%s\", app.Name, app.Summary())\n+\t\tw.Printf(`Run \"%s --help\" for more information.`, app.Name)\n+\t} else {\n+\t\tw.Printf(\"Usage: %s %s\", app.Name, cmd.Summary())\n+\t\tw.Printf(`Run \"%s --help\" for more information.`, cmd.FullPath())\n+\t}\n+\treturn w.Write(ctx.Stdout)\n+}\n+\n // DefaultHelpPrinter is the default HelpPrinter.\n func DefaultHelpPrinter(options HelpOptions, ctx *Context) error {\n \tif ctx.Empty() {\ndiff --git a/help_test.go b/help_test.go\nindex 0f0f2cb..6bf00b3 100644\n--- a/help_test.go\n+++ b/help_test.go\n@@ -2,6 +2,7 @@ package kong_test\n \n import (\n \t\"bytes\"\n+\t\"fmt\"\n \t\"strings\"\n \t\"testing\"\n \n@@ -512,3 +513,80 @@ Group 2\n \t\trequire.Equal(t, expected, w.String())\n \t})\n }\n+\n+func TestUsageOnError(t *testing.T) {\n+\tvar cli struct {\n+\t\tFlag string `help:\"A required flag.\" required`\n+\t}\n+\tw := &strings.Builder{}\n+\tp := mustNew(t, &cli,\n+\t\tkong.Writers(w, w),\n+\t\tkong.Description(\"Some description.\"),\n+\t\tkong.Exit(func(int) {}),\n+\t\tkong.UsageOnError(),\n+\t)\n+\t_, err := p.Parse([]string{})\n+\tp.FatalIfErrorf(err)\n+\n+\texpected := `Usage: test --flag=STRING\n+\n+Some description.\n+\n+Flags:\n+  -h, --help           Show context-sensitive help.\n+      --flag=STRING    A required flag.\n+\n+test: error: missing flags: --flag=STRING\n+`\n+\trequire.Equal(t, expected, w.String())\n+}\n+\n+func TestShortUsageOnError(t *testing.T) {\n+\tvar cli struct {\n+\t\tFlag string `help:\"A required flag.\" required`\n+\t}\n+\tw := &strings.Builder{}\n+\tp := mustNew(t, &cli,\n+\t\tkong.Writers(w, w),\n+\t\tkong.Description(\"Some description.\"),\n+\t\tkong.Exit(func(int) {}),\n+\t\tkong.ShortUsageOnError(),\n+\t)\n+\t_, err := p.Parse([]string{})\n+\trequire.Error(t, err)\n+\tp.FatalIfErrorf(err)\n+\n+\texpected := `Usage: test --flag=STRING\n+Run \"test --help\" for more information.\n+\n+test: error: missing flags: --flag=STRING\n+`\n+\trequire.Equal(t, expected, w.String())\n+}\n+\n+func TestCustomShortUsageOnError(t *testing.T) {\n+\tvar cli struct {\n+\t\tFlag string `help:\"A required flag.\" required`\n+\t}\n+\tw := &strings.Builder{}\n+\tshortHelp := func(_ kong.HelpOptions, ctx *kong.Context) error {\n+\t\tfmt.Fprintln(ctx.Stdout, \"🤷 wish I could help\")\n+\t\treturn nil\n+\t}\n+\tp := mustNew(t, &cli,\n+\t\tkong.Writers(w, w),\n+\t\tkong.Description(\"Some description.\"),\n+\t\tkong.Exit(func(int) {}),\n+\t\tkong.ShortHelp(shortHelp),\n+\t\tkong.ShortUsageOnError(),\n+\t)\n+\t_, err := p.Parse([]string{})\n+\trequire.Error(t, err)\n+\tp.FatalIfErrorf(err)\n+\n+\texpected := `🤷 wish I could help\n+\n+test: error: missing flags: --flag=STRING\n+`\n+\trequire.Equal(t, expected, w.String())\n+}\ndiff --git a/kong.go b/kong.go\nindex 9b67db9..b59d61c 100644\n--- a/kong.go\n+++ b/kong.go\n@@ -31,6 +31,13 @@ func Must(ast interface{}, options ...Option) *Kong {\n \treturn k\n }\n \n+type usageOnError int\n+\n+const (\n+\tshortUsage usageOnError = iota + 1\n+\tfullUsage\n+)\n+\n // Kong is the main parser type.\n type Kong struct {\n \t// Grammar model.\n@@ -48,8 +55,9 @@ type Kong struct {\n \tregistry  *Registry\n \n \tnoDefaultHelp bool\n-\tusageOnError  bool\n+\tusageOnError  usageOnError\n \thelp          HelpPrinter\n+\tshortHelp     HelpPrinter\n \thelpFormatter HelpValueFormatter\n \thelpOptions   HelpOptions\n \thelpFlag      *Flag\n@@ -86,6 +94,10 @@ func New(grammar interface{}, options ...Option) (*Kong, error) {\n \t\tk.help = DefaultHelpPrinter\n \t}\n \n+\tif k.shortHelp == nil {\n+\t\tk.shortHelp = DefaultShortHelpPrinter\n+\t}\n+\n \tmodel, err := build(k, grammar)\n \tif err != nil {\n \t\treturn k, err\n@@ -331,10 +343,15 @@ func (k *Kong) FatalIfErrorf(err error, args ...interface{}) {\n \t\tmsg = fmt.Sprintf(args[0].(string), args[1:]...) + \": \" + err.Error()\n \t}\n \t// Maybe display usage information.\n-\tif err, ok := err.(*ParseError); ok && k.usageOnError {\n-\t\toptions := k.helpOptions\n-\t\t_ = k.help(options, err.Context)\n-\t\tfmt.Fprintln(k.Stdout)\n+\tif err, ok := err.(*ParseError); ok {\n+\t\tswitch k.usageOnError {\n+\t\tcase fullUsage:\n+\t\t\t_ = k.help(k.helpOptions, err.Context)\n+\t\t\tfmt.Fprintln(k.Stdout)\n+\t\tcase shortUsage:\n+\t\t\t_ = k.shortHelp(k.helpOptions, err.Context)\n+\t\t\tfmt.Fprintln(k.Stdout)\n+\t\t}\n \t}\n \tk.Fatalf(\"%s\", msg)\n }\ndiff --git a/options.go b/options.go\nindex bdb57f6..ef83970 100644\n--- a/options.go\n+++ b/options.go\n@@ -192,6 +192,17 @@ func Help(help HelpPrinter) Option {\n \t})\n }\n \n+// ShortHelp configures the short usage message.\n+//\n+// It should be used together with kong.ShortUsageOnError() to display a\n+// custom short usage message on errors.\n+func ShortHelp(shortHelp HelpPrinter) Option {\n+\treturn OptionFunc(func(k *Kong) error {\n+\t\tk.shortHelp = shortHelp\n+\t\treturn nil\n+\t})\n+}\n+\n // HelpFormatter configures how the help text is formatted.\n func HelpFormatter(helpFormatter HelpValueFormatter) Option {\n \treturn OptionFunc(func(k *Kong) error {\n@@ -251,7 +262,17 @@ func ExplicitGroups(groups []Group) Option {\n // UsageOnError configures Kong to display context-sensitive usage if FatalIfErrorf is called with an error.\n func UsageOnError() Option {\n \treturn OptionFunc(func(k *Kong) error {\n-\t\tk.usageOnError = true\n+\t\tk.usageOnError = fullUsage\n+\t\treturn nil\n+\t})\n+}\n+\n+// ShortUsageOnError configures Kong to display context-sensitive short\n+// usage if FatalIfErrorf is called with an error. The default short\n+// usage message can be overridden with kong.ShortHelp(...).\n+func ShortUsageOnError() Option {\n+\treturn OptionFunc(func(k *Kong) error {\n+\t\tk.usageOnError = shortUsage\n \t\treturn nil\n \t})\n }\n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    ".gitignore",
+    ".golangci.yml",
+    "COPYING",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/README.md",
+    "_examples/server/console.go",
+    "_examples/server/go.mod",
+    "_examples/server/go.sum",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/main.go",
+    "benchmark_test.go",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "config_test.go",
+    "context.go",
+    "defaults.go",
+    "defaults_test.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "go.mod",
+    "go.sum",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "testdata/file.txt",
+    "util.go",
+    "util_test.go",
+    "visit.go"
+  ],
+  "explanation": {
+    "what": "エラー時に完全なヘルプではなく短い使用法だけを表示する `kong.ShortUsageOnError()` オプションを追加した。`usageOnError` フィールドを bool から `shortUsage`/`fullUsage` の2値を持つ列挙型 `usageOnError` に変更し、FatalIfErrorf 内で分岐する。短い使用法の既定実装として `DefaultShortHelpPrinter` を新設し、`kong.ShortHelp(HelpPrinter)` でカスタム実装に差し替えられるようにした。また DefaultHelpPrinter 冒頭にあった「引数無しなら Summary を非表示にする」処理を削除している。",
+    "why": "PR body によれば、既存の `UsageOnError()` はフルヘルプを表示するため冗長になりがちな場面があり、1行程度の簡潔な使用法だけを表示したいというニーズに応えたもの。なお HelpOptions.Summary リセット処理の削除については、PR作者自身がコミットメッセージ中で「影響はよく分からないがテストは通る」と留保を付けている。",
+    "highlights": [
+      { "file": "kong.go", "note": "`usageOnError` を bool から shortUsage/fullUsage の列挙値に変更し、FatalIfErrorf の分岐が増えた" },
+      { "file": "help.go", "note": "DefaultShortHelpPrinter で1行の Usage と `--help` 実行の案内のみを出す" }
+    ],
+    "langNotes": [
+      { "topic": "型付き定数によるenum表現", "note": "Go には他言語のような enum キーワードが無いため、`type usageOnError int` と `const (shortUsage usageOnError = iota + 1; fullUsage)` の組み合わせで列挙型を表現するのが定番のイディオム。iota は連番を自動採番する定数生成子。" }
+    ],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [
+      { "type": "pr", "number": 143, "url": "https://github.com/alecthomas/kong/pull/143" }
+    ],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

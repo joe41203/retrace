@@ -1,0 +1,151 @@
+{
+  "seq": 334,
+  "sha": "95a465b4b5324acaa5d9cf6733fd019dde718de0",
+  "parents": [
+    "919e70103f7a7068ebccb991e24836f2933529fd"
+  ],
+  "author": {
+    "name": "Alec Thomas",
+    "email": "aat@squareup.com",
+    "date": "2023-01-13T09:33:59-05:00"
+  },
+  "message": "feat: add FlagNamer option\n\nFixes #347",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 5,
+    "additions": 28,
+    "deletions": 6
+  },
+  "files": [
+    {
+      "path": "build.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "kong.go",
+      "status": "M",
+      "additions": 4,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "kong_test.go",
+      "status": "M",
+      "additions": 5,
+      "deletions": 5,
+      "binary": false
+    },
+    {
+      "path": "options.go",
+      "status": "M",
+      "additions": 8,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "options_test.go",
+      "status": "M",
+      "additions": 10,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/build.go b/build.go\nindex be7679e..0a23fd0 100644\n--- a/build.go\n+++ b/build.go\n@@ -133,7 +133,7 @@ MAIN:\n \t\ttag := field.tag\n \t\tname := tag.Name\n \t\tif name == \"\" {\n-\t\t\tname = tag.Prefix + strings.ToLower(dashedString(ft.Name))\n+\t\t\tname = tag.Prefix + k.flagNamer(ft.Name)\n \t\t} else {\n \t\t\tname = tag.Prefix + name\n \t\t}\ndiff --git a/kong.go b/kong.go\nindex 1ae9188..70e8906 100644\n--- a/kong.go\n+++ b/kong.go\n@@ -65,6 +65,7 @@ type Kong struct {\n \thelpFlag      *Flag\n \tgroups        []Group\n \tvars          Vars\n+\tflagNamer     func(string) string\n \n \t// Set temporarily by Options. These are applied after build().\n \tpostBuildOptions []Option\n@@ -85,6 +86,9 @@ func New(grammar interface{}, options ...Option) (*Kong, error) {\n \t\tbindings:      bindings{},\n \t\thelpFormatter: DefaultHelpValueFormatter,\n \t\tignoreFields:  make([]*regexp.Regexp, 0),\n+\t\tflagNamer: func(s string) string {\n+\t\t\treturn strings.ToLower(dashedString(s))\n+\t\t},\n \t}\n \n \toptions = append(options, Bind(k))\ndiff --git a/kong_test.go b/kong_test.go\nindex 3d8a617..53e064b 100644\n--- a/kong_test.go\n+++ b/kong_test.go\n@@ -642,17 +642,17 @@ func TestRun(t *testing.T) {\n \n func TestInterpolationIntoModel(t *testing.T) {\n \tvar cli struct {\n-\t\tFlag    string `default:\"${default}\" help:\"Help, I need ${somebody}\" enum:\"${enum}\"`\n+\t\tFlag    string `default:\"${default_value}\" help:\"Help, I need ${somebody}\" enum:\"${enum}\"`\n \t\tEnumRef string `enum:\"a,b\" required:\"\" help:\"One of ${enum}\"`\n \t\tEnvRef  string `env:\"${env}\" help:\"God ${env}\"`\n \t}\n \t_, err := kong.New(&cli)\n \tassert.Error(t, err)\n \tp, err := kong.New(&cli, kong.Vars{\n-\t\t\"default\":  \"Some default value.\",\n-\t\t\"somebody\": \"chickens!\",\n-\t\t\"enum\":     \"a,b,c,d\",\n-\t\t\"env\":      \"SAVE_THE_QUEEN\",\n+\t\t\"default_value\": \"Some default value.\",\n+\t\t\"somebody\":      \"chickens!\",\n+\t\t\"enum\":          \"a,b,c,d\",\n+\t\t\"env\":           \"SAVE_THE_QUEEN\",\n \t})\n \tassert.NoError(t, err)\n \tassert.Equal(t, 4, len(p.Model.Flags))\ndiff --git a/options.go b/options.go\nindex ec724b0..8633f68 100644\n--- a/options.go\n+++ b/options.go\n@@ -483,3 +483,11 @@ func DefaultEnvars(prefix string) Option {\n \t\treturn nil\n \t})\n }\n+\n+// FlagNamer allows you to override the default kebab-case automated flag name generation.\n+func FlagNamer(namer func(fieldName string) string) Option {\n+\treturn OptionFunc(func(k *Kong) error {\n+\t\tk.flagNamer = namer\n+\t\treturn nil\n+\t})\n+}\ndiff --git a/options_test.go b/options_test.go\nindex a77853a..2dbd0ba 100644\n--- a/options_test.go\n+++ b/options_test.go\n@@ -2,6 +2,7 @@ package kong\n \n import (\n \t\"reflect\"\n+\t\"strings\"\n \t\"testing\"\n \n \t\"github.com/alecthomas/assert/v2\"\n@@ -112,3 +113,12 @@ func TestBindToProvider(t *testing.T) {\n \tassert.NoError(t, err)\n \tassert.True(t, cli.Called)\n }\n+\n+func TestFlagNamer(t *testing.T) {\n+\tvar cli struct {\n+\t\tSomeFlag string\n+\t}\n+\tapp, err := New(&cli, FlagNamer(strings.ToUpper))\n+\tassert.NoError(t, err)\n+\tassert.Equal(t, \"SOMEFLAG\", app.Model.Flags[1].Name)\n+}\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/FUNDING.yml",
+    ".github/workflows/ci.yml",
+    ".gitignore",
+    ".golangci.yml",
+    "COPYING",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/README.md",
+    "_examples/server/console.go",
+    "_examples/server/go.mod",
+    "_examples/server/go.sum",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/commandstring/main.go",
+    "_examples/shell/help/README.md",
+    "_examples/shell/help/main.go",
+    "benchmark_test.go",
+    "bin/.go-1.19.1.pkg",
+    "bin/.golangci-lint-1.46.2.pkg",
+    "bin/README.hermit.md",
+    "bin/activate-hermit",
+    "bin/go",
+    "bin/gofmt",
+    "bin/golangci-lint",
+    "bin/hermit",
+    "bin/hermit.hcl",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "config_test.go",
+    "context.go",
+    "defaults.go",
+    "defaults_test.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "go.mod",
+    "go.sum",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "helpwrap1.18_test.go",
+    "helpwrap1.19_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_linux_test.go",
+    "mapper_test.go",
+    "mapper_windows_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "testdata/file.txt",
+    "util.go",
+    "util_test.go",
+    "visit.go"
+  ],
+  "explanation": {
+    "what": "FlagNamer オプションを追加した。Kong 構造体に flagNamer フィールド(既定はケバブケース変換の dashedString())を持たせ、build.go のフラグ名生成箇所を k.flagNamer(ft.Name) に置き換えた。FlagNamer(namer) オプションでこの関数を任意の命名規則に差し替えられるようにした。",
+    "why": "コミットメッセージに \"Fixes #347\" とあり、フィールド名からフラグ名を導出する既定のケバブケース変換ロジックを利用側で上書きできるようにするための機能追加とみられる。",
+    "highlights": [
+      { "file": "options.go", "note": "FlagNamer(namer func(string) string) Option の定義" },
+      { "file": "kong.go", "note": "既定の flagNamer はこれまでの strings.ToLower(dashedString(s)) をそのまま関数値として保持" }
+    ],
+    "langNotes": [
+      { "topic": "FlagNamer オプション", "note": "kong.FlagNamer(func(fieldName string) string) で、構造体フィールド名からコマンドラインフラグ名への変換規則を差し替えられる。例えば TestFlagNamer では strings.ToUpper を渡して SOMEFLAG のような大文字フラグ名を生成している。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

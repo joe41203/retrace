@@ -1,0 +1,112 @@
+{
+  "seq": 165,
+  "sha": "b66dcf327909ef41bea81867be901eae51838642",
+  "parents": [
+    "5db71ed6571455e08d5e890a77028632a033807f"
+  ],
+  "author": {
+    "name": "Alec Thomas",
+    "email": "alec@swapoff.org",
+    "date": "2020-01-23T20:56:25+11:00"
+  },
+  "message": "Support default commands.\n\nFixes #41.",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 3,
+    "additions": 67,
+    "deletions": 1
+  },
+  "files": [
+    {
+      "path": "README.md",
+      "status": "M",
+      "additions": 3,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "context.go",
+      "status": "M",
+      "additions": 29,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "kong_test.go",
+      "status": "M",
+      "additions": 35,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/README.md b/README.md\nindex 81b9505..fa90ad5 100644\n--- a/README.md\n+++ b/README.md\n@@ -293,6 +293,8 @@ type CLI struct {\n }\n ```\n \n+If a sub-command is tagged with `default:\"1\"` it will be selected if there are no further arguments.\n+\n <a id=\"markdown-branching-positional-arguments\" name=\"branching-positional-arguments\"></a>\n ## Branching positional arguments\n \n@@ -419,6 +421,7 @@ Tag                    | Description\n `type:\"X\"`             | Specify [named types](#custom-named-types) to use.\n `placeholder:\"X\"`      | Placeholder text.\n `default:\"X\"`          | Default value.\n+`default:\"1\"`          | On a command, make it the default.\n `short:\"X\"`            | Short name, if flag.\n `required`             | If present, flag/arg is required.\n `optional`             | If present, flag/arg is optional.\ndiff --git a/context.go b/context.go\nindex 9baca0e..86e6f5b 100644\n--- a/context.go\n+++ b/context.go\n@@ -397,6 +397,24 @@ func (c *Context) trace(node *Node) (err error) { // nolint: gocyclo\n \t\t\treturn fmt.Errorf(\"unexpected token %s\", token)\n \t\t}\n \t}\n+\n+\t// End of the line, check for a default command.\n+\tvar defaultNode *Path\n+\tfor _, child := range node.Children {\n+\t\tif child.Type == CommandNode && child.Tag.Default != \"\" {\n+\t\t\tif defaultNode != nil {\n+\t\t\t\treturn fmt.Errorf(\"can't have more than one default command under %s\", node.Summary())\n+\t\t\t}\n+\t\t\tdefaultNode = &Path{\n+\t\t\t\tParent:  child,\n+\t\t\t\tCommand: child,\n+\t\t\t\tFlags:   child.Flags,\n+\t\t\t}\n+\t\t}\n+\t}\n+\tif defaultNode != nil {\n+\t\tc.Path = append(c.Path, defaultNode)\n+\t}\n \treturn nil\n }\n \n@@ -617,6 +635,7 @@ func checkMissingChildren(node *Node) error {\n \t\tmissing = append(missing, strconv.Quote(strings.Join(missingArgs, \" \")))\n \t}\n \n+\thaveDefault := 0\n \tfor _, child := range node.Children {\n \t\tif child.Hidden {\n \t\t\tcontinue\n@@ -627,10 +646,19 @@ func checkMissingChildren(node *Node) error {\n \t\t\t}\n \t\t\tmissing = append(missing, strconv.Quote(child.Summary()))\n \t\t} else {\n+\t\t\tif child.Tag.Default != \"\" {\n+\t\t\t\tif len(child.Children) > 0 {\n+\t\t\t\t\treturn fmt.Errorf(\"default command %s must not have subcommands or arguments\", child.Summary())\n+\t\t\t\t}\n+\t\t\t\thaveDefault++\n+\t\t\t}\n \t\t\tmissing = append(missing, strconv.Quote(child.Name))\n \t\t}\n \t}\n-\tif len(missing) == 0 {\n+\tif haveDefault > 1 {\n+\t\treturn fmt.Errorf(\"more than one default command found under %s\", node.Summary())\n+\t}\n+\tif len(missing) == 0 || haveDefault > 0 {\n \t\treturn nil\n \t}\n \ndiff --git a/kong_test.go b/kong_test.go\nindex 75a7fcd..b55093a 100644\n--- a/kong_test.go\n+++ b/kong_test.go\n@@ -815,3 +815,38 @@ func TestIssue40EnumAcrossCommands(t *testing.T) {\n \t_, err = p.Parse([]string{\"three\", \"c\"})\n \trequire.NoError(t, err)\n }\n+\n+func TestEnumArg(t *testing.T) {\n+\tvar cli struct {\n+\t\tNested struct {\n+\t\t\tOne string `arg:\"\" enum:\"a,b,c\"`\n+\t\t\tTwo string `arg:\"\"`\n+\t\t} `cmd:\"\"`\n+\t}\n+\tp := mustNew(t, &cli)\n+\t_, err := p.Parse([]string{\"nested\", \"a\", \"b\"})\n+\trequire.NoError(t, err)\n+\trequire.Equal(t, \"a\", cli.Nested.One)\n+\trequire.Equal(t, \"b\", cli.Nested.Two)\n+}\n+\n+func TestDefaultCommand(t *testing.T) {\n+\tvar cli struct {\n+\t\tOne struct{} `cmd:\"\" default:\"1\"`\n+\t\tTwo struct{} `cmd:\"\"`\n+\t}\n+\tp := mustNew(t, &cli)\n+\tctx, err := p.Parse([]string{})\n+\trequire.NoError(t, err)\n+\trequire.Equal(t, \"one\", ctx.Command())\n+}\n+\n+func TestMultipleDefaultCommands(t *testing.T) {\n+\tvar cli struct {\n+\t\tOne struct{} `cmd:\"\" default:\"1\"`\n+\t\tTwo struct{} `cmd:\"\" default:\"1\"`\n+\t}\n+\tp := mustNew(t, &cli)\n+\t_, err := p.Parse([]string{})\n+\trequire.EqualError(t, err, \"can't have more than one default command under  <command>\")\n+}\n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    ".golangci.yml",
+    "COPYING",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/console.go",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/main.go",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "config_test.go",
+    "context.go",
+    "defaults.go",
+    "defaults_test.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "go.mod",
+    "go.sum",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "util.go",
+    "util_test.go",
+    "visit.go"
+  ],
+  "explanation": {
+    "what": "サブコマンドに `default:\"1\"` タグを付けると、それ以上の引数が無い場合に自動選択されるデフォルトコマンド機能を追加した。Context.trace() の末尾で子ノードを走査し、Tag.Default が設定されたコマンドが1つだけあればそれを Path に追加する。2つ以上あればエラーを返す。checkMissingChildren() 側でも、デフォルトコマンドがあれば「必須の子コマンドが無い」エラーを出さないよう調整し、デフォルトコマンドがサブコマンド/引数を持つ場合はエラーにする。",
+    "why": "コミットメッセージの \"Fixes #41.\" が示す通り、特定の issue で要望された挙動(引数無しで実行したときに既定のサブコマンドへフォールバックしたい)に対応する変更。",
+    "highlights": [
+      { "file": "context.go", "note": "trace() の末尾で defaultNode を探索し、複数あればエラーにする分岐" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

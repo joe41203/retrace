@@ -1,0 +1,141 @@
+{
+  "seq": 316,
+  "sha": "edc47ebc344998df6a7138f42ccc9a33ffec2420",
+  "parents": [
+    "9d72e94240dd124d43da7bb2efa232fb97a93769"
+  ],
+  "author": {
+    "name": "pyq-lsa",
+    "email": "26353308+pyq-lsa@users.noreply.github.com",
+    "date": "2022-06-11T14:29:19-07:00"
+  },
+  "message": "helpful error message when flag is missing values (#310)\n\nFixes #277 ",
+  "pr": {
+    "number": 310,
+    "title": "helpful error message when flag is missing values",
+    "body": "Intended to address #277.",
+    "url": "https://github.com/alecthomas/kong/pull/310"
+  },
+  "linkedIssues": [
+    {
+      "number": 277,
+      "title": "Improve error message when flag value is not provided at EOL",
+      "body": "`cmd: error: --start: unexpected EOL` is not helpful",
+      "url": "https://github.com/alecthomas/kong/issues/277"
+    }
+  ],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 106,
+    "deletions": 6
+  },
+  "files": [
+    {
+      "path": "kong_test.go",
+      "status": "M",
+      "additions": 100,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "mapper.go",
+      "status": "M",
+      "additions": 6,
+      "deletions": 6,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/kong_test.go b/kong_test.go\nindex 9848356..7549906 100644\n--- a/kong_test.go\n+++ b/kong_test.go\n@@ -1561,3 +1561,103 @@ func TestHelpShouldStillWork(t *testing.T) {\n \t// program; errors will not propagate in the real world).\n \trequire.Error(t, err)\n }\n+\n+func TestSliceDecoderHelpfulErrorMsg(t *testing.T) {\n+\ttests := []struct {\n+\t\tname string\n+\t\tcli  interface{}\n+\t\targs []string\n+\t\terr  string\n+\t}{\n+\t\t{\n+\t\t\t\"DefaultRune\",\n+\t\t\t&struct {\n+\t\t\t\tStuff []string\n+\t\t\t}{},\n+\t\t\t[]string{\"--stuff\"},\n+\t\t\t`--stuff: missing value, expecting \"<arg>,...\"`,\n+\t\t},\n+\t\t{\n+\t\t\t\"SpecifiedRune\",\n+\t\t\t&struct {\n+\t\t\t\tStuff []string `sep:\",\"`\n+\t\t\t}{},\n+\t\t\t[]string{\"--stuff\"},\n+\t\t\t`--stuff: missing value, expecting \"<arg>,...\"`,\n+\t\t},\n+\t\t{\n+\t\t\t\"SpaceRune\",\n+\t\t\t&struct {\n+\t\t\t\tStuff []string `sep:\" \"`\n+\t\t\t}{},\n+\t\t\t[]string{\"--stuff\"},\n+\t\t\t`--stuff: missing value, expecting \"<arg> ...\"`,\n+\t\t},\n+\t\t{\n+\t\t\t\"OtherRune\",\n+\t\t\t&struct {\n+\t\t\t\tStuff []string `sep:\"_\"`\n+\t\t\t}{},\n+\t\t\t[]string{\"--stuff\"},\n+\t\t\t`--stuff: missing value, expecting \"<arg>_...\"`,\n+\t\t},\n+\t}\n+\tfor _, test := range tests {\n+\t\ttest := test\n+\t\tt.Run(test.name, func(t *testing.T) {\n+\t\t\tp := mustNew(t, test.cli)\n+\t\t\t_, err := p.Parse(test.args)\n+\t\t\trequire.EqualError(t, err, test.err)\n+\t\t})\n+\t}\n+}\n+\n+func TestMapDecoderHelpfulErrorMsg(t *testing.T) {\n+\ttests := []struct {\n+\t\tname     string\n+\t\tcli      interface{}\n+\t\targs     []string\n+\t\texpected string\n+\t}{\n+\t\t{\n+\t\t\t\"DefaultRune\",\n+\t\t\t&struct {\n+\t\t\t\tStuff map[string]int\n+\t\t\t}{},\n+\t\t\t[]string{\"--stuff\"},\n+\t\t\t`--stuff: missing value, expecting \"<key>=<value>;...\"`,\n+\t\t},\n+\t\t{\n+\t\t\t\"SpecifiedRune\",\n+\t\t\t&struct {\n+\t\t\t\tStuff map[string]int `mapsep:\";\"`\n+\t\t\t}{},\n+\t\t\t[]string{\"--stuff\"},\n+\t\t\t`--stuff: missing value, expecting \"<key>=<value>;...\"`,\n+\t\t},\n+\t\t{\n+\t\t\t\"SpaceRune\",\n+\t\t\t&struct {\n+\t\t\t\tStuff map[string]int `mapsep:\" \"`\n+\t\t\t}{},\n+\t\t\t[]string{\"--stuff\"},\n+\t\t\t`--stuff: missing value, expecting \"<key>=<value> ...\"`,\n+\t\t},\n+\t\t{\n+\t\t\t\"OtherRune\",\n+\t\t\t&struct {\n+\t\t\t\tStuff map[string]int `mapsep:\",\"`\n+\t\t\t}{},\n+\t\t\t[]string{\"--stuff\"},\n+\t\t\t`--stuff: missing value, expecting \"<key>=<value>,...\"`,\n+\t\t},\n+\t}\n+\tfor _, test := range tests {\n+\t\ttest := test\n+\t\tt.Run(test.name, func(t *testing.T) {\n+\t\t\tp := mustNew(t, test.cli)\n+\t\t\t_, err := p.Parse(test.args)\n+\t\t\trequire.EqualError(t, err, test.expected)\n+\t\t})\n+\t}\n+}\ndiff --git a/mapper.go b/mapper.go\nindex 796a6cc..231ce09 100644\n--- a/mapper.go\n+++ b/mapper.go\n@@ -439,17 +439,17 @@ func mapDecoder(r *Registry) MapperFunc {\n \t\t\ttarget.Set(reflect.MakeMap(target.Type()))\n \t\t}\n \t\tel := target.Type()\n-\t\tsep := ctx.Value.Tag.MapSep\n+\t\tmapsep := ctx.Value.Tag.MapSep\n \t\tvar childScanner *Scanner\n \t\tif ctx.Value.Flag != nil {\n \t\t\tt := ctx.Scan.Pop()\n-\t\t\t// If decoding a flag, we need an argument.\n+\t\t\t// If decoding a flag, we need an value.\n \t\t\tif t.IsEOL() {\n-\t\t\t\treturn errors.New(\"unexpected EOL\")\n+\t\t\t\treturn fmt.Errorf(\"missing value, expecting \\\"<key>=<value>%c...\\\"\", mapsep)\n \t\t\t}\n \t\t\tswitch v := t.Value.(type) {\n \t\t\tcase string:\n-\t\t\t\tchildScanner = ScanAsType(t.Type, SplitEscaped(v, sep)...)\n+\t\t\t\tchildScanner = ScanAsType(t.Type, SplitEscaped(v, mapsep)...)\n \n \t\t\tcase []map[string]interface{}:\n \t\t\t\tfor _, m := range v {\n@@ -518,9 +518,9 @@ func sliceDecoder(r *Registry) MapperFunc {\n \t\tvar childScanner *Scanner\n \t\tif ctx.Value.Flag != nil {\n \t\t\tt := ctx.Scan.Pop()\n-\t\t\t// If decoding a flag, we need an argument.\n+\t\t\t// If decoding a flag, we need an value.\n \t\t\tif t.IsEOL() {\n-\t\t\t\treturn errors.New(\"unexpected EOL\")\n+\t\t\t\treturn fmt.Errorf(\"missing value, expecting \\\"<arg>%c...\\\"\", sep)\n \t\t\t}\n \t\t\tswitch v := t.Value.(type) {\n \t\t\tcase string:\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/FUNDING.yml",
+    ".github/workflows/ci.yml",
+    ".gitignore",
+    ".golangci.yml",
+    "COPYING",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/README.md",
+    "_examples/server/console.go",
+    "_examples/server/go.mod",
+    "_examples/server/go.sum",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/commandstring/main.go",
+    "_examples/shell/help/README.md",
+    "_examples/shell/help/main.go",
+    "benchmark_test.go",
+    "bin/.go-1.17.8.pkg",
+    "bin/.golangci-lint-1.42.0.pkg",
+    "bin/README.hermit.md",
+    "bin/activate-hermit",
+    "bin/go",
+    "bin/gofmt",
+    "bin/golangci-lint",
+    "bin/hermit",
+    "bin/hermit.hcl",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "config_test.go",
+    "context.go",
+    "defaults.go",
+    "defaults_test.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "go.mod",
+    "go.sum",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_linux_test.go",
+    "mapper_test.go",
+    "mapper_windows_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "testdata/file.txt",
+    "util.go",
+    "util_test.go",
+    "visit.go"
+  ],
+  "explanation": {
+    "what": "mapper.go の mapDecoder / sliceDecoder で、フラグの値がEOL(コマンドライン末尾)で欠落している場合に返していた汎用エラー \"unexpected EOL\" を、期待する構文を示す具体的なメッセージ(map なら `missing value, expecting \"<key>=<value>;...\"`、slice なら `missing value, expecting \"<arg>,...\"` など、実際のセパレータ文字を埋め込んだ形)に変更した。kong_test.go に、デフォルト/明示指定/スペース/任意文字のセパレータそれぞれについてこのエラーメッセージを検証するテーブル駆動テストを追加している。",
+    "why": "リンクされた issue #277 の通り、従来の `cmd: error: --start: unexpected EOL` というエラーはユーザーにとって何が問題か分かりにくかった。何のフラグにどんな形式の値が必要かを具体的に示すことで、ユーザーが自力で修正できるようにする狙い。",
+    "highlights": [
+      { "file": "mapper.go", "note": "t.IsEOL() 時のエラーを fmt.Errorf で組み立て、mapsep/sep の実際の区切り文字をメッセージに埋め込む" },
+      { "file": "kong_test.go", "note": "TestSliceDecoderHelpfulErrorMsg / TestMapDecoderHelpfulErrorMsg がセパレータ違いごとの期待メッセージを列挙" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "issue",
+    "refs": [
+      { "type": "pr", "number": 310, "url": "https://github.com/alecthomas/kong/pull/310" },
+      { "type": "issue", "number": 277, "url": "https://github.com/alecthomas/kong/issues/277" }
+    ],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

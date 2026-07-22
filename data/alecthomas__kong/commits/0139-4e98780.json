@@ -1,0 +1,124 @@
+{
+  "seq": 139,
+  "sha": "4e9878074f961465f36174e18034ac203cf182b8",
+  "parents": [
+    "42ea64b1b4884b5435d29a966c27a289a01d0def"
+  ],
+  "author": {
+    "name": "Alec Thomas",
+    "email": "alec@swapoff.org",
+    "date": "2019-03-29T11:08:28+11:00"
+  },
+  "message": "Hide hidden sub-commands.",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 5,
+    "additions": 24,
+    "deletions": 11
+  },
+  "files": [
+    {
+      "path": ".circleci/config.yml",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": ".golangci.yml",
+      "status": "M",
+      "additions": 1,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "help.go",
+      "status": "M",
+      "additions": 20,
+      "deletions": 9,
+      "binary": false
+    },
+    {
+      "path": "kong_test.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "util.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/.circleci/config.yml b/.circleci/config.yml\nindex 1a59803..035a373 100644\n--- a/.circleci/config.yml\n+++ b/.circleci/config.yml\n@@ -12,7 +12,7 @@ jobs:\n           command: |\n             go get -v github.com/jstemmer/go-junit-report\n             go get -v -t -d ./...\n-            curl -sfL https://install.goreleaser.com/github.com/golangci/golangci-lint.sh | bash -s v1.10.2\n+            curl -sfL https://install.goreleaser.com/github.com/golangci/golangci-lint.sh | bash -s v1.15.0\n             mkdir ~/report\n           when: always\n       - run:\ndiff --git a/.golangci.yml b/.golangci.yml\nindex bb56945..0b9ebc2 100644\n--- a/.golangci.yml\n+++ b/.golangci.yml\n@@ -9,6 +9,7 @@ linters:\n   disable:\n     - maligned\n     - lll\n+    - gochecknoglobals\n \n linters-settings:\n   govet:\ndiff --git a/help.go b/help.go\nindex e1e8ce2..d26d300 100644\n--- a/help.go\n+++ b/help.go\n@@ -142,6 +142,9 @@ func printNodeDetail(w *helpWriter, node *Node, hide bool) {\n \n func writeCommandList(cmds []*Node, iw *helpWriter) {\n \tfor i, cmd := range cmds {\n+\t\tif cmd.Hidden {\n+\t\t\tcontinue\n+\t\t}\n \t\tprintCommandSummary(iw, cmd)\n \t\tif i != len(cmds)-1 {\n \t\t\tiw.Print(\"\")\n@@ -152,29 +155,37 @@ func writeCommandList(cmds []*Node, iw *helpWriter) {\n func writeCompactCommandList(cmds []*Node, iw *helpWriter) {\n \trows := [][2]string{}\n \tfor _, cmd := range cmds {\n+\t\tif cmd.Hidden {\n+\t\t\tcontinue\n+\t\t}\n \t\trows = append(rows, [2]string{cmd.Path(), cmd.Help})\n \t}\n-\twriteTwoColumns(iw, defaultColumnPadding, rows)\n+\twriteTwoColumns(iw, rows)\n }\n \n func writeCommandTree(w *helpWriter, node *Node) {\n \tiw := w.Indent()\n \trows := make([][2]string, 0, len(node.Children)*2)\n \tfor i, cmd := range node.Children {\n+\t\tif cmd.Hidden {\n+\t\t\tcontinue\n+\t\t}\n \t\trows = append(rows, w.commandTree(cmd, \"\")...)\n \t\tif i != len(node.Children)-1 {\n \t\t\trows = append(rows, [2]string{\"\", \"\"})\n \t\t}\n \t}\n-\twriteTwoColumns(iw, defaultColumnPadding, rows)\n+\twriteTwoColumns(iw, rows)\n }\n \n+// nolint: unused\n type helpCommandGroup struct {\n \tName     string\n \tCommands []*Node\n }\n \n-func collectCommandGroups(nodes []*Node) []helpCommandGroup { // nolint: deadcode\n+// nolint: unused, deadcode\n+func collectCommandGroups(nodes []*Node) []helpCommandGroup {\n \tgroups := map[string][]*Node{}\n \tfor _, node := range nodes {\n \t\tgroups[node.Group] = append(groups[node.Group], node)\n@@ -253,7 +264,7 @@ func writePositionals(w *helpWriter, args []*Positional) {\n \tfor _, arg := range args {\n \t\trows = append(rows, [2]string{arg.Summary(), arg.Help})\n \t}\n-\twriteTwoColumns(w, defaultColumnPadding, rows)\n+\twriteTwoColumns(w, rows)\n }\n \n func writeFlags(w *helpWriter, groups [][]*Flag) {\n@@ -277,10 +288,10 @@ func writeFlags(w *helpWriter, groups [][]*Flag) {\n \t\t\t}\n \t\t}\n \t}\n-\twriteTwoColumns(w, defaultColumnPadding, rows)\n+\twriteTwoColumns(w, rows)\n }\n \n-func writeTwoColumns(w *helpWriter, padding int, rows [][2]string) {\n+func writeTwoColumns(w *helpWriter, rows [][2]string) {\n \tmaxLeft := 375 * w.width / 1000\n \tif maxLeft < 30 {\n \t\tmaxLeft = 30\n@@ -293,16 +304,16 @@ func writeTwoColumns(w *helpWriter, padding int, rows [][2]string) {\n \t\t}\n \t}\n \n-\toffsetStr := strings.Repeat(\" \", leftSize+padding)\n+\toffsetStr := strings.Repeat(\" \", leftSize+defaultColumnPadding)\n \n \tfor _, row := range rows {\n \t\tbuf := bytes.NewBuffer(nil)\n-\t\tdoc.ToText(buf, row[1], \"\", strings.Repeat(\" \", defaultIndent), w.width-leftSize-padding)\n+\t\tdoc.ToText(buf, row[1], \"\", strings.Repeat(\" \", defaultIndent), w.width-leftSize-defaultColumnPadding)\n \t\tlines := strings.Split(strings.TrimRight(buf.String(), \"\\n\"), \"\\n\")\n \n \t\tline := fmt.Sprintf(\"%-*s\", leftSize, row[0])\n \t\tif len(row[0]) < maxLeft {\n-\t\t\tline += fmt.Sprintf(\"%*s%s\", padding, \"\", lines[0])\n+\t\t\tline += fmt.Sprintf(\"%*s%s\", defaultColumnPadding, \"\", lines[0])\n \t\t\tlines = lines[1:]\n \t\t}\n \t\tw.Print(line)\ndiff --git a/kong_test.go b/kong_test.go\nindex a4f5a25..3ce1ef4 100644\n--- a/kong_test.go\n+++ b/kong_test.go\n@@ -409,6 +409,7 @@ func TestHooks(t *testing.T) {\n \tfor _, test := range tests {\n \t\t*ctx = hookContext{}\n \t\tcli.One = hookCmd{}\n+\t\t// nolint: scopelint\n \t\tt.Run(test.name, func(t *testing.T) {\n \t\t\t_, err := p.Parse(strings.Split(test.input, \" \"))\n \t\t\trequire.NoError(t, err)\ndiff --git a/util.go b/util.go\nindex addd64f..154aebc 100644\n--- a/util.go\n+++ b/util.go\n@@ -13,7 +13,7 @@ type ConfigFlag string\n // BeforeResolve adds a resolver.\n func (c ConfigFlag) BeforeResolve(kong *Kong, ctx *Context, trace *Path) error {\n \tif kong.loader == nil {\n-\t\treturn fmt.Errorf(\"Kong must be configured with kong.Configuration(...)\")\n+\t\treturn fmt.Errorf(\"kong must be configured with kong.Configuration(...)\")\n \t}\n \tpath := string(ctx.FlagValue(trace.Flag).(ConfigFlag))\n \tresolver, err := kong.LoadConfig(path)\n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    ".golangci.yml",
+    "COPYING",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/console.go",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/main.go",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "config_test.go",
+    "context.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "go.mod",
+    "go.sum",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "util.go",
+    "util_test.go",
+    "visit.go"
+  ],
+  "explanation": {
+    "what": "writeCommandList()・writeCompactCommandList()・writeCommandTree()のそれぞれに`if cmd.Hidden { continue }`を追加し、hiddenなサブコマンドをヘルプの一覧・コンパクト表示・ツリー表示のいずれからも除外するようにした。副次的にwriteTwoColumns()の引数からpadding(常にdefaultColumnPaddingだった)を削除し、golangci-lintのバージョンを v1.10.2→v1.15.0 に上げてgochecknoglobalsを無効化リストに追加、未使用関数へのnolintコメントを整理し、util.goのエラーメッセージの先頭を小文字化(golintのerror string慣習)した。",
+    "why": "以前のコミット(seq94,95, \"Don't suggest hidden commands\")でSuggest機能ではhiddenコマンドを除外していたが、通常のヘルプ一覧・ツリー表示では除外されておらず、コマンドツリー機能(seq137)の追加でこの抜けが目立つようになったための修正と見られる。golangci-lintの更新とnolintコメント整理も、おそらく新バージョンのlinterルールへの追従と見られる。",
+    "highlights": [
+      { "file": "help.go", "note": "3つのヘルプ描画関数それぞれにcmd.Hiddenのスキップを追加" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "inferred",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

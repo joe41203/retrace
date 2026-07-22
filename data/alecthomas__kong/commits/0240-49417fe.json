@@ -1,0 +1,122 @@
+{
+  "seq": 240,
+  "sha": "49417fe9662c37d6cf6c1d432d4a2ced9753343f",
+  "parents": [
+    "57bfb058d5f7c92a56dd8910400a1815e27245fb"
+  ],
+  "author": {
+    "name": "Alec Thomas",
+    "email": "alec@swapoff.org",
+    "date": "2021-04-02T11:27:28+11:00"
+  },
+  "message": "Add support for dynamically registered commands.",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 3,
+    "additions": 64,
+    "deletions": 0
+  },
+  "files": [
+    {
+      "path": "kong.go",
+      "status": "M",
+      "additions": 15,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "kong_test.go",
+      "status": "M",
+      "additions": 27,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "options.go",
+      "status": "M",
+      "additions": 22,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/kong.go b/kong.go\nindex b59d61c..9c0e437 100644\n--- a/kong.go\n+++ b/kong.go\n@@ -66,6 +66,7 @@ type Kong struct {\n \n \t// Set temporarily by Options. These are applied after build().\n \tpostBuildOptions []Option\n+\tdynamicCommands  []*dynamicCommand\n }\n \n // New creates a new Kong parser on grammar.\n@@ -106,6 +107,20 @@ func New(grammar interface{}, options ...Option) (*Kong, error) {\n \tk.Model = model\n \tk.Model.HelpFlag = k.helpFlag\n \n+\t// Synthesise command nodes.\n+\tfor _, dcmd := range k.dynamicCommands {\n+\t\ttag := newEmptyTag()\n+\t\ttag.Name = dcmd.name\n+\t\ttag.Help = dcmd.help\n+\t\ttag.Group = dcmd.group\n+\t\ttag.Cmd = true\n+\t\tv := reflect.Indirect(reflect.ValueOf(dcmd.cmd))\n+\t\tbuildChild(k, k.Model.Node, CommandNode, reflect.Value{}, reflect.StructField{\n+\t\t\tName: dcmd.name,\n+\t\t\tType: v.Type(),\n+\t\t}, v, tag, dcmd.name, map[string]bool{})\n+\t}\n+\n \tfor _, option := range k.postBuildOptions {\n \t\tif err = option.Apply(k); err != nil {\n \t\t\treturn nil, err\ndiff --git a/kong_test.go b/kong_test.go\nindex 9163141..2f333b7 100644\n--- a/kong_test.go\n+++ b/kong_test.go\n@@ -1002,3 +1002,30 @@ func TestPointers(t *testing.T) {\n \trequire.NotNil(t, cli.JSON)\n \trequire.Equal(t, \"FOO\", string(*cli.JSON))\n }\n+\n+type dynamicCommand struct {\n+\tFlag string\n+\n+\tran bool\n+}\n+\n+func (d *dynamicCommand) Run() error {\n+\td.ran = true\n+\treturn nil\n+}\n+\n+func TestDynamicCommands(t *testing.T) {\n+\tcli := struct {\n+\t\tOne struct{} `cmd:\"one\"`\n+\t}{}\n+\ttwo := &dynamicCommand{}\n+\tvar twoi interface{} = &two\n+\tp := mustNew(t, &cli, kong.DynamicCommand(\"two\", \"\", \"\", twoi))\n+\tkctx, err := p.Parse([]string{\"two\", \"--flag=flag\"})\n+\trequire.NoError(t, err)\n+\trequire.Equal(t, \"flag\", two.Flag)\n+\trequire.False(t, two.ran)\n+\terr = kctx.Run()\n+\trequire.NoError(t, err)\n+\trequire.True(t, two.ran)\n+}\ndiff --git a/options.go b/options.go\nindex ef83970..259b6b1 100644\n--- a/options.go\n+++ b/options.go\n@@ -54,6 +54,28 @@ func Exit(exit func(int)) Option {\n \t})\n }\n \n+type dynamicCommand struct {\n+\tname  string\n+\thelp  string\n+\tgroup string\n+\tcmd   interface{}\n+}\n+\n+// DynamicCommand registers a dynamically constructed command with the root of the CLI.\n+//\n+// This is useful for command-line structures that are extensible via user-provided plugins.\n+func DynamicCommand(name, help, group string, cmd interface{}) Option {\n+\treturn OptionFunc(func(k *Kong) error {\n+\t\tk.dynamicCommands = append(k.dynamicCommands, &dynamicCommand{\n+\t\t\tname:  name,\n+\t\t\thelp:  help,\n+\t\t\tgroup: group,\n+\t\t\tcmd:   cmd,\n+\t\t})\n+\t\treturn nil\n+\t})\n+}\n+\n // NoDefaultHelp disables the default help flags.\n func NoDefaultHelp() Option {\n \treturn OptionFunc(func(k *Kong) error {\n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    ".github/FUNDING.yml",
+    ".gitignore",
+    ".golangci.yml",
+    "COPYING",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/README.md",
+    "_examples/server/console.go",
+    "_examples/server/go.mod",
+    "_examples/server/go.sum",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/main.go",
+    "benchmark_test.go",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "config_test.go",
+    "context.go",
+    "defaults.go",
+    "defaults_test.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "go.mod",
+    "go.sum",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "testdata/file.txt",
+    "util.go",
+    "util_test.go",
+    "visit.go"
+  ],
+  "explanation": {
+    "what": "options.go に `DynamicCommand(name, help, group string, cmd interface{})` という新しい Option を追加した。これは Kong 構造体に `dynamicCommands` として蓄積され、`New()` の中で `k.Model` の構築(build)後・postBuildOptions 適用前というタイミングで `buildChild()` を直接呼び出し、struct タグ由来ではないコマンドノードをルートに合成する。TestDynamicCommands で、通常の struct 埋め込みなしに `two` という名前のコマンドを実行時に登録し、フラグ解析と Run() 呼び出しの両方が機能することを確認している。",
+    "why": "コミットメッセージからは「動的に登録されるコマンドのサポートを追加した」こと自体は分かるが、具体的な動機は本文に書かれていない。おそらくプラグイン機構のように、コンパイル時には決まっていないコマンド集合を実行時に組み立てて CLI に追加したいユースケースに対応するためと考えられる。kong の通常の使い方は struct のフィールドと `cmd` タグで宣言的にコマンドツリーを組むが、それだと利用側コードが動的にサブコマンドを増やすことができないための拡張と推測される。",
+    "highlights": [
+      { "file": "kong.go", "note": "New() 内で dynamicCommands をループし buildChild() でコマンドノードを合成する箇所" },
+      { "file": "options.go", "note": "DynamicCommand が返す OptionFunc が k.dynamicCommands に追記するだけの単純な蓄積処理であること" }
+    ],
+    "langNotes": [
+      { "topic": "Option パターンと OptionFunc", "note": "kong は `type Option interface { Apply(*Kong) error }` を関数値でも満たせるよう `OptionFunc` というアダプタ型を用意している(いわゆる functional options パターン)。New() の可変長引数 `options ...Option` に渡された値は Apply() で Kong 構造体を段階的に設定していく。" }
+    ],
+    "diagram": null,
+    "evidence": "inferred",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

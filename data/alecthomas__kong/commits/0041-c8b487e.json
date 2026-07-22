@@ -1,0 +1,72 @@
+{
+  "seq": 41,
+  "sha": "c8b487e49c9dd29de1f83394e20ffff7e404be43",
+  "parents": [
+    "ca0490fe2ae3cfef8ffafaf3fbfdfde20122de60"
+  ],
+  "author": {
+    "name": "Gerald Kaszuba",
+    "email": "gak@gak0.com",
+    "date": "2018-06-03T17:22:32+10:00"
+  },
+  "message": "Removed double parsing of options.",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 0,
+    "deletions": 4
+  },
+  "files": [
+    {
+      "path": "kong.go",
+      "status": "M",
+      "additions": 0,
+      "deletions": 4,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/kong.go b/kong.go\nindex 2d7283a..95c67c8 100644\n--- a/kong.go\n+++ b/kong.go\n@@ -53,10 +53,6 @@ func New(grammar interface{}, options ...Option) (*Kong, error) {\n \t\thooks:  map[reflect.Value]HookFunction{},\n \t}\n \n-\tfor _, option := range options {\n-\t\toption(k)\n-\t}\n-\n \tmodel, err := build(grammar, k.extraFlags())\n \tif err != nil {\n \t\treturn k, err\n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    "README.md",
+    "_examples/shell/main.go",
+    "build.go",
+    "camelcase.go",
+    "context.go",
+    "context_test.go",
+    "decoders.go",
+    "decoders_test.go",
+    "global.go",
+    "global_test.go",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "kong.go",
+    "kong_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "tokentype_string.go"
+  ],
+  "explanation": {
+    "what": "kong.go の New() から、options を Kong にループで再適用していた冗長なブロック(4行)を削除した。",
+    "why": "diff を見ると、この options 適用ループは New() 内に重複して存在していた形跡があり(コミットメッセージ「Removed double parsing of options.」の通り)、同じ Option 群が二重に適用されうる状態だった。1箇所を削除して1回だけ適用されるようにしている。",
+    "highlights": [
+      { "file": "kong.go", "note": "New() 内で options を for ループ適用していた箇所が丸ごと削除されている" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

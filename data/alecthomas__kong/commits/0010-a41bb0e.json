@@ -1,0 +1,66 @@
+{
+  "seq": 10,
+  "sha": "a41bb0e4da6a2c43eeaef85f778f205ef05c2269",
+  "parents": [
+    "c6776fe4b817392845ae629df772ec72603d1a49"
+  ],
+  "author": {
+    "name": "Alec Thomas",
+    "email": "alec@swapoff.org",
+    "date": "2018-05-18T14:41:10+10:00"
+  },
+  "message": "Remove gotestyourself.",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 14,
+    "deletions": 12
+  },
+  "files": [
+    {
+      "path": "scanner.go",
+      "status": "M",
+      "additions": 2,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "scanner_test.go",
+      "status": "M",
+      "additions": 12,
+      "deletions": 12,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/scanner.go b/scanner.go\nindex 08e7476..5d2c268 100644\n--- a/scanner.go\n+++ b/scanner.go\n@@ -91,6 +91,8 @@ func (s *Scanner) Pop() Token {\n }\n \n // PopValue token, or panic with Error.\n+//\n+// \"context\" is used to assist the user if the value can not be popped, eg. \"expected <context> value but got <type>\"\n func (s *Scanner) PopValue(context string) string {\n \tt := s.Pop()\n \tif !t.IsValue() {\ndiff --git a/scanner_test.go b/scanner_test.go\nindex 3e37d38..9324a18 100644\n--- a/scanner_test.go\n+++ b/scanner_test.go\n@@ -3,24 +3,24 @@ package kong\n import (\n \t\"testing\"\n \n-\t\"github.com/gotestyourself/gotestyourself/assert\"\n+\t\"github.com/stretchr/testify/require\"\n )\n \n func TestScannerTake(t *testing.T) {\n \ts := Scan(\"a\", \"b\", \"c\")\n-\tassert.Assert(t, s.Pop().Value == \"a\")\n-\tassert.Assert(t, s.Pop().Value == \"b\")\n-\tassert.Assert(t, s.Pop().Value == \"c\")\n-\tassert.Assert(t, s.Pop().Type == EOLToken)\n+\trequire.Equal(t, s.Pop().Value, \"a\")\n+\trequire.Equal(t, s.Pop().Value, \"b\")\n+\trequire.Equal(t, s.Pop().Value, \"c\")\n+\trequire.Equal(t, s.Pop().Type, EOLToken)\n }\n \n func TestScannerPeek(t *testing.T) {\n \ts := Scan(\"a\", \"b\", \"c\")\n-\tassert.Assert(t, s.Peek().Value == \"a\")\n-\tassert.Assert(t, s.Pop().Value == \"a\")\n-\tassert.Assert(t, s.Peek().Value == \"b\")\n-\tassert.Assert(t, s.Pop().Value == \"b\")\n-\tassert.Assert(t, s.Peek().Value == \"c\")\n-\tassert.Assert(t, s.Pop().Value == \"c\")\n-\tassert.Assert(t, s.Peek().Type == EOLToken)\n+\trequire.Equal(t, s.Peek().Value, \"a\")\n+\trequire.Equal(t, s.Pop().Value, \"a\")\n+\trequire.Equal(t, s.Peek().Value, \"b\")\n+\trequire.Equal(t, s.Pop().Value, \"b\")\n+\trequire.Equal(t, s.Peek().Value, \"c\")\n+\trequire.Equal(t, s.Pop().Value, \"c\")\n+\trequire.Equal(t, s.Peek().Type, EOLToken)\n }\n",
+  "diffTruncated": false,
+  "tree": [
+    "README.md",
+    "_examples/shell/main.go",
+    "build.go",
+    "camelcase.go",
+    "decoders.go",
+    "decoders_test.go",
+    "global.go",
+    "kong.go",
+    "kong_test.go",
+    "model.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tokentype_string.go"
+  ],
+  "explanation": {
+    "what": "scanner_test.go の外部依存 github.com/gotestyourself/gotestyourself/assert をやめ、既に他のテストファイルで使われている github.com/stretchr/testify/require に統一した。scanner.go の PopValue() のコメントに context 引数の使われ方(エラーメッセージへの埋め込み例)を追記した。",
+    "why": "コミットメッセージ通り、テストアサーションライブラリを1種類(testify/require)に揃えて依存を減らす整理。kong_test.go 側は既に require を使っており、scanner_test.go だけが別ライブラリを使っていた不整合を解消したと考えられる。",
+    "highlights": [
+      { "file": "scanner_test.go", "note": "assert.Assert(t, x == y) 形式から require.Equal(t, x, y) への書き換え" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

@@ -1,0 +1,91 @@
+{
+  "seq": 17,
+  "sha": "8e96da517db24a7ce0bbe57f0834a30645bd78fd",
+  "parents": [
+    "aea859372cab0b926ad4e25331273fe740af1997"
+  ],
+  "author": {
+    "name": "Gerald Kaszuba",
+    "email": "gak@gak0.com",
+    "date": "2018-05-19T20:54:26+10:00"
+  },
+  "message": "Fixes #3 Required and optional flags+args (#6)",
+  "pr": {
+    "number": 6,
+    "title": "Fixes #3 Required and optional flags+args",
+    "body": "",
+    "url": "https://github.com/alecthomas/kong/pull/6"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 4,
+    "additions": 186,
+    "deletions": 21
+  },
+  "files": [
+    {
+      "path": "build.go",
+      "status": "M",
+      "additions": 27,
+      "deletions": 7,
+      "binary": false
+    },
+    {
+      "path": "kong.go",
+      "status": "M",
+      "additions": 67,
+      "deletions": 14,
+      "binary": false
+    },
+    {
+      "path": "kong_test.go",
+      "status": "M",
+      "additions": 91,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "model.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/build.go b/build.go\nindex 656c452..03aae9f 100644\n--- a/build.go\n+++ b/build.go\n@@ -103,19 +103,24 @@ func buildNode(v reflect.Value, cmd bool) *Node {\n \t\t\tif decoder == nil {\n \t\t\t\tfail(\"no decoder for %s.%s (of type %s)\", v.Type(), ft.Name, ft.Type)\n \t\t\t}\n+\n+\t\t\tflag := !arg\n+\n \t\t\tvalue := Value{\n-\t\t\t\tName:     name,\n-\t\t\t\tHelp:     help,\n-\t\t\t\tDecoder:  decoder,\n-\t\t\t\tValue:    fv,\n-\t\t\t\tField:    ft,\n-\t\t\t\tRequired: !optional || required,\n+\t\t\t\tName:    name,\n+\t\t\t\tFlag:    flag,\n+\t\t\t\tHelp:    help,\n+\t\t\t\tDecoder: decoder,\n+\t\t\t\tValue:   fv,\n+\t\t\t\tField:   ft,\n+\n+\t\t\t\t// Flags are optional by default, and args are required by default.\n+\t\t\t\tRequired: (flag && required) || (arg && !optional),\n \t\t\t\tFormat:   format,\n \t\t\t}\n \t\t\tif arg {\n \t\t\t\tnode.Positional = append(node.Positional, &value)\n \t\t\t} else {\n-\t\t\t\tvalue.Flag = true\n \t\t\t\tnode.Flags = append(node.Flags, &Flag{\n \t\t\t\t\tValue:       value,\n \t\t\t\t\tShort:       short,\n@@ -126,5 +131,20 @@ func buildNode(v reflect.Value, cmd bool) *Node {\n \t\t\t}\n \t\t}\n \t}\n+\n+\t// Scan through argument positionals to ensure optional is never before a required\n+\tlast := true\n+\tfor _, p := range node.Positional {\n+\t\tif p.Flag {\n+\t\t\tcontinue\n+\t\t}\n+\n+\t\tif !last && p.Required {\n+\t\t\tfail(\"arguments can not be required after an optional: %v\", p.Name)\n+\t\t}\n+\n+\t\tlast = p.Required\n+\t}\n+\n \treturn node\n }\ndiff --git a/kong.go b/kong.go\nindex b150b8e..f6c6b91 100644\n--- a/kong.go\n+++ b/kong.go\n@@ -201,25 +201,77 @@ func (k *Kong) applyNode(scan *Scanner, node *Node, flags []*Flag) (command []st\n \t\t\treturn nil, fmt.Errorf(\"unexpected token %s\", token)\n \t\t}\n \t}\n-\tif positional < len(node.Positional) {\n-\t\tmissing := []string{}\n-\t\tfor ; positional < len(node.Positional); positional++ {\n-\t\t\tmissing = append(missing, \"<\"+node.Positional[positional].Name+\">\")\n+\n+\tif err := checkMissingPositionals(positional, node.Positional); err != nil {\n+\t\treturn nil, err\n+\t}\n+\n+\tif err := checkMissingChildren(node.Children); err != nil {\n+\t\treturn nil, err\n+\t}\n+\n+\tif err := chickMissingFlags(node.Children, flags); err != nil {\n+\t\treturn nil, err\n+\t}\n+\n+\treturn\n+}\n+\n+func chickMissingFlags(children []*Branch, flags []*Flag) error {\n+\t// Only check required missing fields at the last child.\n+\tif len(children) > 0 {\n+\t\treturn nil\n+\t}\n+\tmissing := []string{}\n+\tfor _, flag := range flags {\n+\t\tif !flag.Required || flag.Set {\n+\t\t\tcontinue\n \t\t}\n-\t\treturn nil, fmt.Errorf(\"missing positional arguments %s\", strings.Join(missing, \" \"))\n+\t\tmissing = append(missing, flag.Name)\n \t}\n-\tif len(node.Children) > 0 {\n-\t\tmissing := []string{}\n-\t\tfor _, child := range node.Children {\n-\t\t\tif child.Argument != nil {\n-\t\t\t\tmissing = append(missing, \"<\"+child.Argument.Name+\">\")\n-\t\t\t} else {\n-\t\t\t\tmissing = append(missing, child.Command.Name)\n+\tif len(missing) == 0 {\n+\t\treturn nil\n+\t}\n+\n+\treturn fmt.Errorf(\"missing flags: %s\", strings.Join(missing, \", \"))\n+}\n+\n+func checkMissingChildren(children []*Branch) error {\n+\tmissing := []string{}\n+\tfor _, child := range children {\n+\t\tif child.Argument != nil {\n+\t\t\tif !child.Argument.Argument.Required {\n+\t\t\t\tcontinue\n \t\t\t}\n+\t\t\tmissing = append(missing, \"<\"+child.Argument.Name+\">\")\n+\t\t} else {\n+\t\t\tmissing = append(missing, child.Command.Name)\n \t\t}\n-\t\treturn nil, fmt.Errorf(\"expected one of %s\", strings.Join(missing, \", \"))\n \t}\n-\treturn\n+\tif len(missing) == 0 {\n+\t\treturn nil\n+\t}\n+\n+\treturn fmt.Errorf(\"expected one of %s\", strings.Join(missing, \", \"))\n+}\n+\n+// If we're missing any positionals and they're required, return an error.\n+func checkMissingPositionals(positional int, values []*Value) error {\n+\t// All the positionals are in.\n+\tif positional == len(values) {\n+\t\treturn nil\n+\t}\n+\n+\t// We're low on supplied positionals, but the missing one is optional.\n+\tif !values[positional].Required {\n+\t\treturn nil\n+\t}\n+\n+\tmissing := []string{}\n+\tfor ; positional < len(values); positional++ {\n+\t\tmissing = append(missing, \"<\"+values[positional].Name+\">\")\n+\t}\n+\treturn fmt.Errorf(\"missing positional arguments %s\", strings.Join(missing, \" \"))\n }\n \n func matchFlags(flags []*Flag, token Token, scan *Scanner, matcher func(f *Flag) bool) (err error) {\n@@ -238,6 +290,7 @@ func matchFlags(flags []*Flag, token Token, scan *Scanner, matcher func(f *Flag)\n \t\t\tif err != nil {\n \t\t\t\treturn err\n \t\t\t}\n+\t\t\tflag.Set = true\n \t\t\treturn nil\n \t\t}\n \t}\ndiff --git a/kong_test.go b/kong_test.go\nindex 35018f3..066453a 100644\n--- a/kong_test.go\n+++ b/kong_test.go\n@@ -150,3 +150,94 @@ func TestPropagatedFlags(t *testing.T) {\n \trequire.Equal(t, \"moo\", cli.Flag1)\n \trequire.Equal(t, true, cli.Command1.Flag2)\n }\n+\n+func TestRequiredFlag(t *testing.T) {\n+\tvar cli struct {\n+\t\tFlag string `required:\"\"`\n+\t}\n+\n+\tparser := mustNew(t, &cli)\n+\t_, err := parser.Parse([]string{})\n+\trequire.Error(t, err)\n+}\n+\n+func TestOptionalArg(t *testing.T) {\n+\tvar cli struct {\n+\t\tArg string `arg:\"\" optional:\"\"`\n+\t}\n+\n+\tparser := mustNew(t, &cli)\n+\t_, err := parser.Parse([]string{})\n+\trequire.NoError(t, err)\n+}\n+\n+func TestRequiredArg(t *testing.T) {\n+\tvar cli struct {\n+\t\tArg string `arg:\"\"`\n+\t}\n+\n+\tparser := mustNew(t, &cli)\n+\t_, err := parser.Parse([]string{})\n+\trequire.Error(t, err)\n+}\n+\n+func TestInvalidRequiredAfterOptional(t *testing.T) {\n+\tvar cli struct {\n+\t\tID   int    `arg:\"\" optional:\"\"`\n+\t\tName string `arg:\"\"`\n+\t}\n+\n+\t_, err := New(&cli)\n+\trequire.Error(t, err)\n+}\n+\n+func TestOptionalStructArg(t *testing.T) {\n+\tvar cli struct {\n+\t\tName struct {\n+\t\t\tName    string `arg:\"\" optional:\"\"`\n+\t\t\tEnabled bool\n+\t\t} `arg:\"\" optional:\"\"`\n+\t}\n+\n+\tparser := mustNew(t, &cli)\n+\n+\tt.Run(\"WithFlag\", func(t *testing.T) {\n+\t\t_, err := parser.Parse([]string{\"gak\", \"--enabled\"})\n+\t\trequire.NoError(t, err)\n+\t\trequire.Equal(t, \"gak\", cli.Name.Name)\n+\t\trequire.Equal(t, true, cli.Name.Enabled)\n+\t})\n+\n+\tt.Run(\"WithoutFlag\", func(t *testing.T) {\n+\t\t_, err := parser.Parse([]string{\"gak\"})\n+\t\trequire.NoError(t, err)\n+\t\trequire.Equal(t, \"gak\", cli.Name.Name)\n+\t})\n+\n+\tt.Run(\"WithNothing\", func(t *testing.T) {\n+\t\t_, err := parser.Parse([]string{})\n+\t\trequire.NoError(t, err)\n+\t})\n+}\n+\n+func TestMixedRequiredArgs(t *testing.T) {\n+\tvar cli struct {\n+\t\tName string `arg:\"\"`\n+\t\tID   int    `arg:\"\" optional:\"\"`\n+\t}\n+\n+\tparser := mustNew(t, &cli)\n+\n+\tt.Run(\"SingleRequired\", func(t *testing.T) {\n+\t\t_, err := parser.Parse([]string{\"gak\", \"5\"})\n+\t\trequire.NoError(t, err)\n+\t\trequire.Equal(t, \"gak\", cli.Name)\n+\t\trequire.Equal(t, 5, cli.ID)\n+\t})\n+\n+\tt.Run(\"ExtraOptional\", func(t *testing.T) {\n+\t\t_, err := parser.Parse([]string{\"gak\"})\n+\t\trequire.NoError(t, err)\n+\t\trequire.Equal(t, \"gak\", cli.Name)\n+\t})\n+}\ndiff --git a/model.go b/model.go\nindex e7beda6..8d0bd2e 100644\n--- a/model.go\n+++ b/model.go\n@@ -29,6 +29,7 @@ type Value struct {\n \tField    reflect.StructField\n \tValue    reflect.Value\n \tRequired bool\n+\tSet      bool   // Used with Required to test if a value has been given.\n \tFormat   string // Formatting directive, if applicable.\n }\n \n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    "README.md",
+    "_examples/shell/main.go",
+    "build.go",
+    "camelcase.go",
+    "decoders.go",
+    "decoders_test.go",
+    "global.go",
+    "help.go",
+    "kong.go",
+    "kong_test.go",
+    "model.go",
+    "options.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tokentype_string.go"
+  ],
+  "explanation": {
+    "what": "Value.Required の算出ロジックを「flag なら required タグがある時だけ必須、arg なら optional タグが無い限り必須」という規則に変更(flag はデフォルト任意、arg はデフォルト必須)。buildNode() 末尾で positional 引数を走査し、必須引数の後に任意引数が来る組み合わせを fail() で禁止するチェックも追加した。applyNode() の欠落チェックは checkMissingPositionals/checkMissingChildren/checkMissingFlags の3関数に分割し、Value に Set フィールドを追加してフラグが実際に指定されたかを追跡できるようにした。",
+    "why": "PR タイトルの \"Required and optional flags+args\" が示す通り、フラグと位置引数それぞれについて「必須/任意」をタグで宣言できるようにし、必須なのに指定されなかった場合にパースエラーとして検出する検証機構を整えることが目的。任意引数の後に必須引数を置けないようにするのは、可変長のトークン列から一意にどの引数か決定できなくなることを防ぐためと考えられる。",
+    "highlights": [
+      { "file": "build.go", "note": "Required: (flag && required) || (arg && !optional) というフラグ/引数で異なるデフォルトの算出式" },
+      { "file": "kong.go", "note": "checkMissingPositionals/checkMissingChildren/checkMissingFlags への分割と Set フィールドを使った必須チェック" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [
+      { "type": "pr", "number": 6, "url": "https://github.com/alecthomas/kong/pull/6" }
+    ],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

@@ -1,0 +1,157 @@
+{
+  "seq": 258,
+  "sha": "247574041d77de7af3aa287c228a3a886f9df6ae",
+  "parents": [
+    "c494f8b8f3dd0d87f7db89884004897fbc7992a8"
+  ],
+  "author": {
+    "name": "Alec Thomas",
+    "email": "alec@swapoff.org",
+    "date": "2021-06-21T20:32:40+09:30"
+  },
+  "message": "Enum fields must be required or have a default.\n\nThis is a breaking change, but the previous behaviour was broken so I'm\nnot concerned.\n\nAlso made most programmer errors more useful by giving type.field\ncontext information.\n\nFixes #179.",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 7,
+    "additions": 33,
+    "deletions": 23
+  },
+  "files": [
+    {
+      "path": "README.md",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "build.go",
+      "status": "M",
+      "additions": 7,
+      "deletions": 9,
+      "binary": false
+    },
+    {
+      "path": "config_test.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "kong.go",
+      "status": "M",
+      "additions": 9,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "kong_test.go",
+      "status": "M",
+      "additions": 5,
+      "deletions": 5,
+      "binary": false
+    },
+    {
+      "path": "tag.go",
+      "status": "M",
+      "additions": 9,
+      "deletions": 6,
+      "binary": false
+    },
+    {
+      "path": "tag_test.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/README.md b/README.md\nindex 368b098..03996db 100644\n--- a/README.md\n+++ b/README.md\n@@ -444,7 +444,7 @@ Tag                    | Description\n `format:\"X\"`           | Format for parsing input, if supported.\n `sep:\"X\"`              | Separator for sequences (defaults to \",\"). May be `none` to disable splitting.\n `mapsep:\"X\"`           | Separator for maps (defaults to \";\"). May be `none` to disable splitting.\n-`enum:\"X,Y,...\"`       | Set of valid values allowed for this flag.\n+`enum:\"X,Y,...\"`       | Set of valid values allowed for this flag. An enum field must be `required` or have a valid `default`.\n `group:\"X\"`            | Logical group for a flag or command.\n `xor:\"X,Y,...\"`        | Exclusive OR groups for flags. Only one flag in the group can be used which is restricted within the same command. When combined with `required`, at least one of the `xor` group will be required.\n `prefix:\"X\"`           | Prefix for all sub-flags.\ndiff --git a/build.go b/build.go\nindex d2ca41c..22f9839 100644\n--- a/build.go\n+++ b/build.go\n@@ -51,7 +51,7 @@ func flattenedFields(v reflect.Value) (out []flattenedField) {\n \tfor i := 0; i < v.NumField(); i++ {\n \t\tft := v.Type().Field(i)\n \t\tfv := v.Field(i)\n-\t\ttag := parseTag(fv, ft)\n+\t\ttag := parseTag(v, fv, ft)\n \t\tif tag.Ignored {\n \t\t\tcontinue\n \t\t}\n@@ -156,8 +156,7 @@ func buildChild(k *Kong, node *Node, typ NodeType, v reflect.Value, ft reflect.S\n \t// a positional argument is provided to the child, and move it to the branching argument field.\n \tif tag.Arg {\n \t\tif len(child.Positional) == 0 {\n-\t\t\tfail(\"positional branch %s.%s must have at least one child positional argument named %q\",\n-\t\t\t\tv.Type().Name(), ft.Name, name)\n+\t\t\tfailField(v, ft, \"positional branch must have at least one child positional argument named %q\", name)\n \t\t}\n \n \t\tvalue := child.Positional[0]\n@@ -168,8 +167,7 @@ func buildChild(k *Kong, node *Node, typ NodeType, v reflect.Value, ft reflect.S\n \n \t\tchild.Name = value.Name\n \t\tif child.Name != name {\n-\t\t\tfail(\"first field in positional branch %s.%s must have the same name as the parent field (%s).\",\n-\t\t\t\tv.Type().Name(), ft.Name, child.Name)\n+\t\t\tfailField(v, ft, \"first field in positional branch must have the same name as the parent field (%s).\", child.Name)\n \t\t}\n \n \t\tchild.Argument = value\n@@ -179,14 +177,14 @@ func buildChild(k *Kong, node *Node, typ NodeType, v reflect.Value, ft reflect.S\n \tnode.Children = append(node.Children, child)\n \n \tif len(child.Positional) > 0 && len(child.Children) > 0 {\n-\t\tfail(\"can't mix positional arguments and branching arguments on %s.%s\", v.Type().Name(), ft.Name)\n+\t\tfailField(v, ft, \"can't mix positional arguments and branching arguments\")\n \t}\n }\n \n func buildField(k *Kong, node *Node, v reflect.Value, ft reflect.StructField, fv reflect.Value, tag *Tag, name string, seenFlags map[string]bool) {\n \tmapper := k.registry.ForNamedValue(tag.Type, fv)\n \tif mapper == nil {\n-\t\tfail(\"unsupported field type %s.%s (of type %s), perhaps missing a cmd:\\\"\\\" tag?\", v.Type(), ft.Name, ft.Type)\n+\t\tfailField(v, ft, \"unsupported field type %s, perhaps missing a cmd:\\\"\\\" tag?\", ft.Type)\n \t}\n \n \tvalue := &Value{\n@@ -209,13 +207,13 @@ func buildField(k *Kong, node *Node, v reflect.Value, ft reflect.StructField, fv\n \t\tnode.Positional = append(node.Positional, value)\n \t} else {\n \t\tif seenFlags[\"--\"+value.Name] {\n-\t\t\tfail(\"duplicate flag --%s\", value.Name)\n+\t\t\tfailField(v, ft, \"duplicate flag --%s\", value.Name)\n \t\t} else {\n \t\t\tseenFlags[\"--\"+value.Name] = true\n \t\t}\n \t\tif tag.Short != 0 {\n \t\t\tif seenFlags[\"-\"+string(tag.Short)] {\n-\t\t\t\tfail(\"duplicate short flag -%c\", tag.Short)\n+\t\t\t\tfailField(v, ft, \"duplicate short flag -%c\", tag.Short)\n \t\t\t} else {\n \t\t\t\tseenFlags[\"-\"+string(tag.Short)] = true\n \t\t\t}\ndiff --git a/config_test.go b/config_test.go\nindex 69e279d..a63205b 100644\n--- a/config_test.go\n+++ b/config_test.go\n@@ -32,7 +32,7 @@ func TestMultipleConfigLoading(t *testing.T) {\n \n func TestConfigValidation(t *testing.T) {\n \tvar cli struct {\n-\t\tFlag string `json:\"flag,omitempty\" enum:\"valid\"`\n+\t\tFlag string `json:\"flag,omitempty\" enum:\"valid\" required:\"\"`\n \t}\n \n \tcli.Flag = \"invalid\"\ndiff --git a/kong.go b/kong.go\nindex f02b867..3edfc3b 100644\n--- a/kong.go\n+++ b/kong.go\n@@ -22,6 +22,15 @@ func fail(format string, args ...interface{}) {\n \tpanic(Error{msg: fmt.Sprintf(format, args...)})\n }\n \n+func failField(parent reflect.Value, field reflect.StructField, format string, args ...interface{}) {\n+\tname := parent.Type().Name()\n+\tif name == \"\" {\n+\t\tname = \"<anonymous struct>\"\n+\t}\n+\tmsg := fmt.Sprintf(\"%s.%s: %s\", name, field.Name, fmt.Sprintf(format, args...))\n+\tpanic(Error{msg: msg})\n+}\n+\n // Must creates a new Parser or panics if there is an error.\n func Must(ast interface{}, options ...Option) *Kong {\n \tk, err := New(ast, options...)\ndiff --git a/kong_test.go b/kong_test.go\nindex 1a8af52..37f7529 100644\n--- a/kong_test.go\n+++ b/kong_test.go\n@@ -643,7 +643,7 @@ func TestRun(t *testing.T) {\n func TestInterpolationIntoModel(t *testing.T) {\n \tvar cli struct {\n \t\tFlag    string `default:\"${default}\" help:\"Help, I need ${somebody}\" enum:\"${enum}\"`\n-\t\tEnumRef string `enum:\"a,b\" help:\"One of ${enum}\"`\n+\t\tEnumRef string `enum:\"a,b\" required:\"\" help:\"One of ${enum}\"`\n \t}\n \t_, err := kong.New(&cli)\n \trequire.Error(t, err)\n@@ -763,7 +763,7 @@ func TestHooksCalledForDefault(t *testing.T) {\n \n func TestEnum(t *testing.T) {\n \tvar cli struct {\n-\t\tFlag string `enum:\"a,b,c\"`\n+\t\tFlag string `enum:\"a,b,c\" required:\"\"`\n \t}\n \t_, err := mustNew(t, &cli).Parse([]string{\"--flag\", \"d\"})\n \trequire.EqualError(t, err, \"--flag must be one of \\\"a\\\",\\\"b\\\",\\\"c\\\" but got \\\"d\\\"\")\n@@ -978,7 +978,7 @@ func TestIssue153(t *testing.T) {\n func TestEnumArg(t *testing.T) {\n \tvar cli struct {\n \t\tNested struct {\n-\t\t\tOne string `arg:\"\" enum:\"a,b,c\"`\n+\t\t\tOne string `arg:\"\" enum:\"a,b,c\" required:\"\"`\n \t\t\tTwo string `arg:\"\"`\n \t\t} `cmd:\"\"`\n \t}\n@@ -1142,7 +1142,7 @@ func TestDuplicateShortflags(t *testing.T) {\n \t\tFlag2 bool `short:\"t\"`\n \t}{}\n \t_, err := kong.New(&cli)\n-\trequire.EqualError(t, err, \"duplicate short flag -t\")\n+\trequire.EqualError(t, err, \"<anonymous struct>.Flag2: duplicate short flag -t\")\n }\n \n func TestDuplicateNestedShortFlags(t *testing.T) {\n@@ -1153,5 +1153,5 @@ func TestDuplicateNestedShortFlags(t *testing.T) {\n \t\t} `cmd:\"\"`\n \t}{}\n \t_, err := kong.New(&cli)\n-\trequire.EqualError(t, err, \"duplicate short flag -t\")\n+\trequire.EqualError(t, err, \"<anonymous struct>.Flag2: duplicate short flag -t\")\n }\ndiff --git a/tag.go b/tag.go\nindex 9ecde85..7c9ae99 100644\n--- a/tag.go\n+++ b/tag.go\n@@ -129,7 +129,7 @@ func tagSplitFn(r rune) bool {\n \treturn r == ',' || r == ' '\n }\n \n-func parseTag(fv reflect.Value, ft reflect.StructField) *Tag {\n+func parseTag(parent, fv reflect.Value, ft reflect.StructField) *Tag {\n \tif ft.Tag.Get(\"kong\") == \"-\" {\n \t\tt := newEmptyTag()\n \t\tt.Ignored = true\n@@ -146,7 +146,7 @@ func parseTag(fv reflect.Value, ft reflect.StructField) *Tag {\n \trequired := t.Has(\"required\")\n \toptional := t.Has(\"optional\")\n \tif required && optional {\n-\t\tfail(\"can't specify both required and optional\")\n+\t\tfailField(parent, ft, \"can't specify both required and optional\")\n \t}\n \tt.Required = required\n \tt.Optional = optional\n@@ -161,7 +161,7 @@ func parseTag(fv reflect.Value, ft reflect.StructField) *Tag {\n \tt.Env = t.Get(\"env\")\n \tt.Short, err = t.GetRune(\"short\")\n \tif err != nil && t.Get(\"short\") != \"\" {\n-\t\tfail(\"invalid short flag name %q: %s\", t.Get(\"short\"), err)\n+\t\tfailField(parent, ft, \"invalid short flag name %q: %s\", t.Get(\"short\"), err)\n \t}\n \tt.Hidden = t.Has(\"hidden\")\n \tt.Format = t.Get(\"format\")\n@@ -175,7 +175,7 @@ func parseTag(fv reflect.Value, ft reflect.StructField) *Tag {\n \tt.Embed = t.Has(\"embed\")\n \tnegatable := t.Has(\"negatable\")\n \tif negatable && ft.Type.Kind() != reflect.Bool {\n-\t\tfail(\"negatable can only be set on booleans\")\n+\t\tfailField(parent, ft, \"negatable can only be set on booleans\")\n \t}\n \tt.Negatable = negatable\n \taliases := t.Get(\"aliases\")\n@@ -186,7 +186,7 @@ func parseTag(fv reflect.Value, ft reflect.StructField) *Tag {\n \tfor _, set := range t.GetAll(\"set\") {\n \t\tparts := strings.SplitN(set, \"=\", 2)\n \t\tif len(parts) == 0 {\n-\t\t\tfail(\"set should be in the form key=value but got %q\", set)\n+\t\t\tfailField(parent, ft, \"set should be in the form key=value but got %q\", set)\n \t\t}\n \t\tt.Vars[parts[0]] = parts[1]\n \t}\n@@ -195,9 +195,12 @@ func parseTag(fv reflect.Value, ft reflect.StructField) *Tag {\n \t\tt.PlaceHolder = strings.ToUpper(dashedString(fv.Type().Name()))\n \t}\n \tt.Enum = t.Get(\"enum\")\n+\tif t.Enum != \"\" && !(t.Required || t.Default != \"\") {\n+\t\tfailField(parent, ft, \"enum value is only valid if it is either required or has a valid default value\")\n+\t}\n \tpassthrough := t.Has(\"passthrough\")\n \tif passthrough && !t.Arg {\n-\t\tfail(\"passthrough only makes sense for positional arguments\")\n+\t\tfailField(parent, ft, \"passthrough only makes sense for positional arguments\")\n \t}\n \tt.Passthrough = passthrough\n \treturn t\ndiff --git a/tag_test.go b/tag_test.go\nindex ae8c38d..ca9f213 100644\n--- a/tag_test.go\n+++ b/tag_test.go\n@@ -198,5 +198,5 @@ func TestInvalidRuneErrors(t *testing.T) {\n \t\tFlag bool `short:\"invalid\"`\n \t}{}\n \t_, err := kong.New(&cli)\n-\trequire.EqualError(t, err, \"invalid short flag name \\\"invalid\\\": invalid rune\")\n+\trequire.EqualError(t, err, \"<anonymous struct>.Flag: invalid short flag name \\\"invalid\\\": invalid rune\")\n }\n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    ".github/FUNDING.yml",
+    ".gitignore",
+    ".golangci.yml",
+    "COPYING",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/README.md",
+    "_examples/server/console.go",
+    "_examples/server/go.mod",
+    "_examples/server/go.sum",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/main.go",
+    "benchmark_test.go",
+    "bin/.go@latest.pkg",
+    "bin/.golangci-lint-1.40.1.pkg",
+    "bin/README.hermit.md",
+    "bin/activate-hermit",
+    "bin/go",
+    "bin/gofmt",
+    "bin/golangci-lint",
+    "bin/hermit",
+    "bin/hermit.hcl",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "config_test.go",
+    "context.go",
+    "defaults.go",
+    "defaults_test.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "go.mod",
+    "go.sum",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "testdata/file.txt",
+    "util.go",
+    "util_test.go",
+    "visit.go"
+  ],
+  "explanation": {
+    "what": "enum タグを持つフィールドは required か有効な default を持たなければビルド時にエラーとするバリデーションを追加した(tag.go の parseTag)。合わせて failField(parent, field, format, args...) というヘルパーを kong.go に新設し、既存の fail() 呼び出しの多くをこれに置き換えて、エラーメッセージに `<型名>.<フィールド名>:` というプレフィックスを付与するようにした。parseTag / flattenedFields のシグネチャに親の reflect.Value(parent)を追加で渡すよう変更している。README・複数のテスト(config_test.go, kong_test.go)も enum フィールドに required を追加する形で追従修正されている。",
+    "why": "コミットメッセージにある通り、enum を指定していても required でも default でもないフィールドは、値未指定時に空文字列が enum の許可値に含まれず常にバリデーションエラーになる、という壊れた挙動だったため、これを禁止して早期にビルド時エラーにする破壊的変更。合わせて、プログラマ向けのエラー(タグの付け方ミスなど)がどの型・フィールドで発生したか分かるよう `type.field:` 形式のコンテキストを付与した。",
+    "highlights": [
+      { "file": "kong.go", "note": "failField ヘルパーの新設。parent.Type().Name() と field.Name からエラーメッセージに文脈を追加する" },
+      { "file": "tag.go", "note": "enum タグがあるのに required でも default でもないフィールドを failField で拒否する新規チェック" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

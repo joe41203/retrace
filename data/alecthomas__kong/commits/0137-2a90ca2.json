@@ -1,0 +1,123 @@
+{
+  "seq": 137,
+  "sha": "2a90ca2ad300aa9820c9cf299ae21fb0385f964c",
+  "parents": [
+    "fcf5f9bc1a4fc3388f490d77c7477a5681b1f97a"
+  ],
+  "author": {
+    "name": "Matthias Fax",
+    "email": "matthias.fax@gmail.com",
+    "date": "2019-01-21T14:14:26+01:00"
+  },
+  "message": "feat: add a command tree help view (#32)\n\nAdd a command tree help view.\r\n\r\nFollowing up #29 and #30, I noticed that the default help looks quite duplicative since only the help text of the last command in chain is viewed. I needed an option to also show the help text of the command nodes in an appropriate way.  This is what I came up with.\r",
+  "pr": {
+    "number": 32,
+    "title": "feat: add a command tree help view",
+    "body": "Following up #29 and #30, I noticed that the default help looks quite duplicative since only the help text of the last command in chain is viewed. I needed an option to also show the help text of the command nodes in an appropriate way.  This is what I came up with.\r\n\r\nIt introduces an additional help option that overrides the others. Then it prints a tree view of the nodes, their sub commands, and arguments. It looks like that in the output:\r\n\r\n```bash\r\nCommand Tree:\r\n  version                     display the app version\r\n\r\n  help                        show help for a command\r\n  |- [<command> ...]          the commands for which to show help\r\n\r\n  build                       build Docker tags from the given tag vectors\r\n  |- from                     determine the source of the tag vectors\r\n  |  |- stdin                 read the tag vectors from the standard input\r\n  |  |- file                  read the tag vectors from a Dockerfile\r\n  |  |  |- <file>             the Dockerfile containing the vectors as FROM instructions\r\n  |  |- <param>               pass the tag vectors as arguments\r\n\r\n  tag                         tag the given source image with the Docker tags from the given tag vectors\r\n  |- <source-tag>             the source tag of the image that should receive the generated tags\r\n  |  |- from                  determine the source of the tag vectors\r\n  |  |  |- stdin              read the tag vectors from the standard input\r\n  |  |  |- file               read the tag vectors from a Dockerfile\r\n  |  |  |  |- <file>          the Dockerfile containing the vectors as FROM instructions\r\n  |  |  |- <param>            pass the tag vectors as arguments\r\n  |  |- to                    set a target repository\r\n  |  |  |- <repository>       the Docker Hub repository of the root tag vector in the format 'organization/repository'\r\n  |  |  |  |- from            determine the source of the tag vectors\r\n  |  |  |  |  |- stdin        read the tag vectors from the standard input\r\n  |  |  |  |  |- file         read the tag vectors from a Dockerfile\r\n  |  |  |  |  |  |- <file>    the Dockerfile containing the vectors as FROM instructions\r\n  |  |  |  |  |- <param>      pass the tag vectors as arguments\r\n```",
+    "url": "https://github.com/alecthomas/kong/pull/32"
+  },
+  "linkedIssues": [
+    {
+      "number": 29,
+      "title": "Native and idiomatic option for long help text",
+      "body": "Maybe I just haven't figured it out, but is there a simple way to add longer help texts to the commands, not just one liners?",
+      "url": "https://github.com/alecthomas/kong/issues/29"
+    },
+    {
+      "number": 30,
+      "title": "embedding reusable subcommands from the same struct",
+      "body": "In my current project, I faced the following challenge. I have a cli whichs commands are composed of two subcommand sets. E.g, `build` and `find` as root commands and both have the same sub commands with the same methods, e.g., `build foo`, `build goo`, `find foo`, and `find goo`. Ideally, there would be only one sub command struct for `foo` and `goo` that is embedded in the root commands. However, I could not find an idiomatic way to call the root commands (i.e, parents) from the sub commands `Run` methods. I had to access `context.Command()` and identify the struct field using reflection.\r\n\r\nSo I'm wondering if you considered such a case - maybe I haven't seen the obvious again - or if you would like to see a feature that allows to traverse to parent command structs and execute a `Run` on it. Thereby, someone could create quite advanced command chains.",
+      "url": "https://github.com/alecthomas/kong/issues/30"
+    }
+  ],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 176,
+    "deletions": 10
+  },
+  "files": [
+    {
+      "path": "help.go",
+      "status": "M",
+      "additions": 81,
+      "deletions": 10,
+      "binary": false
+    },
+    {
+      "path": "help_test.go",
+      "status": "M",
+      "additions": 95,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/help.go b/help.go\nindex d640efb..bc4aeba 100644\n--- a/help.go\n+++ b/help.go\n@@ -37,6 +37,14 @@ type HelpOptions struct {\n \n \t// Write help in a more compact, but still fully-specified, form.\n \tCompact bool\n+\n+\t// Tree writes command chains in a tree structure instead of listing them separately.\n+\tTree bool\n+\n+\t// Indenter modulates the given prefix for the next layer in the tree view.\n+\t// The following exported templates can be used: kong.SpaceIndenter, kong.LineIndenter, kong.TreeIndenter\n+\t// The kong.SpaceIndenter will be used by default.\n+\tIndenter HelpIndenter\n }\n \n // HelpProvider can be implemented by commands/args to provide detailed help.\n@@ -45,6 +53,9 @@ type HelpProvider interface {\n \tHelp() string\n }\n \n+// HelpIndenter is used to indent new layers in the help tree.\n+type HelpIndenter func(prefix string) string\n+\n // HelpPrinter is used to print context-sensitive help.\n type HelpPrinter func(options HelpOptions, ctx *Context) error\n \n@@ -115,19 +126,32 @@ func printNodeDetail(w *helpWriter, node *Node, hide bool) {\n \tcmds := node.Leaves(hide)\n \tif len(cmds) > 0 {\n \t\tw.Print(\"\")\n-\t\tw.Print(\"Commands:\")\n-\t\tiw := w.Indent()\n-\t\tif w.Compact {\n-\t\t\trows := [][2]string{}\n-\t\t\tfor _, cmd := range cmds {\n-\t\t\t\trows = append(rows, [2]string{cmd.Path(), cmd.Help})\n+\t\tif w.Tree {\n+\t\t\tw.Print(\"Command Tree:\")\n+\t\t\tiw := w.Indent()\n+\t\t\tvar rows [][2]string\n+\t\t\tfor i, cmd := range node.Children {\n+\t\t\t\trows = append(rows, w.commandTree(cmd, \"\")...)\n+\t\t\t\tif i != len(node.Children)-1 {\n+\t\t\t\t\trows = append(rows, [2]string{\"\", \"\"})\n+\t\t\t\t}\n \t\t\t}\n \t\t\twriteTwoColumns(iw, defaultColumnPadding, rows)\n \t\t} else {\n-\t\t\tfor i, cmd := range cmds {\n-\t\t\t\tprintCommandSummary(iw, cmd)\n-\t\t\t\tif i != len(cmds)-1 {\n-\t\t\t\t\tiw.Print(\"\")\n+\t\t\tw.Print(\"Commands:\")\n+\t\t\tiw := w.Indent()\n+\t\t\tif w.Compact {\n+\t\t\t\trows := [][2]string{}\n+\t\t\t\tfor _, cmd := range cmds {\n+\t\t\t\t\trows = append(rows, [2]string{cmd.Path(), cmd.Help})\n+\t\t\t\t}\n+\t\t\t\twriteTwoColumns(iw, defaultColumnPadding, rows)\n+\t\t\t} else {\n+\t\t\t\tfor i, cmd := range cmds {\n+\t\t\t\t\tprintCommandSummary(iw, cmd)\n+\t\t\t\t\tif i != len(cmds)-1 {\n+\t\t\t\t\t\tiw.Print(\"\")\n+\t\t\t\t\t}\n \t\t\t\t}\n \t\t\t}\n \t\t}\n@@ -276,3 +300,50 @@ func formatFlag(haveShort bool, flag *Flag) string {\n \t}\n \treturn flagString\n }\n+\n+// commandTree creates a tree with the given node name as root and its children's arguments and sub commands as leaves.\n+func (w *HelpOptions) commandTree(node *Node, prefix string) (rows [][2]string) {\n+\tvar nodeName string\n+\tswitch node.Type {\n+\tdefault:\n+\t\tnodeName += prefix + node.Name\n+\tcase ArgumentNode:\n+\t\tnodeName += prefix + \"<\" + node.Name + \">\"\n+\t}\n+\trows = append(rows, [2]string{nodeName, node.Help})\n+\tif w.Indenter == nil {\n+\t\tprefix = SpaceIndenter(prefix)\n+\t} else {\n+\t\tprefix = w.Indenter(prefix)\n+\t}\n+\tfor _, arg := range node.Positional {\n+\t\trows = append(rows, [2]string{prefix + arg.Summary(), arg.Help})\n+\t}\n+\tfor _, subCmd := range node.Children {\n+\t\trows = append(rows, w.commandTree(subCmd, prefix)...)\n+\t}\n+\treturn\n+}\n+\n+// SpaceIndenter adds a space indent to the given prefix.\n+func SpaceIndenter(prefix string) string {\n+\treturn prefix + strings.Repeat(\" \", defaultIndent)\n+}\n+\n+// SpaceIndenter adds line points to every new indent.\n+func LineIndenter(prefix string) string {\n+\tif prefix == \"\" {\n+\t\treturn \"- \"\n+\t} else {\n+\t\treturn strings.Repeat(\" \", defaultIndent) + prefix\n+\t}\n+}\n+\n+// TreeIndenter adds line points to every new indent and vertical lines to every layer.\n+func TreeIndenter(prefix string) string {\n+\tif prefix == \"\" {\n+\t\treturn \"|- \"\n+\t} else {\n+\t\treturn \"|\" + strings.Repeat(\" \", defaultIndent) + prefix\n+\t}\n+}\ndiff --git a/help_test.go b/help_test.go\nindex 91068c5..a985bba 100644\n--- a/help_test.go\n+++ b/help_test.go\n@@ -124,3 +124,98 @@ Flags:\n \t\trequire.Equal(t, expected, w.String())\n \t})\n }\n+\n+func TestHelpTree(t *testing.T) {\n+\t// nolint: govet\n+\tvar cli struct {\n+\t\tOne struct {\n+\t\t\tThing struct {\n+\t\t\t\tArg string `arg help:\"argument\"`\n+\t\t\t} `cmd help:\"subcommand thing\"`\n+\t\t\tOther struct {\n+\t\t\t\tOther string `arg help:\"other arg\"`\n+\t\t\t} `arg help:\"subcommand other\"`\n+\t\t} `cmd help:\"subcommand one\"`\n+\n+\t\tTwo struct {\n+\t\t\tThree threeArg `arg help:\"Sub-sub-arg.\"`\n+\n+\t\t\tFour struct {\n+\t\t\t} `cmd help:\"Sub-sub-command.\"`\n+\t\t} `cmd help:\"Another subcommand.\"`\n+\t}\n+\n+\tw := bytes.NewBuffer(nil)\n+\texited := false\n+\tapp := mustNew(t, &cli,\n+\t\tkong.Name(\"test-app\"),\n+\t\tkong.Description(\"A test app.\"),\n+\t\tkong.Writers(w, w),\n+\t\tkong.ConfigureHelp(kong.HelpOptions{\n+\t\t\tTree:     true,\n+\t\t\tIndenter: kong.LineIndenter,\n+\t\t}),\n+\t\tkong.Exit(func(int) {\n+\t\t\texited = true\n+\t\t\tpanic(true) // Panic to fake \"exit\".\n+\t\t}),\n+\t)\n+\n+\tt.Run(\"Full\", func(t *testing.T) {\n+\t\trequire.PanicsWithValue(t, true, func() {\n+\t\t\t_, err := app.Parse([]string{\"--help\"})\n+\t\t\trequire.NoError(t, err)\n+\t\t})\n+\t\trequire.True(t, exited)\n+\t\texpected := `Usage: test-app <command>\n+\n+A test app.\n+\n+Flags:\n+  --help    Show context-sensitive help.\n+\n+Command Tree:\n+  one          subcommand one\n+  - thing      subcommand thing\n+    - <arg>    argument\n+  - <other>    subcommand other\n+\n+  two          Another subcommand.\n+  - <three>    Sub-sub-arg.\n+  - four       Sub-sub-command.\n+\n+Run \"test-app <command> --help\" for more information on a command.\n+`\n+\t\tif expected != w.String() {\n+\t\t\tt.Errorf(\"help command returned:\\n%v\\n\\nwant:\\n%v\", w.String(), expected)\n+\t\t}\n+\t\trequire.Equal(t, expected, w.String())\n+\t})\n+\n+\tt.Run(\"Selected\", func(t *testing.T) {\n+\t\texited = false\n+\t\tw.Truncate(0)\n+\t\trequire.PanicsWithValue(t, true, func() {\n+\t\t\t_, err := app.Parse([]string{\"one\", \"--help\"})\n+\t\t\trequire.NoError(t, err)\n+\t\t})\n+\t\trequire.True(t, exited)\n+\t\texpected := `Usage: test-app one <command>\n+\n+subcommand one\n+\n+Flags:\n+  --help    Show context-sensitive help.\n+\n+Command Tree:\n+  thing      subcommand thing\n+  - <arg>    argument\n+\n+  <other>    subcommand other\n+`\n+\t\tif expected != w.String() {\n+\t\t\tt.Errorf(\"help command returned:\\n%v\\n\\nwant:\\n%v\", w.String(), expected)\n+\t\t}\n+\t\trequire.Equal(t, expected, w.String())\n+\t})\n+}\n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    ".golangci.yml",
+    "COPYING",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/console.go",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/main.go",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "config_test.go",
+    "context.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "go.mod",
+    "go.sum",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "util.go",
+    "util_test.go",
+    "visit.go"
+  ],
+  "explanation": {
+    "what": "HelpOptionsにTree(bool)とIndenter(HelpIndenter型)フィールドを追加し、コマンド階層をツリー形式で表示するCommand Tree出力を実装した。help.goにcommandTree()(再帰的にノード名・引数・子コマンドを行として集めるメソッド)、SpaceIndenter/LineIndenter/TreeIndenterという3種のインデント関数を追加。help_test.goにTestHelpTreeを追加してツリー表示の期待出力を検証している。",
+    "why": "linkedIssue #29(サブコマンドに長いヘルプテキストを付ける慣用的な方法がない)と#30(同じサブコマンド構造体を複数の親から再利用したいが親を辿る方法がない)を受けて投稿者が着手したPR。PR本文では、デフォルトのヘルプは各コマンドチェーンの末端のヘルプしか表示せず冗長に見えるため、階層内の各ノードのヘルプをツリー状に表示するオプションを追加したと説明されている。",
+    "highlights": [
+      { "file": "help.go", "note": "commandTree()の再帰とIndenter(SpaceIndenter/LineIndenter/TreeIndenter)の切り替え" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [
+      { "type": "pr", "number": 32, "url": "https://github.com/alecthomas/kong/pull/32" }
+    ],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

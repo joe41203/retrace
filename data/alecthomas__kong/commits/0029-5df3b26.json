@@ -1,0 +1,88 @@
+{
+  "seq": 29,
+  "sha": "5df3b26bab23575cda2b4f926b18072d946ddb2c",
+  "parents": [
+    "886edb6f5abe5433eaf04ff8fc540efaffc99fcf"
+  ],
+  "author": {
+    "name": "Alec Thomas",
+    "email": "alec@swapoff.org",
+    "date": "2018-05-23T12:20:47-04:00"
+  },
+  "message": "Use new Tag type for slice separator.",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 4,
+    "additions": 6,
+    "deletions": 4
+  },
+  "files": [
+    {
+      "path": "build.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "decoders.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "model.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "tag.go",
+      "status": "M",
+      "additions": 3,
+      "deletions": 2,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/build.go b/build.go\nindex b3299cc..43e4b6c 100644\n--- a/build.go\n+++ b/build.go\n@@ -118,6 +118,7 @@ func buildNode(v reflect.Value, seenFlags map[string]bool, cmd bool) *Node {\n \t\t\t\tHelp:    tag.Help,\n \t\t\t\tDefault: tag.Default,\n \t\t\t\tDecoder: decoder,\n+\t\t\t\tTag:     tag,\n \t\t\t\tValue:   fv,\n \n \t\t\t\t// Flags are optional by default, and args are required by default.\ndiff --git a/decoders.go b/decoders.go\nindex f477417..2858889 100644\n--- a/decoders.go\n+++ b/decoders.go\n@@ -222,7 +222,7 @@ func floatDecoder(bits int) DecoderFunc {\n \n func sliceDecoder(ctx *DecoderContext, scan *Scanner, target reflect.Value) error {\n \tel := target.Type().Elem()\n-\tsep, ok := ctx.Value.Tag.Lookup(\"sep\")\n+\tsep, ok := ctx.Value.Tag.Get(\"sep\")\n \tif !ok {\n \t\tsep = \",\"\n \t}\ndiff --git a/model.go b/model.go\nindex 388f6d7..32fb206 100644\n--- a/model.go\n+++ b/model.go\n@@ -30,7 +30,7 @@ type Value struct {\n \tHelp     string\n \tDefault  string\n \tDecoder  Decoder\n-\tTag      reflect.StructTag\n+\tTag      *Tag\n \tValue    reflect.Value\n \tRequired bool\n \tSet      bool   // Used with Required to test if a value has been given.\ndiff --git a/tag.go b/tag.go\nindex 46e1667..5431783 100644\n--- a/tag.go\n+++ b/tag.go\n@@ -123,8 +123,9 @@ func (t *Tag) Has(k string) bool {\n \treturn ok\n }\n \n-func (t *Tag) Get(k string) (string, error) {\n-\treturn t.items[k], nil\n+func (t *Tag) Get(k string) (string, bool) {\n+\ts, ok := t.items[k]\n+\treturn s, ok\n }\n \n func (t *Tag) GetBool(k string) (bool, error) {\n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    "README.md",
+    "_examples/shell/main.go",
+    "build.go",
+    "camelcase.go",
+    "context.go",
+    "decoders.go",
+    "decoders_test.go",
+    "global.go",
+    "global_test.go",
+    "help.go",
+    "kong.go",
+    "kong_test.go",
+    "model.go",
+    "options.go",
+    "options_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tokentype_string.go"
+  ],
+  "explanation": {
+    "what": "Value.Tag のフィールド型を reflect.StructTag から前コミットで導入した *Tag に変更し、sliceDecoder が区切り文字を読み取る際も reflect.StructTag.Lookup(\"sep\") ではなく Tag.Get(\"sep\") を使うように書き換えた。Tag.Get のシグネチャも (string, error) から (string, bool) に修正されている。",
+    "why": "コミットメッセージの通り、直前のコミットで追加した Tag 型のアクセサ機構を、既に reflect.StructTag を直接読んでいた sep(スライス区切り文字)にも適用して一本化する変更。",
+    "highlights": [
+      { "file": "decoders.go", "note": "sliceDecoder が reflect.StructTag ではなく Tag.Get(\"sep\") を使うように変更" },
+      { "file": "model.go", "note": "Value.Tag の型が *Tag に変わった" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

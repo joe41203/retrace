@@ -1,0 +1,71 @@
+{
+  "seq": 30,
+  "sha": "93e21885b139be753e2324d291a5af49dc50c836",
+  "parents": [
+    "5df3b26bab23575cda2b4f926b18072d946ddb2c"
+  ],
+  "author": {
+    "name": "Gerald Kaszuba",
+    "email": "gak@gak0.com",
+    "date": "2018-05-24T11:53:32+10:00"
+  },
+  "message": "A basic refactor in build, splitting the two main code branches.",
+  "pr": {
+    "number": 16,
+    "title": "A basic refactor in build, splitting the two main code branches.",
+    "body": "",
+    "url": "https://github.com/alecthomas/kong/pull/16"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 79,
+    "deletions": 69
+  },
+  "files": [
+    {
+      "path": "build.go",
+      "status": "M",
+      "additions": 79,
+      "deletions": 69,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/build.go b/build.go\nindex 43e4b6c..36ffb4e 100644\n--- a/build.go\n+++ b/build.go\n@@ -62,83 +62,16 @@ func buildNode(v reflect.Value, seenFlags map[string]bool, cmd bool) *Node {\n \t\t}\n \n \t\ttag := parseTag(fv, ft.Tag.Get(\"kong\"))\n-\t\tdecoder := DecoderForField(tag.Type, ft)\n \n \t\tif !cmd {\n \t\t\tcmd = tag.Cmd\n \t\t}\n \n-\t\tenv := ft.Tag.Get(\"env\")\n-\t\tformat := ft.Tag.Get(\"format\")\n-\n \t\t// Nested structs are either commands or args.\n \t\tif ft.Type.Kind() == reflect.Struct && (cmd || tag.Arg) {\n-\t\t\tchild := buildNode(fv, seenFlags, false)\n-\t\t\tchild.Help = tag.Help\n-\n-\t\t\t// A branching argument. This is a bit hairy, as we let buildNode() do the parsing, then check that\n-\t\t\t// a positional argument is provided to the child, and move it to the branching argument field.\n-\t\t\tif tag.Arg {\n-\t\t\t\tif len(child.Positional) == 0 {\n-\t\t\t\t\tfail(\"positional branch %s.%s must have at least one child positional argument\",\n-\t\t\t\t\t\tv.Type().Name(), ft.Name)\n-\t\t\t\t}\n-\t\t\t\tvalue := child.Positional[0]\n-\t\t\t\tchild.Positional = child.Positional[1:]\n-\t\t\t\tif child.Help == \"\" {\n-\t\t\t\t\tchild.Help = value.Help\n-\t\t\t\t}\n-\t\t\t\tchild.Name = value.Name\n-\t\t\t\tif child.Name != name {\n-\t\t\t\t\tfail(\"first field in positional branch %s.%s must have the same name as the parent field (%s).\",\n-\t\t\t\t\t\tv.Type().Name(), ft.Name, child.Name)\n-\t\t\t\t}\n-\t\t\t\tnode.Children = append(node.Children, &Branch{Argument: &Argument{\n-\t\t\t\t\tNode:     *child,\n-\t\t\t\t\tArgument: value,\n-\t\t\t\t}})\n-\t\t\t} else {\n-\t\t\t\tchild.Name = name\n-\t\t\t\tnode.Children = append(node.Children, &Branch{Command: child})\n-\t\t\t}\n-\n-\t\t\tif len(child.Positional) > 0 && len(child.Children) > 0 {\n-\t\t\t\tfail(\"can't mix positional arguments and branching arguments on %s.%s\", v.Type().Name(), ft.Name)\n-\t\t\t}\n+\t\t\tbuildChild(node, v, ft, fv, tag, name, seenFlags)\n \t\t} else {\n-\t\t\tif decoder == nil {\n-\t\t\t\tfail(\"no decoder for %s.%s (of type %s)\", v.Type(), ft.Name, ft.Type)\n-\t\t\t}\n-\n-\t\t\tflag := !tag.Arg\n-\n-\t\t\tvalue := Value{\n-\t\t\t\tName:    name,\n-\t\t\t\tFlag:    flag,\n-\t\t\t\tHelp:    tag.Help,\n-\t\t\t\tDefault: tag.Default,\n-\t\t\t\tDecoder: decoder,\n-\t\t\t\tTag:     tag,\n-\t\t\t\tValue:   fv,\n-\n-\t\t\t\t// Flags are optional by default, and args are required by default.\n-\t\t\t\tRequired: (flag && tag.Required) || (tag.Arg && !tag.Optional),\n-\t\t\t\tFormat:   format,\n-\t\t\t}\n-\t\t\tif tag.Arg {\n-\t\t\t\tnode.Positional = append(node.Positional, &value)\n-\t\t\t} else {\n-\t\t\t\tif seenFlags[value.Name] {\n-\t\t\t\t\tfail(\"duplicate flag --%s\", value.Name)\n-\t\t\t\t}\n-\t\t\t\tseenFlags[value.Name] = true\n-\t\t\t\tnode.Flags = append(node.Flags, &Flag{\n-\t\t\t\t\tValue:       value,\n-\t\t\t\t\tShort:       tag.Short,\n-\t\t\t\t\tPlaceholder: tag.Placeholder,\n-\t\t\t\t\tEnv:         env,\n-\t\t\t\t})\n-\t\t\t}\n+\t\t\tbuildField(node, v, ft, fv, tag, name, seenFlags)\n \t\t}\n \t}\n \n@@ -159,3 +92,80 @@ func buildNode(v reflect.Value, seenFlags map[string]bool, cmd bool) *Node {\n \n \treturn node\n }\n+\n+func buildChild(node *Node, v reflect.Value, ft reflect.StructField, fv reflect.Value, tag *Tag, name string, seenFlags map[string]bool) {\n+\tchild := buildNode(fv, seenFlags, false)\n+\tchild.Help = tag.Help\n+\n+\t// A branching argument. This is a bit hairy, as we let buildNode() do the parsing, then check that\n+\t// a positional argument is provided to the child, and move it to the branching argument field.\n+\tif tag.Arg {\n+\t\tif len(child.Positional) == 0 {\n+\t\t\tfail(\"positional branch %s.%s must have at least one child positional argument\",\n+\t\t\t\tv.Type().Name(), ft.Name)\n+\t\t}\n+\n+\t\tvalue := child.Positional[0]\n+\t\tchild.Positional = child.Positional[1:]\n+\t\tif child.Help == \"\" {\n+\t\t\tchild.Help = value.Help\n+\t\t}\n+\n+\t\tchild.Name = value.Name\n+\t\tif child.Name != name {\n+\t\t\tfail(\"first field in positional branch %s.%s must have the same name as the parent field (%s).\",\n+\t\t\t\tv.Type().Name(), ft.Name, child.Name)\n+\t\t}\n+\n+\t\tnode.Children = append(node.Children, &Branch{Argument: &Argument{\n+\t\t\tNode:     *child,\n+\t\t\tArgument: value,\n+\t\t}})\n+\t} else {\n+\t\tchild.Name = name\n+\t\tnode.Children = append(node.Children, &Branch{Command: child})\n+\t}\n+\n+\tif len(child.Positional) > 0 && len(child.Children) > 0 {\n+\t\tfail(\"can't mix positional arguments and branching arguments on %s.%s\", v.Type().Name(), ft.Name)\n+\t}\n+}\n+\n+func buildField(node *Node, v reflect.Value, ft reflect.StructField, fv reflect.Value, tag *Tag, name string, seenFlags map[string]bool) {\n+\tdecoder := DecoderForField(tag.Type, ft)\n+\tif decoder == nil {\n+\t\tfail(\"no decoder for %s.%s (of type %s)\", v.Type(), ft.Name, ft.Type)\n+\t}\n+\n+\tflag := !tag.Arg\n+\n+\tvalue := Value{\n+\t\tName:    name,\n+\t\tFlag:    flag,\n+\t\tHelp:    tag.Help,\n+\t\tDefault: tag.Default,\n+\t\tDecoder: decoder,\n+\t\tTag:     tag,\n+\t\tValue:   fv,\n+\n+\t\t// Flags are optional by default, and args are required by default.\n+\t\tRequired: (flag && tag.Required) || (tag.Arg && !tag.Optional),\n+\t\tFormat:   tag.Format,\n+\t}\n+\n+\tif tag.Arg {\n+\t\tnode.Positional = append(node.Positional, &value)\n+\t} else {\n+\t\tif seenFlags[value.Name] {\n+\t\t\tfail(\"duplicate flag --%s\", value.Name)\n+\t\t}\n+\t\tseenFlags[value.Name] = true\n+\t\tnode.Flags = append(node.Flags, &Flag{\n+\t\t\tValue:       value,\n+\t\t\tShort:       tag.Short,\n+\t\t\tPlaceholder: tag.Placeholder,\n+\t\t\tEnv:         tag.Env,\n+\t\t})\n+\t}\n+}\n+\n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    "README.md",
+    "_examples/shell/main.go",
+    "build.go",
+    "camelcase.go",
+    "context.go",
+    "decoders.go",
+    "decoders_test.go",
+    "global.go",
+    "global_test.go",
+    "help.go",
+    "kong.go",
+    "kong_test.go",
+    "model.go",
+    "options.go",
+    "options_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tokentype_string.go"
+  ],
+  "explanation": {
+    "what": "buildNode 内で分岐していた「ネスト構造体(コマンド/引数)の処理」と「通常フィールド(フラグ/位置引数)の処理」の2つの大きな if-else ブロックを、それぞれ buildChild と buildField という独立関数に切り出した。ロジック自体は変更されておらず、コードの移動のみ。",
+    "why": "PR本文はタイトルのみで詳細な説明は無いが、コミット件名の「two main code branches の分割」が示す通り、buildNode が長く読みにくくなっていた2つの責務(構造体を再帰的に子ノードとして組み立てる処理と、単一フィールドを Value/Flag に変換する処理)を関数として分離した可読性目的のリファクタと見られる。",
+    "highlights": [
+      { "file": "build.go", "note": "buildNode 本体が buildChild/buildField の呼び出しに置き換わり、各処理が独立した関数として読めるようになっている" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [{ "type": "pr", "number": 16, "url": "https://github.com/alecthomas/kong/pull/16" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

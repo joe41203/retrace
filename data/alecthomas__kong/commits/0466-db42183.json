@@ -1,0 +1,149 @@
+{
+  "seq": 466,
+  "sha": "db421839da20b56a6ac185e1549d60d58e17412d",
+  "parents": [
+    "a2df5f59ed4d2c2703a5dea1e333cc0f2950fcca"
+  ],
+  "author": {
+    "name": "Mitar",
+    "email": "mitar.git@tnode.com",
+    "date": "2026-04-01T02:33:29-07:00"
+  },
+  "message": "feat: allow explicitly set path with default to an empty string to clear it (#592)",
+  "pr": {
+    "number": 592,
+    "title": "feat: allow explicitly set path with default to an empty string to clear it",
+    "body": "Fixes #591.",
+    "url": "https://github.com/alecthomas/kong/pull/592"
+  },
+  "linkedIssues": [
+    {
+      "number": 591,
+      "title": "Unable to un-set path type argument which has a default",
+      "body": "I have config like:\n\n```\ntype PopulateCommand struct {\n\tTablesDir string `default:\"tables\" name:\"tables\" placeholder:\"DIR\" short:\"t\" type:\"path\"`\n}\n```\n\nThe issue is that I cannot set it an empty value to override the default, running:\n\n```\n./program --tables=\"\"\n```\n\nmakes `TablesDir` be equal to the current directory (because `filepath.Abs(\"\")` makes it so).\n\nOn the other hand, having:\n\n```\ntype PopulateCommand struct {\n\tTablesDir string `name:\"tables\" placeholder:\"DIR\" short:\"t\" type:\"path\"`\n}\n```\n\nworks and has `TablesDir` an empty string unless it is set.\n\nI would suggest that `type:\"path\"` should map an empty string to an empty string. If somebody wants current directory, they can always use `\".\"` as the argument.",
+      "url": "https://github.com/alecthomas/kong/issues/591"
+    }
+  ],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 44,
+    "deletions": 0
+  },
+  "files": [
+    {
+      "path": "mapper.go",
+      "status": "M",
+      "additions": 8,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "mapper_test.go",
+      "status": "M",
+      "additions": 36,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/mapper.go b/mapper.go\nindex 872a837..273bdf4 100644\n--- a/mapper.go\n+++ b/mapper.go\n@@ -584,6 +584,7 @@ func pathMapper(r *Registry) MapperFunc {\n \t\tif target.Kind() == reflect.Slice {\n \t\t\treturn sliceDecoder(r)(ctx, target)\n \t\t}\n+\t\toriginalTarget := target\n \t\tif target.Kind() == reflect.Ptr && target.Elem().Kind() == reflect.String {\n \t\t\tif target.IsNil() {\n \t\t\t\treturn nil\n@@ -598,6 +599,13 @@ func pathMapper(r *Registry) MapperFunc {\n \t\tif err != nil {\n \t\t\treturn err\n \t\t}\n+\t\t// Skip if path with default is explicitly set to \"\". For the current directory use \".\".\n+\t\tif ctx.Value.HasDefault && path == \"\" {\n+\t\t\tif originalTarget.Kind() == reflect.Ptr {\n+\t\t\t\toriginalTarget.Set(reflect.Zero(originalTarget.Type()))\n+\t\t\t}\n+\t\t\treturn nil\n+\t\t}\n \t\tif path != \"-\" {\n \t\t\tpath = ExpandPath(path)\n \t\t}\ndiff --git a/mapper_test.go b/mapper_test.go\nindex b10ca9d..ef1db36 100644\n--- a/mapper_test.go\n+++ b/mapper_test.go\n@@ -555,6 +555,42 @@ func TestPathMapperUsingStringPointer(t *testing.T) {\n \t})\n }\n \n+func TestPathMapperWithDefaultUsingStringPointer(t *testing.T) {\n+\ttype CLI struct {\n+\t\tPath *string `type:\"path\" default:\"foobar\"`\n+\t}\n+\tvar cli CLI\n+\n+\tt.Run(\"With value\", func(t *testing.T) {\n+\t\tpwd, err := os.Getwd()\n+\t\tassert.NoError(t, err)\n+\t\tp := mustNew(t, &cli)\n+\t\t_, err = p.Parse([]string{\"--path\", \".\"})\n+\t\tassert.NoError(t, err)\n+\t\tassert.NotZero(t, cli.Path)\n+\t\tassert.Equal(t, pwd, *cli.Path)\n+\t})\n+\n+\tt.Run(\"Zero value\", func(t *testing.T) {\n+\t\tp := mustNew(t, &cli)\n+\t\t_, err := p.Parse([]string{\"--path\", \"\"})\n+\t\tassert.NoError(t, err)\n+\t\tassert.Equal(t, nil, cli.Path)\n+\t})\n+\n+\tt.Run(\"Without value\", func(t *testing.T) {\n+\t\tpwd, err := os.Getwd()\n+\t\tassert.NoError(t, err)\n+\t\tpwd = filepath.Join(pwd, \"foobar\")\n+\t\tpwd, err = filepath.Abs(pwd)\n+\t\tassert.NoError(t, err)\n+\t\tp := mustNew(t, &cli)\n+\t\t_, err = p.Parse([]string{\"--\"})\n+\t\tassert.NoError(t, err)\n+\t\tassert.Equal(t, pwd, *cli.Path)\n+\t})\n+}\n+\n //nolint:dupl\n func TestExistingFileMapper(t *testing.T) {\n \ttype CLI struct {\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/FUNDING.yml",
+    ".github/workflows/ci.yml",
+    ".gitignore",
+    ".golangci.yml",
+    "COPYING",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/README.md",
+    "_examples/server/console.go",
+    "_examples/server/go.mod",
+    "_examples/server/go.sum",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/commandstring/main.go",
+    "_examples/shell/help/README.md",
+    "_examples/shell/help/main.go",
+    "benchmark_test.go",
+    "bin/.go-1.25.6.pkg",
+    "bin/.golangci-lint-1.64.5.pkg",
+    "bin/.lefthook-1.13.6.pkg",
+    "bin/README.hermit.md",
+    "bin/activate-hermit",
+    "bin/go",
+    "bin/gofmt",
+    "bin/golangci-lint",
+    "bin/hermit",
+    "bin/hermit.hcl",
+    "bin/lefthook",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "config_test.go",
+    "context.go",
+    "defaults.go",
+    "defaults_test.go",
+    "doc.go",
+    "error.go",
+    "exit.go",
+    "global.go",
+    "global_test.go",
+    "go.mod",
+    "go.sum",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "helpwrap1.18_test.go",
+    "helpwrap1.19_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "lefthook.yml",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_linux_test.go",
+    "mapper_test.go",
+    "mapper_windows_test.go",
+    "model.go",
+    "model_test.go",
+    "negatable.go",
+    "options.go",
+    "options_test.go",
+    "renovate.json5",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "signature_test.go",
+    "tag.go",
+    "tag_test.go",
+    "testdata/file.txt",
+    "util.go",
+    "util_test.go",
+    "visit.go"
+  ],
+  "explanation": {
+    "what": "mapper.go の pathMapper に、default タグを持つ path 型フィールドに対して明示的に空文字列 \"\" が渡された場合の特別扱いを追加。ctx.Value.HasDefault && path == \"\" のとき、target がポインタならゼロ値(nil)をセットして早期 return し、従来のように filepath.Abs(\"\") でカレントディレクトリに解決されるのを防ぐ。mapper_test.go に文字列ポインタ型 path フィールドで「値あり」「空文字列で明示クリア」「未指定(デフォルト適用)」の3パターンを検証するテストを追加。",
+    "why": "リンクされた issue #591 が報告する通り、`type:\"path\"` かつ `default:\"tables\"` のようなフィールドを `--tables=\"\"` で明示的に空にしても、filepath.Abs(\"\") が現在のディレクトリを返すため意図通り空にできなかった。文字列型(非 path)では空文字列がそのまま得られていたため、path 型でも同様に明示的な空文字列はデフォルト解決をスキップしてクリアできるようにした。",
+    "highlights": [
+      { "file": "mapper.go", "note": "HasDefault && path == \"\" のとき originalTarget をゼロ値に戻して早期 return する分岐" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "issue",
+    "refs": [
+      { "type": "pr", "number": 592, "url": "https://github.com/alecthomas/kong/pull/592" },
+      { "type": "issue", "number": 591, "url": "https://github.com/alecthomas/kong/issues/591" }
+    ],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

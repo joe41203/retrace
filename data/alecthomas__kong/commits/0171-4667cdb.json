@@ -1,0 +1,116 @@
+{
+  "seq": 171,
+  "sha": "4667cdb6e429c0096ba33156ca460ffc47801d00",
+  "parents": [
+    "529703d8d10528c87dfff818bc996007ec7c45a0"
+  ],
+  "author": {
+    "name": "Rene Zbinden",
+    "email": "rene.zbinden@postfinance.ch",
+    "date": "2020-02-18T07:03:40+01:00"
+  },
+  "message": "change help exit code to 0",
+  "pr": {
+    "number": 55,
+    "title": "change help exit code to 0",
+    "body": "Fixes #38 :-)\r\n\r\nAnd also some people are bothered by the fact that the help function terminates with exit code 1: [reddit](https://www.reddit.com/r/golang/comments/f454o4/best_practices_or_tips_writing_a_cli_tool_with/fhyo8t5?utm_source=share&utm_medium=web2x)",
+    "url": "https://github.com/alecthomas/kong/pull/55"
+  },
+  "linkedIssues": [
+    {
+      "number": 38,
+      "title": "Help Option Exit Code 1",
+      "body": "Currently if the the default `--help` option is used the app returns exit code `1`. I personally don't think that someone specifically calling `--help` should result in an exit code other than `0`.  Is there a way to change this behavior? I've reviewed the docs and Issues pretty thoroughly and can't find anything.\r\n\r\nI'm also open to any rational that presents a good argument for why a program should return an exit code other than `0` for a user (person or automation) specifically calling `--help` as the only parameter sent to a program.",
+      "url": "https://github.com/alecthomas/kong/issues/38"
+    }
+  ],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 1,
+    "deletions": 1
+  },
+  "files": [
+    {
+      "path": "help.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/help.go b/help.go\nindex 0f4dfe0..0ea9004 100644\n--- a/help.go\n+++ b/help.go\n@@ -23,7 +23,7 @@ func (h helpValue) BeforeApply(ctx *Context) error {\n \tif err != nil {\n \t\treturn err\n \t}\n-\tctx.Kong.Exit(1)\n+\tctx.Kong.Exit(0)\n \treturn nil\n }\n \n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    ".golangci.yml",
+    "COPYING",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/README.md",
+    "_examples/server/console.go",
+    "_examples/server/go.mod",
+    "_examples/server/go.sum",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/main.go",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "config_test.go",
+    "context.go",
+    "defaults.go",
+    "defaults_test.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "go.mod",
+    "go.sum",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "util.go",
+    "util_test.go",
+    "visit.go"
+  ],
+  "explanation": {
+    "what": "help.go の helpValue.BeforeApply() で、ヘルプ表示後に呼んでいた ctx.Kong.Exit() の終了コードを 1 から 0 に変更した。",
+    "why": "issue #38 で「--help を明示的に指定しただけなのに終了コード1が返るのはおかしい」という指摘があり、リンクされた Reddit のスレッドでも同様の意見が出ていた。PR本文がこれを直接の動機として説明している。",
+    "highlights": [
+      { "file": "help.go", "note": "Exit(1) → Exit(0) の1行変更。ヘルプ表示は異常終了ではないという解釈の転換。" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [
+      { "type": "pr", "number": 55, "url": "https://github.com/alecthomas/kong/pull/55" },
+      { "type": "issue", "number": 38, "url": "https://github.com/alecthomas/kong/issues/38" }
+    ],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

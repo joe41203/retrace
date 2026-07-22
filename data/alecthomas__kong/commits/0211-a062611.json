@@ -1,0 +1,126 @@
+{
+  "seq": 211,
+  "sha": "a062611ecf33c3cbb6f757b7a09516835e5122cf",
+  "parents": [
+    "5b3fd5476ad18f3bc7df3548bbea529282120585"
+  ],
+  "author": {
+    "name": "hasheddan",
+    "email": "georgedanielmangum@gmail.com",
+    "date": "2020-10-04T19:27:12-05:00"
+  },
+  "message": "Do not run parent node on missing child err with usageOnMissing option\n\nRefactors usageOnMissing option to not run parent commands after\nprinting usage when a child node is missing.\n\nSigned-off-by: hasheddan <georgedanielmangum@gmail.com>",
+  "pr": {
+    "number": 109,
+    "title": "Do not run parent node on missing child err with usageOnMissing option",
+    "body": "Refactors usageOnMissing option to not run parent commands after\r\nprinting usage when a child node is missing.\r\n\r\nSigned-off-by: hasheddan <georgedanielmangum@gmail.com>\r\n\r\nFollow up to #108 \r\n\r\n@alecthomas I opted to not make the custom error type (and related functions) exported because I don't see it as worth adding to the public API.",
+    "url": "https://github.com/alecthomas/kong/pull/109"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 3,
+    "additions": 40,
+    "deletions": 12
+  },
+  "files": [
+    {
+      "path": "context.go",
+      "status": "M",
+      "additions": 5,
+      "deletions": 11,
+      "binary": false
+    },
+    {
+      "path": "error.go",
+      "status": "M",
+      "additions": 31,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "kong.go",
+      "status": "M",
+      "additions": 4,
+      "deletions": 1,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/context.go b/context.go\nindex b4d1ee2..244c672 100644\n--- a/context.go\n+++ b/context.go\n@@ -187,9 +187,6 @@ func (c *Context) Validate() error { // nolint: gocyclo\n \t}\n \n \tif err := checkMissingChildren(node); err != nil {\n-\t\tif c.Kong.usageOnMissing {\n-\t\t\treturn c.PrintUsage(false)\n-\t\t}\n \t\treturn err\n \t}\n \tif err := checkMissingPositionals(positionals, node.Positional); err != nil {\n@@ -628,10 +625,13 @@ func (c *Context) Run(binds ...interface{}) (err error) {\n \tnode := c.Selected()\n \tif node == nil {\n \t\tif c.Kong.usageOnMissing {\n-\t\t\treturn nil\n+\t\t\treturn c.PrintUsage(false)\n \t\t}\n \t\treturn fmt.Errorf(\"no command selected\")\n \t}\n+\tif c.Kong.usageOnMissing && isMissingChildError(c.Error) {\n+\t\treturn c.PrintUsage(false)\n+\t}\n \treturn c.RunNode(node, binds...)\n }\n \n@@ -700,13 +700,7 @@ func checkMissingChildren(node *Node) error {\n \t\treturn nil\n \t}\n \n-\tif len(missing) > 5 {\n-\t\tmissing = append(missing[:5], \"...\")\n-\t}\n-\tif len(missing) == 1 {\n-\t\treturn fmt.Errorf(\"expected %s\", missing[0])\n-\t}\n-\treturn fmt.Errorf(\"expected one of %s\", strings.Join(missing, \",  \"))\n+\treturn newMissingChildError(missing)\n }\n \n // If we're missing any positionals and they're required, return an error.\ndiff --git a/error.go b/error.go\nindex 30b8858..36f512b 100644\n--- a/error.go\n+++ b/error.go\n@@ -1,5 +1,10 @@\n package kong\n \n+import (\n+\t\"fmt\"\n+\t\"strings\"\n+)\n+\n // ParseError is the error type returned by Kong.Parse().\n //\n // It contains the parse Context that triggered the error.\n@@ -10,3 +15,29 @@ type ParseError struct {\n \n // Cause returns the original cause of the error.\n func (p *ParseError) Cause() error { return p.error }\n+\n+type missingChildError struct {\n+\tmissing []string\n+}\n+\n+func (m *missingChildError) Error() string {\n+\tif len(m.missing) > 5 {\n+\t\tm.missing = append(m.missing[:5], \"...\")\n+\t}\n+\tif len(m.missing) == 1 {\n+\t\treturn fmt.Sprintf(\"expected %s\", m.missing[0])\n+\t}\n+\treturn fmt.Sprintf(\"expected one of %s\", strings.Join(m.missing, \",  \"))\n+}\n+\n+func newMissingChildError(missing []string) *missingChildError {\n+\treturn &missingChildError{missing}\n+}\n+\n+func isMissingChildError(err error) bool {\n+\tif err == nil {\n+\t\treturn false\n+\t}\n+\t_, ok := err.(*missingChildError)\n+\treturn ok\n+}\ndiff --git a/kong.go b/kong.go\nindex c16b723..d46915e 100644\n--- a/kong.go\n+++ b/kong.go\n@@ -219,7 +219,10 @@ func (k *Kong) Parse(args []string) (ctx *Context, err error) {\n \t\treturn nil, &ParseError{error: err, Context: ctx}\n \t}\n \tif err = ctx.Validate(); err != nil {\n-\t\treturn nil, &ParseError{error: err, Context: ctx}\n+\t\tif !k.usageOnError || !isMissingChildError(err) {\n+\t\t\treturn nil, &ParseError{error: err, Context: ctx}\n+\t\t}\n+\t\tctx.Error = err\n \t}\n \tif err = k.applyHook(ctx, \"AfterApply\"); err != nil {\n \t\treturn nil, &ParseError{error: err, Context: ctx}\n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    ".gitignore",
+    ".golangci.yml",
+    "COPYING",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/README.md",
+    "_examples/server/console.go",
+    "_examples/server/go.mod",
+    "_examples/server/go.sum",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/main.go",
+    "benchmark_test.go",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "config_test.go",
+    "context.go",
+    "defaults.go",
+    "defaults_test.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "go.mod",
+    "go.sum",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "testdata/file.txt",
+    "util.go",
+    "util_test.go",
+    "visit.go"
+  ],
+  "explanation": {
+    "what": "usageOnMissing オプションが有効な場合の挙動を修正した。従来は checkMissingChildren のエラー時に Validate() 内で即座に PrintUsage を呼んで正常終了させていたが、これを error.go に新設した missingChildError 型(と isMissingChildError ヘルパー)を介した判定に置き換え、kong.go の Parse() 側でエラー種別を見てから ctx.Error にエラーを保持しつつ処理を継続する形にした。Context.Run() でも c.Error が missingChildError のときのみ PrintUsage を呼ぶよう変更している。",
+    "why": "PR本文と follow up 元の #108 の記述から、目的は「子コマンドが指定されなかったときに usageOnMissing オプションで使用方法を表示した後、親ノードの Run() が誤って実行されてしまう」問題の修正と読み取れる。エラーを一度握りつぶして即 return するのではなく、エラー型を判別可能な形で ctx.Error に残すことで、後続の Run() 側が「子コマンド未指定によるエラーだったか」を判定できるようにしている。",
+    "highlights": [
+      { "file": "error.go", "note": "missingChildError という専用エラー型と isMissingChildError() 判定関数を追加。エラーの中身ではなく型で分岐する設計に変更された" },
+      { "file": "context.go", "note": "Validate() 内の即時 PrintUsage 呼び出しを削除し、エラーをそのまま伝播させるように単純化" }
+    ],
+    "langNotes": [
+      { "topic": "error type assertion", "note": "isMissingChildError は err.(*missingChildError) という型アサーションでエラーの種類を判定している。Go の標準的なカスタムエラー識別パターンで、errors.As 以前によく使われた書き方。" }
+    ],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [{ "type": "pr", "number": 109, "url": "https://github.com/alecthomas/kong/pull/109" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

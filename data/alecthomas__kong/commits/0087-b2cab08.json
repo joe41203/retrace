@@ -1,0 +1,112 @@
+{
+  "seq": 87,
+  "sha": "b2cab08684176e7d0a30717e3a159a49377f386b",
+  "parents": [
+    "0bc26a865db7359e3a31c11832f4995c294dadc5"
+  ],
+  "author": {
+    "name": "Alec Thomas",
+    "email": "alec@swapoff.org",
+    "date": "2018-06-29T12:33:50+10:00"
+  },
+  "message": "Add support for a mapper interface directly on fields.\n\nIf a field implements the MapperValue interface that interface will be\nused.",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 4,
+    "additions": 72,
+    "deletions": 13
+  },
+  "files": [
+    {
+      "path": "README.md",
+      "status": "M",
+      "additions": 8,
+      "deletions": 2,
+      "binary": false
+    },
+    {
+      "path": "build.go",
+      "status": "M",
+      "additions": 2,
+      "deletions": 2,
+      "binary": false
+    },
+    {
+      "path": "mapper.go",
+      "status": "M",
+      "additions": 43,
+      "deletions": 9,
+      "binary": false
+    },
+    {
+      "path": "mapper_test.go",
+      "status": "M",
+      "additions": 19,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/README.md b/README.md\nindex 257f9a3..224c205 100644\n--- a/README.md\n+++ b/README.md\n@@ -16,7 +16,8 @@\n 1. [Terminating positional arguments](#terminating-positional-arguments)\n 1. [Slices](#slices)\n 1. [Maps](#maps)\n-1. [Custom named types](#custom-named-types)\n+1. [Custom named decoders](#custom-named-decoders)\n+1. [Custom decoders](#custom-decoders)\n 1. [Supported tags](#supported-tags)\n 1. [Variable interpolation](#variable-interpolation)\n 1. [Modifying Kong's behaviour](#modifying-kongs-behaviour)\n@@ -306,7 +307,7 @@ var CLI struct {\n }\n ```\n \n-## Custom named types\n+## Custom named decoders\n \n Kong includes a number of builtin custom type mappers. These can be used by\n specifying the tag `type:\"<type>\"`. They are registered with the option\n@@ -324,6 +325,11 @@ specifies the element type. For maps, the tag has the format\n `tag:\"[<key>]:[<value>]\"` where either may be omitted.\n \n \n+## Custom decoders\n+\n+If a field implements the [MapperValue](https://godoc.org/github.com/alecthomas/kong#MapperValue)\n+interface it will be used to decode arguments into the field.\n+\n ## Supported tags\n \n Tags can be in two forms:\ndiff --git a/build.go b/build.go\nindex e8e36b1..e607617 100644\n--- a/build.go\n+++ b/build.go\n@@ -70,8 +70,8 @@ func buildNode(k *Kong, v reflect.Value, typ NodeType, seenFlags map[string]bool\n \t\t\tname = strings.ToLower(dashedString(ft.Name))\n \t\t}\n \n-\t\t// Nested structs are either commands or args.\n-\t\tif ft.Type.Kind() == reflect.Struct && (tag.Cmd || tag.Arg) {\n+\t\t// Nested structs are either commands or args, unless they implement the Mapper interface.\n+\t\tif ft.Type.Kind() == reflect.Struct && (tag.Cmd || tag.Arg) && k.registry.ForValue(fv) == nil {\n \t\t\ttyp := CommandNode\n \t\t\tif tag.Arg {\n \t\t\t\ttyp = ArgumentNode\ndiff --git a/mapper.go b/mapper.go\nindex d5f04ff..ba40b12 100644\n--- a/mapper.go\n+++ b/mapper.go\n@@ -11,6 +11,11 @@ import (\n \t\"time\"\n )\n \n+var (\n+\tmapperValueType = reflect.TypeOf((*MapperValue)(nil)).Elem()\n+\tboolMapperType  = reflect.TypeOf((*BoolMapper)(nil)).Elem()\n+)\n+\n // DecodeContext is passed to a Mapper's Decode().\n //\n // It contains the Value being decoded into and the Scanner to parse from.\n@@ -29,17 +34,40 @@ func (r *DecodeContext) WithScanner(scan *Scanner) *DecodeContext {\n \t}\n }\n \n+// MapperValue may be implemented by fields in order to provide custom mapping.\n+type MapperValue interface {\n+\tDecode(ctx *DecodeContext) error\n+}\n+\n+type mapperValueAdapter struct {\n+\tisBool bool\n+}\n+\n+func (m *mapperValueAdapter) Decode(ctx *DecodeContext, target reflect.Value) error {\n+\tif target.Type().Implements(mapperValueType) {\n+\t\treturn target.Interface().(MapperValue).Decode(ctx)\n+\t}\n+\treturn target.Addr().Interface().(MapperValue).Decode(ctx)\n+}\n+\n+func (m *mapperValueAdapter) IsBool() bool {\n+\treturn m.isBool\n+}\n+\n // A Mapper represents how a field is mapped from command-line values to Go.\n //\n // Mappers can be associated with concrete fields via pointer, reflect.Type, reflect.Kind, or via a \"type\" tag.\n+//\n+// Additionally, if a type implements this interface, it will be used.\n type Mapper interface {\n \t// Decode ctx.Value with ctx.Scanner into target.\n \tDecode(ctx *DecodeContext, target reflect.Value) error\n }\n \n // A BoolMapper is a Mapper to a value that is a boolean.\n+//\n+// This is used solely for formatting help.\n type BoolMapper interface {\n-\tMapper\n \tIsBool() bool\n }\n \n@@ -78,6 +106,14 @@ func (r *Registry) ForNamedValue(name string, value reflect.Value) Mapper {\n \treturn r.ForValue(value)\n }\n \n+// ForValue looks up the Mapper for a reflect.Value.\n+func (r *Registry) ForValue(value reflect.Value) Mapper {\n+\tif mapper, ok := r.values[value]; ok {\n+\t\treturn mapper\n+\t}\n+\treturn r.ForType(value.Type())\n+}\n+\n // ForNamedType finds a mapper for a type with a user-specified name.\n //\n // Will return nil if a mapper can not be determined.\n@@ -88,18 +124,16 @@ func (r *Registry) ForNamedType(name string, typ reflect.Type) Mapper {\n \treturn r.ForType(typ)\n }\n \n-// ForValue looks up the Mapper for a reflect.Value.\n-func (r *Registry) ForValue(value reflect.Value) Mapper {\n-\tif mapper, ok := r.values[value]; ok {\n-\t\treturn mapper\n-\t}\n-\treturn r.ForType(value.Type())\n-}\n-\n // ForType finds a mapper from a type, by type, then kind.\n //\n // Will return nil if a mapper can not be determined.\n func (r *Registry) ForType(typ reflect.Type) Mapper {\n+\t// Check if the type implements MapperValue.\n+\tfor _, impl := range []reflect.Type{typ, reflect.PtrTo(typ)} {\n+\t\tif impl.Implements(mapperValueType) {\n+\t\t\treturn &mapperValueAdapter{impl.Implements(boolMapperType)}\n+\t\t}\n+\t}\n \tvar mapper Mapper\n \tvar ok bool\n \tif mapper, ok = r.types[typ]; ok {\ndiff --git a/mapper_test.go b/mapper_test.go\nindex 12e982f..ce43564 100644\n--- a/mapper_test.go\n+++ b/mapper_test.go\n@@ -120,3 +120,22 @@ func TestSliceConsumesRemainingPositionalArgs(t *testing.T) {\n \trequire.NoError(t, err)\n \trequire.Equal(t, []string{\"ls\", \"-lart\"}, cli.Remainder)\n }\n+\n+type mappedValue struct {\n+\tdecoded string\n+}\n+\n+func (m *mappedValue) Decode(ctx *kong.DecodeContext) error {\n+\tm.decoded = ctx.Scan.PopValue(\"mapped\")\n+\treturn nil\n+}\n+\n+func TestMapperValue(t *testing.T) {\n+\tvar cli struct {\n+\t\tValue mappedValue `arg:\"\"`\n+\t}\n+\tp := mustNew(t, &cli)\n+\t_, err := p.Parse([]string{\"foo\"})\n+\trequire.NoError(t, err)\n+\trequire.Equal(t, \"foo\", cli.Value.decoded)\n+}\n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    ".golangci.yml",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/console.go",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/main.go",
+    "build.go",
+    "camelcase.go",
+    "context.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "tokentype_string.go"
+  ],
+  "explanation": {
+    "what": "新しい MapperValue インターフェース(Decode(ctx *DecodeContext) error を持つ)を定義し、フィールドの型自身がこれを実装していれば Registry.ForType がそれを優先的に使うようにした(mapperValueAdapter でラップして既存の Mapper インターフェースに適合させる)。buildNode 側でも、struct フィールドが MapperValue を実装していればコマンド/引数のネスト構造ではなく通常の値として扱うよう分岐を追加した。",
+    "why": "コミットメッセージにある通り、フィールドの型自身が MapperValue を実装していればそれを使うようにする機能追加で、これまで Mapper は型・kind・タグ名で外部から登録する方式しかなかったのに対し、フィールドの型自体にデコード方法を持たせたいケース(独自型が自分自身の解析ロジックを知っている場合)に対応するためとおもわれる。",
+    "highlights": [
+      { "file": "mapper.go", "note": "MapperValue インターフェースと、それを Mapper に適合させる mapperValueAdapter が新設された" },
+      { "file": "build.go", "note": "struct フィールドが MapperValue を実装している場合はコマンド/引数として展開せず、値としてマッピングするよう分岐が追加された" }
+    ],
+    "langNotes": [
+      { "topic": "フィールド上の mapper インターフェース(MapperValue)", "note": "Go では型が特定のメソッドセットを満たせば暗黙にインターフェースを実装したことになる。このコミットでは reflect.Type.Implements() を使い、フィールドの型(またはそのポインタ型)が MapperValue を実装しているかを実行時に判定し、実装していればその Decode をそのまま呼び出す。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

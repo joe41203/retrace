@@ -1,0 +1,132 @@
+{
+  "seq": 223,
+  "sha": "7e27c8ecf54f10863747529c60f90f39aac02092",
+  "parents": [
+    "b68e1aba6340deb6b378f3a3fc241a0cc871b4c6"
+  ],
+  "author": {
+    "name": "Alec Thomas",
+    "email": "alec@swapoff.org",
+    "date": "2021-02-09T15:08:22+11:00"
+  },
+  "message": "Support a simplified `kong.Groups{<key>: <title>}` way of specifiying groups.\n\nSee #135.",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 5,
+    "additions": 47,
+    "deletions": 26
+  },
+  "files": [
+    {
+      "path": "build.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "help.go",
+      "status": "M",
+      "additions": 4,
+      "deletions": 4,
+      "binary": false
+    },
+    {
+      "path": "help_test.go",
+      "status": "M",
+      "additions": 8,
+      "deletions": 17,
+      "binary": false
+    },
+    {
+      "path": "model.go",
+      "status": "M",
+      "additions": 2,
+      "deletions": 2,
+      "binary": false
+    },
+    {
+      "path": "options.go",
+      "status": "M",
+      "additions": 32,
+      "deletions": 2,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/build.go b/build.go\nindex 8e70674..0e3bc5f 100644\n--- a/build.go\n+++ b/build.go\n@@ -232,7 +232,7 @@ func buildGroupForKey(k *Kong, key string) *Group {\n \t\t}\n \t}\n \n-\t// No group provided with kong.Groups. We create one ad-hoc for this key.\n+\t// No group provided with kong.ExplicitGroups. We create one ad-hoc for this key.\n \treturn &Group{\n \t\tKey:   key,\n \t\tTitle: key,\ndiff --git a/help.go b/help.go\nindex 31b0b75..90e3708 100644\n--- a/help.go\n+++ b/help.go\n@@ -150,8 +150,8 @@ func printNodeDetail(w *helpWriter, node *Node, hide bool) {\n \t\t\tif group.Metadata.Title != \"\" {\n \t\t\t\tw.Print(group.Metadata.Title)\n \t\t\t}\n-\t\t\tif group.Metadata.Header != \"\" {\n-\t\t\t\tw.Print(group.Metadata.Header)\n+\t\t\tif group.Metadata.Description != \"\" {\n+\t\t\t\tw.Print(group.Metadata.Description)\n \t\t\t}\n \t\t\twriteFlags(w.Indent(), group.Flags)\n \t\t}\n@@ -170,8 +170,8 @@ func printNodeDetail(w *helpWriter, node *Node, hide bool) {\n \t\t\t\tif group.Metadata.Title != \"\" {\n \t\t\t\t\tw.Print(group.Metadata.Title)\n \t\t\t\t}\n-\t\t\t\tif group.Metadata.Header != \"\" {\n-\t\t\t\t\tw.Print(group.Metadata.Header)\n+\t\t\t\tif group.Metadata.Description != \"\" {\n+\t\t\t\t\tw.Print(group.Metadata.Description)\n \t\t\t\t}\n \n \t\t\t\tif w.Compact {\ndiff --git a/help_test.go b/help_test.go\nindex 51b5132..b83a16b 100644\n--- a/help_test.go\n+++ b/help_test.go\n@@ -295,20 +295,11 @@ func TestHelpGrouping(t *testing.T) {\n \tapp := mustNew(t, &cli,\n \t\tkong.Name(\"test-app\"),\n \t\tkong.Description(\"A test app.\"),\n-\t\tkong.Groups([]kong.Group{\n-\t\t\t{\n-\t\t\t\tKey:    \"Group A\",\n-\t\t\t\tTitle:  \"Group title taken from the kong.Groups option\",\n-\t\t\t\tHeader: \"A group header\",\n-\t\t\t},\n-\t\t\t{\n-\t\t\t\tKey:   \"Group 1\",\n-\t\t\t\tTitle: \"Another group title, this time without header\",\n-\t\t\t},\n-\t\t\t{\n-\t\t\t\tKey: \"Unknown key\",\n-\t\t\t},\n-\t\t}),\n+\t\tkong.Groups{\n+\t\t\t\"Group A\":     \"Group title taken from the kong.ExplicitGroups option\\nA group header\",\n+\t\t\t\"Group 1\":     \"Another group title, this time without header\",\n+\t\t\t\"Unknown key\": \"\",\n+\t\t},\n \t\tkong.Writers(w, w),\n \t\tkong.Exit(func(int) {\n \t\t\texited = true\n@@ -331,7 +322,7 @@ Flags:\n       --free-string=STRING    A non grouped string flag.\n       --free-bool             A non grouped bool flag.\n \n-Group title taken from the kong.Groups option\n+Group title taken from the kong.ExplicitGroups option\n A group header\n   --grouped-a-string=STRING    A string flag grouped in A.\n   --grouped-a-bool             A bool flag grouped in A.\n@@ -343,7 +334,7 @@ Commands:\n   two\n     A non grouped subcommand.\n \n-Group title taken from the kong.Groups option\n+Group title taken from the kong.ExplicitGroups option\n A group header\n   one thing <arg>\n     subcommand thing\n@@ -387,7 +378,7 @@ Flags:\n \n       --a-free-string=STRING    A non grouped string flag.\n \n-Group title taken from the kong.Groups option\n+Group title taken from the kong.ExplicitGroups option\n A group header\n   --grouped-a-string=STRING    A string flag grouped in A.\n   --grouped-a-bool             A bool flag grouped in A.\ndiff --git a/model.go b/model.go\nindex c13c693..c64cab3 100644\n--- a/model.go\n+++ b/model.go\n@@ -412,9 +412,9 @@ type Group struct {\n \tKey string\n \t// Title is displayed above the grouped items.\n \tTitle string\n-\t// Header is optional and displayed under the Title when non empty.\n+\t// Description is optional and displayed under the Title when non empty.\n \t// It can be used to introduce the group's purpose to the user.\n-\tHeader string\n+\tDescription string\n }\n \n // This is directly from the Go 1.13 source code.\ndiff --git a/options.go b/options.go\nindex fc218d1..bdb57f6 100644\n--- a/options.go\n+++ b/options.go\n@@ -208,10 +208,40 @@ func ConfigureHelp(options HelpOptions) Option {\n \t})\n }\n \n-// Groups associates `group` field tags with their metadata.\n+// Groups associates `group` field tags with group metadata.\n+//\n+// This option is used to simplify Kong tags while providing\n+// rich group information such as title and optional description.\n+//\n+// Each key in the \"groups\" map corresponds to the value of a\n+// `group` Kong tag, while the first line of the value will be\n+// the title, and subsequent lines if any will be the description of\n+// the group.\n+//\n+// See also ExplicitGroups for a more structured alternative.\n+type Groups map[string]string\n+\n+func (g Groups) Apply(k *Kong) error { // nolint: golint\n+\tfor key, info := range g {\n+\t\tlines := strings.Split(info, \"\\n\")\n+\t\ttitle := strings.TrimSpace(lines[0])\n+\t\tdescription := \"\"\n+\t\tif len(lines) > 1 {\n+\t\t\tdescription = strings.TrimSpace(strings.Join(lines[1:], \"\\n\"))\n+\t\t}\n+\t\tk.groups = append(k.groups, Group{\n+\t\t\tKey:         key,\n+\t\t\tTitle:       title,\n+\t\t\tDescription: description,\n+\t\t})\n+\t}\n+\treturn nil\n+}\n+\n+// ExplicitGroups associates `group` field tags with their metadata.\n //\n // It can be used to provide a title or header to a command or flag group.\n-func Groups(groups []Group) Option {\n+func ExplicitGroups(groups []Group) Option {\n \treturn OptionFunc(func(k *Kong) error {\n \t\tk.groups = groups\n \t\treturn nil\n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    ".gitignore",
+    ".golangci.yml",
+    "COPYING",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/README.md",
+    "_examples/server/console.go",
+    "_examples/server/go.mod",
+    "_examples/server/go.sum",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/main.go",
+    "benchmark_test.go",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "config_test.go",
+    "context.go",
+    "defaults.go",
+    "defaults_test.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "go.mod",
+    "go.sum",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "testdata/file.txt",
+    "util.go",
+    "util_test.go",
+    "visit.go"
+  ],
+  "explanation": {
+    "what": "直前のコミットで追加した `ExplicitGroups([]Group)`(構造体スライスでの明示指定)に加え、より簡潔な `kong.Groups{<key>: <title>\\n<description>}` という `map[string]string` 型のオプションを新設した。値の1行目をタイトル、2行目以降を Description として扱う。従来の `Groups` 関数は `ExplicitGroups` に改名し、`Group.Header` フィールドも `Description` にリネームしている。",
+    "why": "コミットメッセージが \"See #135\" とだけ参照しており詳細な動機説明は無いが、直前のコミットで追加したばかりの Group 指定 API が構造体スライス主体でやや冗長だったため、単純な `map[string]title` で済ませたいケースに向けた簡易版を用意したとみられる。",
+    "highlights": [
+      { "file": "options.go", "note": "`Groups` 型(map)の Apply() が改行でタイトルと Description を分離するパース処理" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

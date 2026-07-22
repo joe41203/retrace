@@ -1,0 +1,150 @@
+{
+  "seq": 444,
+  "sha": "66d5762b66ba3ef4afe924a112ec25a4028d8d9f",
+  "parents": [
+    "f0b321097eed010e1c58eda710b59dd61e9044dc"
+  ],
+  "author": {
+    "name": "Sam Xie",
+    "email": "sam@samxie.me",
+    "date": "2025-04-23T15:24:47-07:00"
+  },
+  "message": "Support parsing integer literals (#529)",
+  "pr": {
+    "number": 529,
+    "title": "Support parsing integer literals",
+    "body": "Resolve #528",
+    "url": "https://github.com/alecthomas/kong/pull/529"
+  },
+  "linkedIssues": [
+    {
+      "number": 528,
+      "title": "Support parsing integer literals",
+      "body": "When typing a long integer number, using underscore characters between successive digits can improve readability. For instance, for the number `1000000000`, it becomes `1_000_000_000` with underscore characters. This is easy to read. This is also the format defined in the Go spec https://go.dev/ref/spec#Integer_literals\n\n> For readability, an underscore character _ may appear after a base prefix or between successive digits; such underscores do not change the literal's value. \n\nKong cannot parse an int string like `1_000`. It would return an error\n\n```\nexpected a valid 64 bit int but got \"10_000_000\"\n```",
+      "url": "https://github.com/alecthomas/kong/issues/528"
+    }
+  ],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 27,
+    "deletions": 2
+  },
+  "files": [
+    {
+      "path": "mapper.go",
+      "status": "M",
+      "additions": 2,
+      "deletions": 2,
+      "binary": false
+    },
+    {
+      "path": "mapper_test.go",
+      "status": "M",
+      "additions": 25,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/mapper.go b/mapper.go\nindex db3f24e..7e97836 100644\n--- a/mapper.go\n+++ b/mapper.go\n@@ -387,7 +387,7 @@ func intDecoder(bits int) MapperFunc { //nolint: dupl\n \t\tdefault:\n \t\t\treturn fmt.Errorf(\"expected an int but got %q (%T)\", t, t.Value)\n \t\t}\n-\t\tn, err := strconv.ParseInt(sv, 10, bits)\n+\t\tn, err := strconv.ParseInt(sv, 0, bits)\n \t\tif err != nil {\n \t\t\treturn fmt.Errorf(\"expected a valid %d bit int but got %q\", bits, sv)\n \t\t}\n@@ -416,7 +416,7 @@ func uintDecoder(bits int) MapperFunc { //nolint: dupl\n \t\tdefault:\n \t\t\treturn fmt.Errorf(\"expected an int but got %q (%T)\", t, t.Value)\n \t\t}\n-\t\tn, err := strconv.ParseUint(sv, 10, bits)\n+\t\tn, err := strconv.ParseUint(sv, 0, bits)\n \t\tif err != nil {\n \t\t\treturn fmt.Errorf(\"expected a valid %d bit uint but got %q\", bits, sv)\n \t\t}\ndiff --git a/mapper_test.go b/mapper_test.go\nindex 947f836..dd04119 100644\n--- a/mapper_test.go\n+++ b/mapper_test.go\n@@ -395,6 +395,31 @@ func TestNumbers(t *testing.T) {\n \t\t\tI64: math.MinInt64,\n \t\t}, cli)\n \t})\n+\tt.Run(\"Integer literals\", func(t *testing.T) {\n+\t\tintegerLiterals := \"10_0\"\n+\n+\t\t_, err := p.Parse([]string{\n+\t\t\tfmt.Sprintf(\"--i-8=%s\", integerLiterals),\n+\t\t\tfmt.Sprintf(\"--i-16=%s\", integerLiterals),\n+\t\t\tfmt.Sprintf(\"--i-32=%s\", integerLiterals),\n+\t\t\tfmt.Sprintf(\"--i-64=%s\", integerLiterals),\n+\t\t\tfmt.Sprintf(\"--u-8=%s\", integerLiterals),\n+\t\t\tfmt.Sprintf(\"--u-16=%s\", integerLiterals),\n+\t\t\tfmt.Sprintf(\"--u-32=%s\", integerLiterals),\n+\t\t\tfmt.Sprintf(\"--u-64=%s\", integerLiterals),\n+\t\t})\n+\t\tassert.NoError(t, err)\n+\t\tassert.Equal(t, CLI{\n+\t\t\tI8:  int8(100),\n+\t\t\tI16: int16(100),\n+\t\t\tI32: int32(100),\n+\t\t\tI64: int64(100),\n+\t\t\tU8:  uint8(100),\n+\t\t\tU16: uint16(100),\n+\t\t\tU32: uint32(100),\n+\t\t\tU64: uint64(100),\n+\t\t}, cli)\n+\t})\n }\n \n func TestJSONLargeNumber(t *testing.T) {\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/FUNDING.yml",
+    ".github/workflows/ci.yml",
+    ".gitignore",
+    ".golangci.yml",
+    "COPYING",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/README.md",
+    "_examples/server/console.go",
+    "_examples/server/go.mod",
+    "_examples/server/go.sum",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/commandstring/main.go",
+    "_examples/shell/help/README.md",
+    "_examples/shell/help/main.go",
+    "benchmark_test.go",
+    "bin/.go-1.24.2.pkg",
+    "bin/.golangci-lint-1.64.5.pkg",
+    "bin/.lefthook-1.11.10.pkg",
+    "bin/README.hermit.md",
+    "bin/activate-hermit",
+    "bin/go",
+    "bin/gofmt",
+    "bin/golangci-lint",
+    "bin/hermit",
+    "bin/hermit.hcl",
+    "bin/lefthook",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "config_test.go",
+    "context.go",
+    "defaults.go",
+    "defaults_test.go",
+    "doc.go",
+    "error.go",
+    "exit.go",
+    "global.go",
+    "global_test.go",
+    "go.mod",
+    "go.sum",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "helpwrap1.18_test.go",
+    "helpwrap1.19_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "lefthook.yml",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_linux_test.go",
+    "mapper_test.go",
+    "mapper_windows_test.go",
+    "model.go",
+    "model_test.go",
+    "negatable.go",
+    "options.go",
+    "options_test.go",
+    "renovate.json5",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "testdata/file.txt",
+    "util.go",
+    "util_test.go",
+    "visit.go"
+  ],
+  "explanation": {
+    "what": "mapper.go の intDecoder / uintDecoder で strconv.ParseInt / strconv.ParseUint に渡す基数指定を 10 から 0 に変更した。基数0はGo標準ライブラリの規約で、文字列のプレフィックス(0x, 0, 0b等)や桁区切りのアンダースコアを解釈させる指定になる。テストとして --i-64=10_0 のようなアンダースコア区切り整数リテラルが各整数型フラグに正しくパースされることを確認するケースを追加した。",
+    "why": "リンクされたissue #528が、Goの整数リテラル記法(https://go.dev/ref/spec#Integer_literals)にある桁区切りのアンダースコア(例: 1_000_000_000)を、kongのフラグ値としてパースできず `expected a valid 64 bit int but got \"10_000_000\"` のエラーになる問題を報告していた。可読性のためにアンダースコアを使いたいユーザーの要望に応える形で対応した。",
+    "highlights": [
+      { "file": "mapper.go", "note": "ParseInt/ParseUint の基数引数を 10→0 に変えるだけで Go の整数リテラル構文(0x, 0b, アンダースコア区切り等)がまとめて有効になる" }
+    ],
+    "langNotes": [
+      { "topic": "strconv.ParseInt の基数0", "note": "strconv.ParseInt(s, base, bitSize) は base=0 のとき文字列先頭のプレフィックス(0x, 0o, 0b等)から基数を自動判定し、かつGoの整数リテラルと同様に桁区切りのアンダースコアを許容する。base=10固定だとこの解釈が働かない。" }
+    ],
+    "diagram": null,
+    "evidence": "issue",
+    "refs": [
+      { "type": "pr", "number": 529, "url": "https://github.com/alecthomas/kong/pull/529" },
+      { "type": "issue", "number": 528, "url": "https://github.com/alecthomas/kong/issues/528" }
+    ],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

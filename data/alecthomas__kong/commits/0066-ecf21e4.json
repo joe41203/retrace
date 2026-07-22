@@ -1,0 +1,122 @@
+{
+  "seq": 66,
+  "sha": "ecf21e4cc9913703b433126e8a71a9dbb49a7048",
+  "parents": [
+    "54386f7fa5a8f6c529ecd9cb9b28e851bb89cf5a"
+  ],
+  "author": {
+    "name": "Alec Thomas",
+    "email": "alec@swapoff.org",
+    "date": "2018-06-13T22:16:43+10:00"
+  },
+  "message": "Add support for maps.",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 7,
+    "additions": 76,
+    "deletions": 22
+  },
+  "files": [
+    {
+      "path": "help.go",
+      "status": "M",
+      "additions": 0,
+      "deletions": 4,
+      "binary": false
+    },
+    {
+      "path": "help_test.go",
+      "status": "M",
+      "additions": 9,
+      "deletions": 3,
+      "binary": false
+    },
+    {
+      "path": "kong_test.go",
+      "status": "M",
+      "additions": 10,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "mapper.go",
+      "status": "M",
+      "additions": 36,
+      "deletions": 2,
+      "binary": false
+    },
+    {
+      "path": "model.go",
+      "status": "M",
+      "additions": 16,
+      "deletions": 3,
+      "binary": false
+    },
+    {
+      "path": "resolver.go",
+      "status": "M",
+      "additions": 5,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "tag.go",
+      "status": "M",
+      "additions": 0,
+      "deletions": 8,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/help.go b/help.go\nindex 4f92437..8fe9cc7 100644\n--- a/help.go\n+++ b/help.go\n@@ -5,7 +5,6 @@ import (\n \t\"fmt\"\n \t\"go/doc\"\n \t\"io\"\n-\t\"reflect\"\n \t\"strings\"\n )\n \n@@ -197,8 +196,5 @@ func formatFlag(haveShort bool, flag *Flag) string {\n \tif !isBool {\n \t\tflagString += fmt.Sprintf(\"=%s\", flag.FormatPlaceHolder())\n \t}\n-\tif flag.Value.Target.Kind() == reflect.Slice {\n-\t\tflagString += \" ...\"\n-\t}\n \treturn flagString\n }\ndiff --git a/help_test.go b/help_test.go\nindex 5d5e76d..9aa6004 100644\n--- a/help_test.go\n+++ b/help_test.go\n@@ -10,9 +10,11 @@ import (\n func TestHelp(t *testing.T) {\n \t// nolint: govet\n \tvar cli struct {\n-\t\tString   string `help:\"A string flag.\"`\n-\t\tBool     bool   `help:\"A bool flag with very long help that wraps a lot and is verbose and is really verbose.\"`\n-\t\tRequired bool   `required help:\"A required flag.\"`\n+\t\tString   string         `help:\"A string flag.\"`\n+\t\tBool     bool           `help:\"A bool flag with very long help that wraps a lot and is verbose and is really verbose.\"`\n+\t\tSlice    []string       `help:\"A slice of strings.\" placeholder:\"STR\"`\n+\t\tMap      map[string]int `help:\"A map of strings to ints.\"`\n+\t\tRequired bool           `required help:\"A required flag.\"`\n \n \t\tOne struct {\n \t\t\tFlag string `help:\"Nested flag.\"`\n@@ -60,6 +62,8 @@ Flags:\n   --string=STRING  A string flag.\n   --bool           A bool flag with very long help that wraps a lot and is\n                    verbose and is really verbose.\n+  --slice=STR,...  A slice of strings.\n+  --map=KEY=VALUE  A map of strings to ints.\n   --required       A required flag.\n \n Commands:\n@@ -91,6 +95,8 @@ Flags:\n   --string=STRING   A string flag.\n   --bool            A bool flag with very long help that wraps a lot and is\n                     verbose and is really verbose.\n+  --slice=STR,...   A slice of strings.\n+  --map=KEY=VALUE   A map of strings to ints.\n   --required        A required flag.\n \n   --flag=STRING     Nested flag under two.\ndiff --git a/kong_test.go b/kong_test.go\nindex bb3d322..2eaaf72 100644\n--- a/kong_test.go\n+++ b/kong_test.go\n@@ -139,7 +139,7 @@ func TestArgSliceWithSeparator(t *testing.T) {\n \n func TestUnsupportedFieldErrors(t *testing.T) {\n \tvar cli struct {\n-\t\tKeys map[string]string\n+\t\tKeys struct{}\n \t}\n \t_, err := New(&cli)\n \trequire.Error(t, err)\n@@ -401,3 +401,12 @@ func TestDuplicateSliceAccumulates(t *testing.T) {\n \trequire.NoError(t, err)\n \trequire.Equal(t, []int{1, 2, 3, 4}, cli.Flag)\n }\n+\n+func TestMapFlag(t *testing.T) {\n+\tvar cli struct {\n+\t\tSet map[string]int\n+\t}\n+\t_, err := mustNew(t, &cli).Parse([]string{\"--set\", \"a=10\", \"--set\", \"b=20\"})\n+\trequire.NoError(t, err)\n+\trequire.Equal(t, map[string]int{\"a\": 10, \"b\": 20}, cli.Set)\n+}\ndiff --git a/mapper.go b/mapper.go\nindex 6b4d05a..dcbacd0 100644\n--- a/mapper.go\n+++ b/mapper.go\n@@ -153,7 +153,8 @@ func (d *Registry) RegisterDefaults() *Registry {\n \t\tRegisterKind(reflect.Bool, boolMapper{}).\n \t\tRegisterType(reflect.TypeOf(time.Time{}), timeDecoder()).\n \t\tRegisterType(reflect.TypeOf(time.Duration(0)), durationDecoder()).\n-\t\tRegisterKind(reflect.Slice, sliceDecoder(d))\n+\t\tRegisterKind(reflect.Slice, sliceDecoder(d)).\n+\t\tRegisterKind(reflect.Map, mapDecoder(d))\n }\n \n type boolMapper struct{}\n@@ -228,6 +229,36 @@ func floatDecoder(bits int) MapperFunc {\n \n func mapDecoder(d *Registry) MapperFunc {\n \treturn func(ctx *DecodeContext, target reflect.Value) error {\n+\t\tif target.IsNil() {\n+\t\t\ttarget.Set(reflect.MakeMap(target.Type()))\n+\t\t}\n+\t\tel := target.Type()\n+\t\tsep := ctx.Value.Tag.Sep\n+\t\tif sep == 0 {\n+\t\t\tsep = '='\n+\t\t}\n+\t\ttoken := ctx.Scan.PopValue(\"map\")\n+\t\tparts := SplitEscaped(token, sep)\n+\t\tif len(parts) != 2 {\n+\t\t\treturn fmt.Errorf(\"expected \\\"<key>%c<value>\\\" but got %q\", sep, token)\n+\t\t}\n+\t\tkey, value := parts[0], parts[1]\n+\n+\t\tkeyScanner := Scan(key)\n+\t\tkeyDecoder := d.ForType(el.Key())\n+\t\tkeyValue := reflect.New(el.Key()).Elem()\n+\t\tif err := keyDecoder.Decode(ctx.WithScanner(keyScanner), keyValue); err != nil {\n+\t\t\treturn fmt.Errorf(\"invalid map key %q\", key)\n+\t\t}\n+\n+\t\tvalueScanner := Scan(value)\n+\t\tvalueDecoder := d.ForType(el.Elem())\n+\t\tvalueValue := reflect.New(el.Elem()).Elem()\n+\t\tif err := valueDecoder.Decode(ctx.WithScanner(valueScanner), valueValue); err != nil {\n+\t\t\treturn fmt.Errorf(\"invalid map value %q\", value)\n+\t\t}\n+\n+\t\ttarget.SetMapIndex(keyValue, valueValue)\n \t\treturn nil\n \t}\n }\n@@ -236,12 +267,15 @@ func sliceDecoder(d *Registry) MapperFunc {\n \treturn func(ctx *DecodeContext, target reflect.Value) error {\n \t\tel := target.Type().Elem()\n \t\tsep := ctx.Value.Tag.Sep\n+\t\tif sep == 0 {\n+\t\t\tsep = ','\n+\t\t}\n \t\tvar childScanner *Scanner\n \t\tif ctx.Value.Flag != nil {\n \t\t\t// If decoding a flag, we need an argument.\n \t\t\tchildScanner = Scan(SplitEscaped(ctx.Scan.PopValue(\"list\"), sep)...)\n \t\t} else {\n-\t\t\ttokens := ctx.Scan.PopUntil(func(t Token) bool { return !t.IsValue() })\n+\t\t\ttokens := ctx.Scan.PopWhile(func(t Token) bool { return t.IsValue() })\n \t\t\tchildScanner = Scan(tokens...)\n \t\t}\n \t\tchildDecoder := d.ForType(el)\ndiff --git a/model.go b/model.go\nindex a7834ca..cdf5e50 100644\n--- a/model.go\n+++ b/model.go\n@@ -164,11 +164,21 @@ func (v *Value) Summary() string {\n \treturn argText\n }\n \n-// IsCumulative returns true of the value is a slice.\n+// IsCumulative returns true if the type can be accumulated into.\n func (v *Value) IsCumulative() bool {\n+\treturn v.IsSlice() || v.IsMap()\n+}\n+\n+// IsSlice returns true if the value is a slice.\n+func (v *Value) IsSlice() bool {\n \treturn v.Target.Kind() == reflect.Slice\n }\n \n+// IsMap returns true if the value is a map.\n+func (v *Value) IsMap() bool {\n+\treturn v.Target.Kind() == reflect.Map\n+}\n+\n // IsBool returns true if the underlying value is a boolean.\n func (v *Value) IsBool() bool {\n \tif m, ok := v.Mapper.(BoolMapper); ok && m.IsBool() {\n@@ -229,8 +239,8 @@ func (f *Flag) String() string {\n // FormatPlaceHolder formats the placeholder string for a Flag.\n func (f *Flag) FormatPlaceHolder() string {\n \ttail := \"\"\n-\tif f.Value.IsCumulative() {\n-\t\ttail += \", ...\"\n+\tif f.Value.IsSlice() {\n+\t\ttail += \",...\"\n \t}\n \tif f.Default != \"\" {\n \t\tif f.Value.Target.Kind() == reflect.String {\n@@ -241,5 +251,8 @@ func (f *Flag) FormatPlaceHolder() string {\n \tif f.PlaceHolder != \"\" {\n \t\treturn f.PlaceHolder + tail\n \t}\n+\tif f.Value.IsMap() {\n+\t\treturn \"KEY=VALUE\" + tail\n+\t}\n \treturn strings.ToUpper(f.Name) + tail\n }\ndiff --git a/resolver.go b/resolver.go\nindex 08520ae..fd5a02d 100755\n--- a/resolver.go\n+++ b/resolver.go\n@@ -26,7 +26,11 @@ func JSON(r io.Reader) (ResolverFunc, error) {\n \t\tif !ok {\n \t\t\treturn \"\", nil\n \t\t}\n-\t\tvalue, err := jsonDecodeValue(flag.Tag.Sep, raw)\n+\t\tsep := flag.Tag.Sep\n+\t\tif sep == 0 {\n+\t\t\tsep = ','\n+\t\t}\n+\t\tvalue, err := jsonDecodeValue(sep, raw)\n \t\tif err != nil {\n \t\t\treturn \"\", err\n \t\t}\ndiff --git a/tag.go b/tag.go\nindex 17a71e6..1573806 100644\n--- a/tag.go\n+++ b/tag.go\n@@ -130,14 +130,6 @@ func parseTag(fv reflect.Value, ft reflect.StructField) *Tag {\n \tt.Hidden = t.Has(\"hidden\")\n \tt.Format, _ = t.Get(\"format\")\n \tt.Sep, _ = t.GetRune(\"sep\")\n-\tif t.Sep == 0 {\n-\t\tif t.Cmd || t.Arg {\n-\t\t\tt.Sep = ' '\n-\t\t} else {\n-\t\t\tt.Sep = ','\n-\t\t}\n-\t}\n-\n \tt.PlaceHolder, _ = t.Get(\"placeholder\")\n \tif t.PlaceHolder == \"\" {\n \t\tt.PlaceHolder = strings.ToUpper(dashedString(fv.Type().Name()))\n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    ".golangci.yml",
+    "README.md",
+    "_examples/shell/main.go",
+    "build.go",
+    "camelcase.go",
+    "context.go",
+    "doc.go",
+    "global.go",
+    "global_test.go",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "tokentype_string.go"
+  ],
+  "explanation": {
+    "what": "map 型フィールドを CLI フラグとして扱う mapDecoder を実装し、Registry.RegisterDefaults() に reflect.Map 用の mapper として登録した。トークンを \"key<sep>value\" として分割し、キーと値それぞれを対応する Mapper で再帰的に decode して target map に SetMapIndex する。Value.IsMap()/IsSlice() を追加して IsCumulative() をスライス・マップ両対応に一般化し、ヘルプの placeholder も \"KEY=VALUE\" を出すようにした。tag.go 側では sep のデフォルト値決定(コマンド/引数は空白、それ以外はカンマ)のロジックを一旦削除している。",
+    "why": "Kong の主要な差別化ポイントである「struct タグから CLI 文法を組み立てる」対象を map 型にも広げるための機能追加。スライスの累積処理(前コミットの Context.values 一元管理)が既にあったため、map も同じ仕組みの上に \"1回のフラグ指定で1つの key=value を追加し、複数回指定で累積する\" 形で自然に実装できた、とみられる。",
+    "highlights": [
+      { "file": "mapper.go", "note": "mapDecoder: target が nil マップなら reflect.MakeMap で初期化し、key/value を別々の Mapper で decode してから SetMapIndex" },
+      { "file": "model.go", "note": "IsCumulative() が IsSlice() || IsMap() に一般化され、フラグの累積可能判定がスライス専用でなくなった" }
+    ],
+    "langNotes": [
+      { "topic": "reflect.MakeMap と SetMapIndex", "note": "Go の reflect でマップを操作する際は reflect.MakeMap(型) で空マップを生成してから target.Set() で書き戻し、要素追加は target.SetMapIndex(key, value) で行う。ここでは --set a=1 のようなフラグ指定のたびにこの操作を繰り返してマップを組み立てている。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

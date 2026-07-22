@@ -1,0 +1,113 @@
+{
+  "seq": 97,
+  "sha": "f0bd1294a7fcd0b5a3b4e50b51d5f9c61cf9f3ec",
+  "parents": [
+    "27d2a08e53ca6c4f767c7212a0bde866d6f51d6e"
+  ],
+  "author": {
+    "name": "Alec Thomas",
+    "email": "aat@squareup.com",
+    "date": "2018-08-14T14:41:27+10:00"
+  },
+  "message": "Support detailed help.\n\nAny command/arg implementing the HelpProvider interface will be used to\nprovide arbitrarily detailed help.",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 4,
+    "additions": 31,
+    "deletions": 5
+  },
+  "files": [
+    {
+      "path": "build.go",
+      "status": "M",
+      "additions": 6,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "help.go",
+      "status": "M",
+      "additions": 10,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "help_test.go",
+      "status": "M",
+      "additions": 13,
+      "deletions": 4,
+      "binary": false
+    },
+    {
+      "path": "model.go",
+      "status": "M",
+      "additions": 2,
+      "deletions": 1,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/build.go b/build.go\nindex e607617..666025b 100644\n--- a/build.go\n+++ b/build.go\n@@ -6,6 +6,8 @@ import (\n \t\"strings\"\n )\n \n+var helpProviderType = reflect.TypeOf((*HelpProvider)(nil)).Elem()\n+\n func build(k *Kong, ast interface{}) (app *Application, err error) {\n \tdefer catch(&err)\n \tv := reflect.ValueOf(ast)\n@@ -107,6 +109,10 @@ func buildChild(k *Kong, node *Node, typ NodeType, v reflect.Value, ft reflect.S\n \tchild.Help = tag.Help\n \tchild.Hidden = tag.Hidden\n \n+\tif fv.Type().Implements(helpProviderType) {\n+\t\tchild.Detail = fv.Interface().(HelpProvider).Help()\n+\t}\n+\n \t// A branching argument. This is a bit hairy, as we let buildNode() do the parsing, then check that\n \t// a positional argument is provided to the child, and move it to the branching argument field.\n \tif tag.Arg {\ndiff --git a/help.go b/help.go\nindex 4d27b50..abee58d 100644\n--- a/help.go\n+++ b/help.go\n@@ -25,6 +25,12 @@ type HelpOptions struct {\n \tCompact bool\n }\n \n+// HelpProvider can be implemented by commands/args to provide detailed help.\n+type HelpProvider interface {\n+\t// This string is formatted by go/doc and thus has the same formatting rules.\n+\tHelp() string\n+}\n+\n // HelpPrinter is used to print context-sensitive help.\n type HelpPrinter func(options HelpOptions, ctx *Context) error\n \n@@ -77,6 +83,10 @@ func printNodeDetail(w *helpWriter, node *Node) {\n \tif w.Summary {\n \t\treturn\n \t}\n+\tif node.Detail != \"\" {\n+\t\tw.Print(\"\")\n+\t\tw.Wrap(node.Detail)\n+\t}\n \tif len(node.Positional) > 0 {\n \t\tw.Print(\"\")\n \t\tw.Print(\"Arguments:\")\ndiff --git a/help_test.go b/help_test.go\nindex 8b5bca9..54caae9 100644\n--- a/help_test.go\n+++ b/help_test.go\n@@ -9,6 +9,16 @@ import (\n \t\"github.com/alecthomas/kong\"\n )\n \n+// nolint: govet\n+type threeArg struct {\n+\tRequiredThree bool   `required`\n+\tThree         string `arg`\n+}\n+\n+func (threeArg) Help() string {\n+\treturn `Detailed help provided through the HelpProvider interface.`\n+}\n+\n func TestHelp(t *testing.T) {\n \t// nolint: govet\n \tvar cli struct {\n@@ -26,10 +36,7 @@ func TestHelp(t *testing.T) {\n \t\t\tFlag        string `help:\"Nested flag under two.\"`\n \t\t\tRequiredTwo bool   `required`\n \n-\t\t\tThree struct {\n-\t\t\t\tRequiredThree bool   `required`\n-\t\t\t\tThree         string `arg`\n-\t\t\t} `arg help:\"Sub-sub-arg.\"`\n+\t\t\tThree threeArg `arg help:\"Sub-sub-arg.\"`\n \n \t\t\tFour struct {\n \t\t\t} `cmd help:\"Sub-sub-command.\"`\n@@ -95,6 +102,8 @@ Run \"test-app <command> --help\" for more information on a command.\n \n Sub-sub-arg.\n \n+Detailed help provided through the HelpProvider interface.\n+\n Flags:\n   --help              Show context-sensitive help.\n   --string=STRING     A string flag.\ndiff --git a/model.go b/model.go\nindex 38f1d0d..df009ac 100644\n--- a/model.go\n+++ b/model.go\n@@ -35,7 +35,8 @@ type Node struct {\n \tType       NodeType\n \tParent     *Node\n \tName       string\n-\tHelp       string\n+\tHelp       string // Short help displayed in summaries.\n+\tDetail     string // Detailed help displayed when describing command/arg alone.\n \tHidden     bool\n \tFlags      []*Flag\n \tPositional []*Positional\n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    ".golangci.yml",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/console.go",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/main.go",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "context.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "tokentype_string.go"
+  ],
+  "explanation": {
+    "what": "HelpProvider インターフェース(Help() string を持つ)を新設し、build.go でコマンド/引数の struct が reflect でこのインターフェースを実装しているか判定して、実装していれば Node.Detail に Help() の戻り値を格納するようにした。help.go の printNodeDetail() は Node.Detail が空でなければそれを出力するようになり、Node.Help(要約用)と Node.Detail(詳細用)の役割がコメントで明確化された。",
+    "why": "コミットメッセージ本文に明記されている通り、HelpProvider を実装したコマンド/引数に「任意の詳細な」ヘルプ文章を提供させたいという狙いで、struct タグの help:\"...\" では表現しきれない長文の説明を Go のコードとして書けるようにしている。",
+    "highlights": [
+      { "file": "help.go", "note": "HelpProvider インターフェース定義と printNodeDetail() での Detail 出力" },
+      { "file": "build.go", "note": "reflect で HelpProvider 実装を検出し Node.Detail に格納する箇所" }
+    ],
+    "langNotes": [
+      { "topic": "detailed help (HelpProvider)", "note": "struct が Help() string というメソッドを持てば HelpProvider インターフェースを暗黙に満たし、reflect.Type.Implements() で検出される。Go の interface は明示的な implements 宣言が不要なダックタイピング的な仕組みで、この検出には reflect.TypeOf((*HelpProvider)(nil)).Elem() という「nilポインタから型情報だけ取り出す」定石イディオムが使われている。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

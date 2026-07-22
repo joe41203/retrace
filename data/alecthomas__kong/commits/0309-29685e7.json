@@ -1,0 +1,162 @@
+{
+  "seq": 309,
+  "sha": "29685e7da63a86110928c4bc4cdba7f88cb17d71",
+  "parents": [
+    "5538b7f045240a29069ac910b749fee38959f1b6"
+  ],
+  "author": {
+    "name": "David Shiflet",
+    "email": "david.shiflet@microsoft.com",
+    "date": "2022-05-03T21:19:51-04:00"
+  },
+  "message": "treat \\ as escape only before a separator",
+  "pr": {
+    "number": 302,
+    "title": "treat \\ as escape only before a separator",
+    "body": "Fixes #198\nThis change is needed to support the Windows path separator character, and use of `\\<somechar>` sequences in general where `<somechar>` isn't the separator.\n",
+    "url": "https://github.com/alecthomas/kong/pull/302"
+  },
+  "linkedIssues": [
+    {
+      "number": 198,
+      "title": "Backslash characters removed from Windows paths using []string and existingFile",
+      "body": "This code:\r\n\r\n```go\r\npackage main\r\n\r\nimport (\r\n\t\"fmt\"\r\n\r\n\t\"github.com/alecthomas/kong\"\r\n)\r\n\r\ntype arg struct {\r\n\tInputFile  string   `short:\"i\"  type:\"existingFile\"`\r\n\tInputPath  string   `short:\"p\"  type:\"path\"`\r\n\tInputFiles []string `short:\"f\" type:\"existingFile\"`\r\n\tInputPaths []string `short:\"t\"  type:\"path\"`\r\n}\r\n\r\nvar Arg arg\r\n\r\nfunc main() {\r\n\tkong.Parse(&Arg)\r\n\tfmt.Println(\"InputFile:\", Arg.InputFile)\r\n\tfmt.Println(\"InputPath\", Arg.InputPath)\r\n\tfmt.Println(\"InputFiles:\", Arg.InputFiles)\r\n\tfmt.Println(\"InputPaths\", Arg.InputPaths)\r\n}\r\n```\r\n\r\nWith this command line:\r\n\r\n```\r\n\r\nkt.exe -i c:\\temp\\foo.json -p c:\\myfolderpath\\subfolder -f c:\\temp\\foo.resjson -t c:\\somefolder\\subfolder\r\n\r\n```\r\n\r\nPrints this. Notice InputFiles value is missing all the \\ and InputPaths is missing the last one\r\n\r\n```\r\nInputFile: c:\\temp\\foo.json\r\nInputPath c:\\myfolderpath\\subfolder\r\nInputFiles: [c:tempfoo.resjson]\r\nInputPaths [C:\\temp\\somefoldersubfolder]\r\n```\r\n",
+      "url": "https://github.com/alecthomas/kong/issues/198"
+    }
+  ],
+  "stats": {
+    "filesChanged": 5,
+    "additions": 86,
+    "deletions": 20
+  },
+  "files": [
+    {
+      "path": "mapper.go",
+      "status": "M",
+      "additions": 5,
+      "deletions": 2,
+      "binary": false
+    },
+    {
+      "path": "mapper_linux_test.go",
+      "status": "A",
+      "additions": 26,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "mapper_test.go",
+      "status": "M",
+      "additions": 6,
+      "deletions": 16,
+      "binary": false
+    },
+    {
+      "path": "mapper_windows_test.go",
+      "status": "A",
+      "additions": 44,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "util_test.go",
+      "status": "M",
+      "additions": 5,
+      "deletions": 2,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/mapper.go b/mapper.go\nindex e8778ee..daf09bd 100644\n--- a/mapper.go\n+++ b/mapper.go\n@@ -721,12 +721,15 @@ func SplitEscaped(s string, sep rune) (out []string) {\n \t}\n \tescaped := false\n \ttoken := \"\"\n-\tfor _, ch := range s {\n+\tfor i, ch := range s {\n \t\tswitch {\n \t\tcase escaped:\n+\t\t\tif ch != sep {\n+\t\t\t\ttoken += `\\`\n+\t\t\t}\n \t\t\ttoken += string(ch)\n \t\t\tescaped = false\n-\t\tcase ch == '\\\\':\n+\t\tcase ch == '\\\\' && i < len(s)-1:\n \t\t\tescaped = true\n \t\tcase ch == sep && !escaped:\n \t\t\tout = append(out, token)\ndiff --git a/mapper_linux_test.go b/mapper_linux_test.go\nnew file mode 100644\nindex 0000000..8148e24\n--- /dev/null\n+++ b/mapper_linux_test.go\n@@ -0,0 +1,26 @@\n+//go:build !windows\n+// +build !windows\n+\n+package kong_test\n+\n+import (\n+\t\"os\"\n+\t\"testing\"\n+\n+\t\"github.com/stretchr/testify/require\"\n+)\n+\n+func TestPathMapper(t *testing.T) {\n+\tvar cli struct {\n+\t\tPath string `arg:\"\" type:\"path\"`\n+\t}\n+\tp := mustNew(t, &cli)\n+\n+\t_, err := p.Parse([]string{\"/an/absolute/path\"})\n+\trequire.NoError(t, err)\n+\trequire.Equal(t, \"/an/absolute/path\", cli.Path)\n+\n+\t_, err = p.Parse([]string{\"-\"})\n+\trequire.NoError(t, err)\n+\trequire.Equal(t, \"-\", cli.Path)\n+}\ndiff --git a/mapper_test.go b/mapper_test.go\nindex fdd7c8e..c162cb8 100644\n--- a/mapper_test.go\n+++ b/mapper_test.go\n@@ -9,6 +9,7 @@ import (\n \t\"net/url\"\n \t\"os\"\n \t\"reflect\"\n+\t\"runtime\"\n \t\"strings\"\n \t\"testing\"\n \t\"time\"\n@@ -412,25 +413,14 @@ func TestFileMapper(t *testing.T) {\n \t_ = cli.File.Close()\n \t_, err = p.Parse([]string{\"testdata/missing.txt\"})\n \trequire.Error(t, err)\n-\trequire.Contains(t, err.Error(), \"missing.txt: no such file or directory\")\n-\t_, err = p.Parse([]string{\"-\"})\n-\trequire.NoError(t, err)\n-\trequire.Equal(t, os.Stdin, cli.File)\n-}\n-\n-func TestPathMapper(t *testing.T) {\n-\tvar cli struct {\n-\t\tPath string `arg:\"\" type:\"path\"`\n+\tif runtime.GOOS == \"windows\" {\n+\t\trequire.Contains(t, err.Error(), \"missing.txt: The system cannot find the file specified.\")\n+\t} else {\n+\t\trequire.Contains(t, err.Error(), \"missing.txt: no such file or directory\")\n \t}\n-\tp := mustNew(t, &cli)\n-\n-\t_, err := p.Parse([]string{\"/an/absolute/path\"})\n-\trequire.NoError(t, err)\n-\trequire.Equal(t, \"/an/absolute/path\", cli.Path)\n-\n \t_, err = p.Parse([]string{\"-\"})\n \trequire.NoError(t, err)\n-\trequire.Equal(t, \"-\", cli.Path)\n+\trequire.Equal(t, os.Stdin, cli.File)\n }\n \n func TestMapperPlaceHolder(t *testing.T) {\ndiff --git a/mapper_windows_test.go b/mapper_windows_test.go\nnew file mode 100644\nindex 0000000..039e9ec\n--- /dev/null\n+++ b/mapper_windows_test.go\n@@ -0,0 +1,44 @@\n+//go:build windows\n+// +build windows\n+\n+package kong_test\n+\n+import (\n+\t\"os\"\n+\t\"testing\"\n+\n+\t\"github.com/stretchr/testify/require\"\n+)\n+\n+func TestWindowsPathMapper(t *testing.T) {\n+\tvar cli struct {\n+\t\tPath  string   `short:\"p\" type:\"path\"`\n+\t\tFiles []string `short:\"f\" type:\"path\"`\n+\t}\n+\twd, err := os.Getwd()\n+\trequire.NoError(t, err, \"Getwd failed\")\n+\tp := mustNew(t, &cli)\n+\n+\t_, err = p.Parse([]string{`-p`, `c:\\an\\absolute\\path`, `-f`, `c:\\second\\absolute\\path\\`, `-f`, `relative\\path\\file`})\n+\trequire.NoError(t, err)\n+\trequire.Equal(t, `c:\\an\\absolute\\path`, cli.Path)\n+\trequire.Equal(t, []string{`c:\\second\\absolute\\path\\`, wd + `\\relative\\path\\file`}, cli.Files)\n+}\n+\n+func TestWindowsFileMapper(t *testing.T) {\n+\ttype CLI struct {\n+\t\tFile *os.File `arg:\"\"`\n+\t}\n+\tvar cli CLI\n+\tp := mustNew(t, &cli)\n+\t_, err := p.Parse([]string{\"testdata\\\\file.txt\"})\n+\trequire.NoError(t, err)\n+\trequire.NotNil(t, cli.File)\n+\t_ = cli.File.Close()\n+\t_, err = p.Parse([]string{\"testdata\\\\missing.txt\"})\n+\trequire.Error(t, err)\n+\trequire.Contains(t, err.Error(), \"missing.txt: The system cannot find the file specified.\")\n+\t_, err = p.Parse([]string{\"-\"})\n+\trequire.NoError(t, err)\n+\trequire.Equal(t, os.Stdin, cli.File)\n+}\ndiff --git a/util_test.go b/util_test.go\nindex 5bf586f..77ccb99 100644\n--- a/util_test.go\n+++ b/util_test.go\n@@ -4,6 +4,7 @@ import (\n \t\"io/ioutil\"\n \t\"os\"\n \t\"path/filepath\"\n+\t\"runtime\"\n \t\"strings\"\n \t\"testing\"\n \n@@ -62,7 +63,9 @@ func TestChangeDirFlag(t *testing.T) {\n \tp := Must(&cli)\n \t_, err = p.Parse([]string{\"-C\", dir, \"out.txt\"})\n \trequire.NoError(t, err)\n-\tfile, err = filepath.EvalSymlinks(file) // Needed because OSX uses a symlinked tmp dir.\n-\trequire.NoError(t, err)\n+\tif runtime.GOOS != \"windows\" {\n+\t\tfile, err = filepath.EvalSymlinks(file) // Needed because OSX uses a symlinked tmp dir.\n+\t\trequire.NoError(t, err)\n+\t}\n \trequire.Equal(t, file, cli.Path)\n }\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/FUNDING.yml",
+    ".github/workflows/ci.yml",
+    ".gitignore",
+    ".golangci.yml",
+    "COPYING",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/README.md",
+    "_examples/server/console.go",
+    "_examples/server/go.mod",
+    "_examples/server/go.sum",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/main.go",
+    "benchmark_test.go",
+    "bin/.go-1.17.8.pkg",
+    "bin/.golangci-lint-1.42.0.pkg",
+    "bin/README.hermit.md",
+    "bin/activate-hermit",
+    "bin/go",
+    "bin/gofmt",
+    "bin/golangci-lint",
+    "bin/hermit",
+    "bin/hermit.hcl",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "config_test.go",
+    "context.go",
+    "defaults.go",
+    "defaults_test.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "go.mod",
+    "go.sum",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_linux_test.go",
+    "mapper_test.go",
+    "mapper_windows_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "testdata/file.txt",
+    "util.go",
+    "util_test.go",
+    "visit.go"
+  ],
+  "explanation": {
+    "what": "SplitEscaped でのエスケープ処理を、バックスラッシュが常にエスケープ文字として働く挙動から「区切り文字の直前にある場合のみ」エスケープとして扱う挙動に変更した。あわせて mapper_linux_test.go / mapper_windows_test.go を新設し、OS 依存のパス区切り文字・エラーメッセージの違いを踏まえたテストに分割した。",
+    "why": "PR本文および紐づく issue #198 によると、Windows のパス区切り文字である \\ が既存の実装では常時エスケープ文字として扱われ、`c:\\temp\\foo.json` のようなスライス/existingFile 型の値からバックスラッシュが失われてしまう不具合があった。区切り文字の直前だけをエスケープ対象とすることで、Windows パスをそのまま値として扱えるようにした。",
+    "highlights": [
+      { "file": "mapper.go", "note": "SplitEscaped で `ch == '\\\\' && i < len(s)-1` の条件を追加し、区切り文字直前以外の \\ はエスケープとして消費しない" },
+      { "file": "mapper_windows_test.go", "note": "Windows 固有のパス区切り・エラーメッセージを検証する //go:build windows テストを新設" }
+    ],
+    "langNotes": [
+      { "topic": "//go:build ビルドタグ", "note": "mapper_linux_test.go と mapper_windows_test.go の先頭にある //go:build windows / !windows は、OS ごとにコンパイル対象を切り替える Go のビルド制約構文。同名のテストを環境別に用意する定番パターン。" }
+    ],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [
+      { "type": "pr", "number": 302, "url": "https://github.com/alecthomas/kong/pull/302" },
+      { "type": "issue", "number": 198, "url": "https://github.com/alecthomas/kong/issues/198" }
+    ],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

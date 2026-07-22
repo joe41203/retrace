@@ -1,0 +1,98 @@
+{
+  "seq": 35,
+  "sha": "afbb43164102631e7fa7ce97d6a991bc62e072cc",
+  "parents": [
+    "cf89213e1ef55939f5a956510b4ff94e354e24ec"
+  ],
+  "author": {
+    "name": "Alec Thomas",
+    "email": "alec@swapoff.org",
+    "date": "2018-05-27T13:37:17-04:00"
+  },
+  "message": "Convert Hook to an Option.",
+  "pr": {
+    "number": 18,
+    "title": "Separate validation",
+    "body": "This allows help to be called even when the parse trace is invalid.\r\nWithout this, the command-line would have to be valid in order to use\r\nhelp at all, which defeats the purpose.\r\n",
+    "url": "https://github.com/alecthomas/kong/pull/18"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 4,
+    "additions": 56,
+    "deletions": 28
+  },
+  "files": [
+    {
+      "path": "help.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "kong.go",
+      "status": "M",
+      "additions": 26,
+      "deletions": 12,
+      "binary": false
+    },
+    {
+      "path": "kong_test.go",
+      "status": "M",
+      "additions": 10,
+      "deletions": 15,
+      "binary": false
+    },
+    {
+      "path": "options.go",
+      "status": "M",
+      "additions": 19,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/help.go b/help.go\nindex 8338ed3..809481e 100644\n--- a/help.go\n+++ b/help.go\n@@ -18,7 +18,7 @@ usage: {{.Name}}\n var defaultHelpTemplate = template.Must(template.New(\"help\").Parse(defaultHelp))\n \n // Help returns a Hook that will display help and exit.\n-func Help(tmpl *template.Template, tmplctx map[string]interface{}) Hook {\n+func Help(tmpl *template.Template, tmplctx map[string]interface{}) HookFunction {\n \treturn func(app *Kong, ctx *Context, trace *Trace) error {\n \t\tmerged := map[string]interface{}{\n \t\t\t\"Application\": app.Model,\ndiff --git a/kong.go b/kong.go\nindex d43623b..d166bb9 100644\n--- a/kong.go\n+++ b/kong.go\n@@ -9,7 +9,7 @@ import (\n \t\"text/template\"\n )\n \n-type Hook func(app *Kong, ctx *Context, trace *Trace) error\n+type HookFunction func(app *Kong, ctx *Context, trace *Trace) error\n \n // Error reported by Kong.\n type Error struct{ msg string }\n@@ -37,10 +37,11 @@ type Kong struct {\n \tStdout io.Writer\n \tStderr io.Writer\n \n-\thelp        *template.Template\n-\thelpContext map[string]interface{}\n-\thelpFuncs   template.FuncMap\n-\thooks       map[reflect.Value]Hook\n+\thelp          *template.Template\n+\thelpContext   map[string]interface{}\n+\thelpFuncs     template.FuncMap\n+\thooks         map[reflect.Value]HookFunction\n+\tnoDefaultHelp bool\n }\n \n // New creates a new Kong parser into ast.\n@@ -52,7 +53,7 @@ func New(ast interface{}, options ...Option) (*Kong, error) {\n \t\thelp:        defaultHelpTemplate,\n \t\thelpContext: map[string]interface{}{},\n \t\thelpFuncs:   template.FuncMap{},\n-\t\thooks:       map[reflect.Value]Hook{},\n+\t\thooks:       map[reflect.Value]HookFunction{},\n \t}\n \n \tmodel, err := build(ast)\n@@ -66,9 +67,28 @@ func New(ast interface{}, options ...Option) (*Kong, error) {\n \t\toption(k)\n \t}\n \n+\tif !k.noDefaultHelp {\n+\t\tk.integrateHelp()\n+\t}\n+\n \treturn k, nil\n }\n \n+func (k *Kong) integrateHelp() {\n+\thelpValue := false\n+\thelp := &Flag{\n+\t\tValue: Value{\n+\t\t\tName:    \"help\",\n+\t\t\tHelp:    \"Show context-sensitive help.\",\n+\t\t\tFlag:    true,\n+\t\t\tValue:   reflect.ValueOf(&helpValue).Elem(),\n+\t\t\tDecoder: kindDecoders[reflect.Bool],\n+\t\t},\n+\t}\n+\tk.Model.Flags = append([]*Flag{help}, k.Model.Flags...)\n+\tHook(&helpValue, Help(defaultHelpTemplate, nil))(k)\n+}\n+\n // Trace parses the command-line, validating and collecting matching grammar nodes.\n func (k *Kong) Trace(args []string) (*Context, error) {\n \tp := &Context{\n@@ -89,12 +109,6 @@ func (k *Kong) Trace(args []string) (*Context, error) {\n \treturn p, nil\n }\n \n-// Hook to execute when a command is encountered.\n-func (k *Kong) Hook(ptr interface{}, hook Hook) *Kong {\n-\tk.hooks[reflect.ValueOf(ptr)] = hook\n-\treturn k\n-}\n-\n // Parse arguments into target.\n //\n // The returned \"command\" is a space separated path to the final selected command, if any. Commands appear as\ndiff --git a/kong_test.go b/kong_test.go\nindex cdfa1a9..29acfd6 100644\n--- a/kong_test.go\n+++ b/kong_test.go\n@@ -7,11 +7,12 @@ import (\n \t\"github.com/stretchr/testify/require\"\n )\n \n-func mustNew(t *testing.T, cli interface{}) *Kong {\n+func mustNew(t *testing.T, cli interface{}, options ...Option) *Kong {\n \tt.Helper()\n-\tparser, err := New(cli, ExitFunction(func(int) {\n+\toptions = append(options, ExitFunction(func(int) {\n \t\tt.Fatalf(\"unexpected exit()\")\n \t}))\n+\tparser, err := New(cli, options...)\n \trequire.NoError(t, err)\n \treturn parser\n }\n@@ -381,19 +382,13 @@ func TestHooks(t *testing.T) {\n \t\t{\"Flag\", \"one --three=three\", values{true, \"\", \"three\"}},\n \t\t{\"ArgAndFlag\", \"one two --three=three\", values{true, \"two\", \"three\"}},\n \t}\n-\tp := mustNew(t, &cli).\n-\t\tHook(&cli.One, func(app *Kong, ctx *Context, trace *Trace) error {\n-\t\t\thooked.one = true\n-\t\t\treturn nil\n-\t\t}).\n-\t\tHook(&cli.One.Two, func(app *Kong, ctx *Context, trace *Trace) error {\n-\t\t\thooked.two = trace.Value.String()\n-\t\t\treturn nil\n-\t\t}).\n-\t\tHook(&cli.One.Three, func(app *Kong, ctx *Context, trace *Trace) error {\n-\t\t\thooked.three = trace.Value.String()\n-\t\t\treturn nil\n-\t\t})\n+\tsetOne := func(app *Kong, ctx *Context, trace *Trace) error { hooked.one = true; return nil }\n+\tsetTwo := func(app *Kong, ctx *Context, trace *Trace) error { hooked.two = trace.Value.String(); return nil }\n+\tsetThree := func(app *Kong, ctx *Context, trace *Trace) error { hooked.three = trace.Value.String(); return nil }\n+\tp := mustNew(t, &cli,\n+\t\tHook(&cli.One, setOne),\n+\t\tHook(&cli.One.Two, setTwo),\n+\t\tHook(&cli.One.Three, setThree))\n \n \tfor _, test := range tests {\n \t\thooked = values{}\ndiff --git a/options.go b/options.go\nindex 17ef158..e573cea 100644\n--- a/options.go\n+++ b/options.go\n@@ -2,6 +2,7 @@ package kong\n \n import (\n \t\"io\"\n+\t\"reflect\"\n \t\"text/template\"\n )\n \n@@ -12,6 +13,13 @@ func ExitFunction(exit func(int)) Option {\n \treturn func(k *Kong) { k.Exit = exit }\n }\n \n+// NoDefaultHelp disables the default help flags.\n+func NoDefaultHelp() Option {\n+\treturn func(k *Kong) {\n+\t\tk.noDefaultHelp = true\n+\t}\n+}\n+\n // Name overrides the application name.\n func Name(name string) Option {\n \treturn func(k *Kong) { k.Model.Name = name }\n@@ -41,3 +49,14 @@ func Writers(stdout, stderr io.Writer) Option {\n \t\tk.Stderr = stderr\n \t}\n }\n+\n+// Hook to execute when a command, flag or positional argument is encountered.\n+func Hook(ptr interface{}, hook HookFunction) Option {\n+\tkey := reflect.ValueOf(ptr)\n+\tif key.Kind() != reflect.Ptr {\n+\t\tpanic(\"expected a pointer\")\n+\t}\n+\treturn func(k *Kong) {\n+\t\tk.hooks[key] = hook\n+\t}\n+}\n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    "README.md",
+    "_examples/shell/main.go",
+    "build.go",
+    "camelcase.go",
+    "context.go",
+    "context_test.go",
+    "decoders.go",
+    "decoders_test.go",
+    "global.go",
+    "global_test.go",
+    "help.go",
+    "kong.go",
+    "kong_test.go",
+    "model.go",
+    "options.go",
+    "options_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tokentype_string.go"
+  ],
+  "explanation": {
+    "what": "前段のコミットで追加された `Kong.Hook(ptr, hook) *Kong` メソッドを削除し、代わりに `Hook(ptr, hook) Option` という Option 関数として提供するよう変更した。あわせて `--help` フラグの登録も `New()` 内の `integrateHelp()` で行うよう変更し、`NoDefaultHelp()` という Option でこのデフォルト help 登録を無効化できるようにした。`HookFunction` 型もこの流れで導入されている(前コミットの `Hook` 型からのリネーム)。",
+    "why": "Hook をメソッドチェーン(`kong.Must(&CLI).Hook(...)`)ではなく `New(ast, options...)` に渡す Option の1つとして扱うことで、他の設定(Name・Description・Writers 等)と同じ流儀に統一し、New() の呼び出し1回でパーサーの構成を完結できるようにしたと見られる。",
+    "highlights": [
+      { "file": "kong.go", "note": "integrateHelp(): --help フラグの合成と Hook(&helpValue, Help(...)) 登録をコンストラクタ内に移した箇所" },
+      { "file": "options.go", "note": "Hook() が Option を返す関数として再実装された箇所" }
+    ],
+    "langNotes": [
+      { "topic": "Option パターン", "note": "Go でよく使われる「Functional Options」パターン。`type Option func(k *Kong)` という関数型を定義し、`New(ast, options...)` の可変長引数として渡すことで、コンストラクタの引数を増やさずに任意の設定を追加できる。このコミットで Hook もこの Option の仲間入りをした。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [
+      { "type": "pr", "number": 18, "url": "https://github.com/alecthomas/kong/pull/18" }
+    ],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

@@ -1,0 +1,140 @@
+{
+  "seq": 313,
+  "sha": "6042c4b10e0231a40461cb2cc9f0e75ae56bca91",
+  "parents": [
+    "1db2ea27affa4beaabda8ca52f5f6ef6b34c51ee"
+  ],
+  "author": {
+    "name": "Keilin Olsen",
+    "email": "keilin.olsen@anz.com",
+    "date": "2021-11-30T23:18:58+11:00"
+  },
+  "message": "Add example of HelpProvider + README\n\nRelocate detailed help docs to main README",
+  "pr": {
+    "number": 242,
+    "title": "Add example and supplementary doc around `HelpProviders`",
+    "body": "A late-night attempt at adding docs to cover some of the usage patterns which weren't immediately clear to me regarding custom help.\r\n\r\n>> **NB: It's still unclear how to cause a _flag_ to print out its help, so just leaving this as a draft for now**",
+    "url": "https://github.com/alecthomas/kong/pull/242"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 3,
+    "additions": 159,
+    "deletions": 43
+  },
+  "files": [
+    {
+      "path": "README.md",
+      "status": "M",
+      "additions": 107,
+      "deletions": 43,
+      "binary": false
+    },
+    {
+      "path": "_examples/shell/help/README.md",
+      "status": "A",
+      "additions": 3,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "_examples/shell/help/main.go",
+      "status": "A",
+      "additions": 49,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/README.md b/README.md\nindex a0bc3ca..bb704d3 100644\n--- a/README.md\n+++ b/README.md\n@@ -12,6 +12,9 @@\n 1. [Help](#help)\n     1. [Help as a user of a Kong application](#help-as-a-user-of-a-kong-application)\n     1. [Defining help in Kong](#defining-help-in-kong)\n+        1. [Showing the _command_'s detailed help](#showing-the-commands-detailed-help)\n+        1. [Showing an _argument_'s detailed help](#showing-an-arguments-detailed-help)\n+        1. [Showing a _flag_'s detailed help](#showing-a-flags-detailed-help)\n 1. [Command handling](#command-handling)\n     1. [Switch on the command string](#switch-on-the-command-string)\n     1. [Attach a `Run(...) error` method to each command](#attach-a-run-error-method-to-each-command)\n@@ -134,7 +137,68 @@ also be interpolated into the help string.\n Finally, any command, argument, or flag type implementing the interface\n `Help() string` will have this function called to retrieve more detail to\n augment the help tag. This allows for much more descriptive text than can\n-fit in Go tags.\n+fit in Go tags.  [See _examples/shell/help](./_examples/shell/help)\n+\n+#### Showing the _command_'s detailed help\n+\n+A command's additional help text is _not_ shown from top-level help, but can be displayed within contextual help:\n+\n+**Top level help**\n+```bash\n+ $ go run ./_examples/shell/help --help\n+Usage: help <command>\n+\n+An app demonstrating HelpProviders\n+\n+Flags:\n+  -h, --help    Show context-sensitive help.\n+      --flag    Regular flag help\n+\n+Commands:\n+  echo    Regular command help\n+```\n+\n+**Contextual**\n+```bash\n+ $ go run ./_examples/shell/help echo --help\n+Usage: help echo <msg>\n+\n+Regular command help\n+\n+🚀 additional command help\n+\n+Arguments:\n+  <msg>    Regular argument help\n+\n+Flags:\n+  -h, --help    Show context-sensitive help.\n+      --flag    Regular flag help\n+```\n+\n+#### Showing an _argument_'s detailed help\n+\n+Custom help will only be shown for _positional arguments with named fields_ ([see the README section on positional arguments for more details on what that means](../../../README.md#branching-positional-arguments))\n+\n+**Contextual argument help**\n+```bash\n+ $ go run ./_examples/shell/help msg --help\n+Usage: help echo <msg>\n+\n+Regular argument help\n+\n+📣 additional argument help\n+\n+Flags:\n+  -h, --help    Show context-sensitive help.\n+      --flag    Regular flag help\n+```\n+\n+#### Showing a _flag_'s detailed help\n+\n+> **TODO** (not known how to elicit this behaviour)\n+\n+Neither `go run ./main.go --help --flag` nor `go run ./main.go --flag --help` appear to work\n+\n \n ## Command handling\n \n@@ -405,12 +469,12 @@ Kong includes a number of builtin custom type mappers. These can be used by\n specifying the tag `type:\"<type>\"`. They are registered with the option\n function `NamedMapper(name, mapper)`.\n \n-| Name              | Description\n-|-------------------|---------------------------------------------------\n-| `path`            | A path. ~ expansion is applied. `-` is accepted for stdout, and will be passed unaltered.\n-| `existingfile`    | An existing file. ~ expansion is applied. `-` is accepted for stdin, and will be passed unaltered.\n-| `existingdir`     | An existing directory. ~ expansion is applied.\n-| `counter`         | Increment a numeric field. Useful for `-vvv`. Can accept `-s`, `--long` or `--long=N`.\n+| Name           | Description                                                                                        |\n+| -------------- | -------------------------------------------------------------------------------------------------- |\n+| `path`         | A path. ~ expansion is applied. `-` is accepted for stdout, and will be passed unaltered.          |\n+| `existingfile` | An existing file. ~ expansion is applied. `-` is accepted for stdin, and will be passed unaltered. |\n+| `existingdir`  | An existing directory. ~ expansion is applied.                                                     |\n+| `counter`      | Increment a numeric field. Useful for `-vvv`. Can accept `-s`, `--long` or `--long=N`.             |\n \n \n Slices and maps treat type tags specially. For slices, the `type:\"\"` tag\n@@ -426,12 +490,12 @@ specifies the element type. For maps, the tag has the format\n Any field implementing `encoding.TextUnmarshaler` or `json.Unmarshaler` will use those interfaces\n for decoding values. Kong also includes builtin support for many common Go types:\n \n-| Type                | Description\n-|---------------------|--------------------------------------------\n-| `time.Duration`     | Populated using `time.ParseDuration()`.\n-| `time.Time`         | Populated using `time.Parse()`. Format defaults to RFC3339 but can be overridden with the `format:\"X\"` tag.\n-| `*os.File`          | Path to a file that will be opened, or `-` for `os.Stdin`. File must be closed by the user.\n-| `*url.URL`          | Populated with `url.Parse()`.\n+| Type            | Description                                                                                                 |\n+| --------------- | ----------------------------------------------------------------------------------------------------------- |\n+| `time.Duration` | Populated using `time.ParseDuration()`.                                                                     |\n+| `time.Time`     | Populated using `time.Parse()`. Format defaults to RFC3339 but can be overridden with the `format:\"X\"` tag. |\n+| `*os.File`      | Path to a file that will be opened, or `-` for `os.Stdin`. File must be closed by the user.                 |\n+| `*url.URL`      | Populated with `url.Parse()`.                                                                               |\n \n For more fine-grained control, if a field implements the\n [MapperValue](https://godoc.org/github.com/alecthomas/kong#MapperValue)\n@@ -446,36 +510,36 @@ Tags can be in two forms:\n \n Both can coexist with standard Tag parsing.\n \n-Tag                    | Description\n------------------------| -------------------------------------------\n-`cmd:\"\"`               | If present, struct is a command.\n-`arg:\"\"`               | If present, field is an argument. Required by default.\n-`env:\"X\"`              | Specify envar to use for default value.\n-`name:\"X\"`             | Long name, for overriding field name.\n-`help:\"X\"`             | Help text.\n-`type:\"X\"`             | Specify [named types](#custom-named-decoders) to use.\n-`placeholder:\"X\"`      | Placeholder text.\n-`default:\"X\"`          | Default value.\n-`default:\"1\"`          | On a command, make it the default.\n-`default:\"withargs\"`   | On a command, make it the default and allow args/flags from that command\n-`short:\"X\"`            | Short name, if flag.\n-`aliases:\"X,Y\"`        | One or more aliases (for cmd).\n-`required:\"\"`          | If present, flag/arg is required.\n-`optional:\"\"`          | If present, flag/arg is optional.\n-`hidden:\"\"`            | If present, command or flag is hidden.\n-`negatable:\"\"`         | If present on a `bool` field, supports prefixing a flag with `--no-` to invert the default value\n-`format:\"X\"`           | Format for parsing input, if supported.\n-`sep:\"X\"`              | Separator for sequences (defaults to \",\"). May be `none` to disable splitting.\n-`mapsep:\"X\"`           | Separator for maps (defaults to \";\"). May be `none` to disable splitting.\n-`enum:\"X,Y,...\"`       | Set of valid values allowed for this flag. An enum field must be `required` or have a valid `default`.\n-`group:\"X\"`            | Logical group for a flag or command.\n-`xor:\"X,Y,...\"`        | Exclusive OR groups for flags. Only one flag in the group can be used which is restricted within the same command. When combined with `required`, at least one of the `xor` group will be required.\n-`prefix:\"X\"`           | Prefix for all sub-flags.\n-`envprefix:\"X\"`        | Envar prefix for all sub-flags.\n-`set:\"K=V\"`            | Set a variable for expansion by child elements. Multiples can occur.\n-`embed:\"\"`             | If present, this field's children will be embedded in the parent. Useful for composition.\n-`passthrough:\"\"`       | If present on a positional argument, it stops flag parsing when encountered, as if `--` was processed before. Useful for external command wrappers, like `exec`. On a command it requires that the command contains only one argument of type `[]string` which is then filled with everything following the command, unparsed.\n-`-`                    | Ignore the field. Useful for adding non-CLI fields to a configuration struct. e.g `` `kong:\"-\"` ``\n+| Tag                  | Description                                                                                                                                                                                                                                                                                                                    |\n+| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |\n+| `cmd:\"\"`             | If present, struct is a command.                                                                                                                                                                                                                                                                                               |\n+| `arg:\"\"`             | If present, field is an argument. Required by default.                                                                                                                                                                                                                                                                         |\n+| `env:\"X\"`            | Specify envar to use for default value.                                                                                                                                                                                                                                                                                        |\n+| `name:\"X\"`           | Long name, for overriding field name.                                                                                                                                                                                                                                                                                          |\n+| `help:\"X\"`           | Help text.                                                                                                                                                                                                                                                                                                                     |\n+| `type:\"X\"`           | Specify [named types](#custom-named-decoders) to use.                                                                                                                                                                                                                                                                          |\n+| `placeholder:\"X\"`    | Placeholder text.                                                                                                                                                                                                                                                                                                              |\n+| `default:\"X\"`        | Default value.                                                                                                                                                                                                                                                                                                                 |\n+| `default:\"1\"`        | On a command, make it the default.                                                                                                                                                                                                                                                                                             |\n+| `default:\"withargs\"` | On a command, make it the default and allow args/flags from that command                                                                                                                                                                                                                                                       |\n+| `short:\"X\"`          | Short name, if flag.                                                                                                                                                                                                                                                                                                           |\n+| `aliases:\"X,Y\"`      | One or more aliases (for cmd).                                                                                                                                                                                                                                                                                                 |\n+| `required:\"\"`        | If present, flag/arg is required.                                                                                                                                                                                                                                                                                              |\n+| `optional:\"\"`        | If present, flag/arg is optional.                                                                                                                                                                                                                                                                                              |\n+| `hidden:\"\"`          | If present, command or flag is hidden.                                                                                                                                                                                                                                                                                         |\n+| `negatable:\"\"`       | If present on a `bool` field, supports prefixing a flag with `--no-` to invert the default value                                                                                                                                                                                                                               |\n+| `format:\"X\"`         | Format for parsing input, if supported.                                                                                                                                                                                                                                                                                        |\n+| `sep:\"X\"`            | Separator for sequences (defaults to \",\"). May be `none` to disable splitting.                                                                                                                                                                                                                                                 |\n+| `mapsep:\"X\"`         | Separator for maps (defaults to \";\"). May be `none` to disable splitting.                                                                                                                                                                                                                                                      |\n+| `enum:\"X,Y,...\"`     | Set of valid values allowed for this flag. An enum field must be `required` or have a valid `default`.                                                                                                                                                                                                                         |\n+| `group:\"X\"`          | Logical group for a flag or command.                                                                                                                                                                                                                                                                                           |\n+| `xor:\"X,Y,...\"`      | Exclusive OR groups for flags. Only one flag in the group can be used which is restricted within the same command. When combined with `required`, at least one of the `xor` group will be required.                                                                                                                            |\n+| `prefix:\"X\"`         | Prefix for all sub-flags.                                                                                                                                                                                                                                                                                                      |\n+| `envprefix:\"X\"`      | Envar prefix for all sub-flags.                                                                                                                                                                                                                                                                                                |\n+| `set:\"K=V\"`          | Set a variable for expansion by child elements. Multiples can occur.                                                                                                                                                                                                                                                           |\n+| `embed:\"\"`           | If present, this field's children will be embedded in the parent. Useful for composition.                                                                                                                                                                                                                                      |\n+| `passthrough:\"\"`     | If present on a positional argument, it stops flag parsing when encountered, as if `--` was processed before. Useful for external command wrappers, like `exec`. On a command it requires that the command contains only one argument of type `[]string` which is then filled with everything following the command, unparsed. |\n+| `-`                  | Ignore the field. Useful for adding non-CLI fields to a configuration struct. e.g `` `kong:\"-\"` ``                                                                                                                                                                                                                             |\n \n ## Plugins\n \ndiff --git a/_examples/shell/help/README.md b/_examples/shell/help/README.md\nnew file mode 100644\nindex 0000000..ab591a6\n--- /dev/null\n+++ b/_examples/shell/help/README.md\n@@ -0,0 +1,3 @@\n+# Example of custom help providers\n+\n+This example demonstrates how to add `Help() string` functions (ie. the `HelpProvider` interface) to your commands, arguments, and flags to augment the help text provided using `help:\"\"` style tagged annotations.\ndiff --git a/_examples/shell/help/main.go b/_examples/shell/help/main.go\nnew file mode 100644\nindex 0000000..56b8ce6\n--- /dev/null\n+++ b/_examples/shell/help/main.go\n@@ -0,0 +1,49 @@\n+package main\n+\n+import (\n+\t\"fmt\"\n+\n+\t\"github.com/alecthomas/kong\"\n+)\n+\n+var cli struct {\n+\tFlag flagWithHelp    `help:\"Regular flag help\"`\n+\tEcho commandWithHelp `cmd:\"\" help:\"Regular command help\"`\n+}\n+\n+type flagWithHelp bool\n+\n+func (f *flagWithHelp) Help() string {\n+\treturn \"🏁 additional flag help\"\n+}\n+\n+type commandWithHelp struct {\n+\tMsg argumentWithHelp `arg:\"\" help:\"Regular argument help\"`\n+}\n+\n+func (c *commandWithHelp) Help() string {\n+\treturn \"🚀 additional command help\"\n+}\n+\n+type argumentWithHelp struct {\n+\tMsg string `arg:\"\"`\n+}\n+\n+func (f *argumentWithHelp) Help() string {\n+\treturn \"📣 additional argument help\"\n+}\n+\n+func main() {\n+\tctx := kong.Parse(&cli,\n+\t\tkong.Name(\"help\"),\n+\t\tkong.Description(\"An app demonstrating HelpProviders\"),\n+\t\tkong.UsageOnError(),\n+\t\tkong.ConfigureHelp(kong.HelpOptions{\n+\t\t\tCompact: true,\n+\t\t\tSummary: false,\n+\t\t}))\n+\tswitch ctx.Command() {\n+\tcase \"echo <msg>\":\n+\t\tfmt.Println(cli.Echo.Msg)\n+\t}\n+}\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/FUNDING.yml",
+    ".github/workflows/ci.yml",
+    ".gitignore",
+    ".golangci.yml",
+    "COPYING",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/README.md",
+    "_examples/server/console.go",
+    "_examples/server/go.mod",
+    "_examples/server/go.sum",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/commandstring/main.go",
+    "_examples/shell/help/README.md",
+    "_examples/shell/help/main.go",
+    "benchmark_test.go",
+    "bin/.go-1.17.8.pkg",
+    "bin/.golangci-lint-1.42.0.pkg",
+    "bin/README.hermit.md",
+    "bin/activate-hermit",
+    "bin/go",
+    "bin/gofmt",
+    "bin/golangci-lint",
+    "bin/hermit",
+    "bin/hermit.hcl",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "config_test.go",
+    "context.go",
+    "defaults.go",
+    "defaults_test.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "go.mod",
+    "go.sum",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_linux_test.go",
+    "mapper_test.go",
+    "mapper_windows_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "testdata/file.txt",
+    "util.go",
+    "util_test.go",
+    "visit.go"
+  ],
+  "explanation": {
+    "what": "_examples/shell/help/ に新しいサンプル(main.go・README.md)を追加し、README.md の目次と本文を大幅に加筆した。サンプルでは flagWithHelp・commandWithHelp・argumentWithHelp という3つの型に Help() string メソッドを実装し、それぞれがコマンド・引数・フラグの詳細ヘルプとして表示される様子を示している。README には command/argument の詳細ヘルプの表示例(--help 実行結果)を追記したが、flag の詳細ヘルプについては「表示させる方法が不明」という TODO も明記されている。",
+    "why": "PR本文によれば、著者はカスタムヘルプ(Help() を実装する HelpProvider パターン)の使い方がすぐには分からなかったため、自身の理解を兼ねてサンプルとドキュメントを追加した。ドラフトPRとして提出されており、flag の詳細ヘルプの挙動は著者自身も未解決のまま残している。",
+    "highlights": [
+      { "file": "_examples/shell/help/main.go", "note": "flagWithHelp/commandWithHelp/argumentWithHelp が Help() string を実装し HelpProvider として振る舞う" },
+      { "file": "README.md", "note": "Showing the command's/argument's detailed help のセクションと、flag側の未解決TODOの記述" }
+    ],
+    "langNotes": [
+      { "topic": "HelpProvider (暗黙インターフェース)", "note": "Go にはインターフェースを明示的に implements 宣言する構文がない。ここでは Help() string というメソッドを型に生やすだけで、Kong 内部で型アサーションされる HelpProvider インターフェースを満たしたことになる(duck typing に近い静的インターフェース実装)。" }
+    ],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [{ "type": "pr", "number": 242, "url": "https://github.com/alecthomas/kong/pull/242" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

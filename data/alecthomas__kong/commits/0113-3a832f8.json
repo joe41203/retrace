@@ -1,0 +1,129 @@
+{
+  "seq": 113,
+  "sha": "3a832f83439002319ba860bfdf2cfe9eff2dc12e",
+  "parents": [
+    "026359efd81fb7965f6ca8eb2f017591b8f3b47f"
+  ],
+  "author": {
+    "name": "Alec Thomas",
+    "email": "alec@swapoff.org",
+    "date": "2018-09-21T12:06:24+10:00"
+  },
+  "message": "Treat envars as higher priority than resolvers.",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 5,
+    "additions": 28,
+    "deletions": 52
+  },
+  "files": [
+    {
+      "path": "context.go",
+      "status": "M",
+      "additions": 3,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "kong.go",
+      "status": "M",
+      "additions": 12,
+      "deletions": 12,
+      "binary": false
+    },
+    {
+      "path": "model.go",
+      "status": "M",
+      "additions": 13,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "resolver.go",
+      "status": "M",
+      "additions": 0,
+      "deletions": 14,
+      "binary": false
+    },
+    {
+      "path": "resolver_test.go",
+      "status": "M",
+      "additions": 0,
+      "deletions": 25,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/context.go b/context.go\nindex 78c4b0e..a502412 100644\n--- a/context.go\n+++ b/context.go\n@@ -198,6 +198,9 @@ func (c *Context) FlagValue(flag *Flag) interface{} {\n \t\t\treturn v.Interface()\n \t\t}\n \t}\n+\tif flag.Target.IsValid() {\n+\t\treturn flag.Target.Interface()\n+\t}\n \treturn flag.DefaultValue.Interface()\n }\n \ndiff --git a/kong.go b/kong.go\nindex 53c345d..b1c45c4 100644\n--- a/kong.go\n+++ b/kong.go\n@@ -63,13 +63,12 @@ type Kong struct {\n // See the README (https://github.com/alecthomas/kong) for usage instructions.\n func New(grammar interface{}, options ...Option) (*Kong, error) {\n \tk := &Kong{\n-\t\tExit:      os.Exit,\n-\t\tStdout:    os.Stdout,\n-\t\tStderr:    os.Stderr,\n-\t\tregistry:  NewRegistry().RegisterDefaults(),\n-\t\tresolvers: []ResolverFunc{Envars()},\n-\t\tvars:      Vars{},\n-\t\tbindings:  bindings{},\n+\t\tExit:     os.Exit,\n+\t\tStdout:   os.Stdout,\n+\t\tStderr:   os.Stderr,\n+\t\tregistry: NewRegistry().RegisterDefaults(),\n+\t\tvars:     Vars{},\n+\t\tbindings: bindings{},\n \t}\n \n \toptions = append(options, Bind(k))\n@@ -169,11 +168,12 @@ func (k *Kong) extraFlags() []*Flag {\n \tvalue := reflect.ValueOf(&helpTarget).Elem()\n \thelpFlag := &Flag{\n \t\tValue: &Value{\n-\t\t\tName:   \"help\",\n-\t\t\tHelp:   \"Show context-sensitive help.\",\n-\t\t\tTarget: value,\n-\t\t\tTag:    &Tag{},\n-\t\t\tMapper: k.registry.ForValue(value),\n+\t\t\tName:         \"help\",\n+\t\t\tHelp:         \"Show context-sensitive help.\",\n+\t\t\tTarget:       value,\n+\t\t\tTag:          &Tag{},\n+\t\t\tMapper:       k.registry.ForValue(value),\n+\t\t\tDefaultValue: reflect.ValueOf(false),\n \t\t},\n \t}\n \thelpFlag.Flag = helpFlag\ndiff --git a/model.go b/model.go\nindex 50c1df9..5b90741 100644\n--- a/model.go\n+++ b/model.go\n@@ -2,6 +2,7 @@ package kong\n \n import (\n \t\"fmt\"\n+\t\"os\"\n \t\"reflect\"\n \t\"strconv\"\n \t\"strings\"\n@@ -282,11 +283,22 @@ func (v *Value) Apply(value reflect.Value) {\n \tv.Set = true\n }\n \n-// Reset this value to its default, either the zero value or the parsed result of its \"default\" tag.\n+// Reset this value to its default, either the zero value or the parsed result of its envar,\n+// or its \"default\" tag.\n //\n // Does not include resolvers.\n func (v *Value) Reset() error {\n \tv.Target.Set(reflect.Zero(v.Target.Type()))\n+\tif v.Tag.Env != \"\" {\n+\t\tenvar := os.Getenv(v.Tag.Env)\n+\t\tif envar != \"\" {\n+\t\t\terr := v.Parse(Scan(envar), v.Target)\n+\t\t\tif err != nil {\n+\t\t\t\treturn fmt.Errorf(\"%s (from envar %s=%q)\", err, v.Tag.Env, envar)\n+\t\t\t}\n+\t\t\treturn nil\n+\t\t}\n+\t}\n \tif v.Default != \"\" {\n \t\treturn v.Parse(Scan(v.Default), v.Target)\n \t}\ndiff --git a/resolver.go b/resolver.go\nindex 5c89a18..9de21a5 100644\n--- a/resolver.go\n+++ b/resolver.go\n@@ -4,7 +4,6 @@ import (\n \t\"encoding/json\"\n \t\"fmt\"\n \t\"io\"\n-\t\"os\"\n \t\"strings\"\n )\n \n@@ -61,16 +60,3 @@ func jsonDecodeValue(sep rune, value interface{}) (string, error) {\n \t}\n \treturn \"\", fmt.Errorf(\"unsupported JSON value %v (of type %T)\", value, value)\n }\n-\n-// Envars resolves flag values using the `env:\"<name>\"` tag. It ignores flags without this tag.\n-//\n-// This resolver is installed by default.\n-func Envars() ResolverFunc {\n-\treturn func(context *Context, parent *Path, flag *Flag) (string, error) {\n-\t\tif flag.Tag.Env == \"\" {\n-\t\t\treturn \"\", nil\n-\t\t}\n-\t\tv, _ := os.LookupEnv(flag.Tag.Env)\n-\t\treturn v, nil\n-\t}\n-}\ndiff --git a/resolver_test.go b/resolver_test.go\nindex 501eae9..ad0cebe 100644\n--- a/resolver_test.go\n+++ b/resolver_test.go\n@@ -61,31 +61,6 @@ func TestEnvarsFlagOverride(t *testing.T) {\n \trequire.Equal(t, \"hello\", cli.Flag)\n }\n \n-func TestEnvarsOnlyPopulateUsedBranches(t *testing.T) {\n-\t// nolint\n-\tvar cli struct {\n-\t\tUnvisitedArg struct {\n-\t\t\tUnvisitedArg string `arg`\n-\t\t\tInt          int    `env:\"KONG_INT\"`\n-\t\t} `arg`\n-\t\tUnvisitedCmd struct {\n-\t\t\tInt int `env:\"KONG_INT\"`\n-\t\t} `cmd`\n-\t\tVisited struct {\n-\t\t\tInt int `env:\"KONG_INT\"`\n-\t\t} `cmd`\n-\t}\n-\tparser, restoreEnv := newEnvParser(t, &cli, envMap{\"KONG_INT\": \"512\"})\n-\tdefer restoreEnv()\n-\n-\t_, err := parser.Parse([]string{\"visited\"})\n-\trequire.NoError(t, err)\n-\n-\trequire.Equal(t, 512, cli.Visited.Int)\n-\trequire.Equal(t, 0, cli.UnvisitedArg.Int)\n-\trequire.Equal(t, 0, cli.UnvisitedCmd.Int)\n-}\n-\n func TestEnvarsTag(t *testing.T) {\n \tvar cli struct {\n \t\tSlice []int `env:\"KONG_NUMBERS\"`\n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    ".golangci.yml",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/console.go",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/main.go",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "context.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "go.mod",
+    "go.sum",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "tokentype_string.go",
+    "util.go",
+    "util_test.go",
+    "visit.go"
+  ],
+  "explanation": {
+    "what": "デフォルトで登録されていた Envars() リゾルバー(resolver.go)を削除し、代わりに Value.Reset() が env タグを直接読んで(os.Getenv)ゼロ値・デフォルト値より先に反映するようにした。Reset() の適用順序は「ゼロ値 → envar があれば envar → なければ default タグ」になった。Kong.New() の resolvers 初期値からも Envars() が外され、resolverFunc の一覧には JSON など通常のリゾルバーだけが残る。",
+    "why": "コミットメッセージの通り、envar は resolver(設定ファイルなど外部リゾルバー)より優先度が高くあるべきという判断。以前は Envars() が他のリゾルバーと同列の Resolve() 呼び出しで処理されており、リゾルバーの登録順や Resolve() のループ内での扱いに依存していたが、Reset() の中で直接処理することで envar を「常に先に効く」特別な地位に固定した。",
+    "highlights": [
+      { "file": "model.go", "note": "Value.Reset() が env タグを os.Getenv で読み、値があれば Parse してすぐ return する部分" },
+      { "file": "resolver.go", "note": "Envars() リゾルバー実装がまるごと削除されている" }
+    ],
+    "langNotes": [
+      { "topic": "env タグと os.Getenv によるデフォルト解決", "note": "struct タグ(`env:\"NAME\"`)で環境変数名を宣言し、パーサ内部で os.Getenv を呼んで値を取り込む。Go の CLI ライブラリでよく見る構造体タグ駆動の設定読み込みパターンで、この後の resolver・config ファイル読み込みと並ぶ値解決経路の一つになる。" }
+    ],
+    "diagram": {
+      "mermaid": "flowchart TD\n  A[\"Value.Reset()\"] --> B[\"ゼロ値にセット\"]\n  B --> C{\"env タグの環境変数に値がある?\"}\n  C -->|\"はい\"| D[\"envar の値を Parse して確定\"]\n  C -->|\"いいえ\"| E{\"default タグがある?\"}\n  E -->|\"はい\"| F[\"default の値を Parse\"]\n  E -->|\"いいえ\"| G[\"ゼロ値のまま\"]\n  D --> H[\"Resolve(): 外部リゾルバーで未設定フラグのみ上書き\"]\n  F --> H\n  G --> H",
+      "caption": "Reset() における値解決の優先順位。envar は resolver より先に、default タグより優先して適用される"
+    },
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

@@ -1,0 +1,101 @@
+{
+  "seq": 174,
+  "sha": "b21bf1031aa3278718f987369e11f8a098f9338b",
+  "parents": [
+    "af533a38fb593823ca862dd886b7167186eff07e"
+  ],
+  "author": {
+    "name": "Alec Thomas",
+    "email": "alec@swapoff.org",
+    "date": "2020-02-19T13:19:52+11:00"
+  },
+  "message": "Support interpolating \"$env\".\n\nFixes #57.",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 3,
+    "deletions": 0
+  },
+  "files": [
+    {
+      "path": "kong.go",
+      "status": "M",
+      "additions": 3,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/kong.go b/kong.go\nindex 713c337..64cd407 100644\n--- a/kong.go\n+++ b/kong.go\n@@ -153,6 +153,9 @@ func (k *Kong) interpolateValue(value *Value, vars Vars) (err error) {\n \t\t\"default\": value.Default,\n \t\t\"enum\":    value.Enum,\n \t})\n+\tif value.Tag.Env != \"\" {\n+\t\tvars[\"env\"] = value.Tag.Env\n+\t}\n \tif value.Help, err = interpolate(value.Help, vars); err != nil {\n \t\treturn fmt.Errorf(\"help for %s: %s\", value.Summary(), err)\n \t}\n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    ".golangci.yml",
+    "COPYING",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/README.md",
+    "_examples/server/console.go",
+    "_examples/server/go.mod",
+    "_examples/server/go.sum",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/main.go",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "config_test.go",
+    "context.go",
+    "defaults.go",
+    "defaults_test.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "go.mod",
+    "go.sum",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "util.go",
+    "util_test.go",
+    "visit.go"
+  ],
+  "explanation": {
+    "what": "kong.go の interpolateValue() で、フィールドに env タグが設定されている場合に vars マップへ \"env\" キーとしてその環境変数名を追加するようにした。これにより help テキスト中で ${env} という変数参照が使えるようになる。",
+    "why": "コミットメッセージに \"Fixes #57\" とあり、env タグの値をヘルプ文字列に埋め込みたいという要望への対応であることが分かる。既存の ${default} / ${enum} と同様の変数展開の仕組みに ${env} を追加する形で実装している。",
+    "highlights": [
+      { "file": "kong.go", "note": "vars[\"env\"] = value.Tag.Env の1行追加のみ。既存の interpolate() の枠組みに乗せている。" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

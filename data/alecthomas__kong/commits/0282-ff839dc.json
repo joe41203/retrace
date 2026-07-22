@@ -1,0 +1,128 @@
+{
+  "seq": 282,
+  "sha": "ff839dc6db0f5e9abef848a2ddc3b5ae988c51dc",
+  "parents": [
+    "f00d33b57c8d5d84887fe7f7cb463694ba195c3b"
+  ],
+  "author": {
+    "name": "Colin",
+    "email": "valentini.colin@gmail.com",
+    "date": "2021-11-23T21:57:08-05:00"
+  },
+  "message": "Fix env var interpolation (#236)",
+  "pr": {
+    "number": 236,
+    "title": "Fix env var interpolation",
+    "body": "Support was added for variable interpolation of the `env` tag in #234, but it did not fully succeed in practice. This PR ensures that the `Env` attribute is updated on both the `value.Flag` and `value.Tag` of the node being interpolated.\r\n\r\nWithout this change, when `context.Reset` is called, the `env` value on the tag is still something like `${envToBeInterpolated}`, even though the the flag's `env` might be `SOME_ENV_VAR`.",
+    "url": "https://github.com/alecthomas/kong/pull/236"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 14,
+    "deletions": 4
+  },
+  "files": [
+    {
+      "path": "kong.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "resolver_test.go",
+      "status": "M",
+      "additions": 13,
+      "deletions": 4,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/kong.go b/kong.go\nindex 70107d5..45ef8b8 100644\n--- a/kong.go\n+++ b/kong.go\n@@ -201,6 +201,7 @@ func (k *Kong) interpolateValue(value *Value, vars Vars) (err error) {\n \t\tif value.Flag.Env, err = interpolate(value.Flag.Env, vars, nil); err != nil {\n \t\t\treturn fmt.Errorf(\"env value for %s: %s\", value.Summary(), err)\n \t\t}\n+\t\tvalue.Tag.Env = value.Flag.Env\n \t\tupdatedVars[\"env\"] = value.Flag.Env\n \t}\n \tvalue.Help, err = interpolate(value.Help, vars, updatedVars)\ndiff --git a/resolver_test.go b/resolver_test.go\nindex fa83465..81d64f1 100644\n--- a/resolver_test.go\n+++ b/resolver_test.go\n@@ -37,17 +37,26 @@ func TestEnvarsFlagBasic(t *testing.T) {\n \tvar cli struct {\n \t\tString string `env:\"KONG_STRING\"`\n \t\tSlice  []int  `env:\"KONG_SLICE\"`\n+\t\tInterp string `env:\"${kongInterp}\"`\n \t}\n-\tparser, unsetEnvs := newEnvParser(t, &cli, envMap{\n-\t\t\"KONG_STRING\": \"bye\",\n-\t\t\"KONG_SLICE\":  \"5,2,9\",\n-\t})\n+\tkongInterpEnv := \"KONG_INTERP\"\n+\tparser, unsetEnvs := newEnvParser(t, &cli,\n+\t\tenvMap{\n+\t\t\t\"KONG_STRING\": \"bye\",\n+\t\t\t\"KONG_SLICE\":  \"5,2,9\",\n+\t\t\t\"KONG_INTERP\": \"foo\",\n+\t\t},\n+\t\tkong.Vars{\n+\t\t\t\"kongInterp\": kongInterpEnv,\n+\t\t},\n+\t)\n \tdefer unsetEnvs()\n \n \t_, err := parser.Parse([]string{})\n \trequire.NoError(t, err)\n \trequire.Equal(t, \"bye\", cli.String)\n \trequire.Equal(t, []int{5, 2, 9}, cli.Slice)\n+\trequire.Equal(t, \"foo\", cli.Interp)\n }\n \n func TestEnvarsFlagOverride(t *testing.T) {\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/FUNDING.yml",
+    ".github/workflows/ci.yml",
+    ".gitignore",
+    ".golangci.yml",
+    "COPYING",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/README.md",
+    "_examples/server/console.go",
+    "_examples/server/go.mod",
+    "_examples/server/go.sum",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/main.go",
+    "benchmark_test.go",
+    "bin/.go@latest.pkg",
+    "bin/.golangci-lint-1.42.0.pkg",
+    "bin/README.hermit.md",
+    "bin/activate-hermit",
+    "bin/go",
+    "bin/gofmt",
+    "bin/golangci-lint",
+    "bin/hermit",
+    "bin/hermit.hcl",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "config_test.go",
+    "context.go",
+    "defaults.go",
+    "defaults_test.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "go.mod",
+    "go.sum",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "testdata/file.txt",
+    "util.go",
+    "util_test.go",
+    "visit.go"
+  ],
+  "explanation": {
+    "what": "kong.go の interpolateValue で、Flag.Env を補間(interpolate)した結果を value.Flag.Env だけでなく value.Tag.Env にも書き戻す1行を追加した。resolver_test.go には `env:\"${kongInterp}\"` のように env タグ自体を変数展開するケースのテストを追加している。",
+    "why": "PR本文によれば、env タグの変数補間自体は先行 PR(#234)で対応済みだったが、Context.Reset() が呼ばれるとタグ側の Env はまだ未展開の `${envToBeInterpolated}` のままで、Flag 側の Env とタグ側の Env が食い違う不整合が残っていた。value.Tag.Env にも展開結果を反映することでこのずれを解消した。",
+    "highlights": [
+      { "file": "kong.go", "note": "`value.Tag.Env = value.Flag.Env` の1行追加が本質的な修正" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [
+      { "type": "pr", "number": 236, "url": "https://github.com/alecthomas/kong/pull/236" }
+    ],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

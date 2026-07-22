@@ -1,0 +1,112 @@
+{
+  "seq": 237,
+  "sha": "93f73cf38cefcd96da05d5825ee3ba7bc93443d5",
+  "parents": [
+    "09467435e1a911affe851d6c69e332e917daa680"
+  ],
+  "author": {
+    "name": "Alec Thomas",
+    "email": "alec@swapoff.org",
+    "date": "2021-03-13T20:25:26+11:00"
+  },
+  "message": "Display multiple optional args in a more expected way.\n\nPreviously:\n\n    Usage: command [<one>] [<two>]\n\nNow:\n\n    Usage: command [<one> [<two>]]\n\nThanks to @juliaogris for the inspiration!",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 40,
+    "deletions": 2
+  },
+  "files": [
+    {
+      "path": "help_test.go",
+      "status": "M",
+      "additions": 32,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "model.go",
+      "status": "M",
+      "additions": 8,
+      "deletions": 2,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/help_test.go b/help_test.go\nindex 7537486..730c189 100644\n--- a/help_test.go\n+++ b/help_test.go\n@@ -21,6 +21,38 @@ func (threeArg) Help() string {\n \treturn `Detailed help provided through the HelpProvider interface.`\n }\n \n+func TestHelpOptionalArgs(t *testing.T) {\n+\tvar cli struct {\n+\t\tOne string `arg:\"\" optional:\"\" help:\"One optional arg.\"`\n+\t\tTwo string `arg:\"\" optional:\"\" help:\"Two optional arg.\"`\n+\t}\n+\tw := bytes.NewBuffer(nil)\n+\texited := false\n+\tapp := mustNew(t, &cli,\n+\t\tkong.Name(\"test-app\"),\n+\t\tkong.Writers(w, w),\n+\t\tkong.Exit(func(int) {\n+\t\t\texited = true\n+\t\t\tpanic(true) // Panic to fake \"exit\".\n+\t\t}),\n+\t)\n+\trequire.PanicsWithValue(t, true, func() {\n+\t\t_, err := app.Parse([]string{\"--help\"})\n+\t\trequire.NoError(t, err)\n+\t})\n+\trequire.True(t, exited)\n+\texpected := `Usage: test-app [<one> [<two>]]\n+\n+Arguments:\n+  [<one>]    One optional arg.\n+  [<two>]    Two optional arg.\n+\n+Flags:\n+  -h, --help    Show context-sensitive help.\n+`\n+\trequire.Equal(t, expected, w.String())\n+}\n+\n func TestHelp(t *testing.T) {\n \t// nolint: govet\n \tvar cli struct {\ndiff --git a/model.go b/model.go\nindex 4ce2456..c1ef65b 100644\n--- a/model.go\n+++ b/model.go\n@@ -146,11 +146,17 @@ func (n *Node) Summary() string {\n \t\tsummary += \" \" + flags\n \t}\n \targs := []string{}\n+\toptional := 0\n \tfor _, arg := range n.Positional {\n-\t\targs = append(args, arg.Summary())\n+\t\tsummary := arg.Summary()\n+\t\tif arg.Tag.Optional {\n+\t\t\toptional++\n+\t\t\tsummary = strings.TrimRight(summary, \"]\")\n+\t\t}\n+\t\targs = append(args, summary)\n \t}\n \tif len(args) != 0 {\n-\t\tsummary += \" \" + strings.Join(args, \" \")\n+\t\tsummary += \" \" + strings.Join(args, \" \") + strings.Repeat(\"]\", optional)\n \t} else if len(n.Children) > 0 {\n \t\tsummary += \" <command>\"\n \t}\n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    ".github/FUNDING.yml",
+    ".gitignore",
+    ".golangci.yml",
+    "COPYING",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/README.md",
+    "_examples/server/console.go",
+    "_examples/server/go.mod",
+    "_examples/server/go.sum",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/main.go",
+    "benchmark_test.go",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "config_test.go",
+    "context.go",
+    "defaults.go",
+    "defaults_test.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "go.mod",
+    "go.sum",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "testdata/file.txt",
+    "util.go",
+    "util_test.go",
+    "visit.go"
+  ],
+  "explanation": {
+    "what": "複数の任意(optional)位置引数がある場合の Usage 表示を、`[<one>] [<two>]`(それぞれ独立した角括弧)から `[<one> [<two>]]`(ネストした角括弧)に変更した。model.go の Node.Summary() で、optional な引数ごとに末尾の `]` を一旦 TrimRight で取り除いておき、全引数を連結した後に optional の数だけ `]` を repeat して付け直すことで入れ子の閉じ括弧を作っている。",
+    "why": "コミットメッセージに記載の通り、以前の表示形式では `[<one>] [<two>]` のように独立した括弧になり、`<one>` を省略して `<two>` だけ渡せるかのように誤解されやすかった。実際には位置引数は先頭から順にしか埋められないため、`[<one> [<two>]]` のようにネストさせることで「one を省略すれば two も指定できない」という依存関係を視覚的に正しく示せるようにした。@juliaogris の着想に基づくとメッセージに明記されている。",
+    "highlights": [
+      { "file": "model.go", "note": "TrimRight で `]` を外し、optional の数だけ Repeat で閉じ括弧を後置するネスト表現のロジック" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

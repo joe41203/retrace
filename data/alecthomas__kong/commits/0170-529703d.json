@@ -1,0 +1,138 @@
+{
+  "seq": 170,
+  "sha": "529703d8d10528c87dfff818bc996007ec7c45a0",
+  "parents": [
+    "ca3a30c5f18b04d9818bf8b87accf460ec946de2"
+  ],
+  "author": {
+    "name": "Rene Zbinden",
+    "email": "rene.zbinden@postfinance.ch",
+    "date": "2020-02-14T10:47:58+01:00"
+  },
+  "message": "add support to make map separator configurable",
+  "pr": {
+    "number": 53,
+    "title": "add support to make map separator configurable",
+    "body": "As promised in #52 ",
+    "url": "https://github.com/alecthomas/kong/pull/53"
+  },
+  "linkedIssues": [
+    {
+      "number": 52,
+      "title": "mapsep tag",
+      "body": "Would a pull request for a mapsep tag be accepted? A ; char is very unfortunate since ot terminates the command if you don‘t put it into ‘.",
+      "url": "https://github.com/alecthomas/kong/issues/52"
+    }
+  ],
+  "stats": {
+    "filesChanged": 4,
+    "additions": 23,
+    "deletions": 2
+  },
+  "files": [
+    {
+      "path": "README.md",
+      "status": "M",
+      "additions": 2,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "mapper.go",
+      "status": "M",
+      "additions": 2,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "mapper_test.go",
+      "status": "M",
+      "additions": 10,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "tag.go",
+      "status": "M",
+      "additions": 9,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/README.md b/README.md\nindex fa90ad5..f0f519b 100644\n--- a/README.md\n+++ b/README.md\n@@ -370,7 +370,7 @@ var CLI struct {\n }\n ```\n \n-For flags, multiple key+value pairs should be separated by `;` eg. `--set=\"key1=value1;key2=value2\"`.\n+For flags, multiple key+value pairs should be separated by `mapsep:\"rune\"` tag (defaults to `;`) eg. `--set=\"key1=value1;key2=value2\"`.\n \n <a id=\"markdown-custom-named-decoders\" name=\"custom-named-decoders\"></a>\n ## Custom named decoders\n@@ -428,6 +428,7 @@ Tag                    | Description\n `hidden`               | If present, command or flag is hidden.\n `format:\"X\"`           | Format for parsing input, if supported.\n `sep:\"X\"`              | Separator for sequences (defaults to \",\"). May be `none` to disable splitting.\n+`mapsep:\"X\"`           | Separator for maps (defaults to \";\"). May be `none` to disable splitting.\n `enum:\"X,Y,...\"`       | Set of valid values allowed for this flag.\n `group:\"X\"`            | Logical group for a flag or command.\n `xor:\"X\"`              | Exclusive OR group for flags. Only one flag in the group can be used which is restricted within the same command.\ndiff --git a/mapper.go b/mapper.go\nindex 1482f1b..a1d9058 100644\n--- a/mapper.go\n+++ b/mapper.go\n@@ -408,6 +408,7 @@ func mapDecoder(r *Registry) MapperFunc {\n \t\t\ttarget.Set(reflect.MakeMap(target.Type()))\n \t\t}\n \t\tel := target.Type()\n+\t\tsep := ctx.Value.Tag.MapSep\n \t\tvar childScanner *Scanner\n \t\tif ctx.Value.Flag != nil {\n \t\t\tt := ctx.Scan.Pop()\n@@ -417,7 +418,7 @@ func mapDecoder(r *Registry) MapperFunc {\n \t\t\t}\n \t\t\tswitch v := t.Value.(type) {\n \t\t\tcase string:\n-\t\t\t\tchildScanner = Scan(SplitEscaped(v, ';')...)\n+\t\t\t\tchildScanner = Scan(SplitEscaped(v, sep)...)\n \n \t\t\tcase []map[string]interface{}:\n \t\t\t\tfor _, m := range v {\ndiff --git a/mapper_test.go b/mapper_test.go\nindex e67cfc2..1ec9441 100644\n--- a/mapper_test.go\n+++ b/mapper_test.go\n@@ -161,6 +161,16 @@ func TestMapWithMultipleValues(t *testing.T) {\n \trequire.Equal(t, map[string]string{\"a\": \"b\", \"c\": \"d\"}, cli.Value)\n }\n \n+func TestMapWithDifferentSeparator(t *testing.T) {\n+\tvar cli struct {\n+\t\tValue map[string]string `mapsep:\",\"`\n+\t}\n+\tk := mustNew(t, &cli)\n+\t_, err := k.Parse([]string{\"--value=a=b,c=d\"})\n+\trequire.NoError(t, err)\n+\trequire.Equal(t, map[string]string{\"a\": \"b\", \"c\": \"d\"}, cli.Value)\n+}\n+\n func TestURLMapper(t *testing.T) {\n \tvar cli struct {\n \t\tURL *url.URL `arg:\"\"`\ndiff --git a/tag.go b/tag.go\nindex a642e99..88380fe 100644\n--- a/tag.go\n+++ b/tag.go\n@@ -25,6 +25,7 @@ type Tag struct {\n \tShort       rune\n \tHidden      bool\n \tSep         rune\n+\tMapSep      rune\n \tEnum        string\n \tGroup       string\n \tXor         string\n@@ -151,6 +152,7 @@ func parseTag(fv reflect.Value, ft reflect.StructField) *Tag {\n \tt.Hidden = t.Has(\"hidden\")\n \tt.Format = t.Get(\"format\")\n \tt.Sep, _ = t.GetRune(\"sep\")\n+\tt.MapSep, _ = t.GetRune(\"mapsep\")\n \tt.Group = t.Get(\"group\")\n \tt.Xor = t.Get(\"xor\")\n \tt.Prefix = t.Get(\"prefix\")\n@@ -162,6 +164,13 @@ func parseTag(fv reflect.Value, ft reflect.StructField) *Tag {\n \t\t\tt.Sep = ','\n \t\t}\n \t}\n+\tif t.MapSep == 0 {\n+\t\tif t.Get(\"mapsep\") == \"none\" {\n+\t\t\tt.MapSep = -1\n+\t\t} else {\n+\t\t\tt.MapSep = ';'\n+\t\t}\n+\t}\n \tt.Vars = Vars{}\n \tfor _, set := range t.GetAll(\"set\") {\n \t\tparts := strings.SplitN(set, \"=\", 2)\n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    ".golangci.yml",
+    "COPYING",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/README.md",
+    "_examples/server/console.go",
+    "_examples/server/go.mod",
+    "_examples/server/go.sum",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/main.go",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "config_test.go",
+    "context.go",
+    "defaults.go",
+    "defaults_test.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "go.mod",
+    "go.sum",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "util.go",
+    "util_test.go",
+    "visit.go"
+  ],
+  "explanation": {
+    "what": "map 型フィールドのキー・値ペアを区切る記号(従来は `;` 固定)を `mapsep:\"X\"` タグで設定可能にした。Tag 構造体に MapSep フィールドを追加し、parseTag() で mapsep タグを読み取って rune にパースする(未指定時は `;`、`\"none\"` 指定時は分割無効を表す -1)。mapDecoder() 側は SplitEscaped(v, ';') 固定だった呼び出しを SplitEscaped(v, sep) に変更し、ctx.Value.Tag.MapSep を使うようにした。README にも `mapsep` タグの説明を追記。",
+    "why": "issue #52 で「マップの区切り文字が `;` 固定だとシェル上でコマンドを終端させてしまい扱いづらいので mapsep タグを受け付けてほしい」と要望されており、PR本文の \"As promised in #52\" の通りその要望に応える形で実装された。",
+    "highlights": [
+      { "file": "tag.go", "note": "MapSep フィールドと mapsep タグのパース(none指定時は -1 で分割無効)" },
+      { "file": "mapper.go", "note": "mapDecoder() が固定の ';' ではなく Tag.MapSep を使うよう変更" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [
+      { "type": "pr", "number": 53, "url": "https://github.com/alecthomas/kong/pull/53" },
+      { "type": "issue", "number": 52, "url": "https://github.com/alecthomas/kong/issues/52" }
+    ],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

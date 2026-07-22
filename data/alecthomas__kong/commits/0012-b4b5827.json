@@ -1,0 +1,73 @@
+{
+  "seq": 12,
+  "sha": "b4b58270446cd24859c6956afd095568c6cc7343",
+  "parents": [
+    "67b1a12059a70651bbe4ef47186e37360e2eab0e"
+  ],
+  "author": {
+    "name": "Gerald Kaszuba",
+    "email": "gak@gak0.com",
+    "date": "2018-05-18T18:38:53+10:00"
+  },
+  "message": "Matching arg field (#1)\n\nCheck if the first field of an argument branch matches the parent struct field.\r",
+  "pr": {
+    "number": 1,
+    "title": "Matching arg field",
+    "body": "",
+    "url": "https://github.com/alecthomas/kong/pull/1"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 16,
+    "deletions": 1
+  },
+  "files": [
+    {
+      "path": "build.go",
+      "status": "M",
+      "additions": 4,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "kong_test.go",
+      "status": "M",
+      "additions": 12,
+      "deletions": 1,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/build.go b/build.go\nindex d867222..8b4834e 100644\n--- a/build.go\n+++ b/build.go\n@@ -79,6 +79,10 @@ func buildNode(v reflect.Value, cmd bool) *Node {\n \t\t\t\t\tchild.Help = value.Help\n \t\t\t\t}\n \t\t\t\tchild.Name = value.Name\n+\t\t\t\tif child.Name != name {\n+\t\t\t\t\tfail(\"first field in positional branch %s.%s must have the same name as the parent field (%s).\",\n+\t\t\t\t\t\tv.Type().Name(), ft.Name, child.Name)\n+\t\t\t\t}\n \t\t\t\tnode.Children = append(node.Children, &Branch{Argument: &Argument{\n \t\t\t\t\tNode:     *child,\n \t\t\t\t\tArgument: value,\ndiff --git a/kong_test.go b/kong_test.go\nindex 72ec784..007a317 100644\n--- a/kong_test.go\n+++ b/kong_test.go\n@@ -98,10 +98,21 @@ func TestArgSlice(t *testing.T) {\n \trequire.Equal(t, true, cli.Flag)\n }\n \n-func TestUnsupportedfieldErrors(t *testing.T) {\n+func TestUnsupportedFieldErrors(t *testing.T) {\n \tvar cli struct {\n \t\tKeys map[string]string\n \t}\n \t_, err := New(\"\", \"\", &cli)\n \trequire.Error(t, err)\n }\n+\n+func TestMatchingArgField(t *testing.T) {\n+\tvar cli struct {\n+\t\tID struct {\n+\t\t\tNotID int `arg:\"\"`\n+\t\t} `arg:\"\"`\n+\t}\n+\n+\t_, err := New(\"\", \"\", &cli)\n+\trequire.Error(t, err)\n+}\n",
+  "diffTruncated": false,
+  "tree": [
+    "README.md",
+    "_examples/shell/main.go",
+    "build.go",
+    "camelcase.go",
+    "decoders.go",
+    "decoders_test.go",
+    "global.go",
+    "kong.go",
+    "kong_test.go",
+    "model.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tokentype_string.go"
+  ],
+  "explanation": {
+    "what": "分岐引数(branching argument)を構築する際、その構造体の最初のフィールド名(positional argument の名前)が親フィールド名と一致しない場合に fail() でエラーにするチェックを build.go に追加した。対応するテスト TestMatchingArgField も追加されている。",
+    "why": "PR タイトルの \"Matching arg field\" が示す通り、分岐引数の最初のフィールドは親構造体フィールドの値そのものを受け取る特別な位置づけであり、名前が食い違うと混乱を招く設計上の不整合になるため、ビルド時に検出してエラーにしたと考えられる。",
+    "highlights": [
+      { "file": "build.go", "note": "child.Name != name のときに fail() で構築時エラーにする箇所" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [
+      { "type": "pr", "number": 1, "url": "https://github.com/alecthomas/kong/pull/1" }
+    ],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

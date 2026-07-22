@@ -1,0 +1,66 @@
+{
+  "seq": 5,
+  "sha": "cb88963909be7f7f98954d083d08fd17517831dd",
+  "parents": [
+    "8f26b130881b003f744a509b050a3f3850412617"
+  ],
+  "author": {
+    "name": "Alec Thomas",
+    "email": "alec@swapoff.org",
+    "date": "2018-05-17T11:21:20+10:00"
+  },
+  "message": "Clean up decoders a bit.",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 72,
+    "deletions": 70
+  },
+  "files": [
+    {
+      "path": "build.go",
+      "status": "M",
+      "additions": 4,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "decoders.go",
+      "status": "M",
+      "additions": 68,
+      "deletions": 69,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/build.go b/build.go\nindex 7a8dccd..2e38444 100644\n--- a/build.go\n+++ b/build.go\n@@ -37,7 +37,10 @@ func buildNode(v reflect.Value) *Node {\n \t\t\tname = strings.ToLower(strings.Join(camelCase(ft.Name), \"-\"))\n \t\t}\n \t\thelp := ft.Tag.Get(\"help\")\n-\t\tdecoder := DecoderForField(ft)\n+\t\tdecoder, err := DecoderForField(ft)\n+\t\tif err != nil && ft.Type.Kind() != reflect.Struct {\n+\t\t\tpanic(err)\n+\t\t}\n \t\tdflt := ft.Tag.Get(\"default\")\n \t\tplaceholder := ft.Tag.Get(\"placeholder\")\n \t\tif placeholder == \"\" {\ndiff --git a/decoders.go b/decoders.go\nindex 26ddfca..88c5dbd 100644\n--- a/decoders.go\n+++ b/decoders.go\n@@ -85,26 +85,25 @@ var (\n )\n \n // DecoderForField finds a decoder for a struct field.\n-//\n-func DecoderForField(field reflect.StructField) Decoder {\n+func DecoderForField(field reflect.StructField) (Decoder, error) {\n \tname, ok := field.Tag.Lookup(\"type\")\n \tif ok {\n \t\tif decoder, ok := namedDecoders[name]; ok {\n-\t\t\treturn decoder\n+\t\t\treturn decoder, nil\n \t\t}\n \t}\n \treturn DecoderForType(field.Type)\n }\n \n-func DecoderForType(typ reflect.Type) Decoder {\n+func DecoderForType(typ reflect.Type) (Decoder, error) {\n \tvar decoder Decoder\n \tvar ok bool\n \tif decoder, ok = typeDecoders[typ]; ok {\n-\t\treturn decoder\n+\t\treturn decoder, nil\n \t} else if decoder, ok = kindDecoders[typ.Kind()]; ok {\n-\t\treturn decoder\n+\t\treturn decoder, nil\n \t}\n-\treturn missingDecoder\n+\treturn nil, fmt.Errorf(\"no decoder for type %s\", typ)\n }\n \n // RegisterDecoder registers decoders.\n@@ -126,49 +125,19 @@ func RegisterDecoder(decoders ...Decoder) {\n }\n \n func init() {\n-\tintDecoder := NewKindDecoder(reflect.Int, func(ctx *DecoderContext, scan *Scanner, target reflect.Value) error {\n-\t\tn, err := strconv.ParseInt(scan.PopValue(\"int\"), 10, 64)\n-\t\tif err != nil {\n-\t\t\treturn err\n-\t\t}\n-\t\ttarget.SetInt(n)\n-\t\treturn nil\n-\t})\n-\tuintDecoder := NewKindDecoder(reflect.Uint, func(ctx *DecoderContext, scan *Scanner, target reflect.Value) error {\n-\t\tn, err := strconv.ParseUint(scan.PopValue(\"uint\"), 10, 64)\n-\t\tif err != nil {\n-\t\t\treturn err\n-\t\t}\n-\t\ttarget.SetUint(n)\n-\t\treturn nil\n-\t})\n \tkindDecoders = map[reflect.Kind]KindDecoder{\n-\t\treflect.Int:    intDecoder,\n-\t\treflect.Int8:   intDecoder,\n-\t\treflect.Int16:  intDecoder,\n-\t\treflect.Int32:  intDecoder,\n-\t\treflect.Int64:  intDecoder,\n-\t\treflect.Uint:   uintDecoder,\n-\t\treflect.Uint8:  uintDecoder,\n-\t\treflect.Uint16: uintDecoder,\n-\t\treflect.Uint32: uintDecoder,\n-\t\treflect.Uint64: uintDecoder,\n-\t\treflect.Float32: NewKindDecoder(reflect.Float32, func(ctx *DecoderContext, scan *Scanner, target reflect.Value) error {\n-\t\t\tn, err := strconv.ParseFloat(scan.PopValue(\"float\"), 32)\n-\t\t\tif err != nil {\n-\t\t\t\treturn err\n-\t\t\t}\n-\t\t\ttarget.SetFloat(n)\n-\t\t\treturn nil\n-\t\t}),\n-\t\treflect.Float64: NewKindDecoder(reflect.Float64, func(ctx *DecoderContext, scan *Scanner, target reflect.Value) error {\n-\t\t\tn, err := strconv.ParseFloat(scan.PopValue(\"float\"), 64)\n-\t\t\tif err != nil {\n-\t\t\t\treturn err\n-\t\t\t}\n-\t\t\ttarget.SetFloat(n)\n-\t\t\treturn nil\n-\t\t}),\n+\t\treflect.Int:     NewKindDecoder(reflect.Int, intDecoder),\n+\t\treflect.Int8:    NewKindDecoder(reflect.Int8, intDecoder),\n+\t\treflect.Int16:   NewKindDecoder(reflect.Int16, intDecoder),\n+\t\treflect.Int32:   NewKindDecoder(reflect.Int32, intDecoder),\n+\t\treflect.Int64:   NewKindDecoder(reflect.Int64, intDecoder),\n+\t\treflect.Uint:    NewKindDecoder(reflect.Uint, uintDecoder),\n+\t\treflect.Uint8:   NewKindDecoder(reflect.Uint8, uintDecoder),\n+\t\treflect.Uint16:  NewKindDecoder(reflect.Uint16, uintDecoder),\n+\t\treflect.Uint32:  NewKindDecoder(reflect.Uint32, uintDecoder),\n+\t\treflect.Uint64:  NewKindDecoder(reflect.Uint64, uintDecoder),\n+\t\treflect.Float32: NewKindDecoder(reflect.Float32, floatDecoder(32)),\n+\t\treflect.Float64: NewKindDecoder(reflect.Float64, floatDecoder(64)),\n \t\treflect.String: NewKindDecoder(reflect.String, func(ctx *DecoderContext, scan *Scanner, target reflect.Value) error {\n \t\t\ttarget.SetString(scan.PopValue(\"string\"))\n \t\t\treturn nil\n@@ -177,27 +146,57 @@ func init() {\n \t\t\ttarget.SetBool(true)\n \t\t\treturn nil\n \t\t}),\n-\t\treflect.Slice: NewKindDecoder(reflect.Slice, func(ctx *DecoderContext, scan *Scanner, target reflect.Value) error {\n-\t\t\tel := target.Type().Elem()\n-\t\t\tsep, ok := ctx.Value.Field.Tag.Lookup(\"sep\")\n-\t\t\tif !ok {\n-\t\t\t\tsep = \",\"\n-\t\t\t}\n-\t\t\tchildScanner := Scan(strings.Split(scan.PopValue(\"slice\"), sep)...)\n-\t\t\tchildDecoder := DecoderForType(el)\n-\t\t\tfor childScanner.Peek().Type != EOLToken {\n-\t\t\t\tchildValue := reflect.New(el).Elem()\n-\t\t\t\terr := childDecoder.Decode(ctx, childScanner, childValue)\n-\t\t\t\tif err != nil {\n-\t\t\t\t\treturn err\n-\t\t\t\t}\n-\t\t\t\ttarget.Set(reflect.Append(target, childValue))\n-\t\t\t}\n-\t\t\treturn nil\n-\t\t}),\n+\t\treflect.Slice: NewKindDecoder(reflect.Slice, sliceDecoder),\n+\t}\n+}\n+\n+func intDecoder(ctx *DecoderContext, scan *Scanner, target reflect.Value) error {\n+\tn, err := strconv.ParseInt(scan.PopValue(\"int\"), 10, 64)\n+\tif err != nil {\n+\t\treturn err\n \t}\n+\ttarget.SetInt(n)\n+\treturn nil\n }\n \n-var missingDecoder DecoderFunc = func(ctx *DecoderContext, scan *Scanner, target reflect.Value) error {\n-\treturn fmt.Errorf(\"no decoder for %q (of type %T) for field %q\", target.String(), target.Type(), ctx.Value.Field.Name)\n+func uintDecoder(ctx *DecoderContext, scan *Scanner, target reflect.Value) error {\n+\tn, err := strconv.ParseUint(scan.PopValue(\"uint\"), 10, 64)\n+\tif err != nil {\n+\t\treturn err\n+\t}\n+\ttarget.SetUint(n)\n+\treturn nil\n+}\n+\n+func floatDecoder(bits int) DecoderFunc {\n+\treturn func(ctx *DecoderContext, scan *Scanner, target reflect.Value) error {\n+\t\tn, err := strconv.ParseFloat(scan.PopValue(\"float\"), bits)\n+\t\tif err != nil {\n+\t\t\treturn err\n+\t\t}\n+\t\ttarget.SetFloat(n)\n+\t\treturn nil\n+\t}\n+}\n+\n+func sliceDecoder(ctx *DecoderContext, scan *Scanner, target reflect.Value) error {\n+\tel := target.Type().Elem()\n+\tsep, ok := ctx.Value.Field.Tag.Lookup(\"sep\")\n+\tif !ok {\n+\t\tsep = \",\"\n+\t}\n+\tchildScanner := Scan(strings.Split(scan.PopValue(\"list\"), sep)...)\n+\tchildDecoder, err := DecoderForType(el)\n+\tif err != nil {\n+\t\treturn err\n+\t}\n+\tfor childScanner.Peek().Type != EOLToken {\n+\t\tchildValue := reflect.New(el).Elem()\n+\t\terr := childDecoder.Decode(ctx, childScanner, childValue)\n+\t\tif err != nil {\n+\t\t\treturn err\n+\t\t}\n+\t\ttarget.Set(reflect.Append(target, childValue))\n+\t}\n+\treturn nil\n }\n",
+  "diffTruncated": false,
+  "tree": [
+    "README.md",
+    "_examples/shell/main.go",
+    "build.go",
+    "camelcase.go",
+    "decoders.go",
+    "decoders_test.go",
+    "global.go",
+    "kong.go",
+    "kong_test.go",
+    "model.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tokentype_string.go"
+  ],
+  "explanation": {
+    "what": "DecoderForField()/DecoderForType() が (Decoder, error) を返すよう変更し、int/uint/float 系の無名関数だった decoder 実装を intDecoder/uintDecoder/floatDecoder という名前付き関数に切り出した。init() 内の巨大なマップリテラルを整理し、build.go 側では decoder 解決に失敗してもフィールドが struct(コマンド/引数分岐)なら panic しないよう分岐した。",
+    "why": "コミットメッセージの通り、直前のコミットで肥大化した decoder 定義まわりの重複コードと可読性を整理する回。無名関数の羅列を名前付き関数(intDecoder 等)に切り出すことで、int系・uint系・float系それぞれの decoder が同じ実装を共有していることが見やすくなっている。",
+    "highlights": [
+      { "file": "decoders.go", "note": "intDecoder/uintDecoder/floatDecoder(bits) という名前付き関数への切り出し。float は bits をクロージャで持つ関数を返す形" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

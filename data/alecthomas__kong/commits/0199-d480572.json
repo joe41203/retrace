@@ -1,0 +1,118 @@
+{
+  "seq": 199,
+  "sha": "d480572d75eb82a6052e1eb7d16268983820608f",
+  "parents": [
+    "d4822839a2ea5f7d5c8960c8d8479beeecbe2692"
+  ],
+  "author": {
+    "name": "Alec Thomas",
+    "email": "alec@swapoff.org",
+    "date": "2020-06-10T15:40:22+10:00"
+  },
+  "message": "Make counter flags more flexible.\n\nThey now support three forms:\n\n    -s\n    --long\n    --long=N\n\nThe last of which explicitly sets the counter value.\n\nFixes #87.",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 3,
+    "additions": 32,
+    "deletions": 2
+  },
+  "files": [
+    {
+      "path": "README.md",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "mapper.go",
+      "status": "M",
+      "additions": 22,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "mapper_test.go",
+      "status": "M",
+      "additions": 9,
+      "deletions": 1,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/README.md b/README.md\nindex 508a1df..eaad200 100644\n--- a/README.md\n+++ b/README.md\n@@ -375,7 +375,7 @@ function `NamedMapper(name, mapper)`.\n | `path`            | A path. ~ expansion is applied.          \n | `existingfile`    | An existing file. ~ expansion is applied. `-` is accepted for stdin.\n | `existingdir`     | An existing directory. ~ expansion is applied.   \n-| `counter`         | Increment a numeric field. Useful for `-vvv`    \n+| `counter`         | Increment a numeric field. Useful for `-vvv`. Can accept `-s`, `--long` or `--long=N`.\n \n \n Slices and maps treat type tags specially. For slices, the `type:\"\"` tag\ndiff --git a/mapper.go b/mapper.go\nindex 8a1944d..b0f99b1 100644\n--- a/mapper.go\n+++ b/mapper.go\n@@ -597,6 +597,28 @@ func existingDirMapper(r *Registry) MapperFunc {\n \n func counterMapper() MapperFunc {\n \treturn func(ctx *DecodeContext, target reflect.Value) error {\n+\t\tif ctx.Scan.Peek().Type == FlagValueToken {\n+\t\t\tt, err := ctx.Scan.PopValue(\"counter\")\n+\t\t\tif err != nil {\n+\t\t\t\treturn err\n+\t\t\t}\n+\t\t\tswitch v := t.Value.(type) {\n+\t\t\tcase string:\n+\t\t\t\tn, err := strconv.ParseInt(v, 10, 64)\n+\t\t\t\tif err != nil {\n+\t\t\t\t\treturn errors.Errorf(\"expected a counter but got %q (%T)\", t, t.Value)\n+\t\t\t\t}\n+\t\t\t\ttarget.SetInt(n)\n+\n+\t\t\tcase int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64:\n+\t\t\t\ttarget.Set(reflect.ValueOf(v))\n+\n+\t\t\tdefault:\n+\t\t\t\treturn errors.Errorf(\"expected a counter but got %q (%T)\", t, t.Value)\n+\t\t\t}\n+\t\t\treturn nil\n+\t\t}\n+\n \t\tswitch target.Kind() {\n \t\tcase reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:\n \t\t\ttarget.SetInt(target.Int() + 1)\ndiff --git a/mapper_test.go b/mapper_test.go\nindex b6d7737..c0ba855 100644\n--- a/mapper_test.go\n+++ b/mapper_test.go\n@@ -262,7 +262,15 @@ func TestCounter(t *testing.T) {\n \t}\n \tp := mustNew(t, &cli)\n \n-\t_, err := p.Parse([]string{\"-iii\"})\n+\t_, err := p.Parse([]string{\"--int\", \"--int\", \"--int\"})\n+\trequire.NoError(t, err)\n+\trequire.Equal(t, 3, cli.Int)\n+\n+\t_, err = p.Parse([]string{\"--int=5\"})\n+\trequire.NoError(t, err)\n+\trequire.Equal(t, 5, cli.Int)\n+\n+\t_, err = p.Parse([]string{\"-iii\"})\n \trequire.NoError(t, err)\n \trequire.Equal(t, 3, cli.Int)\n \n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    ".golangci.yml",
+    "COPYING",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/README.md",
+    "_examples/server/console.go",
+    "_examples/server/go.mod",
+    "_examples/server/go.sum",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/main.go",
+    "benchmark_test.go",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "config_test.go",
+    "context.go",
+    "defaults.go",
+    "defaults_test.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "go.mod",
+    "go.sum",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "util.go",
+    "util_test.go",
+    "visit.go"
+  ],
+  "explanation": {
+    "what": "mapper.go の counterMapper() を変更し、フラグに値が伴っている(ctx.Scan.Peek().Type == FlagValueToken)場合は、その値を整数としてパースして target に直接セットするパスを追加した。従来通り値が無い場合は単純にカウンタをインクリメントする挙動も残している。README.md の counter 型の説明も更新。",
+    "why": "コミットメッセージが \"Fixes #87\" と明記する通り、counter フラグ(繰り返し指定でインクリメントする、例: -vvv)が -s / --long の形しか受け付けられず、--long=N のように値を明示的に指定するパースができなかった問題を修正するもの。これにより -s・--long・--long=N の3形式すべてを受け付けるようになった。",
+    "highlights": [
+      { "file": "mapper.go", "note": "counterMapper() の先頭に FlagValueToken 判定を追加し、値指定時は文字列/整数どちらの内部表現も受け付けて target.SetInt する" }
+    ],
+    "langNotes": [
+      { "topic": "counter フラグ", "note": "kong の counter 型は -v を繰り返すたびに整数フィールドをインクリメントする慣習(例えば -vvv で verbosity=3)。このコミットで --long=N のように値を直接指定する形もサポートし、より柔軟なCLI表現ができるようになった。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

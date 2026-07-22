@@ -1,0 +1,83 @@
+{
+  "seq": 19,
+  "sha": "d1acfab2e695c0b41a5dc279ddf023ca2565daa0",
+  "parents": [
+    "c27dd50be683a5d60517894e428cf46db73afeac"
+  ],
+  "author": {
+    "name": "Alec Thomas",
+    "email": "alec@swapoff.org",
+    "date": "2018-05-19T21:44:07+10:00"
+  },
+  "message": "Factor parsing out into a ParseContext type.\n\nThis is groundwork for supporting context-sensitive help and completion.\n\nFixes #7.",
+  "pr": {
+    "number": 8,
+    "title": "Factor parsing out into a ParseContext type.",
+    "body": "This is groundwork for supporting context-sensitive help and completion.\r\n\r\nFixes #7.",
+    "url": "https://github.com/alecthomas/kong/pull/8"
+  },
+  "linkedIssues": [
+    {
+      "number": 7,
+      "title": "Factor parsing state into a \"ParseContext\".",
+      "body": "This will hold the state for the parse, which we can then use for not only parsing, but for context-sensitive help, and context-sensitive completion.\r\n\r\nFor example, if at a subcommand `app cmd --help`, the parse context would have the cumulative flags, cumulative commands, as well as the current node. This allows help to be context-sensitive, and completion as well.",
+      "url": "https://github.com/alecthomas/kong/issues/7"
+    }
+  ],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 45,
+    "deletions": 44
+  },
+  "files": [
+    {
+      "path": "kong.go",
+      "status": "M",
+      "additions": 45,
+      "deletions": 44,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/kong.go b/kong.go\nindex 8246db7..d03cb5b 100644\n--- a/kong.go\n+++ b/kong.go\n@@ -65,8 +65,11 @@ func (k *Kong) Parse(args []string) (command string, err error) {\n \t\t}\n \t}()\n \tk.reset(k.Model)\n-\tcmd, err := k.applyNode(Scan(args...), k.Model, nil)\n-\treturn strings.Join(cmd, \" \"), err\n+\tctx := &ParseContext{\n+\t\tScan: Scan(args...),\n+\t}\n+\terr = ctx.applyNode(k.Model)\n+\treturn strings.Join(ctx.Command, \" \"), err\n }\n \n // Recursively reset values to defaults (as specified in the grammar) or the zero value.\n@@ -96,11 +99,17 @@ func (k *Kong) reset(node *Node) {\n \t}\n }\n \n-func (k *Kong) applyNode(scan *Scanner, node *Node, flags []*Flag) (command []string, err error) { // nolint: gocyclo\n+type ParseContext struct {\n+\tScan    *Scanner\n+\tCommand []string\n+\tFlags   []*Flag\n+}\n+\n+func (p *ParseContext) applyNode(node *Node) (err error) { // nolint: gocyclo\n \tpositional := 0\n-\tflags = append(flags, node.Flags...) // Track all parent flags.\n+\tp.Flags = append(p.Flags, node.Flags...)\n \n-\tfor token := scan.Pop(); token.Type != EOLToken; token = scan.Pop() {\n+\tfor token := p.Scan.Pop(); token.Type != EOLToken; token = p.Scan.Pop() {\n \t\tswitch token.Type {\n \t\tcase UntypedToken:\n \t\t\tswitch {\n@@ -108,7 +117,7 @@ func (k *Kong) applyNode(scan *Scanner, node *Node, flags []*Flag) (command []st\n \t\t\tcase token.Value == \"--\":\n \t\t\t\targs := []string{}\n \t\t\t\tfor {\n-\t\t\t\t\ttoken = scan.Pop()\n+\t\t\t\t\ttoken = p.Scan.Pop()\n \t\t\t\t\tif token.Type == EOLToken {\n \t\t\t\t\t\tbreak\n \t\t\t\t\t}\n@@ -116,7 +125,7 @@ func (k *Kong) applyNode(scan *Scanner, node *Node, flags []*Flag) (command []st\n \t\t\t\t}\n \t\t\t\t// Note: tokens must be pushed in reverse order.\n \t\t\t\tfor i := range args {\n-\t\t\t\t\tscan.PushTyped(args[len(args)-1-i], PositionalArgumentToken)\n+\t\t\t\t\tp.Scan.PushTyped(args[len(args)-1-i], PositionalArgumentToken)\n \t\t\t\t}\n \n \t\t\t// Long flag.\n@@ -124,52 +133,52 @@ func (k *Kong) applyNode(scan *Scanner, node *Node, flags []*Flag) (command []st\n \t\t\t\t// Parse it and push the tokens.\n \t\t\t\tparts := strings.SplitN(token.Value[2:], \"=\", 2)\n \t\t\t\tif len(parts) > 1 {\n-\t\t\t\t\tscan.PushTyped(parts[1], FlagValueToken)\n+\t\t\t\t\tp.Scan.PushTyped(parts[1], FlagValueToken)\n \t\t\t\t}\n-\t\t\t\tscan.PushTyped(parts[0], FlagToken)\n+\t\t\t\tp.Scan.PushTyped(parts[0], FlagToken)\n \n \t\t\t// Short flag.\n \t\t\tcase strings.HasPrefix(token.Value, \"-\"):\n \t\t\t\t// Note: tokens must be pushed in reverse order.\n-\t\t\t\tscan.PushTyped(token.Value[2:], ShortFlagTailToken)\n-\t\t\t\tscan.PushTyped(token.Value[1:2], ShortFlagToken)\n+\t\t\t\tp.Scan.PushTyped(token.Value[2:], ShortFlagTailToken)\n+\t\t\t\tp.Scan.PushTyped(token.Value[1:2], ShortFlagToken)\n \n \t\t\tdefault:\n-\t\t\t\tscan.PushTyped(token.Value, PositionalArgumentToken)\n+\t\t\t\tp.Scan.PushTyped(token.Value, PositionalArgumentToken)\n \t\t\t}\n \n \t\tcase ShortFlagTailToken:\n \t\t\t// Note: tokens must be pushed in reverse order.\n-\t\t\tscan.PushTyped(token.Value[1:], ShortFlagTailToken)\n-\t\t\tscan.PushTyped(token.Value[0:1], ShortFlagToken)\n+\t\t\tp.Scan.PushTyped(token.Value[1:], ShortFlagTailToken)\n+\t\t\tp.Scan.PushTyped(token.Value[0:1], ShortFlagToken)\n \n \t\tcase FlagToken:\n-\t\t\tif err := matchFlags(flags, token, scan, func(f *Flag) bool {\n+\t\t\tif err := matchFlags(p.Flags, token, p.Scan, func(f *Flag) bool {\n \t\t\t\treturn f.Name == token.Value\n \t\t\t}); err != nil {\n-\t\t\t\treturn nil, err\n+\t\t\t\treturn err\n \t\t\t}\n \n \t\tcase ShortFlagToken:\n-\t\t\tif err := matchFlags(flags, token, scan, func(f *Flag) bool {\n+\t\t\tif err := matchFlags(p.Flags, token, p.Scan, func(f *Flag) bool {\n \t\t\t\treturn string(f.Name) == token.Value\n \t\t\t}); err != nil {\n-\t\t\t\treturn nil, err\n+\t\t\t\treturn err\n \t\t\t}\n \n \t\tcase FlagValueToken:\n-\t\t\treturn nil, fmt.Errorf(\"unexpected flag argument %q\", token.Value)\n+\t\t\treturn fmt.Errorf(\"unexpected flag argument %q\", token.Value)\n \n \t\tcase PositionalArgumentToken:\n-\t\t\tscan.PushToken(token)\n+\t\t\tp.Scan.PushToken(token)\n \t\t\t// Ensure we've consumed all positional arguments.\n \t\t\tif positional < len(node.Positional) {\n \t\t\t\targ := node.Positional[positional]\n-\t\t\t\terr := arg.Decode(scan)\n+\t\t\t\terr := arg.Decode(p.Scan)\n \t\t\t\tif err != nil {\n-\t\t\t\t\treturn nil, err\n+\t\t\t\t\treturn err\n \t\t\t\t}\n-\t\t\t\tcommand = append(command, \"<\"+arg.Name+\">\")\n+\t\t\t\tp.Command = append(p.Command, \"<\"+arg.Name+\">\")\n \t\t\t\tpositional++\n \t\t\t\tbreak\n \t\t\t}\n@@ -179,47 +188,39 @@ func (k *Kong) applyNode(scan *Scanner, node *Node, flags []*Flag) (command []st\n \t\t\t\tswitch {\n \t\t\t\tcase branch.Command != nil:\n \t\t\t\t\tif branch.Command.Name == token.Value {\n-\t\t\t\t\t\tscan.Pop()\n-\t\t\t\t\t\tcommand = append(command, branch.Command.Name)\n-\t\t\t\t\t\tcmd, err := k.applyNode(scan, branch.Command, flags)\n-\t\t\t\t\t\tif err != nil {\n-\t\t\t\t\t\t\treturn nil, err\n-\t\t\t\t\t\t}\n-\t\t\t\t\t\treturn append(command, cmd...), nil\n+\t\t\t\t\t\tp.Scan.Pop()\n+\t\t\t\t\t\tp.Command = append(p.Command, branch.Command.Name)\n+\t\t\t\t\t\treturn p.applyNode(branch.Command)\n \t\t\t\t\t}\n \n \t\t\t\tcase branch.Argument != nil:\n \t\t\t\t\targ := branch.Argument.Argument\n-\t\t\t\t\tif err := arg.Decode(scan); err == nil {\n-\t\t\t\t\t\tcommand = append(command, \"<\"+arg.Name+\">\")\n-\t\t\t\t\t\tcmd, err := k.applyNode(scan, &branch.Argument.Node, flags)\n-\t\t\t\t\t\tif err != nil {\n-\t\t\t\t\t\t\treturn nil, err\n-\t\t\t\t\t\t}\n-\t\t\t\t\t\treturn append(command, cmd...), nil\n+\t\t\t\t\tif err := arg.Decode(p.Scan); err == nil {\n+\t\t\t\t\t\tp.Command = append(p.Command, \"<\"+arg.Name+\">\")\n+\t\t\t\t\t\treturn p.applyNode(&branch.Argument.Node)\n \t\t\t\t\t}\n \t\t\t\t}\n \t\t\t}\n-\t\t\treturn nil, fmt.Errorf(\"unexpected positional argument %s\", token)\n+\t\t\treturn fmt.Errorf(\"unexpected positional argument %s\", token)\n \n \t\tdefault:\n-\t\t\treturn nil, fmt.Errorf(\"unexpected token %s\", token)\n+\t\t\treturn fmt.Errorf(\"unexpected token %s\", token)\n \t\t}\n \t}\n \n \tif err := checkMissingPositionals(positional, node.Positional); err != nil {\n-\t\treturn nil, err\n+\t\treturn err\n \t}\n \n \tif err := checkMissingChildren(node.Children); err != nil {\n-\t\treturn nil, err\n+\t\treturn err\n \t}\n \n-\tif err := checkMissingFlags(node.Children, flags); err != nil {\n-\t\treturn nil, err\n+\tif err := checkMissingFlags(node.Children, p.Flags); err != nil {\n+\t\treturn err\n \t}\n \n-\treturn\n+\treturn nil\n }\n \n func checkMissingFlags(children []*Branch, flags []*Flag) error {\n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    "README.md",
+    "_examples/shell/main.go",
+    "build.go",
+    "camelcase.go",
+    "decoders.go",
+    "decoders_test.go",
+    "global.go",
+    "help.go",
+    "kong.go",
+    "kong_test.go",
+    "model.go",
+    "options.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tokentype_string.go"
+  ],
+  "explanation": {
+    "what": "パース中に受け渡していた scan *Scanner・command []string・flags []*Flag という3つの引数と戻り値を、新設した ParseContext 構造体(Scan/Command/Flags のフィールドを持つ)に集約した。applyNode() は (k *Kong) のメソッドから (p *ParseContext) のメソッドに移動し、シグネチャも `applyNode(node *Node) (err error)` に簡素化。Kong.Parse() は ParseContext を1つ生成してから ctx.applyNode(k.Model) を呼ぶだけになった。",
+    "why": "issue #7 に明記されている通り、今後コンテキスト依存のヘルプ表示(現在位置までの累積フラグ・累積コマンドを踏まえた `app cmd --help`)や補完機能を実装するための地ならしとして、パース中の状態を1箇所にまとめておく必要があった。バラバラな引数の受け渡しのままでは、後からその状態を外部に取り出して使うのが難しいため。",
+    "highlights": [
+      { "file": "kong.go", "note": "ParseContext { Scan, Command, Flags } という状態集約と、applyNode が (p *ParseContext) のメソッドに変わった箇所" },
+      { "file": "kong.go", "note": "Kong.Parse() が ctx := &ParseContext{...} を作って ctx.applyNode(k.Model) に委譲するだけになった簡素化" }
+    ],
+    "langNotes": [
+      { "topic": "ParseContext (状態を構造体へ集約するリファクタリング)", "note": "Go には可変長の暗黙引数や隠れたスレッドローカル状態が無いため、再帰関数間で共有する状態は明示的に構造体へまとめてポインタで渡すのが定石。ここでは scan/command/flags という3つの生引数を ParseContext に集約し、そのメソッドとして applyNode を再定義することで、将来ヘルプや補完機能がこの状態を外部から参照できるようにしている。" }
+    ],
+    "diagram": {
+      "mermaid": "flowchart LR\n  A[\"Kong.Parse(args)\"] --> B[\"ParseContext{Scan, Command, Flags}\"]\n  B --> C[\"ctx.applyNode(k.Model)\"]\n  C -->|\"再帰\"| C\n  C --> D[\"ctx.Command / ctx.Flags\"]",
+      "caption": "パース状態を ParseContext に集約し、applyNode がそのメソッドとして再帰する流れ"
+    },
+    "evidence": "issue",
+    "refs": [
+      { "type": "pr", "number": 8, "url": "https://github.com/alecthomas/kong/pull/8" },
+      { "type": "issue", "number": 7, "url": "https://github.com/alecthomas/kong/issues/7" }
+    ],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

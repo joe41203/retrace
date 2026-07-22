@@ -1,0 +1,146 @@
+{
+  "seq": 281,
+  "sha": "f00d33b57c8d5d84887fe7f7cb463694ba195c3b",
+  "parents": [
+    "79f896f0c0cbaef813d02006acd321d64e9cf55d"
+  ],
+  "author": {
+    "name": "Nate Parsons",
+    "email": "nate@planet.com",
+    "date": "2021-11-22T19:13:08-08:00"
+  },
+  "message": "Use reflect-compatible struct tags in examples",
+  "pr": {
+    "number": 235,
+    "title": "Use reflect-compatible struct tags in examples and make linter happy",
+    "body": "per suggestion in #88 ",
+    "url": "https://github.com/alecthomas/kong/pull/235"
+  },
+  "linkedIssues": [
+    {
+      "number": 88,
+      "title": "struct field tag not compatible ... bad syntax for struct tag pair",
+      "body": "I am getting the follow warning in my IDE:\r\n```\r\nstruct field tag `cmd help:\"Lists all active games\"` not compatible with reflect.StructTag.Get: bad syntax for struct tag pair\r\n```\r\n<img width=\"471\" alt=\"image\" src=\"https://user-images.githubusercontent.com/2089581/84275176-a85e1100-ab28-11ea-902c-b43598fabdfc.png\">\r\n\r\nNothing specularly bad, just wondering if you know of a work around. I'm getting the issue here - https://github.com/mattcanty/lichess-cli/blob/master/main.go#L15. Note that line 16 also nods to #66!",
+      "url": "https://github.com/alecthomas/kong/issues/88"
+    }
+  ],
+  "stats": {
+    "filesChanged": 3,
+    "additions": 46,
+    "deletions": 51
+  },
+  "files": [
+    {
+      "path": "_examples/docker/main.go",
+      "status": "M",
+      "additions": 41,
+      "deletions": 41,
+      "binary": false
+    },
+    {
+      "path": "_examples/server/console.go",
+      "status": "M",
+      "additions": 4,
+      "deletions": 4,
+      "binary": false
+    },
+    {
+      "path": "_examples/server/main.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 6,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/_examples/docker/main.go b/_examples/docker/main.go\nindex 3c3afcb..347157a 100644\n--- a/_examples/docker/main.go\n+++ b/_examples/docker/main.go\n@@ -33,47 +33,47 @@ func (v VersionFlag) BeforeApply(app *kong.Kong, vars kong.Vars) error {\n type CLI struct {\n \tGlobals\n \n-\tAttach  AttachCmd  `cmd help:\"Attach local standard input, output, and error streams to a running container\"`\n-\tBuild   BuildCmd   `cmd help:\"Build an image from a Dockerfile\"`\n-\tCommit  CommitCmd  `cmd help:\"Create a new image from a container's changes\"`\n-\tCp      CpCmd      `cmd help:\"Copy files/folders between a container and the local filesystem\"`\n-\tCreate  CreateCmd  `cmd help:\"Create a new container\"`\n-\tDeploy  DeployCmd  `cmd help:\"Deploy a new stack or update an existing stack\"`\n-\tDiff    DiffCmd    `cmd help:\"Inspect changes to files or directories on a container's filesystem\"`\n-\tEvents  EventsCmd  `cmd help:\"Get real time events from the server\"`\n-\tExec    ExecCmd    `cmd help:\"Run a command in a running container\"`\n-\tExport  ExportCmd  `cmd help:\"Export a container's filesystem as a tar archive\"`\n-\tHistory HistoryCmd `cmd help:\"Show the history of an image\"`\n-\tImages  ImagesCmd  `cmd help:\"List images\"`\n-\tImport  ImportCmd  `cmd help:\"Import the contents from a tarball to create a filesystem image\"`\n-\tInfo    InfoCmd    `cmd help:\"Display system-wide information\"`\n-\tInspect InspectCmd `cmd help:\"Return low-level information on Docker objects\"`\n-\tKill    KillCmd    `cmd help:\"Kill one or more running containers\"`\n-\tLoad    LoadCmd    `cmd help:\"Load an image from a tar archive or STDIN\"`\n-\tLogin   LoginCmd   `cmd help:\"Log in to a Docker registry\"`\n-\tLogout  LogoutCmd  `cmd help:\"Log out from a Docker registry\"`\n-\tLogs    LogsCmd    `cmd help:\"Fetch the logs of a container\"`\n-\tPause   PauseCmd   `cmd help:\"Pause all processes within one or more containers\"`\n-\tPort    PortCmd    `cmd help:\"List port mappings or a specific mapping for the container\"`\n-\tPs      PsCmd      `cmd help:\"List containers\"`\n-\tPull    PullCmd    `cmd help:\"Pull an image or a repository from a registry\"`\n-\tPush    PushCmd    `cmd help:\"Push an image or a repository to a registry\"`\n-\tRename  RenameCmd  `cmd help:\"Rename a container\"`\n-\tRestart RestartCmd `cmd help:\"Restart one or more containers\"`\n-\tRm      RmCmd      `cmd help:\"Remove one or more containers\"`\n-\tRmi     RmiCmd     `cmd help:\"Remove one or more images\"`\n-\tRun     RunCmd     `cmd help:\"Run a command in a new container\"`\n-\tSave    SaveCmd    `cmd help:\"Save one or more images to a tar archive (streamed to STDOUT by default)\"`\n-\tSearch  SearchCmd  `cmd help:\"Search the Docker Hub for images\"`\n-\tStart   StartCmd   `cmd help:\"Start one or more stopped containers\"`\n-\tStats   StatsCmd   `cmd help:\"Display a live stream of container(s) resource usage statistics\"`\n-\tStop    StopCmd    `cmd help:\"Stop one or more running containers\"`\n-\tTag     TagCmd     `cmd help:\"Create a tag TARGET_IMAGE that refers to SOURCE_IMAGE\"`\n-\tTop     TopCmd     `cmd help:\"Display the running processes of a container\"`\n-\tUnpause UnpauseCmd `cmd help:\"Unpause all processes within one or more containers\"`\n-\tUpdate  UpdateCmd  `cmd help:\"Update configuration of one or more containers\"`\n-\tVersion VersionCmd `cmd help:\"Show the Docker version information\"`\n-\tWait    WaitCmd    `cmd help:\"Block until one or more containers stop, then print their exit codes\"`\n+\tAttach  AttachCmd  `cmd:\"\" help:\"Attach local standard input, output, and error streams to a running container\"`\n+\tBuild   BuildCmd   `cmd:\"\" help:\"Build an image from a Dockerfile\"`\n+\tCommit  CommitCmd  `cmd:\"\" help:\"Create a new image from a container's changes\"`\n+\tCp      CpCmd      `cmd:\"\" help:\"Copy files/folders between a container and the local filesystem\"`\n+\tCreate  CreateCmd  `cmd:\"\" help:\"Create a new container\"`\n+\tDeploy  DeployCmd  `cmd:\"\" help:\"Deploy a new stack or update an existing stack\"`\n+\tDiff    DiffCmd    `cmd:\"\" help:\"Inspect changes to files or directories on a container's filesystem\"`\n+\tEvents  EventsCmd  `cmd:\"\" help:\"Get real time events from the server\"`\n+\tExec    ExecCmd    `cmd:\"\" help:\"Run a command in a running container\"`\n+\tExport  ExportCmd  `cmd:\"\" help:\"Export a container's filesystem as a tar archive\"`\n+\tHistory HistoryCmd `cmd:\"\" help:\"Show the history of an image\"`\n+\tImages  ImagesCmd  `cmd:\"\" help:\"List images\"`\n+\tImport  ImportCmd  `cmd:\"\" help:\"Import the contents from a tarball to create a filesystem image\"`\n+\tInfo    InfoCmd    `cmd:\"\" help:\"Display system-wide information\"`\n+\tInspect InspectCmd `cmd:\"\" help:\"Return low-level information on Docker objects\"`\n+\tKill    KillCmd    `cmd:\"\" help:\"Kill one or more running containers\"`\n+\tLoad    LoadCmd    `cmd:\"\" help:\"Load an image from a tar archive or STDIN\"`\n+\tLogin   LoginCmd   `cmd:\"\" help:\"Log in to a Docker registry\"`\n+\tLogout  LogoutCmd  `cmd:\"\" help:\"Log out from a Docker registry\"`\n+\tLogs    LogsCmd    `cmd:\"\" help:\"Fetch the logs of a container\"`\n+\tPause   PauseCmd   `cmd:\"\" help:\"Pause all processes within one or more containers\"`\n+\tPort    PortCmd    `cmd:\"\" help:\"List port mappings or a specific mapping for the container\"`\n+\tPs      PsCmd      `cmd:\"\" help:\"List containers\"`\n+\tPull    PullCmd    `cmd:\"\" help:\"Pull an image or a repository from a registry\"`\n+\tPush    PushCmd    `cmd:\"\" help:\"Push an image or a repository to a registry\"`\n+\tRename  RenameCmd  `cmd:\"\" help:\"Rename a container\"`\n+\tRestart RestartCmd `cmd:\"\" help:\"Restart one or more containers\"`\n+\tRm      RmCmd      `cmd:\"\" help:\"Remove one or more containers\"`\n+\tRmi     RmiCmd     `cmd:\"\" help:\"Remove one or more images\"`\n+\tRun     RunCmd     `cmd:\"\" help:\"Run a command in a new container\"`\n+\tSave    SaveCmd    `cmd:\"\" help:\"Save one or more images to a tar archive (streamed to STDOUT by default)\"`\n+\tSearch  SearchCmd  `cmd:\"\" help:\"Search the Docker Hub for images\"`\n+\tStart   StartCmd   `cmd:\"\" help:\"Start one or more stopped containers\"`\n+\tStats   StatsCmd   `cmd:\"\" help:\"Display a live stream of container(s) resource usage statistics\"`\n+\tStop    StopCmd    `cmd:\"\" help:\"Stop one or more running containers\"`\n+\tTag     TagCmd     `cmd:\"\" help:\"Create a tag TARGET_IMAGE that refers to SOURCE_IMAGE\"`\n+\tTop     TopCmd     `cmd:\"\" help:\"Display the running processes of a container\"`\n+\tUnpause UnpauseCmd `cmd:\"\" help:\"Unpause all processes within one or more containers\"`\n+\tUpdate  UpdateCmd  `cmd:\"\" help:\"Update configuration of one or more containers\"`\n+\tVersion VersionCmd `cmd:\"\" help:\"Show the Docker version information\"`\n+\tWait    WaitCmd    `cmd:\"\" help:\"Block until one or more containers stop, then print their exit codes\"`\n }\n \n func main() {\ndiff --git a/_examples/server/console.go b/_examples/server/console.go\nindex 6b7a86c..0ecb7cf 100644\n--- a/_examples/server/console.go\n+++ b/_examples/server/console.go\n@@ -12,10 +12,10 @@ var _ = kong.Must(&grammar{})\n \n // Server interface.\n type grammar struct {\n-\tHelp     helpCmd `cmd help:\"Show help.\"`\n-\tQuestion helpCmd `cmd hidden name:\"?\" help:\"Show help.\"`\n+\tHelp     helpCmd `cmd:\"\" help:\"Show help.\"`\n+\tQuestion helpCmd `cmd:\"\" hidden:\"\" name:\"?\" help:\"Show help.\"`\n \n-\tStatus statusCmd `cmd help:\"Show server status.\"`\n+\tStatus statusCmd `cmd:\"\" help:\"Show server status.\"`\n }\n \n type statusCmd struct {\n@@ -28,7 +28,7 @@ func (s *statusCmd) Run(ctx *kong.Context) error {\n }\n \n type helpCmd struct {\n-\tCommand []string `arg optional help:\"Show help on command.\"`\n+\tCommand []string `arg:\"\" optional:\"\" help:\"Show help on command.\"`\n }\n \n // Run shows help.\ndiff --git a/_examples/server/main.go b/_examples/server/main.go\nindex 362b04a..921b749 100644\n--- a/_examples/server/main.go\n+++ b/_examples/server/main.go\n@@ -18,17 +18,12 @@ import (\n \t\"github.com/alecthomas/kong\"\n )\n \n-type context struct {\n-\tkong *kong.Context\n-\trl   *readline.Instance\n-}\n-\n // Handle a single SSH interactive connection.\n func handle(log *log.Logger, s ssh.Session) error {\n \tlog.Printf(\"New SSH\")\n \tsshPty, _, isPty := s.Pty()\n \tif !isPty {\n-\t\treturn errors.New(\"No PTY requested\")\n+\t\treturn errors.New(\"no PTY requested\")\n \t}\n \tlog.Printf(\"Using TERM=%s width=%d height=%d\", sshPty.Term, sshPty.Window.Width, sshPty.Window.Height)\n \tcpty, tty, err := pty.Open()\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/FUNDING.yml",
+    ".github/workflows/ci.yml",
+    ".gitignore",
+    ".golangci.yml",
+    "COPYING",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/README.md",
+    "_examples/server/console.go",
+    "_examples/server/go.mod",
+    "_examples/server/go.sum",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/main.go",
+    "benchmark_test.go",
+    "bin/.go@latest.pkg",
+    "bin/.golangci-lint-1.42.0.pkg",
+    "bin/README.hermit.md",
+    "bin/activate-hermit",
+    "bin/go",
+    "bin/gofmt",
+    "bin/golangci-lint",
+    "bin/hermit",
+    "bin/hermit.hcl",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "config_test.go",
+    "context.go",
+    "defaults.go",
+    "defaults_test.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "go.mod",
+    "go.sum",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "testdata/file.txt",
+    "util.go",
+    "util_test.go",
+    "visit.go"
+  ],
+  "explanation": {
+    "what": "_examples/docker と _examples/server のサンプルコードで、`cmd help:\"...\"` や `arg optional help:\"...\"` のように値を持たないタグを裸で並べていた記法を、すべて `cmd:\"\" help:\"...\"` `arg:\"\" optional:\"\" help:\"...\"` のように空文字列を明示する記法に置き換えた。あわせて server/main.go の未使用の `context` 型を削除し、エラーメッセージの先頭を小文字化している。",
+    "why": "Go の `reflect.StructTag.Get` は `key:\"value\"` という key-value ペアの並びを前提にしており、値を持たないタグ(`cmd` 単体など)は仕様上不正な構造体タグとして静的解析ツール(vet や IDE)に警告される。issue #88 で報告されたこの警告を、サンプルコード側で `cmd:\"\"` のように空文字列を与える正しい記法に直すことで解消した。",
+    "highlights": [
+      { "file": "_examples/docker/main.go", "note": "`cmd help:...` → `cmd:\"\" help:...` への一括置換。CLI 全体のサブコマンド一覧なので変更量が最も大きい" },
+      { "file": "_examples/server/console.go", "note": "`arg optional help:...` も同様に `arg:\"\" optional:\"\" help:...` へ" }
+    ],
+    "langNotes": [
+      { "topic": "struct tag (reflect.StructTag)", "note": "Go の構造体タグは `key:\"value\" key2:\"value2\"` という文字列で、`reflect.StructTag.Get` は各 key に対応する引用符付き文字列を探す。kong は独自にタグをパースするため `cmd` のような値なし記法でも動作するが、`go vet` や IDE の標準 reflect 準拠チェックには引っかかるため、値なしタグでも `key:\"\"` と空文字列を明示するのが安全とされる。" }
+    ],
+    "diagram": null,
+    "evidence": "issue",
+    "refs": [
+      { "type": "pr", "number": 235, "url": "https://github.com/alecthomas/kong/pull/235" },
+      { "type": "issue", "number": 88, "url": "https://github.com/alecthomas/kong/issues/88" }
+    ],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

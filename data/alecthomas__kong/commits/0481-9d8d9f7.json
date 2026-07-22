@@ -1,0 +1,152 @@
+{
+  "seq": 481,
+  "sha": "9d8d9f772ab5ab77e661a845f8d44d4b1fdabdc5",
+  "parents": [
+    "ff164468ad52f13b250bac98443c1bc81bb9772b"
+  ],
+  "author": {
+    "name": "Noah Starkenburg",
+    "email": "153941584+NoahStarkenburg@users.noreply.github.com",
+    "date": "2026-07-04T19:40:09-05:00"
+  },
+  "message": "Allow a node with a Run() method to run without a subcommand (#614)\n\nA node that declares subcommands but also defines a Run() method can now\nbe invoked on its own. checkMissingChildren no longer requires one of the\nsubcommands to be selected when the node is runnable, and ctx.Run()\nalready runs such a node.",
+  "pr": {
+    "number": 614,
+    "title": "Allow a node with a Run() method to run without a subcommand",
+    "body": "Fixes #561\n\nA node that declares subcommands but also defines a `Run()` method cannot currently be invoked on its own. Running the app with no subcommand fails with `expected one of ...`, even though `Run()` is defined.\n\nThis matches the approach suggested in the issue: if a node has a `Run()` method it can act as a terminating command. `checkMissingChildren` no longer requires one of the subcommands to be selected when the node is runnable. `ctx.Run()` already runs such a node (the application node with a `Run()` method), so no change was needed there.\n\nSubcommands still work, and nodes without a `Run()` method still require a subcommand. Added tests for all three cases.\n",
+    "url": "https://github.com/alecthomas/kong/pull/614"
+  },
+  "linkedIssues": [
+    {
+      "number": 561,
+      "title": "Allow Root commands when there are subcommands",
+      "body": "If I have a CLI with sub commands, it is not possible to call the root comand, even if `Run()` is defined at the root.\n\nFor example:\n```go\ntype CLI struct {\n\tSubCmd1 SubCmd1 `cmd:\"\"`\n\tSubCmd2 SubCmd2  `cmd:\"\"`\n}\n\nfunc (cli *CLI) Run() error {\n\tfmt.Println(\"This is the root command\")\n\treturn nil\n}\n\ntype SubCmd1 struct {}\n\nfunc (c *SubCmd1) Run() error {\n\tfmt.Println(\"This is sub command 1\")\n\treturn nil\n}\n\ntype SubCmd2 struct {}\n\nfunc (c *SubCmd3) Run() error {\n\tfmt.Println(\"This is sub command 3\")\n\treturn nil\n}\n\nfunc main() {\n\tvar cli CLI\n\tctx := kong.Parse(&cli)\n\terr := ctx.Run()\n\tctx.FatalIfErrorf(err)\n}\n```\n\nUpon compiling, it is not possible to call `./myapp` as it will return the following error: `myapp: error: expected one of \"sub-cmd1\", \"sub-cmd2\"`. I would love to have the ability to call `Run()` on the root: `./myapp` as well as the sub commands: `./myapp sub-cmd1`.",
+      "url": "https://github.com/alecthomas/kong/issues/561"
+    }
+  ],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 44,
+    "deletions": 1
+  },
+  "files": [
+    {
+      "path": "context.go",
+      "status": "M",
+      "additions": 5,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "kong_test.go",
+      "status": "M",
+      "additions": 39,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/context.go b/context.go\nindex 1e38bf5..133004e 100644\n--- a/context.go\n+++ b/context.go\n@@ -972,6 +972,10 @@ func checkMissingChildren(node *Node) error {\n \t\tmissing = append(missing, strconv.Quote(strings.Join(missingArgs, \" \")))\n \t}\n \n+\t// A node with a Run() method may run on its own, so it does not require one\n+\t// of its subcommands to be selected.\n+\trunnable := node.Target.IsValid() && getMethod(node.Target, \"Run\").IsValid()\n+\n \tfor _, child := range node.Children {\n \t\tif child.Hidden {\n \t\t\tcontinue\n@@ -981,7 +985,7 @@ func checkMissingChildren(node *Node) error {\n \t\t\t\tcontinue\n \t\t\t}\n \t\t\tmissing = append(missing, strconv.Quote(child.Summary()))\n-\t\t} else {\n+\t\t} else if !runnable {\n \t\t\tmissing = append(missing, strconv.Quote(child.Name))\n \t\t}\n \t}\ndiff --git a/kong_test.go b/kong_test.go\nindex f638938..4f446c2 100644\n--- a/kong_test.go\n+++ b/kong_test.go\n@@ -806,6 +806,45 @@ func TestRun(t *testing.T) {\n \tassert.Equal(t, \"argping\", cli.Three.SubCommand.Arg)\n }\n \n+type rootWithRun struct {\n+\tran     bool\n+\tSubCmd1 struct{} `cmd:\"\"`\n+\tSubCmd2 struct{} `cmd:\"\"`\n+}\n+\n+func (r *rootWithRun) Run() error {\n+\tr.ran = true\n+\treturn nil\n+}\n+\n+func TestRunnableNodeDoesNotRequireSubcommand(t *testing.T) {\n+\tt.Run(\"runs the node when no subcommand is given\", func(t *testing.T) {\n+\t\tcli := &rootWithRun{}\n+\t\tp := mustNew(t, cli)\n+\t\tctx, err := p.Parse([]string{})\n+\t\tassert.NoError(t, err)\n+\t\tassert.NoError(t, ctx.Run())\n+\t\tassert.True(t, cli.ran)\n+\t})\n+\n+\tt.Run(\"still allows selecting a subcommand\", func(t *testing.T) {\n+\t\tcli := &rootWithRun{}\n+\t\tp := mustNew(t, cli)\n+\t\t_, err := p.Parse([]string{\"sub-cmd-1\"})\n+\t\tassert.NoError(t, err)\n+\t})\n+\n+\tt.Run(\"still requires a subcommand without a Run method\", func(t *testing.T) {\n+\t\tvar cli struct {\n+\t\t\tSubCmd1 struct{} `cmd:\"\"`\n+\t\t\tSubCmd2 struct{} `cmd:\"\"`\n+\t\t}\n+\t\tp := mustNew(t, &cli)\n+\t\t_, err := p.Parse([]string{})\n+\t\tassert.Error(t, err)\n+\t})\n+}\n+\n type failCmd struct{}\n \n func (f failCmd) Run() error {\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/FUNDING.yml",
+    ".github/workflows/ci.yml",
+    ".gitignore",
+    ".golangci.yml",
+    "COPYING",
+    "README.md",
+    "_examples/asciilogo/main.go",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/README.md",
+    "_examples/server/console.go",
+    "_examples/server/go.mod",
+    "_examples/server/go.sum",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/commandstring/main.go",
+    "_examples/shell/help/README.md",
+    "_examples/shell/help/main.go",
+    "benchmark_test.go",
+    "bin/.go-1.26.4.pkg",
+    "bin/.golangci-lint-1.64.5.pkg",
+    "bin/.lefthook-2.1.9.pkg",
+    "bin/README.hermit.md",
+    "bin/activate-hermit",
+    "bin/go",
+    "bin/gofmt",
+    "bin/golangci-lint",
+    "bin/hermit",
+    "bin/hermit.hcl",
+    "bin/lefthook",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "config_test.go",
+    "context.go",
+    "defaults.go",
+    "defaults_test.go",
+    "doc.go",
+    "error.go",
+    "exit.go",
+    "global.go",
+    "global_test.go",
+    "go.mod",
+    "go.sum",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "helpwrap1.18_test.go",
+    "helpwrap1.19_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "lefthook.yml",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_linux_test.go",
+    "mapper_test.go",
+    "mapper_windows_test.go",
+    "model.go",
+    "model_test.go",
+    "negatable.go",
+    "options.go",
+    "options_test.go",
+    "renovate.json5",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "signature_test.go",
+    "tag.go",
+    "tag_test.go",
+    "testdata/file.txt",
+    "util.go",
+    "util_test.go",
+    "visit.go"
+  ],
+  "explanation": {
+    "what": "サブコマンドを持つノードが Run() メソッドも定義している場合に、サブコマンドを指定せずにそのノード自身を実行できるようにした。context.go の checkMissingChildren に「このノードは runnable か(Target が有効かつ Run メソッドを持つか)」の判定を追加し、runnable なノードでは子コマンド未選択でも missing children エラーを出さないようにしている。kong_test.go に3ケース(サブコマンドなしで実行/サブコマンドを選んでも実行/Run が無ければ従来通りエラー)のテストを追加した。",
+    "why": "issue #561 で「ルートに Run() を定義していてもサブコマンドなしでは `expected one of ...` エラーになり呼び出せない」という要望が報告されていた。PR本文によれば、ctx.Run() 自体は既にこの種のノードを実行できていたため、パース段階の checkMissingChildren がサブコマンド選択を無条件に要求していたのが唯一の障害だった。そこを緩めるだけで済む最小限の修正になっている。",
+    "highlights": [
+      { "file": "context.go", "note": "checkMissingChildren に runnable 判定を追加し、子ノードが未選択でも `else if !runnable` でエラーをスキップする箇所" }
+    ],
+    "langNotes": [
+      { "topic": "Run() without subcommand", "note": "kong では struct に Run() error メソッドを生やすとそのノードが実行可能コマンドになる。このコミット以前は、サブコマンドを持つ親ノードに Run() を定義しても親単体では実行できず、必ずいずれかの子コマンドを選ぶ必要があった。" }
+    ],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [
+      { "type": "pr", "number": 614, "url": "https://github.com/alecthomas/kong/pull/614" },
+      { "type": "issue", "number": 561, "url": "https://github.com/alecthomas/kong/issues/561" }
+    ],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

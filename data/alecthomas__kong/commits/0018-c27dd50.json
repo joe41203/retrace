@@ -1,0 +1,83 @@
+{
+  "seq": 18,
+  "sha": "c27dd50be683a5d60517894e428cf46db73afeac",
+  "parents": [
+    "8e96da517db24a7ce0bbe57f0834a30645bd78fd"
+  ],
+  "author": {
+    "name": "Alec Thomas",
+    "email": "alec@swapoff.org",
+    "date": "2018-05-19T21:02:49+10:00"
+  },
+  "message": "Move .Set = true into Decode().",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 4,
+    "additions": 25,
+    "deletions": 11
+  },
+  "files": [
+    {
+      "path": "build.go",
+      "status": "M",
+      "additions": 2,
+      "deletions": 6,
+      "binary": false
+    },
+    {
+      "path": "kong.go",
+      "status": "M",
+      "additions": 7,
+      "deletions": 3,
+      "binary": false
+    },
+    {
+      "path": "kong_test.go",
+      "status": "M",
+      "additions": 10,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "model.go",
+      "status": "M",
+      "additions": 6,
+      "deletions": 2,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/build.go b/build.go\nindex 03aae9f..e7e3a96 100644\n--- a/build.go\n+++ b/build.go\n@@ -110,6 +110,7 @@ func buildNode(v reflect.Value, cmd bool) *Node {\n \t\t\t\tName:    name,\n \t\t\t\tFlag:    flag,\n \t\t\t\tHelp:    help,\n+\t\t\t\tDefault: dflt,\n \t\t\t\tDecoder: decoder,\n \t\t\t\tValue:   fv,\n \t\t\t\tField:   ft,\n@@ -124,7 +125,6 @@ func buildNode(v reflect.Value, cmd bool) *Node {\n \t\t\t\tnode.Flags = append(node.Flags, &Flag{\n \t\t\t\t\tValue:       value,\n \t\t\t\t\tShort:       short,\n-\t\t\t\t\tDefault:     dflt,\n \t\t\t\t\tPlaceholder: placeholder,\n \t\t\t\t\tEnv:         env,\n \t\t\t\t})\n@@ -135,12 +135,8 @@ func buildNode(v reflect.Value, cmd bool) *Node {\n \t// Scan through argument positionals to ensure optional is never before a required\n \tlast := true\n \tfor _, p := range node.Positional {\n-\t\tif p.Flag {\n-\t\t\tcontinue\n-\t\t}\n-\n \t\tif !last && p.Required {\n-\t\t\tfail(\"arguments can not be required after an optional: %v\", p.Name)\n+\t\t\tfail(\"argument %q can not be required after an optional\", p.Name)\n \t\t}\n \n \t\tlast = p.Required\ndiff --git a/kong.go b/kong.go\nindex f6c6b91..8246db7 100644\n--- a/kong.go\n+++ b/kong.go\n@@ -75,10 +75,15 @@ func (k *Kong) reset(node *Node) {\n \t\tflag.Value.Value.Set(reflect.Zero(flag.Value.Value.Type()))\n \t\tif flag.Default != \"\" {\n \t\t\tflag.Decode(Scan(flag.Default))\n+\t\t\tflag.Set = false\n \t\t}\n \t}\n \tfor _, pos := range node.Positional {\n \t\tpos.Value.Set(reflect.Zero(pos.Value.Type()))\n+\t\tif pos.Default != \"\" {\n+\t\t\tpos.Decode(Scan(pos.Default))\n+\t\t\tpos.Set = false\n+\t\t}\n \t}\n \tfor _, branch := range node.Children {\n \t\tif branch.Argument != nil {\n@@ -210,14 +215,14 @@ func (k *Kong) applyNode(scan *Scanner, node *Node, flags []*Flag) (command []st\n \t\treturn nil, err\n \t}\n \n-\tif err := chickMissingFlags(node.Children, flags); err != nil {\n+\tif err := checkMissingFlags(node.Children, flags); err != nil {\n \t\treturn nil, err\n \t}\n \n \treturn\n }\n \n-func chickMissingFlags(children []*Branch, flags []*Flag) error {\n+func checkMissingFlags(children []*Branch, flags []*Flag) error {\n \t// Only check required missing fields at the last child.\n \tif len(children) > 0 {\n \t\treturn nil\n@@ -290,7 +295,6 @@ func matchFlags(flags []*Flag, token Token, scan *Scanner, matcher func(f *Flag)\n \t\t\tif err != nil {\n \t\t\t\treturn err\n \t\t\t}\n-\t\t\tflag.Set = true\n \t\t\treturn nil\n \t\t}\n \t}\ndiff --git a/kong_test.go b/kong_test.go\nindex 066453a..b9f4f76 100644\n--- a/kong_test.go\n+++ b/kong_test.go\n@@ -241,3 +241,13 @@ func TestMixedRequiredArgs(t *testing.T) {\n \t\trequire.Equal(t, \"gak\", cli.Name)\n \t})\n }\n+\n+func TestDefaultValueForOptionalArg(t *testing.T) {\n+\tvar cli struct {\n+\t\tArg string `arg:\"\" optional:\"\" default:\"default\"`\n+\t}\n+\tp := mustNew(t, &cli)\n+\t_, err := p.Parse(nil)\n+\trequire.NoError(t, err)\n+\trequire.Equal(t, \"default\", cli.Arg)\n+}\ndiff --git a/model.go b/model.go\nindex 8d0bd2e..6a0fcf5 100644\n--- a/model.go\n+++ b/model.go\n@@ -25,6 +25,7 @@ type Value struct {\n \tFlag     bool // True if flag, false if positional argument.\n \tName     string\n \tHelp     string\n+\tDefault  string\n \tDecoder  Decoder\n \tField    reflect.StructField\n \tValue    reflect.Value\n@@ -34,7 +35,11 @@ type Value struct {\n }\n \n func (v *Value) Decode(scan *Scanner) error {\n-\treturn v.Decoder.Decode(&DecoderContext{Value: v}, scan, v.Value)\n+\terr := v.Decoder.Decode(&DecoderContext{Value: v}, scan, v.Value)\n+\tif err == nil {\n+\t\tv.Set = true\n+\t}\n+\treturn err\n }\n \n type Positional = Value\n@@ -49,5 +54,4 @@ type Flag struct {\n \tPlaceholder string\n \tEnv         string\n \tShort       rune\n-\tDefault     string\n }\n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    "README.md",
+    "_examples/shell/main.go",
+    "build.go",
+    "camelcase.go",
+    "decoders.go",
+    "decoders_test.go",
+    "global.go",
+    "help.go",
+    "kong.go",
+    "kong_test.go",
+    "model.go",
+    "options.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tokentype_string.go"
+  ],
+  "explanation": {
+    "what": "Value.Set = true を設定する処理を Value.Decode() の中に移し(呼び出し側 matchFlags() から削除)、デコードが成功した時点で自動的に Set が立つようにした。Flag.Default フィールドを廃止して Value.Default に統合し、Default はフラグ・位置引数に共通のフィールドとした。chickMissingFlags のタイポも checkMissingFlags に修正。",
+    "why": "Set フラグを立てる処理が呼び出し元ごとに散らばっていると付け忘れが起きやすいため、Decode() 内に一本化して「デコードできた=値が設定された」を機械的に保証したと考えられる。Default の重複定義(Flag と Value の両方にあった)も Value 側に寄せて整理したもの。",
+    "highlights": [
+      { "file": "model.go", "note": "Value.Decode() が成功時に v.Set = true をセットする一元化" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

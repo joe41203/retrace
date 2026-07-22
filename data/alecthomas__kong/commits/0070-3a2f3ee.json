@@ -1,0 +1,101 @@
+{
+  "seq": 70,
+  "sha": "3a2f3eebdd1e95b0ea5104055d22e08169983bc1",
+  "parents": [
+    "9a68d32e7221f93b0a4d8ac02a6af949c2a4f15c"
+  ],
+  "author": {
+    "name": "Alec Thomas",
+    "email": "alec@swapoff.org",
+    "date": "2018-06-20T12:44:18+10:00"
+  },
+  "message": "Indent multi-line messages/errors.",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 4,
+    "additions": 25,
+    "deletions": 5
+  },
+  "files": [
+    {
+      "path": ".golangci.yml",
+      "status": "M",
+      "additions": 1,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "build.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "kong.go",
+      "status": "M",
+      "additions": 13,
+      "deletions": 4,
+      "binary": false
+    },
+    {
+      "path": "kong_test.go",
+      "status": "M",
+      "additions": 10,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/.golangci.yml b/.golangci.yml\nindex e500bc5..0e0401b 100644\n--- a/.golangci.yml\n+++ b/.golangci.yml\n@@ -31,3 +31,4 @@ issues:\n     # Very commonly not checked.\n     - 'Error return value of .(.*\\.Help|.*\\.MarkFlagRequired|(os\\.)?std(out|err)\\..*|.*Close|.*Flush|os\\.Remove(All)?|.*printf?|os\\.(Un)?Setenv). is not checked'\n     - 'exported method (.*\\.MarshalJSON|.*\\.UnmarshalJSON) should have comment or be unexported'\n+    - 'composite literal uses unkeyed fields'\ndiff --git a/build.go b/build.go\nindex 85eb204..75ad002 100644\n--- a/build.go\n+++ b/build.go\n@@ -49,7 +49,7 @@ func flattenedFields(v reflect.Value) (out []flattenedField) {\n \t\tif !fv.CanSet() {\n \t\t\tcontinue\n \t\t}\n-\t\tout = append(out, flattenedField{ft, fv})\n+\t\tout = append(out, flattenedField{field: ft, value: fv})\n \t}\n \treturn\n }\ndiff --git a/kong.go b/kong.go\nindex 053d0a4..ec10dfe 100644\n--- a/kong.go\n+++ b/kong.go\n@@ -6,6 +6,7 @@ import (\n \t\"os\"\n \t\"path/filepath\"\n \t\"reflect\"\n+\t\"strings\"\n )\n \n // Error reported by Kong.\n@@ -14,7 +15,7 @@ type Error struct{ msg string }\n func (e Error) Error() string { return e.msg }\n \n func fail(format string, args ...interface{}) {\n-\tpanic(Error{fmt.Sprintf(format, args...)})\n+\tpanic(Error{msg: fmt.Sprintf(format, args...)})\n }\n \n // Must creates a new Parser or panics if there is an error.\n@@ -170,15 +171,23 @@ func (k *Kong) applyHooks(ctx *Context) error {\n \treturn nil\n }\n \n+func formatMultilineMessage(w io.Writer, leader string, format string, args ...interface{}) {\n+\tlines := strings.Split(fmt.Sprintf(format, args...), \"\\n\")\n+\tfmt.Fprintf(w, \"%s%s\\n\", leader, lines[0])\n+\tfor _, line := range lines[1:] {\n+\t\tfmt.Fprintf(w, \"%*s%s\\n\", len(leader), \" \", line)\n+\t}\n+}\n+\n // Printf writes a message to Kong.Stdout with the application name prefixed.\n func (k *Kong) Printf(format string, args ...interface{}) *Kong {\n-\tfmt.Fprintf(k.Stdout, k.Model.Name+\": \"+format, args...)\n+\tformatMultilineMessage(k.Stdout, k.Model.Name+\": \", format, args...)\n \treturn k\n }\n \n // Errorf writes a message to Kong.Stderr with the application name prefixed.\n func (k *Kong) Errorf(format string, args ...interface{}) *Kong {\n-\tfmt.Fprintf(k.Stderr, k.Model.Name+\": error: \"+format, args...)\n+\tformatMultilineMessage(k.Stderr, k.Model.Name+\": error: \", format, args...)\n \treturn k\n }\n \n@@ -191,7 +200,7 @@ func (k *Kong) FatalIfErrorf(err error, args ...interface{}) {\n \tif len(args) > 0 {\n \t\tmsg = fmt.Sprintf(args[0].(string), args[1:]...) + \": \" + err.Error()\n \t}\n-\tk.Errorf(\"%s\\n\", msg)\n+\tk.Errorf(\"%s\", msg)\n \tk.Exit(1)\n }\n \ndiff --git a/kong_test.go b/kong_test.go\nindex 8590603..1af7cbe 100644\n--- a/kong_test.go\n+++ b/kong_test.go\n@@ -1,6 +1,7 @@\n package kong\n \n import (\n+\t\"bytes\"\n \t\"strings\"\n \t\"testing\"\n \n@@ -10,6 +11,7 @@ import (\n func mustNew(t *testing.T, cli interface{}, options ...Option) *Kong {\n \tt.Helper()\n \toptions = append([]Option{\n+\t\tName(\"test\"),\n \t\tExit(func(int) {\n \t\t\tt.Helper()\n \t\t\tt.Fatalf(\"unexpected exit()\")\n@@ -444,3 +446,11 @@ func TestSliceWithDisabledSeparator(t *testing.T) {\n \trequire.NoError(t, err)\n \trequire.Equal(t, []string{\"a,b\", \"b,c\"}, cli.Flag)\n }\n+\n+func TestMultilineMessage(t *testing.T) {\n+\tw := &bytes.Buffer{}\n+\tvar cli struct{}\n+\tp := mustNew(t, &cli, Writers(w, w))\n+\tp.Printf(\"hello\\nworld\")\n+\trequire.Equal(t, \"test: hello\\n      world\\n\", w.String())\n+}\n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    ".golangci.yml",
+    "README.md",
+    "_examples/shell/main.go",
+    "build.go",
+    "camelcase.go",
+    "context.go",
+    "doc.go",
+    "global.go",
+    "global_test.go",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "tokentype_string.go"
+  ],
+  "explanation": {
+    "what": "Kong.Printf/Errorf が出力する複数行メッセージを、2行目以降をアプリ名プレフィックスの幅だけインデントして揃える formatMultilineMessage() を追加した。あわせて golangci-lint の除外パターンに \"composite literal uses unkeyed fields\" を追加し、build.go の flattenedField{ft, fv} をキー付きの flattenedField{field: ft, value: fv} に修正、fail() の Error{...} もキー付きに変更している。",
+    "why": "コミットメッセージの通り、複数行のメッセージやエラーを読みやすく整形するための変更。テスト TestMultilineMessage が \"test: hello\\n      world\\n\" という期待値を検証しており、1行目のプレフィックス幅に2行目以降を揃える体裁が意図であることが確認できる。",
+    "highlights": [
+      { "file": "kong.go", "note": "formatMultilineMessage(): 1行目にプレフィックスを付け、2行目以降は同じ幅の空白でインデントして揃える" },
+      { "file": "kong_test.go", "note": "TestMultilineMessage が \"test: hello\\n      world\\n\" という整形結果を仕様として固定" }
+    ],
+    "langNotes": [
+      { "topic": "unkeyed composite literal と golangci-lint の govet 警告", "note": "Go の struct リテラルはフィールド名を省略して `Foo{a, b}` のように書けるが、フィールド順序に依存するため脆い。govet はこれを \"composite literal uses unkeyed fields\" として警告する。ここでは `flattenedField{field: ft, value: fv}` のようにキー付きへ修正している。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

@@ -1,0 +1,133 @@
+{
+  "seq": 88,
+  "sha": "1f1e9d0f0f86b9d40cccceb925da84f8333e188b",
+  "parents": [
+    "b2cab08684176e7d0a30717e3a159a49377f386b"
+  ],
+  "author": {
+    "name": "Alec Thomas",
+    "email": "alec@swapoff.org",
+    "date": "2018-07-03T22:56:22+10:00"
+  },
+  "message": "Convert Option to an interface and make Vars a map conforming to the interface.",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 7,
+    "additions": 44,
+    "deletions": 35
+  },
+  "files": [
+    {
+      "path": ".circleci/config.yml",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": ".golangci.yml",
+      "status": "M",
+      "additions": 1,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "README.md",
+      "status": "M",
+      "additions": 3,
+      "deletions": 3,
+      "binary": false
+    },
+    {
+      "path": "kong.go",
+      "status": "M",
+      "additions": 2,
+      "deletions": 2,
+      "binary": false
+    },
+    {
+      "path": "kong_test.go",
+      "status": "M",
+      "additions": 2,
+      "deletions": 2,
+      "binary": false
+    },
+    {
+      "path": "mapper.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "options.go",
+      "status": "M",
+      "additions": 34,
+      "deletions": 26,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/.circleci/config.yml b/.circleci/config.yml\nindex 7122cbc..53f457b 100644\n--- a/.circleci/config.yml\n+++ b/.circleci/config.yml\n@@ -12,7 +12,7 @@ jobs:\n           command: |\n             go get -v github.com/jstemmer/go-junit-report\n             go get -v -t -d ./...\n-            curl -sfL https://install.goreleaser.com/github.com/golangci/golangci-lint.sh | bash -s latest\n+            curl -sfL https://install.goreleaser.com/github.com/golangci/golangci-lint.sh | bash -s v1.8\n             mkdir ~/report\n           when: always\n       - run:\ndiff --git a/.golangci.yml b/.golangci.yml\nindex 0e0401b..8e056c9 100644\n--- a/.golangci.yml\n+++ b/.golangci.yml\n@@ -8,6 +8,7 @@ linters:\n   enable-all: true\n   disable:\n     - maligned\n+    - lll\n \n linters-settings:\n   govet:\ndiff --git a/README.md b/README.md\nindex 224c205..4022a27 100644\n--- a/README.md\n+++ b/README.md\n@@ -366,7 +366,7 @@ Variables are in the form:\n \n     ${<name>}\n \n-Variables are set with the `Vars(map[string]string)` option. Undefined\n+Variables are set with the `Vars{\"key\": \"value\", ...}` option. Undefined\n variable references in the grammar will result in an error at construction\n time.\n \n@@ -385,9 +385,9 @@ type cli struct {\n \n func main() {\n   kong.Parse(&cli,\n-    kong.Vars(map[string]string{\n+    kong.Vars{\n       \"config_file\": \"~/.app.conf\",\n-    }))\n+    })\n }\n ```\n \ndiff --git a/kong.go b/kong.go\nindex 0771fe9..8ff4bcb 100644\n--- a/kong.go\n+++ b/kong.go\n@@ -72,7 +72,7 @@ func New(grammar interface{}, options ...Option) (*Kong, error) {\n \t}\n \n \tfor _, option := range options {\n-\t\tif err := option(k); err != nil {\n+\t\tif err := option.Apply(k); err != nil {\n \t\t\treturn nil, err\n \t\t}\n \t}\n@@ -90,7 +90,7 @@ func New(grammar interface{}, options ...Option) (*Kong, error) {\n \tk.Model.HelpFlag = k.helpFlag\n \n \tfor _, option := range k.postBuildOptions {\n-\t\tif err = option(k); err != nil {\n+\t\tif err = option.Apply(k); err != nil {\n \t\t\treturn nil, err\n \t\t}\n \t}\ndiff --git a/kong_test.go b/kong_test.go\nindex 90cf24a..2f11c40 100644\n--- a/kong_test.go\n+++ b/kong_test.go\n@@ -520,11 +520,11 @@ func TestInterpolationIntoModel(t *testing.T) {\n \t}\n \t_, err := kong.New(&cli)\n \trequire.Error(t, err)\n-\tp, err := kong.New(&cli, kong.Vars(map[string]string{\n+\tp, err := kong.New(&cli, kong.Vars{\n \t\t\"default\":  \"Some default value.\",\n \t\t\"somebody\": \"chickens!\",\n \t\t\"enum\":     \"a,b,c,d\",\n-\t}))\n+\t})\n \trequire.NoError(t, err)\n \tflag := p.Model.Flags[1]\n \tflag2 := p.Model.Flags[2]\ndiff --git a/mapper.go b/mapper.go\nindex ba40b12..03acc02 100644\n--- a/mapper.go\n+++ b/mapper.go\n@@ -150,7 +150,7 @@ func (r *Registry) RegisterKind(kind reflect.Kind, mapper Mapper) *Registry {\n \treturn r\n }\n \n-// RegisterName registeres a mapper to be used if the value mapper has a \"type\" tag matching name.\n+// RegisterName registers a mapper to be used if the value mapper has a \"type\" tag matching name.\n //\n // eg.\n //\ndiff --git a/options.go b/options.go\nindex 4b99281..0db6d23 100644\n--- a/options.go\n+++ b/options.go\n@@ -10,20 +10,28 @@ import (\n )\n \n // An Option applies optional changes to the Kong application.\n-type Option func(k *Kong) error\n+type Option interface {\n+\tApply(k *Kong) error\n+}\n+\n+// OptionFunc is function that adheres to the Option interface.\n+type OptionFunc func(k *Kong) error\n+\n+func (o OptionFunc) Apply(k *Kong) error { return o(k) } // nolint: golint\n \n // Vars sets the variables to use for interpolation into help strings and default values.\n //\n // See README for details.\n-func Vars(vars map[string]string) Option {\n-\treturn func(k *Kong) error {\n-\t\tk.vars = vars\n-\t\treturn nil\n-\t}\n+type Vars map[string]string\n+\n+// Apply lets Vars act as an Option.\n+func (v Vars) Apply(k *Kong) error {\n+\tk.vars = v\n+\treturn nil\n }\n \n // Exit overrides the function used to terminate. This is useful for testing or interactive use.\n-func Exit(exit func(int)) Option {\n+func Exit(exit func(int)) OptionFunc {\n \treturn func(k *Kong) error {\n \t\tk.Exit = exit\n \t\treturn nil\n@@ -31,7 +39,7 @@ func Exit(exit func(int)) Option {\n }\n \n // NoDefaultHelp disables the default help flags.\n-func NoDefaultHelp() Option {\n+func NoDefaultHelp() OptionFunc {\n \treturn func(k *Kong) error {\n \t\tk.noDefaultHelp = true\n \t\treturn nil\n@@ -39,29 +47,29 @@ func NoDefaultHelp() Option {\n }\n \n // Name overrides the application name.\n-func Name(name string) Option {\n+func Name(name string) OptionFunc {\n \treturn func(k *Kong) error {\n-\t\tk.postBuildOptions = append(k.postBuildOptions, func(k *Kong) error {\n+\t\tk.postBuildOptions = append(k.postBuildOptions, OptionFunc(func(k *Kong) error {\n \t\t\tk.Model.Name = name\n \t\t\treturn nil\n-\t\t})\n+\t\t}))\n \t\treturn nil\n \t}\n }\n \n // Description sets the application description.\n-func Description(description string) Option {\n+func Description(description string) OptionFunc {\n \treturn func(k *Kong) error {\n-\t\tk.postBuildOptions = append(k.postBuildOptions, func(k *Kong) error {\n+\t\tk.postBuildOptions = append(k.postBuildOptions, OptionFunc(func(k *Kong) error {\n \t\t\tk.Model.Help = description\n \t\t\treturn nil\n-\t\t})\n+\t\t}))\n \t\treturn nil\n \t}\n }\n \n // TypeMapper registers a mapper to a type.\n-func TypeMapper(typ reflect.Type, mapper Mapper) Option {\n+func TypeMapper(typ reflect.Type, mapper Mapper) OptionFunc {\n \treturn func(k *Kong) error {\n \t\tk.registry.RegisterType(typ, mapper)\n \t\treturn nil\n@@ -69,7 +77,7 @@ func TypeMapper(typ reflect.Type, mapper Mapper) Option {\n }\n \n // KindMapper registers a mapper to a kind.\n-func KindMapper(kind reflect.Kind, mapper Mapper) Option {\n+func KindMapper(kind reflect.Kind, mapper Mapper) OptionFunc {\n \treturn func(k *Kong) error {\n \t\tk.registry.RegisterKind(kind, mapper)\n \t\treturn nil\n@@ -77,7 +85,7 @@ func KindMapper(kind reflect.Kind, mapper Mapper) Option {\n }\n \n // ValueMapper registers a mapper to a field value.\n-func ValueMapper(ptr interface{}, mapper Mapper) Option {\n+func ValueMapper(ptr interface{}, mapper Mapper) OptionFunc {\n \treturn func(k *Kong) error {\n \t\tk.registry.RegisterValue(ptr, mapper)\n \t\treturn nil\n@@ -85,7 +93,7 @@ func ValueMapper(ptr interface{}, mapper Mapper) Option {\n }\n \n // NamedMapper registers a mapper to a name.\n-func NamedMapper(name string, mapper Mapper) Option {\n+func NamedMapper(name string, mapper Mapper) OptionFunc {\n \treturn func(k *Kong) error {\n \t\tk.registry.RegisterName(name, mapper)\n \t\treturn nil\n@@ -93,7 +101,7 @@ func NamedMapper(name string, mapper Mapper) Option {\n }\n \n // Writers overrides the default writers. Useful for testing or interactive use.\n-func Writers(stdout, stderr io.Writer) Option {\n+func Writers(stdout, stderr io.Writer) OptionFunc {\n \treturn func(k *Kong) error {\n \t\tk.Stdout = stdout\n \t\tk.Stderr = stderr\n@@ -112,7 +120,7 @@ type HookFunc func(ctx *Context, path *Path) error\n //\n // Note that the hook will be called once for each time the corresponding node is encountered. This means that if a flag\n // is passed twice, its hook will be called twice.\n-func Hook(ptr interface{}, hook HookFunc) Option {\n+func Hook(ptr interface{}, hook HookFunc) OptionFunc {\n \tkey := reflect.ValueOf(ptr)\n \tif key.Kind() != reflect.Ptr {\n \t\tpanic(\"expected a pointer\")\n@@ -124,7 +132,7 @@ func Hook(ptr interface{}, hook HookFunc) Option {\n }\n \n // Help printer to use.\n-func Help(help HelpPrinter) Option {\n+func Help(help HelpPrinter) OptionFunc {\n \treturn func(k *Kong) error {\n \t\tk.help = help\n \t\treturn nil\n@@ -132,7 +140,7 @@ func Help(help HelpPrinter) Option {\n }\n \n // ConfigureHelp sets the HelpOptions to use for printing help.\n-func ConfigureHelp(options HelpOptions) Option {\n+func ConfigureHelp(options HelpOptions) OptionFunc {\n \treturn func(k *Kong) error {\n \t\tk.helpOptions = options\n \t\treturn nil\n@@ -140,7 +148,7 @@ func ConfigureHelp(options HelpOptions) Option {\n }\n \n // UsageOnError configures Kong to display context-sensitive usage if FatalIfErrorf is called with an error.\n-func UsageOnError() Option {\n+func UsageOnError() OptionFunc {\n \treturn func(k *Kong) error {\n \t\tk.usageOnError = true\n \t\treturn nil\n@@ -148,7 +156,7 @@ func UsageOnError() Option {\n }\n \n // ClearResolvers clears all existing resolvers.\n-func ClearResolvers() Option {\n+func ClearResolvers() OptionFunc {\n \treturn func(k *Kong) error {\n \t\tk.resolvers = nil\n \t\treturn nil\n@@ -156,7 +164,7 @@ func ClearResolvers() Option {\n }\n \n // Resolver registers flag resolvers.\n-func Resolver(resolvers ...ResolverFunc) Option {\n+func Resolver(resolvers ...ResolverFunc) OptionFunc {\n \treturn func(k *Kong) error {\n \t\tk.resolvers = append(k.resolvers, resolvers...)\n \t\treturn nil\n@@ -173,7 +181,7 @@ type ConfigurationFunc func(r io.Reader) (ResolverFunc, error)\n // Note: The JSON function is a ConfigurationFunc.\n //\n // ~ expansion will occur on the provided paths.\n-func Configuration(loader ConfigurationFunc, paths ...string) Option {\n+func Configuration(loader ConfigurationFunc, paths ...string) OptionFunc {\n \treturn func(k *Kong) error {\n \t\tfor _, path := range paths {\n \t\t\tpath = expandPath(path)\n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    ".golangci.yml",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/console.go",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/main.go",
+    "build.go",
+    "camelcase.go",
+    "context.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "tokentype_string.go"
+  ],
+  "explanation": {
+    "what": "Option を関数型(type Option func(k *Kong) error)からメソッド Apply(k *Kong) error を持つインターフェースに変更し、既存の関数群は OptionFunc(内部で Apply を呼ぶだけのラッパー型)として提供するようにした。これに伴い、前コミットで追加された Vars(map[string]string) 関数オプションを、map[string]string 自体に Apply メソッドを生やした型 Vars に置き換え、kong.Vars{\"key\": \"value\"} とリテラルで直接書けるようにした。",
+    "why": "コミットメッセージの通り、Option をインターフェース化して Vars を map ベースの Option に変えるための変更。関数オプションのままでは Vars(map[string]string{...}) という二重の記述になるところを、Vars 自体を Option インターフェースに適合させることで kong.Vars{...} という1階層のリテラルで書けるようにしたとおもわれる。",
+    "highlights": [
+      { "file": "options.go", "note": "Option がインターフェース化され、type Vars map[string]string が Apply メソッドで Option に適合するようになった" },
+      { "file": "kong.go", "note": "option(k) の呼び出しが option.Apply(k) に変わっている" }
+    ],
+    "langNotes": [
+      { "topic": "Option のインターフェース化", "note": "Go では関数型（type OptionFunc func(k *Kong) error）にメソッドを持たせて Apply(k *Kong) error 経由でインターフェースを満たすことができる。これにより「関数オプション」と「データを持つ独自型（Vars など）」の両方を同じ Option インターフェースの値として扱える。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

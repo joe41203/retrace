@@ -1,0 +1,111 @@
+{
+  "seq": 216,
+  "sha": "8bf0a335db4164850aef12a70fb818dafbed16ec",
+  "parents": [
+    "097bba54ecc3ca993ab0e2703330b6e78d219ea3"
+  ],
+  "author": {
+    "name": "Alec Thomas",
+    "email": "alec@swapoff.org",
+    "date": "2020-10-30T15:26:38+11:00"
+  },
+  "message": "Add NamedFileContentFlag.",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 41,
+    "deletions": 0
+  },
+  "files": [
+    {
+      "path": "mapper.go",
+      "status": "M",
+      "additions": 27,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "mapper_test.go",
+      "status": "M",
+      "additions": 14,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/mapper.go b/mapper.go\nindex 875e438..01343b0 100644\n--- a/mapper.go\n+++ b/mapper.go\n@@ -721,6 +721,33 @@ func JoinEscaped(s []string, sep rune) string {\n \treturn strings.Join(escaped, string(sep))\n }\n \n+// NamedFileContentFlag is a flag value that loads a file's contents and filename into its value.\n+type NamedFileContentFlag struct {\n+\tFilename string\n+\tContents []byte\n+}\n+\n+func (f *NamedFileContentFlag) Decode(ctx *DecodeContext) error { // nolint: golint\n+\tvar filename string\n+\terr := ctx.Scan.PopValueInto(\"filename\", &filename)\n+\tif err != nil {\n+\t\treturn err\n+\t}\n+\t// This allows unsetting of file content flags.\n+\tif filename == \"\" {\n+\t\t*f = NamedFileContentFlag{}\n+\t\treturn nil\n+\t}\n+\tfilename = ExpandPath(filename)\n+\tdata, err := ioutil.ReadFile(filename) // nolint: gosec\n+\tif err != nil {\n+\t\treturn errors.Errorf(\"failed to open %q: %s\", filename, err)\n+\t}\n+\tf.Contents = data\n+\tf.Filename = filename\n+\treturn nil\n+}\n+\n // FileContentFlag is a flag value that loads a file's contents into its value.\n type FileContentFlag []byte\n \ndiff --git a/mapper_test.go b/mapper_test.go\nindex ca4f42f..aecce76 100644\n--- a/mapper_test.go\n+++ b/mapper_test.go\n@@ -240,6 +240,20 @@ func TestFileContentFlag(t *testing.T) {\n \trequire.Equal(t, []byte(\"hello world\"), []byte(cli.File))\n }\n \n+func TestNamedFileContentFlag(t *testing.T) {\n+\tvar cli struct {\n+\t\tFile kong.NamedFileContentFlag\n+\t}\n+\tf, err := ioutil.TempFile(\"\", \"\")\n+\trequire.NoError(t, err)\n+\tdefer os.Remove(f.Name())\n+\tfmt.Fprint(f, \"hello world\")\n+\tf.Close()\n+\t_, err = mustNew(t, &cli).Parse([]string{\"--file\", f.Name()})\n+\trequire.NoError(t, err)\n+\trequire.Equal(t, []byte(\"hello world\"), cli.File.Contents)\n+}\n+\n func TestNamedSliceTypesDontHaveEllipsis(t *testing.T) {\n \tvar cli struct {\n \t\tFile kong.FileContentFlag\n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    ".gitignore",
+    ".golangci.yml",
+    "COPYING",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/README.md",
+    "_examples/server/console.go",
+    "_examples/server/go.mod",
+    "_examples/server/go.sum",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/main.go",
+    "benchmark_test.go",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "config_test.go",
+    "context.go",
+    "defaults.go",
+    "defaults_test.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "go.mod",
+    "go.sum",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "testdata/file.txt",
+    "util.go",
+    "util_test.go",
+    "visit.go"
+  ],
+  "explanation": {
+    "what": "既存の FileContentFlag(ファイル内容だけを []byte として保持する型)に加えて、ファイル名(Filename)と内容(Contents)の両方を保持する NamedFileContentFlag 構造体を mapper.go に追加した。Decode() は filename タグの値をファイルパスとして展開(ExpandPath)・読み込みし、空文字が渡された場合はゼロ値にリセットしてフラグの取り消しを可能にしている。対応するテストも追加。",
+    "why": "message からは直接の動機は読み取れないが、おそらく既存の FileContentFlag では内容しか取得できず、後から「どのファイルから読み込んだか」を参照できないという制約を補うためにファイル名も保持する派生型を追加したと考えられる。",
+    "highlights": [
+      { "file": "mapper.go", "note": "NamedFileContentFlag.Decode() は空文字列で構造体をゼロ値に戻す分岐を持ち、フラグの明示的な「未設定化」に対応している" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "inferred",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

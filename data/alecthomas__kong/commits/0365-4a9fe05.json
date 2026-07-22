@@ -1,0 +1,137 @@
+{
+  "seq": 365,
+  "sha": "4a9fe056ead8eeff10f0c0401ea0368561e8ebe4",
+  "parents": [
+    "088cd7874e49bfbe3e390851bd89a31db93f2205"
+  ],
+  "author": {
+    "name": "Chris Stephen",
+    "email": "chris.stephen@circleci.com",
+    "date": "2024-03-05T04:59:11-04:00"
+  },
+  "message": "Support string pointers for path mapper (#360)",
+  "pr": {
+    "number": 360,
+    "title": "Support string pointers for path mapper",
+    "body": "I have a use case where I would like to differentiate between an unset path and an empty string path (which expands to the current directory).\r\n\r\nThis PR updates the `pathMapper` function to allow a `path` type to be applied to a `*string` to make this differentiation per the pointer behaviour described here: https://github.com/alecthomas/kong#pointers",
+    "url": "https://github.com/alecthomas/kong/pull/360"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 49,
+    "deletions": 0
+  },
+  "files": [
+    {
+      "path": "mapper.go",
+      "status": "M",
+      "additions": 6,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "mapper_test.go",
+      "status": "M",
+      "additions": 43,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/mapper.go b/mapper.go\nindex 5675754..14bd896 100644\n--- a/mapper.go\n+++ b/mapper.go\n@@ -580,6 +580,12 @@ func pathMapper(r *Registry) MapperFunc {\n \t\tif target.Kind() == reflect.Slice {\n \t\t\treturn sliceDecoder(r)(ctx, target)\n \t\t}\n+\t\tif target.Kind() == reflect.Ptr && target.Elem().Kind() == reflect.String {\n+\t\t\tif target.IsNil() {\n+\t\t\t\treturn nil\n+\t\t\t}\n+\t\t\ttarget = target.Elem()\n+\t\t}\n \t\tif target.Kind() != reflect.String {\n \t\t\treturn fmt.Errorf(\"\\\"path\\\" type must be applied to a string not %s\", target.Type())\n \t\t}\ndiff --git a/mapper_test.go b/mapper_test.go\nindex fc013bb..e054712 100644\n--- a/mapper_test.go\n+++ b/mapper_test.go\n@@ -487,6 +487,49 @@ func TestFileContentMapper(t *testing.T) {\n \tassert.Contains(t, err.Error(), \"is a directory\")\n }\n \n+func TestPathMapperUsingStringPointer(t *testing.T) {\n+\ttype CLI struct {\n+\t\tPath *string `type:\"path\"`\n+\t}\n+\tvar cli CLI\n+\n+\tt.Run(\"With value\", func(t *testing.T) {\n+\t\tp := mustNew(t, &cli)\n+\t\t_, err := p.Parse([]string{\"--path\", \"/foo/bar\"})\n+\t\tassert.NoError(t, err)\n+\t\tassert.NotZero(t, cli.Path)\n+\t\tassert.Equal(t, \"/foo/bar\", *cli.Path)\n+\t})\n+\n+\tt.Run(\"Zero value\", func(t *testing.T) {\n+\t\tp := mustNew(t, &cli)\n+\t\t_, err := p.Parse([]string{\"--path\", \"\"})\n+\t\tassert.NoError(t, err)\n+\t\tassert.NotZero(t, cli.Path)\n+\t\twd, err := os.Getwd()\n+\t\tassert.NoError(t, err)\n+\t\tassert.Equal(t, wd, *cli.Path)\n+\t})\n+\n+\tt.Run(\"Without value\", func(t *testing.T) {\n+\t\tp := mustNew(t, &cli)\n+\t\t_, err := p.Parse([]string{\"--\"})\n+\t\tassert.NoError(t, err)\n+\t\tassert.Equal(t, nil, cli.Path)\n+\t})\n+\n+\tt.Run(\"Non-string pointer\", func(t *testing.T) {\n+\t\ttype CLI struct {\n+\t\t\tPath *any `type:\"path\"`\n+\t\t}\n+\t\tvar cli CLI\n+\t\tp := mustNew(t, &cli)\n+\t\t_, err := p.Parse([]string{\"--path\", \"\"})\n+\t\tassert.Error(t, err)\n+\t\tassert.Contains(t, err.Error(), `\"path\" type must be applied to a string`)\n+\t})\n+}\n+\n //nolint:dupl\n func TestExistingFileMapper(t *testing.T) {\n \ttype CLI struct {\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/FUNDING.yml",
+    ".github/workflows/ci.yml",
+    ".gitignore",
+    ".golangci.yml",
+    "COPYING",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/README.md",
+    "_examples/server/console.go",
+    "_examples/server/go.mod",
+    "_examples/server/go.sum",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/commandstring/main.go",
+    "_examples/shell/help/README.md",
+    "_examples/shell/help/main.go",
+    "benchmark_test.go",
+    "bin/.go-1.22.0.pkg",
+    "bin/.golangci-lint-1.55.2.pkg",
+    "bin/README.hermit.md",
+    "bin/activate-hermit",
+    "bin/go",
+    "bin/gofmt",
+    "bin/golangci-lint",
+    "bin/hermit",
+    "bin/hermit.hcl",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "config_test.go",
+    "context.go",
+    "defaults.go",
+    "defaults_test.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "go.mod",
+    "go.sum",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "helpwrap1.18_test.go",
+    "helpwrap1.19_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_linux_test.go",
+    "mapper_test.go",
+    "mapper_windows_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "renovate.json5",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "testdata/file.txt",
+    "util.go",
+    "util_test.go",
+    "visit.go"
+  ],
+  "explanation": {
+    "what": "pathMapper が `*string` (文字列ポインタ)型のフィールドにも適用できるようにした。target が nil ポインタなら何もせず抜け、非 nil なら Elem() で指す先の string に処理を委譲する。",
+    "why": "PR body の通り、未設定(nil)と空文字列(カレントディレクトリに展開される値)を区別したいというユースケースがあり、kong の「ポインタで未設定を表現する」既存の設計方針(README の Pointers節)に沿って path 型もポインタに対応させた。",
+    "highlights": [
+      { "file": "mapper.go", "note": "target.Kind() == reflect.Ptr && Elem().Kind() == reflect.String の分岐でポインタを剥がしてから既存の string 処理に合流させている" }
+    ],
+    "langNotes": [
+      { "topic": "reflect.Value のポインタ判定と Elem()", "note": "Go の reflect では、値が nil ポインタか、値を持つポインタかを Kind()/IsNil() で判定し、Elem() で指し示す先の Value を取り出す。kong はこのパターンで「未設定(nil)」と「ゼロ値」を区別できるフィールドを表現している。" }
+    ],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [
+      { "type": "pr", "number": 360, "url": "https://github.com/alecthomas/kong/pull/360" }
+    ],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

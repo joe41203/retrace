@@ -1,0 +1,89 @@
+{
+  "seq": 60,
+  "sha": "a5c97373baa3b8e10176416421eb88145bb5f70a",
+  "parents": [
+    "0aec63e1ba7f1921eab43b07720f6ebdf5b19364"
+  ],
+  "author": {
+    "name": "Alec Thomas",
+    "email": "alec@swapoff.org",
+    "date": "2018-06-13T08:40:41+10:00"
+  },
+  "message": "Remove automatic envar naming resolver.",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 3,
+    "additions": 8,
+    "deletions": 44
+  },
+  "files": [
+    {
+      "path": "README.md",
+      "status": "M",
+      "additions": 1,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "resolver.go",
+      "status": "M",
+      "additions": 0,
+      "deletions": 23,
+      "binary": false
+    },
+    {
+      "path": "resolver_test.go",
+      "status": "M",
+      "additions": 7,
+      "deletions": 21,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/README.md b/README.md\nindex 408da2d..e96c6fb 100644\n--- a/README.md\n+++ b/README.md\n@@ -144,6 +144,7 @@ Both can coexist with standard Tag parsing.\n | -----------------------| ------------------------------------------- |\n | `cmd`                  | If present, struct is a command.            |\n | `arg`                  | If present, field is an argument.           |\n+| `env:\"X\"`              | Specify envar to use for default value.\n | `type:\"X\"`             | Specify named Mapper to use.                |\n | `help:\"X\"`             | Help text.                                  |\n | `placeholder:\"X\"`      | Placeholder text.                           |\ndiff --git a/resolver.go b/resolver.go\nindex 1627b91..c2495fe 100755\n--- a/resolver.go\n+++ b/resolver.go\n@@ -61,17 +61,6 @@ func jsonDecodeValue(sep rune, value interface{}) (string, error) {\n \treturn \"\", fmt.Errorf(\"unsupported JSON value %v (of type %T)\", value, value)\n }\n \n-// PerFlagEnvResolver automatically determines environment variables based on the name of each flag, transformed to\n-// uppercase and underscored, e.g. `my-flag` -> `MY_FLAG`.\n-//\n-// The environment variable key can be overridden with the `env:\"<name>\"` tag.\n-func PerFlagEnvResolver(prefix string) ResolverFunc {\n-\treturn func(context *Context, parent *Path, flag *Flag) (string, error) {\n-\t\tv, _ := os.LookupEnv(envString(prefix, flag))\n-\t\treturn v, nil\n-\t}\n-}\n-\n // EnvResolver resolves flag values using the `env:\"<name>\"` tag. It ignores flags without this tag.\n //\n // This resolver is installed by default.\n@@ -84,15 +73,3 @@ func EnvResolver() ResolverFunc {\n \t\treturn v, nil\n \t}\n }\n-\n-func envString(prefix string, flag *Flag) string {\n-\tif env, ok := flag.Tag.Get(\"env\"); ok {\n-\t\treturn env\n-\t}\n-\n-\tenv := strings.ToUpper(flag.Name)\n-\tenv = strings.Replace(env, \"-\", \"_\", -1)\n-\tenv = prefix + env\n-\n-\treturn env\n-}\ndiff --git a/resolver_test.go b/resolver_test.go\nindex 9ba6831..8e6c5ef 100755\n--- a/resolver_test.go\n+++ b/resolver_test.go\n@@ -26,14 +26,14 @@ func tempEnv(env envMap) func() {\n func newEnvParser(t *testing.T, cli interface{}, env envMap) (*Kong, func()) {\n \tt.Helper()\n \trestoreEnv := tempEnv(env)\n-\tparser := mustNew(t, cli, Resolver(PerFlagEnvResolver(\"KONG_\")))\n+\tparser := mustNew(t, cli)\n \treturn parser, restoreEnv\n }\n \n func TestEnvResolverFlagBasic(t *testing.T) {\n \tvar cli struct {\n-\t\tString string\n-\t\tSlice  []int\n+\t\tString string `env:\"KONG_STRING\"`\n+\t\tSlice  []int  `env:\"KONG_SLICE\"`\n \t}\n \tparser, unsetEnvs := newEnvParser(t, &cli, envMap{\n \t\t\"KONG_STRING\": \"bye\",\n@@ -49,7 +49,7 @@ func TestEnvResolverFlagBasic(t *testing.T) {\n \n func TestEnvResolverFlagOverride(t *testing.T) {\n \tvar cli struct {\n-\t\tFlag string\n+\t\tFlag string `env:\"KONG_FLAG\"`\n \t}\n \tparser, restoreEnv := newEnvParser(t, &cli, envMap{\"KONG_FLAG\": \"bye\"})\n \tdefer restoreEnv()\n@@ -64,13 +64,13 @@ func TestEnvResolverOnlyPopulateUsedBranches(t *testing.T) {\n \tvar cli struct {\n \t\tUnvisitedArg struct {\n \t\t\tUnvisitedArg string `arg`\n-\t\t\tInt          int\n+\t\t\tInt          int    `env:\"KONG_INT\"`\n \t\t} `arg`\n \t\tUnvisitedCmd struct {\n-\t\t\tInt int\n+\t\t\tInt int `env:\"KONG_INT\"`\n \t\t} `cmd`\n \t\tVisited struct {\n-\t\t\tInt int\n+\t\t\tInt int `env:\"KONG_INT\"`\n \t\t} `cmd`\n \t}\n \tparser, restoreEnv := newEnvParser(t, &cli, envMap{\"KONG_INT\": \"512\"})\n@@ -166,11 +166,8 @@ func TestResolversWithMappers(t *testing.T) {\n \trestoreEnv := tempEnv(envMap{\"KONG_MOO\": \"meow\"})\n \tdefer restoreEnv()\n \n-\tr := PerFlagEnvResolver(\"KONG_\")\n-\n \tparser := mustNew(t, &cli,\n \t\tNamedMapper(\"upper\", testUppercaseMapper{}),\n-\t\tResolver(r),\n \t)\n \t_, err := parser.Parse([]string{})\n \trequire.NoError(t, err)\n@@ -235,14 +232,3 @@ func TestResolverSatisfiesRequired(t *testing.T) {\n \trequire.NoError(t, err)\n \trequire.Equal(t, 1, cli.Int)\n }\n-\n-func TestEnvResolver(t *testing.T) {\n-\tvar cli struct {\n-\t\tInt int `env:\"SOME_ENVAR\"`\n-\t}\n-\trestoreEnv := tempEnv(envMap{\"SOME_ENVAR\": \"12\"})\n-\tdefer restoreEnv()\n-\t_, err := mustNew(t, &cli, Resolver(EnvResolver())).Parse(nil)\n-\trequire.NoError(t, err)\n-\trequire.Equal(t, 12, cli.Int)\n-}\n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    "README.md",
+    "_examples/shell/main.go",
+    "build.go",
+    "camelcase.go",
+    "context.go",
+    "global.go",
+    "global_test.go",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "tokentype_string.go"
+  ],
+  "explanation": {
+    "what": "直前のコミットで追加した`PerFlagEnvResolver(prefix)`(フラグ名からENV名を自動推測してprefix付きで解決するresolver)とその補助関数envString()を削除した。テストは全て`env`タグを明示するEnvResolver方式のみを使うよう書き換え、READMEのタグ一覧表に`env:\"X\"`の説明行を追加した。",
+    "why": "コミットメッセージ「Remove automatic envar naming resolver.」の通り、フラグ名から自動的に環境変数名を推測する機構を廃止する意図。おそらく、フラグ名の自動変換(ハイフンをアンダースコアに変換して大文字化するなど)による環境変数名の衝突や予期しない値の混入を避け、`env`タグで明示的に指定する方式に一本化する設計判断と考えられる。",
+    "highlights": [
+      { "file": "resolver.go", "note": "PerFlagEnvResolver関数とenvString補助関数を削除し、EnvResolver()(envタグ明示方式)のみを残した" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "inferred",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

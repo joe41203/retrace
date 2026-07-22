@@ -1,0 +1,75 @@
+{
+  "seq": 68,
+  "sha": "51ca3e76a8949e54ac0085f69e4300aafaf33e1f",
+  "parents": [
+    "662ace41c50c29ec87018a0c2699f6a86b10abb9"
+  ],
+  "author": {
+    "name": "Alec Thomas",
+    "email": "alec@swapoff.org",
+    "date": "2018-06-13T23:10:30+10:00"
+  },
+  "message": "More docs.",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 44,
+    "deletions": 2
+  },
+  "files": [
+    {
+      "path": "README.md",
+      "status": "M",
+      "additions": 44,
+      "deletions": 2,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/README.md b/README.md\nindex aefc505..b071d50 100644\n--- a/README.md\n+++ b/README.md\n@@ -11,6 +11,8 @@\n 1. [Commands and sub-commands](#commands-and-sub-commands)\n 1. [Branching positional arguments](#branching-positional-arguments)\n 1. [Terminating positional arguments](#terminating-positional-arguments)\n+1. [Slices](#slices)\n+1. [Maps](#maps)\n 1. [Supported tags](#supported-tags)\n 1. [Modifying Kong's behaviour](#modifying-kongs-behaviour)\n     1. [`Name(help)` and `Description(help)` - set the application name description](#namehelp-and-descriptionhelp---set-the-application-name-description)\n@@ -157,7 +159,47 @@ This looks a little verbose in this contrived example, but typically this will n\n \n ## Terminating positional arguments\n \n-If a [mapped type](#mapper---customising-how-the-command-line-is-mapped-to-go-values) is tagged with `arg`,\n+If a [mapped type](#mapper---customising-how-the-command-line-is-mapped-to-go-values) is tagged with `arg` it will be treated as the final positional values to be parsed on the command line.\n+\n+If a positional argument is a slice, all remaining arguments will be appended to that slice.\n+\n+## Slices\n+\n+Slice values are treated specially. First the input is split on the `sep:\"<rune>\"` tag (defaults to `,`), then each element is parsed by the slice element type and appended to the slice. If the same value is encountered multiple times, elements continue to be appended.\n+\n+To represent the following command-line:\n+\n+    cmd ls <file> <file> ...\n+\n+You would use the following:\n+\n+```go\n+var CLI struct {\n+  Ls struct {\n+    Files []string `arg`\n+  } `cmd`\n+}\n+```\n+\n+## Maps\n+\n+Maps are similar to slices except that only one key/value pair can be assigned per value, and the `sep` tag denotes the assignment character and defaults to `=`.\n+\n+To represent the following command-line:\n+\n+    cmd config set <key>=<value> <key>=<value> ...\n+\n+You would use the following:\n+\n+```go\n+var CLI struct {\n+  Config struct {\n+    Set struct {\n+      Config map[string]float64 `arg`\n+    } `cmd`\n+  } `cmd`\n+}\n+```\n \n ## Supported tags\n \n@@ -183,7 +225,7 @@ Both can coexist with standard Tag parsing.\n | `optional`             | If present, flag/arg is optional.           |\n | `hidden`               | If present, flag is hidden.                 |\n | `format:\"X\"`           | Format for parsing input, if supported.     |\n-| `sep:\"X\"`              | Separator for sequences (defaults to \",\")   |\n+| `sep:\"X\"`              | Separator for sequences (defaults to \",\") or maps (defaults to \"=\") |\n \n ## Modifying Kong's behaviour\n \n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    ".golangci.yml",
+    "README.md",
+    "_examples/shell/main.go",
+    "build.go",
+    "camelcase.go",
+    "context.go",
+    "doc.go",
+    "global.go",
+    "global_test.go",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "tokentype_string.go"
+  ],
+  "explanation": {
+    "what": "README に Slices と Maps の章を新設し、スライスの sep デフォルトやマップの key=value 記法、末尾位置引数(Terminating positional arguments)の説明を追記した。sep タグの説明表もスライス・マップ両対応の記述に更新している。",
+    "why": "おそらく、直前の2コミット(map サポート追加、sep デフォルト決定の整理)で実装が固まったマップ機能を、ユーザー向けドキュメントとして明文化するための追記と考えられる。",
+    "highlights": [],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "inferred",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

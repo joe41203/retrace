@@ -1,0 +1,97 @@
+{
+  "seq": 86,
+  "sha": "0bc26a865db7359e3a31c11832f4995c294dadc5",
+  "parents": [
+    "1bb0c0b4b20af09ce6609fe1fa4b8eb2187c1a48"
+  ],
+  "author": {
+    "name": "Alec Thomas",
+    "email": "alec@swapoff.org",
+    "date": "2018-06-27T21:13:47+10:00"
+  },
+  "message": "Minor cleanup.",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 6,
+    "deletions": 5
+  },
+  "files": [
+    {
+      "path": "camelcase.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "mapper.go",
+      "status": "M",
+      "additions": 5,
+      "deletions": 4,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/camelcase.go b/camelcase.go\nindex b12d111..7d889b5 100644\n--- a/camelcase.go\n+++ b/camelcase.go\n@@ -55,7 +55,7 @@ func camelCase(src string) (entries []string) {\n \t// split into fields based on class of unicode character\n \tfor _, r := range src {\n \t\tvar class int\n-\t\tswitch true {\n+\t\tswitch {\n \t\tcase unicode.IsLower(r):\n \t\t\tclass = 1\n \t\tcase unicode.IsUpper(r):\ndiff --git a/mapper.go b/mapper.go\nindex 244dcb3..d5f04ff 100644\n--- a/mapper.go\n+++ b/mapper.go\n@@ -383,16 +383,17 @@ func SplitEscaped(s string, sep rune) (out []string) {\n \tescaped := false\n \ttoken := \"\"\n \tfor _, ch := range s {\n-\t\tif escaped {\n+\t\tswitch {\n+\t\tcase escaped:\n \t\t\ttoken += string(ch)\n \t\t\tescaped = false\n-\t\t} else if ch == '\\\\' {\n+\t\tcase ch == '\\\\':\n \t\t\tescaped = true\n-\t\t} else if ch == sep && !escaped {\n+\t\tcase ch == sep && !escaped:\n \t\t\tout = append(out, token)\n \t\t\ttoken = \"\"\n \t\t\tescaped = false\n-\t\t} else {\n+\t\tdefault:\n \t\t\ttoken += string(ch)\n \t\t}\n \t}\n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    ".golangci.yml",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/console.go",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/main.go",
+    "build.go",
+    "camelcase.go",
+    "context.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "tokentype_string.go"
+  ],
+  "explanation": {
+    "what": "camelcase.go の switch true { case ... } を switch { case ... } という条件式なしの switch に、mapper.go の SplitEscaped 内の if-else if 連鎖を switch { case escaped: ... } に書き換えた。振る舞いは変えていない。",
+    "why": "コミットメッセージの通り「Minor cleanup」で、Go の linter(golangci-lint)が switch true を冗長と指摘しがちなスタイル上の書き換えだとおもわれる。",
+    "highlights": [
+      { "file": "mapper.go", "note": "SplitEscaped のエスケープ処理の if-else 連鎖が switch 文に整理された" }
+    ],
+    "langNotes": [
+      { "topic": "条件式なし switch", "note": "Go の switch は条件式を省略でき、`switch { case cond1: ...; case cond2: ... }` は if-else if 連鎖と等価だが、golangci-lint などはこの形をより慣用的とみなす。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

@@ -1,0 +1,150 @@
+{
+  "seq": 376,
+  "sha": "e864bb02209592cb6e8259b74d325edf4236f47c",
+  "parents": [
+    "605cdd64a921c795cab5abc722861d3fd5e2645d"
+  ],
+  "author": {
+    "name": "Leo Antunes",
+    "email": "leo@costela.net",
+    "date": "2024-07-05T14:51:38+02:00"
+  },
+  "message": "feat: allow non-structs to be used as commands (#428)\n\n* feat: allow non-structs to be used as commands\r\n\r\nThis small MR allows using the func-to-interface trick to implement a command (see commandFunc in kong_test.go).\r\n\r\nThis is useful e.g. for commands that have no flags or arguments of their own, but instead receive all required information via bound  parameters.\r\n\r\n* fix: check DynamicCommand is runnable when adding",
+  "pr": {
+    "number": 428,
+    "title": "feat: allow non-structs to be used as commands",
+    "body": "This small MR allows using the func-to-interface trick to implement a command (see commandFunc in kong_test.go).\r\n\r\nThis is useful e.g. for commands that have no flags or arguments of their own, but instead receive all required information via bound  parameters.\r\n\r\n:question: we could (but don't need to) also provide a `CommandFunc` type, analogous to `http.HandlerFunc`.",
+    "url": "https://github.com/alecthomas/kong/pull/428"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 4,
+    "additions": 25,
+    "deletions": 2
+  },
+  "files": [
+    {
+      "path": "build.go",
+      "status": "M",
+      "additions": 3,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "context.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "kong_test.go",
+      "status": "M",
+      "additions": 17,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "options.go",
+      "status": "M",
+      "additions": 4,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/build.go b/build.go\nindex 1cfe1c3..aed1f72 100644\n--- a/build.go\n+++ b/build.go\n@@ -51,6 +51,9 @@ type flattenedField struct {\n \n func flattenedFields(v reflect.Value, ptag *Tag) (out []flattenedField, err error) {\n \tv = reflect.Indirect(v)\n+\tif v.Kind() != reflect.Struct {\n+\t\treturn out, nil\n+\t}\n \tfor i := 0; i < v.NumField(); i++ {\n \t\tft := v.Type().Field(i)\n \t\tfv := v.Field(i)\ndiff --git a/context.go b/context.go\nindex 4f82813..03044ec 100644\n--- a/context.go\n+++ b/context.go\n@@ -903,7 +903,7 @@ func checkMissingChildren(node *Node) error {\n \tif len(missing) == 1 {\n \t\treturn fmt.Errorf(\"expected %s\", missing[0])\n \t}\n-\treturn fmt.Errorf(\"expected one of %s\", strings.Join(missing, \",  \"))\n+\treturn fmt.Errorf(\"expected one of %s\", strings.Join(missing, \", \"))\n }\n \n // If we're missing any positionals and they're required, return an error.\ndiff --git a/kong_test.go b/kong_test.go\nindex f90f86d..c4ed7f6 100644\n--- a/kong_test.go\n+++ b/kong_test.go\n@@ -1297,6 +1297,12 @@ func (d *dynamicCommand) Run() error {\n \treturn nil\n }\n \n+type commandFunc func() error\n+\n+func (cf commandFunc) Run() error {\n+\treturn cf()\n+}\n+\n func TestDynamicCommands(t *testing.T) {\n \tcli := struct {\n \t\tOne struct{} `cmd:\"one\"`\n@@ -1304,9 +1310,12 @@ func TestDynamicCommands(t *testing.T) {\n \thelp := &strings.Builder{}\n \ttwo := &dynamicCommand{}\n \tthree := &dynamicCommand{}\n+\tfourRan := false\n+\tfour := commandFunc(func() error { fourRan = true; return nil })\n \tp := mustNew(t, &cli,\n \t\tkong.DynamicCommand(\"two\", \"\", \"\", &two),\n \t\tkong.DynamicCommand(\"three\", \"\", \"\", three, \"hidden\"),\n+\t\tkong.DynamicCommand(\"four\", \"\", \"\", &four),\n \t\tkong.Writers(help, help),\n \t\tkong.Exit(func(int) {}))\n \tkctx, err := p.Parse([]string{\"two\", \"--flag=flag\"})\n@@ -1317,8 +1326,15 @@ func TestDynamicCommands(t *testing.T) {\n \tassert.NoError(t, err)\n \tassert.True(t, two.ran)\n \n+\tkctx, err = p.Parse([]string{\"four\"})\n+\tassert.NoError(t, err)\n+\tassert.False(t, fourRan)\n+\terr = kctx.Run()\n+\tassert.NoError(t, err)\n+\tassert.True(t, fourRan)\n+\n \t_, err = p.Parse([]string{\"--help\"})\n-\tassert.EqualError(t, err, `expected one of \"one\",  \"two\"`)\n+\tassert.EqualError(t, err, `expected one of \"one\", \"two\", \"four\"`)\n \tassert.NotContains(t, help.String(), \"three\", help.String())\n }\n \ndiff --git a/options.go b/options.go\nindex d01aeec..3ab383b 100644\n--- a/options.go\n+++ b/options.go\n@@ -89,6 +89,10 @@ type dynamicCommand struct {\n // \"tags\" is a list of extra tag strings to parse, in the form <key>:\"<value>\".\n func DynamicCommand(name, help, group string, cmd interface{}, tags ...string) Option {\n \treturn OptionFunc(func(k *Kong) error {\n+\t\tif run := getMethod(reflect.Indirect(reflect.ValueOf(cmd)), \"Run\"); !run.IsValid() {\n+\t\t\treturn fmt.Errorf(\"kong: DynamicCommand %q must be a type with a 'Run' method; got %T\", name, cmd)\n+\t\t}\n+\n \t\tk.dynamicCommands = append(k.dynamicCommands, &dynamicCommand{\n \t\t\tname:  name,\n \t\t\thelp:  help,\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/FUNDING.yml",
+    ".github/workflows/ci.yml",
+    ".gitignore",
+    ".golangci.yml",
+    "COPYING",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/README.md",
+    "_examples/server/console.go",
+    "_examples/server/go.mod",
+    "_examples/server/go.sum",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/commandstring/main.go",
+    "_examples/shell/help/README.md",
+    "_examples/shell/help/main.go",
+    "benchmark_test.go",
+    "bin/.go-1.22.5.pkg",
+    "bin/.golangci-lint-1.55.2.pkg",
+    "bin/README.hermit.md",
+    "bin/activate-hermit",
+    "bin/go",
+    "bin/gofmt",
+    "bin/golangci-lint",
+    "bin/hermit",
+    "bin/hermit.hcl",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "config_test.go",
+    "context.go",
+    "defaults.go",
+    "defaults_test.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "go.mod",
+    "go.sum",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "helpwrap1.18_test.go",
+    "helpwrap1.19_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_linux_test.go",
+    "mapper_test.go",
+    "mapper_windows_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "renovate.json5",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "testdata/file.txt",
+    "util.go",
+    "util_test.go",
+    "visit.go"
+  ],
+  "explanation": {
+    "what": "build.go の flattenedFields で、対象の reflect.Value が struct でない場合は即座に空を返すガードを追加し、DynamicCommand に struct でない値(func-to-interfaceで Run() メソッドを実装した型など)を渡せるようにした。options.go の DynamicCommand には、渡された cmd が Run メソッドを持つか(getMethod で検証)を事前チェックする処理を追加。あわせて checkMissingChildren のエラーメッセージの余分なスペース(\",  \" → \", \")も修正している。",
+    "why": "PR本文の通り、フラグや引数を持たず、バインドされたパラメータだけで動作するコマンド(例: 関数を Run() を持つ型に変換する commandFunc)を非struct のまま DynamicCommand として登録できるようにするための機能追加。",
+    "highlights": [
+      { "file": "build.go", "note": "flattenedFields冒頭の v.Kind() != reflect.Struct ガードが非struct許容の核" },
+      { "file": "kong_test.go", "note": "commandFunc型でfunc-to-interfaceトリックを実演" }
+    ],
+    "langNotes": [
+      { "topic": "func-to-interface (関数を型変換してインターフェースを満たす)", "note": "Go では関数型に独自の名前を付けてメソッドを生やせる。commandFunc は func() error の別名型で、Run() メソッドを1つ実装するだけで Runnable インターフェースを満たし、構造体を介さずに関数そのものをコマンドとして登録できる(標準ライブラリの http.HandlerFunc と同じ発想)。" }
+    ],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [{ "type": "pr", "number": 428, "url": "https://github.com/alecthomas/kong/pull/428" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

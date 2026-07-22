@@ -1,0 +1,63 @@
+{
+  "seq": 22,
+  "sha": "184735e6893267ed02f26b88a71c73a07a263035",
+  "parents": [
+    "6a5fba0967a503464e4926553cb200fc7d934352"
+  ],
+  "author": {
+    "name": "Alec Thomas",
+    "email": "alec@swapoff.org",
+    "date": "2018-05-20T00:42:54+10:00"
+  },
+  "message": "Document how decoders work.",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 21,
+    "deletions": 0
+  },
+  "files": [
+    {
+      "path": "README.md",
+      "status": "M",
+      "additions": 21,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/README.md b/README.md\nindex 5ef36e4..143d108 100644\n--- a/README.md\n+++ b/README.md\n@@ -24,3 +24,24 @@ func main() {\n   kong.Parse(&CLI)\n }\n ```\n+\n+## Decoders\n+\n+Command-line arguments are mapped to Go values via the Decoder interface:\n+\n+```go\n+// A Decoder knows how to decode text into a Go value.\n+type Decoder interface {\n+\t// Decode scan into target.\n+\t//\n+\t// \"ctx\" contains context about the value being decoded that may be useful\n+\t// to some decoders.\n+\tDecode(ctx *DecoderContext, scan *Scanner, target reflect.Value) error\n+}\n+```\n+\n+All builtin Go types (as well as a bunch of useful stdlib types like `time.Time`) have decoders registered by default. Decoders for custom types can be added using `kong.RegisterDecoder(decoder)`. Decoders are mapped from fields in three ways:\n+\n+1. By registering a `kong.NamedDecoder` and using the tag `type:\"<name>\"`.\n+2. By registering a `kong.KindDecoder` with a `reflect.Kind`.\n+3. By registering a `kong.TypeDecoder` with a `reflect.Type`.\n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    "README.md",
+    "_examples/shell/main.go",
+    "build.go",
+    "camelcase.go",
+    "context.go",
+    "decoders.go",
+    "decoders_test.go",
+    "global.go",
+    "help.go",
+    "kong.go",
+    "kong_test.go",
+    "model.go",
+    "options.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tokentype_string.go"
+  ],
+  "explanation": {
+    "what": "README.md に「Decoders」節を追加し、Decoder インターフェースのコード例と、フィールドへのデコーダの割り当て方法(NamedDecoder + type タグ、KindDecoder、TypeDecoder の3通り)を文章で説明した。",
+    "why": "コミットメッセージの通り、既存の decoders.go の仕組みを利用者向けに文書化する目的。直前までの一連のコミットで decoder ベースのパース機構が形になってきたため、ここで一区切りとしてドキュメントを追いついた形。",
+    "highlights": [
+      { "file": "README.md", "note": "Decoder インターフェースの定義と、3種類のデコーダ登録方法の説明" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

@@ -1,0 +1,141 @@
+{
+  "seq": 111,
+  "sha": "6406edf15f9cda783211dee6106859e2caafdc2a",
+  "parents": [
+    "6fa83bdc0e9a653dd7c25c6e0c39056e25847580"
+  ],
+  "author": {
+    "name": "Alec Thomas",
+    "email": "alec@swapoff.org",
+    "date": "2018-09-20T21:29:57+10:00"
+  },
+  "message": "Add Visitor function for walking the model.",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 7,
+    "additions": 143,
+    "deletions": 95
+  },
+  "files": [
+    {
+      "path": ".circleci/config.yml",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "build.go",
+      "status": "M",
+      "additions": 0,
+      "deletions": 7,
+      "binary": false
+    },
+    {
+      "path": "context.go",
+      "status": "M",
+      "additions": 9,
+      "deletions": 29,
+      "binary": false
+    },
+    {
+      "path": "help_test.go",
+      "status": "M",
+      "additions": 10,
+      "deletions": 6,
+      "binary": false
+    },
+    {
+      "path": "kong.go",
+      "status": "M",
+      "additions": 47,
+      "deletions": 38,
+      "binary": false
+    },
+    {
+      "path": "model.go",
+      "status": "M",
+      "additions": 20,
+      "deletions": 14,
+      "binary": false
+    },
+    {
+      "path": "visit.go",
+      "status": "A",
+      "additions": 56,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/.circleci/config.yml b/.circleci/config.yml\nindex 56fa38e..31d2bd3 100644\n--- a/.circleci/config.yml\n+++ b/.circleci/config.yml\n@@ -12,7 +12,7 @@ jobs:\n           command: |\n             go get -v github.com/jstemmer/go-junit-report\n             go get -v -t -d ./...\n-            curl -sfL https://install.goreleaser.com/github.com/golangci/golangci-lint.sh | bash -s v1.10\n+            curl -sfL https://install.goreleaser.com/github.com/golangci/golangci-lint.sh | bash -s v1.10.2\n             mkdir ~/report\n           when: always\n       - run:\ndiff --git a/build.go b/build.go\nindex 2a6a21d..49cc767 100644\n--- a/build.go\n+++ b/build.go\n@@ -191,13 +191,6 @@ func buildField(k *Kong, node *Node, v reflect.Value, ft reflect.StructField, fv\n \t\tFormat:   tag.Format,\n \t}\n \n-\tif value.Default != \"\" {\n-\t\terr := value.Parse(Scan(tag.Default), value.DefaultValue)\n-\t\tif err != nil {\n-\t\t\tfail(\"invalid default value %q for field type %s.%s (of type %s)\", value.Default, v.Type(), ft.Name, ft.Type)\n-\t\t}\n-\t}\n-\n \tif tag.Arg {\n \t\tnode.Positional = append(node.Positional, value)\n \t} else {\ndiff --git a/context.go b/context.go\nindex 8175eef..2144dfb 100644\n--- a/context.go\n+++ b/context.go\n@@ -197,32 +197,12 @@ func (c *Context) FlagValue(flag *Flag) interface{} {\n \n // Recursively reset values to defaults (as specified in the grammar) or the zero value.\n func (c *Context) reset(node *Node) error {\n-\tfor _, flag := range node.Flags {\n-\t\terr := flag.Value.Reset()\n-\t\tif err != nil {\n-\t\t\treturn err\n-\t\t}\n-\t}\n-\tfor _, pos := range node.Positional {\n-\t\terr := pos.Reset()\n-\t\tif err != nil {\n-\t\t\treturn err\n+\treturn Visit(node, func(node Visitable, next Next) error {\n+\t\tif value, ok := node.(*Value); ok {\n+\t\t\treturn next(value.Reset())\n \t\t}\n-\t}\n-\tfor _, branch := range node.Children {\n-\t\tif branch.Argument != nil {\n-\t\t\targ := branch.Argument\n-\t\t\terr := arg.Reset()\n-\t\t\tif err != nil {\n-\t\t\t\treturn err\n-\t\t\t}\n-\t\t}\n-\t\terr := c.reset(branch)\n-\t\tif err != nil {\n-\t\t\treturn err\n-\t\t}\n-\t}\n-\treturn nil\n+\t\treturn next(nil)\n+\t})\n }\n \n func (c *Context) trace(node *Node) (err error) { // nolint: gocyclo\n@@ -562,13 +542,13 @@ func checkMissingChildren(node *Node) error {\n \t\treturn nil\n \t}\n \n-\tif len(missing) == 1 {\n-\t\treturn fmt.Errorf(\"expected %s\", missing[0])\n-\t}\n \tif len(missing) > 5 {\n \t\tmissing = append(missing[:5], \"...\")\n \t}\n-\treturn fmt.Errorf(\"expected one of %s\", strings.Join(missing, \", \"))\n+\tif len(missing) == 1 {\n+\t\treturn fmt.Errorf(\"expected %s\", missing[0])\n+\t}\n+\treturn fmt.Errorf(\"expected %s\", strings.Join(missing, \"  \"))\n }\n \n // If we're missing any positionals and they're required, return an error.\ndiff --git a/help_test.go b/help_test.go\nindex 54caae9..d8af552 100644\n--- a/help_test.go\n+++ b/help_test.go\n@@ -61,8 +61,7 @@ func TestHelp(t *testing.T) {\n \t\t\trequire.NoError(t, err)\n \t\t})\n \t\trequire.True(t, exited)\n-\t\tt.Log(w.String())\n-\t\trequire.Equal(t, `Usage: test-app --required <command>\n+\t\texpected := `Usage: test-app --required <command>\n \n A test app.\n \n@@ -86,7 +85,10 @@ Commands:\n     Sub-sub-command.\n \n Run \"test-app <command> --help\" for more information on a command.\n-`, w.String())\n+`\n+\t\tt.Log(w.String())\n+\t\tt.Log(expected)\n+\t\trequire.Equal(t, expected, w.String())\n \t})\n \n \tt.Run(\"Selected\", func(t *testing.T) {\n@@ -97,8 +99,7 @@ Run \"test-app <command> --help\" for more information on a command.\n \t\t\trequire.NoError(t, err)\n \t\t})\n \t\trequire.True(t, exited)\n-\t\tt.Log(w.String())\n-\t\trequire.Equal(t, `Usage: test-app two <three> --required --required-two --required-three\n+\t\texpected := `Usage: test-app two <three> --required --required-two --required-three\n \n Sub-sub-arg.\n \n@@ -117,6 +118,9 @@ Flags:\n   --required-two\n \n   --required-three\n-`, w.String())\n+`\n+\t\tt.Log(expected)\n+\t\tt.Log(w.String())\n+\t\trequire.Equal(t, expected, w.String())\n \t})\n }\ndiff --git a/kong.go b/kong.go\nindex 2de2b12..53c345d 100644\n--- a/kong.go\n+++ b/kong.go\n@@ -108,29 +108,38 @@ func New(grammar interface{}, options ...Option) (*Kong, error) {\n \treturn k, nil\n }\n \n+type varStack []Vars\n+\n+func (v *varStack) head() Vars { return (*v)[len(*v)-1] }\n+func (v *varStack) pop()       { *v = (*v)[:len(*v)-1] }\n+func (v *varStack) push(vars Vars) Vars {\n+\tif len(*v) != 0 {\n+\t\tvars = (*v)[len(*v)-1].CloneWith(vars)\n+\t}\n+\t*v = append(*v, vars)\n+\treturn vars\n+}\n+\n // Interpolate variables into model.\n func (k *Kong) interpolate(node *Node) (err error) {\n-\tvars := node.Vars()\n-\tnode.Help, err = interpolate(node.Help, vars)\n-\tif err != nil {\n-\t\treturn fmt.Errorf(\"help for %s: %s\", node.Path(), err)\n-\t}\n-\tfor _, flag := range node.Flags {\n-\t\tif err = k.interpolateValue(flag.Value, vars); err != nil {\n-\t\t\treturn err\n-\t\t}\n-\t}\n-\tfor _, pos := range node.Positional {\n-\t\tif err = k.interpolateValue(pos, vars); err != nil {\n-\t\t\treturn err\n-\t\t}\n-\t}\n-\tfor _, child := range node.Children {\n-\t\tif err = k.interpolate(child); err != nil {\n+\tstack := varStack{}\n+\treturn Visit(node, func(node Visitable, next Next) error {\n+\t\tswitch node := node.(type) {\n+\t\tcase *Node:\n+\t\t\tvars := stack.push(node.Vars())\n+\t\t\tnode.Help, err = interpolate(node.Help, vars)\n+\t\t\tif err != nil {\n+\t\t\t\treturn fmt.Errorf(\"help for %s: %s\", node.Path(), err)\n+\t\t\t}\n+\t\t\terr = next(nil)\n+\t\t\tstack.pop()\n \t\t\treturn err\n+\n+\t\tcase *Value:\n+\t\t\treturn next(k.interpolateValue(node, stack.head()))\n \t\t}\n-\t}\n-\treturn nil\n+\t\treturn next(nil)\n+\t})\n }\n \n func (k *Kong) interpolateValue(value *Value, vars Vars) (err error) {\n@@ -244,27 +253,27 @@ func (k *Kong) applyHookToDefaultFlags(ctx *Context, node *Node, name string) er\n \tif node == nil {\n \t\treturn nil\n \t}\n-\tbindings := k.bindings.clone().add(ctx).add(node.Vars().CloneWith(k.vars))\n-\tfor _, flag := range node.Flags {\n-\t\tif flag.Default == \"\" || ctx.values[flag.Value].IsValid() || !flag.Target.IsValid() {\n-\t\t\tcontinue\n+\treturn Visit(node, func(n Visitable, next Next) error {\n+\t\tnode, ok := n.(*Node)\n+\t\tif !ok {\n+\t\t\treturn next(nil)\n \t\t}\n-\t\tmethod := getMethod(flag.Target, name)\n-\t\tif !method.IsValid() {\n-\t\t\tcontinue\n-\t\t}\n-\t\tpath := &Path{Flag: flag}\n-\t\tif err := callMethod(name, flag.Target, method, bindings.clone().add(path)); err != nil {\n-\t\t\treturn err\n+\t\tbinds := k.bindings.clone().add(ctx).add(node.Vars().CloneWith(k.vars))\n+\t\tfor _, flag := range node.Flags {\n+\t\t\tif flag.Default == \"\" || ctx.values[flag.Value].IsValid() || !flag.Target.IsValid() {\n+\t\t\t\tcontinue\n+\t\t\t}\n+\t\t\tmethod := getMethod(flag.Target, name)\n+\t\t\tif !method.IsValid() {\n+\t\t\t\tcontinue\n+\t\t\t}\n+\t\t\tpath := &Path{Flag: flag}\n+\t\t\tif err := callMethod(name, flag.Target, method, binds.clone().add(path)); err != nil {\n+\t\t\t\treturn next(err)\n+\t\t\t}\n \t\t}\n-\t}\n-\tfor _, branch := range node.Children {\n-\t\terr := k.applyHookToDefaultFlags(ctx, branch, name)\n-\t\tif err != nil {\n-\t\t\treturn err\n-\t\t}\n-\t}\n-\treturn nil\n+\t\treturn next(nil)\n+\t})\n }\n \n func formatMultilineMessage(w io.Writer, leaders []string, format string, args ...interface{}) {\ndiff --git a/model.go b/model.go\nindex f0180d8..50c1df9 100644\n--- a/model.go\n+++ b/model.go\n@@ -7,6 +7,11 @@ import (\n \t\"strings\"\n )\n \n+// A Visitable component in the model.\n+type Visitable interface {\n+\tnode()\n+}\n+\n // Application is the root of the Kong model.\n type Application struct {\n \t*Node\n@@ -48,6 +53,8 @@ type Node struct {\n \tArgument *Value // Populated when Type is ArgumentNode.\n }\n \n+func (*Node) node() {}\n+\n // Leaf returns true if this Node is a leaf node.\n func (n *Node) Leaf() bool {\n \treturn len(n.Children) == 0\n@@ -99,23 +106,20 @@ func (n *Node) AllFlags(hide bool) (out [][]*Flag) {\n //\n // If \"hidden\" is true hidden leaves will be omitted.\n func (n *Node) Leaves(hide bool) (out []*Node) {\n-\tvar walk func(n *Node)\n-\twalk = func(n *Node) {\n-\t\tif hide && n.Hidden {\n-\t\t\treturn\n+\t_ = Visit(n, func(nd Visitable, next Next) error {\n+\t\tif nd == n {\n+\t\t\treturn next(nil)\n \t\t}\n-\t\tif len(n.Children) == 0 && n.Type != ApplicationNode {\n-\t\t\tout = append(out, n)\n-\t\t}\n-\t\tfor _, child := range n.Children {\n-\t\t\tif child.Type == CommandNode || child.Type == ArgumentNode {\n-\t\t\t\twalk(child)\n+\t\tif node, ok := nd.(*Node); ok {\n+\t\t\tif hide && node.Hidden {\n+\t\t\t\treturn next(nil)\n+\t\t\t}\n+\t\t\tif len(node.Children) == 0 && node.Type != ApplicationNode {\n+\t\t\t\tout = append(out, node)\n \t\t\t}\n \t\t}\n-\t}\n-\tfor _, child := range n.Children {\n-\t\twalk(child)\n-\t}\n+\t\treturn next(nil)\n+\t})\n \treturn\n }\n \n@@ -289,6 +293,8 @@ func (v *Value) Reset() error {\n \treturn nil\n }\n \n+func (*Value) node() {}\n+\n // A Positional represents a non-branching command-line positional argument.\n type Positional = Value\n \ndiff --git a/visit.go b/visit.go\nnew file mode 100644\nindex 0000000..d00bc27\n--- /dev/null\n+++ b/visit.go\n@@ -0,0 +1,56 @@\n+package kong\n+\n+import (\n+\t\"fmt\"\n+)\n+\n+// Next should be called by Visitor to proceed with the walk.\n+type Next func(error) error\n+\n+// Visitor can be used to walk all nodes in the model.\n+type Visitor func(node Visitable, next Next) error\n+\n+// Visit all nodes.\n+func Visit(node Visitable, visitor Visitor) error {\n+\treturn visitor(node, func(err error) error {\n+\t\tif err != nil {\n+\t\t\treturn err\n+\t\t}\n+\t\tswitch node := node.(type) {\n+\t\tcase *Application:\n+\t\t\treturn visitNodeChildren(node.Node, visitor)\n+\t\tcase *Node:\n+\t\t\treturn visitNodeChildren(node, visitor)\n+\t\tcase *Value:\n+\t\tcase *Flag:\n+\t\t\treturn Visit(node.Value, visitor)\n+\t\tdefault:\n+\t\t\tpanic(fmt.Sprintf(\"unsupported node type %T\", node))\n+\t\t}\n+\t\treturn nil\n+\t})\n+}\n+\n+func visitNodeChildren(node *Node, visitor Visitor) error {\n+\tif node.Argument != nil {\n+\t\tif err := Visit(node.Argument, visitor); err != nil {\n+\t\t\treturn err\n+\t\t}\n+\t}\n+\tfor _, flag := range node.Flags {\n+\t\tif err := Visit(flag, visitor); err != nil {\n+\t\t\treturn err\n+\t\t}\n+\t}\n+\tfor _, pos := range node.Positional {\n+\t\tif err := Visit(pos, visitor); err != nil {\n+\t\t\treturn err\n+\t\t}\n+\t}\n+\tfor _, child := range node.Children {\n+\t\tif err := Visit(child, visitor); err != nil {\n+\t\t\treturn err\n+\t\t}\n+\t}\n+\treturn nil\n+}\n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    ".golangci.yml",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/console.go",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/main.go",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "context.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "go.mod",
+    "go.sum",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "tokentype_string.go",
+    "util.go",
+    "util_test.go",
+    "visit.go"
+  ],
+  "explanation": {
+    "what": "model.go 内で個別に手書きされていた再帰処理(Context.reset、Kong.interpolate、applyHookToDefaultFlags、Node.Leaves)を、新設の visit.go の Visit 関数と Visitable インターフェースに置き換えた。Node と Value に node() マーカーメソッドを実装させて Visitable とし、Application/Node/Value/Flag のツリーを一箇所の走査ロジック(Visit・visitNodeChildren)経由で辿れるようにした。",
+    "why": "reset・interpolate・hook適用・Leaves列挙のたびに Flags/Positional/Children を辿る再帰コードがほぼ同じ形で重複していた。おそらくこの重複を解消し、今後モデルツリーを走査する処理(この後の envar 優先度判定や enum バリデーションなど)を Visit 一本に集約する目的で導入したと考えられる。",
+    "highlights": [
+      { "file": "visit.go", "note": "Visitor/Next/Visit の型定義。Next を呼ぶことで走査を継続するコールバック形式の巡回API" },
+      { "file": "model.go", "note": "Visitable インターフェースと node() マーカーメソッドの追加箇所" }
+    ],
+    "langNotes": [
+      { "topic": "interface{ node() }", "note": "Go にはマーカーインターフェースという言語機能は無いが、外部から実装できない小さなメソッドを1つだけ持つインターフェースを定義することで、パッケージ内の特定の型(*Node, *Value)だけがその印を持つことを保証する慣習的テクニックとして使われている。" },
+      { "topic": "コールバック型のトラバーサル(Visitor/Next)", "note": "Visit(node, visitor) は visitor 内から next(err) を呼ぶことで子要素への再帰を継続する形式になっている。switch文で型ごとの分岐をしつつ、共通の巡回ロジックを一箇所にまとめる Go でよく見るパターン。" }
+    ],
+    "diagram": null,
+    "evidence": "inferred",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

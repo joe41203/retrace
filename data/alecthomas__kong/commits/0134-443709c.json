@@ -1,0 +1,96 @@
+{
+  "seq": 134,
+  "sha": "443709c0bb12422221caa835ae3f9c5d8d6185c6",
+  "parents": [
+    "9b2e9343a0776986b78d872b09b8a04caf873071"
+  ],
+  "author": {
+    "name": "Alec Thomas",
+    "email": "alec@swapoff.org",
+    "date": "2019-01-12T21:48:24+11:00"
+  },
+  "message": "Allow multiple Vars{} to be passed.",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 3,
+    "deletions": 1
+  },
+  "files": [
+    {
+      "path": "options.go",
+      "status": "M",
+      "additions": 3,
+      "deletions": 1,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/options.go b/options.go\nindex 7cdcfbe..450c34b 100644\n--- a/options.go\n+++ b/options.go\n@@ -25,7 +25,9 @@ type Vars map[string]string\n \n // Apply lets Vars act as an Option.\n func (v Vars) Apply(k *Kong) error {\n-\tk.vars = v\n+\tfor key, value := range v {\n+\t\tk.vars[key] = value\n+\t}\n \treturn nil\n }\n \n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    ".golangci.yml",
+    "COPYING",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/console.go",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/main.go",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "config_test.go",
+    "context.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "go.mod",
+    "go.sum",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "util.go",
+    "util_test.go",
+    "visit.go"
+  ],
+  "explanation": {
+    "what": "Vars.Apply()の実装を、渡されたmapでk.varsを丸ごと置き換える形から、キーごとにk.varsへマージする形に変更した(k.vars = v → for key, value := range v { k.vars[key] = value })。",
+    "why": "おそらく複数のkong.Vars{}オプションを同時に渡した場合、従来は後勝ちで丸ごと上書きされ先に指定した変数が消えてしまっていたため、マージすることで複数のVars{}を組み合わせて使えるようにしたと見られる。commit messageの\"Allow multiple Vars{} to be passed\"がこの意図と整合する。",
+    "highlights": [
+      { "file": "options.go", "note": "Vars.Apply()が上書きからマージへ変更された箇所" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

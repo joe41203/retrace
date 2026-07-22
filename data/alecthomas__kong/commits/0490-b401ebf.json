@@ -1,0 +1,153 @@
+{
+  "seq": 490,
+  "sha": "b401ebfa4443573d701bdacc870ae44a4ed6bf02",
+  "parents": [
+    "8cbde34ab0a442378448797e3c711aea557fe4a6"
+  ],
+  "author": {
+    "name": "Andrew Chen",
+    "email": "48723787+chuenchen309@users.noreply.github.com",
+    "date": "2026-07-19T19:16:56+08:00"
+  },
+  "message": "Fix filecontent mapper panicking on a non-[]byte target (#625)\n\n### Problem\n\n`type:\"filecontent\"` on a field that isn't `[]byte` panics with an\nopaque `reflect` error at parse time, instead of the mapper's own \"must\nbe applied to []byte\" validation error:\n\n```go\nvar cli struct { F string `type:\"filecontent\"` }\nkong.Parse(&cli, ...)   // panics: reflect: call of reflect.Value.Elem on string Value\n\nvar cli2 struct { F []string `type:\"filecontent\"` }\nkong.Parse(&cli2, ...)  // panics: reflect.Value.SetBytes of non-byte slice\n```\n\n### Cause\n\nThe guard in `fileContentMapper` (`mapper.go`) has two defects on one\nline:\n\n```go\nif target.Kind() != reflect.Slice && target.Elem().Kind() != reflect.Uint8 {\n```\n\n- `&&` should be `||`: a slice with a non-byte element makes the first\noperand false, short-circuits, skips the error, and falls through to\n`SetBytes` on a non-byte slice.\n- `target.Elem()` should be `target.Type().Elem()`:\n`reflect.Value.Elem()` panics on a scalar `Kind` like `string`.\n\nThe sibling mappers (`path`, `existingfile`, `existingdir`) validate\ntheir target kind correctly and return a clean error; `filecontent` was\nthe only one that panicked.\n\n### Fix\n\n```go\nif target.Kind() != reflect.Slice || target.Type().Elem().Kind() != reflect.Uint8 {\n```\n\nNow both misuse cases return the intended `--f: \"filecontent\" must be\napplied to []byte not <type>` error, and the `[]byte` case is unchanged.\nAdded `TestFileContentMapperRejectsNonByteSlice` (string + []string).\n`go test ./...` passes; `golangci-lint run ./...` is clean; `gofmt`\nclean.\n\nThis only hardens the guard — it does not add the string support\nrequested in #482; that remains a separate feature decision.\n\n---\n\n*Disclosure: found, written and verified by an AI coding agent (Claude\nCode) running on this account — it wrote the repro, ran it, and produced\nthis description from running the code, not reading it. I review every\nchange and am accountable for it. Happy to adjust anything.*\n\nSigned-off-by: Andrew Chen <48723787+chuenchen309@users.noreply.github.com>\nCo-authored-by: Claude Opus 4.8 (1M context) <noreply@anthropic.com>",
+  "pr": {
+    "number": 625,
+    "title": "Fix filecontent mapper panicking on a non-[]byte target",
+    "body": "### Problem\n\n`type:\"filecontent\"` on a field that isn't `[]byte` panics with an opaque `reflect` error at parse time, instead of the mapper's own \"must be applied to []byte\" validation error:\n\n```go\nvar cli struct { F string `type:\"filecontent\"` }\nkong.Parse(&cli, ...)   // panics: reflect: call of reflect.Value.Elem on string Value\n\nvar cli2 struct { F []string `type:\"filecontent\"` }\nkong.Parse(&cli2, ...)  // panics: reflect.Value.SetBytes of non-byte slice\n```\n\n### Cause\n\nThe guard in `fileContentMapper` (`mapper.go`) has two defects on one line:\n\n```go\nif target.Kind() != reflect.Slice && target.Elem().Kind() != reflect.Uint8 {\n```\n\n- `&&` should be `||`: a slice with a non-byte element makes the first operand false, short-circuits, skips the error, and falls through to `SetBytes` on a non-byte slice.\n- `target.Elem()` should be `target.Type().Elem()`: `reflect.Value.Elem()` panics on a scalar `Kind` like `string`.\n\nThe sibling mappers (`path`, `existingfile`, `existingdir`) validate their target kind correctly and return a clean error; `filecontent` was the only one that panicked.\n\n### Fix\n\n```go\nif target.Kind() != reflect.Slice || target.Type().Elem().Kind() != reflect.Uint8 {\n```\n\nNow both misuse cases return the intended `--f: \"filecontent\" must be applied to []byte not <type>` error, and the `[]byte` case is unchanged. Added `TestFileContentMapperRejectsNonByteSlice` (string + []string). `go test ./...` passes; `golangci-lint run ./...` is clean; `gofmt` clean.\n\nThis only hardens the guard — it does not add the string support requested in #482; that remains a separate feature decision.\n\n---\n\n*Disclosure: found, written and verified by an AI coding agent (Claude Code) running on this account — it wrote the repro, ran it, and produced this description from running the code, not reading it. I review every change and am accountable for it. Happy to adjust anything.*\n",
+    "url": "https://github.com/alecthomas/kong/pull/625"
+  },
+  "linkedIssues": [
+    {
+      "number": 482,
+      "title": "String type support for `filecontent`",
+      "body": "Currently `filecontent` requires a field to be `[]byte`. I would propose that it also allows `string` field in which case file contents is simply converted with `string(...)` in Go. It allows one to signal that the flag expects a textual file as input.",
+      "url": "https://github.com/alecthomas/kong/issues/482"
+    }
+  ],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 23,
+    "deletions": 1
+  },
+  "files": [
+    {
+      "path": "mapper.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "mapper_test.go",
+      "status": "M",
+      "additions": 22,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/mapper.go b/mapper.go\nindex 075fb38..af8f8f1 100644\n--- a/mapper.go\n+++ b/mapper.go\n@@ -717,7 +717,7 @@ func existingDirMapper(r *Registry) MapperFunc {\n \n func fileContentMapper(r *Registry) MapperFunc {\n \treturn func(ctx *DecodeContext, target reflect.Value) error {\n-\t\tif target.Kind() != reflect.Slice && target.Elem().Kind() != reflect.Uint8 {\n+\t\tif target.Kind() != reflect.Slice || target.Type().Elem().Kind() != reflect.Uint8 {\n \t\t\treturn fmt.Errorf(\"\\\"filecontent\\\" must be applied to []byte not %s\", target.Type())\n \t\t}\n \t\tvar path string\ndiff --git a/mapper_test.go b/mapper_test.go\nindex ef1db36..33be792 100644\n--- a/mapper_test.go\n+++ b/mapper_test.go\n@@ -510,6 +510,28 @@ func TestFileContentMapper(t *testing.T) {\n \tassert.Contains(t, err.Error(), \"is a directory\")\n }\n \n+func TestFileContentMapperRejectsNonByteSlice(t *testing.T) {\n+\t// A non-[]byte target must return the mapper's validation error, not panic.\n+\tt.Run(\"string\", func(t *testing.T) {\n+\t\tvar cli struct {\n+\t\t\tFile string `type:\"filecontent\"`\n+\t\t}\n+\t\tp := mustNew(t, &cli)\n+\t\t_, err := p.Parse([]string{\"--file\", \"testdata/file.txt\"})\n+\t\tassert.Error(t, err)\n+\t\tassert.Contains(t, err.Error(), `\"filecontent\" must be applied to []byte not string`)\n+\t})\n+\tt.Run(\"string slice\", func(t *testing.T) {\n+\t\tvar cli struct {\n+\t\t\tFile []string `type:\"filecontent\"`\n+\t\t}\n+\t\tp := mustNew(t, &cli)\n+\t\t_, err := p.Parse([]string{\"--file\", \"testdata/file.txt\"})\n+\t\tassert.Error(t, err)\n+\t\tassert.Contains(t, err.Error(), `\"filecontent\" must be applied to []byte not []string`)\n+\t})\n+}\n+\n func TestPathMapperUsingStringPointer(t *testing.T) {\n \ttype CLI struct {\n \t\tPath *string `type:\"path\"`\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/FUNDING.yml",
+    ".github/workflows/ci.yml",
+    ".gitignore",
+    ".golangci.yml",
+    "COPYING",
+    "README.md",
+    "_examples/asciilogo/main.go",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/README.md",
+    "_examples/server/console.go",
+    "_examples/server/go.mod",
+    "_examples/server/go.sum",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/commandstring/main.go",
+    "_examples/shell/help/README.md",
+    "_examples/shell/help/main.go",
+    "benchmark_test.go",
+    "bin/.go-1.26.5.pkg",
+    "bin/.golangci-lint-1.64.5.pkg",
+    "bin/.lefthook-2.1.10.pkg",
+    "bin/README.hermit.md",
+    "bin/activate-hermit",
+    "bin/go",
+    "bin/gofmt",
+    "bin/golangci-lint",
+    "bin/hermit",
+    "bin/hermit.hcl",
+    "bin/lefthook",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "config_test.go",
+    "context.go",
+    "defaults.go",
+    "defaults_test.go",
+    "doc.go",
+    "error.go",
+    "exit.go",
+    "global.go",
+    "global_test.go",
+    "go.mod",
+    "go.sum",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "helpwrap1.18_test.go",
+    "helpwrap1.19_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "lefthook.yml",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_linux_test.go",
+    "mapper_test.go",
+    "mapper_windows_test.go",
+    "model.go",
+    "model_test.go",
+    "negatable.go",
+    "options.go",
+    "options_test.go",
+    "renovate.json5",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "signature_test.go",
+    "tag.go",
+    "tag_test.go",
+    "testdata/file.txt",
+    "util.go",
+    "util_test.go",
+    "visit.go"
+  ],
+  "explanation": {
+    "what": "type:\"filecontent\" mapper が []byte 以外のフィールド(string や []string など)に適用された際、意図していた「[]byte でなければならない」というバリデーションエラーではなく生の reflect panic を出していた不具合を修正した。fileContentMapper のガード条件を `target.Kind() != reflect.Slice && target.Elem().Kind() != reflect.Uint8` から `target.Kind() != reflect.Slice || target.Type().Elem().Kind() != reflect.Uint8` に変更し、TestFileContentMapperRejectsNonByteSlice(string / []string の2ケース)を追加した。",
+    "why": "PR本文によれば、旧条件には2つの欠陥があった。1つは `&&` であるべきところが `||` になっており、byte 以外の要素を持つスライス(例: []string)だと最初のオペランドが false になって短絡評価でエラーがスキップされ、非 byte スライスに対して SetBytes が呼ばれてしまう。もう1つは `target.Elem()` が `target.Type().Elem()` であるべきで、reflect.Value.Elem() は string のようなスカラー Kind に対して呼ぶと panic する。path/existingfile/existingdir など他の mapper は正しく検証してクリーンなエラーを返しており、filecontent だけがこの欠陥を持っていた。issue #482 の string 対応要望とは別の話であり、この修正はガードの堅牢化のみで機能追加は含まないと明記されている。",
+    "highlights": [
+      { "file": "mapper.go", "note": "fileContentMapper のガード条件。`&&`→`||`、`target.Elem()`→`target.Type().Elem()` の2点修正" }
+    ],
+    "langNotes": [
+      { "topic": "filecontent mapper", "note": "kong の type:\"filecontent\" は指定したパスのファイル内容をそのままフィールドに読み込む mapper で、対象フィールドは []byte でなければならない。このコミット以前は []byte 以外を指定すると reflect の内部エラーで panic していたが、修正後は kong 自身のエラーメッセージ(\"filecontent\" must be applied to []byte not <type>)を返すようになった。" },
+      { "topic": "reflect.Value.Elem() vs Type().Elem()", "note": "reflect.Value.Elem() はポインタ/インターフェースの参照先を取り出すメソッドで、string のようなスカラー値に呼ぶと panic する。スライスの要素型を知りたいときは reflect.Value.Type().Elem() を使うのが正しく、両者の取り違えがこのバグの一因だった。" }
+    ],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [
+      { "type": "pr", "number": 625, "url": "https://github.com/alecthomas/kong/pull/625" },
+      { "type": "issue", "number": 482, "url": "https://github.com/alecthomas/kong/issues/482" }
+    ],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

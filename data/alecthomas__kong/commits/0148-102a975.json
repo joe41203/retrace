@@ -1,0 +1,120 @@
+{
+  "seq": 148,
+  "sha": "102a9758446ae67aebac1c20a2fd9ed7f6f23efc",
+  "parents": [
+    "95de7d2f0dd4cc5b9a74133e7117507bb3724a6e"
+  ],
+  "author": {
+    "name": "Alec Thomas",
+    "email": "alec@swapoff.org",
+    "date": "2019-06-21T12:09:04+10:00"
+  },
+  "message": "Validate after everything is applied.\n\nFixes #27.",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 4,
+    "additions": 20,
+    "deletions": 8
+  },
+  "files": [
+    {
+      "path": "context.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "defaults.go",
+      "status": "M",
+      "additions": 2,
+      "deletions": 3,
+      "binary": false
+    },
+    {
+      "path": "kong.go",
+      "status": "M",
+      "additions": 2,
+      "deletions": 2,
+      "binary": false
+    },
+    {
+      "path": "kong_test.go",
+      "status": "M",
+      "additions": 15,
+      "deletions": 2,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/context.go b/context.go\nindex 4861f00..c63b1ab 100644\n--- a/context.go\n+++ b/context.go\n@@ -135,7 +135,7 @@ func (c *Context) Validate() error {\n \terr := Visit(c.Model, func(node Visitable, next Next) error {\n \t\tif value, ok := node.(*Value); ok {\n \t\t\tif value.Enum != \"\" && !value.EnumMap()[fmt.Sprintf(\"%v\", value.Target.Interface())] {\n-\t\t\t\treturn fmt.Errorf(\"%s must be one of %s but got %q\", value.Summary(), value.Enum, value.Target.Interface())\n+\t\t\t\treturn fmt.Errorf(\"%s must be one of %s but got %q\", value.ShortSummary(), value.Enum, value.Target.Interface())\n \t\t\t}\n \t\t}\n \t\treturn next(nil)\ndiff --git a/defaults.go b/defaults.go\nindex a4a314e..f6728d7 100644\n--- a/defaults.go\n+++ b/defaults.go\n@@ -14,9 +14,8 @@ func ApplyDefaults(target interface{}, options ...Option) error {\n \tif err != nil {\n \t\treturn err\n \t}\n-\terr = ctx.Validate()\n-\tif err != nil {\n+\tif err = ctx.ApplyDefaults(); err != nil {\n \t\treturn err\n \t}\n-\treturn ctx.ApplyDefaults()\n+\treturn ctx.Validate()\n }\ndiff --git a/kong.go b/kong.go\nindex 197b187..713c337 100644\n--- a/kong.go\n+++ b/kong.go\n@@ -209,10 +209,10 @@ func (k *Kong) Parse(args []string) (ctx *Context, err error) {\n \tif err = k.applyHook(ctx, \"BeforeApply\"); err != nil {\n \t\treturn nil, &ParseError{error: err, Context: ctx}\n \t}\n-\tif err = ctx.Validate(); err != nil {\n+\tif _, err = ctx.Apply(); err != nil {\n \t\treturn nil, &ParseError{error: err, Context: ctx}\n \t}\n-\tif _, err = ctx.Apply(); err != nil {\n+\tif err = ctx.Validate(); err != nil {\n \t\treturn nil, &ParseError{error: err, Context: ctx}\n \t}\n \tif err = k.applyHook(ctx, \"AfterApply\"); err != nil {\ndiff --git a/kong_test.go b/kong_test.go\nindex e6c3858..11c3171 100644\n--- a/kong_test.go\n+++ b/kong_test.go\n@@ -680,7 +680,7 @@ func TestEnum(t *testing.T) {\n \t\tFlag string `enum:\"a,b,c\"`\n \t}\n \t_, err := mustNew(t, &cli).Parse([]string{\"--flag\", \"d\"})\n-\trequire.EqualError(t, err, \"--flag=STRING must be one of a,b,c but got \\\"\\\"\")\n+\trequire.EqualError(t, err, \"--flag must be one of a,b,c but got \\\"d\\\"\")\n }\n \n type commandWithHook struct {\n@@ -734,5 +734,18 @@ func TestDefaultEnumValidated(t *testing.T) {\n \t}\n \tp := mustNew(t, &cli)\n \t_, err := p.Parse(nil)\n-\trequire.Error(t, err)\n+\trequire.EqualError(t, err, \"--flag must be one of valid but got \\\"invalid\\\"\")\n+}\n+\n+func TestEnvarEnumValidated(t *testing.T) {\n+\trestore := tempEnv(map[string]string{\n+\t\t\"FLAG\": \"invalid\",\n+\t})\n+\tdefer restore()\n+\tvar cli struct {\n+\t\tFlag string `env:\"FLAG\" enum:\"valid\" default:\"valid\"`\n+\t}\n+\tp := mustNew(t, &cli)\n+\t_, err := p.Parse(nil)\n+\trequire.EqualError(t, err, \"--flag must be one of valid but got \\\"invalid\\\"\")\n }\n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    ".golangci.yml",
+    "COPYING",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/console.go",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/main.go",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "config_test.go",
+    "context.go",
+    "defaults.go",
+    "defaults_test.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "go.mod",
+    "go.sum",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "util.go",
+    "util_test.go",
+    "visit.go"
+  ],
+  "explanation": {
+    "what": "Kong.Parse() 内で ctx.Validate() と ctx.Apply() の呼び出し順序を入れ替え、Apply(トレースした値を実際に target struct のフィールドへ書き込む処理)を先に、Validate(enum などのバリデーション)を後に実行するようにした。あわせて ApplyDefaults() でも ApplyDefaults→Validate の順に変更し、Value.ShortSummary() を使うようエラーメッセージも修正した。kong_test.go には envar 経由で不正な enum 値が渡された場合のテスト(TestEnvarEnumValidated)を追加している。",
+    "why": "コミットメッセージ \"Fixes #27\" の通り、既存の実装ではまだフラグ値が target struct に反映される前に Validate が走っていたため、envar やデフォルト値経由で設定された不正な enum 値がチェックをすり抜けてしまう不具合があった。全ての値が Apply された後に Validate することで、フラグ・envar・デフォルト値のどの経路で値が設定されても一貫して enum チェックが効くようにした。",
+    "highlights": [
+      { "file": "kong.go", "note": "ctx.Apply() → ctx.Validate() の順序に入れ替え" },
+      { "file": "context.go", "note": "Validate のエラーメッセージが value.Summary() から value.ShortSummary() に変更" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

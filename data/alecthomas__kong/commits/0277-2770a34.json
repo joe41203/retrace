@@ -1,0 +1,160 @@
+{
+  "seq": 277,
+  "sha": "2770a34ce6d4b41741a2fc65ca666868f1c55fa2",
+  "parents": [
+    "749d3f0752b5ee005551041230343b0239592f3f"
+  ],
+  "author": {
+    "name": "Dan",
+    "email": "artifactori62@gmail.com",
+    "date": "2021-10-22T11:28:58+07:00"
+  },
+  "message": "Add envprefix tag",
+  "pr": {
+    "number": 227,
+    "title": "Prefixing environment variables",
+    "body": "This is one implementation to solve issue #226 by adding `envprefix` tag.\r\n\r\n```go\r\ntype Authentication struct {\r\n\tURL string `required:\"\" env:\"URL\"`\r\n\tKey string `env:\"KEY\"`\r\n}\r\n\r\ntype Flag struct {\r\n\tServerA Authentication `embed:\"\" prefix:\"server-a-\" envprefix:\"SERVER_A_\"`\r\n\tServerB Authentication `embed:\"\" prefix:\"server-b-\" envprefix:\"SERVER_B_\"`\r\n}\r\n```\r\n\r\nThis snippet may results in:\r\n```\r\n      --server-a-url=STRING    ($SERVER_A_URL)\r\n      --server-a-key=STRING    ($SERVER_A_KEY)\r\n      --server-b-url=STRING    ($SERVER_B_URL)\r\n      --server-b-key=STRING    ($SERVER_B_KEY)\r\n```",
+    "url": "https://github.com/alecthomas/kong/pull/227"
+  },
+  "linkedIssues": [
+    {
+      "number": 226,
+      "title": "Prefixing environment variables",
+      "body": "Flags can be prefixed which is really nice, but how about envars?\r\n\r\n```go\r\ntype Authentication struct {\r\n\tURL string `required:\"\" env:\"URL\"`\r\n\tKey string `env:\"KEY\"`\r\n}\r\n\r\ntype Flag struct {\r\n\tServerA Authentication `embed:\"\" prefix:\"server-a-\"`\r\n\tServerB Authentication `embed:\"\" prefix:\"server-b-\"`\r\n}\r\n```\r\n\r\nThis snippet above results in:\r\n```\r\n      --server-a-url=STRING    ($URL)\r\n      --server-a-key=STRING    ($KEY)\r\n      --server-b-url=STRING    ($URL)\r\n      --server-b-key=STRING    ($KEY)\r\n```\r\n\r\nIt'll be nice if envars can be prefixed too, so they're not conflicting anymore.",
+      "url": "https://github.com/alecthomas/kong/issues/226"
+    }
+  ],
+  "stats": {
+    "filesChanged": 5,
+    "additions": 53,
+    "deletions": 0
+  },
+  "files": [
+    {
+      "path": "README.md",
+      "status": "M",
+      "additions": 1,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "build.go",
+      "status": "M",
+      "additions": 3,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "help_test.go",
+      "status": "M",
+      "additions": 14,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "resolver_test.go",
+      "status": "M",
+      "additions": 33,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "tag.go",
+      "status": "M",
+      "additions": 2,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/README.md b/README.md\nindex 57ec0a8..a065193 100644\n--- a/README.md\n+++ b/README.md\n@@ -450,6 +450,7 @@ Tag                    | Description\n `group:\"X\"`            | Logical group for a flag or command.\n `xor:\"X,Y,...\"`        | Exclusive OR groups for flags. Only one flag in the group can be used which is restricted within the same command. When combined with `required`, at least one of the `xor` group will be required.\n `prefix:\"X\"`           | Prefix for all sub-flags.\n+`envprefix:\"X\"`        | Envar prefix for all sub-flags.\n `set:\"K=V\"`            | Set a variable for expansion by child elements. Multiples can occur.\n `embed:\"\"`             | If present, this field's children will be embedded in the parent. Useful for composition.\n `passthrough:\"\"`       | If present, this positional argument stops flag parsing when encountered, as if `--` was processed before. Useful for external command wrappers, like `exec`.\ndiff --git a/build.go b/build.go\nindex 95ca7e1..aa5a143 100644\n--- a/build.go\n+++ b/build.go\n@@ -97,6 +97,7 @@ func flattenedFields(v reflect.Value) (out []flattenedField, err error) {\n \t\t\t}\n \t\t\t// Accumulate prefixes.\n \t\t\tsubf.tag.Prefix = tag.Prefix + subf.tag.Prefix\n+\t\t\tsubf.tag.EnvPrefix = tag.EnvPrefix + subf.tag.EnvPrefix\n \t\t\t// Combine parent vars.\n \t\t\tsubf.tag.Vars = tag.Vars.CloneWith(subf.tag.Vars)\n \t\t}\n@@ -138,6 +139,8 @@ MAIN:\n \t\t\tname = tag.Prefix + name\n \t\t}\n \n+\t\ttag.Env = tag.EnvPrefix + tag.Env\n+\n \t\t// Nested structs are either commands or args, unless they implement the Mapper interface.\n \t\tif field.value.Kind() == reflect.Struct && (tag.Cmd || tag.Arg) && k.registry.ForValue(fv) == nil {\n \t\t\ttyp := CommandNode\ndiff --git a/help_test.go b/help_test.go\nindex 728681e..875ca1b 100644\n--- a/help_test.go\n+++ b/help_test.go\n@@ -461,6 +461,20 @@ func TestEnvarAutoHelp(t *testing.T) {\n \trequire.Contains(t, w.String(), \"A flag ($FLAG).\")\n }\n \n+func TestEnvarAutoHelpWithEnvPrefix(t *testing.T) {\n+\ttype Anonymous struct {\n+\t\tFlag string `env:\"FLAG\" help:\"A flag.\"`\n+\t}\n+\tvar cli struct {\n+\t\tAnonymous `envprefix:\"ANON_\"`\n+\t}\n+\tw := &strings.Builder{}\n+\tp := mustNew(t, &cli, kong.Writers(w, w), kong.Exit(func(int) {}))\n+\t_, err := p.Parse([]string{\"--help\"})\n+\trequire.NoError(t, err)\n+\trequire.Contains(t, w.String(), \"A flag ($ANON_FLAG).\")\n+}\n+\n func TestCustomHelpFormatter(t *testing.T) {\n \tvar cli struct {\n \t\tFlag string `env:\"FLAG\" help:\"A flag.\"`\ndiff --git a/resolver_test.go b/resolver_test.go\nindex 2606ad4..fa83465 100644\n--- a/resolver_test.go\n+++ b/resolver_test.go\n@@ -74,6 +74,39 @@ func TestEnvarsTag(t *testing.T) {\n \trequire.Equal(t, []int{5, 2, 9}, cli.Slice)\n }\n \n+func TestEnvarsEnvPrefix(t *testing.T) {\n+\ttype Anonymous struct {\n+\t\tSlice []int `env:\"NUMBERS\"`\n+\t}\n+\tvar cli struct {\n+\t\tAnonymous `envprefix:\"KONG_\"`\n+\t}\n+\tparser, restoreEnv := newEnvParser(t, &cli, envMap{\"KONG_NUMBERS\": \"1,2,3\"})\n+\tdefer restoreEnv()\n+\n+\t_, err := parser.Parse([]string{})\n+\trequire.NoError(t, err)\n+\trequire.Equal(t, []int{1, 2, 3}, cli.Slice)\n+}\n+\n+func TestEnvarsNestedEnvPrefix(t *testing.T) {\n+\ttype NestedAnonymous struct {\n+\t\tString string `env:\"STRING\"`\n+\t}\n+\ttype Anonymous struct {\n+\t\tNestedAnonymous `envprefix:\"ANON_\"`\n+\t}\n+\tvar cli struct {\n+\t\tAnonymous `envprefix:\"KONG_\"`\n+\t}\n+\tparser, restoreEnv := newEnvParser(t, &cli, envMap{\"KONG_ANON_STRING\": \"abc\"})\n+\tdefer restoreEnv()\n+\n+\t_, err := parser.Parse([]string{})\n+\trequire.NoError(t, err)\n+\trequire.Equal(t, \"abc\", cli.String)\n+}\n+\n func TestEnvarsWithDefault(t *testing.T) {\n \tvar cli struct {\n \t\tFlag string `env:\"KONG_FLAG\" default:\"default\"`\ndiff --git a/tag.go b/tag.go\nindex 84c068d..03b8ca6 100644\n--- a/tag.go\n+++ b/tag.go\n@@ -32,6 +32,7 @@ type Tag struct {\n \tXor         []string\n \tVars        Vars\n \tPrefix      string // Optional prefix on anonymous structs. All sub-flags will have this prefix.\n+\tEnvPrefix   string\n \tEmbed       bool\n \tAliases     []string\n \tNegatable   bool\n@@ -196,6 +197,7 @@ func hydrateTag(t *Tag, typeName string, isBool bool) error {\n \t\tt.Xor = append(t.Xor, strings.FieldsFunc(xor, tagSplitFn)...)\n \t}\n \tt.Prefix = t.Get(\"prefix\")\n+\tt.EnvPrefix = t.Get(\"envprefix\")\n \tt.Embed = t.Has(\"embed\")\n \tnegatable := t.Has(\"negatable\")\n \tif negatable && !isBool {\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/FUNDING.yml",
+    ".github/workflows/ci.yml",
+    ".gitignore",
+    ".golangci.yml",
+    "COPYING",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/README.md",
+    "_examples/server/console.go",
+    "_examples/server/go.mod",
+    "_examples/server/go.sum",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/main.go",
+    "benchmark_test.go",
+    "bin/.go@latest.pkg",
+    "bin/.golangci-lint-1.42.0.pkg",
+    "bin/README.hermit.md",
+    "bin/activate-hermit",
+    "bin/go",
+    "bin/gofmt",
+    "bin/golangci-lint",
+    "bin/hermit",
+    "bin/hermit.hcl",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "config_test.go",
+    "context.go",
+    "defaults.go",
+    "defaults_test.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "go.mod",
+    "go.sum",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "testdata/file.txt",
+    "util.go",
+    "util_test.go",
+    "visit.go"
+  ],
+  "explanation": {
+    "what": "Tag に EnvPrefix フィールドを追加し、新しい struct タグ `envprefix:\"X\"` として解析できるようにした。flattenedFields で親の EnvPrefix を子フィールドに累積し、buildNode 内で `tag.Env = tag.EnvPrefix + tag.Env` として env タグの値にプレフィックスを合成する。README にもタグ一覧の説明を追記している。",
+    "why": "linkedIssue #226 が示す通り、embed + prefix で複数の同じ構造体(例: 複数サーバの認証情報)をフラグとして埋め込むと、env タグで指定した環境変数名が衝突してしまう問題があった。prefix タグがフラグ名を分離できるのと同様に、envprefix タグで環境変数名も分離できるようにした。",
+    "highlights": [
+      { "file": "tag.go", "note": "Tag.EnvPrefix フィールドと `t.Get(\"envprefix\")` によるタグ解析の追加。" },
+      { "file": "build.go", "note": "flattenedFields での EnvPrefix の親子累積と、buildNode での `tag.Env = tag.EnvPrefix + tag.Env` という合成処理。" }
+    ],
+    "langNotes": [
+      { "topic": "envprefix タグ(struct タグによる環境変数名の合成)", "note": "kong は embed されたネスト構造体に prefix / envprefix タグを付けることで、フラグ名・環境変数名の双方を自動的にプレフィックス付きにできる。struct タグは文字列連結だけの単純な仕組みだが、reflect でネストを辿りながら親のプレフィックスを子に伝播させることで名前空間分離を実現している。" }
+    ],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [
+      { "type": "pr", "number": 227, "url": "https://github.com/alecthomas/kong/pull/227" },
+      { "type": "issue", "number": 226, "url": "https://github.com/alecthomas/kong/issues/226" }
+    ],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

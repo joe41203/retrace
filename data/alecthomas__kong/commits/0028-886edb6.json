@@ -1,0 +1,85 @@
+{
+  "seq": 28,
+  "sha": "886edb6f5abe5433eaf04ff8fc540efaffc99fcf",
+  "parents": [
+    "6c80dd3f311dd09c5fa795eacd75d2a11e6c65d6"
+  ],
+  "author": {
+    "name": "Gerald Kaszuba",
+    "email": "gak@gak0.com",
+    "date": "2018-05-23T10:22:57+10:00"
+  },
+  "message": "Extend Tag for non-core decoders (Fixes #14)",
+  "pr": {
+    "number": 15,
+    "title": "Extend Tag for non-core decoders (Fixes #14)",
+    "body": "It now doesn't fail with an incorrect key which I don't think is ideal.",
+    "url": "https://github.com/alecthomas/kong/pull/15"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 3,
+    "additions": 51,
+    "deletions": 40
+  },
+  "files": [
+    {
+      "path": "global_test.go",
+      "status": "M",
+      "additions": 2,
+      "deletions": 2,
+      "binary": false
+    },
+    {
+      "path": "kong_test.go",
+      "status": "M",
+      "additions": 0,
+      "deletions": 8,
+      "binary": false
+    },
+    {
+      "path": "tag.go",
+      "status": "M",
+      "additions": 49,
+      "deletions": 30,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/global_test.go b/global_test.go\nindex fdc5336..e371c62 100644\n--- a/global_test.go\n+++ b/global_test.go\n@@ -9,7 +9,7 @@ import (\n \n func TestParseHandlingBadBuild(t *testing.T) {\n \tvar cli struct {\n-\t\tEnabled bool `kong:\"unknown\"`\n+\t\tEnabled bool `kong:\"fail='\"`\n \t}\n \n \targs := os.Args\n@@ -21,7 +21,7 @@ func TestParseHandlingBadBuild(t *testing.T) {\n \n \tdefer func() {\n \t\tif r := recover(); r != nil {\n-\t\t\trequire.Equal(t, Error{msg: \"unknown is an unknown kong key\"}, r)\n+\t\t\trequire.Equal(t, Error{msg: \"fail=' is not quoted properly\"}, r)\n \t\t}\n \t}()\n \ndiff --git a/kong_test.go b/kong_test.go\nindex bb9a6e1..77638c3 100644\n--- a/kong_test.go\n+++ b/kong_test.go\n@@ -276,14 +276,6 @@ func TestCommaInQuotes(t *testing.T) {\n \trequire.Equal(t, \"1,2\", cli.Numbers)\n }\n \n-func TestUnknownKey(t *testing.T) {\n-\tvar cli struct {\n-\t\tNumbers string `kong:\"gak='hi'\"`\n-\t}\n-\t_, err := New(&cli)\n-\trequire.Error(t, err)\n-}\n-\n func TestBadString(t *testing.T) {\n \tvar cli struct {\n \t\tNumbers string `kong:\"default='yay'n\"`\ndiff --git a/tag.go b/tag.go\nindex ef10f99..46e1667 100644\n--- a/tag.go\n+++ b/tag.go\n@@ -1,7 +1,9 @@\n package kong\n \n import (\n+\t\"fmt\"\n \t\"reflect\"\n+\t\"strconv\"\n \t\"strings\"\n \t\"unicode/utf8\"\n )\n@@ -18,6 +20,9 @@ type Tag struct {\n \tPlaceholder string\n \tEnv         string\n \tShort       rune\n+\n+\t// Storage for all tag keys for arbitrary lookups.\n+\titems map[string]string\n }\n \n func parseCSV(s string) map[string]string {\n@@ -86,44 +91,58 @@ func parseCSV(s string) map[string]string {\n }\n \n func parseTag(fv reflect.Value, s string) *Tag {\n-\tt := &Tag{}\n+\tt := &Tag{\n+\t\titems: map[string]string{},\n+\t}\n \tif s == \"\" {\n \t\treturn t\n \t}\n \n-\tfor k, v := range parseCSV(s) {\n-\t\tswitch k {\n-\t\tcase \"cmd\":\n-\t\t\tt.Cmd = true\n-\t\tcase \"arg\":\n-\t\t\tt.Arg = true\n-\t\tcase \"required\":\n-\t\t\tt.Required = true\n-\t\tcase \"optional\":\n-\t\t\tt.Optional = true\n-\t\tcase \"default\":\n-\t\t\tt.Default = v\n-\t\tcase \"help\":\n-\t\t\tt.Help = v\n-\t\tcase \"type\":\n-\t\t\tt.Type = v\n-\t\tcase \"placeholder\":\n-\t\t\tt.Placeholder = v\n-\t\tcase \"env\":\n-\t\t\tt.Env = v\n-\t\tcase \"rune\":\n-\t\t\tt.Short, _ = utf8.DecodeRuneInString(v)\n-\t\t\tif t.Short == utf8.RuneError {\n-\t\t\t\tt.Short = 0\n-\t\t\t}\n-\t\tdefault:\n-\t\t\tfail(\"%v is an unknown kong key\", k)\n-\t\t}\n-\t}\n+\tt.items = parseCSV(s)\n \n+\tt.Cmd = t.Has(\"cmd\")\n+\tt.Arg = t.Has(\"arg\")\n+\tt.Required = t.Has(\"required\")\n+\tt.Optional = t.Has(\"optional\")\n+\tt.Default, _ = t.Get(\"default\")\n+\tt.Help, _ = t.Get(\"help\")\n+\tt.Type, _ = t.Get(\"type\")\n+\tt.Env, _ = t.Get(\"env\")\n+\tt.Short, _ = t.GetRune(\"short\")\n+\n+\tt.Placeholder, _ = t.Get(\"placeholder\")\n \tif t.Placeholder == \"\" {\n \t\tt.Placeholder = strings.ToUpper(dashedString(fv.Type().Name()))\n \t}\n \n \treturn t\n }\n+\n+func (t *Tag) Has(k string) bool {\n+\t_, ok := t.items[k]\n+\treturn ok\n+}\n+\n+func (t *Tag) Get(k string) (string, error) {\n+\treturn t.items[k], nil\n+}\n+\n+func (t *Tag) GetBool(k string) (bool, error) {\n+\treturn strconv.ParseBool(t.items[k])\n+}\n+\n+func (t *Tag) GetFloat(k string) (float64, error) {\n+\treturn strconv.ParseFloat(t.items[k], 64)\n+}\n+\n+func (t *Tag) GetInt(k string) (int64, error) {\n+\treturn strconv.ParseInt(t.items[k], 10, 64)\n+}\n+\n+func (t *Tag) GetRune(k string) (rune, error) {\n+\tr, _ := utf8.DecodeRuneInString(t.items[k])\n+\tif r == utf8.RuneError {\n+\t\treturn 0, fmt.Errorf(\"%v has a rune error\", t.items[k])\n+\t}\n+\treturn r, nil\n+}\n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    "README.md",
+    "_examples/shell/main.go",
+    "build.go",
+    "camelcase.go",
+    "context.go",
+    "decoders.go",
+    "decoders_test.go",
+    "global.go",
+    "global_test.go",
+    "help.go",
+    "kong.go",
+    "kong_test.go",
+    "model.go",
+    "options.go",
+    "options_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tokentype_string.go"
+  ],
+  "explanation": {
+    "what": "Tag 構造体に生のキー・値を保持する items マップを追加し、Has/Get/GetBool/GetFloat/GetInt/GetRune というアクセサ群を新設した。parseTag は既知キー(cmd/arg/required/... )をこれらのアクセサ経由で読み取るように書き換えられ、未知のキーがあってもエラーにしなくなった。あわせて未知キーをエラーとする既存テスト(TestUnknownKey)を削除している。",
+    "why": "PR本文に、非コアのデコーダ(kong 本体が知らない独自タグキー)を使えるようにするための変更だと明記されている。カスタムデコーダが `type` 以外の独自キー(例: `sep` など)をタグから読み取れるようにするため、既知キー以外を拒否しない設計に変えたと考えられる。PR本文自身も「不正なキーで失敗しなくなったのは理想的ではない」と留保を述べている。",
+    "highlights": [
+      { "file": "tag.go", "note": "items マップと Has/Get 系アクセサの追加により、カスタムデコーダが任意のタグキーを読み取れるようになった" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [{ "type": "pr", "number": 15, "url": "https://github.com/alecthomas/kong/pull/15" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

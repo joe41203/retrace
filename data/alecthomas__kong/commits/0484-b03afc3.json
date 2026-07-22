@@ -1,0 +1,159 @@
+{
+  "seq": 484,
+  "sha": "b03afc3d2c330aad564546e92cee4602a7cec616",
+  "parents": [
+    "66d2f03dc92c486fd77272b0a0af6c4dd97c9177"
+  ],
+  "author": {
+    "name": "Charlie Tonneslan",
+    "email": "cst0520@gmail.com",
+    "date": "2026-07-04T20:51:00-04:00"
+  },
+  "message": "treat single-character aliases as short flags (#605)\n\n`aliases:\"n,name\"` set both n and name up as long flags, so the\nshort form -n didn't match. Single-rune aliases now resolve as short\nflags instead, since that's clearly the intent and there's no other\nway to declare a short alias today.\n\nCloses #589\n\nSigned-off-by: Charlie Tonneslan <cst0520@gmail.com>",
+  "pr": {
+    "number": 605,
+    "title": "treat single-character aliases as short flags",
+    "body": "\\`aliases:\\\"n,name\\\"\\` set up both \\`n\\` and \\`name\\` as long flags, so \\`-n\\` didn't match. Single-rune aliases now resolve as short flags instead, since that's clearly the intent and there's no other way to declare a short alias today. Existing multi-char aliases (the \\`TestAlias\\` case \\`--str\\`) keep working unchanged.\n\nTouches \\`context.go\\` (parse match) and \\`build.go\\` (the dedup check uses the same prefix). Test added: \\`TestSingleCharAliasIsShortFlag\\` with \\`aliases:\\\"n,num\\\"\\` parsed via \\`-n hello\\`.\n\nfixes #589",
+    "url": "https://github.com/alecthomas/kong/pull/605"
+  },
+  "linkedIssues": [
+    {
+      "number": 589,
+      "title": "Single letter alias should be treated as a short flag",
+      "body": "When using the `alias` tag I can set multiple alternatives for a flag, however if I do something like `aliases:\"n,name\"`, the \"n\" is treated as a long name and requires a double dash.  It would be nice if this was instead treated as a single dash short flag.",
+      "url": "https://github.com/alecthomas/kong/issues/589"
+    }
+  ],
+  "stats": {
+    "filesChanged": 3,
+    "additions": 21,
+    "deletions": 3
+  },
+  "files": [
+    {
+      "path": "build.go",
+      "status": "M",
+      "additions": 4,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "context.go",
+      "status": "M",
+      "additions": 7,
+      "deletions": 3,
+      "binary": false
+    },
+    {
+      "path": "kong_test.go",
+      "status": "M",
+      "additions": 10,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/build.go b/build.go\nindex 0033885..22c44a5 100644\n--- a/build.go\n+++ b/build.go\n@@ -4,6 +4,7 @@ import (\n \t\"fmt\"\n \t\"reflect\"\n \t\"strings\"\n+\t\"unicode/utf8\"\n )\n \n // Plugins are dynamically embedded command-line structures.\n@@ -344,6 +345,9 @@ func buildField(k *Kong, node *Node, v reflect.Value, ft reflect.StructField, fv\n \t\tseenFlags[\"--\"+value.Name] = true\n \t\tfor _, alias := range tag.Aliases {\n \t\t\taliasFlag := \"--\" + alias\n+\t\t\tif utf8.RuneCountInString(alias) == 1 {\n+\t\t\t\taliasFlag = \"-\" + alias\n+\t\t\t}\n \t\t\tif seenFlags[aliasFlag] {\n \t\t\t\treturn failField(v, ft, \"duplicate flag %s\", aliasFlag)\n \t\t\t}\ndiff --git a/context.go b/context.go\nindex 133004e..596697b 100644\n--- a/context.go\n+++ b/context.go\n@@ -8,6 +8,7 @@ import (\n \t\"sort\"\n \t\"strconv\"\n \t\"strings\"\n+\t\"unicode/utf8\"\n )\n \n // Path records the nodes and parsed values from the current command-line.\n@@ -746,9 +747,12 @@ func (c *Context) parseFlag(flags []*Flag, match string) (err error) {\n \t\t\tcandidates = append(candidates, short)\n \t\t}\n \t\tfor _, alias := range flag.Aliases {\n-\t\t\talias = \"--\" + alias\n-\t\t\tmatched = matched || (alias == match)\n-\t\t\tcandidates = append(candidates, alias)\n+\t\t\taliasFlag := \"--\" + alias\n+\t\t\tif utf8.RuneCountInString(alias) == 1 {\n+\t\t\t\taliasFlag = \"-\" + alias\n+\t\t\t}\n+\t\t\tmatched = matched || (aliasFlag == match)\n+\t\t\tcandidates = append(candidates, aliasFlag)\n \t\t}\n \n \t\tneg := negatableFlagName(flag.Name, flag.Tag.Negatable)\ndiff --git a/kong_test.go b/kong_test.go\nindex 4f446c2..34e89c9 100644\n--- a/kong_test.go\n+++ b/kong_test.go\n@@ -669,6 +669,16 @@ func TestAlias(t *testing.T) {\n \tassert.Equal(t, \"hello\", cli.String)\n }\n \n+func TestSingleCharAliasIsShortFlag(t *testing.T) {\n+\tvar cli struct {\n+\t\tNumber string `aliases:\"n,num\"`\n+\t}\n+\tapp := mustNew(t, &cli)\n+\t_, err := app.Parse([]string{\"-n\", \"hello\"})\n+\tassert.NoError(t, err)\n+\tassert.Equal(t, \"hello\", cli.Number)\n+}\n+\n func TestDuplicateFlagChoosesLast(t *testing.T) {\n \tvar cli struct {\n \t\tFlag int\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/FUNDING.yml",
+    ".github/workflows/ci.yml",
+    ".gitignore",
+    ".golangci.yml",
+    "COPYING",
+    "README.md",
+    "_examples/asciilogo/main.go",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/README.md",
+    "_examples/server/console.go",
+    "_examples/server/go.mod",
+    "_examples/server/go.sum",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/commandstring/main.go",
+    "_examples/shell/help/README.md",
+    "_examples/shell/help/main.go",
+    "benchmark_test.go",
+    "bin/.go-1.26.4.pkg",
+    "bin/.golangci-lint-1.64.5.pkg",
+    "bin/.lefthook-2.1.9.pkg",
+    "bin/README.hermit.md",
+    "bin/activate-hermit",
+    "bin/go",
+    "bin/gofmt",
+    "bin/golangci-lint",
+    "bin/hermit",
+    "bin/hermit.hcl",
+    "bin/lefthook",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "config_test.go",
+    "context.go",
+    "defaults.go",
+    "defaults_test.go",
+    "doc.go",
+    "error.go",
+    "exit.go",
+    "global.go",
+    "global_test.go",
+    "go.mod",
+    "go.sum",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "helpwrap1.18_test.go",
+    "helpwrap1.19_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "lefthook.yml",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_linux_test.go",
+    "mapper_test.go",
+    "mapper_windows_test.go",
+    "model.go",
+    "model_test.go",
+    "negatable.go",
+    "options.go",
+    "options_test.go",
+    "renovate.json5",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "signature_test.go",
+    "tag.go",
+    "tag_test.go",
+    "testdata/file.txt",
+    "util.go",
+    "util_test.go",
+    "visit.go"
+  ],
+  "explanation": {
+    "what": "aliases タグで指定した単一文字のエイリアスを、長いフラグ(--)ではなく短いフラグ(-)として扱うようにした。build.go の buildField では単一文字エイリアスの重複チェック用プレフィックスを `-` に変え、context.go の parseFlag ではマッチング候補の生成でも同様に単一文字なら `-` を付けるよう修正している。utf8.RuneCountInString で文字数を判定する。",
+    "why": "issue #589 で「`aliases:\"n,name\"` の n が長いフラグ扱いになり `-n` で通らない」という報告があった。PR本文によれば、単一文字エイリアスを短いフラグとして扱うのが意図に合致し、現状他に短いエイリアスを宣言する手段がないため、この振る舞いを変更しても既存の複数文字エイリアス(TestAlias の --str 等)には影響しないとされている。",
+    "highlights": [
+      { "file": "context.go", "note": "parseFlag 内でエイリアスの候補文字列を組み立てる箇所。単一文字なら `-` + alias、それ以外は `--` + alias" }
+    ],
+    "langNotes": [
+      { "topic": "single-char aliases", "note": "kong の aliases タグは複数の別名をカンマ区切りで指定できる。このコミット以降は1文字のエイリアスだけ自動的に短フラグ(`-x`)として扱われ、2文字以上は従来通り長フラグ(`--xxx`)になる。utf8.RuneCountInString はマルチバイト文字を考慮して「文字数」を数える標準ライブラリ関数で、len(string) のバイト数カウントと区別される。" }
+    ],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [
+      { "type": "pr", "number": 605, "url": "https://github.com/alecthomas/kong/pull/605" },
+      { "type": "issue", "number": 589, "url": "https://github.com/alecthomas/kong/issues/589" }
+    ],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

@@ -1,0 +1,92 @@
+{
+  "seq": 13,
+  "sha": "d03571a8730258210f8a387607d300937450648a",
+  "parents": [
+    "b4b58270446cd24859c6956afd095568c6cc7343"
+  ],
+  "author": {
+    "name": "Alec Thomas",
+    "email": "alec@swapoff.org",
+    "date": "2018-05-18T21:17:48+10:00"
+  },
+  "message": "Use variadic options to configure Kong.",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 5,
+    "additions": 128,
+    "deletions": 18
+  },
+  "files": [
+    {
+      "path": "global.go",
+      "status": "M",
+      "additions": 3,
+      "deletions": 2,
+      "binary": false
+    },
+    {
+      "path": "help.go",
+      "status": "A",
+      "additions": 28,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "kong.go",
+      "status": "M",
+      "additions": 45,
+      "deletions": 12,
+      "binary": false
+    },
+    {
+      "path": "kong_test.go",
+      "status": "M",
+      "additions": 12,
+      "deletions": 4,
+      "binary": false
+    },
+    {
+      "path": "options.go",
+      "status": "A",
+      "additions": 40,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/global.go b/global.go\nindex 180fd7f..9daaac6 100644\n--- a/global.go\n+++ b/global.go\n@@ -2,8 +2,9 @@ package kong\n \n import \"os\"\n \n-func Parse(cli interface{}) {\n-\tparser, err := New(\"\", \"\", cli)\n+// Parse constructs a new parser and parses the default command-line.\n+func Parse(cli interface{}, options ...Option) {\n+\tparser, err := New(cli, options...)\n \tparser.FatalIfErrorf(err)\n \t_, err = parser.Parse(os.Args[1:])\n \tparser.FatalIfErrorf(err)\ndiff --git a/help.go b/help.go\nnew file mode 100644\nindex 0000000..6332bef\n--- /dev/null\n+++ b/help.go\n@@ -0,0 +1,28 @@\n+package kong\n+\n+import (\n+\t\"io\"\n+\t\"text/template\"\n+)\n+\n+const defaultHelp = `{{- with .Application -}}\n+usage: {{.Name}}\n+\n+{{- end -}}\n+`\n+\n+var defaultHelpTemplate = template.Must(template.New(\"help\").Parse(defaultHelp))\n+\n+// WriteHelp to w. If w is nil, the default stdout writer will be used.\n+func (k *Kong) WriteHelp(w io.Writer) error {\n+\tif w == nil {\n+\t\tw = k.stdout\n+\t}\n+\tctx := map[string]interface{}{\n+\t\t\"Application\": k.Model,\n+\t}\n+\tfor k, v := range k.helpContext {\n+\t\tctx[k] = v\n+\t}\n+\treturn k.help.Execute(w, ctx)\n+}\ndiff --git a/kong.go b/kong.go\nindex 6fdfa47..7cfe223 100644\n--- a/kong.go\n+++ b/kong.go\n@@ -2,10 +2,12 @@ package kong\n \n import (\n \t\"fmt\"\n+\t\"io\"\n \t\"os\"\n \t\"path/filepath\"\n \t\"reflect\"\n \t\"strings\"\n+\t\"text/template\"\n )\n \n type Error struct{ msg string }\n@@ -16,27 +18,40 @@ func fail(format string, args ...interface{}) {\n \tpanic(Error{fmt.Sprintf(format, args...)})\n }\n \n+// Kong is the main parser type.\n type Kong struct {\n \tModel *Application\n \t// Termination function (defaults to os.Exit)\n-\tTerminate func(int)\n+\tterminate func(int)\n+\n+\tstdout io.Writer\n+\tstderr io.Writer\n+\n+\thelp        *template.Template\n+\thelpContext map[string]interface{}\n+\thelpFuncs   template.FuncMap\n }\n \n // New creates a new Kong parser into ast.\n-func New(name, description string, ast interface{}) (*Kong, error) {\n-\tif name == \"\" {\n-\t\tname = filepath.Base(os.Args[0])\n-\t}\n+func New(ast interface{}, options ...Option) (*Kong, error) {\n \tmodel, err := build(ast)\n \tif err != nil {\n \t\treturn nil, err\n \t}\n-\tmodel.Name = name\n-\tmodel.Help = description\n-\treturn &Kong{\n-\t\tModel:     model,\n-\t\tTerminate: os.Exit,\n-\t}, nil\n+\tmodel.Name = filepath.Base(os.Args[0])\n+\tk := &Kong{\n+\t\tModel:       model,\n+\t\tterminate:   os.Exit,\n+\t\tstdout:      os.Stdout,\n+\t\tstderr:      os.Stderr,\n+\t\thelp:        defaultHelpTemplate,\n+\t\thelpContext: map[string]interface{}{},\n+\t\thelpFuncs:   template.FuncMap{},\n+\t}\n+\tfor _, option := range options {\n+\t\toption(k)\n+\t}\n+\treturn k, nil\n }\n \n // Parse arguments into target.\n@@ -183,6 +198,24 @@ func (k *Kong) applyNode(scan *Scanner, node *Node) (command []string, err error\n \t\t\treturn nil, fmt.Errorf(\"unexpected token %s\", token)\n \t\t}\n \t}\n+\tif positional < len(node.Positional) {\n+\t\tmissing := []string{}\n+\t\tfor ; positional < len(node.Positional); positional++ {\n+\t\t\tmissing = append(missing, \"<\"+node.Positional[positional].Name+\">\")\n+\t\t}\n+\t\treturn nil, fmt.Errorf(\"missing positional arguments %s\", strings.Join(missing, \" \"))\n+\t}\n+\tif len(node.Children) > 0 {\n+\t\tmissing := []string{}\n+\t\tfor _, child := range node.Children {\n+\t\t\tif child.Argument != nil {\n+\t\t\t\tmissing = append(missing, \"<\"+child.Argument.Name+\">\")\n+\t\t\t} else {\n+\t\t\t\tmissing = append(missing, child.Command.Name)\n+\t\t\t}\n+\t\t}\n+\t\treturn nil, fmt.Errorf(\"expected one of %s\", strings.Join(missing, \", \"))\n+\t}\n \treturn\n }\n \n@@ -221,5 +254,5 @@ func (k *Kong) FatalIfErrorf(err error, args ...interface{}) {\n \t\tmsg = fmt.Sprintf(args[0].(string), args...) + \": \" + err.Error()\n \t}\n \tk.Errorf(\"%s\", msg)\n-\tk.Terminate(1)\n+\tk.terminate(1)\n }\ndiff --git a/kong_test.go b/kong_test.go\nindex 007a317..99f1621 100644\n--- a/kong_test.go\n+++ b/kong_test.go\n@@ -8,12 +8,12 @@ import (\n \n func mustNew(t *testing.T, cli interface{}) *Kong {\n \tt.Helper()\n-\tparser, err := New(\"\", \"\", cli)\n+\tparser, err := New(cli)\n \trequire.NoError(t, err)\n \treturn parser\n }\n \n-func TestArgumentSequence(t *testing.T) {\n+func TestPositionalArguments(t *testing.T) {\n \tvar cli struct {\n \t\tUser struct {\n \t\t\tCreate struct {\n@@ -27,6 +27,10 @@ func TestArgumentSequence(t *testing.T) {\n \tcmd, err := p.Parse([]string{\"user\", \"create\", \"10\", \"Alec\", \"Thomas\"})\n \trequire.NoError(t, err)\n \trequire.Equal(t, \"user create <id> <first> <last>\", cmd)\n+\tt.Run(\"Missing\", func(t *testing.T) {\n+\t\t_, err := p.Parse([]string{\"user\", \"create\", \"10\"})\n+\t\trequire.Error(t, err)\n+\t})\n }\n \n func TestBranchingArgument(t *testing.T) {\n@@ -60,6 +64,10 @@ func TestBranchingArgument(t *testing.T) {\n \trequire.NoError(t, err)\n \trequire.Equal(t, 10, cli.User.ID.ID)\n \trequire.Equal(t, \"user <id> delete\", cmd)\n+\tt.Run(\"Missing\", func(t *testing.T) {\n+\t\t_, err = p.Parse([]string{\"user\"})\n+\t\trequire.Error(t, err)\n+\t})\n }\n \n func TestResetWithDefaults(t *testing.T) {\n@@ -102,7 +110,7 @@ func TestUnsupportedFieldErrors(t *testing.T) {\n \tvar cli struct {\n \t\tKeys map[string]string\n \t}\n-\t_, err := New(\"\", \"\", &cli)\n+\t_, err := New(&cli)\n \trequire.Error(t, err)\n }\n \n@@ -113,6 +121,6 @@ func TestMatchingArgField(t *testing.T) {\n \t\t} `arg:\"\"`\n \t}\n \n-\t_, err := New(\"\", \"\", &cli)\n+\t_, err := New(&cli)\n \trequire.Error(t, err)\n }\ndiff --git a/options.go b/options.go\nnew file mode 100644\nindex 0000000..ecabeaf\n--- /dev/null\n+++ b/options.go\n@@ -0,0 +1,40 @@\n+package kong\n+\n+import (\n+\t\"io\"\n+\t\"text/template\"\n+)\n+\n+type Option func(k *Kong)\n+\n+// ExitFunction overrides the function used to terminate. This is useful for testing or interactive use.\n+func ExitFunction(exit func(int)) Option {\n+\treturn func(k *Kong) { k.terminate = exit }\n+}\n+\n+// Name overrides the application name.\n+func Name(name string) Option {\n+\treturn func(k *Kong) { k.Model.Name = name }\n+}\n+\n+// Description sets the application description.\n+func Description(description string) Option {\n+\treturn func(k *Kong) { k.Model.Help = description }\n+}\n+\n+// HelpTemplate overrides the default help template.\n+func HelpTemplate(template *template.Template) Option {\n+\treturn func(k *Kong) { k.help = template }\n+}\n+\n+// HelpContext sets extra context in the help template.\n+//\n+// The key \"Application\" will always be available and is the root of the application model.\n+func HelpContext(context map[string]interface{}) Option {\n+\treturn func(k *Kong) { k.helpContext = context }\n+}\n+\n+// Writers overrides the default writers. Useful for testing or interactive use.\n+func Writers(stdout, stderr io.Writer) Option {\n+\treturn func(k *Kong) { k.stdout = stdout }\n+}\n",
+  "diffTruncated": false,
+  "tree": [
+    "README.md",
+    "_examples/shell/main.go",
+    "build.go",
+    "camelcase.go",
+    "decoders.go",
+    "decoders_test.go",
+    "global.go",
+    "help.go",
+    "kong.go",
+    "kong_test.go",
+    "model.go",
+    "options.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tokentype_string.go"
+  ],
+  "explanation": {
+    "what": "kong.New() のシグネチャを `New(name, description string, ast interface{})` から `New(ast interface{}, options ...Option) (*Kong, error)` に変更し、options.go を新設して Option 型(`func(k *Kong)`)と ExitFunction/Name/Description/HelpTemplate/HelpContext/Writers の各オプション関数を定義した。あわせて help.go を新設し、text/template ベースのデフォルトヘルプテンプレートと WriteHelp() を追加。Kong 構造体のフィールドも terminate/stdout/stderr/help/helpContext/helpFuncs に整理された。",
+    "why": "固定引数(name, description)を Option の可変長引数に置き換えることで、将来 Writers やヘルプテンプレートなど設定項目が増えてもシグネチャを壊さずに拡張できるようにしたと考えられる。同時にヘルプ出力の土台(テンプレート機構)を用意し、後続のヘルプ機能実装に備えたと見られる。",
+    "highlights": [
+      { "file": "options.go", "note": "Option = func(k *Kong) という関数型でオプションを表現する構成" },
+      { "file": "kong.go", "note": "New() が options を順に適用してから *Kong を返す組み立て方" }
+    ],
+    "langNotes": [
+      { "topic": "variadic options pattern", "note": "Go でよく使われる「関数を返す設定用関数(Option)」パターン。New(ast, opt1, opt2, ...) のように可変長引数で任意個のオプションを渡し、各 Option が対象構造体のフィールドを書き換える。Go には名前付き引数やデフォルト引数が無いため、このパターンでコンストラクタの拡張性を確保する。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

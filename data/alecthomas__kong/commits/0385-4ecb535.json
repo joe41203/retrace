@@ -1,0 +1,179 @@
+{
+  "seq": 385,
+  "sha": "4ecb53599b72bbe620e2417a3d6eed815a2e6f2a",
+  "parents": [
+    "7d84b9529490a9048a3765e3fa5966f4cda6157f"
+  ],
+  "author": {
+    "name": "Cam Hutchison",
+    "email": "camh@xdna.net",
+    "date": "2024-09-10T21:02:37+10:00"
+  },
+  "message": "Make negatable flag name customisable (#439)\n\n* fix: Check if negatable duplicates another flag\r\n\r\nAdd a check for flags with the `negatable` option if the negative flag\r\nconflicts with another tag, such as:\r\n\r\n    Flag   bool `negatable:\"\"`\r\n    NoFlag bool\r\n\r\nThe flag `--no-flag` is ambiguous in this scenario.\r\n\r\n* feat: Make negatable flag name customisable\r\n\r\nAllow a value on the `negatable` tag to specify a flag name to use for\r\nnegation instead of using `--no-<flag-name>` as the flag.\r\n\r\ne.g.\r\n\r\n    Approve bool `default:\"true\",negatable:\"deny\"`\r\n\r\nThis example will allow `--deny` to set the `Approve` field to false.",
+  "pr": {
+    "number": 439,
+    "title": "Make negatable flag name customisable",
+    "body": "Allow a value on the `negatable` tag to specify a flag name to use for\r\nnegation instead of using `--no-<flag-name>` as the flag.\r\n\r\ne.g.\r\n\r\n    Approve bool `default:\"true\",negatable:\"deny\"`\r\n\r\nThis example will allow `--deny` to set the `Approve` field to false.\r\n\r\nAdd duplicate flag name detection for negatable flags.",
+    "url": "https://github.com/alecthomas/kong/pull/439"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 8,
+    "additions": 128,
+    "deletions": 49
+  },
+  "files": [
+    {
+      "path": "README.md",
+      "status": "M",
+      "additions": 1,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "build.go",
+      "status": "M",
+      "additions": 7,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "context.go",
+      "status": "M",
+      "additions": 3,
+      "deletions": 3,
+      "binary": false
+    },
+    {
+      "path": "help.go",
+      "status": "M",
+      "additions": 14,
+      "deletions": 19,
+      "binary": false
+    },
+    {
+      "path": "help_test.go",
+      "status": "M",
+      "additions": 3,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "kong_test.go",
+      "status": "M",
+      "additions": 71,
+      "deletions": 22,
+      "binary": false
+    },
+    {
+      "path": "negatable.go",
+      "status": "A",
+      "additions": 19,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "tag.go",
+      "status": "M",
+      "additions": 10,
+      "deletions": 5,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/README.md b/README.md\nindex 994da42..3936fde 100644\n--- a/README.md\n+++ b/README.md\n@@ -571,6 +571,7 @@ Both can coexist with standard Tag parsing.\n | `optional:\"\"`        | If present, flag/arg is optional.                                                                                                                                                                                                                                                                                              |\n | `hidden:\"\"`          | If present, command or flag is hidden.                                                                                                                                                                                                                                                                                         |\n | `negatable:\"\"`       | If present on a `bool` field, supports prefixing a flag with `--no-` to invert the default value                                                                                                                                                                                                                               |\n+| `negatable:\"X\"`      | If present on a `bool` field, supports `--X` to invert the default value                                                                                                                                                                                                                                                       |\n | `format:\"X\"`         | Format for parsing input, if supported.                                                                                                                                                                                                                                                                                        |\n | `sep:\"X\"`            | Separator for sequences (defaults to \",\"). May be `none` to disable splitting.                                                                                                                                                                                                                                                 |\n | `mapsep:\"X\"`         | Separator for maps (defaults to \";\"). May be `none` to disable splitting.                                                                                                                                                                                                                                                      |\ndiff --git a/build.go b/build.go\nindex 18048e0..7791c62 100644\n--- a/build.go\n+++ b/build.go\n@@ -315,6 +315,13 @@ func buildField(k *Kong, node *Node, v reflect.Value, ft reflect.StructField, fv\n \t\t\t}\n \t\t\tseenFlags[\"-\"+string(tag.Short)] = true\n \t\t}\n+\t\tif tag.Negatable != \"\" {\n+\t\t\tnegFlag := negatableFlagName(value.Name, tag.Negatable)\n+\t\t\tif seenFlags[negFlag] {\n+\t\t\t\treturn failField(v, ft, \"duplicate negation flag %s\", negFlag)\n+\t\t\t}\n+\t\t\tseenFlags[negFlag] = true\n+\t\t}\n \t\tflag := &Flag{\n \t\t\tValue:       value,\n \t\t\tAliases:     tag.Aliases,\ndiff --git a/context.go b/context.go\nindex ea0ec1c..c97aa84 100644\n--- a/context.go\n+++ b/context.go\n@@ -710,13 +710,13 @@ func (c *Context) parseFlag(flags []*Flag, match string) (err error) {\n \t\t\tcandidates = append(candidates, alias)\n \t\t}\n \n-\t\tneg := \"--no-\" + flag.Name\n-\t\tif !matched && !(match == neg && flag.Tag.Negatable) {\n+\t\tneg := negatableFlagName(flag.Name, flag.Tag.Negatable)\n+\t\tif !matched && match != neg {\n \t\t\tcontinue\n \t\t}\n \t\t// Found a matching flag.\n \t\tc.scan.Pop()\n-\t\tif match == neg && flag.Tag.Negatable {\n+\t\tif match == neg && flag.Tag.Negatable != \"\" {\n \t\t\tflag.Negated = true\n \t\t}\n \t\terr := flag.Parse(c.scan, c.getValue(flag.Value))\ndiff --git a/help.go b/help.go\nindex cf5a912..26f355d 100644\n--- a/help.go\n+++ b/help.go\n@@ -491,27 +491,22 @@ func formatFlag(haveShort bool, flag *Flag) string {\n \tname := flag.Name\n \tisBool := flag.IsBool()\n \tisCounter := flag.IsCounter()\n+\n+\tshort := \"\"\n \tif flag.Short != 0 {\n-\t\tif isBool && flag.Tag.Negatable {\n-\t\t\tflagString += fmt.Sprintf(\"-%c, --[no-]%s\", flag.Short, name)\n-\t\t} else {\n-\t\t\tflagString += fmt.Sprintf(\"-%c, --%s\", flag.Short, name)\n-\t\t}\n-\t} else {\n-\t\tif isBool && flag.Tag.Negatable {\n-\t\t\tif haveShort {\n-\t\t\t\tflagString = fmt.Sprintf(\"    --[no-]%s\", name)\n-\t\t\t} else {\n-\t\t\t\tflagString = fmt.Sprintf(\"--[no-]%s\", name)\n-\t\t\t}\n-\t\t} else {\n-\t\t\tif haveShort {\n-\t\t\t\tflagString += fmt.Sprintf(\"    --%s\", name)\n-\t\t\t} else {\n-\t\t\t\tflagString += fmt.Sprintf(\"--%s\", name)\n-\t\t\t}\n-\t\t}\n+\t\tshort = \"-\" + string(flag.Short) + \", \"\n+\t} else if haveShort {\n+\t\tshort = \"    \"\n+\t}\n+\n+\tif isBool && flag.Tag.Negatable == negatableDefault {\n+\t\tname = \"[no-]\" + name\n+\t} else if isBool && flag.Tag.Negatable != \"\" {\n+\t\tname += \"/\" + flag.Tag.Negatable\n \t}\n+\n+\tflagString += fmt.Sprintf(\"%s--%s\", short, name)\n+\n \tif !isBool && !isCounter {\n \t\tflagString += fmt.Sprintf(\"=%s\", flag.FormatPlaceHolder())\n \t}\ndiff --git a/help_test.go b/help_test.go\nindex e43a073..e680be2 100644\n--- a/help_test.go\n+++ b/help_test.go\n@@ -71,6 +71,7 @@ func TestHelp(t *testing.T) {\n \t\tMap      map[string]int `help:\"A map of strings to ints.\"`\n \t\tRequired bool           `required help:\"A required flag.\"`\n \t\tSort     bool           `negatable short:\"s\" help:\"Is sortable or not.\"`\n+\t\tApprove  bool           `negatable:\"deny\" help:\"Approve or deny message.\"`\n \n \t\tOne struct {\n \t\t\tFlag string `help:\"Nested flag.\"`\n@@ -118,6 +119,7 @@ Flags:\n       --map=KEY=VALUE;...    A map of strings to ints.\n       --required             A required flag.\n   -s, --[no-]sort            Is sortable or not.\n+      --approve/deny         Approve or deny message.\n \n Commands:\n   one --required [flags]\n@@ -159,6 +161,7 @@ Flags:\n       --map=KEY=VALUE;...    A map of strings to ints.\n       --required             A required flag.\n   -s, --[no-]sort            Is sortable or not.\n+      --approve/deny         Approve or deny message.\n \n       --flag=STRING          Nested flag under two.\n       --required-two\ndiff --git a/kong_test.go b/kong_test.go\nindex c148962..7abf0ac 100644\n--- a/kong_test.go\n+++ b/kong_test.go\n@@ -357,8 +357,9 @@ func TestTraceErrorPartiallySucceeds(t *testing.T) {\n }\n \n type commandWithNegatableFlag struct {\n-\tFlag bool `kong:\"default='true',negatable\"`\n-\tran  bool\n+\tFlag   bool `kong:\"default='true',negatable\"`\n+\tCustom bool `kong:\"default='true',negatable='standard'\"`\n+\tran    bool\n }\n \n func (c *commandWithNegatableFlag) Run() error {\n@@ -368,34 +369,64 @@ func (c *commandWithNegatableFlag) Run() error {\n \n func TestNegatableFlag(t *testing.T) {\n \ttests := []struct {\n-\t\tname     string\n-\t\targs     []string\n-\t\texpected bool\n+\t\tname           string\n+\t\targs           []string\n+\t\texpectedFlag   bool\n+\t\texpectedCustom bool\n \t}{\n \t\t{\n-\t\t\tname:     \"no flag\",\n-\t\t\targs:     []string{\"cmd\"},\n-\t\t\texpected: true,\n+\t\t\tname:           \"no flag\",\n+\t\t\targs:           []string{\"cmd\"},\n+\t\t\texpectedFlag:   true,\n+\t\t\texpectedCustom: true,\n \t\t},\n \t\t{\n-\t\t\tname:     \"boolean flag\",\n-\t\t\targs:     []string{\"cmd\", \"--flag\"},\n-\t\t\texpected: true,\n+\t\t\tname:           \"boolean flag\",\n+\t\t\targs:           []string{\"cmd\", \"--flag\"},\n+\t\t\texpectedFlag:   true,\n+\t\t\texpectedCustom: true,\n \t\t},\n \t\t{\n-\t\t\tname:     \"inverted boolean flag\",\n-\t\t\targs:     []string{\"cmd\", \"--flag=false\"},\n-\t\t\texpected: false,\n+\t\t\tname:           \"custom boolean flag\",\n+\t\t\targs:           []string{\"cmd\", \"--custom\"},\n+\t\t\texpectedFlag:   true,\n+\t\t\texpectedCustom: true,\n \t\t},\n \t\t{\n-\t\t\tname:     \"negated boolean flag\",\n-\t\t\targs:     []string{\"cmd\", \"--no-flag\"},\n-\t\t\texpected: false,\n+\t\t\tname:           \"inverted boolean flag\",\n+\t\t\targs:           []string{\"cmd\", \"--flag=false\"},\n+\t\t\texpectedFlag:   false,\n+\t\t\texpectedCustom: true,\n \t\t},\n \t\t{\n-\t\t\tname:     \"inverted negated boolean flag\",\n-\t\t\targs:     []string{\"cmd\", \"--no-flag=false\"},\n-\t\t\texpected: true,\n+\t\t\tname:           \"custom inverted boolean flag\",\n+\t\t\targs:           []string{\"cmd\", \"--custom=false\"},\n+\t\t\texpectedFlag:   true,\n+\t\t\texpectedCustom: false,\n+\t\t},\n+\t\t{\n+\t\t\tname:           \"negated boolean flag\",\n+\t\t\targs:           []string{\"cmd\", \"--no-flag\"},\n+\t\t\texpectedFlag:   false,\n+\t\t\texpectedCustom: true,\n+\t\t},\n+\t\t{\n+\t\t\tname:           \"custom negated boolean flag\",\n+\t\t\targs:           []string{\"cmd\", \"--standard\"},\n+\t\t\texpectedFlag:   true,\n+\t\t\texpectedCustom: false,\n+\t\t},\n+\t\t{\n+\t\t\tname:           \"inverted negated boolean flag\",\n+\t\t\targs:           []string{\"cmd\", \"--no-flag=false\"},\n+\t\t\texpectedFlag:   true,\n+\t\t\texpectedCustom: true,\n+\t\t},\n+\t\t{\n+\t\t\tname:           \"inverted custom negated boolean flag\",\n+\t\t\targs:           []string{\"cmd\", \"--standard=false\"},\n+\t\t\texpectedFlag:   true,\n+\t\t\texpectedCustom: true,\n \t\t},\n \t}\n \tfor _, tt := range tests {\n@@ -408,16 +439,34 @@ func TestNegatableFlag(t *testing.T) {\n \t\t\tp := mustNew(t, &cli)\n \t\t\tkctx, err := p.Parse(tt.args)\n \t\t\tassert.NoError(t, err)\n-\t\t\tassert.Equal(t, tt.expected, cli.Cmd.Flag)\n+\t\t\tassert.Equal(t, tt.expectedFlag, cli.Cmd.Flag)\n+\t\t\tassert.Equal(t, tt.expectedCustom, cli.Cmd.Custom)\n \n \t\t\terr = kctx.Run()\n \t\t\tassert.NoError(t, err)\n-\t\t\tassert.Equal(t, tt.expected, cli.Cmd.Flag)\n+\t\t\tassert.Equal(t, tt.expectedFlag, cli.Cmd.Flag)\n+\t\t\tassert.Equal(t, tt.expectedCustom, cli.Cmd.Custom)\n \t\t\tassert.True(t, cli.Cmd.ran)\n \t\t})\n \t}\n }\n \n+func TestDuplicateNegatableLong(t *testing.T) {\n+\tcli2 := struct {\n+\t\tNoFlag bool\n+\t\tFlag   bool `negatable:\"\"` // negation duplicates NoFlag\n+\t}{}\n+\t_, err := kong.New(&cli2)\n+\tassert.EqualError(t, err, \"<anonymous struct>.Flag: duplicate negation flag --no-flag\")\n+\n+\tcli3 := struct {\n+\t\tOne bool\n+\t\tTwo bool `negatable:\"one\"` // negation duplicates Flag2\n+\t}{}\n+\t_, err = kong.New(&cli3)\n+\tassert.EqualError(t, err, \"<anonymous struct>.Two: duplicate negation flag --one\")\n+}\n+\n func TestExistingNoFlag(t *testing.T) {\n \tvar cli struct {\n \t\tCmd struct {\ndiff --git a/negatable.go b/negatable.go\nnew file mode 100644\nindex 0000000..7d8902a\n--- /dev/null\n+++ b/negatable.go\n@@ -0,0 +1,19 @@\n+package kong\n+\n+// negatableDefault is a placeholder value for the Negatable tag to indicate\n+// the negated flag is --no-<flag-name>. This is needed as at the time of\n+// parsing a tag, the field's flag name is not yet known.\n+const negatableDefault = \"_\"\n+\n+// negatableFlagName returns the name of the flag for a negatable field, or\n+// an empty string if the field is not negatable.\n+func negatableFlagName(name, negation string) string {\n+\tswitch negation {\n+\tcase \"\":\n+\t\treturn \"\"\n+\tcase negatableDefault:\n+\t\treturn \"--no-\" + name\n+\tdefault:\n+\t\treturn \"--\" + negation\n+\t}\n+}\ndiff --git a/tag.go b/tag.go\nindex 39be2e3..456f7ae 100644\n--- a/tag.go\n+++ b/tag.go\n@@ -38,7 +38,7 @@ type Tag struct {\n \tEnvPrefix   string\n \tEmbed       bool\n \tAliases     []string\n-\tNegatable   bool\n+\tNegatable   string\n \tPassthrough bool\n \n \t// Storage for all tag keys for arbitrary lookups.\n@@ -256,11 +256,16 @@ func hydrateTag(t *Tag, typ reflect.Type) error { //nolint: gocyclo\n \tt.Prefix = t.Get(\"prefix\")\n \tt.EnvPrefix = t.Get(\"envprefix\")\n \tt.Embed = t.Has(\"embed\")\n-\tnegatable := t.Has(\"negatable\")\n-\tif negatable && !isBool && !isBoolPtr {\n-\t\treturn fmt.Errorf(\"negatable can only be set on booleans\")\n+\tif t.Has(\"negatable\") {\n+\t\tif !isBool && !isBoolPtr {\n+\t\t\treturn fmt.Errorf(\"negatable can only be set on booleans\")\n+\t\t}\n+\t\tnegatable := t.Get(\"negatable\")\n+\t\tif negatable == \"\" {\n+\t\t\tnegatable = negatableDefault // placeholder for default negation of --no-<flag>\n+\t\t}\n+\t\tt.Negatable = negatable\n \t}\n-\tt.Negatable = negatable\n \taliases := t.Get(\"aliases\")\n \tif len(aliases) > 0 {\n \t\tt.Aliases = append(t.Aliases, strings.FieldsFunc(aliases, tagSplitFn)...)\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/FUNDING.yml",
+    ".github/workflows/ci.yml",
+    ".gitignore",
+    ".golangci.yml",
+    "COPYING",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/README.md",
+    "_examples/server/console.go",
+    "_examples/server/go.mod",
+    "_examples/server/go.sum",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/commandstring/main.go",
+    "_examples/shell/help/README.md",
+    "_examples/shell/help/main.go",
+    "benchmark_test.go",
+    "bin/.go-1.23.1.pkg",
+    "bin/.golangci-lint-1.60.1.pkg",
+    "bin/README.hermit.md",
+    "bin/activate-hermit",
+    "bin/go",
+    "bin/gofmt",
+    "bin/golangci-lint",
+    "bin/hermit",
+    "bin/hermit.hcl",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "config_test.go",
+    "context.go",
+    "defaults.go",
+    "defaults_test.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "go.mod",
+    "go.sum",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "helpwrap1.18_test.go",
+    "helpwrap1.19_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_linux_test.go",
+    "mapper_test.go",
+    "mapper_windows_test.go",
+    "model.go",
+    "model_test.go",
+    "negatable.go",
+    "options.go",
+    "options_test.go",
+    "renovate.json5",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "testdata/file.txt",
+    "util.go",
+    "util_test.go",
+    "visit.go"
+  ],
+  "explanation": {
+    "what": "`negatable` タグの型を bool から string に変更し、`negatable:\"deny\"` のように値を渡すことで `--no-<flag>` の代わりに任意のフラグ名(例: `--deny`)を否定フラグとして使えるようにした。新設の negatable.go に negatableFlagName() を定義し、tag 未指定時は内部的な placeholder 定数 negatableDefault(\"_\")で「デフォルトの --no- 接頭辞」を表す。build.go では、カスタム否定名が既存フラグと衝突していないかを構築時に検出してエラーにする処理も追加された。help.go のフラグ整形ロジックはこの変更に合わせて共通化・簡潔化されている。",
+    "why": "PR 本文にある通り、negatable フラグの否定形が `--no-<flag>` に固定されていたため、意味的に自然な別名(例えば Approve フラグに対して --deny)を割り当てたいという要望への対応。あわせて、否定フラグ名が既存の別フラグ名と暗黙に衝突するケースを検出する安全策も追加された。",
+    "highlights": [
+      { "file": "negatable.go", "note": "negatableDefault という placeholder 定数と negatableFlagName() の実装。タグ解析時点ではフィールドの実フラグ名がまだ確定していないための工夫" },
+      { "file": "build.go", "note": "negatable フラグ名の重複を seenFlags マップでチェックし、衝突時は failField でエラーにする" }
+    ],
+    "langNotes": [
+      { "topic": "struct tag", "note": "kong は struct フィールドのタグ文字列(例 `negatable:\"deny\"`)を reflect 経由で読み取り CLI 文法を組み立てる。このコミットでは negatable タグが bool 相当の有無フラグから値を持つ文字列タグへ意味が拡張されている。" }
+    ],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [{ "type": "pr", "number": 439, "url": "https://github.com/alecthomas/kong/pull/439" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

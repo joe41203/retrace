@@ -1,0 +1,152 @@
+{
+  "seq": 292,
+  "sha": "7533b11d0669e164d6a73834e219fa8c759f27f6",
+  "parents": [
+    "9c9b8ab50b9228a448af0efa8e039e1125f9756a"
+  ],
+  "author": {
+    "name": "Alec Thomas",
+    "email": "alec@swapoff.org",
+    "date": "2021-12-13T19:03:23+11:00"
+  },
+  "message": "Differentiate between omitted and empty default.\n\nFixes #250.",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 6,
+    "additions": 19,
+    "deletions": 8
+  },
+  "files": [
+    {
+      "path": "build.go",
+      "status": "M",
+      "additions": 2,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "context.go",
+      "status": "M",
+      "additions": 2,
+      "deletions": 2,
+      "binary": false
+    },
+    {
+      "path": "kong.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "kong_test.go",
+      "status": "M",
+      "additions": 7,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "model.go",
+      "status": "M",
+      "additions": 3,
+      "deletions": 2,
+      "binary": false
+    },
+    {
+      "path": "tag.go",
+      "status": "M",
+      "additions": 4,
+      "deletions": 2,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/build.go b/build.go\nindex f3838a7..4d0e2fa 100644\n--- a/build.go\n+++ b/build.go\n@@ -211,7 +211,7 @@ func buildChild(k *Kong, node *Node, typ NodeType, v reflect.Value, ft reflect.S\n \t\tif child.Help == \"\" {\n \t\t\tchild.Help = child.Argument.Help\n \t\t}\n-\t} else if tag.Default != \"\" {\n+\t} else if tag.HasDefault {\n \t\tif node.DefaultCmd != nil {\n \t\t\treturn failField(v, ft, \"can't have more than one default command under %s\", node.Summary())\n \t\t}\n@@ -239,6 +239,7 @@ func buildField(k *Kong, node *Node, v reflect.Value, ft reflect.StructField, fv\n \t\tName:         name,\n \t\tHelp:         tag.Help,\n \t\tOrigHelp:     tag.Help,\n+\t\tHasDefault:   tag.HasDefault,\n \t\tDefault:      tag.Default,\n \t\tDefaultValue: reflect.New(fv.Type()).Elem(),\n \t\tMapper:       mapper,\ndiff --git a/context.go b/context.go\nindex 41a1ea7..6ad4dd0 100644\n--- a/context.go\n+++ b/context.go\n@@ -167,7 +167,7 @@ func (c *Context) Validate() error { // nolint: gocyclo\n \t\tswitch node := node.(type) {\n \t\tcase *Value:\n \t\t\t_, ok := os.LookupEnv(node.Tag.Env)\n-\t\t\tif node.Enum != \"\" && (!node.Required || node.Default != \"\" || (node.Tag.Env != \"\" && ok)) {\n+\t\t\tif node.Enum != \"\" && (!node.Required || node.HasDefault || (node.Tag.Env != \"\" && ok)) {\n \t\t\t\tif err := checkEnum(node, node.Target); err != nil {\n \t\t\t\t\treturn err\n \t\t\t\t}\n@@ -175,7 +175,7 @@ func (c *Context) Validate() error { // nolint: gocyclo\n \n \t\tcase *Flag:\n \t\t\t_, ok := os.LookupEnv(node.Tag.Env)\n-\t\t\tif node.Enum != \"\" && (!node.Required || node.Default != \"\" || (node.Tag.Env != \"\" && ok)) {\n+\t\t\tif node.Enum != \"\" && (!node.Required || node.HasDefault || (node.Tag.Env != \"\" && ok)) {\n \t\t\t\tif err := checkEnum(node.Value, node.Target); err != nil {\n \t\t\t\t\treturn err\n \t\t\t\t}\ndiff --git a/kong.go b/kong.go\nindex a4d230e..3123dc2 100644\n--- a/kong.go\n+++ b/kong.go\n@@ -319,7 +319,7 @@ func (k *Kong) applyHookToDefaultFlags(ctx *Context, node *Node, name string) er\n \t\t}\n \t\tbinds := k.bindings.clone().add(ctx).add(node.Vars().CloneWith(k.vars))\n \t\tfor _, flag := range node.Flags {\n-\t\t\tif flag.Default == \"\" || ctx.values[flag.Value].IsValid() || !flag.Target.IsValid() {\n+\t\t\tif !flag.HasDefault || ctx.values[flag.Value].IsValid() || !flag.Target.IsValid() {\n \t\t\t\tcontinue\n \t\t\t}\n \t\t\tmethod := getMethod(flag.Target, name)\ndiff --git a/kong_test.go b/kong_test.go\nindex a415946..0594565 100644\n--- a/kong_test.go\n+++ b/kong_test.go\n@@ -1432,6 +1432,13 @@ func TestEnumValidation(t *testing.T) {\n \t\t\t}{},\n \t\t\tfalse,\n \t\t},\n+\t\t{\n+\t\t\t\"EnumWithEmptyDefault\",\n+\t\t\t&struct {\n+\t\t\t\tFlag string `enum:\"one,two,\" default:\"\"`\n+\t\t\t}{},\n+\t\t\tfalse,\n+\t\t},\n \t}\n \tfor _, test := range tests {\n \t\ttest := test\ndiff --git a/model.go b/model.go\nindex 5f7f80e..a86b510 100644\n--- a/model.go\n+++ b/model.go\n@@ -232,6 +232,7 @@ type Value struct {\n \tName         string\n \tHelp         string\n \tOrigHelp     string // Original help string, without interpolated variables.\n+\tHasDefault   bool\n \tDefault      string\n \tDefaultValue reflect.Value\n \tEnum         string\n@@ -357,7 +358,7 @@ func (v *Value) Reset() error {\n \t\t\treturn nil\n \t\t}\n \t}\n-\tif v.Default != \"\" {\n+\tif v.HasDefault {\n \t\treturn v.Parse(ScanFromTokens(Token{Type: FlagValueToken, Value: v.Default}), v.Target)\n \t}\n \treturn nil\n@@ -404,7 +405,7 @@ func (f *Flag) FormatPlaceHolder() string {\n \tif f.PlaceHolder != \"\" {\n \t\treturn f.PlaceHolder + tail\n \t}\n-\tif f.Default != \"\" {\n+\tif f.HasDefault {\n \t\tif f.Value.Target.Kind() == reflect.String {\n \t\t\treturn strconv.Quote(f.Default) + tail\n \t\t}\ndiff --git a/tag.go b/tag.go\nindex 9f937d7..e4fae67 100644\n--- a/tag.go\n+++ b/tag.go\n@@ -20,6 +20,7 @@ type Tag struct {\n \tHelp        string\n \tType        string\n \tTypeName    string\n+\tHasDefault  bool\n \tDefault     string\n \tFormat      string\n \tPlaceHolder string\n@@ -182,9 +183,10 @@ func hydrateTag(t *Tag, typ reflect.Type) error { // nolint: gocyclo\n \t}\n \tt.Required = required\n \tt.Optional = optional\n+\tt.HasDefault = t.Has(\"default\")\n \tt.Default = t.Get(\"default\")\n \t// Arguments with defaults are always optional.\n-\tif t.Arg && t.Default != \"\" {\n+\tif t.Arg && t.HasDefault {\n \t\tt.Optional = true\n \t} else if t.Arg && !optional { // Arguments are required unless explicitly made optional.\n \t\tt.Required = true\n@@ -229,7 +231,7 @@ func hydrateTag(t *Tag, typ reflect.Type) error { // nolint: gocyclo\n \tt.PlaceHolder = t.Get(\"placeholder\")\n \tt.Enum = t.Get(\"enum\")\n \tscalarType := (typ == nil || !(typ.Kind() == reflect.Slice || typ.Kind() == reflect.Map))\n-\tif t.Enum != \"\" && !(t.Required || t.Default != \"\") && scalarType {\n+\tif t.Enum != \"\" && !(t.Required || t.HasDefault) && scalarType {\n \t\treturn fmt.Errorf(\"enum value is only valid if it is either required or has a valid default value\")\n \t}\n \tpassthrough := t.Has(\"passthrough\")\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/FUNDING.yml",
+    ".github/workflows/ci.yml",
+    ".gitignore",
+    ".golangci.yml",
+    "COPYING",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/README.md",
+    "_examples/server/console.go",
+    "_examples/server/go.mod",
+    "_examples/server/go.sum",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/main.go",
+    "benchmark_test.go",
+    "bin/.go@latest.pkg",
+    "bin/.golangci-lint-1.42.0.pkg",
+    "bin/README.hermit.md",
+    "bin/activate-hermit",
+    "bin/go",
+    "bin/gofmt",
+    "bin/golangci-lint",
+    "bin/hermit",
+    "bin/hermit.hcl",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "config_test.go",
+    "context.go",
+    "defaults.go",
+    "defaults_test.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "go.mod",
+    "go.sum",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "testdata/file.txt",
+    "util.go",
+    "util_test.go",
+    "visit.go"
+  ],
+  "explanation": {
+    "what": "Tag と Value/Flag に HasDefault bool フィールドを追加し、これまで `Default != \"\"` で判定していた「デフォルト値が設定されているか」を `t.Has(\"default\")` による有無チェックに置き換えた。enum バリデーション・Reset()・プレースホルダ表示・default command 判定など、Default 文字列の空チェックをしていた箇所すべてを HasDefault 参照に修正している。",
+    "why": "コミットメッセージの \"Fixes #250\" が示す通り、`default:\"\"` のように空文字列を明示的にデフォルトとして指定した場合と、default タグ自体を省略した場合を区別できていなかった不具合の修正。`Default != \"\"` という文字列比較では両者が区別できず、空文字列を正当なデフォルト値として扱いたいケース(例えば enum フィールドの空デフォルト)が誤って「デフォルト無し」と判定されていた。",
+    "highlights": [
+      { "file": "tag.go", "note": "t.HasDefault = t.Has(\"default\") でタグの有無そのものを記録" },
+      { "file": "model.go", "note": "Value/Flag に HasDefault を追加し、Reset()やFormatPlaceHolder()の判定を置き換え" }
+    ],
+    "langNotes": [
+      { "topic": "struct tag の Has/Get", "note": "Go の struct tag は文字列なので `default:\"\"` と省略を区別するには reflect.StructTag.Lookup 相当の存在チェック(Has)が必要になる。kong は独自の Tag 型でこれを t.Has(key) として実装している。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

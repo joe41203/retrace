@@ -1,0 +1,103 @@
+{
+  "seq": 126,
+  "sha": "e474873f84e1644430a53476ea2fdd1bd2084ef9",
+  "parents": [
+    "041e879d6340da5a3823152eaf48418f4bc92638"
+  ],
+  "author": {
+    "name": "Alec Thomas",
+    "email": "alec@swapoff.org",
+    "date": "2018-11-06T11:15:35+11:00"
+  },
+  "message": "Don't show ... in help for named slice types.",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 16,
+    "deletions": 1
+  },
+  "files": [
+    {
+      "path": "mapper_test.go",
+      "status": "M",
+      "additions": 15,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "model.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/mapper_test.go b/mapper_test.go\nindex 6d393ad..296a133 100644\n--- a/mapper_test.go\n+++ b/mapper_test.go\n@@ -1,6 +1,7 @@\n package kong_test\n \n import (\n+\t\"bytes\"\n \t\"fmt\"\n \t\"io/ioutil\"\n \t\"net/url\"\n@@ -166,3 +167,17 @@ func TestFileContentFlag(t *testing.T) {\n \trequire.NoError(t, err)\n \trequire.Equal(t, []byte(\"hello world\"), []byte(cli.File))\n }\n+\n+func TestNamedSliceTypesDontHaveEllipsis(t *testing.T) {\n+\tvar cli struct {\n+\t\tFile kong.FileContentFlag\n+\t}\n+\tb := bytes.NewBuffer(nil)\n+\tparser := mustNew(t, &cli, kong.Writers(b, b), kong.Exit(func(int) { panic(\"exit\") }))\n+\t// Ensure that --help\n+\trequire.Panics(t, func() {\n+\t\t_, err := parser.Parse([]string{\"--help\"})\n+\t\trequire.NoError(t, err)\n+\t})\n+\trequire.NotContains(t, b.String(), `--file=FILE-CONTENT-FLAG,...`)\n+}\ndiff --git a/model.go b/model.go\nindex 3b42e75..fa6fa0c 100644\n--- a/model.go\n+++ b/model.go\n@@ -251,7 +251,7 @@ func (v *Value) IsCumulative() bool {\n \n // IsSlice returns true if the value is a slice.\n func (v *Value) IsSlice() bool {\n-\treturn v.Target.Kind() == reflect.Slice\n+\treturn v.Target.Type().Name() == \"\" && v.Target.Kind() == reflect.Slice\n }\n \n // IsMap returns true if the value is a map.\n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    ".golangci.yml",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/console.go",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/main.go",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "context.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "go.mod",
+    "go.sum",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "util.go",
+    "util_test.go",
+    "visit.go"
+  ],
+  "explanation": {
+    "what": "Value.IsSlice() の判定を v.Target.Kind() == reflect.Slice だけでなく v.Target.Type().Name() == \"\" も条件に加えるよう変更した。これにより FileContentFlag のような named slice type ([]byte の別名) は IsSlice() が false を返すようになる。テストで --help のヘルプ出力に --file=FILE-CONTENT-FLAG,... のような末尾 ... が含まれないことを検証している。",
+    "why": "コミットメッセージ \"Don't show ... in help for named slice types\" の通り、直近で FileContentFlag を type FileContentFlag []byte という named slice type にした結果、ヘルプの複数値プレースホルダー表示(スライス扱いによる ...)が誤って付与されるようになった問題の修正。",
+    "highlights": [
+      { "file": "model.go", "note": "v.Target.Type().Name() == \"\" という条件で「無名のスライス型」だけを本来のスライスとして扱い、named type は除外している" }
+    ],
+    "langNotes": [
+      { "topic": "reflect.Type.Name() と named type", "note": "Go では []byte のような無名(anonymous)型と、type FileContentFlag []byte のように名前を与えた named type を区別できる。reflect.Type.Name() は named type では型名の文字列を返し、無名型では空文字列を返すため、この差でスライス「らしさ」の扱いを切り替えている。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

@@ -1,0 +1,128 @@
+{
+  "seq": 219,
+  "sha": "3d57e73d1150575deb7d36405beeee3054bdb375",
+  "parents": [
+    "5a9b3ae0120c481a5e9a25efc2e0848d30a165ab"
+  ],
+  "author": {
+    "name": "Alec Thomas",
+    "email": "alec@swapoff.org",
+    "date": "2020-12-04T16:14:16+11:00"
+  },
+  "message": "Ensure values aren't nil before decoding.",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 4,
+    "additions": 43,
+    "deletions": 3
+  },
+  "files": [
+    {
+      "path": "context.go",
+      "status": "M",
+      "additions": 8,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "kong_test.go",
+      "status": "M",
+      "additions": 14,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "mapper.go",
+      "status": "M",
+      "additions": 20,
+      "deletions": 2,
+      "binary": false
+    },
+    {
+      "path": "mapper_test.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/context.go b/context.go\nindex 654de50..bd6ebae 100644\n--- a/context.go\n+++ b/context.go\n@@ -551,6 +551,14 @@ func (c *Context) getValue(value *Value) reflect.Value {\n \tv, ok := c.values[value]\n \tif !ok {\n \t\tv = reflect.New(value.Target.Type()).Elem()\n+\t\tswitch v.Kind() {\n+\t\tcase reflect.Ptr:\n+\t\t\tv.Set(reflect.New(v.Type().Elem()))\n+\t\tcase reflect.Slice:\n+\t\t\tv.Set(reflect.MakeSlice(v.Type(), 0, 0))\n+\t\tcase reflect.Map:\n+\t\t\tv.Set(reflect.MakeMap(v.Type()))\n+\t\t}\n \t\tc.values[value] = v\n \t}\n \treturn v\ndiff --git a/kong_test.go b/kong_test.go\nindex 3703f4d..03ff1d6 100644\n--- a/kong_test.go\n+++ b/kong_test.go\n@@ -936,3 +936,17 @@ func TestValidateArg(t *testing.T) {\n \t_, err := p.Parse([]string{\"one\"})\n \trequire.EqualError(t, err, \"<arg>: flag error\")\n }\n+\n+func TestPointers(t *testing.T) {\n+\tcli := struct {\n+\t\tMapped *mappedValue\n+\t\tJSON   *jsonUnmarshalerValue\n+\t}{}\n+\tp := mustNew(t, &cli)\n+\t_, err := p.Parse([]string{\"--mapped=mapped\", \"--json=\\\"foo\\\"\"})\n+\trequire.NoError(t, err)\n+\trequire.NotNil(t, cli.Mapped)\n+\trequire.Equal(t, \"mapped\", cli.Mapped.decoded)\n+\trequire.NotNil(t, cli.JSON)\n+\trequire.Equal(t, \"FOO\", string(*cli.JSON))\n+}\ndiff --git a/mapper.go b/mapper.go\nindex 01343b0..183ec09 100644\n--- a/mapper.go\n+++ b/mapper.go\n@@ -19,6 +19,7 @@ import (\n var (\n \tmapperValueType       = reflect.TypeOf((*MapperValue)(nil)).Elem()\n \tboolMapperType        = reflect.TypeOf((*BoolMapper)(nil)).Elem()\n+\tjsonUnmarshalerType   = reflect.TypeOf((*json.Unmarshaler)(nil)).Elem()\n \ttextUnmarshalerType   = reflect.TypeOf((*encoding.TextUnmarshaler)(nil)).Elem()\n \tbinaryUnmarshalerType = reflect.TypeOf((*encoding.BinaryUnmarshaler)(nil)).Elem()\n )\n@@ -89,6 +90,20 @@ func (m *binaryUnmarshalerAdapter) Decode(ctx *DecodeContext, target reflect.Val\n \treturn target.Addr().Interface().(encoding.BinaryUnmarshaler).UnmarshalBinary([]byte(value))\n }\n \n+type jsonUnmarshalerAdapter struct{}\n+\n+func (j *jsonUnmarshalerAdapter) Decode(ctx *DecodeContext, target reflect.Value) error {\n+\tvar value string\n+\terr := ctx.Scan.PopValueInto(\"value\", &value)\n+\tif err != nil {\n+\t\treturn err\n+\t}\n+\tif target.Type().Implements(jsonUnmarshalerType) {\n+\t\treturn target.Interface().(json.Unmarshaler).UnmarshalJSON([]byte(value))\n+\t}\n+\treturn target.Addr().Interface().(json.Unmarshaler).UnmarshalJSON([]byte(value))\n+}\n+\n // A Mapper represents how a field is mapped from command-line values to Go.\n //\n // Mappers can be associated with concrete fields via pointer, reflect.Type, reflect.Kind, or via a \"type\" tag.\n@@ -177,10 +192,13 @@ func (r *Registry) ForType(typ reflect.Type) Mapper {\n \t}\n \t// Next try stdlib unmarshaler interfaces.\n \tfor _, impl := range []reflect.Type{typ, reflect.PtrTo(typ)} {\n-\t\tif impl.Implements(textUnmarshalerType) {\n+\t\tswitch {\n+\t\tcase impl.Implements(textUnmarshalerType):\n \t\t\treturn &textUnmarshalerAdapter{}\n-\t\t} else if impl.Implements(binaryUnmarshalerType) {\n+\t\tcase impl.Implements(binaryUnmarshalerType):\n \t\t\treturn &binaryUnmarshalerAdapter{}\n+\t\tcase impl.Implements(jsonUnmarshalerType):\n+\t\t\treturn &jsonUnmarshalerAdapter{}\n \t\t}\n \t}\n \t// Finally try registered kinds.\ndiff --git a/mapper_test.go b/mapper_test.go\nindex 25fb543..091322c 100644\n--- a/mapper_test.go\n+++ b/mapper_test.go\n@@ -72,7 +72,7 @@ func TestJSONUnmarshaler(t *testing.T) {\n \t\tValue jsonUnmarshalerValue\n \t}\n \tp := mustNew(t, &cli)\n-\t_, err := p.Parse([]string{\"--value=hello\"})\n+\t_, err := p.Parse([]string{\"--value=\\\"hello\\\"\"})\n \trequire.NoError(t, err)\n \trequire.Equal(t, \"HELLO\", string(cli.Value))\n }\n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    ".gitignore",
+    ".golangci.yml",
+    "COPYING",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/README.md",
+    "_examples/server/console.go",
+    "_examples/server/go.mod",
+    "_examples/server/go.sum",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/main.go",
+    "benchmark_test.go",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "config_test.go",
+    "context.go",
+    "defaults.go",
+    "defaults_test.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "go.mod",
+    "go.sum",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "testdata/file.txt",
+    "util.go",
+    "util_test.go",
+    "visit.go"
+  ],
+  "explanation": {
+    "what": "Context.getValue() が新しい reflect.Value を生成する際、対象の Kind がポインタ・スライス・マップの場合はゼロ値のまま放置せず、それぞれ reflect.New / reflect.MakeSlice / reflect.MakeMap で初期化するようにした。あわせて mapper.go に json.Unmarshaler 用のデコードアダプタ(jsonUnmarshalerAdapter)を追加し、Registry.ForType() の判定を if-else 連鎖から switch 文に書き換えて json.Unmarshaler 実装型も判定できるようにした。テストとして *mappedValue・*jsonUnmarshalerValue のポインタ型フラグを解析する TestPointers を追加している。",
+    "why": "コミットメッセージ「Ensure values aren't nil before decoding.」の通り、値が nil のままデコード処理に渡ると外部の Decode/UnmarshalJSON/UnmarshalText 実装がポインタの参照外し等で panic する可能性があったため、おそらく事前に nil でない実体を用意してから渡すように修正したと考えられる。同時に json.Unmarshaler の未対応という別の穴も一緒に塞いでいる。",
+    "highlights": [
+      { "file": "context.go", "note": "getValue() でポインタ/スライス/マップを事前初期化。「デコード前に必ず有効な値を渡す」という不変条件を保証する変更" },
+      { "file": "mapper.go", "note": "Registry.ForType() が textUnmarshalerType / binaryUnmarshalerType に加えて jsonUnmarshalerType も switch で判定するようになった" }
+    ],
+    "langNotes": [
+      { "topic": "reflect.New / MakeSlice / MakeMap", "note": "reflect.New(T) は *T のゼロ値ポインタを、MakeSlice/MakeMap はそれぞれ空のスライス・マップを生成する。Go の nil ポインタ/nilスライス/nilマップはそれぞれ挙動が異なり(nilマップへの書き込みはpanicするが読み取りは可能、等)、reflect 経由で動的に安全な初期値を用意する典型パターン。" }
+    ],
+    "diagram": null,
+    "evidence": "inferred",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

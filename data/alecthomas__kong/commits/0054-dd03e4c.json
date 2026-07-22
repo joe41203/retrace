@@ -1,0 +1,72 @@
+{
+  "seq": 54,
+  "sha": "dd03e4c48a0ee5e63c7d1e9d533ef015f442ce9a",
+  "parents": [
+    "71b2dec48b238fe6d42106f4041eca7f6ced2b0a"
+  ],
+  "author": {
+    "name": "Alec Thomas",
+    "email": "alec@swapoff.org",
+    "date": "2018-06-08T14:54:10+10:00"
+  },
+  "message": "Ensure help Flag has Tag.",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 1,
+    "deletions": 0
+  },
+  "files": [
+    {
+      "path": "kong.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/kong.go b/kong.go\nindex a57fe66..f94ddcb 100644\n--- a/kong.go\n+++ b/kong.go\n@@ -88,6 +88,7 @@ func (k *Kong) extraFlags() []*Flag {\n \t\t\tName:   \"help\",\n \t\t\tHelp:   \"Show context-sensitive help.\",\n \t\t\tValue:  value,\n+\t\t\tTag:    &Tag{},\n \t\t\tMapper: k.registry.ForValue(value),\n \t\t},\n \t}\n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    "README.md",
+    "_examples/shell/main.go",
+    "build.go",
+    "camelcase.go",
+    "context.go",
+    "context_test.go",
+    "global.go",
+    "global_test.go",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "kong.go",
+    "kong_test.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "tokentype_string.go"
+  ],
+  "explanation": {
+    "what": "kong.goのextraFlags()が組み立てる自動生成の--helpフラグに、空の&Tag{}を明示的にセットした。",
+    "why": "コミットメッセージ「Ensure help Flag has Tag.」から、helpフラグだけTagフィールドがnilのままだった状態と考えられる。Tagはヘルプ表示やSep/Env等の各種参照先として他のFlagコードパスから前提にされているため、nilのままだと参照時にnilポインタ参照で落ちる可能性があり、それを避けるための修正。",
+    "highlights": [
+      { "file": "kong.go", "note": "extraFlags()内のhelpFlag生成に`Tag: &Tag{}`を追加" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

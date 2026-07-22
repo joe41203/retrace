@@ -1,0 +1,142 @@
+{
+  "seq": 338,
+  "sha": "074ccd090604a69363b9e6f56b0205bafb79884d",
+  "parents": [
+    "a9be85c4d3d674b9bc993a954861e674372cf7db"
+  ],
+  "author": {
+    "name": "Mitar",
+    "email": "mitar.git@tnode.com",
+    "date": "2023-07-21T05:08:56-07:00"
+  },
+  "message": "fix: remove showing app name twice in errors (#368)",
+  "pr": {
+    "number": 368,
+    "title": "fix: remove showing app name twice in errors",
+    "body": "Fixes #332.\r\n\r\nSo there is no need to prepend the app name at this point because `kong.Errorf` prepends all outputs with app name already. So the app-level failures should just return the error. Only when it is deeper we need additional information about the node where the error is coming from.",
+    "url": "https://github.com/alecthomas/kong/pull/368"
+  },
+  "linkedIssues": [
+    {
+      "number": 332,
+      "title": "Too verbose error message when using Validate",
+      "body": "This might be nitpicking, but a simple [program](https://go.dev/play/p/2oCBDlOgMmm):\r\n\r\n```go\r\npackage main\r\n\r\nimport (\r\n\t\"errors\"\r\n\r\n\t\"github.com/alecthomas/kong\"\r\n)\r\n\r\ntype Config struct{}\r\n\r\nfunc (c Config) Validate() error {\r\n\treturn errors.New(\"foobar\")\r\n}\r\n\r\nfunc main() {\r\n\tvar config Config\r\n\tkong.Parse(&config)\r\n}\r\n```\r\n\r\nOutputs:\r\n\r\n```\r\nplay: error: play: foobar\r\n```\r\n\r\nI find that double `play` in there ugly and unnecessary. Could it be removed?",
+      "url": "https://github.com/alecthomas/kong/issues/332"
+    }
+  ],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 6,
+    "deletions": 3
+  },
+  "files": [
+    {
+      "path": "context.go",
+      "status": "M",
+      "additions": 5,
+      "deletions": 2,
+      "binary": false
+    },
+    {
+      "path": "kong_test.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/context.go b/context.go\nindex 0ec10f4..dddf796 100644\n--- a/context.go\n+++ b/context.go\n@@ -201,7 +201,7 @@ func (c *Context) Validate() error { // nolint: gocyclo\n \n \t\tcase *Application:\n \t\t\tvalue = node.Target\n-\t\t\tdesc = node.Name\n+\t\t\tdesc = \"\"\n \n \t\tcase *Node:\n \t\t\tvalue = node.Target\n@@ -209,7 +209,10 @@ func (c *Context) Validate() error { // nolint: gocyclo\n \t\t}\n \t\tif validate := isValidatable(value); validate != nil {\n \t\t\tif err := validate.Validate(); err != nil {\n-\t\t\t\treturn fmt.Errorf(\"%s: %w\", desc, err)\n+\t\t\t\tif desc != \"\" {\n+\t\t\t\t\treturn fmt.Errorf(\"%s: %w\", desc, err)\n+\t\t\t\t}\n+\t\t\t\treturn err\n \t\t\t}\n \t\t}\n \t}\ndiff --git a/kong_test.go b/kong_test.go\nindex 72c73cf..1ef424e 100644\n--- a/kong_test.go\n+++ b/kong_test.go\n@@ -1214,7 +1214,7 @@ func TestValidateApp(t *testing.T) {\n \tcli := validateCli{}\n \tp := mustNew(t, &cli)\n \t_, err := p.Parse([]string{})\n-\tassert.EqualError(t, err, \"test: app error\")\n+\tassert.EqualError(t, err, \"app error\")\n }\n \n func TestValidateCmd(t *testing.T) {\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/FUNDING.yml",
+    ".github/workflows/ci.yml",
+    ".gitignore",
+    ".golangci.yml",
+    "COPYING",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/README.md",
+    "_examples/server/console.go",
+    "_examples/server/go.mod",
+    "_examples/server/go.sum",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/commandstring/main.go",
+    "_examples/shell/help/README.md",
+    "_examples/shell/help/main.go",
+    "benchmark_test.go",
+    "bin/.go-1.19.1.pkg",
+    "bin/.golangci-lint-1.46.2.pkg",
+    "bin/README.hermit.md",
+    "bin/activate-hermit",
+    "bin/go",
+    "bin/gofmt",
+    "bin/golangci-lint",
+    "bin/hermit",
+    "bin/hermit.hcl",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "config_test.go",
+    "context.go",
+    "defaults.go",
+    "defaults_test.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "go.mod",
+    "go.sum",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "helpwrap1.18_test.go",
+    "helpwrap1.19_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_linux_test.go",
+    "mapper_test.go",
+    "mapper_windows_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "testdata/file.txt",
+    "util.go",
+    "util_test.go",
+    "visit.go"
+  ],
+  "explanation": {
+    "what": "Context.Validate() でアプリケーションレベルの Validate() エラーにアプリ名を前置していた処理を取り除いた。*Application ノードのケースでは desc を空文字にし、desc が空のときはラップせずにエラーをそのまま返すよう context.go を修正した。",
+    "why": "PR本文に説明がある通り、kong.Errorf がすでに全ての出力にアプリ名を前置しているため、アプリレベルの Validate() エラーにさらに desc(アプリ名)を前置すると `play: error: play: foobar` のようにアプリ名が二重に表示されてしまっていた。ノードが深い階層(サブコマンド等)の場合はどのノードでエラーが起きたかの情報が必要なため、そちらの前置は残している。",
+    "highlights": [
+      { "file": "context.go", "note": "*Application ケースのみ desc を空にし、desc が空なら fmt.Errorf でラップせず err をそのまま返す分岐を追加" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [
+      { "type": "pr", "number": 368, "url": "https://github.com/alecthomas/kong/pull/368" },
+      { "type": "issue", "number": 332, "url": "https://github.com/alecthomas/kong/issues/332" }
+    ],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

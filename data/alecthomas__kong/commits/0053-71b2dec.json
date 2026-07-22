@@ -1,0 +1,72 @@
+{
+  "seq": 53,
+  "sha": "71b2dec48b238fe6d42106f4041eca7f6ced2b0a",
+  "parents": [
+    "01fa22ca0396fbdd8ba0f7eb2f09fd2b29fc0053"
+  ],
+  "author": {
+    "name": "Alec Thomas",
+    "email": "alec@swapoff.org",
+    "date": "2018-06-08T14:27:08+10:00"
+  },
+  "message": "Always match commands before arguments.",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 15,
+    "deletions": 14
+  },
+  "files": [
+    {
+      "path": "context.go",
+      "status": "M",
+      "additions": 15,
+      "deletions": 14,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/context.go b/context.go\nindex 449cc83..0cd8cac 100644\n--- a/context.go\n+++ b/context.go\n@@ -264,22 +264,23 @@ func (c *Context) trace(node *Node) (err error) { // nolint: gocyclo\n \t\t\t\tbreak\n \t\t\t}\n \n-\t\t\t// After positional arguments have been consumed, handle commands and branching arguments.\n+\t\t\t// After positional arguments have been consumed, check commands next...\n \t\t\tfor _, branch := range node.Children {\n-\t\t\t\tswitch branch.Type {\n-\t\t\t\tcase CommandNode:\n-\t\t\t\t\tif branch.Name == token.Value {\n-\t\t\t\t\t\tc.scan.Pop()\n-\t\t\t\t\t\tc.Path = append(c.Path, &Path{\n-\t\t\t\t\t\t\tParent:  node,\n-\t\t\t\t\t\t\tCommand: branch,\n-\t\t\t\t\t\t\tValue:   branch.Target,\n-\t\t\t\t\t\t\tFlags:   node.Flags,\n-\t\t\t\t\t\t})\n-\t\t\t\t\t\treturn c.trace(branch)\n-\t\t\t\t\t}\n+\t\t\t\tif branch.Type == CommandNode && branch.Name == token.Value {\n+\t\t\t\t\tc.scan.Pop()\n+\t\t\t\t\tc.Path = append(c.Path, &Path{\n+\t\t\t\t\t\tParent:  node,\n+\t\t\t\t\t\tCommand: branch,\n+\t\t\t\t\t\tValue:   branch.Target,\n+\t\t\t\t\t\tFlags:   node.Flags,\n+\t\t\t\t\t})\n+\t\t\t\t\treturn c.trace(branch)\n+\t\t\t\t}\n+\t\t\t}\n \n-\t\t\t\tcase ArgumentNode:\n+\t\t\t// Finally, check arguments.\n+\t\t\tfor _, branch := range node.Children {\n+\t\t\t\tif branch.Type == ArgumentNode {\n \t\t\t\t\targ := branch.Argument\n \t\t\t\t\tif value, err := arg.Parse(c.scan); err == nil {\n \t\t\t\t\t\tc.Path = append(c.Path, &Path{\n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    "README.md",
+    "_examples/shell/main.go",
+    "build.go",
+    "camelcase.go",
+    "context.go",
+    "context_test.go",
+    "global.go",
+    "global_test.go",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "kong.go",
+    "kong_test.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "tokentype_string.go"
+  ],
+  "explanation": {
+    "what": "Context.trace()内で子ノードを1回のループでCommandNode/ArgumentNodeをswitch分岐していた処理を、コマンドを走査するループと引数を走査するループの2段階に分離した。これにより、同じnode.Childrenの並び順に関係なく、常にコマンド一致判定が先に行われ、一致しなければ次に引数の判定に進むようになる。",
+    "why": "コミットメッセージ「Always match commands before arguments.」が示す通り、コマンドと引数が両方子ノードに含まれる場合に、これまでは子ノードの定義順によってどちらが先に一致判定されるか決まってしまう(コマンドより手前に定義された引数ノードが誤って先にマッチする)問題があったと考えられる。ループを分離することでコマンド優先を構造的に保証する。",
+    "highlights": [
+      { "file": "context.go", "note": "switch文による単一ループを、CommandNodeを見るforループとArgumentNodeを見るforループの直列2段構成に変更" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

@@ -1,0 +1,68 @@
+{
+  "seq": 14,
+  "sha": "3b21a540942367e362db7c5a3ec9b690ed3a853b",
+  "parents": [
+    "d03571a8730258210f8a387607d300937450648a"
+  ],
+  "author": {
+    "name": "Alec Thomas",
+    "email": "alec@swapoff.org",
+    "date": "2018-05-18T21:30:44+10:00"
+  },
+  "message": "More validation.",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 19,
+    "deletions": 2
+  },
+  "files": [
+    {
+      "path": "build.go",
+      "status": "M",
+      "additions": 9,
+      "deletions": 2,
+      "binary": false
+    },
+    {
+      "path": "kong_test.go",
+      "status": "M",
+      "additions": 10,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/build.go b/build.go\nindex 8b4834e..656c452 100644\n--- a/build.go\n+++ b/build.go\n@@ -23,7 +23,11 @@ func build(ast interface{}) (app *Application, err error) {\n \t\treturn nil, fmt.Errorf(\"expected a pointer to a struct but got %T\", ast)\n \t}\n \n-\treturn buildNode(iv, true), nil\n+\tnode := buildNode(iv, true)\n+\tif len(node.Positional) > 0 && len(node.Children) > 0 {\n+\t\treturn nil, fmt.Errorf(\"can't mix positional arguments and branching arguments on %T\", ast)\n+\t}\n+\treturn node, nil\n }\n \n func buildNode(v reflect.Value, cmd bool) *Node {\n@@ -91,6 +95,10 @@ func buildNode(v reflect.Value, cmd bool) *Node {\n \t\t\t\tchild.Name = name\n \t\t\t\tnode.Children = append(node.Children, &Branch{Command: child})\n \t\t\t}\n+\n+\t\t\tif len(child.Positional) > 0 && len(child.Children) > 0 {\n+\t\t\t\tfail(\"can't mix positional arguments and branching arguments on %s.%s\", v.Type().Name(), ft.Name)\n+\t\t\t}\n \t\t} else {\n \t\t\tif decoder == nil {\n \t\t\t\tfail(\"no decoder for %s.%s (of type %s)\", v.Type(), ft.Name, ft.Type)\n@@ -118,6 +126,5 @@ func buildNode(v reflect.Value, cmd bool) *Node {\n \t\t\t}\n \t\t}\n \t}\n-\n \treturn node\n }\ndiff --git a/kong_test.go b/kong_test.go\nindex 99f1621..edf7238 100644\n--- a/kong_test.go\n+++ b/kong_test.go\n@@ -124,3 +124,13 @@ func TestMatchingArgField(t *testing.T) {\n \t_, err := New(&cli)\n \trequire.Error(t, err)\n }\n+\n+func TestCantMixPositionalAndBranches(t *testing.T) {\n+\tvar cli struct {\n+\t\tArg     string `arg:\"\"`\n+\t\tCommand struct {\n+\t\t} `cmd:\"\"`\n+\t}\n+\t_, err := New(&cli)\n+\trequire.Error(t, err)\n+}\n",
+  "diffTruncated": false,
+  "tree": [
+    "README.md",
+    "_examples/shell/main.go",
+    "build.go",
+    "camelcase.go",
+    "decoders.go",
+    "decoders_test.go",
+    "global.go",
+    "help.go",
+    "kong.go",
+    "kong_test.go",
+    "model.go",
+    "options.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tokentype_string.go"
+  ],
+  "explanation": {
+    "what": "build() と buildNode() に、positional 引数(Positional)とブランチ(Children)が同一ノードに混在する場合を検出してエラーにするチェックを追加した。トップレベルは build() 内で fmt.Errorf を返し、ネストした子ノードは buildNode() 内で fail() によるパニックにしている。対応するテスト TestCantMixPositionalAndBranches を追加。",
+    "why": "コマンドラインの文法として、あるコマンドが「後続の位置引数を受け取る」のか「サブコマンドに分岐する」のかは二者択一であるべきで、両方を同時に許すとパース時にどちらとして解釈すべきか曖昧になるため、構築時に禁止したと考えられる。",
+    "highlights": [
+      { "file": "build.go", "note": "len(node.Positional) > 0 && len(node.Children) > 0 で弾く2箇所(トップレベルとネスト)" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

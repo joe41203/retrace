@@ -1,0 +1,101 @@
+{
+  "seq": 65,
+  "sha": "54386f7fa5a8f6c529ecd9cb9b28e851bb89cf5a",
+  "parents": [
+    "c7dca86dad7b2b09190e38e2476a2057587e2533"
+  ],
+  "author": {
+    "name": "Alec Thomas",
+    "email": "alec@swapoff.org",
+    "date": "2018-06-13T21:41:55+10:00"
+  },
+  "message": "Track trace values externally to the path.\n\nThis allows accumulating mappers to work correctly. This also means\nthat resolvers are not even triggered if a command-line value is passed,\nwhich is more desirable behaviour.",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 4,
+    "additions": 53,
+    "deletions": 33
+  },
+  "files": [
+    {
+      "path": "context.go",
+      "status": "M",
+      "additions": 46,
+      "deletions": 20,
+      "binary": false
+    },
+    {
+      "path": "kong_test.go",
+      "status": "M",
+      "additions": 2,
+      "deletions": 2,
+      "binary": false
+    },
+    {
+      "path": "model.go",
+      "status": "M",
+      "additions": 4,
+      "deletions": 10,
+      "binary": false
+    },
+    {
+      "path": "resolver_test.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/context.go b/context.go\nindex 1f39e74..9b26d5f 100755\n--- a/context.go\n+++ b/context.go\n@@ -21,9 +21,6 @@ type Path struct {\n \t// Flags added by this node.\n \tFlags []*Flag\n \n-\t// Parsed value for non-commands.\n-\tValue reflect.Value\n-\n \t// True if this Path element was created as the result of a resolver.\n \tResolved bool\n }\n@@ -34,8 +31,22 @@ type Context struct {\n \tPath  []*Path // A trace through parsed nodes.\n \tError error   // Error that occurred during trace, if any.\n \n-\targs []string\n-\tscan *Scanner\n+\tvalues map[*Value]reflect.Value // Temporary values during tracing.\n+\targs   []string\n+\tscan   *Scanner\n+}\n+\n+// Value returns the value for a particular path element.\n+func (c *Context) Value(path *Path) reflect.Value {\n+\tswitch {\n+\tcase path.Positional != nil:\n+\t\treturn c.values[path.Positional]\n+\tcase path.Flag != nil:\n+\t\treturn c.values[path.Flag.Value]\n+\tcase path.Argument != nil:\n+\t\treturn c.values[path.Argument.Argument]\n+\t}\n+\tpanic(\"can only retrieve value for flag, argument or positional\")\n }\n \n // Selected command or argument.\n@@ -62,9 +73,10 @@ func Trace(k *Kong, args []string) (*Context, error) {\n \t\tApp:  k,\n \t\targs: args,\n \t\tPath: []*Path{\n-\t\t\t{App: k.Model, Flags: k.Model.Flags, Value: k.Model.Target},\n+\t\t\t{App: k.Model, Flags: k.Model.Flags},\n \t\t},\n-\t\tscan: Scan(args...),\n+\t\tvalues: map[*Value]reflect.Value{},\n+\t\tscan:   Scan(args...),\n \t}\n \tc.Error = c.trace(&c.App.Model.Node)\n \treturn c, c.traceResolvers()\n@@ -142,7 +154,7 @@ func (c *Context) Command() (command []string) {\n func (c *Context) FlagValue(flag *Flag) reflect.Value {\n \tfor _, trace := range c.Path {\n \t\tif trace.Flag == flag {\n-\t\t\treturn trace.Value\n+\t\t\treturn c.values[trace.Flag.Value]\n \t\t}\n \t}\n \treturn reflect.Value{}\n@@ -253,14 +265,13 @@ func (c *Context) trace(node *Node) (err error) { // nolint: gocyclo\n \t\t\t// Ensure we've consumed all positional arguments.\n \t\t\tif positional < len(node.Positional) {\n \t\t\t\targ := node.Positional[positional]\n-\t\t\t\tvalue, err := arg.Parse(c.scan)\n+\t\t\t\terr := arg.Parse(c.scan, c.getValue(arg))\n \t\t\t\tif err != nil {\n \t\t\t\t\treturn err\n \t\t\t\t}\n \t\t\t\tc.Path = append(c.Path, &Path{\n \t\t\t\t\tParent:     node,\n \t\t\t\t\tPositional: arg,\n-\t\t\t\t\tValue:      value,\n \t\t\t\t})\n \t\t\t\tpositional++\n \t\t\t\tbreak\n@@ -273,7 +284,6 @@ func (c *Context) trace(node *Node) (err error) { // nolint: gocyclo\n \t\t\t\t\tc.Path = append(c.Path, &Path{\n \t\t\t\t\t\tParent:  node,\n \t\t\t\t\t\tCommand: branch,\n-\t\t\t\t\t\tValue:   branch.Target,\n \t\t\t\t\t\tFlags:   branch.Flags,\n \t\t\t\t\t})\n \t\t\t\t\treturn c.trace(branch)\n@@ -284,11 +294,10 @@ func (c *Context) trace(node *Node) (err error) { // nolint: gocyclo\n \t\t\tfor _, branch := range node.Children {\n \t\t\t\tif branch.Type == ArgumentNode {\n \t\t\t\t\targ := branch.Argument\n-\t\t\t\t\tif value, err := arg.Parse(c.scan); err == nil {\n+\t\t\t\t\tif err := arg.Parse(c.scan, c.getValue(arg)); err == nil {\n \t\t\t\t\t\tc.Path = append(c.Path, &Path{\n \t\t\t\t\t\t\tParent:   node,\n \t\t\t\t\t\t\tArgument: branch,\n-\t\t\t\t\t\t\tValue:    value,\n \t\t\t\t\t\t\tFlags:    branch.Flags,\n \t\t\t\t\t\t})\n \t\t\t\t\t\treturn c.trace(branch)\n@@ -313,6 +322,10 @@ func (c *Context) traceResolvers() error {\n \tinserted := []*Path{}\n \tfor _, path := range c.Path {\n \t\tfor _, flag := range path.Flags {\n+\t\t\t// Flag has already been set on the command-line.\n+\t\t\tif _, ok := c.values[flag.Value]; ok {\n+\t\t\t\tcontinue\n+\t\t\t}\n \t\t\tfor _, resolver := range c.App.resolvers {\n \t\t\t\ts, err := resolver(c, path, flag)\n \t\t\t\tif err != nil {\n@@ -323,13 +336,13 @@ func (c *Context) traceResolvers() error {\n \t\t\t\t}\n \n \t\t\t\tscan := Scan().PushTyped(s, FlagValueToken)\n-\t\t\t\tvalue, err := flag.Parse(scan)\n+\t\t\t\tdelete(c.values, flag.Value)\n+\t\t\t\terr = flag.Parse(scan, c.getValue(flag.Value))\n \t\t\t\tif err != nil {\n \t\t\t\t\treturn err\n \t\t\t\t}\n \t\t\t\tinserted = append(inserted, &Path{\n \t\t\t\t\tFlag:     flag,\n-\t\t\t\t\tValue:    value,\n \t\t\t\t\tResolved: true,\n \t\t\t\t})\n \t\t\t}\n@@ -339,6 +352,15 @@ func (c *Context) traceResolvers() error {\n \treturn nil\n }\n \n+func (c *Context) getValue(value *Value) reflect.Value {\n+\tv, ok := c.values[value]\n+\tif !ok {\n+\t\tv = reflect.New(value.Target.Type()).Elem()\n+\t\tc.values[value] = v\n+\t}\n+\treturn v\n+}\n+\n // Apply traced context to the target grammar.\n func (c *Context) Apply() (string, error) {\n \terr := c.reset(&c.App.Model.Node)\n@@ -349,21 +371,25 @@ func (c *Context) Apply() (string, error) {\n \tpath := []string{}\n \n \tfor _, trace := range c.Path {\n+\t\tvar value *Value\n \t\tswitch {\n \t\tcase trace.App != nil:\n \t\tcase trace.Argument != nil:\n \t\t\tpath = append(path, \"<\"+trace.Argument.Name+\">\")\n-\t\t\ttrace.Argument.Argument.Apply(trace.Value)\n+\t\t\tvalue = trace.Argument.Argument\n \t\tcase trace.Command != nil:\n \t\t\tpath = append(path, trace.Command.Name)\n \t\tcase trace.Flag != nil:\n-\t\t\ttrace.Flag.Value.Apply(trace.Value)\n+\t\t\tvalue = trace.Flag.Value\n \t\tcase trace.Positional != nil:\n \t\t\tpath = append(path, \"<\"+trace.Positional.Name+\">\")\n-\t\t\ttrace.Positional.Apply(trace.Value)\n+\t\t\tvalue = trace.Positional\n \t\tdefault:\n \t\t\tpanic(\"unsupported path ?!\")\n \t\t}\n+\t\tif value != nil {\n+\t\t\tvalue.Apply(c.getValue(value))\n+\t\t}\n \t}\n \n \treturn strings.Join(path, \" \"), nil\n@@ -378,11 +404,11 @@ func (c *Context) matchFlags(flags []*Flag, matcher func(f *Flag) bool) (err err\n \t\t\tcontinue\n \t\t}\n \t\tc.scan.Pop()\n-\t\tvalue, err := flag.Parse(c.scan)\n+\t\terr := flag.Parse(c.scan, c.getValue(flag.Value))\n \t\tif err != nil {\n \t\t\treturn err\n \t\t}\n-\t\tc.Path = append(c.Path, &Path{Flag: flag, Value: value})\n+\t\tc.Path = append(c.Path, &Path{Flag: flag})\n \t\treturn nil\n \t}\n \treturn fmt.Errorf(\"unknown flag --%s\", token.Value)\ndiff --git a/kong_test.go b/kong_test.go\nindex a288980..bb3d322 100644\n--- a/kong_test.go\n+++ b/kong_test.go\n@@ -352,8 +352,8 @@ func TestHooks(t *testing.T) {\n \t\t{\"ArgAndFlag\", \"one two --three=three\", values{true, \"two\", \"three\"}},\n \t}\n \tsetOne := func(ctx *Context, path *Path) error { hooked.one = true; return nil }\n-\tsetTwo := func(ctx *Context, path *Path) error { hooked.two = path.Value.String(); return nil }\n-\tsetThree := func(ctx *Context, path *Path) error { hooked.three = path.Value.String(); return nil }\n+\tsetTwo := func(ctx *Context, path *Path) error { hooked.two = ctx.Value(path).String(); return nil }\n+\tsetThree := func(ctx *Context, path *Path) error { hooked.three = ctx.Value(path).String(); return nil }\n \tp := mustNew(t, &cli,\n \t\tHook(&cli.One, setOne),\n \t\tHook(&cli.One.Two, setTwo),\ndiff --git a/model.go b/model.go\nindex 91bb891..a7834ca 100644\n--- a/model.go\n+++ b/model.go\n@@ -178,13 +178,12 @@ func (v *Value) IsBool() bool {\n }\n \n // Parse tokens into value, parse, and validate, but do not write to the field.\n-func (v *Value) Parse(scan *Scanner) (reflect.Value, error) {\n-\tvalue := reflect.New(v.Target.Type()).Elem()\n-\terr := v.Mapper.Decode(&DecodeContext{Value: v, Scan: scan}, value)\n+func (v *Value) Parse(scan *Scanner, target reflect.Value) error {\n+\terr := v.Mapper.Decode(&DecodeContext{Value: v, Scan: scan}, target)\n \tif err == nil {\n \t\tv.Set = true\n \t}\n-\treturn value, err\n+\treturn err\n }\n \n // Apply value to field.\n@@ -199,12 +198,7 @@ func (v *Value) Apply(value reflect.Value) {\n func (v *Value) Reset() error {\n \tv.Target.Set(reflect.Zero(v.Target.Type()))\n \tif v.Default != \"\" {\n-\t\tvalue, err := v.Parse(Scan(v.Default))\n-\t\tif err != nil {\n-\t\t\treturn err\n-\t\t}\n-\t\tv.Apply(value)\n-\t\tv.Set = false\n+\t\treturn v.Parse(Scan(v.Default), v.Target)\n \t}\n \treturn nil\n }\ndiff --git a/resolver_test.go b/resolver_test.go\nindex 0bd02e1..be4d1f6 100755\n--- a/resolver_test.go\n+++ b/resolver_test.go\n@@ -147,7 +147,7 @@ func TestResolvedValueTriggersHooks(t *testing.T) {\n \t_, err = p.Parse([]string{\"--int=2\"})\n \trequire.NoError(t, err)\n \trequire.Equal(t, 2, cli.Int)\n-\trequire.Equal(t, 2, hooked)\n+\trequire.Equal(t, 1, hooked)\n }\n \n type testUppercaseMapper struct{}\n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    ".golangci.yml",
+    "README.md",
+    "_examples/shell/main.go",
+    "build.go",
+    "camelcase.go",
+    "context.go",
+    "doc.go",
+    "global.go",
+    "global_test.go",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "tokentype_string.go"
+  ],
+  "explanation": {
+    "what": "Path 構造体からパース済み値を保持していた Value フィールドを削除し、Context に *Value(フィールド定義)をキーとした values map を新設して、そこに reflect.Value を一時保管するよう変更した。Value.Parse() のシグネチャも値を返す形から target を受け取って書き込む形に変え、traceResolvers() では「コマンドラインで既に値がセットされているフラグは resolver を呼ばない」ガードを追加した。",
+    "why": "コミットメッセージにある通り、累積型(スライスなど)のマッパーが正しく動作するようにするため。従来 Path ごとに独立した Value を保持していたため、同じフラグが複数回パースされる累積処理では最終的な値を一箇所にまとめて追跡できなかった。Context.values という中央管理に変えることで、同一 *Value への複数回の Parse を1つの reflect.Value に集約できる。副次効果として、コマンドラインで明示指定された値がある場合は resolver(env や設定ファイル)を発火させない、より直感的な優先順位も実現している。",
+    "highlights": [
+      { "file": "context.go", "note": "Context.values map[*Value]reflect.Value と getValue() が新設され、Path.Value フィールドの代わりに一元管理される" },
+      { "file": "model.go", "note": "Value.Parse(scan, target) が target に直接書き込む形に変わり、呼び出し側が値の生存期間を制御できるようになった" }
+    ],
+    "langNotes": [
+      { "topic": "map[*Value]reflect.Value というポインタキーの map", "note": "Go の map はポインタもキーにでき、ポインタの同一性(アドレス一致)で比較される。ここでは struct フィールド定義を表す *Value をキーにして、パース中の一時的な reflect.Value を紐付けている。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

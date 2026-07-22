@@ -1,0 +1,105 @@
+{
+  "seq": 93,
+  "sha": "856d62e28a90921ac7b399478165fec1a0353eda",
+  "parents": [
+    "539214f23ec6f5c1af07afbe5a38f691572f57c8"
+  ],
+  "author": {
+    "name": "Alec Thomas",
+    "email": "alec@swapoff.org",
+    "date": "2018-07-26T20:35:20+10:00"
+  },
+  "message": "Support multiple key+value pairs for map flags.",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 3,
+    "additions": 47,
+    "deletions": 25
+  },
+  "files": [
+    {
+      "path": "README.md",
+      "status": "M",
+      "additions": 2,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "mapper.go",
+      "status": "M",
+      "additions": 35,
+      "deletions": 25,
+      "binary": false
+    },
+    {
+      "path": "mapper_test.go",
+      "status": "M",
+      "additions": 10,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/README.md b/README.md\nindex f39285c..9a54198 100644\n--- a/README.md\n+++ b/README.md\n@@ -346,6 +346,8 @@ var CLI struct {\n }\n ```\n \n+For flags, multiple key+value pairs should be separated by `;` eg. `--set=\"key1=value1;key2=value2\"`.\n+\n ## Custom named decoders\n \n Kong includes a number of builtin custom type mappers. These can be used by\ndiff --git a/mapper.go b/mapper.go\nindex 03acc02..20d1dac 100644\n--- a/mapper.go\n+++ b/mapper.go\n@@ -284,37 +284,47 @@ func mapDecoder(r *Registry) MapperFunc {\n \t\t\ttarget.Set(reflect.MakeMap(target.Type()))\n \t\t}\n \t\tel := target.Type()\n-\t\ttoken := ctx.Scan.PopValue(\"map\")\n-\t\tparts := strings.SplitN(token, \"=\", 2)\n-\t\tif len(parts) != 2 {\n-\t\t\treturn fmt.Errorf(\"expected \\\"<key>=<value>\\\" but got %q\", token)\n+\t\tvar childScanner *Scanner\n+\t\tif ctx.Value.Flag != nil {\n+\t\t\t// If decoding a flag, we need an argument.\n+\t\t\tchildScanner = Scan(SplitEscaped(ctx.Scan.PopValue(\"map\"), ';')...)\n+\t\t} else {\n+\t\t\ttokens := ctx.Scan.PopWhile(func(t Token) bool { return t.IsValue() })\n+\t\t\tchildScanner = ScanFromTokens(tokens...)\n \t\t}\n-\t\tkey, value := parts[0], parts[1]\n-\n-\t\tkeyTypeName, valueTypeName := \"\", \"\"\n-\t\tif typ := ctx.Value.Tag.Type; typ != \"\" {\n-\t\t\tparts := strings.Split(typ, \":\")\n+\t\tfor !childScanner.Peek().IsEOL() {\n+\t\t\ttoken := childScanner.PopValue(\"map\")\n+\t\t\tparts := strings.SplitN(token, \"=\", 2)\n \t\t\tif len(parts) != 2 {\n-\t\t\t\treturn fmt.Errorf(\"type:\\\"\\\" on map field must be in the form \\\"[<keytype>]:[<valuetype>]\\\"\")\n+\t\t\t\treturn fmt.Errorf(\"expected \\\"<key>=<value>\\\" but got %q\", token)\n+\t\t\t}\n+\t\t\tkey, value := parts[0], parts[1]\n+\n+\t\t\tkeyTypeName, valueTypeName := \"\", \"\"\n+\t\t\tif typ := ctx.Value.Tag.Type; typ != \"\" {\n+\t\t\t\tparts := strings.Split(typ, \":\")\n+\t\t\t\tif len(parts) != 2 {\n+\t\t\t\t\treturn fmt.Errorf(\"type:\\\"\\\" on map field must be in the form \\\"[<keytype>]:[<valuetype>]\\\"\")\n+\t\t\t\t}\n+\t\t\t\tkeyTypeName, valueTypeName = parts[0], parts[1]\n \t\t\t}\n-\t\t\tkeyTypeName, valueTypeName = parts[0], parts[1]\n-\t\t}\n \n-\t\tkeyScanner := Scan(key)\n-\t\tkeyDecoder := r.ForNamedType(keyTypeName, el.Key())\n-\t\tkeyValue := reflect.New(el.Key()).Elem()\n-\t\tif err := keyDecoder.Decode(ctx.WithScanner(keyScanner), keyValue); err != nil {\n-\t\t\treturn fmt.Errorf(\"invalid map key %q\", key)\n-\t\t}\n+\t\t\tkeyScanner := Scan(key)\n+\t\t\tkeyDecoder := r.ForNamedType(keyTypeName, el.Key())\n+\t\t\tkeyValue := reflect.New(el.Key()).Elem()\n+\t\t\tif err := keyDecoder.Decode(ctx.WithScanner(keyScanner), keyValue); err != nil {\n+\t\t\t\treturn fmt.Errorf(\"invalid map key %q\", key)\n+\t\t\t}\n \n-\t\tvalueScanner := Scan(value)\n-\t\tvalueDecoder := r.ForNamedType(valueTypeName, el.Elem())\n-\t\tvalueValue := reflect.New(el.Elem()).Elem()\n-\t\tif err := valueDecoder.Decode(ctx.WithScanner(valueScanner), valueValue); err != nil {\n-\t\t\treturn fmt.Errorf(\"invalid map value %q\", value)\n-\t\t}\n+\t\t\tvalueScanner := Scan(value)\n+\t\t\tvalueDecoder := r.ForNamedType(valueTypeName, el.Elem())\n+\t\t\tvalueValue := reflect.New(el.Elem()).Elem()\n+\t\t\tif err := valueDecoder.Decode(ctx.WithScanner(valueScanner), valueValue); err != nil {\n+\t\t\t\treturn fmt.Errorf(\"invalid map value %q\", value)\n+\t\t\t}\n \n-\t\ttarget.SetMapIndex(keyValue, valueValue)\n+\t\t\ttarget.SetMapIndex(keyValue, valueValue)\n+\t\t}\n \t\treturn nil\n \t}\n }\ndiff --git a/mapper_test.go b/mapper_test.go\nindex ce43564..86e3a41 100644\n--- a/mapper_test.go\n+++ b/mapper_test.go\n@@ -99,6 +99,16 @@ func TestMapWithNamedTypes(t *testing.T) {\n \trequire.Equal(t, map[string]string{\"FIRST\": \"5s\", \"SECOND\": \"10s\"}, cli.TypedKey)\n }\n \n+func TestMapWithMultipleValues(t *testing.T) {\n+\tvar cli struct {\n+\t\tValue map[string]string\n+\t}\n+\tk := mustNew(t, &cli)\n+\t_, err := k.Parse([]string{\"--value=a=b;c=d\"})\n+\trequire.NoError(t, err)\n+\trequire.Equal(t, map[string]string{\"a\": \"b\", \"c\": \"d\"}, cli.Value)\n+}\n+\n func TestURLMapper(t *testing.T) {\n \tvar cli struct {\n \t\tURL *url.URL `arg:\"\"`\n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    ".golangci.yml",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/console.go",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/main.go",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "context.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "tokentype_string.go"
+  ],
+  "explanation": {
+    "what": "map デコーダ(mapDecoder)を、単一の \"key=value\" トークンだけでなく `;` 区切りで複数の key=value ペアを含む1つの引数(または複数トークン)を処理できるように書き換えた。フラグの場合は SplitEscaped(..., ';') で子スキャナを作り、位置引数の場合は残りの value トークンをまとめて子スキャナ化し、ループで各ペアを既存のキー/値デコード処理に渡す。README にも `--set=\"key1=value1;key2=value2\"` という利用例を追記した。",
+    "why": "従来は map フラグに `--set=key1=value1 --set=key2=value2` のようにフラグを繰り返す必要があったと考えられ、1回のフラグ指定で複数エントリを渡したいという実用上のニーズに対応するため、区切り文字 `;` による複数ペア指定をサポートした。",
+    "highlights": [
+      { "file": "mapper.go", "note": "childScanner を介して複数の key=value ペアをループ処理する新しいデコーダロジック" }
+    ],
+    "langNotes": [
+      { "topic": "map フラグの複数キー値", "note": "Kong では struct フィールドが map 型のとき、1つのフラグ値に `;` で区切った複数の key=value を書けるようになった。内部では Scanner を入れ子にして(子スキャナ)、外側のトークン分割とは独立に `;` 区切りを再スキャンしている。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

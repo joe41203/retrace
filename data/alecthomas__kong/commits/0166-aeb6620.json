@@ -1,0 +1,98 @@
+{
+  "seq": 166,
+  "sha": "aeb6620dbeae0e376e716aa9d94b2a7985d10530",
+  "parents": [
+    "b66dcf327909ef41bea81867be901eae51838642"
+  ],
+  "author": {
+    "name": "Alec Thomas",
+    "email": "alec@swapoff.org",
+    "date": "2020-01-23T21:19:23+11:00"
+  },
+  "message": "Don't select default command when displaying help.\n\nSee #41.",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 10,
+    "deletions": 1
+  },
+  "files": [
+    {
+      "path": "context.go",
+      "status": "M",
+      "additions": 10,
+      "deletions": 1,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/context.go b/context.go\nindex 86e6f5b..7114acf 100644\n--- a/context.go\n+++ b/context.go\n@@ -397,8 +397,17 @@ func (c *Context) trace(node *Node) (err error) { // nolint: gocyclo\n \t\t\treturn fmt.Errorf(\"unexpected token %s\", token)\n \t\t}\n \t}\n+\treturn c.maybeSelectDefault(flags, node)\n+}\n \n-\t// End of the line, check for a default command.\n+// End of the line, check for a default command, but only if we're not displaying help,\n+// otherwise we'd only ever display the help for the default command.\n+func (c *Context) maybeSelectDefault(flags []*Flag, node *Node) error {\n+\tfor _, flag := range flags {\n+\t\tif flag.Name == \"help\" && flag.Set {\n+\t\t\treturn nil\n+\t\t}\n+\t}\n \tvar defaultNode *Path\n \tfor _, child := range node.Children {\n \t\tif child.Type == CommandNode && child.Tag.Default != \"\" {\n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    ".golangci.yml",
+    "COPYING",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/console.go",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/main.go",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "config_test.go",
+    "context.go",
+    "defaults.go",
+    "defaults_test.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "go.mod",
+    "go.sum",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "util.go",
+    "util_test.go",
+    "visit.go"
+  ],
+  "explanation": {
+    "what": "直前のコミットで追加したデフォルトコマンド選択ロジックを trace() 本体から maybeSelectDefault() という別関数に切り出し、その先頭で `--help` フラグが指定されている場合は何もせず return するガードを追加した。",
+    "why": "コミットメッセージ \"See #41.\" と関数コメントの通り、--help 実行時にまでデフォルトコマンドを選択してしまうと、常にデフォルトコマンドのヘルプしか表示できなくなる問題を防ぐための修正。前コミットの副作用に対する追撃修正。",
+    "highlights": [
+      { "file": "context.go", "note": "maybeSelectDefault() 冒頭で help フラグが Set なら早期 return" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

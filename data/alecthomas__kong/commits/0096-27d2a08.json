@@ -1,0 +1,89 @@
+{
+  "seq": 96,
+  "sha": "27d2a08e53ca6c4f767c7212a0bde866d6f51d6e",
+  "parents": [
+    "e2c55d143e48ce4cdb027163dc99179a93e6abc0"
+  ],
+  "author": {
+    "name": "Alec Thomas",
+    "email": "alec@swapoff.org",
+    "date": "2018-08-09T20:35:47+10:00"
+  },
+  "message": "Use a dynamically sized left column in help.",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 6,
+    "deletions": 2
+  },
+  "files": [
+    {
+      "path": "help.go",
+      "status": "M",
+      "additions": 6,
+      "deletions": 2,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/help.go b/help.go\nindex 99e6033..4d27b50 100644\n--- a/help.go\n+++ b/help.go\n@@ -201,10 +201,14 @@ func writeFlags(w *helpWriter, groups [][]*Flag) {\n }\n \n func writeTwoColumns(w *helpWriter, padding int, rows [][2]string) {\n+\tmaxLeft := 375 * w.width / 1000\n+\tif maxLeft < 30 {\n+\t\tmaxLeft = 30\n+\t}\n \t// Find size of first column.\n \tleftSize := 0\n \tfor _, row := range rows {\n-\t\tif c := len(row[0]); c > leftSize && c < 30 {\n+\t\tif c := len(row[0]); c > leftSize && c < maxLeft {\n \t\t\tleftSize = c\n \t\t}\n \t}\n@@ -217,7 +221,7 @@ func writeTwoColumns(w *helpWriter, padding int, rows [][2]string) {\n \t\tlines := strings.Split(strings.TrimRight(buf.String(), \"\\n\"), \"\\n\")\n \n \t\tline := fmt.Sprintf(\"%-*s\", leftSize, row[0])\n-\t\tif len(row[0]) < 30 {\n+\t\tif len(row[0]) < maxLeft {\n \t\t\tline += fmt.Sprintf(\"%*s%s\", padding, \"\", lines[0])\n \t\t\tlines = lines[1:]\n \t\t}\n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    ".golangci.yml",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/console.go",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/main.go",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "context.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "tokentype_string.go"
+  ],
+  "explanation": {
+    "what": "help.go の writeTwoColumns() で、ヘルプの左カラム(フラグ名等)の最大幅を固定値30から `375 * w.width / 1000`(端末幅に応じた可変値、最低30)に変更した。左カラムの折り返し判定にもこの maxLeft を使うよう統一している。",
+    "why": "従来は左カラム幅が30文字固定で、端末幅が広い環境でも短い長い項目名がすぐ折り返されてしまっていたため、端末幅(w.width)に比例した動的な最大幅を使うことで、より読みやすいヘルプ出力にしている。",
+    "highlights": [
+      { "file": "help.go", "note": "maxLeft の算出式と、固定値30を置き換えた2箇所" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

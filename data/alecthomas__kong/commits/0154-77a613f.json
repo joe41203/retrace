@@ -1,0 +1,107 @@
+{
+  "seq": 154,
+  "sha": "77a613fb8b3b8afefb4363fdd9ec362a4a10c975",
+  "parents": [
+    "9a1f499155e31120356302eb7b17804fdb8793d2"
+  ],
+  "author": {
+    "name": "Alec Thomas",
+    "email": "alec@swapoff.org",
+    "date": "2019-10-11T16:55:10+11:00"
+  },
+  "message": "Much more thorough checking of enum values.",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 41,
+    "deletions": 6
+  },
+  "files": [
+    {
+      "path": "context.go",
+      "status": "M",
+      "additions": 31,
+      "deletions": 6,
+      "binary": false
+    },
+    {
+      "path": "kong_test.go",
+      "status": "M",
+      "additions": 10,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/context.go b/context.go\nindex 1b11f20..7279f63 100644\n--- a/context.go\n+++ b/context.go\n@@ -135,13 +135,10 @@ func (c *Context) Empty() bool {\n func (c *Context) Validate() error {\n \terr := Visit(c.Model, func(node Visitable, next Next) error {\n \t\tif value, ok := node.(*Value); ok {\n-\t\t\tif value.Enum != \"\" && !value.EnumMap()[fmt.Sprintf(\"%v\", value.Target.Interface())] {\n-\t\t\t\tenums := []string{}\n-\t\t\t\tfor enum := range value.EnumMap() {\n-\t\t\t\t\tenums = append(enums, fmt.Sprintf(\"%q\", enum))\n+\t\t\tif value.Enum != \"\" {\n+\t\t\t\tif err := checkEnum(value, value.Target); err != nil {\n+\t\t\t\t\treturn err\n \t\t\t\t}\n-\t\t\t\tsort.Strings(enums)\n-\t\t\t\treturn fmt.Errorf(\"%s must be one of %s but got %q\", value.ShortSummary(), strings.Join(enums, \",\"), value.Target.Interface())\n \t\t\t}\n \t\t}\n \t\treturn next(nil)\n@@ -646,6 +643,34 @@ func checkMissingPositionals(positional int, values []*Value) error {\n \treturn fmt.Errorf(\"missing positional arguments %s\", strings.Join(missing, \" \"))\n }\n \n+func checkEnum(value *Value, target reflect.Value) error {\n+\tswitch target.Kind() {\n+\tcase reflect.Slice, reflect.Array:\n+\t\tfor i := 0; i < target.Len(); i++ {\n+\t\t\tif err := checkEnum(value, target.Index(i)); err != nil {\n+\t\t\t\treturn err\n+\t\t\t}\n+\t\t}\n+\t\treturn nil\n+\n+\tcase reflect.Map, reflect.Struct:\n+\t\treturn errors.Errorf(\"enum can only be applied to a slice or value\")\n+\n+\tdefault:\n+\t\tenumMap := value.EnumMap()\n+\t\tv := fmt.Sprintf(\"%v\", target)\n+\t\tif enumMap[v] {\n+\t\t\treturn nil\n+\t\t}\n+\t\tenums := []string{}\n+\t\tfor enum := range enumMap {\n+\t\t\tenums = append(enums, fmt.Sprintf(\"%q\", enum))\n+\t\t}\n+\t\tsort.Strings(enums)\n+\t\treturn fmt.Errorf(\"%s must be one of %s but got %q\", value.ShortSummary(), strings.Join(enums, \",\"), target.Interface())\n+\t}\n+}\n+\n func checkXorDuplicates(paths []*Path) error {\n \tfor _, path := range paths {\n \t\tseen := map[string]*Flag{}\ndiff --git a/kong_test.go b/kong_test.go\nindex 03fd2cb..b6fcc5f 100644\n--- a/kong_test.go\n+++ b/kong_test.go\n@@ -781,3 +781,13 @@ func TestXorChild(t *testing.T) {\n \t_, err = p.Parse([]string{\"--two=hi\", \"cmd\", \"--three\"})\n \trequire.Error(t, err, \"--two and --three can't be used together\")\n }\n+\n+func TestEnumSequence(t *testing.T) {\n+\tvar cli struct {\n+\t\tState []string `enum:\"a,b,c\" default:\"a\"`\n+\t}\n+\tp := mustNew(t, &cli)\n+\t_, err := p.Parse(nil)\n+\trequire.NoError(t, err)\n+\trequire.Equal(t, []string{\"a\"}, cli.State)\n+}\n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    ".golangci.yml",
+    "COPYING",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/console.go",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/main.go",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "config_test.go",
+    "context.go",
+    "defaults.go",
+    "defaults_test.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "go.mod",
+    "go.sum",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "util.go",
+    "util_test.go",
+    "visit.go"
+  ],
+  "explanation": {
+    "what": "enum 値の検証ロジックを checkEnum 関数として切り出し、対象が Slice/Array なら各要素を再帰的にチェックし、Map/Struct には enum タグの適用自体をエラーにするようにした。従来は単一値の文字列比較しかしていなかった。",
+    "why": "コミットメッセージは「enum 値のチェックをより厳密にする」とだけ述べており詳細な動機は書かれていない。おそらく、enum タグをスライス型フィールドに付けた際に個々の要素が検証されない、あるいは適用できない型に付けてもエラーにならないという抜け穴があり、それを塞ぐための変更と考えられる。",
+    "highlights": [
+      { "file": "context.go", "note": "checkEnum が reflect.Value の Kind で分岐し、Slice/Array は再帰、Map/Struct は明示的にエラーを返す" }
+    ],
+    "langNotes": [
+      { "topic": "enum の厳密チェック", "note": "`enum:\"a,b,c\"` タグは元は単一フィールドの文字列比較のみだったが、reflect.Value.Kind() で型を判定し、スライスなら要素ごとに、マップ/構造体には適用不可としてエラーにするよう強化された。" }
+    ],
+    "diagram": null,
+    "evidence": "inferred",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

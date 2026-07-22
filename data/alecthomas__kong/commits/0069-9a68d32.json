@@ -1,0 +1,109 @@
+{
+  "seq": 69,
+  "sha": "9a68d32e7221f93b0a4d8ac02a6af949c2a4f15c",
+  "parents": [
+    "51ca3e76a8949e54ac0085f69e4300aafaf33e1f"
+  ],
+  "author": {
+    "name": "Alec Thomas",
+    "email": "alec@swapoff.org",
+    "date": "2018-06-14T11:27:10+10:00"
+  },
+  "message": "Support for embedded structs + `sep:\"none\"`.\n\nMap key/value separator is now hardcoded to `=`. This allows the\n`sep` tag to continue to be used for slice separation, cascading to\nsupport maps with slice values eg. `--set a=1,2,3`.",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 5,
+    "additions": 73,
+    "deletions": 21
+  },
+  "files": [
+    {
+      "path": "README.md",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "build.go",
+      "status": "M",
+      "additions": 24,
+      "deletions": 6,
+      "binary": false
+    },
+    {
+      "path": "kong_test.go",
+      "status": "M",
+      "additions": 34,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "mapper.go",
+      "status": "M",
+      "additions": 2,
+      "deletions": 3,
+      "binary": false
+    },
+    {
+      "path": "tag.go",
+      "status": "M",
+      "additions": 12,
+      "deletions": 11,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/README.md b/README.md\nindex b071d50..0b5233e 100644\n--- a/README.md\n+++ b/README.md\n@@ -225,7 +225,7 @@ Both can coexist with standard Tag parsing.\n | `optional`             | If present, flag/arg is optional.           |\n | `hidden`               | If present, flag is hidden.                 |\n | `format:\"X\"`           | Format for parsing input, if supported.     |\n-| `sep:\"X\"`              | Separator for sequences (defaults to \",\") or maps (defaults to \"=\") |\n+| `sep:\"X\"`              | Separator for sequences (defaults to \",\"). May be `none` to disable splitting. |\n \n ## Modifying Kong's behaviour\n \ndiff --git a/build.go b/build.go\nindex 15b1f44..85eb204 100644\n--- a/build.go\n+++ b/build.go\n@@ -33,17 +33,35 @@ func dashedString(s string) string {\n \treturn strings.Join(camelCase(s), \"-\")\n }\n \n+type flattenedField struct {\n+\tfield reflect.StructField\n+\tvalue reflect.Value\n+}\n+\n+func flattenedFields(v reflect.Value) (out []flattenedField) {\n+\tfor i := 0; i < v.NumField(); i++ {\n+\t\tft := v.Type().Field(i)\n+\t\tfv := v.Field(i)\n+\t\tif ft.Anonymous {\n+\t\t\tout = append(out, flattenedFields(fv)...)\n+\t\t\tcontinue\n+\t\t}\n+\t\tif !fv.CanSet() {\n+\t\t\tcontinue\n+\t\t}\n+\t\tout = append(out, flattenedField{ft, fv})\n+\t}\n+\treturn\n+}\n+\n func buildNode(k *Kong, v reflect.Value, typ NodeType, seenFlags map[string]bool) *Node {\n \tnode := &Node{\n \t\tType:   typ,\n \t\tTarget: v,\n \t}\n-\tfor i := 0; i < v.NumField(); i++ {\n-\t\tft := v.Type().Field(i)\n-\t\tif strings.ToLower(ft.Name[0:1]) == ft.Name[0:1] {\n-\t\t\tcontinue\n-\t\t}\n-\t\tfv := v.Field(i)\n+\tfor _, field := range flattenedFields(v) {\n+\t\tft := field.field\n+\t\tfv := field.value\n \n \t\tname := ft.Tag.Get(\"name\")\n \t\tif name == \"\" {\ndiff --git a/kong_test.go b/kong_test.go\nindex 2eaaf72..8590603 100644\n--- a/kong_test.go\n+++ b/kong_test.go\n@@ -410,3 +410,37 @@ func TestMapFlag(t *testing.T) {\n \trequire.NoError(t, err)\n \trequire.Equal(t, map[string]int{\"a\": 10, \"b\": 20}, cli.Set)\n }\n+\n+func TestMapFlagWithSliceValue(t *testing.T) {\n+\tvar cli struct {\n+\t\tSet map[string][]int\n+\t}\n+\t_, err := mustNew(t, &cli).Parse([]string{\"--set\", \"a=1,2\", \"--set\", \"b=3\"})\n+\trequire.NoError(t, err)\n+\trequire.Equal(t, map[string][]int{\"a\": {1, 2}, \"b\": {3}}, cli.Set)\n+}\n+\n+type embeddedFlags struct {\n+\tEmbedded string\n+}\n+\n+func TestEmbeddedStruct(t *testing.T) {\n+\tvar cli struct {\n+\t\tembeddedFlags\n+\t\tNotEmbedded string\n+\t}\n+\n+\t_, err := mustNew(t, &cli).Parse([]string{\"--embedded=moo\", \"--not-embedded=foo\"})\n+\trequire.NoError(t, err)\n+\trequire.Equal(t, \"moo\", cli.Embedded)\n+\trequire.Equal(t, \"foo\", cli.NotEmbedded)\n+}\n+\n+func TestSliceWithDisabledSeparator(t *testing.T) {\n+\tvar cli struct {\n+\t\tFlag []string `sep:\"none\"`\n+\t}\n+\t_, err := mustNew(t, &cli).Parse([]string{\"--flag=a,b\", \"--flag=b,c\"})\n+\trequire.NoError(t, err)\n+\trequire.Equal(t, []string{\"a,b\", \"b,c\"}, cli.Flag)\n+}\ndiff --git a/mapper.go b/mapper.go\nindex e37ca27..6e01a76 100644\n--- a/mapper.go\n+++ b/mapper.go\n@@ -233,11 +233,10 @@ func mapDecoder(d *Registry) MapperFunc {\n \t\t\ttarget.Set(reflect.MakeMap(target.Type()))\n \t\t}\n \t\tel := target.Type()\n-\t\tsep := ctx.Value.Tag.Sep\n \t\ttoken := ctx.Scan.PopValue(\"map\")\n-\t\tparts := SplitEscaped(token, sep)\n+\t\tparts := strings.SplitN(token, \"=\", 2)\n \t\tif len(parts) != 2 {\n-\t\t\treturn fmt.Errorf(\"expected \\\"<key>%c<value>\\\" but got %q\", sep, token)\n+\t\t\treturn fmt.Errorf(\"expected \\\"<key>=<value>\\\" but got %q\", token)\n \t\t}\n \t\tkey, value := parts[0], parts[1]\n \ndiff --git a/tag.go b/tag.go\nindex 1351471..594c75a 100644\n--- a/tag.go\n+++ b/tag.go\n@@ -122,22 +122,22 @@ func parseTag(fv reflect.Value, ft reflect.StructField) *Tag {\n \t}\n \tt.Required = required\n \tt.Optional = optional\n-\tt.Default, _ = t.Get(\"default\")\n-\tt.Help, _ = t.Get(\"help\")\n-\tt.Type, _ = t.Get(\"type\")\n-\tt.Env, _ = t.Get(\"env\")\n+\tt.Default = t.Get(\"default\")\n+\tt.Help = t.Get(\"help\")\n+\tt.Type = t.Get(\"type\")\n+\tt.Env = t.Get(\"env\")\n \tt.Short, _ = t.GetRune(\"short\")\n \tt.Hidden = t.Has(\"hidden\")\n-\tt.Format, _ = t.Get(\"format\")\n+\tt.Format = t.Get(\"format\")\n \tt.Sep, _ = t.GetRune(\"sep\")\n \tif t.Sep == 0 {\n-\t\tif fv.Kind() == reflect.Map {\n-\t\t\tt.Sep = '='\n+\t\tif t.Get(\"sep\") == \"none\" {\n+\t\t\tt.Sep = -1\n \t\t} else {\n \t\t\tt.Sep = ','\n \t\t}\n \t}\n-\tt.PlaceHolder, _ = t.Get(\"placeholder\")\n+\tt.PlaceHolder = t.Get(\"placeholder\")\n \tif t.PlaceHolder == \"\" {\n \t\tt.PlaceHolder = strings.ToUpper(dashedString(fv.Type().Name()))\n \t}\n@@ -152,9 +152,10 @@ func (t *Tag) Has(k string) bool {\n }\n \n // Get returns the value of the given tag.\n-func (t *Tag) Get(k string) (string, bool) {\n-\ts, ok := t.items[k]\n-\treturn s, ok\n+//\n+// Note that this will return the empty string if the tag is missing.\n+func (t *Tag) Get(k string) string {\n+\treturn t.items[k]\n }\n \n // GetBool returns true if the given tag looks like a boolean truth string.\n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    ".golangci.yml",
+    "README.md",
+    "_examples/shell/main.go",
+    "build.go",
+    "camelcase.go",
+    "context.go",
+    "doc.go",
+    "global.go",
+    "global_test.go",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "tokentype_string.go"
+  ],
+  "explanation": {
+    "what": "build.go に flattenedFields() を追加し、struct の匿名フィールド(embedded struct)を再帰的に展開してフラットなフィールド一覧として扱えるようにした。これにより embedded struct のフィールドがそのまま親のフラグとして扱われる。また tag.go の Sep 決定ロジックを見直し、`sep:\"none\"` タグで区切り文字による分割自体を無効化(Sep = -1)できるようにし、map の key/value 区切りは `=` 固定にした。Tag.Get() のシグネチャも (string, bool) から string 単独に簡素化している。",
+    "why": "コミットメッセージにある通り、map の key/value 区切り文字を `=` に固定したことで、sep タグ本来の役割(スライス要素の区切り)を map の値がスライスであるケース(例: `--set a=1,2,3`)にもカスケードして使えるようにする狙い。embedded struct 対応は、CLI 構造体をより自然に構成部品として再利用したいという設計意図の表れと見られる。",
+    "highlights": [
+      { "file": "build.go", "note": "flattenedFields(): ft.Anonymous な埋め込みフィールドを再帰的に潜り、フラグ定義の対象をフラット化する" },
+      { "file": "tag.go", "note": "sep:\"none\" タグは t.Sep = -1 として扱われ、区切りによる分割そのものをスキップするマーカーになる" },
+      { "file": "kong_test.go", "note": "TestEmbeddedStruct・TestMapFlagWithSliceValue・TestSliceWithDisabledSeparator が新機能を仕様として固定" }
+    ],
+    "langNotes": [
+      { "topic": "embedded struct (匿名フィールド)", "note": "Go の struct は型名だけをフィールドとして書く「埋め込み(embedding)」ができ、reflect.StructField.Anonymous で判定できる。埋め込まれた struct のフィールドは、あたかも外側の struct に直接あるかのように扱われる。ここでは埋め込み struct のフラグをそのまま親コマンドのフラグとして展開している。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

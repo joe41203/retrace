@@ -1,0 +1,123 @@
+{
+  "seq": 175,
+  "sha": "73ecfde9b28305995191db7d69e1c1990c7844e9",
+  "parents": [
+    "b21bf1031aa3278718f987369e11f8a098f9338b"
+  ],
+  "author": {
+    "name": "Alec Thomas",
+    "email": "alec@swapoff.org",
+    "date": "2020-02-19T15:49:59+11:00"
+  },
+  "message": "Automatically add envar to help.\n\nSee #57.",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 4,
+    "additions": 40,
+    "deletions": 0
+  },
+  "files": [
+    {
+      "path": "README.md",
+      "status": "M",
+      "additions": 5,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "interpolate.go",
+      "status": "M",
+      "additions": 11,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "kong.go",
+      "status": "M",
+      "additions": 13,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "kong_test.go",
+      "status": "M",
+      "additions": 11,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/README.md b/README.md\nindex f0f519b..a96c059 100644\n--- a/README.md\n+++ b/README.md\n@@ -117,6 +117,10 @@ eg.\n       -f, --force        Force removal.\n       -r, --recursive    Recursively remove files.\n \n+For flags with associated environment variables, the variable `${env}` can be\n+interpolated into the help string. In the absence of this variable in the help, \n+\n+\n <a id=\"markdown-command-handling\" name=\"command-handling\"></a>\n ## Command handling\n \n@@ -459,6 +463,7 @@ are defined from the value itself:\n \n     ${default}\n     ${enum}\n+    ${env}\n \n eg.\n \ndiff --git a/interpolate.go b/interpolate.go\nindex 9de1ff7..bbfff54 100644\n--- a/interpolate.go\n+++ b/interpolate.go\n@@ -7,6 +7,17 @@ import (\n \n var interpolationRegex = regexp.MustCompile(`((?:\\${([[:alpha:]_][[:word:]]*))(?:=([^}]+))?})|(\\$)|([^$]+)`)\n \n+// Returns true if the variable \"v\" is interpolated in \"s\".\n+func interpolationHasVar(s string, v string) bool {\n+\tmatches := interpolationRegex.FindAllStringSubmatch(s, -1)\n+\tfor _, match := range matches {\n+\t\tif name := match[2]; name == v {\n+\t\t\treturn true\n+\t\t}\n+\t}\n+\treturn false\n+}\n+\n // Interpolate variables from vars into s for substrings in the form ${var} or ${var=default}.\n func interpolate(s string, vars map[string]string) (string, error) {\n \tout := \"\"\ndiff --git a/kong.go b/kong.go\nindex 64cd407..5296ef2 100644\n--- a/kong.go\n+++ b/kong.go\n@@ -155,6 +155,19 @@ func (k *Kong) interpolateValue(value *Value, vars Vars) (err error) {\n \t})\n \tif value.Tag.Env != \"\" {\n \t\tvars[\"env\"] = value.Tag.Env\n+\t\tif !interpolationHasVar(value.Help, \"env\") {\n+\t\t\tsuffix := \"($\" + value.Tag.Env + \")\"\n+\t\t\tswitch {\n+\t\t\tcase strings.HasSuffix(value.Help, \".\"):\n+\t\t\t\tvalue.Help = value.Help[:len(value.Help)-1] + \" \" + suffix + \".\"\n+\n+\t\t\tcase value.Help == \"\":\n+\t\t\t\tvalue.Help += suffix\n+\n+\t\t\tdefault:\n+\t\t\t\tvalue.Help += \" \" + suffix\n+\t\t\t}\n+\t\t}\n \t}\n \tif value.Help, err = interpolate(value.Help, vars); err != nil {\n \t\treturn fmt.Errorf(\"help for %s: %s\", value.Summary(), err)\ndiff --git a/kong_test.go b/kong_test.go\nindex b55093a..087252a 100644\n--- a/kong_test.go\n+++ b/kong_test.go\n@@ -750,6 +750,17 @@ func TestEnvarEnumValidated(t *testing.T) {\n \trequire.EqualError(t, err, \"--flag must be one of \\\"valid\\\" but got \\\"invalid\\\"\")\n }\n \n+func TestEnvarAutoHelp(t *testing.T) {\n+\tvar cli struct {\n+\t\tFlag string `env:\"FLAG\" help:\"A flag.\"`\n+\t}\n+\tw := &strings.Builder{}\n+\tp := mustNew(t, &cli, kong.Writers(w, w), kong.Exit(func(int) {}))\n+\t_, err := p.Parse([]string{\"--help\"})\n+\trequire.NoError(t, err)\n+\trequire.Contains(t, w.String(), \"A flag ($FLAG).\")\n+}\n+\n func TestXor(t *testing.T) {\n \tvar cli struct {\n \t\tHello bool   `xor:\"another\"`\n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    ".golangci.yml",
+    "COPYING",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/README.md",
+    "_examples/server/console.go",
+    "_examples/server/go.mod",
+    "_examples/server/go.sum",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/main.go",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "config_test.go",
+    "context.go",
+    "defaults.go",
+    "defaults_test.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "go.mod",
+    "go.sum",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "util.go",
+    "util_test.go",
+    "visit.go"
+  ],
+  "explanation": {
+    "what": "interpolate.go に interpolationHasVar() を追加し、help 文字列中に ${env} が明示的に書かれていない場合、kong.go の interpolateValue() が自動で \"(${ENVVAR})\" という接尾辞をヘルプ文に付け足すようにした。文末がピリオドならその前に挿入するなど文体も考慮している。README とテストも追加。",
+    "why": "コミットメッセージに \"See #57\" とあり、前コミットで導入した ${env} 変数展開だけでは利用者が明示的に書かない限り env の情報がヘルプに出ないため、デフォルトで自動的に見えるようにする狙いだったと読み取れる。",
+    "highlights": [
+      { "file": "kong.go", "note": "help が空文字/末尾ピリオドありなど複数パターンで接尾辞の付け方を分岐している。" },
+      { "file": "interpolate.go", "note": "interpolationHasVar() は正規表現マッチ結果を再利用して「その変数がすでに使われているか」を調べるヘルパー。" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

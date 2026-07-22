@@ -1,0 +1,143 @@
+{
+  "seq": 285,
+  "sha": "c3703cda7ed1c641e57f986744370b28bbc67bda",
+  "parents": [
+    "d564bd286fe258f25fc3222c4cdf4eb18bb1da5d"
+  ],
+  "author": {
+    "name": "Mitar",
+    "email": "mitar.git@tnode.com",
+    "date": "2021-12-02T12:35:12+01:00"
+  },
+  "message": "Fix that default should not override the placeholder.\n\nFixes #243.",
+  "pr": {
+    "number": 245,
+    "title": "Fix that default should not override the placeholder",
+    "body": "Fixes #243.",
+    "url": "https://github.com/alecthomas/kong/pull/245"
+  },
+  "linkedIssues": [
+    {
+      "number": 243,
+      "title": "Specifying default overrides placeholder",
+      "body": "I have:\r\n\r\n```\r\nvar CLI struct {\r\n\tChangelog string `short:\"f\" placeholder:\"PATH\" default:\"CHANGELOG.md\" help:\"Path to the changelog file to use.\"`\r\n}\r\n```\r\n\r\nThe help message is:\r\n\r\n```\r\n-f, --changelog=\"CHANGELOG.md\"    Path to the changelog file to use.\r\n```\r\n\r\nI would expect it would be:\r\n\r\n```\r\n-f, --changelog=PATH    Path to the changelog file to use.\r\n```\r\n\r\nMy plan is to show default value in the help message using variable interpolation.",
+      "url": "https://github.com/alecthomas/kong/issues/243"
+    }
+  ],
+  "stats": {
+    "filesChanged": 3,
+    "additions": 11,
+    "deletions": 7
+  },
+  "files": [
+    {
+      "path": "model.go",
+      "status": "M",
+      "additions": 6,
+      "deletions": 3,
+      "binary": false
+    },
+    {
+      "path": "model_test.go",
+      "status": "M",
+      "additions": 3,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "tag.go",
+      "status": "M",
+      "additions": 2,
+      "deletions": 3,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/model.go b/model.go\nindex bc7f37e..2c2991f 100644\n--- a/model.go\n+++ b/model.go\n@@ -400,21 +400,24 @@ func (f *Flag) FormatPlaceHolder() string {\n \tif f.Value.IsSlice() && f.Value.Tag.Sep != -1 {\n \t\ttail += string(f.Value.Tag.Sep) + \"...\"\n \t}\n+\tif f.PlaceHolder != \"\" {\n+\t\treturn f.PlaceHolder + tail\n+\t}\n \tif f.Default != \"\" {\n \t\tif f.Value.Target.Kind() == reflect.String {\n \t\t\treturn strconv.Quote(f.Default) + tail\n \t\t}\n \t\treturn f.Default + tail\n \t}\n-\tif f.PlaceHolder != \"\" {\n-\t\treturn f.PlaceHolder + tail\n-\t}\n \tif f.Value.IsMap() {\n \t\tif f.Value.Tag.MapSep != -1 {\n \t\t\ttail = string(f.Value.Tag.MapSep) + \"...\"\n \t\t}\n \t\treturn \"KEY=VALUE\" + tail\n \t}\n+\tif f.Tag != nil && f.Tag.TypeName != \"\" {\n+\t\treturn strings.ToUpper(dashedString(f.Tag.TypeName)) + tail\n+\t}\n \treturn strings.ToUpper(f.Name) + tail\n }\n \ndiff --git a/model_test.go b/model_test.go\nindex 0edd1b3..1296f3d 100644\n--- a/model_test.go\n+++ b/model_test.go\n@@ -32,6 +32,7 @@ func TestFlagString(t *testing.T) {\n \t\tDefaultInt              int    `default:\"42\"`\n \t\tDefaultStr              string `default:\"hello\"`\n \t\tPlaceholder             string `placeholder:\"world\"`\n+\t\tDefaultPlaceholder      string `default:\"hello\" placeholder:\"world\"`\n \t\tSliceSep                []string\n \t\tSliceNoSep              []string `sep:\"none\"`\n \t\tSliceDefault            []string `default:\"hello\"`\n@@ -49,11 +50,12 @@ func TestFlagString(t *testing.T) {\n \t\t\"default-int\":               \"--default-int=42\",\n \t\t\"default-str\":               `--default-str=\"hello\"`,\n \t\t\"placeholder\":               \"--placeholder=world\",\n+\t\t\"default-placeholder\":       \"--default-placeholder=world\",\n \t\t\"slice-sep\":                 \"--slice-sep=SLICE-SEP,...\",\n \t\t\"slice-no-sep\":              \"--slice-no-sep=SLICE-NO-SEP\",\n \t\t\"slice-default\":             \"--slice-default=hello,...\",\n \t\t\"slice-placeholder\":         \"--slice-placeholder=world,...\",\n-\t\t\"slice-default-placeholder\": \"--slice-default-placeholder=hello,...\",\n+\t\t\"slice-default-placeholder\": \"--slice-default-placeholder=world,...\",\n \t\t\"map-sep\":                   \"--map-sep=KEY=VALUE;...\",\n \t\t\"map-no-sep\":                \"--map-no-sep=KEY=VALUE\",\n \t\t\"map-default\":               \"--map-default=hello\",\ndiff --git a/tag.go b/tag.go\nindex 03b8ca6..d76c418 100644\n--- a/tag.go\n+++ b/tag.go\n@@ -19,6 +19,7 @@ type Tag struct {\n \tName        string\n \tHelp        string\n \tType        string\n+\tTypeName    string\n \tDefault     string\n \tFormat      string\n \tPlaceHolder string\n@@ -183,6 +184,7 @@ func hydrateTag(t *Tag, typeName string, isBool bool) error {\n \tt.Name = t.Get(\"name\")\n \tt.Help = t.Get(\"help\")\n \tt.Type = t.Get(\"type\")\n+\tt.TypeName = typeName\n \tt.Env = t.Get(\"env\")\n \tt.Short, err = t.GetRune(\"short\")\n \tif err != nil && t.Get(\"short\") != \"\" {\n@@ -217,9 +219,6 @@ func hydrateTag(t *Tag, typeName string, isBool bool) error {\n \t\tt.Vars[parts[0]] = parts[1]\n \t}\n \tt.PlaceHolder = t.Get(\"placeholder\")\n-\tif t.PlaceHolder == \"\" {\n-\t\tt.PlaceHolder = strings.ToUpper(dashedString(typeName))\n-\t}\n \tt.Enum = t.Get(\"enum\")\n \tif t.Enum != \"\" && !(t.Required || t.Default != \"\") {\n \t\treturn fmt.Errorf(\"enum value is only valid if it is either required or has a valid default value\")\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/FUNDING.yml",
+    ".github/workflows/ci.yml",
+    ".gitignore",
+    ".golangci.yml",
+    "COPYING",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/README.md",
+    "_examples/server/console.go",
+    "_examples/server/go.mod",
+    "_examples/server/go.sum",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/main.go",
+    "benchmark_test.go",
+    "bin/.go@latest.pkg",
+    "bin/.golangci-lint-1.42.0.pkg",
+    "bin/README.hermit.md",
+    "bin/activate-hermit",
+    "bin/go",
+    "bin/gofmt",
+    "bin/golangci-lint",
+    "bin/hermit",
+    "bin/hermit.hcl",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "config_test.go",
+    "context.go",
+    "defaults.go",
+    "defaults_test.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "go.mod",
+    "go.sum",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "testdata/file.txt",
+    "util.go",
+    "util_test.go",
+    "visit.go"
+  ],
+  "explanation": {
+    "what": "Flag.FormatPlaceHolder() のチェック順を変更し、`placeholder` タグが明示されていれば default より先に優先して使うようにした。あわせて Tag に TypeName フィールドを追加し、tag.go 側では placeholder 未指定時に型名から自動生成する処理を削除して model.go 側の FormatPlaceHolder に一本化した。",
+    "why": "issue #243 が指摘するように、`placeholder:\"PATH\" default:\"CHANGELOG.md\"` のようなタグ併用時、旧実装ではチェック順の関係で default の値がヘルプの placeholder 表示を上書きしてしまい `--changelog=\"CHANGELOG.md\"` と表示されていた。placeholder を default より優先するよう順序を入れ替えることで、期待通り `--changelog=PATH` と表示されるようにした。",
+    "highlights": [
+      { "file": "model.go", "note": "PlaceHolder → Default → Map → TypeName の優先順位でヘルプの表示値を決めるロジック" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "issue",
+    "refs": [
+      { "type": "pr", "number": 245, "url": "https://github.com/alecthomas/kong/pull/245" },
+      { "type": "issue", "number": 243, "url": "https://github.com/alecthomas/kong/issues/243" }
+    ],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

@@ -1,0 +1,95 @@
+{
+  "seq": 31,
+  "sha": "0bb304449c6524b2339555081eb2e4e709d9bb53",
+  "parents": [
+    "93e21885b139be753e2324d291a5af49dc50c836"
+  ],
+  "author": {
+    "name": "Alec Thomas",
+    "email": "alec@swapoff.org",
+    "date": "2018-05-25T00:05:04-04:00"
+  },
+  "message": "Add Trace() function.",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 5,
+    "additions": 50,
+    "deletions": 14
+  },
+  "files": [
+    {
+      "path": "build.go",
+      "status": "M",
+      "additions": 4,
+      "deletions": 9,
+      "binary": false
+    },
+    {
+      "path": "context.go",
+      "status": "M",
+      "additions": 3,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "help.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "kong.go",
+      "status": "M",
+      "additions": 18,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "kong_test.go",
+      "status": "M",
+      "additions": 24,
+      "deletions": 3,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/build.go b/build.go\nindex 36ffb4e..2eabbf9 100644\n--- a/build.go\n+++ b/build.go\n@@ -33,7 +33,7 @@ func build(ast interface{}) (app *Application, err error) {\n \t\t\t\tDecoder: kindDecoders[reflect.Bool],\n \t\t\t}},\n \t}\n-\tnode := buildNode(iv, map[string]bool{\"help\": true}, true)\n+\tnode := buildNode(iv, map[string]bool{\"help\": true})\n \tif len(node.Positional) > 0 && len(node.Children) > 0 {\n \t\treturn nil, fmt.Errorf(\"can't mix positional arguments and branching arguments on %T\", ast)\n \t}\n@@ -47,7 +47,7 @@ func dashedString(s string) string {\n \treturn strings.Join(camelCase(s), \"-\")\n }\n \n-func buildNode(v reflect.Value, seenFlags map[string]bool, cmd bool) *Node {\n+func buildNode(v reflect.Value, seenFlags map[string]bool) *Node {\n \tnode := &Node{}\n \tfor i := 0; i < v.NumField(); i++ {\n \t\tft := v.Type().Field(i)\n@@ -63,12 +63,8 @@ func buildNode(v reflect.Value, seenFlags map[string]bool, cmd bool) *Node {\n \n \t\ttag := parseTag(fv, ft.Tag.Get(\"kong\"))\n \n-\t\tif !cmd {\n-\t\t\tcmd = tag.Cmd\n-\t\t}\n-\n \t\t// Nested structs are either commands or args.\n-\t\tif ft.Type.Kind() == reflect.Struct && (cmd || tag.Arg) {\n+\t\tif ft.Type.Kind() == reflect.Struct && (tag.Cmd || tag.Arg) {\n \t\t\tbuildChild(node, v, ft, fv, tag, name, seenFlags)\n \t\t} else {\n \t\t\tbuildField(node, v, ft, fv, tag, name, seenFlags)\n@@ -94,7 +90,7 @@ func buildNode(v reflect.Value, seenFlags map[string]bool, cmd bool) *Node {\n }\n \n func buildChild(node *Node, v reflect.Value, ft reflect.StructField, fv reflect.Value, tag *Tag, name string, seenFlags map[string]bool) {\n-\tchild := buildNode(fv, seenFlags, false)\n+\tchild := buildNode(fv, seenFlags)\n \tchild.Help = tag.Help\n \n \t// A branching argument. This is a bit hairy, as we let buildNode() do the parsing, then check that\n@@ -168,4 +164,3 @@ func buildField(node *Node, v reflect.Value, ft reflect.StructField, fv reflect.\n \t\t})\n \t}\n }\n-\ndiff --git a/context.go b/context.go\nindex babbbaf..4047672 100644\n--- a/context.go\n+++ b/context.go\n@@ -20,6 +20,7 @@ type ParseTrace struct {\n \n type ParseContext struct {\n \tTrace []*ParseTrace // A trace through parsed nodes.\n+\tError error         // Error that occurred during trace, if any.\n \n \tcommand []string // Full command path.\n \tflags   []*Flag  // Accumulated available flags.\n@@ -40,7 +41,8 @@ func Trace(args []string, app *Application) (*ParseContext, error) {\n \tif err != nil {\n \t\treturn nil, err\n \t}\n-\treturn p, p.trace(&p.app.Node)\n+\tp.Error = p.trace(&p.app.Node)\n+\treturn p, nil\n }\n \n // FlagValue returns the set value of a flag, if it was encountered and exists.\ndiff --git a/help.go b/help.go\nindex b9e9625..9df8215 100644\n--- a/help.go\n+++ b/help.go\n@@ -9,7 +9,7 @@ const defaultHelp = `{{- with .Application -}}\n usage: {{.Name}}\n \n {{.Help}}\n-{{range .Flags}}\n+{{range .Context.Flags}}\n --{{.Name}}\n {{end}}\n \ndiff --git a/kong.go b/kong.go\nindex 3df6c09..6498f69 100644\n--- a/kong.go\n+++ b/kong.go\n@@ -69,12 +69,30 @@ func (k *Kong) Parse(args []string) (command string, err error) {\n \tif err != nil {\n \t\treturn \"\", err\n \t}\n+\tif ctx.Error != nil {\n+\t\treturn \"\", ctx.Error\n+\t}\n \tif value := ctx.FlagValue(k.Model.HelpFlag); value.IsValid() && value.Bool() {\n \t\treturn \"\", nil\n \t}\n \treturn ctx.Apply()\n }\n \n+// Trace through the command tree.\n+//\n+// The returned context will include a trace of all parsed objects encountered; flags, arguments, commands.\n+func (k *Kong) Trace(args []string) (ctx *ParseContext, err error) {\n+\tdefer func() {\n+\t\tmsg := recover()\n+\t\tif test, ok := msg.(Error); ok {\n+\t\t\terr = test\n+\t\t} else if msg != nil {\n+\t\t\tpanic(msg)\n+\t\t}\n+\t}()\n+\treturn Trace(args, k.Model)\n+}\n+\n func (k *Kong) Errorf(format string, args ...interface{}) {\n \tfmt.Fprintf(os.Stderr, k.Model.Name+\": \"+format, args...)\n }\ndiff --git a/kong_test.go b/kong_test.go\nindex 77638c3..55f3947 100644\n--- a/kong_test.go\n+++ b/kong_test.go\n@@ -321,12 +321,20 @@ func TestHelp(t *testing.T) {\n \trequire.NotEqual(t, \"hello\", cli.Flag)\n }\n \n+func TestCommandMissingTagIsInvalid(t *testing.T) {\n+\tvar cli struct {\n+\t\tOne struct{}\n+\t}\n+\t_, err := New(&cli)\n+\trequire.Error(t, err)\n+}\n+\n func TestDuplicateFlag(t *testing.T) {\n \tvar cli struct {\n \t\tFlag bool\n \t\tCmd  struct {\n \t\t\tFlag bool\n-\t\t}\n+\t\t} `kong:\"cmd\"`\n \t}\n \t_, err := New(&cli)\n \trequire.Error(t, err)\n@@ -336,11 +344,24 @@ func TestDuplicateFlagOnPeerCommandIsOkay(t *testing.T) {\n \tvar cli struct {\n \t\tCmd1 struct {\n \t\t\tFlag bool\n-\t\t}\n+\t\t} `kong:\"cmd\"`\n \t\tCmd2 struct {\n \t\t\tFlag bool\n-\t\t}\n+\t\t} `kong:\"cmd\"`\n \t}\n \t_, err := New(&cli)\n \trequire.NoError(t, err)\n }\n+\n+func TestTraceErrorPartiallySucceeds(t *testing.T) {\n+\tvar cli struct {\n+\t\tOne struct {\n+\t\t\tTwo struct {\n+\t\t\t} `kong:\"cmd\"`\n+\t\t} `kong:\"cmd\"`\n+\t}\n+\tp := mustNew(t, &cli)\n+\ttrace, err := p.Trace([]string{\"one\", \"bad\"})\n+\trequire.NoError(t, err)\n+\trequire.Error(t, trace.Error)\n+}\n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    "README.md",
+    "_examples/shell/main.go",
+    "build.go",
+    "camelcase.go",
+    "context.go",
+    "decoders.go",
+    "decoders_test.go",
+    "global.go",
+    "global_test.go",
+    "help.go",
+    "kong.go",
+    "kong_test.go",
+    "model.go",
+    "options.go",
+    "options_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tokentype_string.go"
+  ],
+  "explanation": {
+    "what": "パース処理の入口として新しい `Trace(args, app)` 関数を追加し、`Kong.Trace()` メソッドからもそれを呼べるようにした。あわせて `buildNode` から不要になった `cmd bool` 引数を削除し、`ParseContext` に `Error error` フィールドを追加してパース時のエラーを保持できるようにしている。テストでは `TestTraceErrorPartiallySucceeds` が追加され、途中まで進んだトレース結果からエラーを取り出せることを検証している。",
+    "why": "それまで `trace()` はパース中にエラーが起きるとすぐ呼び出し元に返っていたが、エラーが起きた時点までの部分的なパース結果(どのコマンド・フラグまで解釈できたか)を保持したまま呼び出し元に返せるようにする狙いがあったと見られる。これは後続のヘルプ表示やエラーメッセージの文脈情報として使われていく前段の変更にあたる。",
+    "highlights": [
+      { "file": "context.go", "note": "Trace() が ParseContext.Error にエラーを格納してから nil エラーで返すようになった箇所" },
+      { "file": "kong_test.go", "note": "TestTraceErrorPartiallySucceeds: 部分的に失敗したトレースの検証パターン" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

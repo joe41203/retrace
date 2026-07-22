@@ -1,0 +1,151 @@
+{
+  "seq": 107,
+  "sha": "2e29ff898111fb03368fa62c149440f97b82c0bf",
+  "parents": [
+    "467352418f41fd92ab186524df06c1f328beb2c4"
+  ],
+  "author": {
+    "name": "Alec Thomas",
+    "email": "alec@swapoff.org",
+    "date": "2018-09-19T12:56:12+10:00"
+  },
+  "message": "Add support for setting variables via tag.\n\nThis provides much more convenient composition when reusing structs in\ndifferent parts of the command grammar.\n\neg.\n\n\ttype Embedded struct {\n\t\tKey string `help:\"A key from ${where}.\"`\n\t}\n\n\tvar cli struct {\n\t\tEmbedded `set:\"where=somewhere\"`\n\t}",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 9,
+    "additions": 134,
+    "deletions": 50
+  },
+  "files": [
+    {
+      "path": "README.md",
+      "status": "M",
+      "additions": 20,
+      "deletions": 19,
+      "binary": false
+    },
+    {
+      "path": "build.go",
+      "status": "M",
+      "additions": 6,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "go.mod",
+      "status": "A",
+      "additions": 7,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "go.sum",
+      "status": "A",
+      "additions": 6,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "kong.go",
+      "status": "M",
+      "additions": 10,
+      "deletions": 19,
+      "binary": false
+    },
+    {
+      "path": "model.go",
+      "status": "M",
+      "additions": 9,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "options.go",
+      "status": "M",
+      "additions": 12,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "tag.go",
+      "status": "M",
+      "additions": 35,
+      "deletions": 12,
+      "binary": false
+    },
+    {
+      "path": "tag_test.go",
+      "status": "M",
+      "additions": 29,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/README.md b/README.md\nindex f11e50d..273691b 100644\n--- a/README.md\n+++ b/README.md\n@@ -394,25 +394,26 @@ Tags can be in two forms:\n \n Both can coexist with standard Tag parsing.\n \n-| Tag                    | Description                                 |\n-| -----------------------| ------------------------------------------- |\n-| `cmd`                  | If present, struct is a command.            |\n-| `arg`                  | If present, field is an argument.           |\n-| `env:\"X\"`              | Specify envar to use for default value.\n-| `name:\"X\"`             | Long name, for overriding field name.       |\n-| `help:\"X\"`             | Help text.                                  |\n-| `type:\"X\"`             | Specify [named types](#custom-named-types) to use.                |\n-| `placeholder:\"X\"`      | Placeholder text.                           |\n-| `default:\"X\"`          | Default value.                              |\n-| `short:\"X\"`            | Short name, if flag.                        |\n-| `required`             | If present, flag/arg is required.           |\n-| `optional`             | If present, flag/arg is optional.           |\n-| `hidden`               | If present, command or flag is hidden.      |\n-| `format:\"X\"`           | Format for parsing input, if supported.     |\n-| `sep:\"X\"`              | Separator for sequences (defaults to \",\"). May be `none` to disable splitting. |\n-| `enum:\"X,Y,...\"`       | Set of valid values allowed for this flag.  |\n-| `group:\"X\"`            | Logical group for a flag or command.        |\n-| `prefix:\"X\"`           | Prefix for all sub-flags.                   |\n+Tag                    | Description\n+-----------------------| -------------------------------------------\n+`cmd`                  | If present, struct is a command.\n+`arg`                  | If present, field is an argument.\n+`env:\"X\"`              | Specify envar to use for default value.\n+`name:\"X\"`             | Long name, for overriding field name.\n+`help:\"X\"`             | Help text.\n+`type:\"X\"`             | Specify [named types](#custom-named-types) to use.\n+`placeholder:\"X\"`      | Placeholder text.\n+`default:\"X\"`          | Default value.\n+`short:\"X\"`            | Short name, if flag.\n+`required`             | If present, flag/arg is required.\n+`optional`             | If present, flag/arg is optional.\n+`hidden`               | If present, command or flag is hidden.\n+`format:\"X\"`           | Format for parsing input, if supported.\n+`sep:\"X\"`              | Separator for sequences (defaults to \",\"). May be `none` to disable splitting.\n+`enum:\"X,Y,...\"`       | Set of valid values allowed for this flag.\n+`group:\"X\"`            | Logical group for a flag or command.\n+`prefix:\"X\"`           | Prefix for all sub-flags.\n+`set:\"K=V\"`            | Set a variable for expansion by child elements. Multiples can occur.\n \n <a id=\"markdown-variable-interpolation\" name=\"variable-interpolation\"></a>\n ## Variable interpolation\ndiff --git a/build.go b/build.go\nindex 4a487b9..ae1ccf7 100644\n--- a/build.go\n+++ b/build.go\n@@ -28,6 +28,8 @@ func build(k *Kong, ast interface{}) (app *Application, err error) {\n \t}\n \tapp.Node = node\n \tapp.Node.Flags = append(extraFlags, app.Node.Flags...)\n+\tapp.Tag = newEmptyTag()\n+\tapp.Tag.Vars = k.vars\n \treturn app, nil\n }\n \n@@ -62,6 +64,8 @@ func flattenedFields(v reflect.Value) (out []flattenedField) {\n \t\t\t\t}\n \t\t\t\t// Accumulate prefixes.\n \t\t\t\tsubf.tag.Prefix = tag.Prefix + subf.tag.Prefix\n+\t\t\t\t// Combine parent vars.\n+\t\t\t\tsubf.tag.Vars = tag.Vars.CloneWith(subf.tag.Vars)\n \t\t\t}\n \t\t\tout = append(out, sub...)\n \t\t\tcontinue\n@@ -78,6 +82,7 @@ func buildNode(k *Kong, v reflect.Value, typ NodeType, seenFlags map[string]bool\n \tnode := &Node{\n \t\tType:   typ,\n \t\tTarget: v,\n+\t\tTag:    newEmptyTag(),\n \t}\n \tfor _, field := range flattenedFields(v) {\n \t\tft := field.field\n@@ -124,6 +129,7 @@ func buildNode(k *Kong, v reflect.Value, typ NodeType, seenFlags map[string]bool\n \n func buildChild(k *Kong, node *Node, typ NodeType, v reflect.Value, ft reflect.StructField, fv reflect.Value, tag *Tag, name string, seenFlags map[string]bool) {\n \tchild := buildNode(k, fv, typ, seenFlags)\n+\tchild.Tag = tag\n \tchild.Parent = node\n \tchild.Help = tag.Help\n \tchild.Hidden = tag.Hidden\ndiff --git a/go.mod b/go.mod\nnew file mode 100644\nindex 0000000..da4aff7\n--- /dev/null\n+++ b/go.mod\n@@ -0,0 +1,7 @@\n+module github.com/alecthomas/kong\n+\n+require (\n+\tgithub.com/davecgh/go-spew v1.1.1 // indirect\n+\tgithub.com/pmezard/go-difflib v1.0.0 // indirect\n+\tgithub.com/stretchr/testify v1.2.2\n+)\ndiff --git a/go.sum b/go.sum\nnew file mode 100644\nindex 0000000..e03ee77\n--- /dev/null\n+++ b/go.sum\n@@ -0,0 +1,6 @@\n+github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=\n+github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=\n+github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZbAQM=\n+github.com/pmezard/go-difflib v1.0.0/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=\n+github.com/stretchr/testify v1.2.2 h1:bSDNvY7ZPG5RlJ8otE/7V6gMiyenm9RtJ7IUVIAoJ1w=\n+github.com/stretchr/testify v1.2.2/go.mod h1:a8OnRcib4nhh0OaRAV+Yts87kKdq0PP7pXfy6kDkUVs=\ndiff --git a/kong.go b/kong.go\nindex fad3113..bce8f94 100644\n--- a/kong.go\n+++ b/kong.go\n@@ -110,17 +110,18 @@ func New(grammar interface{}, options ...Option) (*Kong, error) {\n \n // Interpolate variables into model.\n func (k *Kong) interpolate(node *Node) (err error) {\n-\tnode.Help, err = interpolate(node.Help, k.vars)\n+\tvars := node.Vars()\n+\tnode.Help, err = interpolate(node.Help, vars)\n \tif err != nil {\n \t\treturn fmt.Errorf(\"help for %s: %s\", node.Path(), err)\n \t}\n \tfor _, flag := range node.Flags {\n-\t\tif err = k.interpolateValue(flag.Value); err != nil {\n+\t\tif err = k.interpolateValue(flag.Value, vars); err != nil {\n \t\t\treturn err\n \t\t}\n \t}\n \tfor _, pos := range node.Positional {\n-\t\tif err = k.interpolateValue(pos); err != nil {\n+\t\tif err = k.interpolateValue(pos, vars); err != nil {\n \t\t\treturn err\n \t\t}\n \t}\n@@ -132,14 +133,15 @@ func (k *Kong) interpolate(node *Node) (err error) {\n \treturn nil\n }\n \n-func (k *Kong) interpolateValue(value *Value) (err error) {\n-\tif value.Default, err = interpolate(value.Default, k.vars); err != nil {\n+func (k *Kong) interpolateValue(value *Value, vars Vars) (err error) {\n+\tvars = vars.CloneWith(value.Tag.Vars)\n+\tif value.Default, err = interpolate(value.Default, vars); err != nil {\n \t\treturn fmt.Errorf(\"default value for %s: %s\", value.Summary(), err)\n \t}\n-\tif value.Enum, err = interpolate(value.Enum, k.vars); err != nil {\n+\tif value.Enum, err = interpolate(value.Enum, vars); err != nil {\n \t\treturn fmt.Errorf(\"enum value for %s: %s\", value.Summary(), err)\n \t}\n-\tvars := mergeVars(k.vars, map[string]string{\n+\tvars = vars.CloneWith(map[string]string{\n \t\t\"default\": value.Default,\n \t\t\"enum\":    value.Enum,\n \t})\n@@ -149,17 +151,6 @@ func (k *Kong) interpolateValue(value *Value) (err error) {\n \treturn nil\n }\n \n-func mergeVars(base, extra map[string]string) map[string]string {\n-\tout := make(map[string]string, len(base)+len(extra))\n-\tfor k, v := range base {\n-\t\tout[k] = v\n-\t}\n-\tfor k, v := range extra {\n-\t\tout[k] = v\n-\t}\n-\treturn out\n-}\n-\n type helpValue bool\n \n func (h helpValue) BeforeApply(ctx *Context) error {\n@@ -252,7 +243,7 @@ func (k *Kong) applyHook(ctx *Context, name string) error {\n \t\tif !method.IsValid() {\n \t\t\tcontinue\n \t\t}\n-\t\tbinds := k.bindings.clone().add(ctx, trace)\n+\t\tbinds := k.bindings.clone().add(ctx, trace).add(trace.Node().Vars().CloneWith(k.vars))\n \t\tif err := callMethod(name, value, method, binds); err != nil {\n \t\t\treturn err\n \t\t}\ndiff --git a/model.go b/model.go\nindex db0fa58..8103bf5 100644\n--- a/model.go\n+++ b/model.go\n@@ -43,6 +43,7 @@ type Node struct {\n \tPositional []*Positional\n \tChildren   []*Node\n \tTarget     reflect.Value // Pointer to the value in the grammar that this Node is associated with.\n+\tTag        *Tag\n \n \tArgument *Value // Populated when Type is ArgumentNode.\n }\n@@ -171,6 +172,14 @@ func (n *Node) FullPath() string {\n \treturn strings.TrimSpace(root.Name + \" \" + n.Path())\n }\n \n+// Vars returns the combined Vars defined by all ancestors of this Node.\n+func (n *Node) Vars() Vars {\n+\tif n == nil {\n+\t\treturn Vars{}\n+\t}\n+\treturn n.Parent.Vars().CloneWith(n.Tag.Vars)\n+}\n+\n // Path through ancestors to this Node.\n func (n *Node) Path() (out string) {\n \tif n.Parent != nil {\ndiff --git a/options.go b/options.go\nindex 1bf3218..5bcec7e 100644\n--- a/options.go\n+++ b/options.go\n@@ -29,6 +29,18 @@ func (v Vars) Apply(k *Kong) error {\n \treturn nil\n }\n \n+// CloneWith clones the current Vars and merges \"vars\" onto the clone.\n+func (v Vars) CloneWith(vars Vars) Vars {\n+\tout := Vars{}\n+\tfor key, value := range v {\n+\t\tout[key] = value\n+\t}\n+\tfor key, value := range vars {\n+\t\tout[key] = value\n+\t}\n+\treturn out\n+}\n+\n // Exit overrides the function used to terminate. This is useful for testing or interactive use.\n func Exit(exit func(int)) OptionFunc {\n \treturn func(k *Kong) error {\ndiff --git a/tag.go b/tag.go\nindex 5ade2f1..7167a9e 100644\n--- a/tag.go\n+++ b/tag.go\n@@ -27,10 +27,11 @@ type Tag struct {\n \tSep         rune\n \tEnum        string\n \tGroup       string\n+\tVars        Vars\n \tPrefix      string // Optional prefix on anonymous structs. All sub-flags will have this prefix.\n \n \t// Storage for all tag keys for arbitrary lookups.\n-\titems map[string]string\n+\titems map[string][]string\n }\n \n type tagChars struct {\n@@ -40,15 +41,15 @@ type tagChars struct {\n var kongChars = tagChars{sep: ',', quote: '\\'', assign: '='}\n var bareChars = tagChars{sep: ' ', quote: '\"', assign: ':'}\n \n-func parseTagItems(tagString string, chr tagChars) map[string]string {\n-\td := map[string]string{}\n+func parseTagItems(tagString string, chr tagChars) map[string][]string {\n+\td := map[string][]string{}\n \tkey := []rune{}\n \tvalue := []rune{}\n \tquotes := false\n \tinKey := true\n \n \tadd := func() {\n-\t\td[string(key)] = string(value)\n+\t\td[string(key)] = append(d[string(key)], string(value))\n \t\tkey = []rune{}\n \t\tvalue = []rune{}\n \t\tinKey = true\n@@ -113,13 +114,18 @@ func getTagInfo(ft reflect.StructField) (string, tagChars) {\n \treturn string(ft.Tag), bareChars\n }\n \n+func newEmptyTag() *Tag {\n+\treturn &Tag{items: map[string][]string{}}\n+}\n+\n func parseTag(fv reflect.Value, ft reflect.StructField) *Tag {\n \tif ft.Tag.Get(\"kong\") == \"-\" {\n-\t\treturn &Tag{Ignored: true, items: map[string]string{}}\n+\t\tt := newEmptyTag()\n+\t\tt.Ignored = true\n+\t\treturn t\n \t}\n-\ts, chars := getTagInfo(ft)\n \tt := &Tag{\n-\t\titems: parseTagItems(s, chars),\n+\t\titems: parseTagItems(getTagInfo(ft)),\n \t}\n \tt.Cmd = t.Has(\"cmd\")\n \tt.Arg = t.Has(\"arg\")\n@@ -152,6 +158,14 @@ func parseTag(fv reflect.Value, ft reflect.StructField) *Tag {\n \t\t\tt.Sep = ','\n \t\t}\n \t}\n+\tt.Vars = Vars{}\n+\tfor _, set := range t.GetAll(\"set\") {\n+\t\tparts := strings.SplitN(set, \"=\", 2)\n+\t\tif len(parts) == 0 {\n+\t\t\tfail(\"set should be in the form key=value but got %q\", set)\n+\t\t}\n+\t\tt.Vars[parts[0]] = parts[1]\n+\t}\n \tt.PlaceHolder = t.Get(\"placeholder\")\n \tif t.PlaceHolder == \"\" {\n \t\tt.PlaceHolder = strings.ToUpper(dashedString(fv.Type().Name()))\n@@ -170,29 +184,38 @@ func (t *Tag) Has(k string) bool {\n //\n // Note that this will return the empty string if the tag is missing.\n func (t *Tag) Get(k string) string {\n+\tvalues := t.items[k]\n+\tif len(values) == 0 {\n+\t\treturn \"\"\n+\t}\n+\treturn values[0]\n+}\n+\n+// GetAll returns all encountered values for a tag, in the case of multiple occurrences.\n+func (t *Tag) GetAll(k string) []string {\n \treturn t.items[k]\n }\n \n // GetBool returns true if the given tag looks like a boolean truth string.\n func (t *Tag) GetBool(k string) (bool, error) {\n-\treturn strconv.ParseBool(t.items[k])\n+\treturn strconv.ParseBool(t.Get(k))\n }\n \n // GetFloat parses the given tag as a float64.\n func (t *Tag) GetFloat(k string) (float64, error) {\n-\treturn strconv.ParseFloat(t.items[k], 64)\n+\treturn strconv.ParseFloat(t.Get(k), 64)\n }\n \n // GetInt parses the given tag as an int64.\n func (t *Tag) GetInt(k string) (int64, error) {\n-\treturn strconv.ParseInt(t.items[k], 10, 64)\n+\treturn strconv.ParseInt(t.Get(k), 10, 64)\n }\n \n // GetRune parses the given tag as a rune.\n func (t *Tag) GetRune(k string) (rune, error) {\n-\tr, _ := utf8.DecodeRuneInString(t.items[k])\n+\tr, _ := utf8.DecodeRuneInString(t.Get(k))\n \tif r == utf8.RuneError {\n-\t\treturn 0, fmt.Errorf(\"%v has a rune error\", t.items[k])\n+\t\treturn 0, fmt.Errorf(\"%v has a rune error\", t.Get(k))\n \t}\n \treturn r, nil\n }\ndiff --git a/tag_test.go b/tag_test.go\nindex efd3c92..5276788 100644\n--- a/tag_test.go\n+++ b/tag_test.go\n@@ -1,6 +1,7 @@\n package kong_test\n \n import (\n+\t\"strings\"\n \t\"testing\"\n \n \t\"github.com/stretchr/testify/require\"\n@@ -109,3 +110,31 @@ func TestManySeps(t *testing.T) {\n \trequire.NoError(t, err)\n \trequire.Equal(t, \"hi\", cli.Arg)\n }\n+\n+func TestTagSetOnEmbeddedStruct(t *testing.T) {\n+\ttype Embedded struct {\n+\t\tKey string `help:\"A key from ${where}.\"`\n+\t}\n+\tvar cli struct {\n+\t\tEmbedded `set:\"where=somewhere\"`\n+\t}\n+\tbuf := &strings.Builder{}\n+\tp := mustNew(t, &cli, kong.Writers(buf, buf), kong.Exit(func(int) {}))\n+\t_, err := p.Parse([]string{\"--help\"})\n+\trequire.NoError(t, err)\n+\trequire.Contains(t, buf.String(), `A key from somewhere.`)\n+}\n+\n+func TestTagSetOnCommand(t *testing.T) {\n+\ttype Command struct {\n+\t\tKey string `help:\"A key from ${where}.\"`\n+\t}\n+\tvar cli struct {\n+\t\tCommand Command `set:\"where=somewhere\" cmd:\"\"`\n+\t}\n+\tbuf := &strings.Builder{}\n+\tp := mustNew(t, &cli, kong.Writers(buf, buf), kong.Exit(func(int) {}))\n+\t_, err := p.Parse([]string{\"command\", \"--help\"})\n+\trequire.NoError(t, err)\n+\trequire.Contains(t, buf.String(), `A key from somewhere.`)\n+}\n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    ".golangci.yml",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/console.go",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/main.go",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "context.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "go.mod",
+    "go.sum",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "tokentype_string.go",
+    "util.go",
+    "util_test.go"
+  ],
+  "explanation": {
+    "what": "struct タグに `set:\"K=V\"` を指定すると、そのノード配下の子要素すべてで参照できる変数を定義できるようにした。Tag.Vars(Vars 型)を新設し、Node.Vars() でノードから親を辿りながら CloneWith で変数を合成する。Tag.items の型を map[string]string から map[string][]string に変え、GetAll で `set` の複数指定に対応した。go.mod/go.sum を新規追加し、Go Modules に移行している。",
+    "why": "コミットメッセージ本文に「同じ構造体を CLI の異なる場所で再利用するときの合成をより便利にする」ものだと明記されており、ヘルプ文字列内の `${where}` のような変数展開を、埋め込み元の struct タグから設定できるようにすることで、汎用的な struct を複数箇所で異なる文脈用に使い回せるようにする狙いが書かれている。",
+    "highlights": [
+      { "file": "tag.go", "note": "GetAll: 同一タグキーの複数指定(`set:\"a=1\" set:\"b=2\"` 等)をスライスとして保持" },
+      { "file": "model.go", "note": "Node.Vars(): 親を再帰的に辿り CloneWith で変数マップを合成" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

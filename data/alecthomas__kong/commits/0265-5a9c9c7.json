@@ -1,0 +1,165 @@
+{
+  "seq": 265,
+  "sha": "5a9c9c7864a4cae5cd5dce9089c80234ab174d47",
+  "parents": [
+    "f547618963602ee3a6b092d84f1e4485a69f8b7f"
+  ],
+  "author": {
+    "name": "Simon Frei",
+    "email": "freisim93@gmail.com",
+    "date": "2021-08-19T10:00:53+02:00"
+  },
+  "message": "Bubble errors instead of panicking (#194)",
+  "pr": {
+    "number": 194,
+    "title": "Bubble errors instead of panicking",
+    "body": "The panic, catch and re-panic pattern leads to ugly reported stack-traces for real panics (not panics which are actually kong errors). As in kong's catch is the last entry, where usually it immediately shows the culprit there. So I replaced that with bubbling the error up.",
+    "url": "https://github.com/alecthomas/kong/pull/194"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 7,
+    "additions": 88,
+    "deletions": 83
+  },
+  "files": [
+    {
+      "path": "build.go",
+      "status": "M",
+      "additions": 51,
+      "deletions": 28,
+      "binary": false
+    },
+    {
+      "path": "context.go",
+      "status": "M",
+      "additions": 0,
+      "deletions": 2,
+      "binary": false
+    },
+    {
+      "path": "global_test.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "guesswidth_unix.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "kong.go",
+      "status": "M",
+      "additions": 10,
+      "deletions": 24,
+      "binary": false
+    },
+    {
+      "path": "model.go",
+      "status": "M",
+      "additions": 0,
+      "deletions": 10,
+      "binary": false
+    },
+    {
+      "path": "tag.go",
+      "status": "M",
+      "additions": 25,
+      "deletions": 18,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/build.go b/build.go\nindex 36581e3..6f10a45 100644\n--- a/build.go\n+++ b/build.go\n@@ -12,7 +12,6 @@ import (\n type Plugins []interface{}\n \n func build(k *Kong, ast interface{}) (app *Application, err error) {\n-\tdefer catch(&err)\n \tv := reflect.ValueOf(ast)\n \tiv := reflect.Indirect(v)\n \tif v.Kind() != reflect.Ptr || iv.Kind() != reflect.Struct {\n@@ -25,7 +24,10 @@ func build(k *Kong, ast interface{}) (app *Application, err error) {\n \tfor _, flag := range extraFlags {\n \t\tseenFlags[flag.Name] = true\n \t}\n-\tnode := buildNode(k, iv, ApplicationNode, seenFlags)\n+\tnode, err := buildNode(k, iv, ApplicationNode, seenFlags)\n+\tif err != nil {\n+\t\treturn nil, err\n+\t}\n \tif len(node.Positional) > 0 && len(node.Children) > 0 {\n \t\treturn nil, fmt.Errorf(\"can't mix positional arguments and branching arguments on %T\", ast)\n \t}\n@@ -46,12 +48,15 @@ type flattenedField struct {\n \ttag   *Tag\n }\n \n-func flattenedFields(v reflect.Value) (out []flattenedField) {\n+func flattenedFields(v reflect.Value) (out []flattenedField, err error) {\n \tv = reflect.Indirect(v)\n \tfor i := 0; i < v.NumField(); i++ {\n \t\tft := v.Type().Field(i)\n \t\tfv := v.Field(i)\n-\t\ttag := parseTag(v, ft)\n+\t\ttag, err := parseTag(v, ft)\n+\t\tif err != nil {\n+\t\t\treturn nil, err\n+\t\t}\n \t\tif tag.Ignored {\n \t\t\tcontinue\n \t\t}\n@@ -67,11 +72,18 @@ func flattenedFields(v reflect.Value) (out []flattenedField) {\n \t\t\tfv = fv.Elem()\n \t\t} else if fv.Type() == reflect.TypeOf(Plugins{}) {\n \t\t\tfor i := 0; i < fv.Len(); i++ {\n-\t\t\t\tout = append(out, flattenedFields(fv.Index(i).Elem())...)\n+\t\t\t\tfields, ferr := flattenedFields(fv.Index(i).Elem())\n+\t\t\t\tif ferr != nil {\n+\t\t\t\t\treturn nil, ferr\n+\t\t\t\t}\n+\t\t\t\tout = append(out, fields...)\n \t\t\t}\n \t\t\tcontinue\n \t\t}\n-\t\tsub := flattenedFields(fv)\n+\t\tsub, err := flattenedFields(fv)\n+\t\tif err != nil {\n+\t\t\treturn nil, err\n+\t\t}\n \t\tfor _, subf := range sub {\n \t\t\t// Assign parent if it's not already set.\n \t\t\tif subf.tag.Group == \"\" {\n@@ -84,16 +96,20 @@ func flattenedFields(v reflect.Value) (out []flattenedField) {\n \t\t}\n \t\tout = append(out, sub...)\n \t}\n-\treturn out\n+\treturn out, nil\n }\n \n-func buildNode(k *Kong, v reflect.Value, typ NodeType, seenFlags map[string]bool) *Node {\n+func buildNode(k *Kong, v reflect.Value, typ NodeType, seenFlags map[string]bool) (*Node, error) {\n \tnode := &Node{\n \t\tType:   typ,\n \t\tTarget: v,\n \t\tTag:    newEmptyTag(),\n \t}\n-\tfor _, field := range flattenedFields(v) {\n+\tfields, err := flattenedFields(v)\n+\tif err != nil {\n+\t\treturn nil, err\n+\t}\n+\tfor _, field := range fields {\n \t\tft := field.field\n \t\tfv := field.value\n \n@@ -111,9 +127,12 @@ func buildNode(k *Kong, v reflect.Value, typ NodeType, seenFlags map[string]bool\n \t\t\tif tag.Arg {\n \t\t\t\ttyp = ArgumentNode\n \t\t\t}\n-\t\t\tbuildChild(k, node, typ, v, ft, fv, tag, name, seenFlags)\n+\t\t\terr = buildChild(k, node, typ, v, ft, fv, tag, name, seenFlags)\n \t\t} else {\n-\t\t\tbuildField(k, node, v, ft, fv, tag, name, seenFlags)\n+\t\t\terr = buildField(k, node, v, ft, fv, tag, name, seenFlags)\n+\t\t}\n+\t\tif err != nil {\n+\t\t\treturn nil, err\n \t\t}\n \t}\n \n@@ -129,18 +148,21 @@ func buildNode(k *Kong, v reflect.Value, typ NodeType, seenFlags map[string]bool\n \tlast := true\n \tfor i, p := range node.Positional {\n \t\tif !last && p.Required {\n-\t\t\tfail(\"argument %q can not be required after an optional\", p.Name)\n+\t\t\treturn nil, fmt.Errorf(\"argument %q can not be required after an optional\", p.Name)\n \t\t}\n \n \t\tlast = p.Required\n \t\tp.Position = i\n \t}\n \n-\treturn node\n+\treturn node, nil\n }\n \n-func buildChild(k *Kong, node *Node, typ NodeType, v reflect.Value, ft reflect.StructField, fv reflect.Value, tag *Tag, name string, seenFlags map[string]bool) {\n-\tchild := buildNode(k, fv, typ, seenFlags)\n+func buildChild(k *Kong, node *Node, typ NodeType, v reflect.Value, ft reflect.StructField, fv reflect.Value, tag *Tag, name string, seenFlags map[string]bool) error {\n+\tchild, err := buildNode(k, fv, typ, seenFlags)\n+\tif err != nil {\n+\t\treturn err\n+\t}\n \tchild.Name = name\n \tchild.Tag = tag\n \tchild.Parent = node\n@@ -157,10 +179,10 @@ func buildChild(k *Kong, node *Node, typ NodeType, v reflect.Value, ft reflect.S\n \t// a positional argument is provided to the child, and move it to the branching argument field.\n \tif tag.Arg {\n \t\tif len(child.Positional) == 0 {\n-\t\t\tfailField(v, ft, \"positional branch must have at least one child positional argument named %q\", name)\n+\t\t\treturn failField(v, ft, \"positional branch must have at least one child positional argument named %q\", name)\n \t\t}\n \t\tif child.Positional[0].Name != name {\n-\t\t\tfailField(v, ft, \"first field in positional branch must have the same name as the parent field (%s).\", child.Name)\n+\t\t\treturn failField(v, ft, \"first field in positional branch must have the same name as the parent field (%s).\", child.Name)\n \t\t}\n \n \t\tchild.Argument = child.Positional[0]\n@@ -170,24 +192,26 @@ func buildChild(k *Kong, node *Node, typ NodeType, v reflect.Value, ft reflect.S\n \t\t}\n \t} else if tag.Default != \"\" {\n \t\tif node.DefaultCmd != nil {\n-\t\t\tfailField(v, ft, \"can't have more than one default command under %s\", node.Summary())\n+\t\t\treturn failField(v, ft, \"can't have more than one default command under %s\", node.Summary())\n \t\t}\n \t\tif tag.Default != \"withargs\" && (len(child.Children) > 0 || len(child.Positional) > 0) {\n-\t\t\tfailField(v, ft, \"default command %s must not have subcommands or arguments\", child.Summary())\n+\t\t\treturn failField(v, ft, \"default command %s must not have subcommands or arguments\", child.Summary())\n \t\t}\n \t\tnode.DefaultCmd = child\n \t}\n \tnode.Children = append(node.Children, child)\n \n \tif len(child.Positional) > 0 && len(child.Children) > 0 {\n-\t\tfailField(v, ft, \"can't mix positional arguments and branching arguments\")\n+\t\treturn failField(v, ft, \"can't mix positional arguments and branching arguments\")\n \t}\n+\n+\treturn nil\n }\n \n-func buildField(k *Kong, node *Node, v reflect.Value, ft reflect.StructField, fv reflect.Value, tag *Tag, name string, seenFlags map[string]bool) {\n+func buildField(k *Kong, node *Node, v reflect.Value, ft reflect.StructField, fv reflect.Value, tag *Tag, name string, seenFlags map[string]bool) error {\n \tmapper := k.registry.ForNamedValue(tag.Type, fv)\n \tif mapper == nil {\n-\t\tfailField(v, ft, \"unsupported field type %s, perhaps missing a cmd:\\\"\\\" tag?\", ft.Type)\n+\t\treturn failField(v, ft, \"unsupported field type %s, perhaps missing a cmd:\\\"\\\" tag?\", ft.Type)\n \t}\n \n \tvalue := &Value{\n@@ -210,16 +234,14 @@ func buildField(k *Kong, node *Node, v reflect.Value, ft reflect.StructField, fv\n \t\tnode.Positional = append(node.Positional, value)\n \t} else {\n \t\tif seenFlags[\"--\"+value.Name] {\n-\t\t\tfailField(v, ft, \"duplicate flag --%s\", value.Name)\n-\t\t} else {\n-\t\t\tseenFlags[\"--\"+value.Name] = true\n+\t\t\treturn failField(v, ft, \"duplicate flag --%s\", value.Name)\n \t\t}\n+\t\tseenFlags[\"--\"+value.Name] = true\n \t\tif tag.Short != 0 {\n \t\t\tif seenFlags[\"-\"+string(tag.Short)] {\n-\t\t\t\tfailField(v, ft, \"duplicate short flag -%c\", tag.Short)\n-\t\t\t} else {\n-\t\t\t\tseenFlags[\"-\"+string(tag.Short)] = true\n+\t\t\t\treturn failField(v, ft, \"duplicate short flag -%c\", tag.Short)\n \t\t\t}\n+\t\t\tseenFlags[\"-\"+string(tag.Short)] = true\n \t\t}\n \t\tflag := &Flag{\n \t\t\tValue:       value,\n@@ -233,6 +255,7 @@ func buildField(k *Kong, node *Node, v reflect.Value, ft reflect.StructField, fv\n \t\tvalue.Flag = flag\n \t\tnode.Flags = append(node.Flags, flag)\n \t}\n+\treturn nil\n }\n \n func buildGroupForKey(k *Kong, key string) *Group {\ndiff --git a/context.go b/context.go\nindex 0080b16..83368d1 100644\n--- a/context.go\n+++ b/context.go\n@@ -653,7 +653,6 @@ func (c *Context) Apply() (string, error) {\n }\n \n func (c *Context) parseFlag(flags []*Flag, match string) (err error) {\n-\tdefer catch(&err)\n \tcandidates := []string{}\n \tfor _, flag := range flags {\n \t\tlong := \"--\" + flag.Name\n@@ -734,7 +733,6 @@ func (c *Context) RunNode(node *Node, binds ...interface{}) (err error) {\n // Any passed values will be bindable to arguments of the target Run() method. Additionally,\n // all parent nodes in the command structure will be bound.\n func (c *Context) Run(binds ...interface{}) (err error) {\n-\tdefer catch(&err)\n \tnode := c.Selected()\n \tif node == nil {\n \t\treturn fmt.Errorf(\"no command selected\")\ndiff --git a/global_test.go b/global_test.go\nindex ed0ee83..6f97302 100644\n--- a/global_test.go\n+++ b/global_test.go\n@@ -21,7 +21,7 @@ func TestParseHandlingBadBuild(t *testing.T) {\n \n \tdefer func() {\n \t\tif r := recover(); r != nil {\n-\t\t\trequire.Equal(t, Error{msg: \"fail=' is not quoted properly\"}, r)\n+\t\t\trequire.Equal(t, \"fail=' is not quoted properly\", r.(error).Error())\n \t\t}\n \t}()\n \ndiff --git a/guesswidth_unix.go b/guesswidth_unix.go\nindex 41d54e6..db52595 100644\n--- a/guesswidth_unix.go\n+++ b/guesswidth_unix.go\n@@ -1,3 +1,4 @@\n+//go:build (!appengine && linux) || freebsd || darwin || dragonfly || netbsd || openbsd\n // +build !appengine,linux freebsd darwin dragonfly netbsd openbsd\n \n package kong\ndiff --git a/kong.go b/kong.go\nindex aa60c91..dd4b966 100644\n--- a/kong.go\n+++ b/kong.go\n@@ -13,22 +13,12 @@ var (\n \tcallbackReturnSignature = reflect.TypeOf((*error)(nil)).Elem()\n )\n \n-// Error reported by Kong.\n-type Error struct{ msg string }\n-\n-func (e Error) Error() string { return e.msg }\n-\n-func fail(format string, args ...interface{}) {\n-\tpanic(Error{msg: fmt.Sprintf(format, args...)})\n-}\n-\n-func failField(parent reflect.Value, field reflect.StructField, format string, args ...interface{}) {\n+func failField(parent reflect.Value, field reflect.StructField, format string, args ...interface{}) error {\n \tname := parent.Type().Name()\n \tif name == \"\" {\n \t\tname = \"<anonymous struct>\"\n \t}\n-\tmsg := fmt.Sprintf(\"%s.%s: %s\", name, field.Name, fmt.Sprintf(format, args...))\n-\tpanic(Error{msg: msg})\n+\treturn fmt.Errorf(\"%s.%s: %s\", name, field.Name, fmt.Sprintf(format, args...))\n }\n \n // Must creates a new Parser or panics if there is an error.\n@@ -118,16 +108,22 @@ func New(grammar interface{}, options ...Option) (*Kong, error) {\n \n \t// Synthesise command nodes.\n \tfor _, dcmd := range k.dynamicCommands {\n-\t\ttag := parseTagString(strings.Join(dcmd.tags, \" \"))\n+\t\ttag, terr := parseTagString(strings.Join(dcmd.tags, \" \"))\n+\t\tif terr != nil {\n+\t\t\treturn nil, terr\n+\t\t}\n \t\ttag.Name = dcmd.name\n \t\ttag.Help = dcmd.help\n \t\ttag.Group = dcmd.group\n \t\ttag.Cmd = true\n \t\tv := reflect.Indirect(reflect.ValueOf(dcmd.cmd))\n-\t\tbuildChild(k, k.Model.Node, CommandNode, reflect.Value{}, reflect.StructField{\n+\t\terr = buildChild(k, k.Model.Node, CommandNode, reflect.Value{}, reflect.StructField{\n \t\t\tName: dcmd.name,\n \t\t\tType: v.Type(),\n \t\t}, v, tag, dcmd.name, map[string]bool{})\n+\t\tif err != nil {\n+\t\t\treturn nil, err\n+\t\t}\n \t}\n \n \tfor _, option := range k.postBuildOptions {\n@@ -231,7 +227,6 @@ func (k *Kong) extraFlags() []*Flag {\n // Will return a ParseError if a *semantically* invalid command-line is encountered (as opposed to a syntactically\n // invalid one, which will report a normal error).\n func (k *Kong) Parse(args []string) (ctx *Context, err error) {\n-\tdefer catch(&err)\n \tctx, err = Trace(k, args)\n \tif err != nil {\n \t\treturn nil, err\n@@ -398,12 +393,3 @@ func (k *Kong) LoadConfig(path string) (Resolver, error) {\n \n \treturn k.loader(r)\n }\n-\n-func catch(err *error) {\n-\tmsg := recover()\n-\tif test, ok := msg.(Error); ok {\n-\t\t*err = test\n-\t} else if msg != nil {\n-\t\tpanic(msg)\n-\t}\n-}\ndiff --git a/model.go b/model.go\nindex aed7c35..bc7f37e 100644\n--- a/model.go\n+++ b/model.go\n@@ -317,16 +317,6 @@ func (v *Value) IsCounter() bool {\n \n // Parse tokens into value, parse, and validate, but do not write to the field.\n func (v *Value) Parse(scan *Scanner, target reflect.Value) (err error) {\n-\tdefer func() {\n-\t\tif rerr := recover(); rerr != nil {\n-\t\t\tswitch rerr := rerr.(type) {\n-\t\t\tcase Error:\n-\t\t\t\terr = errors.Wrap(rerr, v.ShortSummary())\n-\t\t\tdefault:\n-\t\t\t\tpanic(fmt.Sprintf(\"mapper %T failed to apply to %s: %s\", v.Mapper, v.Summary(), rerr))\n-\t\t\t}\n-\t\t}\n-\t}()\n \terr = v.Mapper.Decode(&DecodeContext{Value: v, Scan: scan}, target)\n \tif err != nil {\n \t\treturn errors.Wrap(err, v.ShortSummary())\ndiff --git a/tag.go b/tag.go\nindex c30052b..84c068d 100644\n--- a/tag.go\n+++ b/tag.go\n@@ -48,7 +48,7 @@ type tagChars struct {\n var kongChars = tagChars{sep: ',', quote: '\\'', assign: '='}\n var bareChars = tagChars{sep: ' ', quote: '\"', assign: ':'}\n \n-func parseTagItems(tagString string, chr tagChars) map[string][]string {\n+func parseTagItems(tagString string, chr tagChars) (map[string][]string, error) {\n \td := map[string][]string{}\n \tkey := []rune{}\n \tvalue := []rune{}\n@@ -91,11 +91,10 @@ func parseTagItems(tagString string, chr tagChars) map[string][]string {\n \t\t\t\tif next == chr.sep || eof {\n \t\t\t\t\tcontinue\n \t\t\t\t}\n-\t\t\t\tfail(\"%v has an unexpected char at pos %v\", tagString, idx)\n-\t\t\t} else {\n-\t\t\t\tquotes = true\n-\t\t\t\tcontinue\n+\t\t\t\treturn nil, fmt.Errorf(\"%v has an unexpected char at pos %v\", tagString, idx)\n \t\t\t}\n+\t\t\tquotes = true\n+\t\t\tcontinue\n \t\t}\n \t\tif inKey {\n \t\t\tkey = append(key, r)\n@@ -104,12 +103,12 @@ func parseTagItems(tagString string, chr tagChars) map[string][]string {\n \t\t}\n \t}\n \tif quotes {\n-\t\tfail(\"%v is not quoted properly\", tagString)\n+\t\treturn nil, fmt.Errorf(\"%v is not quoted properly\", tagString)\n \t}\n \n \tadd()\n \n-\treturn d\n+\treturn d, nil\n }\n \n func getTagInfo(ft reflect.StructField) (string, tagChars) {\n@@ -129,31 +128,39 @@ func tagSplitFn(r rune) bool {\n \treturn r == ',' || r == ' '\n }\n \n-func parseTagString(s string) *Tag {\n+func parseTagString(s string) (*Tag, error) {\n+\titems, err := parseTagItems(s, bareChars)\n+\tif err != nil {\n+\t\treturn nil, err\n+\t}\n \tt := &Tag{\n-\t\titems: parseTagItems(s, bareChars),\n+\t\titems: items,\n \t}\n-\terr := hydrateTag(t, \"\", false)\n+\terr = hydrateTag(t, \"\", false)\n \tif err != nil {\n-\t\tfail(\"%s: %s\", s, err)\n+\t\treturn nil, fmt.Errorf(\"%s: %s\", s, err)\n \t}\n-\treturn t\n+\treturn t, nil\n }\n \n-func parseTag(parent reflect.Value, ft reflect.StructField) *Tag {\n+func parseTag(parent reflect.Value, ft reflect.StructField) (*Tag, error) {\n \tif ft.Tag.Get(\"kong\") == \"-\" {\n \t\tt := newEmptyTag()\n \t\tt.Ignored = true\n-\t\treturn t\n+\t\treturn t, nil\n+\t}\n+\titems, err := parseTagItems(getTagInfo(ft))\n+\tif err != nil {\n+\t\treturn nil, err\n \t}\n \tt := &Tag{\n-\t\titems: parseTagItems(getTagInfo(ft)),\n+\t\titems: items,\n \t}\n-\terr := hydrateTag(t, ft.Type.Name(), ft.Type.Kind() == reflect.Bool)\n+\terr = hydrateTag(t, ft.Type.Name(), ft.Type.Kind() == reflect.Bool)\n \tif err != nil {\n-\t\tfailField(parent, ft, \"%s\", err)\n+\t\treturn nil, failField(parent, ft, \"%s\", err)\n \t}\n-\treturn t\n+\treturn t, nil\n }\n \n func hydrateTag(t *Tag, typeName string, isBool bool) error {\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/FUNDING.yml",
+    ".github/workflows/ci.yml",
+    ".gitignore",
+    ".golangci.yml",
+    "COPYING",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/README.md",
+    "_examples/server/console.go",
+    "_examples/server/go.mod",
+    "_examples/server/go.sum",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/main.go",
+    "benchmark_test.go",
+    "bin/.go@latest.pkg",
+    "bin/.golangci-lint-1.40.1.pkg",
+    "bin/README.hermit.md",
+    "bin/activate-hermit",
+    "bin/go",
+    "bin/gofmt",
+    "bin/golangci-lint",
+    "bin/hermit",
+    "bin/hermit.hcl",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "config_test.go",
+    "context.go",
+    "defaults.go",
+    "defaults_test.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "go.mod",
+    "go.sum",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "testdata/file.txt",
+    "util.go",
+    "util_test.go",
+    "visit.go"
+  ],
+  "explanation": {
+    "what": "kong の内部エラー通知手段を「panic して呼び出し側で recover する」方式から「関数の戻り値としてエラーを bubble up する」方式へ全面的に置き換えた。build.go の `buildNode`/`buildChild`/`buildField`/`flattenedFields` はすべて `(..., error)` を返すシグネチャに変更され、tag.go の `parseTag`/`parseTagString`/`parseTagItems`/`hydrateTag` も同様にエラーを返すようにした。kong.go からは `fail()`/`catch()` という panic ベースのヘルパーと `Error` 型が削除され、`failField()` はエラーを返す関数になった。`Context.Parse`/`Context.Run`/`Value.Parse` にあった `defer catch(&err)` / `defer recover()` も撤去されている。",
+    "why": "PR本文にある通り、panic→recover→re-panic というパターンでは、本来 kong が意図的に投げたエラー(不正なタグ定義など)と、mapper 実装のバグなどによる本物の panic とが区別しづらく、実際の panic が起きた際にスタックトレースの末尾が kong の recover 処理になってしまい、真の発生源(culprit)がすぐに分からないという問題があった。エラーを通常の戻り値として伝播させることで、本物の panic は素通りしてそのままの呼び出し元スタックが見える設計に改めている。",
+    "highlights": [
+      { "file": "kong.go", "note": "panic ベースの Error 型・fail()・catch() が削除され、failField() はエラーを返す関数に置き換わった" },
+      { "file": "build.go", "note": "buildNode/buildChild/buildField/flattenedFields が軒並み error を戻り値に持つシグネチャへ変更され、呼び出し側で逐次 err チェックする形になった" }
+    ],
+    "langNotes": [
+      { "topic": "panicの代わりにエラーを返す設計", "note": "Go では例外機構がなく、回復可能なエラーはふつう `(値, error)` の多値戻り値で表現し、panic/recover は本当に回復不能な異常系(プログラムのバグなど)に限定して使うのが慣習とされる。このコミットは、当初 panic/recover で組んでいた kong の内部エラー伝播を、この Go らしい `error` 戻り値の連鎖に書き直した設計転換。" },
+      { "topic": "errors.Wrap", "note": "github.com/pkg/errors の Wrap は、元のエラーにコンテキスト文字列を付加しつつ元エラーを保持するラッパーを作る関数。Go 標準の `fmt.Errorf(\"...: %w\", err)` に近い役割で、v.Parse() のエラーメッセージに `v.ShortSummary()` を付与するのに使われている。" }
+    ],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [{ "type": "pr", "number": 194, "url": "https://github.com/alecthomas/kong/pull/194" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

@@ -1,0 +1,103 @@
+{
+  "seq": 37,
+  "sha": "ed123d1c0685a0f70d246c6ff28c2faa125ca682",
+  "parents": [
+    "fdc7230e22e27eabe1a3e0f8075df9b7e34d82bc"
+  ],
+  "author": {
+    "name": "Gerald Kaszuba",
+    "email": "gak@gak0.com",
+    "date": "2018-06-01T11:24:18+10:00"
+  },
+  "message": "Allow \"bare\" tags and moved tag tests into tag_test.go. Fixes #19",
+  "pr": {
+    "number": 21,
+    "title": "Allow \"bare\" tags and moved tag tests into tag_test.go. Fixes #19",
+    "body": "",
+    "url": "https://github.com/alecthomas/kong/pull/21"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 4,
+    "additions": 122,
+    "deletions": 69
+  },
+  "files": [
+    {
+      "path": "build.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "kong_test.go",
+      "status": "M",
+      "additions": 0,
+      "deletions": 58,
+      "binary": false
+    },
+    {
+      "path": "tag.go",
+      "status": "M",
+      "additions": 26,
+      "deletions": 10,
+      "binary": false
+    },
+    {
+      "path": "tag_test.go",
+      "status": "A",
+      "additions": 95,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/build.go b/build.go\nindex ad4a767..13adda2 100644\n--- a/build.go\n+++ b/build.go\n@@ -49,7 +49,7 @@ func buildNode(v reflect.Value, typ NodeType, seenFlags map[string]bool) *Node {\n \t\t\tname = strings.ToLower(dashedString(ft.Name))\n \t\t}\n \n-\t\ttag := parseTag(fv, ft.Tag.Get(\"kong\"))\n+\t\ttag := parseTag(fv, ft)\n \n \t\t// Nested structs are either commands or args.\n \t\tif ft.Type.Kind() == reflect.Struct && (tag.Cmd || tag.Arg) {\ndiff --git a/kong_test.go b/kong_test.go\nindex 7fbdbff..201615c 100644\n--- a/kong_test.go\n+++ b/kong_test.go\n@@ -246,64 +246,6 @@ func TestMixedRequiredArgs(t *testing.T) {\n \t})\n }\n \n-func TestDefaultValueForOptionalArg(t *testing.T) {\n-\tvar cli struct {\n-\t\tArg string `kong:\"arg,optional,default='👌'\"`\n-\t}\n-\tp := mustNew(t, &cli)\n-\t_, err := p.Parse(nil)\n-\trequire.NoError(t, err)\n-\trequire.Equal(t, \"👌\", cli.Arg)\n-}\n-\n-func TestNoValueInTag(t *testing.T) {\n-\tvar cli struct {\n-\t\tEmpty1 string `kong:\"default\"`\n-\t\tEmpty2 string `kong:\"default=\"`\n-\t}\n-\tp := mustNew(t, &cli)\n-\t_, err := p.Parse(nil)\n-\trequire.NoError(t, err)\n-\trequire.Equal(t, \"\", cli.Empty1)\n-\trequire.Equal(t, \"\", cli.Empty2)\n-}\n-\n-func TestCommaInQuotes(t *testing.T) {\n-\tvar cli struct {\n-\t\tNumbers string `kong:\"default='1,2'\"`\n-\t}\n-\tp := mustNew(t, &cli)\n-\t_, err := p.Parse(nil)\n-\trequire.NoError(t, err)\n-\trequire.Equal(t, \"1,2\", cli.Numbers)\n-}\n-\n-func TestBadString(t *testing.T) {\n-\tvar cli struct {\n-\t\tNumbers string `kong:\"default='yay'n\"`\n-\t}\n-\t_, err := New(&cli)\n-\trequire.Error(t, err)\n-}\n-\n-func TestNoQuoteEnd(t *testing.T) {\n-\tvar cli struct {\n-\t\tNumbers string `kong:\"default='yay\"`\n-\t}\n-\t_, err := New(&cli)\n-\trequire.Error(t, err)\n-}\n-\n-func TestEscapedQuote(t *testing.T) {\n-\tvar cli struct {\n-\t\tDoYouKnow string `kong:\"default='i don\\\\'t know'\"`\n-\t}\n-\tp := mustNew(t, &cli)\n-\t_, err := p.Parse(nil)\n-\trequire.NoError(t, err)\n-\trequire.Equal(t, \"i don't know\", cli.DoYouKnow)\n-}\n-\n func TestInvalidDefaultErrors(t *testing.T) {\n \tvar cli struct {\n \t\tFlag int `kong:\"default='foo'\"`\ndiff --git a/tag.go b/tag.go\nindex ed0d938..fe4f874 100644\n--- a/tag.go\n+++ b/tag.go\n@@ -26,9 +26,15 @@ type Tag struct {\n \titems map[string]string\n }\n \n-func parseCSV(s string) map[string]string {\n-\td := map[string]string{}\n+type tagChars struct {\n+\tsep, quote, assign rune\n+}\n \n+var kongChars = tagChars{sep: ',', quote: '\\'', assign: '='}\n+var bareChars = tagChars{sep: ' ', quote: '\"', assign: ':'}\n+\n+func parseCSV(s string, chr tagChars) map[string]string {\n+\td := map[string]string{}\n \tkey := []rune{}\n \tvalue := []rune{}\n \tquotes := false\n@@ -51,23 +57,23 @@ func parseCSV(s string) map[string]string {\n \t\t} else {\n \t\t\teof = true\n \t\t}\n-\t\tif !quotes && r == ',' {\n+\t\tif !quotes && r == chr.sep {\n \t\t\tadd()\n \t\t\tcontinue\n \t\t}\n-\t\tif r == '=' && inKey {\n+\t\tif r == chr.assign && inKey {\n \t\t\tinKey = false\n \t\t\tcontinue\n \t\t}\n \t\tif r == '\\\\' {\n-\t\t\tif next == '\\'' {\n+\t\t\tif next == chr.quote {\n \t\t\t\tidx++\n-\t\t\t\tr = '\\''\n+\t\t\t\tr = chr.quote\n \t\t\t}\n-\t\t} else if r == '\\'' {\n+\t\t} else if r == chr.quote {\n \t\t\tif quotes {\n \t\t\t\tquotes = false\n-\t\t\t\tif next == ',' || eof {\n+\t\t\t\tif next == chr.sep || eof {\n \t\t\t\t\tcontinue\n \t\t\t\t}\n \t\t\t\tfail(\"%v has an unexpected char at pos %v\", s, idx)\n@@ -91,7 +97,17 @@ func parseCSV(s string) map[string]string {\n \treturn d\n }\n \n-func parseTag(fv reflect.Value, s string) *Tag {\n+func getTagInfo(ft reflect.StructField) (string, tagChars) {\n+\ts, ok := ft.Tag.Lookup(\"kong\")\n+\tif ok {\n+\t\treturn s, kongChars\n+\t}\n+\n+\treturn string(ft.Tag), bareChars\n+}\n+\n+func parseTag(fv reflect.Value, ft reflect.StructField) *Tag {\n+\ts, chars := getTagInfo(ft)\n \tt := &Tag{\n \t\titems: map[string]string{},\n \t}\n@@ -99,7 +115,7 @@ func parseTag(fv reflect.Value, s string) *Tag {\n \t\treturn t\n \t}\n \n-\tt.items = parseCSV(s)\n+\tt.items = parseCSV(s, chars)\n \n \tt.Cmd = t.Has(\"cmd\")\n \tt.Arg = t.Has(\"arg\")\ndiff --git a/tag_test.go b/tag_test.go\nnew file mode 100644\nindex 0000000..1decec5\n--- /dev/null\n+++ b/tag_test.go\n@@ -0,0 +1,95 @@\n+package kong\n+\n+import (\n+\t\"testing\"\n+\n+\t\"github.com/stretchr/testify/require\"\n+)\n+\n+func TestDefaultValueForOptionalArg(t *testing.T) {\n+\tvar cli struct {\n+\t\tArg string `kong:\"arg,optional,default='👌'\"`\n+\t}\n+\tp := mustNew(t, &cli)\n+\t_, err := p.Parse(nil)\n+\trequire.NoError(t, err)\n+\trequire.Equal(t, \"👌\", cli.Arg)\n+}\n+\n+func TestNoValueInTag(t *testing.T) {\n+\tvar cli struct {\n+\t\tEmpty1 string `kong:\"default\"`\n+\t\tEmpty2 string `kong:\"default=\"`\n+\t}\n+\tp := mustNew(t, &cli)\n+\t_, err := p.Parse(nil)\n+\trequire.NoError(t, err)\n+\trequire.Equal(t, \"\", cli.Empty1)\n+\trequire.Equal(t, \"\", cli.Empty2)\n+}\n+\n+func TestCommaInQuotes(t *testing.T) {\n+\tvar cli struct {\n+\t\tNumbers string `kong:\"default='1,2'\"`\n+\t}\n+\tp := mustNew(t, &cli)\n+\t_, err := p.Parse(nil)\n+\trequire.NoError(t, err)\n+\trequire.Equal(t, \"1,2\", cli.Numbers)\n+}\n+\n+func TestBadString(t *testing.T) {\n+\tvar cli struct {\n+\t\tNumbers string `kong:\"default='yay'n\"`\n+\t}\n+\t_, err := New(&cli)\n+\trequire.Error(t, err)\n+}\n+\n+func TestNoQuoteEnd(t *testing.T) {\n+\tvar cli struct {\n+\t\tNumbers string `kong:\"default='yay\"`\n+\t}\n+\t_, err := New(&cli)\n+\trequire.Error(t, err)\n+}\n+\n+func TestEscapedQuote(t *testing.T) {\n+\tvar cli struct {\n+\t\tDoYouKnow string `kong:\"default='i don\\\\'t know'\"`\n+\t}\n+\tp := mustNew(t, &cli)\n+\t_, err := p.Parse(nil)\n+\trequire.NoError(t, err)\n+\trequire.Equal(t, \"i don't know\", cli.DoYouKnow)\n+}\n+\n+func TestBareTags(t *testing.T) {\n+\tvar cli struct {\n+\t\tCmd struct {\n+\t\t\tArg  string `arg`\n+\t\t\tFlag string `required default:\"👌\"`\n+\t\t} `cmd`\n+\t}\n+\n+\tp := mustNew(t, &cli)\n+\t_, err := p.Parse([]string{\"cmd\", \"arg\", \"--flag=hi\"})\n+\trequire.NoError(t, err)\n+\trequire.Equal(t, \"hi\", cli.Cmd.Flag)\n+\trequire.Equal(t, \"arg\", cli.Cmd.Arg)\n+}\n+\n+func TestBareTagsWithJsonTag(t *testing.T) {\n+\tvar cli struct {\n+\t\tCmd struct {\n+\t\t\tArg  string `json:\"-\" optional arg`\n+\t\t\tFlag string `json:\"best_flag\" default:\"\\\"'👌'\\\"\"`\n+\t\t} `cmd json:\"CMD\"`\n+\t}\n+\n+\tp := mustNew(t, &cli)\n+\t_, err := p.Parse([]string{\"cmd\"})\n+\trequire.NoError(t, err)\n+\trequire.Equal(t, \"\\\"'👌'\\\"\", cli.Cmd.Flag)\n+\trequire.Equal(t, \"\", cli.Cmd.Arg)\n+}\n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    "README.md",
+    "_examples/shell/main.go",
+    "build.go",
+    "camelcase.go",
+    "context.go",
+    "context_test.go",
+    "decoders.go",
+    "decoders_test.go",
+    "global.go",
+    "global_test.go",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "kong.go",
+    "kong_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "tokentype_string.go"
+  ],
+  "explanation": {
+    "what": "struct タグの解釈を、`kong:\"...\"` タグが無い場合でも動作するよう拡張した。`getTagInfo()` を追加して `kong` タグがあればカンマ区切り・シングルクォート(`kongChars`)、無ければ素の struct タグ文字列をスペース区切り・ダブルクォート(`bareChars`)で解釈するようにし、`parseTag`/`parseCSV` がどちらの記法にも対応する `tagChars{sep, quote, assign}` を受け取るようになった。あわせて tag 関連のテストを `kong_test.go` から新設の `tag_test.go` に移動している。",
+    "why": "コミットメッセージの \"Fixes #19\" が示す通り、既存の issue で報告された不具合・要望への対応。`kong:\"...\"` タグを毎回書かなくても `arg` や `required default:\"...\"` のような素のタグ表記(bare tag)で CLI 定義を書けるようにする狙いだったと見られる。",
+    "highlights": [
+      { "file": "tag.go", "note": "getTagInfo(): kong タグの有無で区切り文字体系(kongChars/bareChars)を切り替える分岐" },
+      { "file": "tag_test.go", "note": "TestBareTags / TestBareTagsWithJsonTag: json タグ等と共存する bare tag の挙動を検証" }
+    ],
+    "langNotes": [
+      { "topic": "struct タグ(reflect.StructTag)", "note": "Go の struct フィールドに書ける `` `kong:\"cmd\"` `` のようなメタデータ文字列。標準では `Tag.Get(\"kong\")` でキー付きの値を取り出すが、このコミットでは `kong` キーが無い場合に `reflect.StructField.Tag` 全体(素の文字列)を代替の記法として読む、という独自拡張をしている。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [
+      { "type": "pr", "number": 21, "url": "https://github.com/alecthomas/kong/pull/21" }
+    ],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

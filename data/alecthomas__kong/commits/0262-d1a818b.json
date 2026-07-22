@@ -1,0 +1,150 @@
+{
+  "seq": 262,
+  "sha": "d1a818b5a1a8ec0d7588b2a3c818ae58b43509de",
+  "parents": [
+    "89315e74ad0c65a7a7deb246a390ed2888727616"
+  ],
+  "author": {
+    "name": "Alec Thomas",
+    "email": "alec@swapoff.org",
+    "date": "2021-07-13T13:53:01+10:00"
+  },
+  "message": "Allow DynamicCommand to specify arbitrary tags.\n\nFixes #185.",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 6,
+    "additions": 57,
+    "deletions": 21
+  },
+  "files": [
+    {
+      "path": "README.md",
+      "status": "M",
+      "additions": 6,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "build.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "kong.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "kong_test.go",
+      "status": "M",
+      "additions": 11,
+      "deletions": 2,
+      "binary": false
+    },
+    {
+      "path": "options.go",
+      "status": "M",
+      "additions": 5,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "tag.go",
+      "status": "M",
+      "additions": 33,
+      "deletions": 16,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/README.md b/README.md\nindex faae736..5520033 100644\n--- a/README.md\n+++ b/README.md\n@@ -25,6 +25,7 @@\n - [Custom decoders mappers](#custom-decoders-mappers)\n - [Supported tags](#supported-tags)\n - [Plugins](#plugins)\n+- [Dynamic Commands](#dynamic-commands)\n - [Variable interpolation](#variable-interpolation)\n - [Validation](#validation)\n - [Modifying Kong's behaviour](#modifying-kongs-behaviour)\n@@ -474,6 +475,11 @@ cli.Plugins = kong.Plugins{&pluginOne, &pluginTwo}\n \n Additionally if an interface type is embedded, it can also be populated with a Kong annotated struct.\n \n+## Dynamic Commands\n+\n+While plugins give complete control over extending command-line interfaces, Kong\n+also supports dynamically adding commands via `kong.DynamicCommand()`.\n+\n ## Variable interpolation\n \n Kong supports limited variable interpolation into help strings, enum lists and\ndiff --git a/build.go b/build.go\nindex 35e9411..36581e3 100644\n--- a/build.go\n+++ b/build.go\n@@ -51,7 +51,7 @@ func flattenedFields(v reflect.Value) (out []flattenedField) {\n \tfor i := 0; i < v.NumField(); i++ {\n \t\tft := v.Type().Field(i)\n \t\tfv := v.Field(i)\n-\t\ttag := parseTag(v, fv, ft)\n+\t\ttag := parseTag(v, ft)\n \t\tif tag.Ignored {\n \t\t\tcontinue\n \t\t}\ndiff --git a/kong.go b/kong.go\nindex 3edfc3b..aa60c91 100644\n--- a/kong.go\n+++ b/kong.go\n@@ -118,7 +118,7 @@ func New(grammar interface{}, options ...Option) (*Kong, error) {\n \n \t// Synthesise command nodes.\n \tfor _, dcmd := range k.dynamicCommands {\n-\t\ttag := newEmptyTag()\n+\t\ttag := parseTagString(strings.Join(dcmd.tags, \" \"))\n \t\ttag.Name = dcmd.name\n \t\ttag.Help = dcmd.help\n \t\ttag.Group = dcmd.group\ndiff --git a/kong_test.go b/kong_test.go\nindex 33a2c52..7c81826 100644\n--- a/kong_test.go\n+++ b/kong_test.go\n@@ -1242,9 +1242,14 @@ func TestDynamicCommands(t *testing.T) {\n \tcli := struct {\n \t\tOne struct{} `cmd:\"one\"`\n \t}{}\n+\thelp := &strings.Builder{}\n \ttwo := &dynamicCommand{}\n-\tvar twoi interface{} = &two\n-\tp := mustNew(t, &cli, kong.DynamicCommand(\"two\", \"\", \"\", twoi))\n+\tthree := &dynamicCommand{}\n+\tp := mustNew(t, &cli,\n+\t\tkong.DynamicCommand(\"two\", \"\", \"\", &two),\n+\t\tkong.DynamicCommand(\"three\", \"\", \"\", three, \"hidden\"),\n+\t\tkong.Writers(help, help),\n+\t\tkong.Exit(func(int) {}))\n \tkctx, err := p.Parse([]string{\"two\", \"--flag=flag\"})\n \trequire.NoError(t, err)\n \trequire.Equal(t, \"flag\", two.Flag)\n@@ -1252,6 +1257,10 @@ func TestDynamicCommands(t *testing.T) {\n \terr = kctx.Run()\n \trequire.NoError(t, err)\n \trequire.True(t, two.ran)\n+\n+\t_, err = p.Parse([]string{\"--help\"})\n+\trequire.EqualError(t, err, `expected one of \"one\",  \"two\"`)\n+\trequire.NotContains(t, help.String(), \"three\", help.String())\n }\n \n func TestDuplicateShortflags(t *testing.T) {\ndiff --git a/options.go b/options.go\nindex 57a8f13..aec57d6 100644\n--- a/options.go\n+++ b/options.go\n@@ -58,19 +58,23 @@ type dynamicCommand struct {\n \tname  string\n \thelp  string\n \tgroup string\n+\ttags  []string\n \tcmd   interface{}\n }\n \n // DynamicCommand registers a dynamically constructed command with the root of the CLI.\n //\n // This is useful for command-line structures that are extensible via user-provided plugins.\n-func DynamicCommand(name, help, group string, cmd interface{}) Option {\n+//\n+// \"tags\" is a list of extra tag strings to parse, in the form <key>:\"<value>\".\n+func DynamicCommand(name, help, group string, cmd interface{}, tags ...string) Option {\n \treturn OptionFunc(func(k *Kong) error {\n \t\tk.dynamicCommands = append(k.dynamicCommands, &dynamicCommand{\n \t\t\tname:  name,\n \t\t\thelp:  help,\n \t\t\tgroup: group,\n \t\t\tcmd:   cmd,\n+\t\t\ttags:  tags,\n \t\t})\n \t\treturn nil\n \t})\ndiff --git a/tag.go b/tag.go\nindex 7c9ae99..c30052b 100644\n--- a/tag.go\n+++ b/tag.go\n@@ -129,24 +129,41 @@ func tagSplitFn(r rune) bool {\n \treturn r == ',' || r == ' '\n }\n \n-func parseTag(parent, fv reflect.Value, ft reflect.StructField) *Tag {\n+func parseTagString(s string) *Tag {\n+\tt := &Tag{\n+\t\titems: parseTagItems(s, bareChars),\n+\t}\n+\terr := hydrateTag(t, \"\", false)\n+\tif err != nil {\n+\t\tfail(\"%s: %s\", s, err)\n+\t}\n+\treturn t\n+}\n+\n+func parseTag(parent reflect.Value, ft reflect.StructField) *Tag {\n \tif ft.Tag.Get(\"kong\") == \"-\" {\n \t\tt := newEmptyTag()\n \t\tt.Ignored = true\n \t\treturn t\n \t}\n-\tvar (\n-\t\terr error\n-\t\tt   = &Tag{\n-\t\t\titems: parseTagItems(getTagInfo(ft)),\n-\t\t}\n-\t)\n+\tt := &Tag{\n+\t\titems: parseTagItems(getTagInfo(ft)),\n+\t}\n+\terr := hydrateTag(t, ft.Type.Name(), ft.Type.Kind() == reflect.Bool)\n+\tif err != nil {\n+\t\tfailField(parent, ft, \"%s\", err)\n+\t}\n+\treturn t\n+}\n+\n+func hydrateTag(t *Tag, typeName string, isBool bool) error {\n+\tvar err error\n \tt.Cmd = t.Has(\"cmd\")\n \tt.Arg = t.Has(\"arg\")\n \trequired := t.Has(\"required\")\n \toptional := t.Has(\"optional\")\n \tif required && optional {\n-\t\tfailField(parent, ft, \"can't specify both required and optional\")\n+\t\treturn fmt.Errorf(\"can't specify both required and optional\")\n \t}\n \tt.Required = required\n \tt.Optional = optional\n@@ -161,7 +178,7 @@ func parseTag(parent, fv reflect.Value, ft reflect.StructField) *Tag {\n \tt.Env = t.Get(\"env\")\n \tt.Short, err = t.GetRune(\"short\")\n \tif err != nil && t.Get(\"short\") != \"\" {\n-\t\tfailField(parent, ft, \"invalid short flag name %q: %s\", t.Get(\"short\"), err)\n+\t\treturn fmt.Errorf(\"invalid short flag name %q: %s\", t.Get(\"short\"), err)\n \t}\n \tt.Hidden = t.Has(\"hidden\")\n \tt.Format = t.Get(\"format\")\n@@ -174,8 +191,8 @@ func parseTag(parent, fv reflect.Value, ft reflect.StructField) *Tag {\n \tt.Prefix = t.Get(\"prefix\")\n \tt.Embed = t.Has(\"embed\")\n \tnegatable := t.Has(\"negatable\")\n-\tif negatable && ft.Type.Kind() != reflect.Bool {\n-\t\tfailField(parent, ft, \"negatable can only be set on booleans\")\n+\tif negatable && !isBool {\n+\t\treturn fmt.Errorf(\"negatable can only be set on booleans\")\n \t}\n \tt.Negatable = negatable\n \taliases := t.Get(\"aliases\")\n@@ -186,24 +203,24 @@ func parseTag(parent, fv reflect.Value, ft reflect.StructField) *Tag {\n \tfor _, set := range t.GetAll(\"set\") {\n \t\tparts := strings.SplitN(set, \"=\", 2)\n \t\tif len(parts) == 0 {\n-\t\t\tfailField(parent, ft, \"set should be in the form key=value but got %q\", set)\n+\t\t\treturn fmt.Errorf(\"set should be in the form key=value but got %q\", set)\n \t\t}\n \t\tt.Vars[parts[0]] = parts[1]\n \t}\n \tt.PlaceHolder = t.Get(\"placeholder\")\n \tif t.PlaceHolder == \"\" {\n-\t\tt.PlaceHolder = strings.ToUpper(dashedString(fv.Type().Name()))\n+\t\tt.PlaceHolder = strings.ToUpper(dashedString(typeName))\n \t}\n \tt.Enum = t.Get(\"enum\")\n \tif t.Enum != \"\" && !(t.Required || t.Default != \"\") {\n-\t\tfailField(parent, ft, \"enum value is only valid if it is either required or has a valid default value\")\n+\t\treturn fmt.Errorf(\"enum value is only valid if it is either required or has a valid default value\")\n \t}\n \tpassthrough := t.Has(\"passthrough\")\n \tif passthrough && !t.Arg {\n-\t\tfailField(parent, ft, \"passthrough only makes sense for positional arguments\")\n+\t\treturn fmt.Errorf(\"passthrough only makes sense for positional arguments\")\n \t}\n \tt.Passthrough = passthrough\n-\treturn t\n+\treturn nil\n }\n \n // Has returns true if the tag contained the given key.\n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    ".github/FUNDING.yml",
+    ".gitignore",
+    ".golangci.yml",
+    "COPYING",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/README.md",
+    "_examples/server/console.go",
+    "_examples/server/go.mod",
+    "_examples/server/go.sum",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/main.go",
+    "benchmark_test.go",
+    "bin/.go@latest.pkg",
+    "bin/.golangci-lint-1.40.1.pkg",
+    "bin/README.hermit.md",
+    "bin/activate-hermit",
+    "bin/go",
+    "bin/gofmt",
+    "bin/golangci-lint",
+    "bin/hermit",
+    "bin/hermit.hcl",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "config_test.go",
+    "context.go",
+    "defaults.go",
+    "defaults_test.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "go.mod",
+    "go.sum",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "testdata/file.txt",
+    "util.go",
+    "util_test.go",
+    "visit.go"
+  ],
+  "explanation": {
+    "what": "`kong.DynamicCommand()` に可変長の `tags ...string` 引数を追加し、動的登録するコマンドにも通常の struct タグ(`help:\"\"` や `hidden` など)と同じ書式で任意のタグを渡せるようにした。あわせて tag.go のタグ解析ロジックを、struct フィールドから直接読む `parseTag` と文字列から読む新設の `parseTagString` に分離し、共通処理を `hydrateTag` に切り出している。",
+    "why": "コミットメッセージの \"Fixes #185.\" が示す通り、issue で報告された制約(DynamicCommand で作ったコマンドには通常のタグオプションが適用できない)を解消するための変更。動的コマンドは struct フィールドの `reflect.StructField` を持たないため、既存の parseTag をそのまま使えず、タグ文字列を直接パースする経路を新設する必要があった。",
+    "highlights": [
+      { "file": "tag.go", "note": "parseTag/parseTagString が hydrateTag を共有し、フィールド由来かどうかに依らず同じタグ解釈ロジックが働く" },
+      { "file": "options.go", "note": "DynamicCommand の可変引数 tags が \"<key>:\\\"<value>\\\"\" 形式のタグ文字列として保持される" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

@@ -1,0 +1,137 @@
+{
+  "seq": 110,
+  "sha": "6fa83bdc0e9a653dd7c25c6e0c39056e25847580",
+  "parents": [
+    "54338bd8b1835d76e9ed51b085f9a657af7bfb4e"
+  ],
+  "author": {
+    "name": "Alec Thomas",
+    "email": "alec@swapoff.org",
+    "date": "2018-09-20T18:16:45+10:00"
+  },
+  "message": "Apply hooks to default values.",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 7,
+    "additions": 107,
+    "deletions": 35
+  },
+  "files": [
+    {
+      "path": "build.go",
+      "status": "M",
+      "additions": 15,
+      "deletions": 7,
+      "binary": false
+    },
+    {
+      "path": "context.go",
+      "status": "M",
+      "additions": 3,
+      "deletions": 3,
+      "binary": false
+    },
+    {
+      "path": "help.go",
+      "status": "M",
+      "additions": 14,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "kong.go",
+      "status": "M",
+      "additions": 29,
+      "deletions": 13,
+      "binary": false
+    },
+    {
+      "path": "kong_test.go",
+      "status": "M",
+      "additions": 12,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "model.go",
+      "status": "M",
+      "additions": 13,
+      "deletions": 12,
+      "binary": false
+    },
+    {
+      "path": "resolver_test.go",
+      "status": "M",
+      "additions": 21,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/build.go b/build.go\nindex 0616785..2a6a21d 100644\n--- a/build.go\n+++ b/build.go\n@@ -177,19 +177,27 @@ func buildField(k *Kong, node *Node, v reflect.Value, ft reflect.StructField, fv\n \t}\n \n \tvalue := &Value{\n-\t\tName:    name,\n-\t\tHelp:    tag.Help,\n-\t\tDefault: tag.Default,\n-\t\tMapper:  mapper,\n-\t\tTag:     tag,\n-\t\tTarget:  fv,\n-\t\tEnum:    tag.Enum,\n+\t\tName:         name,\n+\t\tHelp:         tag.Help,\n+\t\tDefault:      tag.Default,\n+\t\tDefaultValue: reflect.New(fv.Type()).Elem(),\n+\t\tMapper:       mapper,\n+\t\tTag:          tag,\n+\t\tTarget:       fv,\n+\t\tEnum:         tag.Enum,\n \n \t\t// Flags are optional by default, and args are required by default.\n \t\tRequired: (!tag.Arg && tag.Required) || (tag.Arg && !tag.Optional),\n \t\tFormat:   tag.Format,\n \t}\n \n+\tif value.Default != \"\" {\n+\t\terr := value.Parse(Scan(tag.Default), value.DefaultValue)\n+\t\tif err != nil {\n+\t\t\tfail(\"invalid default value %q for field type %s.%s (of type %s)\", value.Default, v.Type(), ft.Name, ft.Type)\n+\t\t}\n+\t}\n+\n \tif tag.Arg {\n \t\tnode.Positional = append(node.Positional, value)\n \t} else {\ndiff --git a/context.go b/context.go\nindex 6df5c36..8175eef 100644\n--- a/context.go\n+++ b/context.go\n@@ -181,18 +181,18 @@ func (c *Context) AddResolver(resolver ResolverFunc) {\n \tc.resolvers = append(c.resolvers, resolver)\n }\n \n-// FlagValue returns the set value of a flag if it was encountered and exists.\n+// FlagValue returns the set value of a flag if it was encountered and exists, or its default value.\n func (c *Context) FlagValue(flag *Flag) interface{} {\n \tfor _, trace := range c.Path {\n \t\tif trace.Flag == flag {\n \t\t\tv, ok := c.values[trace.Flag.Value]\n \t\t\tif !ok {\n-\t\t\t\treturn nil\n+\t\t\t\tbreak\n \t\t\t}\n \t\t\treturn v.Interface()\n \t\t}\n \t}\n-\treturn nil\n+\treturn flag.DefaultValue.Interface()\n }\n \n // Recursively reset values to defaults (as specified in the grammar) or the zero value.\ndiff --git a/help.go b/help.go\nindex 21b6de7..52b6580 100644\n--- a/help.go\n+++ b/help.go\n@@ -13,6 +13,20 @@ const (\n \tdefaultColumnPadding = 4\n )\n \n+// Help flag.\n+type helpValue bool\n+\n+func (h helpValue) BeforeApply(ctx *Context) error {\n+\toptions := ctx.Kong.helpOptions\n+\toptions.Summary = false\n+\terr := ctx.Kong.help(options, ctx)\n+\tif err != nil {\n+\t\treturn err\n+\t}\n+\tctx.Kong.Exit(1)\n+\treturn nil\n+}\n+\n // HelpOptions for HelpPrinters.\n type HelpOptions struct {\n \t// Don't print top-level usage summary.\ndiff --git a/kong.go b/kong.go\nindex bce8f94..2de2b12 100644\n--- a/kong.go\n+++ b/kong.go\n@@ -151,19 +151,6 @@ func (k *Kong) interpolateValue(value *Value, vars Vars) (err error) {\n \treturn nil\n }\n \n-type helpValue bool\n-\n-func (h helpValue) BeforeApply(ctx *Context) error {\n-\toptions := ctx.Kong.helpOptions\n-\toptions.Summary = false\n-\terr := ctx.Kong.help(options, ctx)\n-\tif err != nil {\n-\t\treturn err\n-\t}\n-\tctx.Kong.Exit(1)\n-\treturn nil\n-}\n-\n // Provide additional builtin flags, if any.\n func (k *Kong) extraFlags() []*Flag {\n \tif k.noDefaultHelp {\n@@ -248,6 +235,35 @@ func (k *Kong) applyHook(ctx *Context, name string) error {\n \t\t\treturn err\n \t\t}\n \t}\n+\t// Path[0] will always be the app root.\n+\treturn k.applyHookToDefaultFlags(ctx, ctx.Path[0].Node(), name)\n+}\n+\n+// Call hook on any unset flags with default values.\n+func (k *Kong) applyHookToDefaultFlags(ctx *Context, node *Node, name string) error {\n+\tif node == nil {\n+\t\treturn nil\n+\t}\n+\tbindings := k.bindings.clone().add(ctx).add(node.Vars().CloneWith(k.vars))\n+\tfor _, flag := range node.Flags {\n+\t\tif flag.Default == \"\" || ctx.values[flag.Value].IsValid() || !flag.Target.IsValid() {\n+\t\t\tcontinue\n+\t\t}\n+\t\tmethod := getMethod(flag.Target, name)\n+\t\tif !method.IsValid() {\n+\t\t\tcontinue\n+\t\t}\n+\t\tpath := &Path{Flag: flag}\n+\t\tif err := callMethod(name, flag.Target, method, bindings.clone().add(path)); err != nil {\n+\t\t\treturn err\n+\t\t}\n+\t}\n+\tfor _, branch := range node.Children {\n+\t\terr := k.applyHookToDefaultFlags(ctx, branch, name)\n+\t\tif err != nil {\n+\t\t\treturn err\n+\t\t}\n+\t}\n \treturn nil\n }\n \ndiff --git a/kong_test.go b/kong_test.go\nindex 450f711..6112c53 100644\n--- a/kong_test.go\n+++ b/kong_test.go\n@@ -642,3 +642,15 @@ func TestUnnamedFieldEmbeds(t *testing.T) {\n \trequire.Contains(t, buf.String(), `--one-flag=STRING`)\n \trequire.Contains(t, buf.String(), `--two-flag=STRING`)\n }\n+\n+func TestHooksCalledForDefault(t *testing.T) {\n+\tvar cli struct {\n+\t\tFlag hookValue `default:\"default\"`\n+\t}\n+\n+\tctx := &hookContext{}\n+\t_, err := mustNew(t, &cli, kong.Bind(ctx)).Parse(nil)\n+\trequire.NoError(t, err)\n+\trequire.Equal(t, \"default\", string(cli.Flag))\n+\trequire.Equal(t, []string{\"before:\", \"after:default\"}, ctx.values)\n+}\ndiff --git a/model.go b/model.go\nindex 8103bf5..f0180d8 100644\n--- a/model.go\n+++ b/model.go\n@@ -196,18 +196,19 @@ func (n *Node) Path() (out string) {\n \n // A Value is either a flag or a variable positional argument.\n type Value struct {\n-\tFlag     *Flag // Nil if positional argument.\n-\tName     string\n-\tHelp     string\n-\tDefault  string\n-\tEnum     string\n-\tMapper   Mapper\n-\tTag      *Tag\n-\tTarget   reflect.Value\n-\tRequired bool\n-\tSet      bool   // Set to true when this value is set through some mechanism.\n-\tFormat   string // Formatting directive, if applicable.\n-\tPosition int    // Position (for positional arguments).\n+\tFlag         *Flag // Nil if positional argument.\n+\tName         string\n+\tHelp         string\n+\tDefault      string\n+\tDefaultValue reflect.Value\n+\tEnum         string\n+\tMapper       Mapper\n+\tTag          *Tag\n+\tTarget       reflect.Value\n+\tRequired     bool\n+\tSet          bool   // Set to true when this value is set through some mechanism.\n+\tFormat       string // Formatting directive, if applicable.\n+\tPosition     int    // Position (for positional arguments).\n }\n \n // EnumMap returns a map of the enums in this value.\ndiff --git a/resolver_test.go b/resolver_test.go\nindex 1caa942..501eae9 100644\n--- a/resolver_test.go\n+++ b/resolver_test.go\n@@ -208,3 +208,24 @@ func TestResolverSatisfiesRequired(t *testing.T) {\n \trequire.NoError(t, err)\n \trequire.Equal(t, 1, cli.Int)\n }\n+\n+func TestResolverTriggersHooks(t *testing.T) {\n+\tctx := &hookContext{}\n+\n+\tvar cli struct {\n+\t\tFlag hookValue\n+\t}\n+\n+\tvar first kong.ResolverFunc = func(context *kong.Context, parent *kong.Path, flag *kong.Flag) (string, error) {\n+\t\tif flag.Name == \"flag\" {\n+\t\t\treturn \"1\", nil\n+\t\t}\n+\t\treturn \"\", nil\n+\t}\n+\n+\t_, err := mustNew(t, &cli, kong.Bind(ctx), kong.Resolver(first)).Parse(nil)\n+\trequire.NoError(t, err)\n+\n+\trequire.Equal(t, \"1\", string(cli.Flag))\n+\trequire.Equal(t, []string{\"before:\", \"after:1\"}, ctx.values)\n+}\n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    ".golangci.yml",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/console.go",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/main.go",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "context.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "go.mod",
+    "go.sum",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "tokentype_string.go",
+    "util.go",
+    "util_test.go"
+  ],
+  "explanation": {
+    "what": "Value に DefaultValue reflect.Value フィールドを追加し、buildField でデフォルト値をあらかじめパースして保持するようにした。applyHook の最後で新設の applyHookToDefaultFlags を呼び出し、コマンドラインで明示的にセットされなかった(かつ Target が有効な)デフォルト値付きフラグに対しても BeforeApply/AfterApply 等のフックメソッドを再帰的に呼ぶようにした。Context.FlagValue はフラグが未設定でも nil ではなく flag.DefaultValue.Interface() を返すよう変更している。help.go の helpValue/BeforeApply は kong.go から help.go に移動されている。",
+    "why": "それまではユーザーがフラグを明示的に指定した場合のみフックが呼ばれ、default タグで与えたデフォルト値はフックの副作用(値の変換・検証など)を経ずに直接セットされていた。おそらく TestHooksCalledForDefault や TestResolverTriggersHooks が示すように、デフォルト値・resolver 由来の値でもフック(BeforeApply/AfterApply)を一貫して通すことで、値の設定経路によらず同じフック処理が適用されることを保証する意図とみられる。",
+    "highlights": [
+      { "file": "kong.go", "note": "applyHookToDefaultFlags: 未設定かつデフォルト値ありのフラグへ再帰的にフックを適用" },
+      { "file": "build.go", "note": "buildField: value.Parse で Default 文字列を事前に DefaultValue へパース" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "inferred",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

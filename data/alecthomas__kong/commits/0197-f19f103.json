@@ -1,0 +1,115 @@
+{
+  "seq": 197,
+  "sha": "f19f1031c032a23ba12f3c18289555547fa9669f",
+  "parents": [
+    "b89354adb0c0af65cda278ddccb0ff860808e8f0"
+  ],
+  "author": {
+    "name": "Cam Hutchison",
+    "email": "camh@xdna.net",
+    "date": "2020-06-02T08:17:42+10:00"
+  },
+  "message": "Format help placeholders with slice/map separators\n\nUse the specified separators for a flag in the placeholders printed in\nthe help message for slices and maps. Do not print the separator and\nellipsis if the separator is disabled (`\"none\"`).\n\nPreviously the default separator was printed with an ellipsis, ignoring\nthe `sep` and `mapsep` tags.\n\nAdd tests for `Flag.FormatPlaceHolder()`.",
+  "pr": {
+    "number": 85,
+    "title": "Fix sep:\"none\" and mapsep:\"none\"",
+    "body": "According to the README.md, a value of `\"none\"` for the `sep` tag (for\nslices) and `mapsep` (for maps) is meant to disable the separator that\nwould allow multiple entries to be added from a single argument.\nHowever, using `\"none\"` just set the separator to the rune `'n'`.\n\nFix the parsing of the tag, and also update `SplitEscaped` to not split\nwith a separator of `-1`.\n\nAdd a new test for the new cases.",
+    "url": "https://github.com/alecthomas/kong/pull/85"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 47,
+    "deletions": 3
+  },
+  "files": [
+    {
+      "path": "model.go",
+      "status": "M",
+      "additions": 6,
+      "deletions": 3,
+      "binary": false
+    },
+    {
+      "path": "model_test.go",
+      "status": "M",
+      "additions": 41,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/model.go b/model.go\nindex 8023dce..bd9eec4 100644\n--- a/model.go\n+++ b/model.go\n@@ -372,8 +372,8 @@ func (f *Flag) String() string {\n // FormatPlaceHolder formats the placeholder string for a Flag.\n func (f *Flag) FormatPlaceHolder() string {\n \ttail := \"\"\n-\tif f.Value.IsSlice() {\n-\t\ttail += \",...\"\n+\tif f.Value.IsSlice() && f.Value.Tag.Sep != -1 {\n+\t\ttail += string(f.Value.Tag.Sep) + \"...\"\n \t}\n \tif f.Default != \"\" {\n \t\tif f.Value.Target.Kind() == reflect.String {\n@@ -385,7 +385,10 @@ func (f *Flag) FormatPlaceHolder() string {\n \t\treturn f.PlaceHolder + tail\n \t}\n \tif f.Value.IsMap() {\n-\t\treturn \"KEY=VALUE;...\"\n+\t\tif f.Value.Tag.MapSep != -1 {\n+\t\t\ttail = string(f.Value.Tag.MapSep) + \"...\"\n+\t\t}\n+\t\treturn \"KEY=VALUE\" + tail\n \t}\n \treturn strings.ToUpper(f.Name) + tail\n }\ndiff --git a/model_test.go b/model_test.go\nindex b128aaf..9910704 100644\n--- a/model_test.go\n+++ b/model_test.go\n@@ -25,3 +25,44 @@ func TestModelApplicationCommands(t *testing.T) {\n \t}\n \trequire.Equal(t, []string{\"one two\", \"one three <four>\"}, actual)\n }\n+\n+func TestFormatPlaceHolder(t *testing.T) {\n+\tvar cli struct {\n+\t\tString                  string\n+\t\tDefaultInt              int    `default:\"42\"`\n+\t\tDefaultStr              string `default:\"hello\"`\n+\t\tPlaceholder             string `placeholder:\"world\"`\n+\t\tSliceSep                []string\n+\t\tSliceNoSep              []string `sep:\"none\"`\n+\t\tSliceDefault            []string `default:\"hello\"`\n+\t\tSlicePlaceholder        []string `placeholder:\"world\"`\n+\t\tSliceDefaultPlaceholder []string `default:\"hello\" placeholder:\"world\"`\n+\t\tMapSep                  map[string]string\n+\t\tMapNoSep                map[string]string `mapsep:\"none\"`\n+\t\tMapDefault              map[string]string `mapsep:\"none\" default:\"hello\"`\n+\t\tMapPlaceholder          map[string]string `mapsep:\"none\" placeholder:\"world\"`\n+\t}\n+\ttests := map[string]string{\n+\t\t\"help\":                      \"HELP\",\n+\t\t\"string\":                    \"STRING\",\n+\t\t\"default-int\":               \"42\",\n+\t\t\"default-str\":               `\"hello\"`,\n+\t\t\"placeholder\":               \"world\",\n+\t\t\"slice-sep\":                 \"SLICE-SEP,...\",\n+\t\t\"slice-no-sep\":              \"SLICE-NO-SEP\",\n+\t\t\"slice-default\":             \"hello,...\",\n+\t\t\"slice-placeholder\":         \"world,...\",\n+\t\t\"slice-default-placeholder\": \"hello,...\",\n+\t\t\"map-sep\":                   \"KEY=VALUE;...\",\n+\t\t\"map-no-sep\":                \"KEY=VALUE\",\n+\t\t\"map-default\":               \"hello\",\n+\t\t\"map-placeholder\":           \"world\",\n+\t}\n+\n+\tp := mustNew(t, &cli)\n+\tfor _, flag := range p.Model.Flags {\n+\t\twant, ok := tests[flag.Name]\n+\t\trequire.Truef(t, ok, \"unknown flag name: %s\", flag.Name)\n+\t\trequire.Equal(t, want, flag.FormatPlaceHolder())\n+\t}\n+}\n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    ".golangci.yml",
+    "COPYING",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/README.md",
+    "_examples/server/console.go",
+    "_examples/server/go.mod",
+    "_examples/server/go.sum",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/main.go",
+    "benchmark_test.go",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "config_test.go",
+    "context.go",
+    "defaults.go",
+    "defaults_test.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "go.mod",
+    "go.sum",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "util.go",
+    "util_test.go",
+    "visit.go"
+  ],
+  "explanation": {
+    "what": "model.go の Flag.FormatPlaceHolder() を変更し、スライス・マップのプレースホルダ表示で実際に設定された sep/mapsep 文字を使うようにした。区切りが \"none\"(-1)の場合は末尾の \",...\" や \";...\" を付けないようにする。model_test.go に多数のケースを網羅する TestFormatPlaceHolder を追加。",
+    "why": "PR #85 のコミットメッセージによれば、これまでヘルプのプレースホルダはスライスなら常に固定の \",...\"、マップなら常に \"KEY=VALUE;...\" を表示しており、sep/mapsep タグで区切り文字を変更したりnoneで無効化したりしても表示に反映されていなかった。直前のコミット(seq196)で sep:\"none\" の実装バグを直したことに合わせ、ヘルプ表示側も実際の区切り設定に追従させる。",
+    "highlights": [
+      { "file": "model.go", "note": "FormatPlaceHolder() が f.Value.Tag.Sep / MapSep の実値を見て表示文字列と省略記号の有無を決める" },
+      { "file": "model_test.go", "note": "sep/mapsep のあり・なし・default・placeholder 組み合わせを一括検証するテーブル駆動テスト" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [{ "type": "pr", "number": 85, "url": "https://github.com/alecthomas/kong/pull/85" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

@@ -1,0 +1,105 @@
+{
+  "seq": 155,
+  "sha": "d15c8fca8dfd0f4dba023021118452517cf36d9a",
+  "parents": [
+    "77a613fb8b3b8afefb4363fdd9ec362a4a10c975"
+  ],
+  "author": {
+    "name": "Alec Thomas",
+    "email": "alec@swapoff.org",
+    "date": "2019-10-30T13:46:08+11:00"
+  },
+  "message": "Bind parent nodes when executing Run().",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 21,
+    "deletions": 6
+  },
+  "files": [
+    {
+      "path": "callbacks.go",
+      "status": "M",
+      "additions": 10,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "context.go",
+      "status": "M",
+      "additions": 11,
+      "deletions": 5,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/callbacks.go b/callbacks.go\nindex 7f4637b..e403d27 100644\n--- a/callbacks.go\n+++ b/callbacks.go\n@@ -3,10 +3,19 @@ package kong\n import (\n \t\"fmt\"\n \t\"reflect\"\n+\t\"strings\"\n )\n \n type bindings map[reflect.Type]reflect.Value\n \n+func (b bindings) String() string {\n+\tout := []string{}\n+\tfor k := range b {\n+\t\tout = append(out, k.String())\n+\t}\n+\treturn \"bindings{\" + strings.Join(out, \", \") + \"}\"\n+}\n+\n func (b bindings) add(values ...interface{}) bindings {\n \tfor _, v := range values {\n \t\tb[reflect.TypeOf(v)] = reflect.ValueOf(v)\n@@ -51,7 +60,7 @@ func callMethod(name string, v, f reflect.Value, bindings bindings) error {\n \t\tif arg, ok := bindings[pt]; ok {\n \t\t\tin = append(in, arg)\n \t\t} else {\n-\t\t\treturn fmt.Errorf(\"couldn't find binding of type %s for parameter %d of %T.%s(), use kong.Bind(%s)\", pt, i, v.Type(), name, pt)\n+\t\t\treturn fmt.Errorf(\"couldn't find binding of type %s for parameter %d of %s.%s(), use kong.Bind(%s)\", pt, i, v.Type(), name, pt)\n \t\t}\n \t}\n \tout := f.Call(in)\ndiff --git a/context.go b/context.go\nindex 7279f63..80c262f 100644\n--- a/context.go\n+++ b/context.go\n@@ -525,8 +525,9 @@ func (c *Context) parseFlag(flags []*Flag, match string) (err error) {\n \n // Run executes the Run() method on the selected command, which must exist.\n //\n-// Any passed values will be bindable to arguments of the target Run() method.\n-func (c *Context) Run(bindings ...interface{}) (err error) {\n+// Any passed values will be bindable to arguments of the target Run() method. Additionally,\n+// all parent nodes in the command structure will be bound.\n+func (c *Context) Run(binds ...interface{}) (err error) {\n \tdefer catch(&err)\n \tnode := c.Selected()\n \tif node == nil {\n@@ -535,12 +536,18 @@ func (c *Context) Run(bindings ...interface{}) (err error) {\n \ttype targetMethod struct {\n \t\tnode   *Node\n \t\tmethod reflect.Value\n+\t\tbinds  bindings\n \t}\n+\tmethodBinds := c.Kong.bindings.clone().add(binds...).add(c).merge(c.bindings)\n \tmethods := []targetMethod{}\n \tfor i := 0; node != nil; i, node = i+1, node.Parent {\n \t\tmethod := getMethod(node.Target, \"Run\")\n+\t\tmethodBinds = methodBinds.clone()\n+\t\tfor p := node; p != nil; p = p.Parent {\n+\t\t\tmethodBinds = methodBinds.add(p.Target.Addr().Interface())\n+\t\t}\n \t\tif method.IsValid() {\n-\t\t\tmethods = append(methods, targetMethod{node, method})\n+\t\t\tmethods = append(methods, targetMethod{node, method, methodBinds})\n \t\t}\n \t}\n \tif len(methods) == 0 {\n@@ -552,8 +559,7 @@ func (c *Context) Run(bindings ...interface{}) (err error) {\n \t}\n \n \tfor _, method := range methods {\n-\t\tbinds := c.Kong.bindings.clone().add(bindings...).add(c).merge(c.bindings)\n-\t\tif err = callMethod(\"Run\", method.node.Target, method.method, binds); err != nil {\n+\t\tif err = callMethod(\"Run\", method.node.Target, method.method, method.binds); err != nil {\n \t\t\treturn err\n \t\t}\n \t}\n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    ".golangci.yml",
+    "COPYING",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/console.go",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/main.go",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "config_test.go",
+    "context.go",
+    "defaults.go",
+    "defaults_test.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "go.mod",
+    "go.sum",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "util.go",
+    "util_test.go",
+    "visit.go"
+  ],
+  "explanation": {
+    "what": "Context.Run() がコマンド階層を辿って各ノードの Run() メソッドを呼ぶ際に、そのノードの親ノード群(のポインタ)も bindings に追加するようにした。各ノードごとに methodBinds を clone してから親を遡って Target.Addr() を bind し、ノードごとに異なる bindings セットを保持する。あわせて bindings.String() を追加し、bind 不足時のエラーメッセージで型を %s で見やすく出力するようにした。",
+    "why": "コミットメッセージは「Run() 実行時に親ノードをバインドする」という変更内容のみで動機の説明はない。おそらく、サブコマンドの Run() が親コマンド構造体(例えば共有オプションを持つ struct)を引数として受け取りたいケースがあり、それまでは kong.Bind() で明示的に渡す必要があった手間を解消する狙いと考えられる。",
+    "highlights": [
+      { "file": "context.go", "note": "methodBinds はノードごとに clone され、node から親へ遡って Target.Addr().Interface() を bind する" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "inferred",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

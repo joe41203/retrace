@@ -1,0 +1,107 @@
+{
+  "seq": 195,
+  "sha": "b11ebc500bcc282daebe03fd1ffa7cd3a4736304",
+  "parents": [
+    "c77deac080b5dd847a46540a186ea923b68b276a"
+  ],
+  "author": {
+    "name": "Cam Hutchison",
+    "email": "camh@xdna.net",
+    "date": "2020-06-01T21:43:09+10:00"
+  },
+  "message": "Fix help tests with the introduction of -h\n\nCommit c77deac080b5dd847a46540a186ea923b68b276a in PR #83 added `h` as\nthe short flag for help, but the help tests were not updated. Update the\ntests with the `-h` in the help output.",
+  "pr": {
+    "number": 84,
+    "title": "Fix help tests with the introduction of -h",
+    "body": "Commit c77deac080b5dd847a46540a186ea923b68b276a in PR #83 added `h` as the short flag for help, but the help tests were not updated. Update the tests with the `-h` in the help output.",
+    "url": "https://github.com/alecthomas/kong/pull/84"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 21,
+    "deletions": 21
+  },
+  "files": [
+    {
+      "path": "help_test.go",
+      "status": "M",
+      "additions": 21,
+      "deletions": 21,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/help_test.go b/help_test.go\nindex 3f6f368..7a61fa8 100644\n--- a/help_test.go\n+++ b/help_test.go\n@@ -67,13 +67,13 @@ func TestHelp(t *testing.T) {\n A test app.\n \n Flags:\n-  --help                 Show context-sensitive help.\n-  --string=STRING        A string flag.\n-  --bool                 A bool flag with very long help that wraps a lot and is\n-                         verbose and is really verbose.\n-  --slice=STR,...        A slice of strings.\n-  --map=KEY=VALUE;...    A map of strings to ints.\n-  --required             A required flag.\n+  -h, --help                 Show context-sensitive help.\n+      --string=STRING        A string flag.\n+      --bool                 A bool flag with very long help that wraps a lot\n+                             and is verbose and is really verbose.\n+      --slice=STR,...        A slice of strings.\n+      --map=KEY=VALUE;...    A map of strings to ints.\n+      --required             A required flag.\n \n Commands:\n   one --required\n@@ -107,18 +107,18 @@ Sub-sub-arg.\n Detailed help provided through the HelpProvider interface.\n \n Flags:\n-  --help                 Show context-sensitive help.\n-  --string=STRING        A string flag.\n-  --bool                 A bool flag with very long help that wraps a lot and is\n-                         verbose and is really verbose.\n-  --slice=STR,...        A slice of strings.\n-  --map=KEY=VALUE;...    A map of strings to ints.\n-  --required             A required flag.\n-\n-  --flag=STRING          Nested flag under two.\n-  --required-two\n-\n-  --required-three\n+  -h, --help                 Show context-sensitive help.\n+      --string=STRING        A string flag.\n+      --bool                 A bool flag with very long help that wraps a lot\n+                             and is verbose and is really verbose.\n+      --slice=STR,...        A slice of strings.\n+      --map=KEY=VALUE;...    A map of strings to ints.\n+      --required             A required flag.\n+\n+      --flag=STRING          Nested flag under two.\n+      --required-two\n+\n+      --required-three\n `\n \t\tt.Log(expected)\n \t\tt.Log(w.String())\n@@ -173,7 +173,7 @@ func TestHelpTree(t *testing.T) {\n A test app.\n \n Flags:\n-  --help    Show context-sensitive help.\n+  -h, --help    Show context-sensitive help.\n \n Commands:\n   one          subcommand one\n@@ -206,7 +206,7 @@ Run \"test-app <command> --help\" for more information on a command.\n subcommand one\n \n Flags:\n-  --help    Show context-sensitive help.\n+  -h, --help    Show context-sensitive help.\n \n Commands:\n   thing      subcommand thing\n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    ".golangci.yml",
+    "COPYING",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/README.md",
+    "_examples/server/console.go",
+    "_examples/server/go.mod",
+    "_examples/server/go.sum",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/main.go",
+    "benchmark_test.go",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "config_test.go",
+    "context.go",
+    "defaults.go",
+    "defaults_test.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "go.mod",
+    "go.sum",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "util.go",
+    "util_test.go",
+    "visit.go"
+  ],
+  "explanation": {
+    "what": "help_test.go 内のヘルプ出力の期待値(golden文字列)を更新し、--help の左カラムに -h, が付くようにした。あわせてフラグ整列用のインデントも -h の分だけ調整している。",
+    "why": "直前コミット(seq194, c77deac)で --help に短縮形 -h が追加されたことでヘルプ出力のフォーマットが変わったが、それに追従するテスト更新が漏れていた。このコミットはメッセージが明記する通り、その追従漏れを修正しテストを通す。",
+    "highlights": [
+      { "file": "help_test.go", "note": "期待値文字列に -h, --help の表記とインデント幅の変更を反映" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [{ "type": "pr", "number": 84, "url": "https://github.com/alecthomas/kong/pull/84" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

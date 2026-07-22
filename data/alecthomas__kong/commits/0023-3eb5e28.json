@@ -1,0 +1,121 @@
+{
+  "seq": 23,
+  "sha": "3eb5e285ed4be64c12368b769de6dc9b84dd024a",
+  "parents": [
+    "184735e6893267ed02f26b88a71c73a07a263035"
+  ],
+  "author": {
+    "name": "Gerald Kaszuba",
+    "email": "gak@gak0.com",
+    "date": "2018-05-21T23:25:19+10:00"
+  },
+  "message": "Use \"kong\" as tag keys fixes #9 (#10)",
+  "pr": {
+    "number": 10,
+    "title": "Use \"kong\" as tag keys fixes #9",
+    "body": "I tried using `csv` to parse the tag, but it doesn't support single quotes. I ended up implementing my own tag parser which is a bit complex, and (very) happy to swap it out with a 3rd party library.",
+    "url": "https://github.com/alecthomas/kong/pull/10"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 8,
+    "additions": 304,
+    "deletions": 98
+  },
+  "files": [
+    {
+      "path": "README.md",
+      "status": "M",
+      "additions": 6,
+      "deletions": 6,
+      "binary": false
+    },
+    {
+      "path": "_examples/shell/main.go",
+      "status": "M",
+      "additions": 16,
+      "deletions": 8,
+      "binary": false
+    },
+    {
+      "path": "build.go",
+      "status": "M",
+      "additions": 35,
+      "deletions": 33,
+      "binary": false
+    },
+    {
+      "path": "decoders.go",
+      "status": "M",
+      "additions": 4,
+      "deletions": 7,
+      "binary": false
+    },
+    {
+      "path": "global.go",
+      "status": "M",
+      "additions": 3,
+      "deletions": 2,
+      "binary": false
+    },
+    {
+      "path": "kong.go",
+      "status": "M",
+      "additions": 15,
+      "deletions": 9,
+      "binary": false
+    },
+    {
+      "path": "kong_test.go",
+      "status": "M",
+      "additions": 89,
+      "deletions": 33,
+      "binary": false
+    },
+    {
+      "path": "tag.go",
+      "status": "A",
+      "additions": 136,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/README.md b/README.md\nindex 143d108..8e1e931 100644\n--- a/README.md\n+++ b/README.md\n@@ -9,15 +9,15 @@ import \"github.com/alecthomas/kong\"\n \n var CLI struct {\n   Rm struct {\n-    Force     bool `help:\"Force removal.\"`\n-    Recursive bool `help:\"Recursively remove files.\"`\n+    Force     bool `kong:\"help='Force removal.'\"`\n+    Recursive bool `kong:\"help='Recursively remove files.'\"`\n \n-    Paths []string `help:\"Paths to remove.\" type:\"path\"`\n-  } `help:\"Remove files.\"`\n+    Paths []string `kong:\"help='Paths to remove.',type='path'\"`\n+  } `kong:\"help='Remove files.'\"`\n \n   Ls struct {\n-    Paths []string `help:\"Paths to list.\" type:\"path\"`\n-  } `help:\"List paths.\"`\n+    Paths []string `kong:\"help='Paths to list.',type='path'\"`\n+  } `kong:\"help='List paths.'\"`\n }\n \n func main() {\ndiff --git a/_examples/shell/main.go b/_examples/shell/main.go\nindex 352cfec..9a6e7d0 100644\n--- a/_examples/shell/main.go\n+++ b/_examples/shell/main.go\n@@ -1,20 +1,28 @@\n package main\n \n-import \"github.com/alecthomas/kong\"\n+import (\n+\t\"encoding/json\"\n+\t\"fmt\"\n+\n+\t\"github.com/alecthomas/kong\"\n+)\n \n var CLI struct {\n \tRm struct {\n-\t\tForce     bool `help:\"Force removal.\"`\n-\t\tRecursive bool `help:\"Recursively remove files.\"`\n+\t\tForce     bool `kong:\"help='Force removal.'\"`\n+\t\tRecursive bool `kong:\"help='Recursively remove files.'\"`\n \n-\t\tPaths []string `help:\"Paths to remove.\" type:\"path\"`\n-\t} `help:\"Remove files.\"`\n+\t\tPaths []string `kong:\"help='Paths to remove.',type='path'\"`\n+\t} `kong:\"help='Remove files.'\"`\n \n \tLs struct {\n-\t\tPaths []string `help:\"Paths to list.\" type:\"path\"`\n-\t} `help:\"List paths.\"`\n+\t\tPaths []string `kong:\"help='Paths to list.',type='path'\"`\n+\t} `kong:\"help='List paths.'\"`\n }\n \n func main() {\n-\tkong.Parse(&CLI)\n+\tcmd := kong.Parse(&CLI)\n+\ts, _ := json.Marshal(&CLI)\n+\tfmt.Println(cmd)\n+\tfmt.Println(string(s))\n }\ndiff --git a/build.go b/build.go\nindex e7e3a96..93c6520 100644\n--- a/build.go\n+++ b/build.go\n@@ -4,7 +4,6 @@ import (\n \t\"fmt\"\n \t\"reflect\"\n \t\"strings\"\n-\t\"unicode/utf8\"\n )\n \n func build(ast interface{}) (app *Application, err error) {\n@@ -23,14 +22,21 @@ func build(ast interface{}) (app *Application, err error) {\n \t\treturn nil, fmt.Errorf(\"expected a pointer to a struct but got %T\", ast)\n \t}\n \n-\tnode := buildNode(iv, true)\n+\tnode, err := buildNode(iv, true)\n+\tif err != nil {\n+\t\treturn node, err\n+\t}\n \tif len(node.Positional) > 0 && len(node.Children) > 0 {\n \t\treturn nil, fmt.Errorf(\"can't mix positional arguments and branching arguments on %T\", ast)\n \t}\n \treturn node, nil\n }\n \n-func buildNode(v reflect.Value, cmd bool) *Node {\n+func dashedString(s string) string {\n+\treturn strings.Join(camelCase(s), \"-\")\n+}\n+\n+func buildNode(v reflect.Value, cmd bool) (*Node, error) {\n \tnode := &Node{}\n \tfor i := 0; i < v.NumField(); i++ {\n \t\tft := v.Type().Field(i)\n@@ -41,38 +47,34 @@ func buildNode(v reflect.Value, cmd bool) *Node {\n \n \t\tname := ft.Tag.Get(\"name\")\n \t\tif name == \"\" {\n-\t\t\tname = strings.ToLower(strings.Join(camelCase(ft.Name), \"-\"))\n+\t\t\tname = strings.ToLower(dashedString(ft.Name))\n \t\t}\n-\t\tdecoder := DecoderForField(ft)\n-\t\thelp, _ := ft.Tag.Lookup(\"help\")\n-\t\tdflt := ft.Tag.Get(\"default\")\n-\t\tplaceholder := ft.Tag.Get(\"placeholder\")\n-\t\tif placeholder == \"\" {\n-\t\t\tplaceholder = strings.ToUpper(strings.Join(camelCase(fv.Type().Name()), \"-\"))\n-\t\t}\n-\t\tshort, _ := utf8.DecodeRuneInString(ft.Tag.Get(\"short\"))\n-\t\tif short == utf8.RuneError {\n-\t\t\tshort = 0\n+\n+\t\ttag, err := parseTag(fv, ft.Tag.Get(\"kong\"))\n+\t\tif err != nil {\n+\t\t\treturn nil, err\n \t\t}\n-\t\t// group := ft.Tag.Get(\"group\")\n-\t\t_, required := ft.Tag.Lookup(\"required\")\n-\t\t_, optional := ft.Tag.Lookup(\"optional\")\n-\t\t// Force field to be an argument, not a flag.\n-\t\t_, arg := ft.Tag.Lookup(\"arg\")\n+\n+\t\tdecoder := DecoderForField(tag.Type, ft)\n+\n \t\tif !cmd {\n-\t\t\t_, cmd = ft.Tag.Lookup(\"cmd\")\n+\t\t\tcmd = tag.Cmd\n \t\t}\n+\n \t\tenv := ft.Tag.Get(\"env\")\n \t\tformat := ft.Tag.Get(\"format\")\n \n \t\t// Nested structs are either commands or args.\n-\t\tif ft.Type.Kind() == reflect.Struct && (cmd || arg) {\n-\t\t\tchild := buildNode(fv, false)\n-\t\t\tchild.Help = help\n+\t\tif ft.Type.Kind() == reflect.Struct && (cmd || tag.Arg) {\n+\t\t\tchild, err := buildNode(fv, false)\n+\t\t\tif err != nil {\n+\t\t\t\treturn nil, err\n+\t\t\t}\n+\t\t\tchild.Help = tag.Help\n \n \t\t\t// A branching argument. This is a bit hairy, as we let buildNode() do the parsing, then check that\n \t\t\t// a positional argument is provided to the child, and move it to the branching argument field.\n-\t\t\tif arg {\n+\t\t\tif tag.Arg {\n \t\t\t\tif len(child.Positional) == 0 {\n \t\t\t\t\tfail(\"positional branch %s.%s must have at least one child positional argument\",\n \t\t\t\t\t\tv.Type().Name(), ft.Name)\n@@ -104,35 +106,35 @@ func buildNode(v reflect.Value, cmd bool) *Node {\n \t\t\t\tfail(\"no decoder for %s.%s (of type %s)\", v.Type(), ft.Name, ft.Type)\n \t\t\t}\n \n-\t\t\tflag := !arg\n+\t\t\tflag := !tag.Arg\n \n \t\t\tvalue := Value{\n \t\t\t\tName:    name,\n \t\t\t\tFlag:    flag,\n-\t\t\t\tHelp:    help,\n-\t\t\t\tDefault: dflt,\n+\t\t\t\tHelp:    tag.Help,\n+\t\t\t\tDefault: tag.Default,\n \t\t\t\tDecoder: decoder,\n \t\t\t\tValue:   fv,\n \t\t\t\tField:   ft,\n \n \t\t\t\t// Flags are optional by default, and args are required by default.\n-\t\t\t\tRequired: (flag && required) || (arg && !optional),\n+\t\t\t\tRequired: (flag && tag.Required) || (tag.Arg && !tag.Optional),\n \t\t\t\tFormat:   format,\n \t\t\t}\n-\t\t\tif arg {\n+\t\t\tif tag.Arg {\n \t\t\t\tnode.Positional = append(node.Positional, &value)\n \t\t\t} else {\n \t\t\t\tnode.Flags = append(node.Flags, &Flag{\n \t\t\t\t\tValue:       value,\n-\t\t\t\t\tShort:       short,\n-\t\t\t\t\tPlaceholder: placeholder,\n+\t\t\t\t\tShort:       tag.Short,\n+\t\t\t\t\tPlaceholder: tag.Placeholder,\n \t\t\t\t\tEnv:         env,\n \t\t\t\t})\n \t\t\t}\n \t\t}\n \t}\n \n-\t// Scan through argument positionals to ensure optional is never before a required\n+\t// Scan through argument positionals to ensure optional is never before a required.\n \tlast := true\n \tfor _, p := range node.Positional {\n \t\tif !last && p.Required {\n@@ -142,5 +144,5 @@ func buildNode(v reflect.Value, cmd bool) *Node {\n \t\tlast = p.Required\n \t}\n \n-\treturn node\n+\treturn node, nil\n }\ndiff --git a/decoders.go b/decoders.go\nindex a5428ec..65d61a8 100644\n--- a/decoders.go\n+++ b/decoders.go\n@@ -70,7 +70,7 @@ var _ KindDecoder = &kindDecoder{}\n //\n // eg.\n //\n-// \t\tField string `type:\"colour\"`\n+// \t\tField string `kong:\"type='colour'`\n //   \tkong.RegisterDecoder(kong.NewNamedDecoder(\"colour\", ...))\n type NamedDecoder interface {\n \tName() string\n@@ -99,12 +99,9 @@ var (\n // DecoderForField finds a decoder for a struct field.\n //\n // Will return nil if a decoder can not be determined.\n-func DecoderForField(field reflect.StructField) Decoder {\n-\tname, ok := field.Tag.Lookup(\"type\")\n-\tif ok {\n-\t\tif decoder, ok := namedDecoders[name]; ok {\n-\t\t\treturn decoder\n-\t\t}\n+func DecoderForField(name string, field reflect.StructField) Decoder {\n+\tif decoder, ok := namedDecoders[name]; ok {\n+\t\treturn decoder\n \t}\n \treturn DecoderForType(field.Type)\n }\ndiff --git a/global.go b/global.go\nindex 9daaac6..72544ca 100644\n--- a/global.go\n+++ b/global.go\n@@ -3,9 +3,10 @@ package kong\n import \"os\"\n \n // Parse constructs a new parser and parses the default command-line.\n-func Parse(cli interface{}, options ...Option) {\n+func Parse(cli interface{}, options ...Option) string {\n \tparser, err := New(cli, options...)\n \tparser.FatalIfErrorf(err)\n-\t_, err = parser.Parse(os.Args[1:])\n+\tcmd, err := parser.Parse(os.Args[1:])\n \tparser.FatalIfErrorf(err)\n+\treturn cmd\n }\ndiff --git a/kong.go b/kong.go\nindex f653f06..a40aad2 100644\n--- a/kong.go\n+++ b/kong.go\n@@ -33,13 +33,7 @@ type Kong struct {\n \n // New creates a new Kong parser into ast.\n func New(ast interface{}, options ...Option) (*Kong, error) {\n-\tmodel, err := build(ast)\n-\tif err != nil {\n-\t\treturn nil, err\n-\t}\n-\tmodel.Name = filepath.Base(os.Args[0])\n \tk := &Kong{\n-\t\tModel:       model,\n \t\tterminate:   os.Exit,\n \t\tstdout:      os.Stdout,\n \t\tstderr:      os.Stderr,\n@@ -47,6 +41,14 @@ func New(ast interface{}, options ...Option) (*Kong, error) {\n \t\thelpContext: map[string]interface{}{},\n \t\thelpFuncs:   template.FuncMap{},\n \t}\n+\n+\tmodel, err := build(ast)\n+\tif err != nil {\n+\t\treturn k, err\n+\t}\n+\tk.Model = model\n+\tk.Model.Name = filepath.Base(os.Args[0])\n+\n \tfor _, option := range options {\n \t\toption(k)\n \t}\n@@ -91,7 +93,11 @@ func (k *Kong) reset(node *Node) {\n }\n \n func (k *Kong) Errorf(format string, args ...interface{}) {\n-\tfmt.Fprintf(os.Stderr, k.Model.Name+\": \"+format, args...)\n+\tif k.Model != nil {\n+\t\tfmt.Fprintf(os.Stderr, k.Model.Name+\": \"+format, args...)\n+\t} else {\n+\t\tfmt.Fprintf(os.Stderr, format, args...)\n+\t}\n }\n \n func (k *Kong) FatalIfErrorf(err error, args ...interface{}) {\n@@ -99,9 +105,9 @@ func (k *Kong) FatalIfErrorf(err error, args ...interface{}) {\n \t\treturn\n \t}\n \tmsg := err.Error()\n-\tif len(args) == 0 {\n+\tif len(args) > 0 {\n \t\tmsg = fmt.Sprintf(args[0].(string), args...) + \": \" + err.Error()\n \t}\n-\tk.Errorf(\"%s\", msg)\n+\tk.Errorf(\"%s\\n\", msg)\n \tk.terminate(1)\n }\ndiff --git a/kong_test.go b/kong_test.go\nindex b9f4f76..385e659 100644\n--- a/kong_test.go\n+++ b/kong_test.go\n@@ -17,11 +17,11 @@ func TestPositionalArguments(t *testing.T) {\n \tvar cli struct {\n \t\tUser struct {\n \t\t\tCreate struct {\n-\t\t\t\tID    int    `arg:\"\"`\n-\t\t\t\tFirst string `arg:\"\"`\n-\t\t\t\tLast  string `arg:\"\"`\n-\t\t\t} `cmd:\"\"`\n-\t\t} `cmd:\"\"`\n+\t\t\t\tID    int    `kong:\"arg\"`\n+\t\t\t\tFirst string `kong:\"arg\"`\n+\t\t\t\tLast  string `kong:\"arg\"`\n+\t\t\t} `kong:\"cmd\"`\n+\t\t} `kong:\"cmd\"`\n \t}\n \tp := mustNew(t, &cli)\n \tcmd, err := p.Parse([]string{\"user\", \"create\", \"10\", \"Alec\", \"Thomas\"})\n@@ -43,21 +43,21 @@ func TestBranchingArgument(t *testing.T) {\n \tvar cli struct {\n \t\tUser struct {\n \t\t\tCreate struct {\n-\t\t\t\tID    string `arg:\"\"`\n-\t\t\t\tFirst string `arg:\"\"`\n-\t\t\t\tLast  string `arg:\"\"`\n-\t\t\t} `cmd:\"\"`\n+\t\t\t\tID    string `kong:\"arg\"`\n+\t\t\t\tFirst string `kong:\"arg\"`\n+\t\t\t\tLast  string `kong:\"arg\"`\n+\t\t\t} `kong:\"cmd\"`\n \n \t\t\t// Branching argument.\n \t\t\tID struct {\n-\t\t\t\tID     int `arg:\"\"`\n+\t\t\t\tID     int `kong:\"arg\"`\n \t\t\t\tFlag   int\n-\t\t\t\tDelete struct{} `cmd:\"\"`\n+\t\t\t\tDelete struct{} `kong:\"cmd\"`\n \t\t\t\tRename struct {\n \t\t\t\t\tTo string\n-\t\t\t\t} `cmd:\"\"`\n-\t\t\t} `arg:\"\"`\n-\t\t} `cmd:\"\"  help:\"User management.\"`\n+\t\t\t\t} `kong:\"cmd\"`\n+\t\t\t} `kong:\"arg\"`\n+\t\t} `kong:\"cmd,help='User management.'\"`\n \t}\n \tp := mustNew(t, &cli)\n \tcmd, err := p.Parse([]string{\"user\", \"10\", \"delete\"})\n@@ -73,7 +73,7 @@ func TestBranchingArgument(t *testing.T) {\n func TestResetWithDefaults(t *testing.T) {\n \tvar cli struct {\n \t\tFlag            string\n-\t\tFlagWithDefault string `default:\"default\" `\n+\t\tFlagWithDefault string `kong:\"default='default'\"`\n \t}\n \tcli.Flag = \"BLAH\"\n \tcli.FlagWithDefault = \"BLAH\"\n@@ -96,7 +96,7 @@ func TestFlagSlice(t *testing.T) {\n \n func TestArgSlice(t *testing.T) {\n \tvar cli struct {\n-\t\tSlice []int `arg:\"\"`\n+\t\tSlice []int `kong:\"arg\"`\n \t\tFlag  bool\n \t}\n \tparser := mustNew(t, &cli)\n@@ -117,8 +117,8 @@ func TestUnsupportedFieldErrors(t *testing.T) {\n func TestMatchingArgField(t *testing.T) {\n \tvar cli struct {\n \t\tID struct {\n-\t\t\tNotID int `arg:\"\"`\n-\t\t} `arg:\"\"`\n+\t\t\tNotID int `kong:\"arg\"`\n+\t\t} `kong:\"arg\"`\n \t}\n \n \t_, err := New(&cli)\n@@ -127,9 +127,9 @@ func TestMatchingArgField(t *testing.T) {\n \n func TestCantMixPositionalAndBranches(t *testing.T) {\n \tvar cli struct {\n-\t\tArg     string `arg:\"\"`\n+\t\tArg     string `kong:\"arg\"`\n \t\tCommand struct {\n-\t\t} `cmd:\"\"`\n+\t\t} `kong:\"cmd\"`\n \t}\n \t_, err := New(&cli)\n \trequire.Error(t, err)\n@@ -140,8 +140,8 @@ func TestPropagatedFlags(t *testing.T) {\n \t\tFlag1    string\n \t\tCommand1 struct {\n \t\t\tFlag2    bool\n-\t\t\tCommand2 struct{} `cmd:\"\"`\n-\t\t} `cmd:\"\"`\n+\t\t\tCommand2 struct{} `kong:\"cmd\"`\n+\t\t} `kong:\"cmd\"`\n \t}\n \n \tparser := mustNew(t, &cli)\n@@ -153,7 +153,7 @@ func TestPropagatedFlags(t *testing.T) {\n \n func TestRequiredFlag(t *testing.T) {\n \tvar cli struct {\n-\t\tFlag string `required:\"\"`\n+\t\tFlag string `kong:\"required\"`\n \t}\n \n \tparser := mustNew(t, &cli)\n@@ -163,7 +163,7 @@ func TestRequiredFlag(t *testing.T) {\n \n func TestOptionalArg(t *testing.T) {\n \tvar cli struct {\n-\t\tArg string `arg:\"\" optional:\"\"`\n+\t\tArg string `kong:\"arg,optional\"`\n \t}\n \n \tparser := mustNew(t, &cli)\n@@ -173,7 +173,7 @@ func TestOptionalArg(t *testing.T) {\n \n func TestRequiredArg(t *testing.T) {\n \tvar cli struct {\n-\t\tArg string `arg:\"\"`\n+\t\tArg string `kong:\"arg\"`\n \t}\n \n \tparser := mustNew(t, &cli)\n@@ -183,8 +183,8 @@ func TestRequiredArg(t *testing.T) {\n \n func TestInvalidRequiredAfterOptional(t *testing.T) {\n \tvar cli struct {\n-\t\tID   int    `arg:\"\" optional:\"\"`\n-\t\tName string `arg:\"\"`\n+\t\tID   int    `kong:\"arg,optional\"`\n+\t\tName string `kong:\"arg\"`\n \t}\n \n \t_, err := New(&cli)\n@@ -194,9 +194,9 @@ func TestInvalidRequiredAfterOptional(t *testing.T) {\n func TestOptionalStructArg(t *testing.T) {\n \tvar cli struct {\n \t\tName struct {\n-\t\t\tName    string `arg:\"\" optional:\"\"`\n+\t\t\tName    string `kong:\"arg,optional\"`\n \t\t\tEnabled bool\n-\t\t} `arg:\"\" optional:\"\"`\n+\t\t} `kong:\"arg,optional\"`\n \t}\n \n \tparser := mustNew(t, &cli)\n@@ -222,8 +222,8 @@ func TestOptionalStructArg(t *testing.T) {\n \n func TestMixedRequiredArgs(t *testing.T) {\n \tvar cli struct {\n-\t\tName string `arg:\"\"`\n-\t\tID   int    `arg:\"\" optional:\"\"`\n+\t\tName string `kong:\"arg\"`\n+\t\tID   int    `kong:\"arg,optional\"`\n \t}\n \n \tparser := mustNew(t, &cli)\n@@ -244,10 +244,66 @@ func TestMixedRequiredArgs(t *testing.T) {\n \n func TestDefaultValueForOptionalArg(t *testing.T) {\n \tvar cli struct {\n-\t\tArg string `arg:\"\" optional:\"\" default:\"default\"`\n+\t\tArg string `kong:\"arg,optional,default='👌'\"`\n \t}\n \tp := mustNew(t, &cli)\n \t_, err := p.Parse(nil)\n \trequire.NoError(t, err)\n-\trequire.Equal(t, \"default\", cli.Arg)\n+\trequire.Equal(t, \"👌\", cli.Arg)\n+}\n+\n+func TestNoValueInTag(t *testing.T) {\n+\tvar cli struct {\n+\t\tEmpty1 string `kong:\"default\"`\n+\t\tEmpty2 string `kong:\"default=\"`\n+\t}\n+\tp := mustNew(t, &cli)\n+\t_, err := p.Parse(nil)\n+\trequire.NoError(t, err)\n+\trequire.Equal(t, \"\", cli.Empty1)\n+\trequire.Equal(t, \"\", cli.Empty2)\n+}\n+\n+func TestCommaInQuotes(t *testing.T) {\n+\tvar cli struct {\n+\t\tNumbers string `kong:\"default='1,2'\"`\n+\t}\n+\tp := mustNew(t, &cli)\n+\t_, err := p.Parse(nil)\n+\trequire.NoError(t, err)\n+\trequire.Equal(t, \"1,2\", cli.Numbers)\n+}\n+\n+func TestUnknownKey(t *testing.T) {\n+\tvar cli struct {\n+\t\tNumbers string `kong:\"gak='hi'\"`\n+\t}\n+\t_, err := New(&cli)\n+\trequire.Error(t, err)\n+}\n+\n+func TestBadString(t *testing.T) {\n+\tvar cli struct {\n+\t\tNumbers string `kong:\"default='yay'n\"`\n+\t}\n+\t_, err := New(&cli)\n+\trequire.Error(t, err)\n+}\n+\n+func TestNoQuoteEnd(t *testing.T) {\n+\tvar cli struct {\n+\t\tNumbers string `kong:\"default='yay\"`\n+\t}\n+\t_, err := New(&cli)\n+\trequire.Error(t, err)\n+}\n+\n+func TestEscapedQuote(t *testing.T) {\n+\tvar cli struct {\n+\t\tDoYouKnow string `kong:\"default='i don\\\\'t know'\"`\n+\t}\n+\tp := mustNew(t, &cli)\n+\t_, err := p.Parse(nil)\n+\trequire.NoError(t, err)\n+\trequire.Equal(t, \"i don't know\", cli.DoYouKnow)\n }\ndiff --git a/tag.go b/tag.go\nnew file mode 100644\nindex 0000000..acdb5c0\n--- /dev/null\n+++ b/tag.go\n@@ -0,0 +1,136 @@\n+package kong\n+\n+import (\n+\t\"fmt\"\n+\t\"reflect\"\n+\t\"strings\"\n+\t\"unicode/utf8\"\n+)\n+\n+type Tag struct {\n+\tCmd         bool\n+\tArg         bool\n+\tRequired    bool\n+\tOptional    bool\n+\tHelp        string\n+\tType        string\n+\tDefault     string\n+\tFormat      string\n+\tPlaceholder string\n+\tEnv         string\n+\tShort       rune\n+}\n+\n+func parseCSV(s string) ([]string, error) {\n+\tnum := 0\n+\tparts := []string{}\n+\tcurrent := []rune{}\n+\n+\tadd := func() {\n+\t\tparts = append(parts, string(current))\n+\t\tcurrent = []rune{}\n+\t\tnum++\n+\t}\n+\n+\tquotes := false\n+\n+\trunes := []rune(s)\n+\tfor idx := 0; idx < len(runes); idx++ {\n+\t\tr := runes[idx]\n+\t\tnext := rune(0)\n+\t\teof := false\n+\t\tif idx < len(runes)-1 {\n+\t\t\tnext = runes[idx+1]\n+\t\t} else {\n+\t\t\teof = true\n+\t\t}\n+\t\tif !quotes && r == ',' {\n+\t\t\tadd()\n+\t\t\tcontinue\n+\t\t}\n+\t\tif r == '\\\\' {\n+\t\t\tif next == '\\'' {\n+\t\t\t\tidx++\n+\t\t\t\tr = '\\''\n+\t\t\t}\n+\t\t} else if r == '\\'' {\n+\t\t\tif quotes {\n+\t\t\t\tquotes = false\n+\t\t\t\tif next == ',' || eof {\n+\t\t\t\t\tcontinue\n+\t\t\t\t}\n+\t\t\t\treturn parts, fmt.Errorf(\"%v has an unexpected char at pos %v\", s, idx)\n+\t\t\t} else {\n+\t\t\t\tquotes = true\n+\t\t\t\tcontinue\n+\t\t\t}\n+\t\t}\n+\t\tcurrent = append(current, r)\n+\t}\n+\tif quotes {\n+\t\treturn parts, fmt.Errorf(\"%v is not quoted properly\", s)\n+\t}\n+\n+\tadd()\n+\n+\treturn parts, nil\n+}\n+\n+func parseTag(fv reflect.Value, s string) (*Tag, error) {\n+\tt := &Tag{}\n+\tif s == \"\" {\n+\t\treturn t, nil\n+\t}\n+\n+\tparts, err := parseCSV(s)\n+\tif err != nil {\n+\t\treturn t, err\n+\t}\n+\n+\tfor _, part := range parts {\n+\t\tis := func(m string) bool { return part == m }\n+\t\tvalue := func(m string) (string, bool) {\n+\t\t\tsplit := strings.SplitN(part, \"=\", 2)\n+\t\t\tif split[0] != m {\n+\t\t\t\treturn \"\", false\n+\t\t\t}\n+\t\t\tif len(split) == 1 {\n+\t\t\t\treturn \"\", true\n+\t\t\t}\n+\t\t\treturn split[1], true\n+\t\t}\n+\n+\t\tif is(\"cmd\") {\n+\t\t\tt.Cmd = true\n+\t\t} else if is(\"arg\") {\n+\t\t\tt.Arg = true\n+\t\t} else if is(\"required\") {\n+\t\t\tt.Required = true\n+\t\t} else if is(\"optional\") {\n+\t\t\tt.Optional = true\n+\t\t} else if v, ok := value(\"default\"); ok {\n+\t\t\tt.Default = v\n+\t\t} else if v, ok := value(\"help\"); ok {\n+\t\t\tt.Help = v\n+\t\t} else if v, ok := value(\"type\"); ok {\n+\t\t\tt.Type = v\n+\t\t} else if v, ok := value(\"placeholder\"); ok {\n+\t\t\tt.Placeholder = v\n+\t\t} else if v, ok := value(\"env\"); ok {\n+\t\t\tt.Env = v\n+\t\t} else if v, ok := value(\"rune\"); ok {\n+\t\t\tt.Short, _ = utf8.DecodeRuneInString(v)\n+\t\t\tif t.Short == utf8.RuneError {\n+\t\t\t\tt.Short = 0\n+\t\t\t}\n+\t\t} else {\n+\t\t\treturn t, fmt.Errorf(\"%v is an unknown kong key\", part)\n+\t\t}\n+\t}\n+\n+\tif t.Placeholder == \"\" {\n+\t\tt.Placeholder = strings.ToUpper(dashedString(fv.Type().Name()))\n+\t}\n+\n+\treturn t, nil\n+}\n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    "README.md",
+    "_examples/shell/main.go",
+    "build.go",
+    "camelcase.go",
+    "context.go",
+    "decoders.go",
+    "decoders_test.go",
+    "global.go",
+    "help.go",
+    "kong.go",
+    "kong_test.go",
+    "model.go",
+    "options.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tokentype_string.go"
+  ],
+  "explanation": {
+    "what": "struct タグを従来の複数タグ(help/type/arg/cmd/required/optional など)から単一の `kong:\"...\"` タグへ集約する tag.go を新規追加した。tag.go には独自の CSV 風パーサ(引用符・エスケープ対応)を実装し、build.go の buildNode はこの Tag 構造体を使ってフィールドをコマンド・引数・フラグに振り分けるよう書き換えられている。DecoderForField のシグネチャも `type` の値を直接受け取る形に変更された。",
+    "why": "PR本文に、csv パッケージでは単一引用符をサポートできなかったため、独自にタグパーサを実装したとある。個別タグ(`help:\"\"` `type:\"\"` など)が増えて煩雑だった状態から、1つの `kong` タグにまとめることで記述を簡潔にし、将来のタグ種追加にも対応しやすくする狙いと考えられる。",
+    "highlights": [
+      { "file": "tag.go", "note": "parseCSV による引用符・エスケープ対応のミニパーサと、それを解釈する parseTag" },
+      { "file": "build.go", "note": "individual struct tag の読み取りが Tag 構造体経由に置き換わっている" }
+    ],
+    "langNotes": [
+      { "topic": "struct tag", "note": "Go の struct tag はフィールド定義末尾に書く `key:\"value\"` 形式のメタデータ文字列で、reflect 経由で実行時に読み取れる。本来は複数キーを空白区切りで併記できるが、このコミットでは kong 独自の単一タグ(カンマ区切りのミニ言語)に統一している。" }
+    ],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [{ "type": "pr", "number": 10, "url": "https://github.com/alecthomas/kong/pull/10" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

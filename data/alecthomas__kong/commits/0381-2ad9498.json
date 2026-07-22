@@ -1,0 +1,196 @@
+{
+  "seq": 381,
+  "sha": "2ad9498bdfbb7dcae73ae57508692826353a918d",
+  "parents": [
+    "62929536454bee27a4b249960e481eeddcc84cb0"
+  ],
+  "author": {
+    "name": "Alec Thomas",
+    "email": "alec@swapoff.org",
+    "date": "2024-08-20T08:16:24+10:00"
+  },
+  "message": "chore: bump go + golangci-lint",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 11,
+    "additions": 11,
+    "deletions": 8
+  },
+  "files": [
+    {
+      "path": ".golangci.yml",
+      "status": "M",
+      "additions": 3,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "bin/.go-1.23.0.pkg",
+      "status": "R",
+      "additions": 0,
+      "deletions": 0,
+      "binary": false,
+      "oldPath": "bin/.go-1.22.6.pkg"
+    },
+    {
+      "path": "bin/.golangci-lint-1.60.1.pkg",
+      "status": "R",
+      "additions": 0,
+      "deletions": 0,
+      "binary": false,
+      "oldPath": "bin/.golangci-lint-1.55.2.pkg"
+    },
+    {
+      "path": "bin/go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "bin/gofmt",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "bin/golangci-lint",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "context.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "help_test.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "kong_test.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "levenshtein.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "resolver.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/.golangci.yml b/.golangci.yml\nindex 2c5bfe3..c922a37 100644\n--- a/.golangci.yml\n+++ b/.golangci.yml\n@@ -47,6 +47,8 @@ linters:\n     - varcheck    # deprecated since v1.49.0\n     - depguard    # nothing to guard against yet\n     - tagalign    # hurts readability of kong tags\n+    - mnd\n+    - perfsprint\n \n linters-settings:\n   govet:\n@@ -76,6 +78,7 @@ issues:\n     - 'bad syntax for struct tag key'\n     - 'bad syntax for struct tag pair'\n     - 'result .* \\(error\\) is always nil'\n+    - 'Error return value of `fmt.Fprintln` is not checked'\n \n   exclude-rules:\n     # Don't warn on unused parameters.\ndiff --git a/bin/.go-1.22.6.pkg b/bin/.go-1.23.0.pkg\nsimilarity index 100%\nrename from bin/.go-1.22.6.pkg\nrename to bin/.go-1.23.0.pkg\ndiff --git a/bin/.golangci-lint-1.55.2.pkg b/bin/.golangci-lint-1.60.1.pkg\nsimilarity index 100%\nrename from bin/.golangci-lint-1.55.2.pkg\nrename to bin/.golangci-lint-1.60.1.pkg\ndiff --git a/bin/go b/bin/go\nindex fec23e2..4602254 120000\n--- a/bin/go\n+++ b/bin/go\n@@ -1 +1 @@\n-.go-1.22.6.pkg\n\\ No newline at end of file\n+.go-1.23.0.pkg\n\\ No newline at end of file\ndiff --git a/bin/gofmt b/bin/gofmt\nindex fec23e2..4602254 120000\n--- a/bin/gofmt\n+++ b/bin/gofmt\n@@ -1 +1 @@\n-.go-1.22.6.pkg\n\\ No newline at end of file\n+.go-1.23.0.pkg\n\\ No newline at end of file\ndiff --git a/bin/golangci-lint b/bin/golangci-lint\nindex 5b19a9d..4857716 120000\n--- a/bin/golangci-lint\n+++ b/bin/golangci-lint\n@@ -1 +1 @@\n-.golangci-lint-1.55.2.pkg\n\\ No newline at end of file\n+.golangci-lint-1.60.1.pkg\n\\ No newline at end of file\ndiff --git a/context.go b/context.go\nindex f5239c7..ea0ec1c 100644\n--- a/context.go\n+++ b/context.go\n@@ -1015,7 +1015,7 @@ func checkXorDuplicatedAndAndMissing(paths []*Path) error {\n \t\terrs = append(errs, err.Error())\n \t}\n \tif len(errs) > 0 {\n-\t\treturn fmt.Errorf(strings.Join(errs, \", \"))\n+\t\treturn errors.New(strings.Join(errs, \", \"))\n \t}\n \treturn nil\n }\ndiff --git a/help_test.go b/help_test.go\nindex 38080a3..e43a073 100644\n--- a/help_test.go\n+++ b/help_test.go\n@@ -600,7 +600,7 @@ func TestAutoGroup(t *testing.T) {\n \t\t\tif node, ok := parent.(*kong.Node); ok {\n \t\t\t\treturn &kong.Group{\n \t\t\t\t\tKey:   node.Name,\n-\t\t\t\t\tTitle: strings.Title(node.Name) + \" flags:\", //nolint\n+\t\t\t\t\tTitle: strings.Title(node.Name) + \" flags:\",\n \t\t\t\t}\n \t\t\t}\n \t\t\treturn nil\ndiff --git a/kong_test.go b/kong_test.go\nindex 0f0bb86..2ac9cbd 100644\n--- a/kong_test.go\n+++ b/kong_test.go\n@@ -608,7 +608,7 @@ func TestMultilineMessage(t *testing.T) {\n \t\t\tw := &bytes.Buffer{}\n \t\t\tvar cli struct{}\n \t\t\tp := mustNew(t, &cli, kong.Writers(w, w))\n-\t\t\tp.Printf(test.text)\n+\t\t\tp.Printf(\"%s\", test.text)\n \t\t\tassert.Equal(t, test.want, w.String())\n \t\t})\n \t}\ndiff --git a/levenshtein.go b/levenshtein.go\nindex 1816f30..6837d6c 100644\n--- a/levenshtein.go\n+++ b/levenshtein.go\n@@ -31,7 +31,7 @@ func levenshtein(a, b string) int {\n \treturn f[len(f)-1]\n }\n \n-func min(a, b int) int {\n+func min(a, b int) int { //nolint:predeclared\n \tif a <= b {\n \t\treturn a\n \t}\ndiff --git a/resolver.go b/resolver.go\nindex 05be7f6..dca4309 100644\n--- a/resolver.go\n+++ b/resolver.go\n@@ -63,6 +63,6 @@ func JSON(r io.Reader) (Resolver, error) {\n }\n \n func snakeCase(name string) string {\n-\tname = strings.Join(strings.Split(strings.Title(name), \"-\"), \"\") //nolint: staticcheck\n+\tname = strings.Join(strings.Split(strings.Title(name), \"-\"), \"\")\n \treturn strings.ToLower(name[:1]) + name[1:]\n }\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/FUNDING.yml",
+    ".github/workflows/ci.yml",
+    ".gitignore",
+    ".golangci.yml",
+    "COPYING",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/README.md",
+    "_examples/server/console.go",
+    "_examples/server/go.mod",
+    "_examples/server/go.sum",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/commandstring/main.go",
+    "_examples/shell/help/README.md",
+    "_examples/shell/help/main.go",
+    "benchmark_test.go",
+    "bin/.go-1.23.0.pkg",
+    "bin/.golangci-lint-1.60.1.pkg",
+    "bin/README.hermit.md",
+    "bin/activate-hermit",
+    "bin/go",
+    "bin/gofmt",
+    "bin/golangci-lint",
+    "bin/hermit",
+    "bin/hermit.hcl",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "config_test.go",
+    "context.go",
+    "defaults.go",
+    "defaults_test.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "go.mod",
+    "go.sum",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "helpwrap1.18_test.go",
+    "helpwrap1.19_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_linux_test.go",
+    "mapper_test.go",
+    "mapper_windows_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "renovate.json5",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "testdata/file.txt",
+    "util.go",
+    "util_test.go",
+    "visit.go"
+  ],
+  "explanation": {
+    "what": "Go を 1.22.6 から 1.23.0 に、golangci-lint を 1.55.2 から 1.60.1 に上げ、hermit 管理下の bin/ シンボリックリンク先を差し替えた。.golangci.yml に新リンター mnd・perfsprint を追加し、それに伴い context.go の fmt.Errorf(strings.Join(...)) を errors.New(...) に、levenshtein.go の min() に //nolint:predeclared を付けるなど、新リンターが指摘した既存コードを最小限修正している。",
+    "why": "ツールチェーンのバージョンを最新化し、golangci-lint のバージョンアップで有効になった新しいリンタールール(mnd = magic number detector、perfsprint = fmt 呼び出しの非効率検出など)に追従するための整備。",
+    "highlights": [
+      { "file": ".golangci.yml", "note": "mnd・perfsprint リンターを追加し、対応する除外パターンも1件追加している" },
+      { "file": "context.go", "note": "fmt.Errorf(strings.Join(...)) を errors.New(...) に置換(perfsprint 由来の指摘への対応と見られる)" }
+    ],
+    "langNotes": [
+      { "topic": "hermit", "note": "bin/ 配下の .go-*.pkg や .golangci-lint-*.pkg はプロジェクトローカルにツールバイナリを固定する hermit というパッケージマネージャの管理ファイル。bin/go 等のシンボリックリンクの参照先を書き換えることでバージョンを切り替える。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

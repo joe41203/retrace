@@ -1,0 +1,152 @@
+{
+  "seq": 327,
+  "sha": "8b826182d82d66ee22cfdce0342026df3223e96e",
+  "parents": [
+    "0c6a9f3a3d4bec030d61c630a9f211bc7162f522"
+  ],
+  "author": {
+    "name": "Alec Thomas",
+    "email": "alec@swapoff.org",
+    "date": "2022-09-21T07:33:27+10:00"
+  },
+  "message": "fix: tests",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 5,
+    "additions": 98,
+    "deletions": 98
+  },
+  "files": [
+    {
+      "path": ".golangci.yml",
+      "status": "M",
+      "additions": 1,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "bin/.go-1.19.1.pkg",
+      "status": "R",
+      "additions": 0,
+      "deletions": 0,
+      "binary": false,
+      "oldPath": "bin/.go-1.18.3.pkg"
+    },
+    {
+      "path": "bin/go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "bin/gofmt",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "kong_test.go",
+      "status": "M",
+      "additions": 95,
+      "deletions": 96,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/.golangci.yml b/.golangci.yml\nindex e90edb8..1ee8fa6 100644\n--- a/.golangci.yml\n+++ b/.golangci.yml\n@@ -65,3 +65,4 @@ issues:\n     - 'bad syntax for struct tag key'\n     - 'bad syntax for struct tag pair'\n     - 'result .* \\(error\\) is always nil'\n+    - 'package io/ioutil is deprecated'\ndiff --git a/bin/.go-1.18.3.pkg b/bin/.go-1.19.1.pkg\nsimilarity index 100%\nrename from bin/.go-1.18.3.pkg\nrename to bin/.go-1.19.1.pkg\ndiff --git a/bin/go b/bin/go\nindex 697e82b..deef954 120000\n--- a/bin/go\n+++ b/bin/go\n@@ -1 +1 @@\n-.go-1.18.3.pkg\n\\ No newline at end of file\n+.go-1.19.1.pkg\n\\ No newline at end of file\ndiff --git a/bin/gofmt b/bin/gofmt\nindex 697e82b..deef954 120000\n--- a/bin/gofmt\n+++ b/bin/gofmt\n@@ -1 +1 @@\n-.go-1.18.3.pkg\n\\ No newline at end of file\n+.go-1.19.1.pkg\n\\ No newline at end of file\ndiff --git a/kong_test.go b/kong_test.go\nindex 8964cfb..3d8a617 100644\n--- a/kong_test.go\n+++ b/kong_test.go\n@@ -1742,13 +1742,13 @@ func TestStringPointer(t *testing.T) {\n \t\tFoo *string\n \t}\n \tk, err := kong.New(&cli)\n-\trequire.NoError(t, err)\n-\trequire.NotNil(t, k)\n+\tassert.NoError(t, err)\n+\tassert.NotZero(t, k)\n \tctx, err := k.Parse([]string{\"--foo\", \"wtf\"})\n-\trequire.NoError(t, err)\n-\trequire.NotNil(t, ctx)\n-\trequire.NotNil(t, cli.Foo)\n-\trequire.Equal(t, \"wtf\", *cli.Foo)\n+\tassert.NoError(t, err)\n+\tassert.NotZero(t, ctx)\n+\tassert.NotZero(t, cli.Foo)\n+\tassert.Equal(t, \"wtf\", *cli.Foo)\n }\n \n func TestStringPointerNoValue(t *testing.T) {\n@@ -1756,12 +1756,12 @@ func TestStringPointerNoValue(t *testing.T) {\n \t\tFoo *string\n \t}\n \tk, err := kong.New(&cli)\n-\trequire.NoError(t, err)\n-\trequire.NotNil(t, k)\n+\tassert.NoError(t, err)\n+\tassert.NotZero(t, k)\n \tctx, err := k.Parse([]string{})\n-\trequire.NoError(t, err)\n-\trequire.NotNil(t, ctx)\n-\trequire.Nil(t, cli.Foo)\n+\tassert.NoError(t, err)\n+\tassert.NotZero(t, ctx)\n+\tassert.Zero(t, cli.Foo)\n }\n \n func TestStringPointerDefault(t *testing.T) {\n@@ -1769,13 +1769,13 @@ func TestStringPointerDefault(t *testing.T) {\n \t\tFoo *string `default:\"stuff\"`\n \t}\n \tk, err := kong.New(&cli)\n-\trequire.NoError(t, err)\n-\trequire.NotNil(t, k)\n+\tassert.NoError(t, err)\n+\tassert.NotZero(t, k)\n \tctx, err := k.Parse([]string{})\n-\trequire.NoError(t, err)\n-\trequire.NotNil(t, ctx)\n-\trequire.NotNil(t, cli.Foo)\n-\trequire.Equal(t, \"stuff\", *cli.Foo)\n+\tassert.NoError(t, err)\n+\tassert.NotZero(t, ctx)\n+\tassert.NotZero(t, cli.Foo)\n+\tassert.Equal(t, \"stuff\", *cli.Foo)\n }\n \n func TestStringPointerAliasNoValue(t *testing.T) {\n@@ -1784,12 +1784,12 @@ func TestStringPointerAliasNoValue(t *testing.T) {\n \t\tF *Foo\n \t}\n \tk, err := kong.New(&cli)\n-\trequire.NoError(t, err)\n-\trequire.NotNil(t, k)\n+\tassert.NoError(t, err)\n+\tassert.NotZero(t, k)\n \tctx, err := k.Parse([]string{})\n-\trequire.NoError(t, err)\n-\trequire.NotNil(t, ctx)\n-\trequire.Nil(t, cli.F)\n+\tassert.NoError(t, err)\n+\tassert.NotZero(t, ctx)\n+\tassert.Zero(t, cli.F)\n }\n \n func TestStringPointerAlias(t *testing.T) {\n@@ -1798,13 +1798,13 @@ func TestStringPointerAlias(t *testing.T) {\n \t\tF *Foo\n \t}\n \tk, err := kong.New(&cli)\n-\trequire.NoError(t, err)\n-\trequire.NotNil(t, k)\n+\tassert.NoError(t, err)\n+\tassert.NotZero(t, k)\n \tctx, err := k.Parse([]string{\"--f=value\"})\n-\trequire.NoError(t, err)\n-\trequire.NotNil(t, ctx)\n-\trequire.NotNil(t, cli.F)\n-\trequire.Equal(t, Foo(\"value\"), *cli.F)\n+\tassert.NoError(t, err)\n+\tassert.NotZero(t, ctx)\n+\tassert.NotZero(t, cli.F)\n+\tassert.Equal(t, Foo(\"value\"), *cli.F)\n }\n \n func TestStringPointerEmptyValue(t *testing.T) {\n@@ -1813,15 +1813,15 @@ func TestStringPointerEmptyValue(t *testing.T) {\n \t\tG *string\n \t}\n \tk, err := kong.New(&cli)\n-\trequire.NoError(t, err)\n-\trequire.NotNil(t, k)\n+\tassert.NoError(t, err)\n+\tassert.NotZero(t, k)\n \tctx, err := k.Parse([]string{\"--f\", \"\", \"--g=\"})\n-\trequire.NoError(t, err)\n-\trequire.NotNil(t, ctx)\n-\trequire.NotNil(t, cli.F)\n-\trequire.NotNil(t, cli.G)\n-\trequire.Equal(t, \"\", *cli.F)\n-\trequire.Equal(t, \"\", *cli.G)\n+\tassert.NoError(t, err)\n+\tassert.NotZero(t, ctx)\n+\tassert.NotZero(t, cli.F)\n+\tassert.NotZero(t, cli.G)\n+\tassert.Equal(t, \"\", *cli.F)\n+\tassert.Equal(t, \"\", *cli.G)\n }\n \n func TestIntPtr(t *testing.T) {\n@@ -1830,14 +1830,14 @@ func TestIntPtr(t *testing.T) {\n \t\tG *int\n \t}\n \tk, err := kong.New(&cli)\n-\trequire.NoError(t, err)\n-\trequire.NotNil(t, k)\n+\tassert.NoError(t, err)\n+\tassert.NotZero(t, k)\n \tctx, err := k.Parse([]string{\"--f=6\"})\n-\trequire.NoError(t, err)\n-\trequire.NotNil(t, ctx)\n-\trequire.NotNil(t, cli.F)\n-\trequire.Nil(t, cli.G)\n-\trequire.Equal(t, 6, *cli.F)\n+\tassert.NoError(t, err)\n+\tassert.NotZero(t, ctx)\n+\tassert.NotZero(t, cli.F)\n+\tassert.Zero(t, cli.G)\n+\tassert.Equal(t, 6, *cli.F)\n }\n \n func TestBoolPtr(t *testing.T) {\n@@ -1845,13 +1845,13 @@ func TestBoolPtr(t *testing.T) {\n \t\tX *bool\n \t}\n \tk, err := kong.New(&cli)\n-\trequire.NoError(t, err)\n-\trequire.NotNil(t, k)\n+\tassert.NoError(t, err)\n+\tassert.NotZero(t, k)\n \tctx, err := k.Parse([]string{\"--x\"})\n-\trequire.NoError(t, err)\n-\trequire.NotNil(t, ctx)\n-\trequire.NotNil(t, cli.X)\n-\trequire.Equal(t, true, *cli.X)\n+\tassert.NoError(t, err)\n+\tassert.NotZero(t, ctx)\n+\tassert.NotZero(t, cli.X)\n+\tassert.Equal(t, true, *cli.X)\n }\n \n func TestBoolPtrFalse(t *testing.T) {\n@@ -1859,13 +1859,13 @@ func TestBoolPtrFalse(t *testing.T) {\n \t\tX *bool\n \t}\n \tk, err := kong.New(&cli)\n-\trequire.NoError(t, err)\n-\trequire.NotNil(t, k)\n+\tassert.NoError(t, err)\n+\tassert.NotZero(t, k)\n \tctx, err := k.Parse([]string{\"--x=false\"})\n-\trequire.NoError(t, err)\n-\trequire.NotNil(t, ctx)\n-\trequire.NotNil(t, cli.X)\n-\trequire.Equal(t, false, *cli.X)\n+\tassert.NoError(t, err)\n+\tassert.NotZero(t, ctx)\n+\tassert.NotZero(t, cli.X)\n+\tassert.Equal(t, false, *cli.X)\n }\n \n func TestBoolPtrNegated(t *testing.T) {\n@@ -1873,13 +1873,13 @@ func TestBoolPtrNegated(t *testing.T) {\n \t\tX *bool `negatable:\"\"`\n \t}\n \tk, err := kong.New(&cli)\n-\trequire.NoError(t, err)\n-\trequire.NotNil(t, k)\n+\tassert.NoError(t, err)\n+\tassert.NotZero(t, k)\n \tctx, err := k.Parse([]string{\"--no-x\"})\n-\trequire.NoError(t, err)\n-\trequire.NotNil(t, ctx)\n-\trequire.NotNil(t, cli.X)\n-\trequire.Equal(t, false, *cli.X)\n+\tassert.NoError(t, err)\n+\tassert.NotZero(t, ctx)\n+\tassert.NotZero(t, cli.X)\n+\tassert.Equal(t, false, *cli.X)\n }\n \n func TestNilNegatableBoolPtr(t *testing.T) {\n@@ -1887,12 +1887,12 @@ func TestNilNegatableBoolPtr(t *testing.T) {\n \t\tX *bool `negatable:\"\"`\n \t}\n \tk, err := kong.New(&cli)\n-\trequire.NoError(t, err)\n-\trequire.NotNil(t, k)\n+\tassert.NoError(t, err)\n+\tassert.NotZero(t, k)\n \tctx, err := k.Parse([]string{})\n-\trequire.NoError(t, err)\n-\trequire.NotNil(t, ctx)\n-\trequire.Nil(t, cli.X)\n+\tassert.NoError(t, err)\n+\tassert.NotZero(t, ctx)\n+\tassert.Zero(t, cli.X)\n }\n \n func TestBoolPtrNil(t *testing.T) {\n@@ -1900,31 +1900,30 @@ func TestBoolPtrNil(t *testing.T) {\n \t\tX *bool\n \t}\n \tk, err := kong.New(&cli)\n-\trequire.NoError(t, err)\n-\trequire.NotNil(t, k)\n+\tassert.NoError(t, err)\n+\tassert.NotZero(t, k)\n \tctx, err := k.Parse([]string{})\n-\trequire.NoError(t, err)\n-\trequire.NotNil(t, ctx)\n-\trequire.Nil(t, cli.X)\n+\tassert.NoError(t, err)\n+\tassert.NotZero(t, ctx)\n+\tassert.Zero(t, cli.X)\n }\n \n func TestUnsupportedPtr(t *testing.T) {\n-\t//nolint:structcheck,unused\n \ttype Foo struct {\n-\t\tx int\n-\t\ty int\n+\t\tx int // nolint\n+\t\ty int // nolint\n \t}\n \n \tvar cli struct {\n \t\tF *Foo\n \t}\n \tk, err := kong.New(&cli)\n-\trequire.NoError(t, err)\n-\trequire.NotNil(t, k)\n+\tassert.NoError(t, err)\n+\tassert.NotZero(t, k)\n \tctx, err := k.Parse([]string{\"--f=whatever\"})\n-\trequire.Nil(t, ctx)\n-\trequire.Error(t, err)\n-\trequire.Equal(t, \"--f: cannot find mapper for kong_test.Foo\", err.Error())\n+\tassert.Zero(t, ctx)\n+\tassert.Error(t, err)\n+\tassert.Equal(t, \"--f: cannot find mapper for kong_test.Foo\", err.Error())\n }\n \n func TestEnumPtr(t *testing.T) {\n@@ -1932,13 +1931,13 @@ func TestEnumPtr(t *testing.T) {\n \t\tX *string `enum:\"A,B,C\" default:\"C\"`\n \t}\n \tk, err := kong.New(&cli)\n-\trequire.NoError(t, err)\n-\trequire.NotNil(t, k)\n+\tassert.NoError(t, err)\n+\tassert.NotZero(t, k)\n \tctx, err := k.Parse([]string{\"--x=A\"})\n-\trequire.NoError(t, err)\n-\trequire.NotNil(t, ctx)\n-\trequire.NotNil(t, cli.X)\n-\trequire.Equal(t, \"A\", *cli.X)\n+\tassert.NoError(t, err)\n+\tassert.NotZero(t, ctx)\n+\tassert.NotZero(t, cli.X)\n+\tassert.Equal(t, \"A\", *cli.X)\n }\n \n func TestEnumPtrOmitted(t *testing.T) {\n@@ -1946,13 +1945,13 @@ func TestEnumPtrOmitted(t *testing.T) {\n \t\tX *string `enum:\"A,B,C\" default:\"C\"`\n \t}\n \tk, err := kong.New(&cli)\n-\trequire.NoError(t, err)\n-\trequire.NotNil(t, k)\n+\tassert.NoError(t, err)\n+\tassert.NotZero(t, k)\n \tctx, err := k.Parse([]string{})\n-\trequire.NoError(t, err)\n-\trequire.NotNil(t, ctx)\n-\trequire.NotNil(t, cli.X)\n-\trequire.Equal(t, \"C\", *cli.X)\n+\tassert.NoError(t, err)\n+\tassert.NotZero(t, ctx)\n+\tassert.NotZero(t, cli.X)\n+\tassert.Equal(t, \"C\", *cli.X)\n }\n \n func TestEnumPtrOmittedNoDefault(t *testing.T) {\n@@ -1960,10 +1959,10 @@ func TestEnumPtrOmittedNoDefault(t *testing.T) {\n \t\tX *string `enum:\"A,B,C\"`\n \t}\n \tk, err := kong.New(&cli)\n-\trequire.NoError(t, err)\n-\trequire.NotNil(t, k)\n+\tassert.NoError(t, err)\n+\tassert.NotZero(t, k)\n \tctx, err := k.Parse([]string{})\n-\trequire.NoError(t, err)\n-\trequire.NotNil(t, ctx)\n-\trequire.Nil(t, cli.X)\n+\tassert.NoError(t, err)\n+\tassert.NotZero(t, ctx)\n+\tassert.Zero(t, cli.X)\n }\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/FUNDING.yml",
+    ".github/workflows/ci.yml",
+    ".gitignore",
+    ".golangci.yml",
+    "COPYING",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/README.md",
+    "_examples/server/console.go",
+    "_examples/server/go.mod",
+    "_examples/server/go.sum",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/commandstring/main.go",
+    "_examples/shell/help/README.md",
+    "_examples/shell/help/main.go",
+    "benchmark_test.go",
+    "bin/.go-1.19.1.pkg",
+    "bin/.golangci-lint-1.46.2.pkg",
+    "bin/README.hermit.md",
+    "bin/activate-hermit",
+    "bin/go",
+    "bin/gofmt",
+    "bin/golangci-lint",
+    "bin/hermit",
+    "bin/hermit.hcl",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "config_test.go",
+    "context.go",
+    "defaults.go",
+    "defaults_test.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "go.mod",
+    "go.sum",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "helpwrap1.18_test.go",
+    "helpwrap1.19_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_linux_test.go",
+    "mapper_test.go",
+    "mapper_windows_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "testdata/file.txt",
+    "util.go",
+    "util_test.go",
+    "visit.go"
+  ],
+  "explanation": {
+    "what": "CIで使うGoのバージョンを1.18.3から1.19.1に上げ(bin/.go-*.pkgのリネームとシンボリックリンク先の更新)、golangci-lint の除外パターンに io/ioutil 非推奨警告を追加した。あわせて kong_test.go 内、前コミットで追加されたポインタ関連テスト群の assert 呼び出しを require.NoError/require.NotNil/require.Nil から assert.NoError/assert.NotZero/assert.Zero に置き換えている。",
+    "why": "コミットメッセージ「fix: tests」および前後のコミット文脈から、おそらく直前のポインタサポート追加コミット(seq326)で入ったテストが何らかの理由で落ちていたことへの追随修正と考えられる。alecthomas/assert パッケージでは NotNil ではなく NotZero、Nil ではなく Zero を使うのがおそらく作法(nil 判定を型を問わず統一的な Zero 値判定に寄せている)であり、既存コードベースの他テストと記法を揃える修正と推測される。PR/issue の記載がなく詳細な理由は diff からの推測にとどまる。",
+    "highlights": [
+      { "file": "kong_test.go", "note": "require.NotNil/Nil → assert.NotZero/Zero への一括置き換え。alecthomas/assert 独自の慣用記法" },
+      { "file": ".golangci.yml", "note": "io/ioutil 非推奨警告の除外パターンを追加(Go 1.19 化に伴うリンター調整)" }
+    ],
+    "langNotes": [
+      { "topic": "alecthomas/assert の NotZero/Zero", "note": "本リポジトリの作者が自作する alecthomas/assert ライブラリでは、ポインタ・インターフェース・スライス等を問わず「ゼロ値かどうか」で判定する NotZero/Zero が使われる。標準的な testify の NotNil/Nil とは異なる独自APIで、reflect ベースでゼロ値判定を行う。" }
+    ],
+    "diagram": null,
+    "evidence": "inferred",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

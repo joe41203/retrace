@@ -1,0 +1,112 @@
+{
+  "seq": 153,
+  "sha": "9a1f499155e31120356302eb7b17804fdb8793d2",
+  "parents": [
+    "f7d3d9bfb5eda57b2f527b637e936ee10d386797"
+  ],
+  "author": {
+    "name": "Alec Thomas",
+    "email": "alec@swapoff.org",
+    "date": "2019-09-24T13:33:20+10:00"
+  },
+  "message": "Support for default values ${var=default} in interpolation variables.",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 3,
+    "additions": 13,
+    "deletions": 10
+  },
+  "files": [
+    {
+      "path": "README.md",
+      "status": "M",
+      "additions": 3,
+      "deletions": 2,
+      "binary": false
+    },
+    {
+      "path": "interpolate.go",
+      "status": "M",
+      "additions": 8,
+      "deletions": 5,
+      "binary": false
+    },
+    {
+      "path": "interpolate_test.go",
+      "status": "M",
+      "additions": 2,
+      "deletions": 3,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/README.md b/README.md\nindex ccbbf7d..e8294c4 100644\n--- a/README.md\n+++ b/README.md\n@@ -416,10 +416,11 @@ default values.\n Variables are in the form:\n \n     ${<name>}\n+    ${<name>=<default>}\n \n Variables are set with the `Vars{\"key\": \"value\", ...}` option. Undefined\n-variable references in the grammar will result in an error at construction\n-time.\n+variable references in the grammar without a default will result in an error at \n+construction time.\n \n Variables can also be set via the `set:\"K=V\"` tag. In this case, those variables will be available for that\n node and all children. This is useful for composition by allowing the same struct to be reused.\ndiff --git a/interpolate.go b/interpolate.go\nindex 296f9a4..9de1ff7 100644\n--- a/interpolate.go\n+++ b/interpolate.go\n@@ -5,18 +5,21 @@ import (\n \t\"regexp\"\n )\n \n-var interpolationRegex = regexp.MustCompile(`(\\${[[:alpha:]_][[:word:]]*})|(\\$)|([^$]+)`)\n+var interpolationRegex = regexp.MustCompile(`((?:\\${([[:alpha:]_][[:word:]]*))(?:=([^}]+))?})|(\\$)|([^$]+)`)\n \n-// Interpolate variables from vars into s for substrings in the form ${var}.\n+// Interpolate variables from vars into s for substrings in the form ${var} or ${var=default}.\n func interpolate(s string, vars map[string]string) (string, error) {\n \tout := \"\"\n \tmatches := interpolationRegex.FindAllStringSubmatch(s, -1)\n \tfor _, match := range matches {\n-\t\tif match[1] != \"\" {\n-\t\t\tname := match[1][2 : len(match[1])-1]\n+\t\tif name := match[2]; name != \"\" {\n \t\t\tvalue, ok := vars[name]\n \t\t\tif !ok {\n-\t\t\t\treturn \"\", fmt.Errorf(\"undefined variable ${%s}\", name)\n+\t\t\t\t// No default value.\n+\t\t\t\tif match[3] == \"\" {\n+\t\t\t\t\treturn \"\", fmt.Errorf(\"undefined variable ${%s}\", name)\n+\t\t\t\t}\n+\t\t\t\tvalue = match[3]\n \t\t\t}\n \t\t\tout += value\n \t\t} else {\ndiff --git a/interpolate_test.go b/interpolate_test.go\nindex f049e38..a2c9df1 100644\n--- a/interpolate_test.go\n+++ b/interpolate_test.go\n@@ -8,10 +8,9 @@ import (\n \n func TestInterpolate(t *testing.T) {\n \tvars := map[string]string{\n-\t\t\"name\": \"Bobby Brown\",\n-\t\t\"age\":  \"35\",\n+\t\t\"age\": \"35\",\n \t}\n-\tactual, err := interpolate(\"${name} is ${age} years old\", vars)\n+\tactual, err := interpolate(\"${name=Bobby Brown} is ${age} years old\", vars)\n \trequire.NoError(t, err)\n \trequire.Equal(t, `Bobby Brown is 35 years old`, actual)\n }\n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    ".golangci.yml",
+    "COPYING",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/console.go",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/main.go",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "config_test.go",
+    "context.go",
+    "defaults.go",
+    "defaults_test.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "go.mod",
+    "go.sum",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "util.go",
+    "util_test.go",
+    "visit.go"
+  ],
+  "explanation": {
+    "what": "変数展開の記法 `${name}` に加えて `${name=default}` というデフォルト値付き記法をサポートした。interpolationRegex を拡張してキャプチャグループでデフォルト値部分を取り出し、vars に該当キーが無くデフォルトも無い場合のみ従来通りエラーにする。",
+    "why": "コミットメッセージの通り、補間変数に未定義時のデフォルト値を指定できるようにするための機能追加。これにより Vars で値を渡し忘れても構築時エラーにならないケースを増やせる。",
+    "highlights": [
+      { "file": "interpolate.go", "note": "正規表現の3番目のキャプチャグループ match[3] がデフォルト値。未定義かつデフォルトも空文字なら従来通りエラー" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

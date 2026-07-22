@@ -1,0 +1,150 @@
+{
+  "seq": 470,
+  "sha": "7ee1766153b2ee0f01683824c7e89b127a5022c0",
+  "parents": [
+    "1159b8aa6161853858747f66a6cce67dda547360"
+  ],
+  "author": {
+    "name": "c-tonneslan",
+    "email": "cst0520@gmail.com",
+    "date": "2026-05-18T03:03:16-04:00"
+  },
+  "message": "fire AfterApply for env-only flags (#600)\n\nA flag that gets its value purely from an env variable never shows up in\nctx.Path: Reset() applies the env value straight to the target and the\nparse loop has nothing to record. The main applyHook walks ctx.Path so\nit skips those flags, and applyHookToDefaultFlags only looked at flags\nwith a default tag, so the hook was silently dropped (reported in #596).\n\nLoosen the default-flag pass to also match flags that have at least one\nenv set. The 'already handled' guard on ctx.values stays, so anything\nthat did show up on the parse path is still skipped (and the hook still\nfires exactly once).\n\nCloses #596\n\nSigned-off-by: Charlie Tonneslan <cst0520@gmail.com>",
+  "pr": {
+    "number": 600,
+    "title": "fire AfterApply for env-only flags",
+    "body": "Closes #596.\n\nReset() applies env vars to the target field directly and never adds the flag to ctx.Path, so the main applyHook loop walks past them. applyHookToDefaultFlags was the catch-all for that case, but it only matched flags with a default tag. Flags whose value comes purely from \\`env:\"…\"\\` had nowhere to fire from.\n\nLoosen the second pass to also match flags with at least one env var set. ctx.values is still the dedup guard, so anything actually parsed off argv or supplied by a resolver still goes through the main loop and only fires once.\n\nTest added that fails on master and passes with this change.",
+    "url": "https://github.com/alecthomas/kong/pull/600"
+  },
+  "linkedIssues": [
+    {
+      "number": 596,
+      "title": "AfterApply hook doesn't work for environment-provided parameters",
+      "body": "Hello! Thank you for your hard work, your library is just perfect for building conveniently configurable cli applications. I love using it. However, I've encountered a problem.\n\nIn my application, a custom parameter with an AfterApply hook can be provided via:\n1. argv\n2. environment variable\n3. json config\n\nThe hook isn't called in the second case. A minimal reproduction script is provided below. It creates a temp directory, main.go there and installs kong, and then runs the app 3 times with different parameter suppliment methods.\n\n```bash\n#!/bin/bash\n\ntempdir=$(mktemp -d)\necho \"entering temp dir: $tempdir\"\ncd \"$tempdir\"\n\ncat <<'EOF' >main.go\npackage main\n\nimport (\n  \"fmt\"\n  \"github.com/alecthomas/kong\"\n)\n\ntype CustomField string\n\nfunc (c CustomField) AfterApply() error {\n  fmt.Println(c)\n  return nil\n}\n\ntype CLI struct {\n  Config kong.ConfigFlag `name:\"config\"`\n  CustomField CustomField `name:\"custom-field\" env:\"CUSTOM_FIELD\" required:\"\"`\n}\n\nfunc main() {\n  var cli CLI\n  kong.Parse(&cli, kong.Configuration(kong.JSON))\n}\nEOF\n\ngo mod init repro\ngo get github.com/alecthomas/kong@v1.15.0\n\ngo run main.go --custom-field running-with-cli-parameter\nCUSTOM_FIELD=running-with-env-parameter go run main.go\ngo run main.go --config <(echo '{\"custom_field\": \"running-with-json-config\"}')\n```\n\nThe actual output:\n```\nentering temp dir: /var/folders/hv/2d98p0sj72vbvcps49zpm7yh0000gq/T/tmp.2FJWWmMOrS\ngo: creating new go.mod: module repro\ngo: to add module requirements and sums:\n        go mod tidy\ngo: added github.com/alecthomas/kong v1.15.0\nrunning-with-cli-parameter\nrunning-with-json-config\n```\n\nThe output expected by me:\n```\nentering temp dir: /var/folders/hv/2d98p0sj72vbvcps49zpm7yh0000gq/T/tmp.2FJWWmMOrS\ngo: creating new go.mod: module repro\ngo: to add module requirements and sums:\n        go mod tidy\ngo: added github.com/alecthomas/kong v1.15.0\nrunning-with-cli-parameter\nrunning-with-env-parameter <------ this line\nrunning-with-json-config\n```",
+      "url": "https://github.com/alecthomas/kong/issues/596"
+    }
+  ],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 37,
+    "deletions": 2
+  },
+  "files": [
+    {
+      "path": "kong.go",
+      "status": "M",
+      "additions": 10,
+      "deletions": 2,
+      "binary": false
+    },
+    {
+      "path": "kong_test.go",
+      "status": "M",
+      "additions": 27,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/kong.go b/kong.go\nindex a0bfaf8..ca5c90a 100644\n--- a/kong.go\n+++ b/kong.go\n@@ -397,7 +397,7 @@ func (k *Kong) getMethods(value reflect.Value, name string) []reflect.Value {\n \t)\n }\n \n-// Call hook on any unset flags with default values.\n+// Call hook on any unset flags with default values or values supplied via env.\n func (k *Kong) applyHookToDefaultFlags(ctx *Context, node *Node, name string) error {\n \tif node == nil {\n \t\treturn nil\n@@ -409,7 +409,15 @@ func (k *Kong) applyHookToDefaultFlags(ctx *Context, node *Node, name string) er\n \t\t}\n \t\tbinds := k.bindings.clone().add(ctx).add(node.Vars().CloneWith(k.vars))\n \t\tfor _, flag := range node.Flags {\n-\t\t\tif !flag.HasDefault || ctx.values[flag.Value].IsValid() || !flag.Target.IsValid() {\n+\t\t\t// Flags handled here are the ones that won't show up in ctx.Path:\n+\t\t\t// they got their value from the default tag or an env var, both of\n+\t\t\t// which Reset() applies straight to the target without touching the\n+\t\t\t// parse path. Anything actually parsed off argv or set by a resolver\n+\t\t\t// shows up in ctx.values and is covered by the main hook loop.\n+\t\t\tif ctx.values[flag.Value].IsValid() || !flag.Target.IsValid() {\n+\t\t\t\tcontinue\n+\t\t\t}\n+\t\t\tif !flag.HasDefault && !atLeastOneEnvSet(flag.Tag.Envs) {\n \t\t\t\tcontinue\n \t\t\t}\n \t\t\tfor _, method := range getMethods(flag.Target, name) {\ndiff --git a/kong_test.go b/kong_test.go\nindex 8f4c753..3eacce5 100644\n--- a/kong_test.go\n+++ b/kong_test.go\n@@ -2605,6 +2605,33 @@ func TestApplyCalledOnce(t *testing.T) {\n \tassert.NoError(t, err)\n }\n \n+type envOnlyAfterApply struct {\n+\tcalled bool\n+}\n+\n+func (e *envOnlyAfterApply) UnmarshalText(text []byte) error { return nil }\n+\n+func (e *envOnlyAfterApply) AfterApply() error {\n+\te.called = true\n+\treturn nil\n+}\n+\n+// Regression for #596: flags whose value is supplied via env should\n+// fire AfterApply just like flags set on the command line or by a\n+// resolver. The Reset path that applies env values doesn't add the\n+// flag to ctx.Path, so the hook used to be silently skipped.\n+func TestAfterApplyFiresForEnvOnlyFlag(t *testing.T) {\n+\ttype CLI struct {\n+\t\tField envOnlyAfterApply `env:\"KONG_ENVHOOK_FIELD\"`\n+\t}\n+\tvar cli CLI\n+\n+\tt.Setenv(\"KONG_ENVHOOK_FIELD\", \"from-env\")\n+\t_, err := mustNew(t, &cli).Parse(nil)\n+\tassert.NoError(t, err)\n+\tassert.True(t, cli.Field.called, \"AfterApply should fire for env-only flags\")\n+}\n+\n func TestCustomTypeNoEllipsis(t *testing.T) {\n \ttype CLI struct {\n \t\tFlag []byte `type:\"existingfile\"`\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/FUNDING.yml",
+    ".github/workflows/ci.yml",
+    ".gitignore",
+    ".golangci.yml",
+    "COPYING",
+    "README.md",
+    "_examples/asciilogo/main.go",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/README.md",
+    "_examples/server/console.go",
+    "_examples/server/go.mod",
+    "_examples/server/go.sum",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/commandstring/main.go",
+    "_examples/shell/help/README.md",
+    "_examples/shell/help/main.go",
+    "benchmark_test.go",
+    "bin/.go-1.26.3.pkg",
+    "bin/.golangci-lint-1.64.5.pkg",
+    "bin/.lefthook-1.13.6.pkg",
+    "bin/README.hermit.md",
+    "bin/activate-hermit",
+    "bin/go",
+    "bin/gofmt",
+    "bin/golangci-lint",
+    "bin/hermit",
+    "bin/hermit.hcl",
+    "bin/lefthook",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "config_test.go",
+    "context.go",
+    "defaults.go",
+    "defaults_test.go",
+    "doc.go",
+    "error.go",
+    "exit.go",
+    "global.go",
+    "global_test.go",
+    "go.mod",
+    "go.sum",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "helpwrap1.18_test.go",
+    "helpwrap1.19_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "lefthook.yml",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_linux_test.go",
+    "mapper_test.go",
+    "mapper_windows_test.go",
+    "model.go",
+    "model_test.go",
+    "negatable.go",
+    "options.go",
+    "options_test.go",
+    "renovate.json5",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "signature_test.go",
+    "tag.go",
+    "tag_test.go",
+    "testdata/file.txt",
+    "util.go",
+    "util_test.go",
+    "visit.go"
+  ],
+  "explanation": {
+    "what": "kong.go の applyHookToDefaultFlags を修正。従来は `!flag.HasDefault` の場合に continue してスキップしていたが、env タグで環境変数を持つフラグ(atLeastOneEnvSet(flag.Tag.Envs))も対象に含めるよう条件を変更した。ctx.values に値が記録済み(既に main の applyHook ループで処理済み)かどうかのガードはそのまま維持し、二重発火は防いでいる。kong_test.go に環境変数のみで値を供給したフラグで AfterApply が呼ばれることを検証する回帰テストを追加。",
+    "why": "PR本文とリンクされた issue #596 が説明する通り、環境変数だけで値が供給されたフラグは Reset() が直接ターゲットに値をセットするため ctx.Path に載らず、ctx.Path を辿るメインの applyHook ループでは素通りしてしまう。default タグを持つフラグの取りこぼしを拾うための第二パスである applyHookToDefaultFlags も、これまでは HasDefault のみを見ていたため env のみのフラグの AfterApply フックが静かに呼ばれずに終わっていた不具合を修正する。",
+    "highlights": [
+      { "file": "kong.go", "note": "!flag.HasDefault && !atLeastOneEnvSet(flag.Tag.Envs) で判定するよう変更した条件分岐" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [
+      { "type": "pr", "number": 600, "url": "https://github.com/alecthomas/kong/pull/600" },
+      { "type": "issue", "number": 596, "url": "https://github.com/alecthomas/kong/issues/596" }
+    ],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

@@ -1,0 +1,155 @@
+{
+  "seq": 221,
+  "sha": "2479d83cc0307560579a16089433cbed7a6e5c77",
+  "parents": [
+    "d78d607800e2d9a4eb100a7b48021f17196babcb"
+  ],
+  "author": {
+    "name": "Joe Schmitt",
+    "email": "dev@joe.sh",
+    "date": "2021-01-10T15:36:13-05:00"
+  },
+  "message": "Add support for command aliases (#130)",
+  "pr": {
+    "number": 130,
+    "title": "Add support for command aliases",
+    "body": "This forks and fixes the CI for the original PR opened at https://github.com/alecthomas/kong/pull/95\r\n\r\nCloses #66 ",
+    "url": "https://github.com/alecthomas/kong/pull/130"
+  },
+  "linkedIssues": [
+    {
+      "number": 66,
+      "title": "command aliases (short commands)",
+      "body": "Some flag handling packages allow shortcuts for commands.\r\nI can do it my putting commands double in the parent struct like this, but it is kind of ugly:\r\n```\r\ntype rootCmd struct {\r\n\tLongName    longNameCmd        `cmd:\"\" help:\"Do something.\"`\r\n\tX1                 longNameCmd        `cmd:\"\" name:\"ln\"`\r\n}\r\n```\r\n\r\nIs there a better way? Should I (try to) make a pull request for an extra tag, or to enable the short tag for commands as well?",
+      "url": "https://github.com/alecthomas/kong/issues/66"
+    }
+  ],
+  "stats": {
+    "filesChanged": 6,
+    "additions": 75,
+    "deletions": 0
+  },
+  "files": [
+    {
+      "path": "README.md",
+      "status": "M",
+      "additions": 1,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "build.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "context.go",
+      "status": "M",
+      "additions": 18,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "model.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "tag.go",
+      "status": "M",
+      "additions": 8,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "tag_test.go",
+      "status": "M",
+      "additions": 46,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/README.md b/README.md\nindex 0788541..71fcd00 100644\n--- a/README.md\n+++ b/README.md\n@@ -436,6 +436,7 @@ Tag                    | Description\n `default:\"X\"`          | Default value.\n `default:\"1\"`          | On a command, make it the default.\n `short:\"X\"`            | Short name, if flag.\n+`aliases:\"X,Y\"`        | One or more aliases (for cmd).\n `required`             | If present, flag/arg is required.\n `optional`             | If present, flag/arg is optional.\n `hidden`               | If present, command or flag is hidden.\ndiff --git a/build.go b/build.go\nindex 9135b4d..9037512 100644\n--- a/build.go\n+++ b/build.go\n@@ -143,6 +143,7 @@ func buildChild(k *Kong, node *Node, typ NodeType, v reflect.Value, ft reflect.S\n \tchild.Help = tag.Help\n \tchild.Hidden = tag.Hidden\n \tchild.Group = tag.Group\n+\tchild.Aliases = tag.Aliases\n \n \tif provider, ok := fv.Addr().Interface().(HelpProvider); ok {\n \t\tchild.Detail = provider.Help()\ndiff --git a/context.go b/context.go\nindex bd6ebae..4d24161 100644\n--- a/context.go\n+++ b/context.go\n@@ -425,6 +425,24 @@ func (c *Context) trace(node *Node) (err error) { // nolint: gocyclo\n \t\t\t\tbreak\n \t\t\t}\n \n+\t\t\t// Assign token value to a branch name if tagged as an alias\n+\t\t\t// An alias will be ignored in the case of an existing command\n+\t\t\tcmds := make(map[string]bool)\n+\t\t\tfor _, branch := range node.Children {\n+\t\t\t\tif branch.Type == CommandNode {\n+\t\t\t\t\tcmds[branch.Name] = true\n+\t\t\t\t}\n+\t\t\t}\n+\t\t\tfor _, branch := range node.Children {\n+\t\t\t\tfor _, a := range branch.Aliases {\n+\t\t\t\t\t_, ok := cmds[a]\n+\t\t\t\t\tif token.Value == a && !ok {\n+\t\t\t\t\t\ttoken.Value = branch.Name\n+\t\t\t\t\t\tbreak\n+\t\t\t\t\t}\n+\t\t\t\t}\n+\t\t\t}\n+\n \t\t\t// After positional arguments have been consumed, check commands next...\n \t\t\tfor _, branch := range node.Children {\n \t\t\t\tif branch.Type == CommandNode && !branch.Hidden {\ndiff --git a/model.go b/model.go\nindex bd9eec4..72dba3e 100644\n--- a/model.go\n+++ b/model.go\n@@ -53,6 +53,7 @@ type Node struct {\n \tChildren   []*Node\n \tTarget     reflect.Value // Pointer to the value in the grammar that this Node is associated with.\n \tTag        *Tag\n+\tAliases    []string\n \n \tArgument *Value // Populated when Type is ArgumentNode.\n }\ndiff --git a/tag.go b/tag.go\nindex 4c58517..b780000 100644\n--- a/tag.go\n+++ b/tag.go\n@@ -32,6 +32,7 @@ type Tag struct {\n \tVars        Vars\n \tPrefix      string // Optional prefix on anonymous structs. All sub-flags will have this prefix.\n \tEmbed       bool\n+\tAliases     []string\n \n \t// Storage for all tag keys for arbitrary lookups.\n \titems map[string][]string\n@@ -157,6 +158,13 @@ func parseTag(fv reflect.Value, ft reflect.StructField) *Tag {\n \tt.Xor = t.Get(\"xor\")\n \tt.Prefix = t.Get(\"prefix\")\n \tt.Embed = t.Has(\"embed\")\n+\tsplitFn := func(r rune) bool {\n+\t\treturn r == ',' || r == ' '\n+\t}\n+\taliases := t.Get(\"aliases\")\n+\tif len(aliases) > 0 {\n+\t\tt.Aliases = append(t.Aliases, strings.FieldsFunc(aliases, splitFn)...)\n+\t}\n \tt.Vars = Vars{}\n \tfor _, set := range t.GetAll(\"set\") {\n \t\tparts := strings.SplitN(set, \"=\", 2)\ndiff --git a/tag_test.go b/tag_test.go\nindex 5f155a2..fc512c4 100644\n--- a/tag_test.go\n+++ b/tag_test.go\n@@ -149,3 +149,49 @@ func TestTagSetOnFlag(t *testing.T) {\n \trequire.NoError(t, err)\n \trequire.Contains(t, buf.String(), `A key from somewhere.`)\n }\n+\n+func TestTagAliases(t *testing.T) {\n+\ttype Command struct {\n+\t\tArg string `arg help:\"Some arg\"`\n+\t}\n+\tvar cli struct {\n+\t\tCmd Command `cmd aliases:\"alias1, alias2\"`\n+\t}\n+\tp := mustNew(t, &cli)\n+\t_, err := p.Parse([]string{\"alias1\", \"arg\"})\n+\trequire.NoError(t, err)\n+\trequire.Equal(t, \"arg\", cli.Cmd.Arg)\n+\t_, err = p.Parse([]string{\"alias2\", \"arg\"})\n+\trequire.NoError(t, err)\n+\trequire.Equal(t, \"arg\", cli.Cmd.Arg)\n+}\n+\n+func TestTagAliasesConflict(t *testing.T) {\n+\ttype Command struct {\n+\t\tArg string `arg help:\"Some arg\"`\n+\t}\n+\tvar cli struct {\n+\t\tCmd      Command `cmd hidden aliases:\"other-cmd\"`\n+\t\tOtherCmd Command `cmd`\n+\t}\n+\tp := mustNew(t, &cli)\n+\t_, err := p.Parse([]string{\"other-cmd\", \"arg\"})\n+\trequire.NoError(t, err)\n+\trequire.Equal(t, \"arg\", cli.OtherCmd.Arg)\n+}\n+\n+func TestTagAliasesSub(t *testing.T) {\n+\ttype SubCommand struct {\n+\t\tArg string `arg help:\"Some arg\"`\n+\t}\n+\ttype Command struct {\n+\t\tSubCmd SubCommand `cmd aliases:\"other-sub-cmd\"`\n+\t}\n+\tvar cli struct {\n+\t\tCmd Command `cmd hidden`\n+\t}\n+\tp := mustNew(t, &cli)\n+\t_, err := p.Parse([]string{\"cmd\", \"other-sub-cmd\", \"arg\"})\n+\trequire.NoError(t, err)\n+\trequire.Equal(t, \"arg\", cli.Cmd.SubCmd.Arg)\n+}\n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    ".gitignore",
+    ".golangci.yml",
+    "COPYING",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/README.md",
+    "_examples/server/console.go",
+    "_examples/server/go.mod",
+    "_examples/server/go.sum",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/main.go",
+    "benchmark_test.go",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "config_test.go",
+    "context.go",
+    "defaults.go",
+    "defaults_test.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "go.mod",
+    "go.sum",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "testdata/file.txt",
+    "util.go",
+    "util_test.go",
+    "visit.go"
+  ],
+  "explanation": {
+    "what": "コマンドに `aliases:\"X,Y\"` タグで別名を指定できるようにした。tag.go でカンマ・スペース区切りの `aliases` タグを `Tag.Aliases` にパースし、build.go で `Node.Aliases` にコピー、context.go の trace() で入力トークンがエイリアスに一致した場合、既存の実コマンド名との衝突がなければトークン値を本来のコマンド名に書き換えてからマッチングを続ける。",
+    "why": "issue #66 で「コマンドの短縮名を struct に二重定義しないと実現できず不格好」という要望があり、専用タグとして追加する形でこれに応えた。PR body によれば、この変更は元々 alecthomas/kong#95 として提案されていたものを fork し、CI を修正した上で改めて出し直したもの。",
+    "highlights": [
+      { "file": "context.go", "note": "trace() 内でエイリアス→実名の付け替えを行う箇所。実在コマンド名が優先され、エイリアスは無視される" },
+      { "file": "tag.go", "note": "`strings.FieldsFunc` でカンマ・スペース両対応の区切りパースをしている" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [
+      { "type": "pr", "number": 130, "url": "https://github.com/alecthomas/kong/pull/130" },
+      { "type": "issue", "number": 66, "url": "https://github.com/alecthomas/kong/issues/66" }
+    ],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

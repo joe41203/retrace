@@ -1,0 +1,74 @@
+{
+  "seq": 45,
+  "sha": "891f8623c1af232a0b09f80fc4a3354edfa3ec07",
+  "parents": [
+    "96fa9c43d5f8545260f30583a5ef9615bacb2b5c"
+  ],
+  "author": {
+    "name": "Alec Thomas",
+    "email": "alec@swapoff.org",
+    "date": "2018-06-05T21:31:14+10:00"
+  },
+  "message": "Make kong.Parse() global more useful.",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 25,
+    "deletions": 0
+  },
+  "files": [
+    {
+      "path": "global.go",
+      "status": "M",
+      "additions": 25,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/global.go b/global.go\nindex a9fd899..10aaa27 100644\n--- a/global.go\n+++ b/global.go\n@@ -4,13 +4,38 @@ import (\n \t\"os\"\n )\n \n+// App is the default global instance. It is populated by Parse().\n+var App *Kong\n+\n // Parse constructs a new parser and parses the default command-line.\n func Parse(cli interface{}, options ...Option) string {\n \tparser, err := New(cli, options...)\n \tif err != nil {\n \t\tpanic(err)\n \t}\n+\tApp = parser\n \tcmd, err := parser.Parse(os.Args[1:])\n \tparser.FatalIfErrorf(err)\n \treturn cmd\n }\n+\n+func FatalIfErrorf(err error, args ...interface{}) {\n+\tif App == nil {\n+\t\tpanic(\"call kong.Parse() before using kong.FatalIfErrorf()\")\n+\t}\n+\tApp.FatalIfErrorf(err, args...)\n+}\n+\n+func Errorf(format string, args ...interface{}) {\n+\tif App == nil {\n+\t\tpanic(\"call kong.Parse() before using kong.Errorf()\")\n+\t}\n+\tApp.Errorf(format, args...)\n+}\n+\n+func Printf(format string, args ...interface{}) {\n+\tif App == nil {\n+\t\tpanic(\"call kong.Parse() before using kong.Printf()\")\n+\t}\n+\tApp.Printf(format, args...)\n+}\n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    "README.md",
+    "_examples/shell/main.go",
+    "build.go",
+    "camelcase.go",
+    "context.go",
+    "context_test.go",
+    "global.go",
+    "global_test.go",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "kong.go",
+    "kong_test.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "tokentype_string.go"
+  ],
+  "explanation": {
+    "what": "global.go に App というパッケージレベルの *Kong 変数を追加し、Parse() がパーサ生成時にそこへ自身を保存するようにした。さらに FatalIfErrorf/Errorf/Printf というパッケージ関数を新設し、内部で App を使って対応する Kong メソッドに委譲する。App が未設定(Parse() 未呼び出し)の場合は panic するガードを入れている。",
+    "why": "コミットメッセージ「Make kong.Parse() global more useful.」の通り、それまで kong.Parse() は *Kong インスタンスを返すだけで、呼び出し側がそれを保持しないと以降のエラー出力等に使えなかった。パッケージ関数として kong.Errorf() のように直接呼べるようにすることで、main() で一度 Parse() すれば以降どこからでもグローバルな App を経由してエラー表示や終了処理ができるようになる、簡易利用時の使い勝手を上げる変更とみられる。",
+    "highlights": [
+      { "file": "global.go", "note": "App 変数と、それを使う FatalIfErrorf/Errorf/Printf のパッケージ関数を追加" }
+    ],
+    "langNotes": [
+      { "topic": "kong.Parse() とパッケージレベル変数", "note": "Go にはクラスのstatic変数に相当するものはないが、パッケージスコープの変数(ここでは App)を使えば同様のグローバル状態を持てる。小規模な CLI では kong.Parse() を呼ぶだけで以降 kong.Errorf() 等のパッケージ関数が使えるようになり、Kong インスタンスを自前で持ち回る必要がなくなる。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

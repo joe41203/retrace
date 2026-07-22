@@ -1,0 +1,81 @@
+{
+  "seq": 52,
+  "sha": "01fa22ca0396fbdd8ba0f7eb2f09fd2b29fc0053",
+  "parents": [
+    "c53590086170e89586ccaab7ef07e0a23c34c64a"
+  ],
+  "author": {
+    "name": "Alec Thomas",
+    "email": "alec@swapoff.org",
+    "date": "2018-06-08T13:44:55+10:00"
+  },
+  "message": "Generalise post-build options.",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 19,
+    "deletions": 19
+  },
+  "files": [
+    {
+      "path": "kong.go",
+      "status": "M",
+      "additions": 7,
+      "deletions": 11,
+      "binary": false
+    },
+    {
+      "path": "options.go",
+      "status": "M",
+      "additions": 12,
+      "deletions": 8,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/kong.go b/kong.go\nindex 0a8dc0d..a57fe66 100644\n--- a/kong.go\n+++ b/kong.go\n@@ -41,9 +41,8 @@ type Kong struct {\n \tnoDefaultHelp bool\n \thelp          func(*Context) error\n \n-\t// Set temporarily by Options. These are moved into the Model after build().\n-\tname        string\n-\tdescription string\n+\t// Set temporarily by Options. These are applied after build().\n+\tpostBuildOptions []Option\n }\n \n // New creates a new Kong parser on grammar.\n@@ -67,16 +66,13 @@ func New(grammar interface{}, options ...Option) (*Kong, error) {\n \tif err != nil {\n \t\treturn k, err\n \t}\n-\tif k.name == \"\" {\n-\t\tmodel.Name = filepath.Base(os.Args[0])\n-\t} else {\n-\t\tmodel.Name = k.name\n-\t}\n-\tif k.description != \"\" {\n-\t\tmodel.Help = k.description\n-\t}\n+\tmodel.Name = filepath.Base(os.Args[0])\n \tk.Model = model\n \n+\tfor _, option := range k.postBuildOptions {\n+\t\toption(k)\n+\t}\n+\n \treturn k, nil\n }\n \ndiff --git a/options.go b/options.go\nindex 7020a0b..c685981 100644\n--- a/options.go\n+++ b/options.go\n@@ -23,7 +23,18 @@ func NoDefaultHelp() Option {\n // Name overrides the application name.\n func Name(name string) Option {\n \treturn func(k *Kong) {\n-\t\tk.name = name\n+\t\tk.postBuildOptions = append(k.postBuildOptions, func(k *Kong) {\n+\t\t\tk.Model.Name = name\n+\t\t})\n+\t}\n+}\n+\n+// Description sets the application description.\n+func Description(description string) Option {\n+\treturn func(k *Kong) {\n+\t\tk.postBuildOptions = append(k.postBuildOptions, func(k *Kong) {\n+\t\t\tk.Model.Help = description\n+\t\t})\n \t}\n }\n \n@@ -47,13 +58,6 @@ func NamedMapper(name string, mapper Mapper) Option {\n \treturn func(k *Kong) { k.registry.RegisterName(name, mapper) }\n }\n \n-// Description sets the application description.\n-func Description(description string) Option {\n-\treturn func(k *Kong) {\n-\t\tk.description = description\n-\t}\n-}\n-\n // Writers overrides the default writers. Useful for testing or interactive use.\n func Writers(stdout, stderr io.Writer) Option {\n \treturn func(k *Kong) {\n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    "README.md",
+    "_examples/shell/main.go",
+    "build.go",
+    "camelcase.go",
+    "context.go",
+    "context_test.go",
+    "global.go",
+    "global_test.go",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "kong.go",
+    "kong_test.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "tokentype_string.go"
+  ],
+  "explanation": {
+    "what": "直前のコミットで導入したname/descriptionという専用の一時フィールドを廃止し、postBuildOptions []Optionという汎用スライスに置き換えた。Name()/Description()は値を直接持たず、build()完了後に実行するクロージャ(Option)をpostBuildOptionsに積むだけになり、New()はbuild後にそのクロージャ群を1回だけ実行する。",
+    "why": "コミットメッセージ「Generalise post-build options.」の通り、Nameとdescriptionの2つだけに個別の一時フィールドを用意するその場しのぎの実装から、build後に実行したいOption全般に対応できる汎用的な仕組みへ一般化する意図。この設計により、以後同種の「モデル構築後でないと適用できないOption」を追加する際にKong構造体へフィールドを増やす必要がなくなる。",
+    "highlights": [
+      { "file": "options.go", "note": "Name()/Description()がpostBuildOptionsへクロージャを追加する形に統一され、両者の実装パターンが揃った" }
+    ],
+    "langNotes": [
+      { "topic": "Option (関数型オプションパターン)", "note": "Kongの`type Option func(k *Kong)`はGoでよく使われる functional options パターン。ここではさらに、Option自身がクロージャとして別のOptionをpostBuildOptionsに積む「遅延実行」に応用されている。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

@@ -1,0 +1,130 @@
+{
+  "seq": 3,
+  "sha": "1d00dfef7b1cb798caa03b4b395fa44f9dfbc295",
+  "parents": [
+    "8516c68cc9a45c9a0863ff9618f24902bf23e5ea"
+  ],
+  "author": {
+    "name": "Alec Thomas",
+    "email": "alec@swapoff.org",
+    "date": "2018-05-16T20:33:18+10:00"
+  },
+  "message": "Implemented most of the base parser.\n\nThis includes branching arguments as well as commands, eg.\n\n    app user create <id> <first> <last>\n    app user <id> delete\n    app user <id> rename <to>\n\nOf note, required/optional flags and positional arguments are not\ncurrently enforced.",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 10,
+    "additions": 599,
+    "deletions": 44
+  },
+  "files": [
+    {
+      "path": "build.go",
+      "status": "A",
+      "additions": 105,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "decoders.go",
+      "status": "M",
+      "additions": 86,
+      "deletions": 6,
+      "binary": false
+    },
+    {
+      "path": "decoders_test.go",
+      "status": "A",
+      "additions": 6,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "global.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "kong.go",
+      "status": "M",
+      "additions": 157,
+      "deletions": 8,
+      "binary": false
+    },
+    {
+      "path": "kong_test.go",
+      "status": "A",
+      "additions": 63,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "model.go",
+      "status": "M",
+      "additions": 29,
+      "deletions": 29,
+      "binary": false
+    },
+    {
+      "path": "scanner.go",
+      "status": "A",
+      "additions": 110,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "scanner_test.go",
+      "status": "A",
+      "additions": 26,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "tokentype_string.go",
+      "status": "A",
+      "additions": 16,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/build.go b/build.go\nnew file mode 100644\nindex 0000000..5433358\n--- /dev/null\n+++ b/build.go\n@@ -0,0 +1,105 @@\n+package kong\n+\n+import (\n+\t\"fmt\"\n+\t\"reflect\"\n+\t\"strings\"\n+\t\"unicode/utf8\"\n+)\n+\n+func build(ast interface{}) (app *Application, err error) {\n+\tdefer func() {\n+\t\tmsg := recover()\n+\t\tif test, ok := recover().(error); ok {\n+\t\t\tapp = nil\n+\t\t\terr = test\n+\t\t} else if msg != nil {\n+\t\t\tpanic(msg)\n+\t\t}\n+\t}()\n+\tv := reflect.ValueOf(ast)\n+\tiv := reflect.Indirect(v)\n+\tif v.Kind() != reflect.Ptr || iv.Kind() != reflect.Struct {\n+\t\treturn nil, fmt.Errorf(\"expected a pointer to a struct but got %T\", ast)\n+\t}\n+\n+\treturn buildNode(iv), nil\n+}\n+\n+func buildNode(v reflect.Value) *Node {\n+\tnode := &Node{}\n+\tfor i := 0; i < v.NumField(); i++ {\n+\t\tft := v.Type().Field(i)\n+\t\tfv := v.Field(i)\n+\n+\t\tname := ft.Tag.Get(\"name\")\n+\t\tif name == \"\" {\n+\t\t\tname = strings.ToLower(strings.Join(camelCase(ft.Name), \"-\"))\n+\t\t}\n+\t\thelp := ft.Tag.Get(\"help\")\n+\t\tdecoder := DecoderForField(ft)\n+\t\tdflt := ft.Tag.Get(\"default\")\n+\t\tplaceholder := ft.Tag.Get(\"placeholder\")\n+\t\tif placeholder == \"\" {\n+\t\t\tplaceholder = strings.ToUpper(strings.Join(camelCase(fv.Type().Name()), \"-\"))\n+\t\t}\n+\t\tshort, _ := utf8.DecodeRuneInString(ft.Tag.Get(\"short\"))\n+\t\tif short == utf8.RuneError {\n+\t\t\tshort = 0\n+\t\t}\n+\t\t// group := ft.Tag.Get(\"group\")\n+\t\t_, required := ft.Tag.Lookup(\"required\")\n+\t\t_, optional := ft.Tag.Lookup(\"optional\")\n+\t\t_, arg := ft.Tag.Lookup(\"arg\")\n+\t\tenv := ft.Tag.Get(\"env\")\n+\n+\t\t// Nested structs are commands.\n+\t\tif ft.Type.Kind() == reflect.Struct {\n+\t\t\tchild := buildNode(fv)\n+\t\t\tchild.Help = help\n+\n+\t\t\t// A branching argument. This is a bit hairy, as we let buildNode() do the parsing, then check that\n+\t\t\t// a positional argument is provided to the child, and move it to the branching argument field.\n+\t\t\tif arg {\n+\t\t\t\tif len(child.Positional) == 0 {\n+\t\t\t\t\tpanic(fmt.Errorf(\"positional branch %s.%s must have at least one child positional argument\",\n+\t\t\t\t\t\tv.Type().Name(), ft.Name))\n+\t\t\t\t}\n+\t\t\t\tvalue := child.Positional[0]\n+\t\t\t\tchild.Positional = child.Positional[1:]\n+\t\t\t\tif child.Help == \"\" {\n+\t\t\t\t\tchild.Help = value.Help\n+\t\t\t\t}\n+\t\t\t\tchild.Name = value.Name\n+\t\t\t\tnode.Children = append(node.Children, &Branch{Argument: &Argument{\n+\t\t\t\t\tNode:     *child,\n+\t\t\t\t\tArgument: value,\n+\t\t\t\t}})\n+\t\t\t} else {\n+\t\t\t\tchild.Name = name\n+\t\t\t\tnode.Children = append(node.Children, &Branch{Command: child})\n+\t\t\t}\n+\t\t} else {\n+\t\t\tvalue := Value{\n+\t\t\t\tName:     name,\n+\t\t\t\tHelp:     help,\n+\t\t\t\tDecoder:  decoder,\n+\t\t\t\tValue:    fv,\n+\t\t\t\tRequired: !optional || required,\n+\t\t\t}\n+\t\t\tif arg {\n+\t\t\t\tnode.Positional = append(node.Positional, &value)\n+\t\t\t} else {\n+\t\t\t\tnode.Flags = append(node.Flags, &Flag{\n+\t\t\t\t\tValue:       value,\n+\t\t\t\t\tShort:       short,\n+\t\t\t\t\tDefault:     dflt,\n+\t\t\t\t\tPlaceholder: placeholder,\n+\t\t\t\t\tEnv:         env,\n+\t\t\t\t})\n+\t\t\t}\n+\t\t}\n+\t}\n+\n+\treturn node\n+}\ndiff --git a/decoders.go b/decoders.go\nindex 514b140..1f12605 100644\n--- a/decoders.go\n+++ b/decoders.go\n@@ -1,14 +1,18 @@\n package kong\n \n-import \"reflect\"\n+import (\n+\t\"fmt\"\n+\t\"reflect\"\n+\t\"strconv\"\n+)\n \n type Decoder interface {\n-\tDecode(input string, target reflect.Value) error\n+\tDecode(scan *Scanner, target reflect.Value) error\n }\n \n-type DecoderFunc func(input string, target reflect.Value) error\n+type DecoderFunc func(scan *Scanner, target reflect.Value) error\n \n-func (d DecoderFunc) Decode(input string, target reflect.Value) error { return d(input, target) }\n+func (d DecoderFunc) Decode(scan *Scanner, target reflect.Value) error { return d(scan, target) }\n \n var _ Decoder = DecoderFunc(nil)\n \n@@ -69,9 +73,30 @@ var _ NamedDecoder = &namedDecoder{}\n var (\n \tnamedDecoders = map[string]NamedDecoder{}\n \ttypeDecoders  = map[reflect.Type]TypeDecoder{}\n-\tkindDecoders  = map[reflect.Kind]KindDecoder{}\n+\tkindDecoders  map[reflect.Kind]KindDecoder\n )\n \n+func DecoderForField(field reflect.StructField) Decoder {\n+\tname, ok := field.Tag.Lookup(\"type\")\n+\tif ok {\n+\t\tif decoder, ok := namedDecoders[name]; ok {\n+\t\t\treturn decoder\n+\t\t}\n+\t}\n+\treturn DecoderForType(field.Type)\n+}\n+\n+func DecoderForType(typ reflect.Type) Decoder {\n+\tvar decoder Decoder\n+\tvar ok bool\n+\tif decoder, ok = typeDecoders[typ]; ok {\n+\t\treturn decoder\n+\t} else if decoder, ok = kindDecoders[typ.Kind()]; ok {\n+\t\treturn decoder\n+\t}\n+\treturn missingDecoder\n+}\n+\n // RegisterDecoder registers decoders.\n //\n // Decoders must be one of TypeDecoder, KindDecoder or NamedDecoder.\n@@ -91,5 +116,60 @@ func RegisterDecoder(decoders ...Decoder) {\n }\n \n func init() {\n-\tRegisterDecoder()\n+\tintDecoder := NewKindDecoder(reflect.Int, func(scan *Scanner, target reflect.Value) error {\n+\t\tn, err := strconv.ParseInt(scan.PopValue(\"int\"), 10, 64)\n+\t\tif err != nil {\n+\t\t\treturn err\n+\t\t}\n+\t\ttarget.SetInt(n)\n+\t\treturn nil\n+\t})\n+\tuintDecoder := NewKindDecoder(reflect.Uint, func(scan *Scanner, target reflect.Value) error {\n+\t\tn, err := strconv.ParseUint(scan.PopValue(\"uint\"), 10, 64)\n+\t\tif err != nil {\n+\t\t\treturn err\n+\t\t}\n+\t\ttarget.SetUint(n)\n+\t\treturn nil\n+\t})\n+\tkindDecoders = map[reflect.Kind]KindDecoder{\n+\t\treflect.Int:    intDecoder,\n+\t\treflect.Int8:   intDecoder,\n+\t\treflect.Int16:  intDecoder,\n+\t\treflect.Int32:  intDecoder,\n+\t\treflect.Int64:  intDecoder,\n+\t\treflect.Uint:   uintDecoder,\n+\t\treflect.Uint8:  uintDecoder,\n+\t\treflect.Uint16: uintDecoder,\n+\t\treflect.Uint32: uintDecoder,\n+\t\treflect.Uint64: uintDecoder,\n+\t\treflect.Float32: NewKindDecoder(reflect.Float32, func(scan *Scanner, target reflect.Value) error {\n+\t\t\tn, err := strconv.ParseFloat(scan.PopValue(\"float\"), 32)\n+\t\t\tif err != nil {\n+\t\t\t\treturn err\n+\t\t\t}\n+\t\t\ttarget.SetFloat(n)\n+\t\t\treturn nil\n+\t\t}),\n+\t\treflect.Float64: NewKindDecoder(reflect.Float64, func(scan *Scanner, target reflect.Value) error {\n+\t\t\tn, err := strconv.ParseFloat(scan.PopValue(\"float\"), 64)\n+\t\t\tif err != nil {\n+\t\t\t\treturn err\n+\t\t\t}\n+\t\t\ttarget.SetFloat(n)\n+\t\t\treturn nil\n+\t\t}),\n+\t\treflect.String: NewKindDecoder(reflect.String, func(scan *Scanner, target reflect.Value) error {\n+\t\t\ttarget.SetString(scan.PopValue(\"string\"))\n+\t\t\treturn nil\n+\t\t}),\n+\t\treflect.Bool: NewKindDecoder(reflect.Bool, func(scan *Scanner, target reflect.Value) error {\n+\t\t\ttarget.SetBool(true)\n+\t\t\treturn nil\n+\t\t}),\n+\t}\n+}\n+\n+var missingDecoder DecoderFunc = func(scan *Scanner, target reflect.Value) error {\n+\treturn fmt.Errorf(\"no decoder for %q (of type %T)\", target.String(), target.Type())\n }\ndiff --git a/decoders_test.go b/decoders_test.go\nnew file mode 100644\nindex 0000000..0eaa188\n--- /dev/null\n+++ b/decoders_test.go\n@@ -0,0 +1,6 @@\n+package kong\n+\n+import \"testing\"\n+\n+func TestDecoders(t *testing.T) {\n+}\ndiff --git a/global.go b/global.go\nindex 2acabe9..180fd7f 100644\n--- a/global.go\n+++ b/global.go\n@@ -5,6 +5,6 @@ import \"os\"\n func Parse(cli interface{}) {\n \tparser, err := New(\"\", \"\", cli)\n \tparser.FatalIfErrorf(err)\n-\terr = parser.Parse(os.Args[1:])\n+\t_, err = parser.Parse(os.Args[1:])\n \tparser.FatalIfErrorf(err)\n }\ndiff --git a/kong.go b/kong.go\nindex 7cfbc6c..d8ece95 100644\n--- a/kong.go\n+++ b/kong.go\n@@ -4,23 +4,27 @@ import (\n \t\"fmt\"\n \t\"os\"\n \t\"path/filepath\"\n+\t\"reflect\"\n+\t\"strings\"\n )\n \n type Kong struct {\n-\tModel *ApplicationModel\n+\tModel *Application\n \t// Termination function (defaults to os.Exit)\n \tTerminate func(int)\n }\n \n-// New creates a new Kong parser into grammar.\n-func New(name, description string, grammar interface{}) (*Kong, error) {\n+// New creates a new Kong parser into ast.\n+func New(name, description string, ast interface{}) (*Kong, error) {\n \tif name == \"\" {\n \t\tname = filepath.Base(os.Args[0])\n \t}\n-\tmodel := &ApplicationModel{\n-\t\tName:        name,\n-\t\tDescription: description,\n+\tmodel, err := build(ast)\n+\tif err != nil {\n+\t\treturn nil, err\n \t}\n+\tmodel.Name = name\n+\tmodel.Help = description\n \treturn &Kong{\n \t\tModel:     model,\n \t\tTerminate: os.Exit,\n@@ -28,8 +32,153 @@ func New(name, description string, grammar interface{}) (*Kong, error) {\n }\n \n // Parse arguments into target.\n-func (k *Kong) Parse(args []string) error {\n-\treturn nil\n+func (k *Kong) Parse(args []string) (command string, err error) {\n+\tdefer func() {\n+\t\tmsg := recover()\n+\t\tif test, ok := msg.(TokenAssertionError); ok {\n+\t\t\terr = test\n+\t\t} else if msg != nil {\n+\t\t\tpanic(msg)\n+\t\t}\n+\t}()\n+\tk.reset(k.Model)\n+\tcmd, err := k.applyNode(Scan(args...), k.Model)\n+\treturn strings.Join(cmd, \" \"), err\n+}\n+\n+// Recursively reset values to defaults (as specified in the grammar) or the zero value.\n+func (k *Kong) reset(node *Node) {\n+\tfor _, flag := range node.Flags {\n+\t\tif flag.Default != \"\" {\n+\t\t\tflag.Decoder.Decode(Scan(flag.Default), flag.Value.Value)\n+\t\t} else {\n+\t\t\tflag.Value.Value.Set(reflect.Zero(flag.Value.Value.Type()))\n+\t\t}\n+\t}\n+\tfor _, pos := range node.Positional {\n+\t\tpos.Value.Set(reflect.Zero(pos.Value.Type()))\n+\t}\n+\tfor _, branch := range node.Children {\n+\t\tif branch.Argument != nil {\n+\t\t\targ := branch.Argument.Argument\n+\t\t\targ.Value.Set(reflect.Zero(arg.Value.Type()))\n+\t\t\tk.reset(&branch.Argument.Node)\n+\t\t} else {\n+\t\t\tk.reset(branch.Command)\n+\t\t}\n+\t}\n+}\n+\n+func (k *Kong) applyNode(scan *Scanner, node *Node) (command []string, err error) {\n+\tfor token := scan.Pop(); token.Type != EOLToken; token = scan.Pop() {\n+\t\tswitch token.Type {\n+\t\tcase UntypedToken:\n+\t\t\tswitch {\n+\t\t\t// -- indicates end of parsing. All remaining arguments are treated as positional arguments only.\n+\t\t\tcase token.Value == \"--\":\n+\t\t\t\tfor {\n+\t\t\t\t\ttoken = scan.Pop()\n+\t\t\t\t\tif token.Type == EOLToken {\n+\t\t\t\t\t\tbreak\n+\t\t\t\t\t}\n+\t\t\t\t\tscan.PushTyped(token.Value, PositionalArgumentToken)\n+\t\t\t\t}\n+\n+\t\t\t// Long flag.\n+\t\t\tcase strings.HasPrefix(token.Value, \"--\"):\n+\t\t\t\t// Parse it and push the tokens.\n+\t\t\t\tparts := strings.SplitN(token.Value[2:], \"=\", 2)\n+\t\t\t\tscan.PushTyped(parts[0], FlagToken)\n+\t\t\t\tif len(parts) > 1 {\n+\t\t\t\t\tscan.PushTyped(parts[1], FlagValueToken)\n+\t\t\t\t}\n+\n+\t\t\t\t// Short flag.\n+\t\t\tcase strings.HasPrefix(token.Value, \"-\"):\n+\t\t\t\tscan.PushTyped(token.Value[1:2], ShortFlagToken)\n+\t\t\t\tscan.PushTyped(token.Value[2:], ShortFlagTailToken)\n+\n+\t\t\tdefault:\n+\t\t\t\tscan.PushTyped(token.Value, PositionalArgumentToken)\n+\t\t\t}\n+\n+\t\tcase ShortFlagTailToken:\n+\t\t\tscan.PushTyped(token.Value[0:1], ShortFlagToken)\n+\t\t\tscan.PushTyped(token.Value[1:], ShortFlagTailToken)\n+\n+\t\tcase FlagToken:\n+\t\t\tif err := matchFlags(node.Flags, token, scan, func(f *Flag) bool {\n+\t\t\t\treturn f.Name == token.Value\n+\t\t\t}); err != nil {\n+\t\t\t\treturn nil, err\n+\t\t\t}\n+\n+\t\tcase ShortFlagToken:\n+\t\t\tif err := matchFlags(node.Flags, token, scan, func(f *Flag) bool {\n+\t\t\t\treturn string(f.Name) == token.Value\n+\t\t\t}); err != nil {\n+\t\t\t\treturn nil, err\n+\t\t\t}\n+\n+\t\tcase FlagValueToken:\n+\t\t\treturn nil, fmt.Errorf(\"unexpected flag argument %q\", token.Value)\n+\n+\t\tcase PositionalArgumentToken:\n+\t\t\tscan.PushToken(token)\n+\t\t\tfor _, branch := range node.Children {\n+\t\t\t\tswitch {\n+\t\t\t\tcase branch.Command != nil:\n+\t\t\t\t\tif branch.Command.Name == token.Value {\n+\t\t\t\t\t\tscan.Pop()\n+\t\t\t\t\t\tcommand = append(command, branch.Command.Name)\n+\t\t\t\t\t\tcmd, err := k.applyNode(scan, branch.Command)\n+\t\t\t\t\t\tif err != nil {\n+\t\t\t\t\t\t\treturn nil, err\n+\t\t\t\t\t\t}\n+\t\t\t\t\t\treturn append(command, cmd...), nil\n+\t\t\t\t\t}\n+\n+\t\t\t\tcase branch.Argument != nil:\n+\t\t\t\t\targ := branch.Argument.Argument\n+\t\t\t\t\tif err := arg.Decoder.Decode(scan, arg.Value); err == nil {\n+\t\t\t\t\t\tcommand = append(command, \"<\"+arg.Name+\">\")\n+\t\t\t\t\t\tcmd, err := k.applyNode(scan, &branch.Argument.Node)\n+\t\t\t\t\t\tif err != nil {\n+\t\t\t\t\t\t\treturn nil, err\n+\t\t\t\t\t\t}\n+\t\t\t\t\t\treturn append(command, cmd...), nil\n+\t\t\t\t\t}\n+\t\t\t\t}\n+\t\t\t}\n+\t\t\treturn nil, fmt.Errorf(\"unexpected positional argument %s\", token)\n+\n+\t\tdefault:\n+\t\t\treturn nil, fmt.Errorf(\"unexpected token %s\", token)\n+\t\t}\n+\t}\n+\treturn\n+}\n+\n+func matchFlags(flags []*Flag, token Token, scan *Scanner, matcher func(f *Flag) bool) (err error) {\n+\tdefer func() {\n+\t\tmsg := recover()\n+\t\tif test, ok := msg.(TokenAssertionError); ok {\n+\t\t\terr = fmt.Errorf(\"%s %s\", token, test)\n+\t\t} else if msg != nil {\n+\t\t\tpanic(msg)\n+\t\t}\n+\t}()\n+\tfor _, flag := range flags {\n+\t\t// Found a matching flag.\n+\t\tif flag.Name == token.Value {\n+\t\t\terr := flag.Decoder.Decode(scan, flag.Value.Value)\n+\t\t\tif err != nil {\n+\t\t\t\treturn err\n+\t\t\t}\n+\t\t\treturn nil\n+\t\t}\n+\t}\n+\treturn fmt.Errorf(\"unknown flag --%s\", token.Value)\n }\n \n func (k *Kong) Errorf(format string, args ...interface{}) {\ndiff --git a/kong_test.go b/kong_test.go\nnew file mode 100644\nindex 0000000..d6a5a80\n--- /dev/null\n+++ b/kong_test.go\n@@ -0,0 +1,63 @@\n+package kong\n+\n+import (\n+\t\"reflect\"\n+\t\"testing\"\n+\n+\t\"github.com/stretchr/testify/require\"\n+\n+\t\"github.com/alecthomas/repr\"\n+)\n+\n+func mustNew(t *testing.T, cli interface{}) *Kong {\n+\tt.Helper()\n+\tparser, err := New(\"\", \"\", cli)\n+\trequire.NoError(t, err)\n+\treturn parser\n+}\n+\n+func TestArgument(t *testing.T) {\n+\t/*\n+\t\tapp user create <id> <first> <last>\n+\t\tapp\tuser <id> delete\n+\t\tapp\tuser <id> rename <to>\n+\n+\t*/\n+\tvar cli struct {\n+\t\tCreate struct {\n+\t\t\tId    string `arg:\"true\"`\n+\t\t\tFirst string `arg:\"true\"`\n+\t\t\tLast  string `arg:\"true\"`\n+\t\t}\n+\n+\t\t// Branching argument.\n+\t\tId struct {\n+\t\t\tId     int `arg:\"true\"`\n+\t\t\tFlag   int\n+\t\t\tDelete struct{}\n+\t\t\tRename struct {\n+\t\t\t\tTo string\n+\t\t\t}\n+\t\t} `arg:\"true\"`\n+\t}\n+\tp := mustNew(t, &cli)\n+\trepr.Println(p.Model, repr.Hide(reflect.Value{}))\n+\tcmd, err := p.Parse([]string{\"10\", \"delete\"})\n+\trequire.NoError(t, err)\n+\trequire.Equal(t, 10, cli.Id.Id)\n+\trequire.Equal(t, \"<id> delete\", cmd)\n+}\n+\n+func TestResetWithDefaults(t *testing.T) {\n+\tvar cli struct {\n+\t\tFlag            string\n+\t\tFlagWithDefault string `default:\"default\"`\n+\t}\n+\tcli.Flag = \"BLAH\"\n+\tcli.FlagWithDefault = \"BLAH\"\n+\tparser := mustNew(t, &cli)\n+\t_, err := parser.Parse([]string{})\n+\trequire.NoError(t, err)\n+\trequire.Equal(t, \"\", cli.Flag)\n+\trequire.Equal(t, \"default\", cli.FlagWithDefault)\n+}\ndiff --git a/model.go b/model.go\nindex d8a5647..285f3f0 100644\n--- a/model.go\n+++ b/model.go\n@@ -1,44 +1,44 @@\n package kong\n \n-import \"flag\"\n+import \"reflect\"\n \n-type Value = flag.Getter\n+type Application = Node\n \n-type ApplicationModel struct {\n-\tName        string\n-\tDescription string\n-\n-\tNodeModel\n+// A Branch is a command or positional argument that results in a branch in the command tree.\n+type Branch struct {\n+\tCommand  *Command\n+\tArgument *Argument\n }\n \n-type NodeModel struct {\n-\tGroups []*GroupModel\n-\t// Positional arguments.\n-\tArguments []*ArgumentModel\n-}\n+type Command = Node\n \n-type GroupModel struct {\n-\t// Flags.\n-\tFlags []*FlagModel\n-\t// Command hierarchy.\n-\tCommands []*CommandModel\n+type Node struct {\n+\tName       string\n+\tHelp       string\n+\tFlags      []*Flag\n+\tPositional []*Value\n+\tChildren   []*Branch\n }\n \n-type ValueModel struct {\n-\tName  string\n-\tHelp  string\n-\tValue flag.Value\n+type Value struct {\n+\tName     string\n+\tHelp     string\n+\tDecoder  Decoder\n+\tValue    reflect.Value\n+\tRequired bool\n }\n \n-type CommandModel struct {\n-\tNodeModel\n-}\n+type Positional = Value\n \n-type ArgumentModel struct {\n-\tValueModel\n+type Argument struct {\n+\tNode\n+\tArgument *Value\n }\n \n-type FlagModel struct {\n-\tValueModel\n-\tShort rune\n+type Flag struct {\n+\tValue\n+\tPlaceholder string\n+\tEnv         string\n+\tShort       rune\n+\tDefault     string\n }\ndiff --git a/scanner.go b/scanner.go\nnew file mode 100644\nindex 0000000..541016b\n--- /dev/null\n+++ b/scanner.go\n@@ -0,0 +1,110 @@\n+package kong\n+\n+import (\n+\t\"fmt\"\n+\t\"strconv\"\n+)\n+\n+//go:generate stringer -type=TokenType\n+\n+type TokenType int\n+\n+const (\n+\tUntypedToken TokenType = iota\n+\tEOLToken\n+\tFlagToken               // --<flag>\n+\tFlagValueToken          // =<value>\n+\tShortFlagToken          // -<short>[<tail]\n+\tShortFlagTailToken      // <tail>\n+\tPositionalArgumentToken // <arg>\n+)\n+\n+type TokenAssertionError struct{ err error }\n+\n+func (t TokenAssertionError) Error() string {\n+\treturn t.err.Error()\n+}\n+\n+type Token struct {\n+\tValue string\n+\tType  TokenType\n+}\n+\n+func (t Token) String() string {\n+\tswitch t.Type {\n+\tcase FlagToken:\n+\t\treturn \"--\" + t.Value\n+\n+\tcase ShortFlagToken:\n+\t\treturn \"-\" + t.Value\n+\n+\tcase EOLToken:\n+\t\treturn \"EOL\"\n+\n+\tdefault:\n+\t\treturn strconv.Quote(t.Value)\n+\t}\n+}\n+\n+func (t Token) IsAny(types ...TokenType) bool {\n+\tfor _, typ := range types {\n+\t\tif t.Type == typ {\n+\t\t\treturn true\n+\t\t}\n+\t}\n+\treturn false\n+}\n+\n+func (t Token) IsValue() bool {\n+\treturn t.IsAny(FlagValueToken, ShortFlagTailToken, PositionalArgumentToken, UntypedToken)\n+}\n+\n+type Scanner struct {\n+\traw  []string\n+\targs []Token\n+}\n+\n+func Scan(args ...string) *Scanner {\n+\ts := &Scanner{raw: args}\n+\tfor _, arg := range args {\n+\t\ts.args = append(s.args, Token{Value: arg})\n+\t}\n+\treturn s\n+}\n+\n+func (s *Scanner) Pop() Token {\n+\tif len(s.args) == 0 {\n+\t\treturn Token{Type: EOLToken}\n+\t}\n+\targ := s.args[0]\n+\ts.args = s.args[1:]\n+\treturn arg\n+}\n+\n+// PopValue or panic with TokenAssertionError.\n+func (s *Scanner) PopValue(context string) string {\n+\tt := s.Pop()\n+\tif !t.IsValue() {\n+\t\tpanic(TokenAssertionError{fmt.Errorf(\"expected %s value but got %s\", context, t)})\n+\t}\n+\treturn t.Value\n+}\n+\n+func (s *Scanner) Peek() Token {\n+\tif len(s.args) == 0 {\n+\t\treturn Token{Type: EOLToken}\n+\t}\n+\treturn s.args[0]\n+}\n+\n+func (s *Scanner) Push(arg string) {\n+\ts.PushToken(Token{Value: arg})\n+}\n+\n+func (s *Scanner) PushTyped(arg string, typ TokenType) {\n+\ts.PushToken(Token{Value: arg, Type: typ})\n+}\n+\n+func (s *Scanner) PushToken(token Token) {\n+\ts.args = append([]Token{token}, s.args...)\n+}\ndiff --git a/scanner_test.go b/scanner_test.go\nnew file mode 100644\nindex 0000000..3e37d38\n--- /dev/null\n+++ b/scanner_test.go\n@@ -0,0 +1,26 @@\n+package kong\n+\n+import (\n+\t\"testing\"\n+\n+\t\"github.com/gotestyourself/gotestyourself/assert\"\n+)\n+\n+func TestScannerTake(t *testing.T) {\n+\ts := Scan(\"a\", \"b\", \"c\")\n+\tassert.Assert(t, s.Pop().Value == \"a\")\n+\tassert.Assert(t, s.Pop().Value == \"b\")\n+\tassert.Assert(t, s.Pop().Value == \"c\")\n+\tassert.Assert(t, s.Pop().Type == EOLToken)\n+}\n+\n+func TestScannerPeek(t *testing.T) {\n+\ts := Scan(\"a\", \"b\", \"c\")\n+\tassert.Assert(t, s.Peek().Value == \"a\")\n+\tassert.Assert(t, s.Pop().Value == \"a\")\n+\tassert.Assert(t, s.Peek().Value == \"b\")\n+\tassert.Assert(t, s.Pop().Value == \"b\")\n+\tassert.Assert(t, s.Peek().Value == \"c\")\n+\tassert.Assert(t, s.Pop().Value == \"c\")\n+\tassert.Assert(t, s.Peek().Type == EOLToken)\n+}\ndiff --git a/tokentype_string.go b/tokentype_string.go\nnew file mode 100644\nindex 0000000..7b68434\n--- /dev/null\n+++ b/tokentype_string.go\n@@ -0,0 +1,16 @@\n+// Code generated by \"stringer -type=TokenType\"; DO NOT EDIT.\n+\n+package kong\n+\n+import \"strconv\"\n+\n+const _TokenType_name = \"UntypedTokenEOLTokenFlagTokenFlagValueTokenShortFlagTokenShortFlagTailTokenPositionalArgumentToken\"\n+\n+var _TokenType_index = [...]uint8{0, 12, 20, 29, 43, 57, 75, 98}\n+\n+func (i TokenType) String() string {\n+\tif i < 0 || i >= TokenType(len(_TokenType_index)-1) {\n+\t\treturn \"TokenType(\" + strconv.FormatInt(int64(i), 10) + \")\"\n+\t}\n+\treturn _TokenType_name[_TokenType_index[i]:_TokenType_index[i+1]]\n+}\n",
+  "diffTruncated": false,
+  "tree": [
+    "README.md",
+    "_examples/shell/main.go",
+    "build.go",
+    "camelcase.go",
+    "decoders.go",
+    "decoders_test.go",
+    "global.go",
+    "kong.go",
+    "kong_test.go",
+    "model.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tokentype_string.go"
+  ],
+  "explanation": {
+    "what": "build.go を新規追加し、reflect で struct を再帰的に走査して Node(Flag/Positional/Children)の木を組み立てる buildNode() を実装した。scanner.go でコマンドライン引数をトークン列として扱う Scanner/Token/TokenType を新設し、kong.go の Parse() に実際のトークン処理ループ(applyNode)を実装、長い/短いフラグの分解、\"--\" 以降を全て位置引数扱いにする処理、コマンド分岐・branching argument のマッチングを行うようにした。model.go の型名を ApplicationModel 等から Application/Command/Node/Value/Argument/Flag に整理し、decoders.go の Decoder は文字列そのものでなく Scanner を受け取るよう変更した。",
+    "why": "コミットメッセージが明言する通り、`app user create <id> <first> <last>` のようなコマンド分岐・branching argument(位置引数の値がそのまま子コマンド階層の名前になるパターン)を含む「ベースパーサ」を実装する回。ここまでは flag.Getter を借りた仮のモデルだったが、実際に struct タグを読んでコマンドツリーを構築し、引数トークン列を消費しながらそのツリーを辿る、という kong の中核設計が初めて動く形になった。メッセージにある通り required/optional の強制はまだ未実装。",
+    "highlights": [
+      { "file": "build.go", "note": "buildNode() が reflect で struct フィールドを走査し、ネストした struct を Command か branching Argument に振り分けるロジック。arg タグの有無で分岐" },
+      { "file": "kong.go", "note": "applyNode() のトークン処理ループ。FlagToken/ShortFlagToken/PositionalArgumentToken ごとに分岐し、再帰的に子ノードへ処理を渡す" },
+      { "file": "scanner.go", "note": "Scanner はスタック的に Push/Pop できるトークン列。長いフラグ `--foo=bar` を FlagToken と FlagValueToken に分解して押し戻す使い方が要点" }
+    ],
+    "langNotes": [
+      { "topic": "reflect による struct タグ読み取り", "note": "buildNode() は reflect.Value/reflect.StructField を使い、フィールドごとに Tag.Get(\"help\") や Tag.Lookup(\"required\") でタグ文字列を読み出す。Lookup は「タグキーが存在するか」を bool で返す点が Get と異なる(値なしタグの判定に使われている)。" },
+      { "topic": "defer + recover によるエラー変換", "note": "build() と Kong.Parse() は defer 内で recover() を使い、パニックを戻り値の error に変換している。Go では「回復不能な異常」に panic を使い、呼び出し境界で recover して通常の error API に戻す設計がよく使われる。" }
+    ],
+    "diagram": {
+      "mermaid": "flowchart LR\n    A[\"struct (CLI 定義)\"] -->|\"reflect で走査\"| B[\"buildNode()\"]\n    B --> C[\"Node (Flags/Positional/Children)\"]\n    D[\"os.Args\"] -->|\"Scan()\"| E[\"Scanner (Token列)\"]\n    E --> F[\"applyNode()\"]\n    C --> F\n    F -->|\"Decoder.Decode\"| G[\"struct フィールドへ値設定\"]",
+      "caption": "struct から CLI 文法を組み立てる buildNode() と、引数トークン列を辿る applyNode() が合流して値を書き戻す流れ"
+    },
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

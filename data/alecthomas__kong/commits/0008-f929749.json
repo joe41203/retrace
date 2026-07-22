@@ -1,0 +1,80 @@
+{
+  "seq": 8,
+  "sha": "f929749094cd8def8290c7a1221745de726f4fbe",
+  "parents": [
+    "31fe51f9d8803cbcba0bd5ea862d0168251e580d"
+  ],
+  "author": {
+    "name": "Alec Thomas",
+    "email": "alec@swapoff.org",
+    "date": "2018-05-17T23:50:12+10:00"
+  },
+  "message": "Add Decode() method to Value to DRY.",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 4,
+    "additions": 30,
+    "deletions": 11
+  },
+  "files": [
+    {
+      "path": "decoders.go",
+      "status": "M",
+      "additions": 15,
+      "deletions": 5,
+      "binary": false
+    },
+    {
+      "path": "kong.go",
+      "status": "M",
+      "additions": 4,
+      "deletions": 4,
+      "binary": false
+    },
+    {
+      "path": "model.go",
+      "status": "M",
+      "additions": 4,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "scanner.go",
+      "status": "M",
+      "additions": 7,
+      "deletions": 2,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/decoders.go b/decoders.go\nindex 4cbb1f1..a5428ec 100644\n--- a/decoders.go\n+++ b/decoders.go\n@@ -13,7 +13,12 @@ type DecoderContext struct {\n \tValue *Value\n }\n \n+// A Decoder knows how to decode text into a Go value.\n type Decoder interface {\n+\t// Decode scan into target.\n+\t//\n+\t// \"ctx\" contains context about the value being decoded that may be useful\n+\t// to some decoders.\n \tDecode(ctx *DecoderContext, scan *Scanner, target reflect.Value) error\n }\n \n@@ -61,6 +66,12 @@ func (k *kindDecoder) Kind() reflect.Kind { return k.kind }\n \n var _ KindDecoder = &kindDecoder{}\n \n+// A NamedDecoder will be used if the value field has a \"type\" tag matching Name().\n+//\n+// eg.\n+//\n+// \t\tField string `type:\"colour\"`\n+//   \tkong.RegisterDecoder(kong.NewNamedDecoder(\"colour\", ...))\n type NamedDecoder interface {\n \tName() string\n \tDecoder\n@@ -98,7 +109,7 @@ func DecoderForField(field reflect.StructField) Decoder {\n \treturn DecoderForType(field.Type)\n }\n \n-// DecoderForType finds a decoder via a type or kind.\n+// DecoderForType finds a decoder from a type or kind.\n //\n // Will return nil if a decoder can not be determined.\n func DecoderForType(typ reflect.Type) Decoder {\n@@ -125,7 +136,7 @@ func RegisterDecoder(decoders ...Decoder) {\n \t\tcase NamedDecoder:\n \t\t\tnamedDecoders[decoder.Name()] = decoder\n \t\tdefault:\n-\t\t\tfail(\"unsupported decoder type \" + reflect.TypeOf(decoder).String())\n+\t\t\tfail(\"unsupported decoder type %T\", decoder)\n \t\t}\n \t}\n }\n@@ -220,11 +231,10 @@ func sliceDecoder(ctx *DecoderContext, scan *Scanner, target reflect.Value) erro\n \t}\n \tvar childScanner *Scanner\n \tif ctx.Value.Flag {\n+\t\t// If decoding a flag, we need an argument.\n \t\tchildScanner = Scan(strings.Split(scan.PopValue(\"list\"), sep)...)\n \t} else {\n-\t\ttokens := scan.PopUntil(func(t Token) bool {\n-\t\t\treturn !t.IsValue() || (t.Type == UntypedToken && strings.HasPrefix(t.Value, \"-\"))\n-\t\t})\n+\t\ttokens := scan.PopUntil(func(t Token) bool { return !t.IsValue() })\n \t\tchildScanner = Scan(tokens...)\n \t}\n \tchildDecoder := DecoderForType(el)\ndiff --git a/kong.go b/kong.go\nindex c382b40..5c06d55 100644\n--- a/kong.go\n+++ b/kong.go\n@@ -61,7 +61,7 @@ func (k *Kong) reset(node *Node) {\n \tfor _, flag := range node.Flags {\n \t\tflag.Value.Value.Set(reflect.Zero(flag.Value.Value.Type()))\n \t\tif flag.Default != \"\" {\n-\t\t\tflag.Decoder.Decode(&DecoderContext{Value: &flag.Value}, Scan(flag.Default), flag.Value.Value)\n+\t\t\tflag.Decode(Scan(flag.Default))\n \t\t}\n \t}\n \tfor _, pos := range node.Positional {\n@@ -144,7 +144,7 @@ func (k *Kong) applyNode(scan *Scanner, node *Node) (command []string, err error\n \t\t\t// Ensure we've consumed all positional arguments.\n \t\t\tif positional < len(node.Positional) {\n \t\t\t\targ := node.Positional[positional]\n-\t\t\t\terr := arg.Decoder.Decode(&DecoderContext{Value: arg}, scan, arg.Value)\n+\t\t\t\terr := arg.Decode(scan)\n \t\t\t\tif err != nil {\n \t\t\t\t\treturn nil, err\n \t\t\t\t}\n@@ -169,7 +169,7 @@ func (k *Kong) applyNode(scan *Scanner, node *Node) (command []string, err error\n \n \t\t\t\tcase branch.Argument != nil:\n \t\t\t\t\targ := branch.Argument.Argument\n-\t\t\t\t\tif err := arg.Decoder.Decode(&DecoderContext{Value: arg}, scan, arg.Value); err == nil {\n+\t\t\t\t\tif err := arg.Decode(scan); err == nil {\n \t\t\t\t\t\tcommand = append(command, \"<\"+arg.Name+\">\")\n \t\t\t\t\t\tcmd, err := k.applyNode(scan, &branch.Argument.Node)\n \t\t\t\t\t\tif err != nil {\n@@ -200,7 +200,7 @@ func matchFlags(flags []*Flag, token Token, scan *Scanner, matcher func(f *Flag)\n \tfor _, flag := range flags {\n \t\t// Found a matching flag.\n \t\tif flag.Name == token.Value {\n-\t\t\terr := flag.Decoder.Decode(&DecoderContext{Value: &flag.Value}, scan, flag.Value.Value)\n+\t\t\terr := flag.Decode(scan)\n \t\t\tif err != nil {\n \t\t\t\treturn err\n \t\t\t}\ndiff --git a/model.go b/model.go\nindex 2583c00..50be9c2 100644\n--- a/model.go\n+++ b/model.go\n@@ -31,6 +31,10 @@ type Value struct {\n \tFormat   string // Formatting directive, if applicable.\n }\n \n+func (v *Value) Decode(scan *Scanner) error {\n+\treturn v.Decoder.Decode(&DecoderContext{Value: v}, scan, v.Value)\n+}\n+\n type Positional = Value\n \n type Argument struct {\ndiff --git a/scanner.go b/scanner.go\nindex 9c7d86d..e653988 100644\n--- a/scanner.go\n+++ b/scanner.go\n@@ -2,6 +2,7 @@ package kong\n \n import (\n \t\"strconv\"\n+\t\"strings\"\n )\n \n //go:generate stringer -type=TokenType\n@@ -48,8 +49,12 @@ func (t Token) IsAny(types ...TokenType) bool {\n \treturn false\n }\n \n+// IsValue returns true if token is usable as a parseable value.\n+//\n+// A parseable value is either a value typed token, or an untyped token NOT starting with a hyphen.\n func (t Token) IsValue() bool {\n-\treturn t.IsAny(FlagValueToken, ShortFlagTailToken, PositionalArgumentToken, UntypedToken)\n+\treturn t.IsAny(FlagValueToken, ShortFlagTailToken, PositionalArgumentToken) ||\n+\t\t(t.Type == UntypedToken && !strings.HasPrefix(t.Value, \"-\"))\n }\n \n type Scanner struct {\n@@ -77,7 +82,7 @@ func (s *Scanner) Pop() Token {\n \treturn arg\n }\n \n-// PopValue or panic with Error.\n+// PopValue token, or panic with Error.\n func (s *Scanner) PopValue(context string) string {\n \tt := s.Pop()\n \tif !t.IsValue() {\n",
+  "diffTruncated": false,
+  "tree": [
+    "README.md",
+    "_examples/shell/main.go",
+    "build.go",
+    "camelcase.go",
+    "decoders.go",
+    "decoders_test.go",
+    "global.go",
+    "kong.go",
+    "kong_test.go",
+    "model.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tokentype_string.go"
+  ],
+  "explanation": {
+    "what": "model.go の Value に Decode(scan *Scanner) error メソッドを追加し、内部で &DecoderContext{Value: v} を組み立てて v.Decoder.Decode() を呼ぶよう共通化した。kong.go の reset()/applyNode()/matchFlags() の各所で個別に DecoderContext を組み立てていたコードを flag.Decode(scan) / arg.Decode(scan) の呼び出しに置き換えた。あわせて decoders.go・scanner.go にコメント(Decoder/NamedDecoder の使い方例、Token.IsValue の意味など)を追加し、Token.IsValue() の判定を「UntypedToken でハイフン始まりでない」条件を含む形に修正した。",
+    "why": "コミットメッセージ通り、DecoderContext を組み立てて Decode を呼ぶという同じ3行がコード中の複数箇所(reset/applyNode/matchFlags)に重複していたのを、Value.Decode() というメソッドに一本化して DRY にする回。",
+    "highlights": [
+      { "file": "model.go", "note": "Value.Decode(scan) メソッドの新設。DecoderContext の組み立てをこの1箇所に閉じ込めた" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

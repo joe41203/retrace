@@ -1,0 +1,88 @@
+{
+  "seq": 78,
+  "sha": "e4f37b5d1a5a31ad3dbfe592aa943449dada895c",
+  "parents": [
+    "212ea2a356634e443ccfe6c42eae31ed2cd99c20"
+  ],
+  "author": {
+    "name": "Alec Thomas",
+    "email": "alec@swapoff.org",
+    "date": "2018-06-21T16:47:26+10:00"
+  },
+  "message": "Support url.URL.",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 28,
+    "deletions": 2
+  },
+  "files": [
+    {
+      "path": "mapper.go",
+      "status": "M",
+      "additions": 15,
+      "deletions": 2,
+      "binary": false
+    },
+    {
+      "path": "mapper_test.go",
+      "status": "M",
+      "additions": 13,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/mapper.go b/mapper.go\nindex 863478e..e6c6ad7 100644\n--- a/mapper.go\n+++ b/mapper.go\n@@ -3,6 +3,7 @@ package kong\n import (\n \t\"fmt\"\n \t\"math/bits\"\n+\t\"net/url\"\n \t\"os\"\n \t\"reflect\"\n \t\"strconv\"\n@@ -162,10 +163,11 @@ func (r *Registry) RegisterDefaults() *Registry {\n \t\t\treturn nil\n \t\t})).\n \t\tRegisterKind(reflect.Bool, boolMapper{}).\n-\t\tRegisterType(reflect.TypeOf(time.Time{}), timeDecoder()).\n-\t\tRegisterType(reflect.TypeOf(time.Duration(0)), durationDecoder()).\n \t\tRegisterKind(reflect.Slice, sliceDecoder(r)).\n \t\tRegisterKind(reflect.Map, mapDecoder(r)).\n+\t\tRegisterType(reflect.TypeOf(time.Time{}), timeDecoder()).\n+\t\tRegisterType(reflect.TypeOf(time.Duration(0)), durationDecoder()).\n+\t\tRegisterType(reflect.TypeOf(&url.URL{}), urlMapper()).\n \t\tRegisterName(\"path\", pathMapper(r)).\n \t\tRegisterName(\"existingfile\", existingFileMapper(r)).\n \t\tRegisterName(\"existingdir\", existingDirMapper(r))\n@@ -360,6 +362,17 @@ func existingDirMapper(r *Registry) MapperFunc {\n \t}\n }\n \n+func urlMapper() MapperFunc {\n+\treturn func(ctx *DecodeContext, target reflect.Value) error {\n+\t\turl, err := url.Parse(ctx.Scan.PopValue(\"url\"))\n+\t\tif err != nil {\n+\t\t\treturn err\n+\t\t}\n+\t\ttarget.Set(reflect.ValueOf(url))\n+\t\treturn nil\n+\t}\n+}\n+\n // SplitEscaped splits a string on a separator.\n //\n // It differs from strings.Split() in that the separator can exist in a field by escaping it with a \\. eg.\ndiff --git a/mapper_test.go b/mapper_test.go\nindex 978a23a..2715246 100644\n--- a/mapper_test.go\n+++ b/mapper_test.go\n@@ -1,6 +1,7 @@\n package kong\n \n import (\n+\t\"net/url\"\n \t\"reflect\"\n \t\"testing\"\n \t\"time\"\n@@ -95,3 +96,15 @@ func TestMapWithNamedTypes(t *testing.T) {\n \trequire.NoError(t, err)\n \trequire.Equal(t, map[string]string{\"FIRST\": \"5s\", \"SECOND\": \"10s\"}, cli.TypedKey)\n }\n+\n+func TestURLMapper(t *testing.T) {\n+\tvar cli struct {\n+\t\tURL *url.URL `arg:\"\"`\n+\t}\n+\tp := mustNew(t, &cli)\n+\t_, err := p.Parse([]string{\"http://w3.org\"})\n+\trequire.NoError(t, err)\n+\trequire.Equal(t, \"http://w3.org\", cli.URL.String())\n+\t_, err = p.Parse([]string{\":foo\"})\n+\trequire.Error(t, err)\n+}\n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    ".golangci.yml",
+    "README.md",
+    "_examples/docker/main.go",
+    "_examples/shell/main.go",
+    "build.go",
+    "camelcase.go",
+    "context.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "tokentype_string.go"
+  ],
+  "explanation": {
+    "what": "`*url.URL` 型のフィールドを直接パースできる `urlMapper()` を追加し、`reflect.TypeOf(&url.URL{})` に対する型マッパーとして登録した。値は `url.Parse()` の結果をそのまま `reflect.ValueOf` でセットする。テストでは正常系(`http://w3.org`)とパース失敗(`:foo`)の両方を確認している。",
+    "why": "前コミットで path 系のカスタム型を追加したのに続き、おそらく CLI 引数としてよく使われる URL も標準の Go 型 `net/url.URL` にマッピングできるようにし、利用者が自前でパース処理を書かずに済むようにする組み込みマッパーを拡充する意図と考えられる。",
+    "highlights": [
+      { "file": "mapper.go", "note": "urlMapper(): url.Parse() の戻り値をそのまま reflect.Value にセットする最小実装" }
+    ],
+    "langNotes": [
+      { "topic": "url.URL 型サポート", "note": "標準ライブラリ net/url の *url.URL 型を Kong の型マッパーとして登録した例。RegisterType はポインタ型 `*url.URL` をキーにしているため、CLI 構造体側のフィールドも `*url.URL` として宣言する必要がある。" }
+    ],
+    "diagram": null,
+    "evidence": "inferred",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

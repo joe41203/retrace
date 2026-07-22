@@ -1,0 +1,142 @@
+{
+  "seq": 246,
+  "sha": "b3bdeb18e2d24173dd8828677048a21e13725dfe",
+  "parents": [
+    "9c81441ae0020a12d3d8f315f3650e72e77f35f2"
+  ],
+  "author": {
+    "name": "andrewbaxter",
+    "email": "i@isandrew.com",
+    "date": "2021-05-17T20:31:07+09:00"
+  },
+  "message": "Fixes #125: Support custom per-mapper placeholder text (#169)",
+  "pr": {
+    "number": 169,
+    "title": "Fixes #125: Support custom per-mapper placeholder text",
+    "body": "Fixes #125 \r\n\r\nThis allows things like having the placeholder text be `--config=/path/to/file or \"-\"` or listing enumerations like `--level=trace|debug|info|warn`, dates like `--start-time=\"2000-11-01 23:00:00\"` etc.  None of these are implemented out of the box - this is only for new custom mappers.\r\n\r\nTo use this implement the `PlaceHolderProvider` interface along with `MapperValue`.  Implementing that interface is optional, the default placeholder will be used otherwise.",
+    "url": "https://github.com/alecthomas/kong/pull/169"
+  },
+  "linkedIssues": [
+    {
+      "number": 125,
+      "title": "Override place holder for mapper",
+      "body": "I have a mapper that takes a json file path and unmarshals it into the arguments with `type:\"jsonfile\"`.  Right now the help text says\r\n\r\n```\r\n--myflag=KEY=VALUE;...\r\n```\r\n\r\nbut ideally it would say `--myflag=PATH` or something.  It always takes a path so `KEY=VALUE` could be confusing.\r\n\r\nIs there a way to have the mapper override the help text here, or could that functionality be added?",
+      "url": "https://github.com/alecthomas/kong/issues/125"
+    }
+  ],
+  "stats": {
+    "filesChanged": 4,
+    "additions": 42,
+    "deletions": 0
+  },
+  "files": [
+    {
+      "path": "help.go",
+      "status": "M",
+      "additions": 5,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "mapper.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "mapper_test.go",
+      "status": "M",
+      "additions": 32,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "model.go",
+      "status": "M",
+      "additions": 4,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/help.go b/help.go\nindex b0fc81d..2a9985f 100644\n--- a/help.go\n+++ b/help.go\n@@ -65,6 +65,11 @@ type HelpProvider interface {\n \tHelp() string\n }\n \n+// PlaceHolderProvider can be implemented by mappers to provide custom placeholder text.\n+type PlaceHolderProvider interface {\n+\tPlaceHolder(flag *Flag) string\n+}\n+\n // HelpIndenter is used to indent new layers in the help tree.\n type HelpIndenter func(prefix string) string\n \ndiff --git a/mapper.go b/mapper.go\nindex b8447ec..f5e1a3f 100644\n--- a/mapper.go\n+++ b/mapper.go\n@@ -43,6 +43,7 @@ func (r *DecodeContext) WithScanner(scan *Scanner) *DecodeContext {\n }\n \n // MapperValue may be implemented by fields in order to provide custom mapping.\n+// Mappers may additionally implement PlaceHolderProvider to provide custom placeholder text.\n type MapperValue interface {\n \tDecode(ctx *DecodeContext) error\n }\ndiff --git a/mapper_test.go b/mapper_test.go\nindex 4f052f9..0a81f9c 100644\n--- a/mapper_test.go\n+++ b/mapper_test.go\n@@ -420,3 +420,35 @@ func TestPathMapper(t *testing.T) {\n \trequire.NoError(t, err)\n \trequire.Equal(t, \"-\", cli.Path)\n }\n+\n+func TestMapperPlaceHolder(t *testing.T) {\n+\tvar cli struct {\n+\t\tFlag string\n+\t}\n+\tb := bytes.NewBuffer(nil)\n+\tk := mustNew(\n+\t\tt,\n+\t\t&cli,\n+\t\tkong.Writers(b, b),\n+\t\tkong.ValueMapper(&cli.Flag, testMapperWithPlaceHolder{}),\n+\t\tkong.Exit(func(int) { panic(\"exit\") }),\n+\t)\n+\t// Ensure that --help\n+\trequire.Panics(t, func() {\n+\t\t_, err := k.Parse([]string{\"--help\"})\n+\t\trequire.NoError(t, err)\n+\t})\n+\trequire.Contains(t, b.String(), \"--flag=/a/b/c\")\n+}\n+\n+type testMapperWithPlaceHolder struct {\n+}\n+\n+func (t testMapperWithPlaceHolder) Decode(ctx *kong.DecodeContext, target reflect.Value) error {\n+\ttarget.SetString(\"hi\")\n+\treturn nil\n+}\n+\n+func (t testMapperWithPlaceHolder) PlaceHolder(flag *kong.Flag) string {\n+\treturn \"/a/b/c\"\n+}\ndiff --git a/model.go b/model.go\nindex f21dece..da64356 100644\n--- a/model.go\n+++ b/model.go\n@@ -397,6 +397,10 @@ func (f *Flag) String() string {\n \n // FormatPlaceHolder formats the placeholder string for a Flag.\n func (f *Flag) FormatPlaceHolder() string {\n+\tplaceholderHelper, ok := f.Value.Mapper.(PlaceHolderProvider)\n+\tif ok {\n+\t\treturn placeholderHelper.PlaceHolder(f)\n+\t}\n \ttail := \"\"\n \tif f.Value.IsSlice() && f.Value.Tag.Sep != -1 {\n \t\ttail += string(f.Value.Tag.Sep) + \"...\"\n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    ".github/FUNDING.yml",
+    ".gitignore",
+    ".golangci.yml",
+    "COPYING",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/README.md",
+    "_examples/server/console.go",
+    "_examples/server/go.mod",
+    "_examples/server/go.sum",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/main.go",
+    "benchmark_test.go",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "config_test.go",
+    "context.go",
+    "defaults.go",
+    "defaults_test.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "go.mod",
+    "go.sum",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "testdata/file.txt",
+    "util.go",
+    "util_test.go",
+    "visit.go"
+  ],
+  "explanation": {
+    "what": "カスタムマッパー(`MapperValue` 実装)がヘルプのプレースホルダー文字列を独自に指定できるよう、新しいインターフェース `PlaceHolderProvider`(`PlaceHolder(flag *Flag) string`)を追加した。`Flag.FormatPlaceHolder()` は、フィールドのマッパーがこのインターフェースを実装していれば型アサーションでそれを検出し、その戻り値をそのままプレースホルダーとして使う。実装していなければ従来通りのデフォルトロジックにフォールバックする。",
+    "why": "リンクされた issue #125 に、独自マッパー(例: JSONファイルパスを受け取るマッパー)が `KEY=VALUE;...` のような的外れなデフォルトプレースホルダーを出してしまい、`--myflag=PATH` のように用途に合わせた表示に変更したいという要望が書かれている。PRはそれをオプトインのインターフェースとして実装したもの。",
+    "highlights": [
+      { "file": "model.go", "note": "型アサーション `f.Value.Mapper.(PlaceHolderProvider)` の ok 判定で、実装があれば委譲・なければデフォルト処理にフォールバックする" }
+    ],
+    "langNotes": [
+      { "topic": "型アサーション(type assertion)による任意インターフェース実装の検出", "note": "`v, ok := x.(SomeInterface)` の形で、ある値が特定のインターフェースを実装しているかどうかを実行時に判定できる。Kong はこのパターンで「オプションで実装できる追加インターフェース」(本コミットの PlaceHolderProvider や HelpProvider 等)を随所で使っており、既存のインターフェースを壊さずに機能を拡張する Go の定番手法。" }
+    ],
+    "diagram": null,
+    "evidence": "issue",
+    "refs": [
+      { "type": "pr", "number": 169, "url": "https://github.com/alecthomas/kong/pull/169" }
+    ],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

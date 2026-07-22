@@ -1,0 +1,104 @@
+{
+  "seq": 123,
+  "sha": "c0df056b1463b3b6823e2981e21704fc2b47a596",
+  "parents": [
+    "119a0d115be5417a31583d539f7e5010ce490557"
+  ],
+  "author": {
+    "name": "Alec Thomas",
+    "email": "alec@swapoff.org",
+    "date": "2018-10-25T12:53:55-07:00"
+  },
+  "message": "Simplify FileContentFlag.",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 3,
+    "deletions": 8
+  },
+  "files": [
+    {
+      "path": "mapper.go",
+      "status": "M",
+      "additions": 2,
+      "deletions": 6,
+      "binary": false
+    },
+    {
+      "path": "mapper_test.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 2,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/mapper.go b/mapper.go\nindex 322ab46..e4d54fd 100644\n--- a/mapper.go\n+++ b/mapper.go\n@@ -474,10 +474,7 @@ func JoinEscaped(s []string, sep rune) string {\n }\n \n // FileContentFlag is a flag value that loads a file's contents into its value.\n-type FileContentFlag struct {\n-\tPath string\n-\tData []byte\n-}\n+type FileContentFlag []byte\n \n func (f *FileContentFlag) Decode(ctx *DecodeContext) error { // nolint: golint\n \tfilename := ctx.Scan.PopValue(\"filename\")\n@@ -485,7 +482,6 @@ func (f *FileContentFlag) Decode(ctx *DecodeContext) error { // nolint: golint\n \tif err != nil {\n \t\treturn fmt.Errorf(\"failed to open %q: %s\", filename, err)\n \t}\n-\tf.Path = filename\n-\tf.Data = data\n+\t*f = data\n \treturn nil\n }\ndiff --git a/mapper_test.go b/mapper_test.go\nindex 04a1d93..6d393ad 100644\n--- a/mapper_test.go\n+++ b/mapper_test.go\n@@ -164,6 +164,5 @@ func TestFileContentFlag(t *testing.T) {\n \tf.Close()\n \t_, err = mustNew(t, &cli).Parse([]string{\"--file\", f.Name()})\n \trequire.NoError(t, err)\n-\trequire.Equal(t, []byte(\"hello world\"), cli.File.Data)\n-\trequire.Equal(t, f.Name(), cli.File.Path)\n+\trequire.Equal(t, []byte(\"hello world\"), []byte(cli.File))\n }\n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    ".golangci.yml",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/console.go",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/main.go",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "context.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "go.mod",
+    "go.sum",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "tokentype_string.go",
+    "util.go",
+    "util_test.go",
+    "visit.go"
+  ],
+  "explanation": {
+    "what": "FileContentFlag を struct { Path string; Data []byte } から type FileContentFlag []byte という名前付きスライス型に変更した。Decode() は f.Path/f.Data への代入をやめ、*f = data の1行で読み込んだファイル内容を直接代入するようになった。テストも cli.File.Data の参照を []byte(cli.File) に変更している。",
+    "why": "おそらく、ファイルパス自体を保持する用途がなかった(または呼び出し側で使われていなかった)ため、struct を廃してユーザーが直接 []byte として扱える単純な型にした簡素化と考えられる。コミットメッセージ・diff からは Path フィールドを削った理由の明言はないが、型を単純化するリファクタリングであることは diff から明らか。",
+    "highlights": [
+      { "file": "mapper.go", "note": "FileContentFlag が struct から named slice type ([]byte) に変わり、Decode() 内で *f = data と自身のポインタ実体へ直接代入している" }
+    ],
+    "langNotes": [
+      { "topic": "named slice type と ポインタレシーバでの再代入", "note": "Go では type FileContentFlag []byte のように基底型を持つ独自の名前付き型を定義でき、[]byte 相当の値として振る舞いつつ独自メソッド (Decode) を持たせられる。*f = data はポインタレシーバ経由でスライス全体を丸ごと差し替える書き方で、struct のフィールド代入より簡潔になる。" }
+    ],
+    "diagram": null,
+    "evidence": "inferred",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

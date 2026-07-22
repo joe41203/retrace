@@ -1,0 +1,115 @@
+{
+  "seq": 64,
+  "sha": "c7dca86dad7b2b09190e38e2476a2057587e2533",
+  "parents": [
+    "29fe92f28634fdac35207c08ec5f74212f391ebc"
+  ],
+  "author": {
+    "name": "Alec Thomas",
+    "email": "alec@swapoff.org",
+    "date": "2018-06-13T21:12:56+10:00"
+  },
+  "message": "Rename Value.Value to Value.Target to correctly reflect its purpose.",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 6,
+    "additions": 23,
+    "deletions": 16
+  },
+  "files": [
+    {
+      "path": "build.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "help.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "kong.go",
+      "status": "M",
+      "additions": 3,
+      "deletions": 3,
+      "binary": false
+    },
+    {
+      "path": "kong_test.go",
+      "status": "M",
+      "additions": 4,
+      "deletions": 3,
+      "binary": false
+    },
+    {
+      "path": "mapper.go",
+      "status": "M",
+      "additions": 7,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "model.go",
+      "status": "M",
+      "additions": 7,
+      "deletions": 7,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/build.go b/build.go\nindex e03aa87..15b1f44 100644\n--- a/build.go\n+++ b/build.go\n@@ -131,7 +131,7 @@ func buildField(k *Kong, node *Node, v reflect.Value, ft reflect.StructField, fv\n \t\tDefault: tag.Default,\n \t\tMapper:  mapper,\n \t\tTag:     tag,\n-\t\tValue:   fv,\n+\t\tTarget:  fv,\n \n \t\t// Flags are optional by default, and args are required by default.\n \t\tRequired: (!tag.Arg && tag.Required) || (tag.Arg && !tag.Optional),\ndiff --git a/help.go b/help.go\nindex bc024f4..4f92437 100644\n--- a/help.go\n+++ b/help.go\n@@ -197,7 +197,7 @@ func formatFlag(haveShort bool, flag *Flag) string {\n \tif !isBool {\n \t\tflagString += fmt.Sprintf(\"=%s\", flag.FormatPlaceHolder())\n \t}\n-\tif flag.Value.Value.Kind() == reflect.Slice {\n+\tif flag.Value.Target.Kind() == reflect.Slice {\n \t\tflagString += \" ...\"\n \t}\n \treturn flagString\ndiff --git a/kong.go b/kong.go\nindex 98ea668..053d0a4 100644\n--- a/kong.go\n+++ b/kong.go\n@@ -90,7 +90,7 @@ func (k *Kong) extraFlags() []*Flag {\n \t\tValue: &Value{\n \t\t\tName:   \"help\",\n \t\t\tHelp:   \"Show context-sensitive help.\",\n-\t\t\tValue:  value,\n+\t\t\tTarget: value,\n \t\t\tTag:    &Tag{},\n \t\t\tMapper: k.registry.ForValue(value),\n \t\t},\n@@ -152,9 +152,9 @@ func (k *Kong) applyHooks(ctx *Context) error {\n \t\tcase trace.Command != nil:\n \t\t\tkey = trace.Command.Target\n \t\tcase trace.Positional != nil:\n-\t\t\tkey = trace.Positional.Value\n+\t\t\tkey = trace.Positional.Target\n \t\tcase trace.Flag != nil:\n-\t\t\tkey = trace.Flag.Value.Value\n+\t\t\tkey = trace.Flag.Value.Target\n \t\tdefault:\n \t\t\tpanic(\"unsupported Path\")\n \t\t}\ndiff --git a/kong_test.go b/kong_test.go\nindex 5a169e4..a288980 100644\n--- a/kong_test.go\n+++ b/kong_test.go\n@@ -391,12 +391,13 @@ func TestDuplicateFlagChoosesLast(t *testing.T) {\n \trequire.Equal(t, 2, cli.Flag)\n }\n \n-func TestDuplicateSliceDoesNotAccumulate(t *testing.T) {\n+func TestDuplicateSliceAccumulates(t *testing.T) {\n \tvar cli struct {\n \t\tFlag []int\n \t}\n \n-\t_, err := mustNew(t, &cli).Parse([]string{\"--flag=1,2\", \"--flag=3,4\"})\n+\targs := []string{\"--flag=1,2\", \"--flag=3,4\"}\n+\t_, err := mustNew(t, &cli).Parse(args)\n \trequire.NoError(t, err)\n-\trequire.Equal(t, []int{3, 4}, cli.Flag)\n+\trequire.Equal(t, []int{1, 2, 3, 4}, cli.Flag)\n }\ndiff --git a/mapper.go b/mapper.go\nindex 9b7c261..6b4d05a 100644\n--- a/mapper.go\n+++ b/mapper.go\n@@ -226,6 +226,12 @@ func floatDecoder(bits int) MapperFunc {\n \t}\n }\n \n+func mapDecoder(d *Registry) MapperFunc {\n+\treturn func(ctx *DecodeContext, target reflect.Value) error {\n+\t\treturn nil\n+\t}\n+}\n+\n func sliceDecoder(d *Registry) MapperFunc {\n \treturn func(ctx *DecodeContext, target reflect.Value) error {\n \t\tel := target.Type().Elem()\n@@ -242,7 +248,7 @@ func sliceDecoder(d *Registry) MapperFunc {\n \t\tif childDecoder == nil {\n \t\t\treturn fmt.Errorf(\"no mapper for element type of %s\", target.Type())\n \t\t}\n-\t\tfor childScanner.Peek().Type != EOLToken {\n+\t\tfor !childScanner.Peek().IsEOL() {\n \t\t\tchildValue := reflect.New(el).Elem()\n \t\t\terr := childDecoder.Decode(ctx.WithScanner(childScanner), childValue)\n \t\t\tif err != nil {\ndiff --git a/model.go b/model.go\nindex fe438c0..91bb891 100644\n--- a/model.go\n+++ b/model.go\n@@ -139,7 +139,7 @@ type Value struct {\n \tDefault  string\n \tMapper   Mapper\n \tTag      *Tag\n-\tValue    reflect.Value\n+\tTarget   reflect.Value\n \tRequired bool\n \tSet      bool   // Set to true when this value is set through some mechanism.\n \tFormat   string // Formatting directive, if applicable.\n@@ -166,7 +166,7 @@ func (v *Value) Summary() string {\n \n // IsCumulative returns true of the value is a slice.\n func (v *Value) IsCumulative() bool {\n-\treturn v.Value.Kind() == reflect.Slice\n+\treturn v.Target.Kind() == reflect.Slice\n }\n \n // IsBool returns true if the underlying value is a boolean.\n@@ -174,12 +174,12 @@ func (v *Value) IsBool() bool {\n \tif m, ok := v.Mapper.(BoolMapper); ok && m.IsBool() {\n \t\treturn true\n \t}\n-\treturn v.Value.Kind() == reflect.Bool\n+\treturn v.Target.Kind() == reflect.Bool\n }\n \n // Parse tokens into value, parse, and validate, but do not write to the field.\n func (v *Value) Parse(scan *Scanner) (reflect.Value, error) {\n-\tvalue := reflect.New(v.Value.Type()).Elem()\n+\tvalue := reflect.New(v.Target.Type()).Elem()\n \terr := v.Mapper.Decode(&DecodeContext{Value: v, Scan: scan}, value)\n \tif err == nil {\n \t\tv.Set = true\n@@ -189,7 +189,7 @@ func (v *Value) Parse(scan *Scanner) (reflect.Value, error) {\n \n // Apply value to field.\n func (v *Value) Apply(value reflect.Value) {\n-\tv.Value.Set(value)\n+\tv.Target.Set(value)\n \tv.Set = true\n }\n \n@@ -197,7 +197,7 @@ func (v *Value) Apply(value reflect.Value) {\n //\n // Does not include resolvers.\n func (v *Value) Reset() error {\n-\tv.Value.Set(reflect.Zero(v.Value.Type()))\n+\tv.Target.Set(reflect.Zero(v.Target.Type()))\n \tif v.Default != \"\" {\n \t\tvalue, err := v.Parse(Scan(v.Default))\n \t\tif err != nil {\n@@ -239,7 +239,7 @@ func (f *Flag) FormatPlaceHolder() string {\n \t\ttail += \", ...\"\n \t}\n \tif f.Default != \"\" {\n-\t\tif f.Value.Value.Kind() == reflect.String {\n+\t\tif f.Value.Target.Kind() == reflect.String {\n \t\t\treturn strconv.Quote(f.Default) + tail\n \t\t}\n \t\treturn f.Default + tail\n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    ".golangci.yml",
+    "README.md",
+    "_examples/shell/main.go",
+    "build.go",
+    "camelcase.go",
+    "context.go",
+    "doc.go",
+    "global.go",
+    "global_test.go",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "tokentype_string.go"
+  ],
+  "explanation": {
+    "what": "model.go の Value 構造体で、コマンドライン値の反映先を保持していたフィールド名を Value から Target にリネームした(struct 名自体が Value であるため、内部の同名フィールドはメソッド呼び出し時に v.Value.Value のような紛らわしい表記を生んでいた)。参照箇所(build.go, help.go, kong.go, mapper.go)も追従して修正し、テスト TestDuplicateSliceDoesNotAccumulate を TestDuplicateSliceAccumulates に改名して累積動作を仕様として明示した。",
+    "why": "コミットメッセージの通り、フィールド名 Value は「reflect の書き込み先(target)」という実際の役割を表しておらず、型名 Value と衝突して読みにくかったため、意味の通る Target に改名した。",
+    "highlights": [
+      { "file": "model.go", "note": "Value 構造体のフィールド `Value reflect.Value` → `Target reflect.Value`" },
+      { "file": "kong_test.go", "note": "スライスフラグの重複指定が上書きでなく累積される、という仕様確認テストへの改名" }
+    ],
+    "langNotes": [
+      { "topic": "reflect.Value と struct フィールド名の衝突", "note": "Go の reflect パッケージでは書き込み対象を reflect.Value 型で保持することが多いが、その型名とフィールド名が同じ Value だと `v.Value.Value` のように読みにくくなる。役割を表す名前(Target)に変えるのは Go でもよく行われるリファクタリング。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

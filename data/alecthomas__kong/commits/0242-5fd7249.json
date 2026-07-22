@@ -1,0 +1,110 @@
+{
+  "seq": 242,
+  "sha": "5fd7249c69d2659f658ba998a59b7fb8bf1b1f9c",
+  "parents": [
+    "d4dd7094455a32ce628828ec330b98d8d7db6731"
+  ],
+  "author": {
+    "name": "Rene Zbinden",
+    "email": "rene.zbinden@postfinance.ch",
+    "date": "2021-04-13T14:45:20+02:00"
+  },
+  "message": "fix panic resolver's configuration file does not have read permission",
+  "pr": {
+    "number": 163,
+    "title": "fix panic resolver's configuration file does not have read permission",
+    "body": "Without this fix you get the following panic when a resolver's file is not readable:\r\n\r\n```console\r\ncommand --help\r\npanic: ~/.config/command/config.yaml: open /home/user/.config/command/config.yaml: permission denied\r\n\r\ngoroutine 1 [running]:\r\ngithub.com/alecthomas/kong.Parse(0xacf6c0, 0xc0000b8900, 0xc0000b0300, 0x8, 0x8, 0x22)\r\n        /home/rz/golang/pkg/mod/github.com/alecthomas/kong@v0.2.16/global.go:11 +0x145\r\nmain.main()\r\n```\r\n\r\nThe easiest way for read permission is via `os.Open`",
+    "url": "https://github.com/alecthomas/kong/pull/163"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 9,
+    "deletions": 2
+  },
+  "files": [
+    {
+      "path": "options.go",
+      "status": "M",
+      "additions": 9,
+      "deletions": 2,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/options.go b/options.go\nindex 259b6b1..b7c4364 100644\n--- a/options.go\n+++ b/options.go\n@@ -329,9 +329,16 @@ func Configuration(loader ConfigurationLoader, paths ...string) Option {\n \treturn OptionFunc(func(k *Kong) error {\n \t\tk.loader = loader\n \t\tfor _, path := range paths {\n-\t\t\tif _, err := os.Stat(ExpandPath(path)); os.IsNotExist(err) {\n-\t\t\t\tcontinue\n+\t\t\tf, err := os.Open(ExpandPath(path))\n+\t\t\tif err != nil {\n+\t\t\t\tif os.IsNotExist(err) || os.IsPermission(err) {\n+\t\t\t\t\tcontinue\n+\t\t\t\t}\n+\n+\t\t\t\treturn err\n \t\t\t}\n+\t\t\tf.Close()\n+\n \t\t\tresolver, err := k.LoadConfig(path)\n \t\t\tif err != nil {\n \t\t\t\treturn errors.Wrap(err, path)\n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    ".github/FUNDING.yml",
+    ".gitignore",
+    ".golangci.yml",
+    "COPYING",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/README.md",
+    "_examples/server/console.go",
+    "_examples/server/go.mod",
+    "_examples/server/go.sum",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/main.go",
+    "benchmark_test.go",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "config_test.go",
+    "context.go",
+    "defaults.go",
+    "defaults_test.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "go.mod",
+    "go.sum",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "testdata/file.txt",
+    "util.go",
+    "util_test.go",
+    "visit.go"
+  ],
+  "explanation": {
+    "what": "設定ファイルの `Configuration` オプションで、パスの存在確認を `os.Stat` から `os.Open` に変更した。読み取り権限がないファイルは `os.IsPermission(err)` で判定して静かにスキップし、それ以外のエラーはそのまま返すようにした。開いたファイルハンドルは即 `Close()` している。",
+    "why": "PR本文によれば、設定ファイルに読み取り権限がない環境で `--help` を実行すると `os.Stat` は成功してしまい後続の読み込み処理で panic していた。`os.Open` で実際に開けるかを確認することで、権限エラーを他の設定ファイル未存在ケースと同様にスキップ扱いにし、panic を防いでいる。",
+    "highlights": [
+      { "file": "options.go", "note": "存在確認を os.Stat から os.Open に変更し、IsNotExist と IsPermission の両方をスキップ条件にしている" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [{ "type": "pr", "number": 163, "url": "https://github.com/alecthomas/kong/pull/163" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

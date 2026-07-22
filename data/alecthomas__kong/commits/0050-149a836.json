@@ -1,0 +1,74 @@
+{
+  "seq": 50,
+  "sha": "149a83692db106860b2f405ebc6592ea26fb764d",
+  "parents": [
+    "57152253ccef6ecbbdd445de47fc2c83e19b7db7"
+  ],
+  "author": {
+    "name": "Alec Thomas",
+    "email": "alec@swapoff.org",
+    "date": "2018-06-07T22:35:09+10:00"
+  },
+  "message": "Bug fix.",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 1,
+    "deletions": 1
+  },
+  "files": [
+    {
+      "path": "kong.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/kong.go b/kong.go\nindex 8ad33b7..1b84f38 100644\n--- a/kong.go\n+++ b/kong.go\n@@ -173,7 +173,7 @@ func (k *Kong) FatalIfErrorf(err error, args ...interface{}) {\n \t}\n \tmsg := err.Error()\n \tif len(args) > 0 {\n-\t\tmsg = fmt.Sprintf(args[0].(string), args...) + \": \" + err.Error()\n+\t\tmsg = fmt.Sprintf(args[0].(string), args[1:]...) + \": \" + err.Error()\n \t}\n \tk.Errorf(\"%s\\n\", msg)\n \tk.Exit(1)\n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    "README.md",
+    "_examples/shell/main.go",
+    "build.go",
+    "camelcase.go",
+    "context.go",
+    "context_test.go",
+    "global.go",
+    "global_test.go",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "kong.go",
+    "kong_test.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "tokentype_string.go"
+  ],
+  "explanation": {
+    "what": "Kong.FatalIfErrorf() で fmt.Sprintf に渡す可変長引数を args から args[1:] に変更した。args[0] はフォーマット文字列自体として使い、残りの args[1:] だけを Sprintf の実引数として渡すように修正している。",
+    "why": "コミットメッセージは「Bug fix.」のみで詳細は書かれていないが、diff を見ると修正前は fmt.Sprintf(args[0].(string), args...) となっており、フォーマット文字列である args[0] 自身も実引数として二重に渡してしまっていた。おそらくこれは Sprintf の可変長引数展開で余分な引数を渡すバグで、args[1:] に直すことで意図通り「先頭がフォーマット文字列、残りがその引数」という呼び出し規約に合わせたものと考えられる。",
+    "highlights": [
+      { "file": "kong.go", "note": "FatalIfErrorf 内の fmt.Sprintf(args[0].(string), args...) を args[1:] に修正" }
+    ],
+    "langNotes": [
+      { "topic": "可変長引数(...interface{})の展開", "note": "Go の可変長引数は呼び出し先で []interface{} として受け取れる。ここでは args[0] をフォーマット文字列として type assertion で取り出しつつ、Sprintf にはそれ以降の args[1:]... だけを展開して渡す必要があった。" }
+    ],
+    "diagram": null,
+    "evidence": "inferred",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

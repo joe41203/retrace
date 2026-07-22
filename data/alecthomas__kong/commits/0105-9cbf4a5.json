@@ -1,0 +1,90 @@
+{
+  "seq": 105,
+  "sha": "9cbf4a5d4b60c69d7d1b53c7a3fde4483ab41b52",
+  "parents": [
+    "63a402d3b2a7c7d58674c0461e3843e5fb4e5b81"
+  ],
+  "author": {
+    "name": "Alec Thomas",
+    "email": "alec@swapoff.org",
+    "date": "2018-09-13T17:13:48+10:00"
+  },
+  "message": "Update TOC.",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 48,
+    "deletions": 24
+  },
+  "files": [
+    {
+      "path": "README.md",
+      "status": "M",
+      "additions": 48,
+      "deletions": 24,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/README.md b/README.md\nindex be44b82..f11e50d 100644\n--- a/README.md\n+++ b/README.md\n@@ -3,35 +3,36 @@\n \n # Kong is a command-line parser for Go [![](https://godoc.org/github.com/alecthomas/kong?status.svg)](http://godoc.org/github.com/alecthomas/kong) [![CircleCI](https://img.shields.io/circleci/project/github/alecthomas/kong.svg)](https://circleci.com/gh/alecthomas/kong)\n \n-<!-- MarkdownTOC -->\n+<!-- TOC -->\n \n 1. [Introduction](#introduction)\n-1. [Help](#help)\n-1. [Command handling](#command-handling)\n+2. [Help](#help)\n+3. [Command handling](#command-handling)\n     1. [Switch on the command string](#switch-on-the-command-string)\n-    1. [Attach a `Run(...) error` method to each command](#attach-a-run-error-method-to-each-command)\n-1. [BeforeApply\\(\\), AfterApply\\(\\) and the Bind\\(\\) option](#BeforeApply-AfterApply-and-the-bind-option)\n-1. [Flags](#flags)\n-1. [Commands and sub-commands](#commands-and-sub-commands)\n-1. [Branching positional arguments](#branching-positional-arguments)\n-1. [Terminating positional arguments](#terminating-positional-arguments)\n-1. [Slices](#slices)\n-1. [Maps](#maps)\n-1. [Custom named decoders](#custom-named-decoders)\n-1. [Custom decoders \\(mappers\\)](#custom-decoders-mappers)\n-1. [Supported tags](#supported-tags)\n-1. [Variable interpolation](#variable-interpolation)\n-1. [Modifying Kong's behaviour](#modifying-kongs-behaviour)\n+    2. [Attach a `Run(...) error` method to each command](#attach-a-run-error-method-to-each-command)\n+4. [Hooks: BeforeResolve(), BeforeApply(), AfterApply() and the Bind() option](#hooks-beforeresolve-beforeapply-afterapply-and-the-bind-option)\n+5. [Flags](#flags)\n+6. [Commands and sub-commands](#commands-and-sub-commands)\n+7. [Branching positional arguments](#branching-positional-arguments)\n+8. [Terminating positional arguments](#terminating-positional-arguments)\n+9. [Slices](#slices)\n+10. [Maps](#maps)\n+11. [Custom named decoders](#custom-named-decoders)\n+12. [Custom decoders (mappers)](#custom-decoders-mappers)\n+13. [Supported tags](#supported-tags)\n+14. [Variable interpolation](#variable-interpolation)\n+15. [Modifying Kong's behaviour](#modifying-kongs-behaviour)\n     1. [`Name(help)` and `Description(help)` - set the application name description](#namehelp-and-descriptionhelp---set-the-application-name-description)\n-    1. [`Configuration(loader, paths...)` - load defaults from configuration files](#configurationloader-paths---load-defaults-from-configuration-files)\n-    1. [`Resolver(...)` - support for default values from external sources](#resolver---support-for-default-values-from-external-sources)\n-    1. [`*Mapper(...)` - customising how the command-line is mapped to Go values](#mapper---customising-how-the-command-line-is-mapped-to-go-values)\n-    1. [`ConfigureHelp(HelpOptions)` and `Help(HelpFunc)` - customising help](#configurehelphelpoptions-and-helphelpfunc---customising-help)\n-    1. [`Bind(...)` - bind values for callback hooks and Run\\(\\) methods](#bind---bind-values-for-callback-hooks-and-run-methods)\n-    1. [Other options](#other-options)\n+    2. [`Configuration(loader, paths...)` - load defaults from configuration files](#configurationloader-paths---load-defaults-from-configuration-files)\n+    3. [`Resolver(...)` - support for default values from external sources](#resolver---support-for-default-values-from-external-sources)\n+    4. [`*Mapper(...)` - customising how the command-line is mapped to Go values](#mapper---customising-how-the-command-line-is-mapped-to-go-values)\n+    5. [`ConfigureHelp(HelpOptions)` and `Help(HelpFunc)` - customising help](#configurehelphelpoptions-and-helphelpfunc---customising-help)\n+    6. [`Bind(...)` - bind values for callback hooks and Run() methods](#bind---bind-values-for-callback-hooks-and-run-methods)\n+    7. [Other options](#other-options)\n \n-<!-- /MarkdownTOC -->\n+<!-- /TOC -->\n \n+<a id=\"markdown-introduction\" name=\"introduction\"></a>\n ## Introduction\n \n Kong aims to support arbitrarily complex command-line structures with as little developer effort as possible.\n@@ -74,6 +75,7 @@ func main() {\n }\n ```\n \n+<a id=\"markdown-help\" name=\"help\"></a>\n ## Help\n \n Help is automatically generated. With no other arguments provided, help will display a full summary of all available commands.\n@@ -114,10 +116,12 @@ eg.\n       -f, --force        Force removal.\n       -r, --recursive    Recursively remove files.\n \n+<a id=\"markdown-command-handling\" name=\"command-handling\"></a>\n ## Command handling\n \n There are two ways to handle commands in Kong.\n \n+<a id=\"markdown-switch-on-the-command-string\" name=\"switch-on-the-command-string\"></a>\n ### Switch on the command string\n \n When you call `kong.Parse()` it will return a unique string representation of the command. Each command branch in the hierarchy will be a bare word and each branching argument or required positional argument will be the name surrounded by angle brackets. Here's an example:\n@@ -157,6 +161,7 @@ func main() {\n \n This has the advantage that it is convenient, but the downside that if you modify your CLI structure, the strings may change. This can be fragile.\n \n+<a id=\"markdown-attach-a-run-error-method-to-each-command\" name=\"attach-a-run-error-method-to-each-command\"></a>\n ### Attach a `Run(...) error` method to each command\n \n A more robust approach is to break each command out into their own structs:\n@@ -212,7 +217,8 @@ func main() {\n \n ```\n \n-## Hooks: BeforeResolve(), BeforeSet(), AfterSet() and the Bind() option\n+<a id=\"markdown-hooks-beforeresolve-beforeapply-afterapply-and-the-bind-option\" name=\"hooks-beforeresolve-beforeapply-afterapply-and-the-bind-option\"></a>\n+## Hooks: BeforeResolve(), BeforeApply(), AfterApply() and the Bind() option\n \n If a node in the grammar has a `BeforeResolve(...)`, `BeforeApply(...) error` and/or `AfterApply(...) error` method, those methods will be called before validation/assignment and after validation/assignment, respectively.\n \n@@ -245,6 +251,7 @@ func main() {\n }\n ```\n \n+<a id=\"markdown-flags\" name=\"flags\"></a>\n ## Flags\n \n Any [mapped](#mapper---customising-how-the-command-line-is-mapped-to-go-values) field in the command structure *not* tagged with `cmd` or `arg` will be a flag. Flags are optional by default.\n@@ -257,6 +264,7 @@ type CLI struct {\n }\n ```\n \n+<a id=\"markdown-commands-and-sub-commands\" name=\"commands-and-sub-commands\"></a>\n ## Commands and sub-commands\n \n Sub-commands are specified by tagging a struct field with `cmd`. Kong supports arbitrarily nested commands.\n@@ -274,6 +282,7 @@ type CLI struct {\n }\n ```\n \n+<a id=\"markdown-branching-positional-arguments\" name=\"branching-positional-arguments\"></a>\n ## Branching positional arguments\n \n In addition to sub-commands, structs can also be configured as branching positional arguments.\n@@ -301,12 +310,14 @@ var CLI struct {\n \n This looks a little verbose in this contrived example, but typically this will not be the case.\n \n+<a id=\"markdown-terminating-positional-arguments\" name=\"terminating-positional-arguments\"></a>\n ## Terminating positional arguments\n \n If a [mapped type](#mapper---customising-how-the-command-line-is-mapped-to-go-values) is tagged with `arg` it will be treated as the final positional values to be parsed on the command line.\n \n If a positional argument is a slice, all remaining arguments will be appended to that slice.\n \n+<a id=\"markdown-slices\" name=\"slices\"></a>\n ## Slices\n \n Slice values are treated specially. First the input is split on the `sep:\"<rune>\"` tag (defaults to `,`), then each element is parsed by the slice element type and appended to the slice. If the same value is encountered multiple times, elements continue to be appended.\n@@ -325,6 +336,7 @@ var CLI struct {\n }\n ```\n \n+<a id=\"markdown-maps\" name=\"maps\"></a>\n ## Maps\n \n Maps are similar to slices except that only one key/value pair can be assigned per value, and the `sep` tag denotes the assignment character and defaults to `=`.\n@@ -347,6 +359,7 @@ var CLI struct {\n \n For flags, multiple key+value pairs should be separated by `;` eg. `--set=\"key1=value1;key2=value2\"`.\n \n+<a id=\"markdown-custom-named-decoders\" name=\"custom-named-decoders\"></a>\n ## Custom named decoders\n \n Kong includes a number of builtin custom type mappers. These can be used by\n@@ -365,11 +378,13 @@ specifies the element type. For maps, the tag has the format\n `tag:\"[<key>]:[<value>]\"` where either may be omitted.\n \n \n+<a id=\"markdown-custom-decoders-mappers\" name=\"custom-decoders-mappers\"></a>\n ## Custom decoders (mappers)\n \n If a field implements the [MapperValue](https://godoc.org/github.com/alecthomas/kong#MapperValue)\n interface it will be used to decode arguments into the field.\n \n+<a id=\"markdown-supported-tags\" name=\"supported-tags\"></a>\n ## Supported tags\n \n Tags can be in two forms:\n@@ -399,6 +414,7 @@ Both can coexist with standard Tag parsing.\n | `group:\"X\"`            | Logical group for a flag or command.        |\n | `prefix:\"X\"`           | Prefix for all sub-flags.                   |\n \n+<a id=\"markdown-variable-interpolation\" name=\"variable-interpolation\"></a>\n ## Variable interpolation\n \n Kong supports limited variable interpolation into help strings, enum lists and\n@@ -433,12 +449,14 @@ func main() {\n }\n ```\n \n+<a id=\"markdown-modifying-kongs-behaviour\" name=\"modifying-kongs-behaviour\"></a>\n ## Modifying Kong's behaviour\n \n Each Kong parser can be configured via functional options passed to `New(cli interface{}, options...Option)`.\n \n The full set of options can be found [here](https://godoc.org/github.com/alecthomas/kong#Option).\n \n+<a id=\"markdown-namehelp-and-descriptionhelp---set-the-application-name-description\" name=\"namehelp-and-descriptionhelp---set-the-application-name-description\"></a>\n ### `Name(help)` and `Description(help)` - set the application name description\n \n Set the application name and/or description.\n@@ -447,6 +465,7 @@ The name of the application will default to the binary name, but can be overridd\n \n As with all help in Kong, text will be wrapped to the terminal.\n \n+<a id=\"markdown-configurationloader-paths---load-defaults-from-configuration-files\" name=\"configurationloader-paths---load-defaults-from-configuration-files\"></a>\n ### `Configuration(loader, paths...)` - load defaults from configuration files\n \n This option provides Kong with support for loading defaults from a set of configuration files. Each file is opened, if possible, and the loader called to create a resolver for that file.\n@@ -457,12 +476,14 @@ eg.\n kong.Parse(&cli, kong.Configuration(kong.JSON, \"/etc/myapp.json\", \"~/.myapp.json\"))\n ```\n \n+<a id=\"markdown-resolver---support-for-default-values-from-external-sources\" name=\"resolver---support-for-default-values-from-external-sources\"></a>\n ### `Resolver(...)` - support for default values from external sources\n \n Resolvers are Kong's extension point for providing default values from external sources. As an example, support for environment variables via the `env` tag is provided by a resolver. There's also a builtin resolver for JSON configuration files.\n \n Example resolvers can be found in [resolver.go](https://github.com/alecthomas/kong/blob/master/resolver.go).\n \n+<a id=\"markdown-mapper---customising-how-the-command-line-is-mapped-to-go-values\" name=\"mapper---customising-how-the-command-line-is-mapped-to-go-values\"></a>\n ### `*Mapper(...)` - customising how the command-line is mapped to Go values\n \n Command-line arguments are mapped to Go values via the Mapper interface:\n@@ -485,6 +506,7 @@ All builtin Go types (as well as a bunch of useful stdlib types like `time.Time`\n 3. `TypeMapper(reflect.Type, Mapper)`.\n 4. `ValueMapper(interface{}, Mapper)`, passing in a pointer to a field of the grammar.\n \n+<a id=\"markdown-configurehelphelpoptions-and-helphelpfunc---customising-help\" name=\"configurehelphelpoptions-and-helphelpfunc---customising-help\"></a>\n ### `ConfigureHelp(HelpOptions)` and `Help(HelpFunc)` - customising help\n \n The default help output is usually sufficient, but if not there are two solutions.\n@@ -492,10 +514,12 @@ The default help output is usually sufficient, but if not there are two solution\n 1. Use `ConfigureHelp(HelpOptions)` to configure how help is formatted (see [HelpOptions](https://godoc.org/github.com/alecthomas/kong#HelpOptions) for details).\n 2. Custom help can be wired into Kong via the `Help(HelpFunc)` option. The `HelpFunc` is passed a `Context`, which contains the parsed context for the current command-line. See the implementation of `PrintHelp` for an example.\n \n+<a id=\"markdown-bind---bind-values-for-callback-hooks-and-run-methods\" name=\"bind---bind-values-for-callback-hooks-and-run-methods\"></a>\n ### `Bind(...)` - bind values for callback hooks and Run() methods\n \n See the [section on hooks](#BeforeApply-AfterApply-and-the-bind-option) for details.\n \n+<a id=\"markdown-other-options\" name=\"other-options\"></a>\n ### Other options\n \n The full set of options can be found [here](https://godoc.org/github.com/alecthomas/kong#Option).\n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    ".golangci.yml",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/console.go",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/main.go",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "context.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "tokentype_string.go",
+    "util.go",
+    "util_test.go"
+  ],
+  "explanation": {
+    "what": "README.md の目次を、番号付きリストのマークダウン記法(`1.` の自動連番)から明示的な連番(`1.` `2.` `3.`...)と `<a id=\"markdown-...\">` アンカーを併用する形式に置き換えた。見出し名も「Hooks: BeforeResolve(), BeforeSet(), AfterSet()」から「Hooks: BeforeResolve(), BeforeApply(), AfterApply()」へ実際のメソッド名に合わせて修正している。",
+    "why": "コミットメッセージは \"Update TOC.\" のみで、目次生成ツール(MarkdownTOC から TOC へ)の出力形式が変わったことに追従したドキュメント整備と読み取れる。",
+    "highlights": [],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

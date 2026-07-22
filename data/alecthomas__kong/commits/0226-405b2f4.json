@@ -1,0 +1,118 @@
+{
+  "seq": 226,
+  "sha": "405b2f4fd9a44c95f00baee2a6e766a32b0e1fa6",
+  "parents": [
+    "abbc2dfc2c431cfaa69580ab0f01d41c4d05d880"
+  ],
+  "author": {
+    "name": "Jaco Coetzee",
+    "email": "jaco@codexorbis.com",
+    "date": "2021-02-09T10:21:40+02:00"
+  },
+  "message": "Help Option to position flags in help output\n\nWhen FlagsLast is set to true, flags are printed after commands.\n\n- Added HelpOptions.FlagsLast bool\n- Added test TestFlagsLast",
+  "pr": {
+    "number": 136,
+    "title": "Help Option to position flags in help output",
+    "body": "When FlagsLast is set to true, flags are printed after commands.\r\n\r\n- Added HelpOptions.FlagsLast bool\r\n- Added test TestFlagsLast",
+    "url": "https://github.com/alecthomas/kong/pull/136"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 130,
+    "deletions": 10
+  },
+  "files": [
+    {
+      "path": "help.go",
+      "status": "M",
+      "additions": 21,
+      "deletions": 10,
+      "binary": false
+    },
+    {
+      "path": "help_test.go",
+      "status": "M",
+      "additions": 109,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/help.go b/help.go\nindex e107724..2594946 100644\n--- a/help.go\n+++ b/help.go\n@@ -41,6 +41,9 @@ type HelpOptions struct {\n \t// Tree writes command chains in a tree structure instead of listing them separately.\n \tTree bool\n \n+\t// Place the flags after the commands listing.\n+\tFlagsLast bool\n+\n \t// Indenter modulates the given prefix for the next layer in the tree view.\n \t// The following exported templates can be used: kong.SpaceIndenter, kong.LineIndenter, kong.TreeIndenter\n \t// The kong.SpaceIndenter will be used by default.\n@@ -143,20 +146,25 @@ func printNodeDetail(w *helpWriter, node *Node, hide bool) {\n \t\tw.Print(\"Arguments:\")\n \t\twritePositionals(w.Indent(), node.Positional)\n \t}\n-\tif flags := node.AllFlags(true); len(flags) > 0 {\n-\t\tgroupedFlags := collectFlagGroups(flags)\n-\t\tfor _, group := range groupedFlags {\n-\t\t\tw.Print(\"\")\n-\t\t\tif group.Metadata.Title != \"\" {\n-\t\t\t\tw.Wrap(group.Metadata.Title)\n-\t\t\t}\n-\t\t\tif group.Metadata.Description != \"\" {\n-\t\t\t\tw.Indent().Wrap(group.Metadata.Description)\n+\tprintFlags := func() {\n+\t\tif flags := node.AllFlags(true); len(flags) > 0 {\n+\t\t\tgroupedFlags := collectFlagGroups(flags)\n+\t\t\tfor _, group := range groupedFlags {\n \t\t\t\tw.Print(\"\")\n+\t\t\t\tif group.Metadata.Title != \"\" {\n+\t\t\t\t\tw.Wrap(group.Metadata.Title)\n+\t\t\t\t}\n+\t\t\t\tif group.Metadata.Description != \"\" {\n+\t\t\t\t\tw.Indent().Wrap(group.Metadata.Description)\n+\t\t\t\t\tw.Print(\"\")\n+\t\t\t\t}\n+\t\t\t\twriteFlags(w.Indent(), group.Flags)\n \t\t\t}\n-\t\t\twriteFlags(w.Indent(), group.Flags)\n \t\t}\n \t}\n+\tif !w.FlagsLast {\n+\t\tprintFlags()\n+\t}\n \tcmds := node.Leaves(hide)\n \tif len(cmds) > 0 {\n \t\tiw := w.Indent()\n@@ -184,6 +192,9 @@ func printNodeDetail(w *helpWriter, node *Node, hide bool) {\n \t\t\t}\n \t\t}\n \t}\n+\tif w.FlagsLast {\n+\t\tprintFlags()\n+\t}\n }\n \n func writeCommandList(cmds []*Node, iw *helpWriter) {\ndiff --git a/help_test.go b/help_test.go\nindex ca0ab10..c7d5fe0 100644\n--- a/help_test.go\n+++ b/help_test.go\n@@ -126,6 +126,115 @@ Flags:\n \t})\n }\n \n+func TestFlagsLast(t *testing.T) {\n+\t// nolint: govet\n+\tvar cli struct {\n+\t\tString   string         `help:\"A string flag.\"`\n+\t\tBool     bool           `help:\"A bool flag with very long help that wraps a lot and is verbose and is really verbose.\"`\n+\t\tSlice    []string       `help:\"A slice of strings.\" placeholder:\"STR\"`\n+\t\tMap      map[string]int `help:\"A map of strings to ints.\"`\n+\t\tRequired bool           `required help:\"A required flag.\"`\n+\n+\t\tOne struct {\n+\t\t\tFlag string `help:\"Nested flag.\"`\n+\t\t} `cmd help:\"A subcommand.\"`\n+\n+\t\tTwo struct {\n+\t\t\tFlag        string `help:\"Nested flag under two.\"`\n+\t\t\tRequiredTwo bool   `required`\n+\n+\t\t\tThree threeArg `arg help:\"Sub-sub-arg.\"`\n+\n+\t\t\tFour struct {\n+\t\t\t} `cmd help:\"Sub-sub-command.\"`\n+\t\t} `cmd help:\"Another subcommand.\"`\n+\t}\n+\n+\tw := bytes.NewBuffer(nil)\n+\texited := false\n+\tapp := mustNew(t, &cli,\n+\t\tkong.Name(\"test-app\"),\n+\t\tkong.Description(\"A test app.\"),\n+\t\tkong.HelpOptions{\n+\t\t\tFlagsLast: true,\n+\t\t},\n+\t\tkong.Writers(w, w),\n+\t\tkong.Exit(func(int) {\n+\t\t\texited = true\n+\t\t\tpanic(true) // Panic to fake \"exit\".\n+\t\t}),\n+\t)\n+\n+\tt.Run(\"Full\", func(t *testing.T) {\n+\t\trequire.PanicsWithValue(t, true, func() {\n+\t\t\t_, err := app.Parse([]string{\"--help\"})\n+\t\t\trequire.NoError(t, err)\n+\t\t})\n+\t\trequire.True(t, exited)\n+\t\texpected := `Usage: test-app --required <command>\n+\n+A test app.\n+\n+Commands:\n+  one --required\n+    A subcommand.\n+\n+  two <three> --required --required-two --required-three\n+    Sub-sub-arg.\n+\n+  two four --required --required-two\n+    Sub-sub-command.\n+\n+Flags:\n+  -h, --help                 Show context-sensitive help.\n+      --string=STRING        A string flag.\n+      --bool                 A bool flag with very long help that wraps a lot\n+                             and is verbose and is really verbose.\n+      --slice=STR,...        A slice of strings.\n+      --map=KEY=VALUE;...    A map of strings to ints.\n+      --required             A required flag.\n+\n+Run \"test-app <command> --help\" for more information on a command.\n+`\n+\t\tt.Log(w.String())\n+\t\tt.Log(expected)\n+\t\trequire.Equal(t, expected, w.String())\n+\t})\n+\n+\tt.Run(\"Selected\", func(t *testing.T) {\n+\t\texited = false\n+\t\tw.Truncate(0)\n+\t\trequire.PanicsWithValue(t, true, func() {\n+\t\t\t_, err := app.Parse([]string{\"two\", \"hello\", \"--help\"})\n+\t\t\trequire.NoError(t, err)\n+\t\t})\n+\t\trequire.True(t, exited)\n+\t\texpected := `Usage: test-app two <three> --required --required-two --required-three\n+\n+Sub-sub-arg.\n+\n+Detailed help provided through the HelpProvider interface.\n+\n+Flags:\n+  -h, --help                 Show context-sensitive help.\n+      --string=STRING        A string flag.\n+      --bool                 A bool flag with very long help that wraps a lot\n+                             and is verbose and is really verbose.\n+      --slice=STR,...        A slice of strings.\n+      --map=KEY=VALUE;...    A map of strings to ints.\n+      --required             A required flag.\n+\n+      --flag=STRING          Nested flag under two.\n+      --required-two\n+\n+      --required-three\n+`\n+\t\tt.Log(expected)\n+\t\tt.Log(w.String())\n+\t\trequire.Equal(t, expected, w.String())\n+\t})\n+}\n+\n func TestHelpTree(t *testing.T) {\n \t// nolint: govet\n \tvar cli struct {\n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    ".gitignore",
+    ".golangci.yml",
+    "COPYING",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/README.md",
+    "_examples/server/console.go",
+    "_examples/server/go.mod",
+    "_examples/server/go.sum",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/main.go",
+    "benchmark_test.go",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "config_test.go",
+    "context.go",
+    "defaults.go",
+    "defaults_test.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "go.mod",
+    "go.sum",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "testdata/file.txt",
+    "util.go",
+    "util_test.go",
+    "visit.go"
+  ],
+  "explanation": {
+    "what": "`HelpOptions.FlagsLast` という bool フィールドを追加した。true にすると、ヘルプ出力でフラグ一覧をコマンド一覧の後ろに表示する。printNodeDetail 内でフラグ出力ロジックを `printFlags` クロージャに切り出し、`FlagsLast` の値に応じて呼び出し位置(コマンド一覧の前/後)を切り替えている。",
+    "why": "PR #130(コミットメッセージ・PR body 共通)によれば、フラグをコマンドの前に表示するか後に表示するかを利用者が選べるようにする目的。サブコマンドが多いツールではコマンド一覧を先に見せたいという需要が背景にあるとみられる。",
+    "highlights": [
+      { "file": "help.go", "note": "printFlags クロージャ化により、フラグ出力位置を FlagsLast の真偽で入れ替えている" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [
+      { "type": "pr", "number": 136, "url": "https://github.com/alecthomas/kong/pull/136" }
+    ],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

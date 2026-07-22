@@ -1,0 +1,126 @@
+{
+  "seq": 115,
+  "sha": "c112a076e71fbb5e59d6fbd87e2da60878e3ccc7",
+  "parents": [
+    "25399cde9e5dc612632fbd594f9f92ce9b3c4a87"
+  ],
+  "author": {
+    "name": "Alec Thomas",
+    "email": "alec@swapoff.org",
+    "date": "2018-09-21T15:18:17+10:00"
+  },
+  "message": "Convert resolvers to an interface with a Validate() method.",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 5,
+    "additions": 82,
+    "deletions": 37
+  },
+  "files": [
+    {
+      "path": "context.go",
+      "status": "M",
+      "additions": 36,
+      "deletions": 26,
+      "binary": false
+    },
+    {
+      "path": "kong.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "options.go",
+      "status": "M",
+      "additions": 2,
+      "deletions": 2,
+      "binary": false
+    },
+    {
+      "path": "resolver.go",
+      "status": "M",
+      "additions": 19,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "resolver_test.go",
+      "status": "M",
+      "additions": 24,
+      "deletions": 7,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/context.go b/context.go\nindex e70af31..fca1e81 100644\n--- a/context.go\n+++ b/context.go\n@@ -51,7 +51,7 @@ type Context struct {\n \tError error\n \n \tvalues    map[*Value]reflect.Value // Temporary values during tracing.\n-\tresolvers []ResolverFunc           // Extra context-specific resolvers.\n+\tresolvers []Resolver               // Extra context-specific resolvers.\n \tscan      *Scanner\n }\n \n@@ -119,6 +119,11 @@ func (c *Context) Empty() bool {\n \n // Validate the current context.\n func (c *Context) Validate() error {\n+\tfor _, resolver := range c.combineResolvers() {\n+\t\tif err := resolver.Validate(c.Model); err != nil {\n+\t\t\treturn err\n+\t\t}\n+\t}\n \tfor _, path := range c.Path {\n \t\tif err := checkMissingFlags(path.Flags); err != nil {\n \t\t\treturn err\n@@ -183,7 +188,7 @@ func (c *Context) Command() string {\n // AddResolver adds a context-specific resolver.\n //\n // This is most useful in the BeforeResolve() hook.\n-func (c *Context) AddResolver(resolver ResolverFunc) {\n+func (c *Context) AddResolver(resolver Resolver) {\n \tc.resolvers = append(c.resolvers, resolver)\n }\n \n@@ -345,31 +350,9 @@ func (c *Context) trace(node *Node) (err error) { // nolint: gocyclo\n \treturn nil\n }\n \n-func findPotentialCandidates(needle string, haystack []string, format string, args ...interface{}) error {\n-\tif len(haystack) == 0 {\n-\t\treturn fmt.Errorf(format, args...)\n-\t}\n-\tclosestCandidates := []string{}\n-\tfor _, candidate := range haystack {\n-\t\tif strings.HasPrefix(candidate, needle) || levenshtein(candidate, needle) <= 2 {\n-\t\t\tclosestCandidates = append(closestCandidates, fmt.Sprintf(\"%q\", candidate))\n-\t\t}\n-\t}\n-\tprefix := fmt.Sprintf(format, args...)\n-\tif len(closestCandidates) == 1 {\n-\t\treturn fmt.Errorf(\"%s, did you mean %s?\", prefix, closestCandidates[0])\n-\t} else if len(closestCandidates) > 1 {\n-\t\treturn fmt.Errorf(\"%s, did you mean one of %s?\", prefix, strings.Join(closestCandidates, \", \"))\n-\t}\n-\treturn fmt.Errorf(\"%s\", prefix)\n-}\n-\n // Resolve walks through the traced path, applying resolvers to any unset flags.\n func (c *Context) Resolve() error {\n-\t// Combine application-level resolvers and context resolvers.\n-\tresolvers := []ResolverFunc{}\n-\tresolvers = append(resolvers, c.Kong.resolvers...)\n-\tresolvers = append(resolvers, c.resolvers...)\n+\tresolvers := c.combineResolvers()\n \tif len(resolvers) == 0 {\n \t\treturn nil\n \t}\n@@ -382,7 +365,7 @@ func (c *Context) Resolve() error {\n \t\t\t\tcontinue\n \t\t\t}\n \t\t\tfor _, resolver := range resolvers {\n-\t\t\t\ts, err := resolver(c, path, flag)\n+\t\t\t\ts, err := resolver.Resolve(c, path, flag)\n \t\t\t\tif err != nil {\n \t\t\t\t\treturn err\n \t\t\t\t}\n@@ -407,6 +390,14 @@ func (c *Context) Resolve() error {\n \treturn nil\n }\n \n+// Combine application-level resolvers and context resolvers.\n+func (c *Context) combineResolvers() []Resolver {\n+\tresolvers := []Resolver{}\n+\tresolvers = append(resolvers, c.Kong.resolvers...)\n+\tresolvers = append(resolvers, c.resolvers...)\n+\treturn resolvers\n+}\n+\n func (c *Context) getValue(value *Value) reflect.Value {\n \tv, ok := c.values[value]\n \tif !ok {\n@@ -573,3 +564,22 @@ func checkMissingPositionals(positional int, values []*Value) error {\n \t}\n \treturn fmt.Errorf(\"missing positional arguments %s\", strings.Join(missing, \" \"))\n }\n+\n+func findPotentialCandidates(needle string, haystack []string, format string, args ...interface{}) error {\n+\tif len(haystack) == 0 {\n+\t\treturn fmt.Errorf(format, args...)\n+\t}\n+\tclosestCandidates := []string{}\n+\tfor _, candidate := range haystack {\n+\t\tif strings.HasPrefix(candidate, needle) || levenshtein(candidate, needle) <= 2 {\n+\t\t\tclosestCandidates = append(closestCandidates, fmt.Sprintf(\"%q\", candidate))\n+\t\t}\n+\t}\n+\tprefix := fmt.Sprintf(format, args...)\n+\tif len(closestCandidates) == 1 {\n+\t\treturn fmt.Errorf(\"%s, did you mean %s?\", prefix, closestCandidates[0])\n+\t} else if len(closestCandidates) > 1 {\n+\t\treturn fmt.Errorf(\"%s, did you mean one of %s?\", prefix, strings.Join(closestCandidates, \", \"))\n+\t}\n+\treturn fmt.Errorf(\"%s\", prefix)\n+}\ndiff --git a/kong.go b/kong.go\nindex b1c45c4..5e31009 100644\n--- a/kong.go\n+++ b/kong.go\n@@ -44,7 +44,7 @@ type Kong struct {\n \n \tbindings  bindings\n \tloader    ConfigurationFunc\n-\tresolvers []ResolverFunc\n+\tresolvers []Resolver\n \tregistry  *Registry\n \n \tnoDefaultHelp bool\ndiff --git a/options.go b/options.go\nindex 5bcec7e..140c1e0 100644\n--- a/options.go\n+++ b/options.go\n@@ -180,8 +180,8 @@ func ClearResolvers() OptionFunc {\n \t}\n }\n \n-// Resolver registers flag resolvers.\n-func Resolver(resolvers ...ResolverFunc) OptionFunc {\n+// Resolvers registers flag resolvers.\n+func Resolvers(resolvers ...Resolver) OptionFunc {\n \treturn func(k *Kong) error {\n \t\tk.resolvers = append(k.resolvers, resolvers...)\n \t\treturn nil\ndiff --git a/resolver.go b/resolver.go\nindex 9de21a5..5cc92ce 100644\n--- a/resolver.go\n+++ b/resolver.go\n@@ -7,9 +7,27 @@ import (\n \t\"strings\"\n )\n \n-// ResolverFunc resolves a Flag value from an external source.\n+// A Resolver resolves a Flag value from an external source.\n+type Resolver interface {\n+\t// Validate configuration against Application.\n+\t//\n+\t// This can be used to validate that all provided configuration is valid within  this application.\n+\tValidate(app *Application) error\n+\n+\t// Resolve the value for a Flag.\n+\tResolve(context *Context, parent *Path, flag *Flag) (string, error)\n+}\n+\n+// ResolverFunc is a convenience type for non-validating Resolvers.\n type ResolverFunc func(context *Context, parent *Path, flag *Flag) (string, error)\n \n+var _ Resolver = ResolverFunc(nil)\n+\n+func (r ResolverFunc) Resolve(context *Context, parent *Path, flag *Flag) (string, error) { // nolint: golint\n+\treturn r(context, parent, flag)\n+}\n+func (r ResolverFunc) Validate(app *Application) error { return nil } //  nolint: golint\n+\n // JSON returns a Resolver that retrieves values from a JSON source.\n //\n // Hyphens in flag names are replaced with underscores.\ndiff --git a/resolver_test.go b/resolver_test.go\nindex ad0cebe..c23c4f3 100644\n--- a/resolver_test.go\n+++ b/resolver_test.go\n@@ -1,6 +1,7 @@\n package kong_test\n \n import (\n+\t\"errors\"\n \t\"os\"\n \t\"reflect\"\n \t\"strings\"\n@@ -91,7 +92,7 @@ func TestJSONBasic(t *testing.T) {\n \tr, err := kong.JSON(strings.NewReader(json))\n \trequire.NoError(t, err)\n \n-\tparser := mustNew(t, &cli, kong.Resolver(r))\n+\tparser := mustNew(t, &cli, kong.Resolvers(r))\n \t_, err = parser.Parse([]string{})\n \trequire.NoError(t, err)\n \trequire.Equal(t, \"🍕\", cli.String)\n@@ -129,14 +130,14 @@ func TestResolverWithBool(t *testing.T) {\n \t\tBool bool\n \t}\n \n-\tresolver := func(context *kong.Context, parent *kong.Path, flag *kong.Flag) (string, error) {\n+\tvar resolver kong.ResolverFunc = func(context *kong.Context, parent *kong.Path, flag *kong.Flag) (string, error) {\n \t\tif flag.Name == \"bool\" {\n \t\t\treturn \"true\", nil\n \t\t}\n \t\treturn \"\", nil\n \t}\n \n-\tp := mustNew(t, &cli, kong.Resolver(resolver))\n+\tp := mustNew(t, &cli, kong.Resolvers(resolver))\n \n \t_, err := p.Parse(nil)\n \trequire.NoError(t, err)\n@@ -162,7 +163,7 @@ func TestLastResolverWins(t *testing.T) {\n \t\treturn \"\", nil\n \t}\n \n-\tp := mustNew(t, &cli, kong.Resolver(first), kong.Resolver(second))\n+\tp := mustNew(t, &cli, kong.Resolvers(first, second))\n \t_, err := p.Parse(nil)\n \trequire.NoError(t, err)\n \trequire.Equal(t, []int{2}, cli.Int)\n@@ -173,13 +174,13 @@ func TestResolverSatisfiesRequired(t *testing.T) {\n \tvar cli struct {\n \t\tInt int `required`\n \t}\n-\tresolver := func(context *kong.Context, parent *kong.Path, flag *kong.Flag) (string, error) {\n+\tvar resolver kong.ResolverFunc = func(context *kong.Context, parent *kong.Path, flag *kong.Flag) (string, error) {\n \t\tif flag.Name == \"int\" {\n \t\t\treturn \"1\", nil\n \t\t}\n \t\treturn \"\", nil\n \t}\n-\t_, err := mustNew(t, &cli, kong.Resolver(resolver)).Parse(nil)\n+\t_, err := mustNew(t, &cli, kong.Resolvers(resolver)).Parse(nil)\n \trequire.NoError(t, err)\n \trequire.Equal(t, 1, cli.Int)\n }\n@@ -198,9 +199,25 @@ func TestResolverTriggersHooks(t *testing.T) {\n \t\treturn \"\", nil\n \t}\n \n-\t_, err := mustNew(t, &cli, kong.Bind(ctx), kong.Resolver(first)).Parse(nil)\n+\t_, err := mustNew(t, &cli, kong.Bind(ctx), kong.Resolvers(first)).Parse(nil)\n \trequire.NoError(t, err)\n \n \trequire.Equal(t, \"1\", string(cli.Flag))\n \trequire.Equal(t, []string{\"before:\", \"after:1\"}, ctx.values)\n }\n+\n+type validatingResolver struct {\n+\terr error\n+}\n+\n+func (v *validatingResolver) Validate(app *kong.Application) error { return v.err }\n+func (v *validatingResolver) Resolve(context *kong.Context, parent *kong.Path, flag *kong.Flag) (string, error) {\n+\treturn \"\", nil\n+}\n+\n+func TestValidatingResolverErrors(t *testing.T) {\n+\tresolver := &validatingResolver{err: errors.New(\"invalid\")}\n+\tvar cli struct{}\n+\t_, err := mustNew(t, &cli, kong.Resolvers(resolver)).Parse(nil)\n+\trequire.EqualError(t, err, \"invalid\")\n+}\n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    ".golangci.yml",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/console.go",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/main.go",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "context.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "go.mod",
+    "go.sum",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "tokentype_string.go",
+    "util.go",
+    "util_test.go",
+    "visit.go"
+  ],
+  "explanation": {
+    "what": "従来 `type ResolverFunc func(...) (string, error)` という単純な関数型だったリゾルバーを、Validate(app *Application) error と Resolve(context, parent, flag) (string, error) の2メソッドを持つ Resolver インターフェースに変換した。ResolverFunc は Resolve() だけを実装し Validate() は no-op を返す形でインターフェースを満たす後方互換アダプタとして残した。Context.Validate() は combineResolvers() で集めた全リゾルバーの Validate(c.Model) を呼ぶようになり、Options.Resolver(...) は複数登録を意図した Resolvers(...) にリネームされた。",
+    "why": "コミットメッセージの通り、リゾルバーに Validate() を持たせることが目的。単なる関数だったときはリゾルバー自身が「このアプリケーションの構成(フラグ体系)に対して自分の設定が妥当か」を検証する手段がなかったが、インターフェース化することで各リゾルバーが Application 全体を見て事前検証できるようになった(直後の TestValidatingResolverErrors で検証エラーがそのまま Parse() のエラーになることを確認している)。",
+    "highlights": [
+      { "file": "resolver.go", "note": "Resolver インターフェースの定義と、ResolverFunc がそれを満たすためのアダプタメソッド" },
+      { "file": "context.go", "note": "Validate() が combineResolvers() の各 Resolver.Validate(c.Model) を呼ぶ追加箇所" }
+    ],
+    "langNotes": [
+      { "topic": "関数型から interface への昇格(アダプタパターン)", "note": "Go では関数に別名の型を付けてメソッドを生やすことで、その型自身がインターフェースを満たす「関数アダプタ」を作れる。ここでは ResolverFunc(元は単なる関数型)に Resolve/Validate メソッドを実装させ、`var _ Resolver = ResolverFunc(nil)` で静的にインターフェース充足を保証している。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

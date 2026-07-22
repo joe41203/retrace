@@ -1,0 +1,73 @@
+{
+  "seq": 9,
+  "sha": "c6776fe4b817392845ae629df772ec72603d1a49",
+  "parents": [
+    "f929749094cd8def8290c7a1221745de726f4fbe"
+  ],
+  "author": {
+    "name": "Alec Thomas",
+    "email": "alec@swapoff.org",
+    "date": "2018-05-18T13:38:07+10:00"
+  },
+  "message": "Docs.",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 3,
+    "additions": 10,
+    "deletions": 4
+  },
+  "files": [
+    {
+      "path": "kong.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 3,
+      "binary": false
+    },
+    {
+      "path": "kong_test.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "scanner.go",
+      "status": "M",
+      "additions": 8,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/kong.go b/kong.go\nindex 5c06d55..6fdfa47 100644\n--- a/kong.go\n+++ b/kong.go\n@@ -8,9 +8,7 @@ import (\n \t\"strings\"\n )\n \n-type Error struct {\n-\tmsg string\n-}\n+type Error struct{ msg string }\n \n func (e Error) Error() string { return e.msg }\n \ndiff --git a/kong_test.go b/kong_test.go\nindex 10e4894..9abbe54 100644\n--- a/kong_test.go\n+++ b/kong_test.go\n@@ -50,7 +50,7 @@ func TestBranchingArgument(t *testing.T) {\n \t\t\t\tFlag   int      `help:\"\"`\n \t\t\t\tDelete struct{} `help:\"\"`\n \t\t\t\tRename struct {\n-\t\t\t\t\tTo string\n+\t\t\t\t\tTo string `help:\"\"`\n \t\t\t\t} `help:\"\"`\n \t\t\t} `arg:\"\" help:\"\"`\n \t\t} `help:\"Manage users.\"`\ndiff --git a/scanner.go b/scanner.go\nindex e653988..08e7476 100644\n--- a/scanner.go\n+++ b/scanner.go\n@@ -57,6 +57,14 @@ func (t Token) IsValue() bool {\n \t\t(t.Type == UntypedToken && !strings.HasPrefix(t.Value, \"-\"))\n }\n \n+// Scanner is a stack-based scanner over command-line tokens.\n+//\n+// Initially all tokens are untyped. As the parser consumes tokens it assigns types, splits tokens, and pushes them back\n+// onto the stream.\n+//\n+// For example, the token \"--foo=bar\" will be split into the following by the parser:\n+//\n+// \t\t[{FlagToken, \"foo\"}, {FlagValueToken, \"bar\"}]\n type Scanner struct {\n \targs []Token\n }\n",
+  "diffTruncated": false,
+  "tree": [
+    "README.md",
+    "_examples/shell/main.go",
+    "build.go",
+    "camelcase.go",
+    "decoders.go",
+    "decoders_test.go",
+    "global.go",
+    "kong.go",
+    "kong_test.go",
+    "model.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tokentype_string.go"
+  ],
+  "explanation": {
+    "what": "Error 型の定義を複数行から1行の struct リテラルに整形し、Scanner 型に「初期状態では全トークンが untyped で、パーサが解析しながら型を付けて分割・push し直す」という設計コメントを追加した(--foo=bar が FlagToken/FlagValueToken に分解される例つき)。テスト側では Rename.To フィールドに抜けていた help タグを補った。",
+    "why": "コミットメッセージ通り、コードそのものよりドキュメンテーションコメントの追加が中心の回。Scanner のトークン分割の仕組みは直感的でないため、後から読む人向けに具体例付きのコメントを足したと考えられる。",
+    "highlights": [
+      { "file": "scanner.go", "note": "Scanner の godoc コメント。--foo=bar がどう FlagToken/FlagValueToken に分解されるかの具体例" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

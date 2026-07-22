@@ -1,0 +1,118 @@
+{
+  "seq": 140,
+  "sha": "2ac3d431243abbb328f58ab3f7c06d5d0ed50ae4",
+  "parents": [
+    "4e9878074f961465f36174e18034ac203cf182b8"
+  ],
+  "author": {
+    "name": "Alec Thomas",
+    "email": "alec@swapoff.org",
+    "date": "2019-04-01T10:06:02+11:00"
+  },
+  "message": "Make invalid value error messages more useful.",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 4,
+    "additions": 34,
+    "deletions": 18
+  },
+  "files": [
+    {
+      "path": "_examples/shell/main.go",
+      "status": "M",
+      "additions": 0,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "kong_test.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "mapper.go",
+      "status": "M",
+      "additions": 11,
+      "deletions": 9,
+      "binary": false
+    },
+    {
+      "path": "model.go",
+      "status": "M",
+      "additions": 22,
+      "deletions": 7,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/_examples/shell/main.go b/_examples/shell/main.go\nindex 6a26f01..295b99a 100644\n--- a/_examples/shell/main.go\n+++ b/_examples/shell/main.go\n@@ -2,7 +2,6 @@ package main\n \n import (\n \t\"fmt\"\n-\n \t\"github.com/alecthomas/kong\"\n )\n \ndiff --git a/kong_test.go b/kong_test.go\nindex 3ce1ef4..a94a3c1 100644\n--- a/kong_test.go\n+++ b/kong_test.go\n@@ -715,7 +715,7 @@ func TestNumericParamErrors(t *testing.T) {\n \t}\n \tparser := mustNew(t, &cli)\n \t_, err := parser.Parse([]string{\"--name\", \"-10\"})\n-\trequire.EqualError(t, err, `expected string value but got \"-10\" (short flag)`)\n+\trequire.EqualError(t, err, `--name: expected string value but got \"-10\" (short flag)`)\n }\n \n func TestDefaultValueIsHyphen(t *testing.T) {\ndiff --git a/mapper.go b/mapper.go\nindex d99eda9..2fdd440 100644\n--- a/mapper.go\n+++ b/mapper.go\n@@ -75,7 +75,7 @@ type BoolMapper interface {\n // A MapperFunc is a single function that complies with the Mapper interface.\n type MapperFunc func(ctx *DecodeContext, target reflect.Value) error\n \n-func (m MapperFunc) Decode(ctx *DecodeContext, target reflect.Value) error { //nolint: golint\n+func (m MapperFunc) Decode(ctx *DecodeContext, target reflect.Value) error { // nolint: golint\n \treturn m(ctx, target)\n }\n \n@@ -224,9 +224,10 @@ func (boolMapper) IsBool() bool { return true }\n \n func durationDecoder() MapperFunc {\n \treturn func(ctx *DecodeContext, target reflect.Value) error {\n-\t\tr, err := time.ParseDuration(ctx.Scan.PopValue(\"duration\"))\n+\t\tvalue := ctx.Scan.PopValue(\"duration\")\n+\t\tr, err := time.ParseDuration(value)\n \t\tif err != nil {\n-\t\t\treturn err\n+\t\t\treturn fmt.Errorf(\"expected duration but got %q: %s\", value, err)\n \t\t}\n \t\ttarget.Set(reflect.ValueOf(r))\n \t\treturn nil\n@@ -235,11 +236,12 @@ func durationDecoder() MapperFunc {\n \n func timeDecoder() MapperFunc {\n \treturn func(ctx *DecodeContext, target reflect.Value) error {\n-\t\tfmt := time.RFC3339\n+\t\tformat := time.RFC3339\n \t\tif ctx.Value.Format != \"\" {\n-\t\t\tfmt = ctx.Value.Format\n+\t\t\tformat = ctx.Value.Format\n \t\t}\n-\t\tt, err := time.Parse(fmt, ctx.Scan.PopValue(\"time\"))\n+\t\tvalue := ctx.Scan.PopValue(\"time\")\n+\t\tt, err := time.Parse(format, value)\n \t\tif err != nil {\n \t\t\treturn err\n \t\t}\n@@ -253,7 +255,7 @@ func intDecoder(bits int) MapperFunc {\n \t\tvalue := ctx.Scan.PopValue(\"int\")\n \t\tn, err := strconv.ParseInt(value, 10, bits)\n \t\tif err != nil {\n-\t\t\treturn fmt.Errorf(\"invalid int %q\", value)\n+\t\t\treturn fmt.Errorf(\"expected int but got %q\", value)\n \t\t}\n \t\ttarget.SetInt(n)\n \t\treturn nil\n@@ -265,7 +267,7 @@ func uintDecoder(bits int) MapperFunc {\n \t\tvalue := ctx.Scan.PopValue(\"uint\")\n \t\tn, err := strconv.ParseUint(value, 10, bits)\n \t\tif err != nil {\n-\t\t\treturn fmt.Errorf(\"invalid uint %q\", value)\n+\t\t\treturn fmt.Errorf(\"expected unsigned int but got %q\", value)\n \t\t}\n \t\ttarget.SetUint(n)\n \t\treturn nil\n@@ -277,7 +279,7 @@ func floatDecoder(bits int) MapperFunc {\n \t\tvalue := ctx.Scan.PopValue(\"float\")\n \t\tn, err := strconv.ParseFloat(value, bits)\n \t\tif err != nil {\n-\t\t\treturn fmt.Errorf(\"invalid float %q\", value)\n+\t\t\treturn fmt.Errorf(\"expected float but got %q\", value)\n \t\t}\n \t\ttarget.SetFloat(n)\n \t\treturn nil\ndiff --git a/model.go b/model.go\nindex 2915892..b2fd39c 100644\n--- a/model.go\n+++ b/model.go\n@@ -226,6 +226,21 @@ func (v *Value) EnumMap() map[string]bool {\n \treturn out\n }\n \n+// ShortSummary returns a human-readable summary of the value, not including any placeholders/defaults.\n+func (v *Value) ShortSummary() string {\n+\tif v.Flag != nil {\n+\t\treturn fmt.Sprintf(\"--%s\", v.Name)\n+\t}\n+\targText := \"<\" + v.Name + \">\"\n+\tif v.IsCumulative() {\n+\t\targText += \" ...\"\n+\t}\n+\tif !v.Required {\n+\t\targText = \"[\" + argText + \"]\"\n+\t}\n+\treturn argText\n+}\n+\n // Summary returns a human-readable summary of the value.\n func (v *Value) Summary() string {\n \tif v.Flag != nil {\n@@ -268,20 +283,20 @@ func (v *Value) IsBool() bool {\n }\n \n // Parse tokens into value, parse, and validate, but do not write to the field.\n-func (v *Value) Parse(scan *Scanner, target reflect.Value) error {\n+func (v *Value) Parse(scan *Scanner, target reflect.Value) (err error) {\n \tdefer func() {\n-\t\tif err := recover(); err != nil {\n-\t\t\tswitch err := err.(type) {\n+\t\tif rerr := recover(); rerr != nil {\n+\t\t\tswitch rerr := rerr.(type) {\n \t\t\tcase Error:\n-\t\t\t\tpanic(err)\n+\t\t\t\terr = fmt.Errorf(\"%s: %s\", v.ShortSummary(), rerr)\n \t\t\tdefault:\n-\t\t\t\tpanic(fmt.Sprintf(\"mapper %T failed to apply to %s: %s\", v.Mapper, v.Summary(), err))\n+\t\t\t\tpanic(fmt.Sprintf(\"mapper %T failed to apply to %s: %s\", v.Mapper, v.Summary(), rerr))\n \t\t\t}\n \t\t}\n \t}()\n-\terr := v.Mapper.Decode(&DecodeContext{Value: v, Scan: scan}, target)\n+\terr = v.Mapper.Decode(&DecodeContext{Value: v, Scan: scan}, target)\n \tif err != nil {\n-\t\treturn fmt.Errorf(\"%s: %s\", v.Summary(), err)\n+\t\treturn fmt.Errorf(\"%s: %s\", v.ShortSummary(), err)\n \t}\n \tv.Set = true\n \treturn nil\n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    ".golangci.yml",
+    "COPYING",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/console.go",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/main.go",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "config_test.go",
+    "context.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "go.mod",
+    "go.sum",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "util.go",
+    "util_test.go",
+    "visit.go"
+  ],
+  "explanation": {
+    "what": "不正な値のパースエラーメッセージをより実用的にした。Value.ShortSummary()を新設し(フラグなら\"--name\"、引数なら\"<name>\"や\"[<name>]\"のような簡潔な表記を返す)、Value.Parse()のエラーメッセージ・panic復帰処理をこのShortSummary()経由に変更。int/uint/float/durationのデコードエラーメッセージも\"invalid int %q\"から\"expected int but got %q\"のような形式に統一した。",
+    "why": "kong_test.goの期待値が`expected string value but got \"-10\" (short flag)`から`--name: expected string value but got \"-10\" (short flag)`に変わっており、どのフラグ/引数でエラーが起きたかをメッセージの先頭に明示することでユーザーがエラー原因を特定しやすくする意図が読み取れる。",
+    "highlights": [
+      { "file": "model.go", "note": "ShortSummary()の新設とParse()でのエラーラップの変更点" },
+      { "file": "mapper.go", "note": "各数値型デコーダのエラーメッセージを\"expected X but got %q\"に統一" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

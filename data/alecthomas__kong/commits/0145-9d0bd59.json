@@ -1,0 +1,98 @@
+{
+  "seq": 145,
+  "sha": "9d0bd596117bb0fa7d3766b46f0f90a66b527d0b",
+  "parents": [
+    "8c83948cffcc5d7f5520be2793ba1818380ce82a"
+  ],
+  "author": {
+    "name": "Alec Thomas",
+    "email": "alec@swapoff.org",
+    "date": "2019-06-21T09:53:05+10:00"
+  },
+  "message": "Print error after usage when UsageOnError is set.\n\nPreviously, the underlying error was often lost when usage output was\nlarge.",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 2,
+    "deletions": 2
+  },
+  "files": [
+    {
+      "path": "kong.go",
+      "status": "M",
+      "additions": 2,
+      "deletions": 2,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/kong.go b/kong.go\nindex d1039d2..197b187 100644\n--- a/kong.go\n+++ b/kong.go\n@@ -324,13 +324,13 @@ func (k *Kong) FatalIfErrorf(err error, args ...interface{}) {\n \tif len(args) > 0 {\n \t\tmsg = fmt.Sprintf(args[0].(string), args[1:]...) + \": \" + err.Error()\n \t}\n-\tk.Errorf(\"%s\", msg)\n \t// Maybe display usage information.\n \tif err, ok := err.(*ParseError); ok && k.usageOnError {\n-\t\tfmt.Fprintln(k.Stdout)\n \t\toptions := k.helpOptions\n \t\t_ = k.help(options, err.Context)\n+\t\tfmt.Fprintln(k.Stdout)\n \t}\n+\tk.Errorf(\"%s\", msg)\n \tk.Exit(1)\n }\n \n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    ".golangci.yml",
+    "COPYING",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/console.go",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/main.go",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "config_test.go",
+    "context.go",
+    "defaults.go",
+    "defaults_test.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "go.mod",
+    "go.sum",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "util.go",
+    "util_test.go",
+    "visit.go"
+  ],
+  "explanation": {
+    "what": "FatalIfErrorf 内で、UsageOnError が有効なときに使用方法(usage)を出力する処理と、エラーメッセージ本体(k.Errorf)を出力する処理の順序を入れ替えた。従来はエラーメッセージを先に出してから usage を表示していたが、usage 表示のあとにエラーメッセージを出すよう変更した。",
+    "why": "コミットメッセージの通り、usage の出力が長いとターミナル上でエラーメッセージがスクロールアウトして見えなくなってしまう問題があった。エラーメッセージを最後に出すことで、ユーザーが必ず直近の出力としてエラー内容を確認できるようにした。",
+    "highlights": [
+      { "file": "kong.go", "note": "usage 出力→改行→エラーメッセージ、の順に入れ替え" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

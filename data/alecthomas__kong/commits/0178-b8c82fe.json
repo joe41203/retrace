@@ -1,0 +1,139 @@
+{
+  "seq": 178,
+  "sha": "b8c82fea7cc495667e6433be35a1fe50bb2e1b60",
+  "parents": [
+    "c45ea59559acb701c8ba7852f1c471bdc6badb8e"
+  ],
+  "author": {
+    "name": "Alec Thomas",
+    "email": "alec@swapoff.org",
+    "date": "2020-03-03T13:57:56+11:00"
+  },
+  "message": "Allow binds to be provided by a function.\n\nThis is useful for situations where the initialisation of some object\nshould be deferred, eg. when there are distinct \"setup\" and \"use\" phases\nto a tools lifecycle.",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 6,
+    "additions": 68,
+    "deletions": 9
+  },
+  "files": [
+    {
+      "path": ".circleci/config.yml",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": ".golangci.yml",
+      "status": "M",
+      "additions": 1,
+      "deletions": 2,
+      "binary": false
+    },
+    {
+      "path": "callbacks.go",
+      "status": "M",
+      "additions": 9,
+      "deletions": 4,
+      "binary": false
+    },
+    {
+      "path": "context.go",
+      "status": "M",
+      "additions": 2,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "options.go",
+      "status": "M",
+      "additions": 29,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "options_test.go",
+      "status": "M",
+      "additions": 26,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/.circleci/config.yml b/.circleci/config.yml\nindex 076df0f..763b2f7 100644\n--- a/.circleci/config.yml\n+++ b/.circleci/config.yml\n@@ -12,7 +12,7 @@ jobs:\n           command: |\n             go get -v github.com/jstemmer/go-junit-report\n             go get -v -t -d ./...\n-            curl -sfL https://install.goreleaser.com/github.com/golangci/golangci-lint.sh | bash -s v1.23.1\n+            curl -sfL https://install.goreleaser.com/github.com/golangci/golangci-lint.sh | bash -s v1.23.7\n             mkdir ~/report\n           when: always\n       - run:\ndiff --git a/.golangci.yml b/.golangci.yml\nindex a5b2806..af55257 100644\n--- a/.golangci.yml\n+++ b/.golangci.yml\n@@ -19,8 +19,6 @@ linters:\n linters-settings:\n   govet:\n     check-shadowing: true\n-  gocyclo:\n-    min-complexity: 10\n   dupl:\n     threshold: 100\n   goconst:\n@@ -41,3 +39,4 @@ issues:\n     - 'composite literal uses unkeyed fields'\n     - 'bad syntax for struct tag key'\n     - 'bad syntax for struct tag pair'\n+    - 'result .* \\(error\\) is always nil'\ndiff --git a/callbacks.go b/callbacks.go\nindex e403d27..139a83b 100644\n--- a/callbacks.go\n+++ b/callbacks.go\n@@ -6,7 +6,7 @@ import (\n \t\"strings\"\n )\n \n-type bindings map[reflect.Type]reflect.Value\n+type bindings map[reflect.Type]func() (reflect.Value, error)\n \n func (b bindings) String() string {\n \tout := []string{}\n@@ -18,7 +18,8 @@ func (b bindings) String() string {\n \n func (b bindings) add(values ...interface{}) bindings {\n \tfor _, v := range values {\n-\t\tb[reflect.TypeOf(v)] = reflect.ValueOf(v)\n+\t\tv := v\n+\t\tb[reflect.TypeOf(v)] = func() (reflect.Value, error) { return reflect.ValueOf(v), nil }\n \t}\n \treturn b\n }\n@@ -57,8 +58,12 @@ func callMethod(name string, v, f reflect.Value, bindings bindings) error {\n \t}\n \tfor i := 0; i < t.NumIn(); i++ {\n \t\tpt := t.In(i)\n-\t\tif arg, ok := bindings[pt]; ok {\n-\t\t\tin = append(in, arg)\n+\t\tif argf, ok := bindings[pt]; ok {\n+\t\t\targv, err := argf()\n+\t\t\tif err != nil {\n+\t\t\t\treturn err\n+\t\t\t}\n+\t\t\tin = append(in, argv)\n \t\t} else {\n \t\t\treturn fmt.Errorf(\"couldn't find binding of type %s for parameter %d of %s.%s(), use kong.Bind(%s)\", pt, i, v.Type(), name, pt)\n \t\t}\ndiff --git a/context.go b/context.go\nindex 334b855..9e1231a 100644\n--- a/context.go\n+++ b/context.go\n@@ -91,7 +91,8 @@ func (c *Context) Bind(args ...interface{}) {\n //\n //    BindTo(impl, (*MyInterface)(nil))\n func (c *Context) BindTo(impl, iface interface{}) {\n-\tc.bindings[reflect.TypeOf(iface).Elem()] = reflect.ValueOf(impl)\n+\tvalueOf := reflect.ValueOf(impl)\n+\tc.bindings[reflect.TypeOf(iface).Elem()] = func() (reflect.Value, error) { return valueOf, nil }\n }\n \n // Value returns the value for a particular path element.\ndiff --git a/options.go b/options.go\nindex 1bf5219..66fd633 100644\n--- a/options.go\n+++ b/options.go\n@@ -6,6 +6,8 @@ import (\n \t\"path/filepath\"\n \t\"reflect\"\n \t\"strings\"\n+\n+\t\"github.com/pkg/errors\"\n )\n \n // An Option applies optional changes to the Kong application.\n@@ -145,7 +147,33 @@ func Bind(args ...interface{}) Option {\n // \t\tBindTo(impl, (*iface)(nil))\n func BindTo(impl, iface interface{}) Option {\n \treturn OptionFunc(func(k *Kong) error {\n-\t\tk.bindings[reflect.TypeOf(iface).Elem()] = reflect.ValueOf(impl)\n+\t\tvalueOf := reflect.ValueOf(impl)\n+\t\tk.bindings[reflect.TypeOf(iface).Elem()] = func() (reflect.Value, error) { return valueOf, nil }\n+\t\treturn nil\n+\t})\n+}\n+\n+// BindToProvider allows binding of provider functions.\n+//\n+// This is useful when the Run() function of different commands require different values that may\n+// not all be initialisable from the main() function.\n+func BindToProvider(provider interface{}) Option {\n+\treturn OptionFunc(func(k *Kong) error {\n+\t\tpv := reflect.ValueOf(provider)\n+\t\tt := pv.Type()\n+\t\tif t.Kind() != reflect.Func || t.NumIn() != 0 || t.NumOut() != 2 || t.Out(1) != reflect.TypeOf((*error)(nil)).Elem() {\n+\t\t\treturn errors.Errorf(\"%T must be a function with the signature func()(T, error)\", provider)\n+\t\t}\n+\t\trt := pv.Type().Out(0)\n+\t\tk.bindings[rt] = func() (reflect.Value, error) {\n+\t\t\tout := pv.Call(nil)\n+\t\t\terrv := out[1]\n+\t\t\tvar err error\n+\t\t\tif !errv.IsNil() {\n+\t\t\t\terr = errv.Interface().(error)\n+\t\t\t}\n+\t\t\treturn out[0], err\n+\t\t}\n \t\treturn nil\n \t})\n }\ndiff --git a/options_test.go b/options_test.go\nindex 5e2da7b..0924e50 100644\n--- a/options_test.go\n+++ b/options_test.go\n@@ -41,3 +41,29 @@ func TestBindTo(t *testing.T) {\n \trequire.NoError(t, err)\n \trequire.Equal(t, \"foo\", saw)\n }\n+\n+type bindToProviderCLI struct {\n+\tCalled bool\n+\tCmd    bindToProviderCmd `cmd:\"\"`\n+}\n+\n+type boundThing struct {\n+}\n+\n+type bindToProviderCmd struct{}\n+\n+func (*bindToProviderCmd) Run(cli *bindToProviderCLI, b *boundThing) error {\n+\tcli.Called = true\n+\treturn nil\n+}\n+\n+func TestBindToProvider(t *testing.T) {\n+\tvar cli bindToProviderCLI\n+\tapp, err := New(&cli, BindToProvider(func() (*boundThing, error) { return &boundThing{}, nil }))\n+\trequire.NoError(t, err)\n+\tctx, err := app.Parse([]string{\"cmd\"})\n+\trequire.NoError(t, err)\n+\terr = ctx.Run()\n+\trequire.NoError(t, err)\n+\trequire.True(t, cli.Called)\n+}\n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    ".golangci.yml",
+    "COPYING",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/README.md",
+    "_examples/server/console.go",
+    "_examples/server/go.mod",
+    "_examples/server/go.sum",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/main.go",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "config_test.go",
+    "context.go",
+    "defaults.go",
+    "defaults_test.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "go.mod",
+    "go.sum",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "util.go",
+    "util_test.go",
+    "visit.go"
+  ],
+  "explanation": {
+    "what": "bindings の型を map[reflect.Type]reflect.Value から map[reflect.Type]func() (reflect.Value, error) に変更した。Bind()/BindTo()/BindTo(Context) は値を即座に reflect.ValueOf() する代わりに、その値を返すだけのクロージャを登録するようになった。加えて BindToProvider(provider) オプションを新設し、func() (T, error) という形のプロバイダ関数を渡すと、実行時(callMethod での呼び出し時)に遅延評価してバインド値を生成できるようにした。",
+    "why": "コミットメッセージに、セットアップフェーズと利用フェーズが分かれているツールでは一部のオブジェクトの初期化を遅延させたい場面がある、と明記されている。BeforeApply/AfterApply/Run() などのフックにバインドされる値を、Kong 構築時ではなく実際にフックが呼ばれる直前まで生成を遅らせられるようにするための変更。",
+    "highlights": [
+      { "file": "options.go", "note": "BindToProvider は reflect で provider の型を検査し func()(T, error) の形でなければ即座にエラーを返す。呼び出し時に out[1] が nil かどうかで error の有無を判定している。" },
+      { "file": "callbacks.go", "note": "callMethod() が bindings[pt] から取り出すのが値そのものではなく関数になったため、argf() を呼んでから使うよう変更されている。" }
+    ],
+    "langNotes": [
+      { "topic": "関数によるbind提供(遅延評価)", "note": "kong.Bind(...) は値を即座に reflect.Value 化して保持するが、本コミットで導入された BindToProvider は「値を作る関数」を保持し、実際に必要になった時点(Run() 呼び出し時など)で呼び出す遅延初期化の仕組み。Go の reflect.Value と関数を組み合わせて、DI(依存性注入)的なコンテナを実現している。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

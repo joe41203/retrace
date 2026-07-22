@@ -1,0 +1,96 @@
+{
+  "seq": 125,
+  "sha": "041e879d6340da5a3823152eaf48418f4bc92638",
+  "parents": [
+    "fddfb973d6d92d2a9c1e3d08ba454eacebbcc15c"
+  ],
+  "author": {
+    "name": "Alec Thomas",
+    "email": "alec@swapoff.org",
+    "date": "2018-11-03T09:51:57+11:00"
+  },
+  "message": "Expand ~ for FileContentFlag.",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 1,
+    "deletions": 1
+  },
+  "files": [
+    {
+      "path": "mapper.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/mapper.go b/mapper.go\nindex e4d54fd..8bd7d00 100644\n--- a/mapper.go\n+++ b/mapper.go\n@@ -477,7 +477,7 @@ func JoinEscaped(s []string, sep rune) string {\n type FileContentFlag []byte\n \n func (f *FileContentFlag) Decode(ctx *DecodeContext) error { // nolint: golint\n-\tfilename := ctx.Scan.PopValue(\"filename\")\n+\tfilename := expandPath(ctx.Scan.PopValue(\"filename\"))\n \tdata, err := ioutil.ReadFile(filename) // nolint: gosec\n \tif err != nil {\n \t\treturn fmt.Errorf(\"failed to open %q: %s\", filename, err)\n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    ".golangci.yml",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/console.go",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/main.go",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "context.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "go.mod",
+    "go.sum",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "util.go",
+    "util_test.go",
+    "visit.go"
+  ],
+  "explanation": {
+    "what": "FileContentFlag.Decode() で filename := ctx.Scan.PopValue(\"filename\") としていた箇所を filename := expandPath(ctx.Scan.PopValue(\"filename\")) に変更し、ファイルパス中の ~ をホームディレクトリに展開してから ioutil.ReadFile するようにした。",
+    "why": "コミットメッセージ \"Expand ~ for FileContentFlag\" の通り、既存の path/existingfile/existingdir マッパーや LoadConfig で使われていた expandPath (options.go) を FileContentFlag にも適用し、~/foo のような入力を他の path 系フラグと同様に扱えるようにする一貫性のための修正。",
+    "highlights": [
+      { "file": "mapper.go", "note": "FileContentFlag.Decode() が expandPath() 経由でパスを解決してからファイルを読むようになった" }
+    ],
+    "langNotes": [
+      { "topic": "~ (チルダ) 展開", "note": "シェルと違い Go の os/ioutil 系 API は ~ を自動でホームディレクトリに展開しない。kong は options.go の expandPath ヘルパーで手動展開しており、このコミットでその適用範囲を FileContentFlag にも広げている。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

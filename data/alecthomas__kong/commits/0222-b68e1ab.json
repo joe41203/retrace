@@ -1,0 +1,165 @@
+{
+  "seq": 222,
+  "sha": "b68e1aba6340deb6b378f3a3fc241a0cc871b4c6",
+  "parents": [
+    "2479d83cc0307560579a16089433cbed7a6e5c77"
+  ],
+  "author": {
+    "name": "Mickaël Menu",
+    "email": "mickael.menu@gmail.com",
+    "date": "2021-02-08T20:58:43+01:00"
+  },
+  "message": "Add support for groups in the default HelpPrinter (#135)",
+  "pr": {
+    "number": 135,
+    "title": "Add support for groups in the default HelpPrinter",
+    "body": "Fix #134\r\n\r\n@alecthomas It is still lacking support for grouped flags, I wanted to check with you that this PR is welcome and on the right path first.\r\n\r\nHere's what's implemented so far:\r\n\r\n* Ungrouped commands are displayed first, under a \"Command:\" group.\r\n* Each group is printed in order of appearance.\r\n* Tree mode ignores group for now.\r\n   * This part is not so easy to implement, maybe that's a reasonable limitation.\r\n\r\nI think it could be useful to add some group metadata as well. In this case, the `group` tag would be a key referencing a declared Group metadata. We could store:\r\n\r\n* The group title, in case it's long and to be able to modify it in only one spot.\r\n  * Git headings are quite long, e.g. `start a working area (see also: git help tutorial)`\r\n* A short help message displayed under the group title.\r\n    ```\r\n    Filtering:\r\n    Options used to filter the items in the list.\r\n\r\n        --name   Filter by name\r\n        --color   Filter by color\r\n    ```\r\n\r\nI'm not sure what would be the best place for such metadata. Maybe an `Option`?",
+    "url": "https://github.com/alecthomas/kong/pull/135"
+  },
+  "linkedIssues": [
+    {
+      "number": 134,
+      "title": "Are logical groups still supported?",
+      "body": "Hi,\r\n\r\nI've been trying to use the `group:\"X\"` fields tag, expecting to see the flags/commands grouped in the help output. Unfortunately it doesn't seem to be working. \r\n\r\nAfter a quick look at the code, it seems that the groups are not used anymore: https://github.com/alecthomas/kong/blob/2479d83cc0307560579a16089433cbed7a6e5c77/help.go#L206-L226\r\n\r\nIs this feature deprecated?\r\n\r\nThanks, I appreciate the effort you put in crafting this beautiful library!",
+      "url": "https://github.com/alecthomas/kong/issues/134"
+    }
+  ],
+  "stats": {
+    "filesChanged": 7,
+    "additions": 325,
+    "deletions": 28
+  },
+  "files": [
+    {
+      "path": "README.md",
+      "status": "M",
+      "additions": 1,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "build.go",
+      "status": "M",
+      "additions": 19,
+      "deletions": 2,
+      "binary": false
+    },
+    {
+      "path": "help.go",
+      "status": "M",
+      "additions": 107,
+      "deletions": 23,
+      "binary": false
+    },
+    {
+      "path": "help_test.go",
+      "status": "M",
+      "additions": 162,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "kong.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "model.go",
+      "status": "M",
+      "additions": 25,
+      "deletions": 2,
+      "binary": false
+    },
+    {
+      "path": "options.go",
+      "status": "M",
+      "additions": 10,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/README.md b/README.md\nindex 71fcd00..f0b7a30 100644\n--- a/README.md\n+++ b/README.md\n@@ -589,6 +589,7 @@ The default help output is usually sufficient, but if not there are two solution\n 1. Use `ConfigureHelp(HelpOptions)` to configure how help is formatted (see [HelpOptions](https://godoc.org/github.com/alecthomas/kong#HelpOptions) for details).\n 2. Custom help can be wired into Kong via the `Help(HelpFunc)` option. The `HelpFunc` is passed a `Context`, which contains the parsed context for the current command-line. See the implementation of `PrintHelp` for an example.\n 3. Use `HelpFormatter(HelpValueFormatter)` if you want to just customize the help text that is accompanied by flags and arguments.\n+4. Use `Groups([]Group)` if you want to customize group titles or add a header.\n \n ### `Bind(...)` - bind values for callback hooks and Run() methods\n \ndiff --git a/build.go b/build.go\nindex 9037512..8e70674 100644\n--- a/build.go\n+++ b/build.go\n@@ -142,7 +142,7 @@ func buildChild(k *Kong, node *Node, typ NodeType, v reflect.Value, ft reflect.S\n \tchild.Parent = node\n \tchild.Help = tag.Help\n \tchild.Hidden = tag.Hidden\n-\tchild.Group = tag.Group\n+\tchild.Group = buildGroupForKey(k, tag.Group)\n \tchild.Aliases = tag.Aliases\n \n \tif provider, ok := fv.Addr().Interface().(HelpProvider); ok {\n@@ -213,7 +213,7 @@ func buildField(k *Kong, node *Node, v reflect.Value, ft reflect.StructField, fv\n \t\t\tShort:       tag.Short,\n \t\t\tPlaceHolder: tag.PlaceHolder,\n \t\t\tEnv:         tag.Env,\n-\t\t\tGroup:       tag.Group,\n+\t\t\tGroup:       buildGroupForKey(k, tag.Group),\n \t\t\tXor:         tag.Xor,\n \t\t\tHidden:      tag.Hidden,\n \t\t}\n@@ -221,3 +221,20 @@ func buildField(k *Kong, node *Node, v reflect.Value, ft reflect.StructField, fv\n \t\tnode.Flags = append(node.Flags, flag)\n \t}\n }\n+\n+func buildGroupForKey(k *Kong, key string) *Group {\n+\tif key == \"\" {\n+\t\treturn nil\n+\t}\n+\tfor _, group := range k.groups {\n+\t\tif group.Key == key {\n+\t\t\treturn &group\n+\t\t}\n+\t}\n+\n+\t// No group provided with kong.Groups. We create one ad-hoc for this key.\n+\treturn &Group{\n+\t\tKey:   key,\n+\t\tTitle: key,\n+\t}\n+}\ndiff --git a/help.go b/help.go\nindex 4814b1c..31b0b75 100644\n--- a/help.go\n+++ b/help.go\n@@ -144,22 +144,41 @@ func printNodeDetail(w *helpWriter, node *Node, hide bool) {\n \t\twritePositionals(w.Indent(), node.Positional)\n \t}\n \tif flags := node.AllFlags(true); len(flags) > 0 {\n-\t\tw.Print(\"\")\n-\t\tw.Print(\"Flags:\")\n-\t\twriteFlags(w.Indent(), flags)\n+\t\tgroupedFlags := collectFlagGroups(flags)\n+\t\tfor _, group := range groupedFlags {\n+\t\t\tw.Print(\"\")\n+\t\t\tif group.Metadata.Title != \"\" {\n+\t\t\t\tw.Print(group.Metadata.Title)\n+\t\t\t}\n+\t\t\tif group.Metadata.Header != \"\" {\n+\t\t\t\tw.Print(group.Metadata.Header)\n+\t\t\t}\n+\t\t\twriteFlags(w.Indent(), group.Flags)\n+\t\t}\n \t}\n \tcmds := node.Leaves(hide)\n \tif len(cmds) > 0 {\n-\t\tw.Print(\"\")\n-\t\tw.Print(\"Commands:\")\n+\t\tiw := w.Indent()\n \t\tif w.Tree {\n-\t\t\twriteCommandTree(w, node)\n+\t\t\tw.Print(\"\")\n+\t\t\tw.Print(\"Commands:\")\n+\t\t\twriteCommandTree(iw, node)\n \t\t} else {\n-\t\t\tiw := w.Indent()\n-\t\t\tif w.Compact {\n-\t\t\t\twriteCompactCommandList(cmds, iw)\n-\t\t\t} else {\n-\t\t\t\twriteCommandList(cmds, iw)\n+\t\t\tgroupedCmds := collectCommandGroups(cmds)\n+\t\t\tfor _, group := range groupedCmds {\n+\t\t\t\tw.Print(\"\")\n+\t\t\t\tif group.Metadata.Title != \"\" {\n+\t\t\t\t\tw.Print(group.Metadata.Title)\n+\t\t\t\t}\n+\t\t\t\tif group.Metadata.Header != \"\" {\n+\t\t\t\t\tw.Print(group.Metadata.Header)\n+\t\t\t\t}\n+\n+\t\t\t\tif w.Compact {\n+\t\t\t\t\twriteCompactCommandList(group.Commands, iw)\n+\t\t\t\t} else {\n+\t\t\t\t\twriteCommandList(group.Commands, iw)\n+\t\t\t\t}\n \t\t\t}\n \t\t}\n \t}\n@@ -189,7 +208,6 @@ func writeCompactCommandList(cmds []*Node, iw *helpWriter) {\n }\n \n func writeCommandTree(w *helpWriter, node *Node) {\n-\tiw := w.Indent()\n \trows := make([][2]string, 0, len(node.Children)*2)\n \tfor i, cmd := range node.Children {\n \t\tif cmd.Hidden {\n@@ -200,27 +218,93 @@ func writeCommandTree(w *helpWriter, node *Node) {\n \t\t\trows = append(rows, [2]string{\"\", \"\"})\n \t\t}\n \t}\n-\twriteTwoColumns(iw, rows)\n+\twriteTwoColumns(w, rows)\n+}\n+\n+type helpFlagGroup struct {\n+\tMetadata *Group\n+\tFlags    [][]*Flag\n+}\n+\n+func collectFlagGroups(flags [][]*Flag) []helpFlagGroup {\n+\t// Group keys in order of appearance.\n+\tgroups := []*Group{}\n+\t// Flags grouped by their group key.\n+\tflagsByGroup := map[string][][]*Flag{}\n+\n+\tfor _, levelFlags := range flags {\n+\t\tlevelFlagsByGroup := map[string][]*Flag{}\n+\n+\t\tfor _, flag := range levelFlags {\n+\t\t\tkey := \"\"\n+\t\t\tif flag.Group != nil {\n+\t\t\t\tkey = flag.Group.Key\n+\t\t\t\tgroupAlreadySeen := false\n+\t\t\t\tfor _, group := range groups {\n+\t\t\t\t\tif key == group.Key {\n+\t\t\t\t\t\tgroupAlreadySeen = true\n+\t\t\t\t\t\tbreak\n+\t\t\t\t\t}\n+\t\t\t\t}\n+\t\t\t\tif !groupAlreadySeen {\n+\t\t\t\t\tgroups = append(groups, flag.Group)\n+\t\t\t\t}\n+\t\t\t}\n+\n+\t\t\tlevelFlagsByGroup[key] = append(levelFlagsByGroup[key], flag)\n+\t\t}\n+\n+\t\tfor key, flags := range levelFlagsByGroup {\n+\t\t\tflagsByGroup[key] = append(flagsByGroup[key], flags)\n+\t\t}\n+\t}\n+\n+\tout := []helpFlagGroup{}\n+\t// Ungrouped flags are always displayed first.\n+\tif ungroupedFlags, ok := flagsByGroup[\"\"]; ok {\n+\t\tout = append(out, helpFlagGroup{\n+\t\t\tMetadata: &Group{Title: \"Flags:\"},\n+\t\t\tFlags:    ungroupedFlags,\n+\t\t})\n+\t}\n+\tfor _, group := range groups {\n+\t\tout = append(out, helpFlagGroup{Metadata: group, Flags: flagsByGroup[group.Key]})\n+\t}\n+\treturn out\n }\n \n-// nolint: unused\n type helpCommandGroup struct {\n-\tName     string\n+\tMetadata *Group\n \tCommands []*Node\n }\n \n-// nolint: unused, deadcode\n func collectCommandGroups(nodes []*Node) []helpCommandGroup {\n-\tgroups := map[string][]*Node{}\n+\t// Groups in order of appearance.\n+\tgroups := []*Group{}\n+\t// Nodes grouped by their group key.\n+\tnodesByGroup := map[string][]*Node{}\n+\n \tfor _, node := range nodes {\n-\t\tgroups[node.Group] = append(groups[node.Group], node)\n+\t\tkey := \"\"\n+\t\tif group := node.ClosestGroup(); group != nil {\n+\t\t\tkey = group.Key\n+\t\t\tif _, ok := nodesByGroup[key]; !ok {\n+\t\t\t\tgroups = append(groups, group)\n+\t\t\t}\n+\t\t}\n+\t\tnodesByGroup[key] = append(nodesByGroup[key], node)\n \t}\n+\n \tout := []helpCommandGroup{}\n-\tfor name, nodes := range groups {\n-\t\tif name == \"\" {\n-\t\t\tname = \"Commands\"\n-\t\t}\n-\t\tout = append(out, helpCommandGroup{Name: name, Commands: nodes})\n+\t// Ungrouped nodes are always displayed first.\n+\tif ungroupedNodes, ok := nodesByGroup[\"\"]; ok {\n+\t\tout = append(out, helpCommandGroup{\n+\t\t\tMetadata: &Group{Title: \"Commands:\"},\n+\t\t\tCommands: ungroupedNodes,\n+\t\t})\n+\t}\n+\tfor _, group := range groups {\n+\t\tout = append(out, helpCommandGroup{Metadata: group, Commands: nodesByGroup[group.Key]})\n \t}\n \treturn out\n }\ndiff --git a/help_test.go b/help_test.go\nindex 7a61fa8..51b5132 100644\n--- a/help_test.go\n+++ b/help_test.go\n@@ -136,7 +136,7 @@ func TestHelpTree(t *testing.T) {\n \t\t\tOther struct {\n \t\t\t\tOther string `arg help:\"other arg\"`\n \t\t\t} `arg help:\"subcommand other\"`\n-\t\t} `cmd help:\"subcommand one\"`\n+\t\t} `cmd help:\"subcommand one\" group:\"Group A\"` // Groups are ignored in trees\n \n \t\tTwo struct {\n \t\t\tThree threeArg `arg help:\"Sub-sub-arg.\"`\n@@ -248,3 +248,164 @@ func TestCustomHelpFormatter(t *testing.T) {\n \trequire.NoError(t, err)\n \trequire.Contains(t, w.String(), \"A flag.\")\n }\n+\n+func TestHelpGrouping(t *testing.T) {\n+\t// nolint: govet\n+\tvar cli struct {\n+\t\tGroupedAString string `help:\"A string flag grouped in A.\" group:\"Group A\"`\n+\t\tFreeString     string `help:\"A non grouped string flag.\"`\n+\t\tGroupedBString string `help:\"A string flag grouped in B.\" group:\"Group B\"`\n+\t\tFreeBool       bool   `help:\"A non grouped bool flag.\"`\n+\t\tGroupedABool   bool   `help:\"A bool flag grouped in A.\" group:\"Group A\"`\n+\n+\t\tOne struct {\n+\t\t\tFlag string `help:\"Nested flag.\"`\n+\t\t\t// Group is inherited from the parent command\n+\t\t\tThing struct {\n+\t\t\t\tArg string `arg help:\"argument\"`\n+\t\t\t} `cmd help:\"subcommand thing\"`\n+\t\t\tOther struct {\n+\t\t\t\tOther string `arg help:\"other arg\"`\n+\t\t\t} `arg help:\"subcommand other\"`\n+\t\t\t// ... but a subcommand can override it\n+\t\t\tStuff struct {\n+\t\t\t\tStuff string `arg help:\"argument\"`\n+\t\t\t} `arg help:\"subcommand stuff\" group:\"Group B\"`\n+\t\t} `cmd help:\"A subcommand grouped in A.\" group:\"Group A\"`\n+\n+\t\tTwo struct {\n+\t\t\tGrouped1String  string `help:\"A string flag grouped in 1.\" group:\"Group 1\"`\n+\t\t\tAFreeString     string `help:\"A non grouped string flag.\"`\n+\t\t\tGrouped2String  string `help:\"A string flag grouped in 2.\" group:\"Group 2\"`\n+\t\t\tAGroupedAString bool   `help:\"A string flag grouped in A.\" group:\"Group A\"`\n+\t\t\tGrouped1Bool    bool   `help:\"A bool flag grouped in 1.\" group:\"Group 1\"`\n+\t\t} `cmd help:\"A non grouped subcommand.\"`\n+\n+\t\tFour struct {\n+\t\t\tFlag string `help:\"Nested flag.\"`\n+\t\t} `cmd help:\"Another subcommand grouped in B.\" group:\"Group B\"`\n+\n+\t\tThree struct {\n+\t\t\tFlag string `help:\"Nested flag.\"`\n+\t\t} `cmd help:\"Another subcommand grouped in A.\" group:\"Group A\"`\n+\t}\n+\n+\tw := bytes.NewBuffer(nil)\n+\texited := false\n+\tapp := mustNew(t, &cli,\n+\t\tkong.Name(\"test-app\"),\n+\t\tkong.Description(\"A test app.\"),\n+\t\tkong.Groups([]kong.Group{\n+\t\t\t{\n+\t\t\t\tKey:    \"Group A\",\n+\t\t\t\tTitle:  \"Group title taken from the kong.Groups option\",\n+\t\t\t\tHeader: \"A group header\",\n+\t\t\t},\n+\t\t\t{\n+\t\t\t\tKey:   \"Group 1\",\n+\t\t\t\tTitle: \"Another group title, this time without header\",\n+\t\t\t},\n+\t\t\t{\n+\t\t\t\tKey: \"Unknown key\",\n+\t\t\t},\n+\t\t}),\n+\t\tkong.Writers(w, w),\n+\t\tkong.Exit(func(int) {\n+\t\t\texited = true\n+\t\t\tpanic(true) // Panic to fake \"exit\".\n+\t\t}),\n+\t)\n+\n+\tt.Run(\"Full\", func(t *testing.T) {\n+\t\trequire.PanicsWithValue(t, true, func() {\n+\t\t\t_, err := app.Parse([]string{\"--help\"})\n+\t\t\trequire.True(t, exited)\n+\t\t\trequire.NoError(t, err)\n+\t\t})\n+\t\texpected := `Usage: test-app <command>\n+\n+A test app.\n+\n+Flags:\n+  -h, --help                  Show context-sensitive help.\n+      --free-string=STRING    A non grouped string flag.\n+      --free-bool             A non grouped bool flag.\n+\n+Group title taken from the kong.Groups option\n+A group header\n+  --grouped-a-string=STRING    A string flag grouped in A.\n+  --grouped-a-bool             A bool flag grouped in A.\n+\n+Group B\n+  --grouped-b-string=STRING    A string flag grouped in B.\n+\n+Commands:\n+  two\n+    A non grouped subcommand.\n+\n+Group title taken from the kong.Groups option\n+A group header\n+  one thing <arg>\n+    subcommand thing\n+\n+  one <other>\n+    subcommand other\n+\n+  three\n+    Another subcommand grouped in A.\n+\n+Group B\n+  one <stuff>\n+    subcommand stuff\n+\n+  four\n+    Another subcommand grouped in B.\n+\n+Run \"test-app <command> --help\" for more information on a command.\n+`\n+\t\tt.Log(w.String())\n+\t\tt.Log(expected)\n+\t\trequire.Equal(t, expected, w.String())\n+\t})\n+\n+\tt.Run(\"Selected\", func(t *testing.T) {\n+\t\texited = false\n+\t\tw.Truncate(0)\n+\t\trequire.PanicsWithValue(t, true, func() {\n+\t\t\t_, err := app.Parse([]string{\"two\", \"--help\"})\n+\t\t\trequire.NoError(t, err)\n+\t\t\trequire.True(t, exited)\n+\t\t})\n+\t\texpected := `Usage: test-app two\n+\n+A non grouped subcommand.\n+\n+Flags:\n+  -h, --help                    Show context-sensitive help.\n+      --free-string=STRING      A non grouped string flag.\n+      --free-bool               A non grouped bool flag.\n+\n+      --a-free-string=STRING    A non grouped string flag.\n+\n+Group title taken from the kong.Groups option\n+A group header\n+  --grouped-a-string=STRING    A string flag grouped in A.\n+  --grouped-a-bool             A bool flag grouped in A.\n+\n+  --a-grouped-a-string         A string flag grouped in A.\n+\n+Group B\n+  --grouped-b-string=STRING    A string flag grouped in B.\n+\n+Another group title, this time without header\n+  --grouped-1-string=STRING    A string flag grouped in 1.\n+  --grouped-1-bool             A bool flag grouped in 1.\n+\n+Group 2\n+  --grouped-2-string=STRING    A string flag grouped in 2.\n+`\n+\t\tt.Log(expected)\n+\t\tt.Log(w.String())\n+\t\trequire.Equal(t, expected, w.String())\n+\t})\n+}\ndiff --git a/kong.go b/kong.go\nindex b94620a..9b67db9 100644\n--- a/kong.go\n+++ b/kong.go\n@@ -53,6 +53,7 @@ type Kong struct {\n \thelpFormatter HelpValueFormatter\n \thelpOptions   HelpOptions\n \thelpFlag      *Flag\n+\tgroups        []Group\n \tvars          Vars\n \n \t// Set temporarily by Options. These are applied after build().\ndiff --git a/model.go b/model.go\nindex 72dba3e..c13c693 100644\n--- a/model.go\n+++ b/model.go\n@@ -46,7 +46,7 @@ type Node struct {\n \tName       string\n \tHelp       string // Short help displayed in summaries.\n \tDetail     string // Detailed help displayed when describing command/arg alone.\n-\tGroup      string\n+\tGroup      *Group\n \tHidden     bool\n \tFlags      []*Flag\n \tPositional []*Positional\n@@ -203,6 +203,18 @@ func (n *Node) Path() (out string) {\n \treturn strings.TrimSpace(out)\n }\n \n+// ClosestGroup finds the first non-nil group in this node and its ancestors.\n+func (n *Node) ClosestGroup() *Group {\n+\tswitch {\n+\tcase n.Group != nil:\n+\t\treturn n.Group\n+\tcase n.Parent != nil:\n+\t\treturn n.Parent.ClosestGroup()\n+\tdefault:\n+\t\treturn nil\n+\t}\n+}\n+\n // A Value is either a flag or a variable positional argument.\n type Value struct {\n \tFlag         *Flag // Nil if positional argument.\n@@ -351,7 +363,7 @@ type Positional = Value\n // A Flag represents a command-line flag.\n type Flag struct {\n \t*Value\n-\tGroup       string // Logical grouping when displaying. May also be used by configuration loaders to group options logically.\n+\tGroup       *Group // Logical grouping when displaying. May also be used by configuration loaders to group options logically.\n \tXor         string\n \tPlaceHolder string\n \tEnv         string\n@@ -394,6 +406,17 @@ func (f *Flag) FormatPlaceHolder() string {\n \treturn strings.ToUpper(f.Name) + tail\n }\n \n+// Group holds metadata about a command or flag group used when printing help.\n+type Group struct {\n+\t// Key is the `group` field tag value used to identify this group.\n+\tKey string\n+\t// Title is displayed above the grouped items.\n+\tTitle string\n+\t// Header is optional and displayed under the Title when non empty.\n+\t// It can be used to introduce the group's purpose to the user.\n+\tHeader string\n+}\n+\n // This is directly from the Go 1.13 source code.\n func reflectValueIsZero(v reflect.Value) bool {\n \tswitch v.Kind() {\ndiff --git a/options.go b/options.go\nindex 5bd36c3..fc218d1 100644\n--- a/options.go\n+++ b/options.go\n@@ -208,6 +208,16 @@ func ConfigureHelp(options HelpOptions) Option {\n \t})\n }\n \n+// Groups associates `group` field tags with their metadata.\n+//\n+// It can be used to provide a title or header to a command or flag group.\n+func Groups(groups []Group) Option {\n+\treturn OptionFunc(func(k *Kong) error {\n+\t\tk.groups = groups\n+\t\treturn nil\n+\t})\n+}\n+\n // UsageOnError configures Kong to display context-sensitive usage if FatalIfErrorf is called with an error.\n func UsageOnError() Option {\n \treturn OptionFunc(func(k *Kong) error {\n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    ".gitignore",
+    ".golangci.yml",
+    "COPYING",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/README.md",
+    "_examples/server/console.go",
+    "_examples/server/go.mod",
+    "_examples/server/go.sum",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/main.go",
+    "benchmark_test.go",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "config_test.go",
+    "context.go",
+    "defaults.go",
+    "defaults_test.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "go.mod",
+    "go.sum",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "testdata/file.txt",
+    "util.go",
+    "util_test.go",
+    "visit.go"
+  ],
+  "explanation": {
+    "what": "デフォルトの HelpPrinter がフラグ・コマンドの `group:\"X\"` タグを再びヘルプ出力に反映するようにした。model.go の `Node.Group` / `Flag.Group` を文字列から新設の `*Group`(Key/Title)構造体に変更し、build.go の buildGroupForKey で group キーごとに `*Group` を解決、help.go に collectFlagGroups / collectCommandGroups を追加してグループ単位で見出し付きに出力する。未グループの項目は常に先頭にまとめて表示する。加えて `Groups([]Group)` オプションでグループのタイトルを外部から指定できるようにした。ツリー表示ではグループはこれまで通り無視される。",
+    "why": "issue #134 の指摘通り、以前のリファクタリングで group タグの実際の出力反映が失われていた(コードは残っていたが未使用)。PR body ではこれを機に「グループにタイトルや説明文を持たせたい」という拡張案も示されており、Group を単なる文字列でなく専用の構造体に格上げすることで、その後の拡張(このコミットの次で実装される Description 等)の土台を作っている。",
+    "highlights": [
+      { "file": "model.go", "note": "`Group` フィールドを `string` から `*Group` 構造体に変更。ネストしたコマンドが親のグループを継承する ClosestGroup() も追加" },
+      { "file": "help.go", "note": "collectFlagGroups / collectCommandGroups がグループ出現順を保ったまま未グループ項目を先頭に固定する" }
+    ],
+    "langNotes": [],
+    "diagram": {
+      "mermaid": "flowchart TD\n  A[\"struct tag group:\\\"X\\\"\"] --> B[\"Tag.Group (文字列)\"]\n  B --> C[\"buildGroupForKey()\"]\n  D[\"kong.Groups([]Group)\"] --> C\n  C --> E[\"Node.Group / Flag.Group (*Group)\"]\n  E --> F[\"collectFlagGroups / collectCommandGroups\"]\n  F --> G[\"ヘルプ出力(見出し付きグループ)\"]",
+      "caption": "group タグからヘルプ出力までのデータフロー"
+    },
+    "evidence": "pr",
+    "refs": [
+      { "type": "pr", "number": 135, "url": "https://github.com/alecthomas/kong/pull/135" },
+      { "type": "issue", "number": 134, "url": "https://github.com/alecthomas/kong/issues/134" }
+    ],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

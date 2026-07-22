@@ -1,0 +1,155 @@
+{
+  "seq": 231,
+  "sha": "2fdddc4f51b84086f40a70db3756571d10739de0",
+  "parents": [
+    "2a0d7af9c548c9232760abd0cb8722d33526e1ff"
+  ],
+  "author": {
+    "name": "Joe Schmitt",
+    "email": "joe@compass.com",
+    "date": "2021-02-18T10:55:55-05:00"
+  },
+  "message": "Add `negatable` tag to set a bool to be negatable.\n\nIf negatable, add `--[no-]` prefix to help.",
+  "pr": {
+    "number": 146,
+    "title": "Add support for negatable boolean flags",
+    "body": "Adds support for a new `negatable` struct tag, which will automatically set a boolean Struct flag value to `false` if the flag's name starts with `--no-`, even when the default is `true`. This idea is shamelessly stolen from the [`commander` npm library](https://github.com/tj/commander.js#other-option-types-negatable-boolean-and-booleanvalue)\r\n\r\nFor example:\r\n```go\r\ntype Cmd struct {\r\n  Sort bool `default:\"true\",negatable`\r\n}\r\n```\r\n\r\nCalling\r\n```sh\r\ncommand\r\n# or\r\ncommand --sort\r\n```\r\nWill set `Sort` to `true`, but\r\n```sh \r\ncommand --no-sort\r\n```\r\nWill set `Sort` to `false`.\r\n\r\n## Why do this?\r\n\r\nIt avoids the situation of having to do:\r\n```go\r\ntype Cmd struct {\r\n  NoSort bool\r\n}\r\n\r\nfunc (c *Cmd) Run() error {\r\n  if !c.NoSort {\r\n    // Double negations are hard to read!\r\n  }\r\n  return nil\r\n}\r\n```",
+    "url": "https://github.com/alecthomas/kong/pull/146"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 7,
+    "additions": 34,
+    "deletions": 5
+  },
+  "files": [
+    {
+      "path": "README.md",
+      "status": "M",
+      "additions": 1,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "context.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "help.go",
+      "status": "M",
+      "additions": 10,
+      "deletions": 2,
+      "binary": false
+    },
+    {
+      "path": "help_test.go",
+      "status": "M",
+      "additions": 3,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "kong_test.go",
+      "status": "M",
+      "additions": 12,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "model.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "tag.go",
+      "status": "M",
+      "additions": 6,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/README.md b/README.md\nindex f0b7a30..ba040c0 100644\n--- a/README.md\n+++ b/README.md\n@@ -440,6 +440,7 @@ Tag                    | Description\n `required`             | If present, flag/arg is required.\n `optional`             | If present, flag/arg is optional.\n `hidden`               | If present, command or flag is hidden.\n+`negatable`            | If present on a `bool` field, supports prefixing a flag with `--no-` to set flag to `false`\n `format:\"X\"`           | Format for parsing input, if supported.\n `sep:\"X\"`              | Separator for sequences (defaults to \",\"). May be `none` to disable splitting.\n `mapsep:\"X\"`           | Separator for maps (defaults to \";\"). May be `none` to disable splitting.\ndiff --git a/context.go b/context.go\nindex 9ca3f35..2c9b791 100644\n--- a/context.go\n+++ b/context.go\n@@ -652,7 +652,7 @@ func (c *Context) parseFlag(flags []*Flag, match string) (err error) {\n \t\t}\n \t\t// Found a matching flag.\n \t\tc.scan.Pop()\n-\t\tif flag.Value.IsBool() && match == neg {\n+\t\tif match == neg && flag.Tag.Negatable {\n \t\t\tflag.Negated = true\n \t\t}\n \t\terr := flag.Parse(c.scan, c.getValue(flag.Value))\ndiff --git a/help.go b/help.go\nindex ab66ab0..fd2f758 100644\n--- a/help.go\n+++ b/help.go\n@@ -472,9 +472,17 @@ func formatFlag(haveShort bool, flag *Flag) string {\n \t\tflagString += fmt.Sprintf(\"-%c, --%s\", flag.Short, name)\n \t} else {\n \t\tif haveShort {\n-\t\t\tflagString += fmt.Sprintf(\"    --%s\", name)\n+\t\t\tif isBool && flag.Tag.Negatable {\n+\t\t\t\tflagString = fmt.Sprintf(\"    --[no-]%s\", name)\n+\t\t\t} else {\n+\t\t\t\tflagString += fmt.Sprintf(\"    --%s\", name)\n+\t\t\t}\n \t\t} else {\n-\t\t\tflagString += fmt.Sprintf(\"--%s\", name)\n+\t\t\tif isBool && flag.Tag.Negatable {\n+\t\t\t\tflagString = fmt.Sprintf(\"--[no-]%s\", name)\n+\t\t\t} else {\n+\t\t\t\tflagString += fmt.Sprintf(\"--%s\", name)\n+\t\t\t}\n \t\t}\n \t}\n \tif !isBool {\ndiff --git a/help_test.go b/help_test.go\nindex 6bf00b3..71266b4 100644\n--- a/help_test.go\n+++ b/help_test.go\n@@ -29,6 +29,7 @@ func TestHelp(t *testing.T) {\n \t\tSlice    []string       `help:\"A slice of strings.\" placeholder:\"STR\"`\n \t\tMap      map[string]int `help:\"A map of strings to ints.\"`\n \t\tRequired bool           `required help:\"A required flag.\"`\n+\t\tSort     bool           `negatable help:\"Is sortable or not.\"`\n \n \t\tOne struct {\n \t\t\tFlag string `help:\"Nested flag.\"`\n@@ -75,6 +76,7 @@ Flags:\n       --slice=STR,...        A slice of strings.\n       --map=KEY=VALUE;...    A map of strings to ints.\n       --required             A required flag.\n+      --[no-]sort            Is sortable or not.\n \n Commands:\n   one --required\n@@ -115,6 +117,7 @@ Flags:\n       --slice=STR,...        A slice of strings.\n       --map=KEY=VALUE;...    A map of strings to ints.\n       --required             A required flag.\n+      --[no-]sort            Is sortable or not.\n \n       --flag=STRING          Nested flag under two.\n       --required-two\ndiff --git a/kong_test.go b/kong_test.go\nindex e9316fe..b7c598f 100644\n--- a/kong_test.go\n+++ b/kong_test.go\n@@ -359,7 +359,7 @@ func TestTraceErrorPartiallySucceeds(t *testing.T) {\n func TestNegatedBooleanFlag(t *testing.T) {\n \tvar cli struct {\n \t\tCmd struct {\n-\t\t\tFlag bool `kong:\"default='true'\"`\n+\t\t\tFlag bool `kong:\"default='true',negatable\"`\n \t\t} `kong:\"cmd\"`\n \t}\n \n@@ -369,6 +369,17 @@ func TestNegatedBooleanFlag(t *testing.T) {\n \trequire.Equal(t, false, cli.Cmd.Flag)\n }\n \n+func TestInvalidNegatedNonBool(t *testing.T) {\n+\tvar cli struct {\n+\t\tCmd struct {\n+\t\t\tFlag string `kong:\"negatable\"`\n+\t\t} `kong:\"cmd\"`\n+\t}\n+\n+\t_, err := kong.New(&cli)\n+\trequire.Error(t, err)\n+}\n+\n type hookContext struct {\n \tcmd    bool\n \tvalues []string\ndiff --git a/model.go b/model.go\nindex 8b90acc..4ce2456 100644\n--- a/model.go\n+++ b/model.go\n@@ -227,7 +227,6 @@ type Value struct {\n \tTag          *Tag\n \tTarget       reflect.Value\n \tRequired     bool\n-\tNegated      bool\n \tSet          bool   // Set to true when this value is set through some mechanism.\n \tFormat       string // Formatting directive, if applicable.\n \tPosition     int    // Position (for positional arguments).\n@@ -370,6 +369,7 @@ type Flag struct {\n \tEnv         string\n \tShort       rune\n \tHidden      bool\n+\tNegated     bool\n }\n \n func (f *Flag) String() string {\ndiff --git a/tag.go b/tag.go\nindex b780000..e4d9af4 100644\n--- a/tag.go\n+++ b/tag.go\n@@ -33,6 +33,7 @@ type Tag struct {\n \tPrefix      string // Optional prefix on anonymous structs. All sub-flags will have this prefix.\n \tEmbed       bool\n \tAliases     []string\n+\tNegatable   bool\n \n \t// Storage for all tag keys for arbitrary lookups.\n \titems map[string][]string\n@@ -158,6 +159,11 @@ func parseTag(fv reflect.Value, ft reflect.StructField) *Tag {\n \tt.Xor = t.Get(\"xor\")\n \tt.Prefix = t.Get(\"prefix\")\n \tt.Embed = t.Has(\"embed\")\n+\tnegatable := t.Has(\"negatable\")\n+\tif negatable && ft.Type.Name() != \"bool\" {\n+\t\tfail(\"negatable can only be set on booleans\")\n+\t}\n+\tt.Negatable = negatable\n \tsplitFn := func(r rune) bool {\n \t\treturn r == ',' || r == ' '\n \t}\n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    ".github/FUNDING.yml",
+    ".gitignore",
+    ".golangci.yml",
+    "COPYING",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/README.md",
+    "_examples/server/console.go",
+    "_examples/server/go.mod",
+    "_examples/server/go.sum",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/main.go",
+    "benchmark_test.go",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "config_test.go",
+    "context.go",
+    "defaults.go",
+    "defaults_test.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "go.mod",
+    "go.sum",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "testdata/file.txt",
+    "util.go",
+    "util_test.go",
+    "visit.go"
+  ],
+  "explanation": {
+    "what": "bool フィールド向けに新しい struct タグ `negatable` を追加した。このタグを付けると、ヘルプ表示で `--[no-]name` のように `--no-` プレフィックスが案内され、`context.go` の parseFlag で `match == neg` かつ `flag.Tag.Negatable` のときだけ `flag.Negated = true` にする。`tag.go` の parseTag では非 bool フィールドに `negatable` を付けると `fail()` でエラーにする。あわせて `model.go` の `Value.Negated` を削除し、`Flag.Negated` に一本化した。",
+    "why": "PR本文によれば、`NoSort bool` のような命名で二重否定(`if !c.NoSort`)を書かせるのを避けるため、`Sort bool \\`default:\"true\",negatable\\`` のように書けば `--no-sort` で明示的に反転できるようにした。commander npm ライブラリの negatable boolean オプションからアイデアを借用したとPR本文に明記されている。",
+    "highlights": [
+      { "file": "tag.go", "note": "negatable を bool 以外に付けると New() の時点で fail() する検証ロジック" },
+      { "file": "context.go", "note": "parseFlag で `--no-` マッチを Negatable タグの有無で判定するよう変更" }
+    ],
+    "langNotes": [
+      { "topic": "struct タグと reflect.StructField", "note": "Go では `` `kong:\"negatable\"` `` のような struct タグ文字列を reflect で読み取り、フィールドの型(`ft.Type.Name()`)を見て動的にバリデーションしている。タグは実行時にしか解釈されないため、このように fail() で早期に矛盾を検出する設計になっている。" }
+    ],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [{ "type": "pr", "number": 146, "url": "https://github.com/alecthomas/kong/pull/146" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

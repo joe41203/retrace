@@ -1,0 +1,90 @@
+{
+  "seq": 7,
+  "sha": "31fe51f9d8803cbcba0bd5ea862d0168251e580d",
+  "parents": [
+    "b9d002b746156c8f9591be7847ce68df75e410d0"
+  ],
+  "author": {
+    "name": "Alec Thomas",
+    "email": "alec@swapoff.org",
+    "date": "2018-05-17T20:16:12+10:00"
+  },
+  "message": "Support cumulative positional arguments.",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 5,
+    "additions": 49,
+    "deletions": 8
+  },
+  "files": [
+    {
+      "path": "build.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "decoders.go",
+      "status": "M",
+      "additions": 18,
+      "deletions": 7,
+      "binary": false
+    },
+    {
+      "path": "kong_test.go",
+      "status": "M",
+      "additions": 13,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "model.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "scanner.go",
+      "status": "M",
+      "additions": 16,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/build.go b/build.go\nindex 63a301f..ef6798f 100644\n--- a/build.go\n+++ b/build.go\n@@ -100,6 +100,7 @@ func buildNode(v reflect.Value) *Node {\n \t\t\tif arg {\n \t\t\t\tnode.Positional = append(node.Positional, &value)\n \t\t\t} else {\n+\t\t\t\tvalue.Flag = true\n \t\t\t\tnode.Flags = append(node.Flags, &Flag{\n \t\t\t\t\tValue:       value,\n \t\t\t\t\tShort:       short,\ndiff --git a/decoders.go b/decoders.go\nindex d1b2c10..4cbb1f1 100644\n--- a/decoders.go\n+++ b/decoders.go\n@@ -181,18 +181,20 @@ func timeDecoder(ctx *DecoderContext, scan *Scanner, target reflect.Value) error\n }\n \n func intDecoder(ctx *DecoderContext, scan *Scanner, target reflect.Value) error {\n-\tn, err := strconv.ParseInt(scan.PopValue(\"int\"), 10, 64)\n+\tvalue := scan.PopValue(\"int\")\n+\tn, err := strconv.ParseInt(value, 10, 64)\n \tif err != nil {\n-\t\treturn err\n+\t\treturn fmt.Errorf(\"invalid int %q\", value)\n \t}\n \ttarget.SetInt(n)\n \treturn nil\n }\n \n func uintDecoder(ctx *DecoderContext, scan *Scanner, target reflect.Value) error {\n-\tn, err := strconv.ParseUint(scan.PopValue(\"uint\"), 10, 64)\n+\tvalue := scan.PopValue(\"uint\")\n+\tn, err := strconv.ParseUint(value, 10, 64)\n \tif err != nil {\n-\t\treturn err\n+\t\treturn fmt.Errorf(\"invalid uint %q\", value)\n \t}\n \ttarget.SetUint(n)\n \treturn nil\n@@ -200,9 +202,10 @@ func uintDecoder(ctx *DecoderContext, scan *Scanner, target reflect.Value) error\n \n func floatDecoder(bits int) DecoderFunc {\n \treturn func(ctx *DecoderContext, scan *Scanner, target reflect.Value) error {\n-\t\tn, err := strconv.ParseFloat(scan.PopValue(\"float\"), bits)\n+\t\tvalue := scan.PopValue(\"float\")\n+\t\tn, err := strconv.ParseFloat(value, bits)\n \t\tif err != nil {\n-\t\t\treturn err\n+\t\t\treturn fmt.Errorf(\"invalid float %q\", value)\n \t\t}\n \t\ttarget.SetFloat(n)\n \t\treturn nil\n@@ -215,7 +218,15 @@ func sliceDecoder(ctx *DecoderContext, scan *Scanner, target reflect.Value) erro\n \tif !ok {\n \t\tsep = \",\"\n \t}\n-\tchildScanner := Scan(strings.Split(scan.PopValue(\"list\"), sep)...)\n+\tvar childScanner *Scanner\n+\tif ctx.Value.Flag {\n+\t\tchildScanner = Scan(strings.Split(scan.PopValue(\"list\"), sep)...)\n+\t} else {\n+\t\ttokens := scan.PopUntil(func(t Token) bool {\n+\t\t\treturn !t.IsValue() || (t.Type == UntypedToken && strings.HasPrefix(t.Value, \"-\"))\n+\t\t})\n+\t\tchildScanner = Scan(tokens...)\n+\t}\n \tchildDecoder := DecoderForType(el)\n \tif childDecoder == nil {\n \t\treturn fmt.Errorf(\"no decoder for element type of %s\", target.Type())\ndiff --git a/kong_test.go b/kong_test.go\nindex 2f3d96b..10e4894 100644\n--- a/kong_test.go\n+++ b/kong_test.go\n@@ -76,7 +76,7 @@ func TestResetWithDefaults(t *testing.T) {\n \trequire.Equal(t, \"default\", cli.FlagWithDefault)\n }\n \n-func TestSlice(t *testing.T) {\n+func TestFlagSlice(t *testing.T) {\n \tvar cli struct {\n \t\tSlice []int `help:\"\"`\n \t}\n@@ -86,6 +86,18 @@ func TestSlice(t *testing.T) {\n \trequire.Equal(t, []int{1, 2, 3}, cli.Slice)\n }\n \n+func TestArgSlice(t *testing.T) {\n+\tvar cli struct {\n+\t\tSlice []int `help:\"\" arg:\"\"`\n+\t\tFlag  bool  `help:\"\"`\n+\t}\n+\tparser := mustNew(t, &cli)\n+\t_, err := parser.Parse([]string{\"1\", \"2\", \"3\", \"--flag\"})\n+\trequire.NoError(t, err)\n+\trequire.Equal(t, []int{1, 2, 3}, cli.Slice)\n+\trequire.Equal(t, true, cli.Flag)\n+}\n+\n func TestUnsupportedfieldErrors(t *testing.T) {\n \tvar cli struct {\n \t\tKeys map[string]string `help:\"\"`\ndiff --git a/model.go b/model.go\nindex 51c12d9..2583c00 100644\n--- a/model.go\n+++ b/model.go\n@@ -21,6 +21,7 @@ type Node struct {\n }\n \n type Value struct {\n+\tFlag     bool // True if flag, false if positional argument.\n \tName     string\n \tHelp     string\n \tDecoder  Decoder\ndiff --git a/scanner.go b/scanner.go\nindex e93b717..9c7d86d 100644\n--- a/scanner.go\n+++ b/scanner.go\n@@ -86,6 +86,22 @@ func (s *Scanner) PopValue(context string) string {\n \treturn t.Value\n }\n \n+// PopWhile predicate returns true.\n+func (s *Scanner) PopWhile(predicate func(Token) bool) (values []string) {\n+\tfor predicate(s.Peek()) {\n+\t\tvalues = append(values, s.Pop().Value)\n+\t}\n+\treturn\n+}\n+\n+// PopUntil predicate returns true.\n+func (s *Scanner) PopUntil(predicate func(Token) bool) (values []string) {\n+\tfor !predicate(s.Peek()) {\n+\t\tvalues = append(values, s.Pop().Value)\n+\t}\n+\treturn\n+}\n+\n func (s *Scanner) Peek() Token {\n \tif len(s.args) == 0 {\n \t\treturn Token{Type: EOLToken}\n",
+  "diffTruncated": false,
+  "tree": [
+    "README.md",
+    "_examples/shell/main.go",
+    "build.go",
+    "camelcase.go",
+    "decoders.go",
+    "decoders_test.go",
+    "global.go",
+    "kong.go",
+    "kong_test.go",
+    "model.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tokentype_string.go"
+  ],
+  "explanation": {
+    "what": "Value に Flag bool フィールドを追加し(フラグか位置引数かを区別)、sliceDecoder がその Flag の値によって挙動を変えるようにした。フラグの場合は従来通り1トークンをカンマ分割するが、位置引数の場合は Scanner.PopUntil() で「値として使えるトークンがなくなるまで」複数の引数トークンをまとめて1つのスライスに詰め込む。Scanner に PopWhile/PopUntil という述語ベースの取得メソッドを追加し、int/uint/float decoder のエラーメッセージに実際の入力値を含めるよう改善した。",
+    "why": "コミットメッセージの通り、位置引数としてのスライス(例: `rm file1 file2 file3`)を「カンマ区切りの1トークン」ではなく「複数の独立したコマンドライン引数の累積」として扱えるようにする回。フラグとしてのスライス(`--files=a,b,c`)とは異なる読み方が必要なため、Value に Flag フラグを持たせて sliceDecoder 内で分岐させている。",
+    "highlights": [
+      { "file": "decoders.go", "note": "sliceDecoder が ctx.Value.Flag で分岐し、位置引数側は PopUntil で連続する値トークンをまとめて消費する" },
+      { "file": "scanner.go", "note": "PopWhile/PopUntil という述語(predicate)駆動のトークン取得メソッドの初出" }
+    ],
+    "langNotes": [
+      { "topic": "累積的位置引数(cumulative positional arguments)", "note": "kong では `Slice []int `arg:\"\"`` のように位置引数をスライス型にすると、残りのコマンドライン引数を(区切り文字なしで)そのままスライスの要素として次々に読み取れる。`app 1 2 3 --flag` のように後続のフラグの手前まで貪欲に値を消費する挙動がこのコミットで入った。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

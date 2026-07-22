@@ -1,0 +1,138 @@
+{
+  "seq": 280,
+  "sha": "79f896f0c0cbaef813d02006acd321d64e9cf55d",
+  "parents": [
+    "5090305bcbfacb80693f5db617b7dfca1b7a27d7"
+  ],
+  "author": {
+    "name": "Colin",
+    "email": "valentini.colin@gmail.com",
+    "date": "2021-11-18T16:56:39-05:00"
+  },
+  "message": "feat: add support for variable interpolation into env tag key (#234)",
+  "pr": {
+    "number": 234,
+    "title": "feat: add support for variable interpolation into env tag key",
+    "body": "Fixes issue #233 by enabling support for variable interpolation into the `env` struct tag.\r\n\r\n```go\r\ntype cli struct {\r\n\tEnvFlag string `env:\"${myEnv}\" help:\"Looks at ${myEnv}\"`\r\n}\r\n\r\nctx := kong.Parse(&cli{}, kong.Vars{\r\n\t\"myEnv\": \"AN_ENV_VAR\",\r\n})\r\n```",
+    "url": "https://github.com/alecthomas/kong/pull/234"
+  },
+  "linkedIssues": [
+    {
+      "number": 233,
+      "title": "Add support for variable interpolation into `env`",
+      "body": "I noticed that `kong.Var` interpolation does not support the `env` tag. I would like to be able to interpolate the environment variable name itself, since in my use case these are defined elsewhere in other packages and I'd rather not hardcode it.\r\n\r\nIf there's some other preferred solution to this using existing functionality, I'd be okay with that (assuming I don't have to add dozens of lines of code to do so).\r\n\r\n```go\r\nimport (\r\n\t\"fmt\"\r\n\t\"os\"\r\n\t\"github.com/alecthomas/kong\"\r\n)\r\n\r\nconst SomeEnvVar = \"SOME_ENV_VAR\"\r\n\r\ntype cli struct {\r\n\tMyEnv string `env:\"${myEnv}\" help:\"An environment variable\"`\r\n}\r\n\r\n// Set environment variable\r\nif err := os.Setenv(SomeEnvVar, \"something/or/other\"); err != nil {\r\n\tpanic(err)\r\n}\r\n\r\ncli := cli{}\r\nctx := kong.Parse(&cli, kong.Vars{\r\n\t\"myEnv\": SomeEnvVar,\r\n})\r\n\r\n// Does not interpolate to \"something/or/other\" (is empty string)\r\nfmt.Printf(\"cli.MyEnv = %s\\n\", cli.MyEnv)\r\n```",
+      "url": "https://github.com/alecthomas/kong/issues/233"
+    }
+  ],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 18,
+    "deletions": 4
+  },
+  "files": [
+    {
+      "path": "kong.go",
+      "status": "M",
+      "additions": 12,
+      "deletions": 4,
+      "binary": false
+    },
+    {
+      "path": "kong_test.go",
+      "status": "M",
+      "additions": 6,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/kong.go b/kong.go\nindex 544da2d..70107d5 100644\n--- a/kong.go\n+++ b/kong.go\n@@ -186,16 +186,24 @@ func (k *Kong) interpolateValue(value *Value, vars Vars) (err error) {\n \tif varsContributor, ok := value.Mapper.(VarsContributor); ok {\n \t\tvars = vars.CloneWith(varsContributor.Vars(value))\n \t}\n+\n+\tupdatedVars := map[string]string{\n+\t\t\"default\": value.Default,\n+\t\t\"enum\":    value.Enum,\n+\t}\n \tif value.Default, err = interpolate(value.Default, vars, nil); err != nil {\n \t\treturn fmt.Errorf(\"default value for %s: %s\", value.Summary(), err)\n \t}\n \tif value.Enum, err = interpolate(value.Enum, vars, nil); err != nil {\n \t\treturn fmt.Errorf(\"enum value for %s: %s\", value.Summary(), err)\n \t}\n-\tvalue.Help, err = interpolate(value.Help, vars, map[string]string{\n-\t\t\"default\": value.Default,\n-\t\t\"enum\":    value.Enum,\n-\t})\n+\tif value.Flag != nil {\n+\t\tif value.Flag.Env, err = interpolate(value.Flag.Env, vars, nil); err != nil {\n+\t\t\treturn fmt.Errorf(\"env value for %s: %s\", value.Summary(), err)\n+\t\t}\n+\t\tupdatedVars[\"env\"] = value.Flag.Env\n+\t}\n+\tvalue.Help, err = interpolate(value.Help, vars, updatedVars)\n \tif err != nil {\n \t\treturn fmt.Errorf(\"help for %s: %s\", value.Summary(), err)\n \t}\ndiff --git a/kong_test.go b/kong_test.go\nindex f189ee9..646665f 100644\n--- a/kong_test.go\n+++ b/kong_test.go\n@@ -644,6 +644,7 @@ func TestInterpolationIntoModel(t *testing.T) {\n \tvar cli struct {\n \t\tFlag    string `default:\"${default}\" help:\"Help, I need ${somebody}\" enum:\"${enum}\"`\n \t\tEnumRef string `enum:\"a,b\" required:\"\" help:\"One of ${enum}\"`\n+\t\tEnvRef  string `env:\"${env}\" help:\"God ${env}\"`\n \t}\n \t_, err := kong.New(&cli)\n \trequire.Error(t, err)\n@@ -651,14 +652,19 @@ func TestInterpolationIntoModel(t *testing.T) {\n \t\t\"default\":  \"Some default value.\",\n \t\t\"somebody\": \"chickens!\",\n \t\t\"enum\":     \"a,b,c,d\",\n+\t\t\"env\":      \"SAVE_THE_QUEEN\",\n \t})\n \trequire.NoError(t, err)\n+\trequire.Len(t, p.Model.Flags, 4)\n \tflag := p.Model.Flags[1]\n \tflag2 := p.Model.Flags[2]\n+\tflag3 := p.Model.Flags[3]\n \trequire.Equal(t, \"Some default value.\", flag.Default)\n \trequire.Equal(t, \"Help, I need chickens!\", flag.Help)\n \trequire.Equal(t, map[string]bool{\"a\": true, \"b\": true, \"c\": true, \"d\": true}, flag.EnumMap())\n \trequire.Equal(t, \"One of a,b\", flag2.Help)\n+\trequire.Equal(t, \"SAVE_THE_QUEEN\", flag3.Env)\n+\trequire.Equal(t, \"God SAVE_THE_QUEEN\", flag3.Help)\n }\n \n func TestErrorMissingArgs(t *testing.T) {\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/FUNDING.yml",
+    ".github/workflows/ci.yml",
+    ".gitignore",
+    ".golangci.yml",
+    "COPYING",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/README.md",
+    "_examples/server/console.go",
+    "_examples/server/go.mod",
+    "_examples/server/go.sum",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/main.go",
+    "benchmark_test.go",
+    "bin/.go@latest.pkg",
+    "bin/.golangci-lint-1.42.0.pkg",
+    "bin/README.hermit.md",
+    "bin/activate-hermit",
+    "bin/go",
+    "bin/gofmt",
+    "bin/golangci-lint",
+    "bin/hermit",
+    "bin/hermit.hcl",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "config_test.go",
+    "context.go",
+    "defaults.go",
+    "defaults_test.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "go.mod",
+    "go.sum",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "testdata/file.txt",
+    "util.go",
+    "util_test.go",
+    "visit.go"
+  ],
+  "explanation": {
+    "what": "interpolateValue 内で value.Flag != nil のとき value.Flag.Env にも interpolate() を適用するようにし、補間結果を updatedVars[\"env\"] として登録した上で value.Help の補間にも渡すようにした。これにより env タグ自体に `${myEnv}` のような変数参照を書けるようになり、補間後の実際の環境変数名がヘルプ文言中の `${env}` にも反映される。",
+    "why": "linkedIssue #233 の通り、既存の kong.Vars による補間は default/help/enum タグには効いていたが env タグの値自体には適用されず、環境変数名を他所で定義した定数から動的に注入したいユースケースに対応できていなかった。PR本文の例(`env:\"${myEnv}\"` + kong.Vars{\"myEnv\": ...})が示す通り、その欠落を埋める変更。",
+    "highlights": [
+      { "file": "kong.go", "note": "value.Flag.Env への interpolate() 適用と、補間後の env 値を updatedVars[\"env\"] として Help 側の補間にも連鎖させている箇所。" }
+    ],
+    "langNotes": [
+      { "topic": "env タグへの変数補間(interpolation)", "note": "kong の Vars 機構はもともと default/help/enum タグ内の `${key}` を kong.Vars{} の値に置換する仕組みだったが、この変更で env タグ自体にも同じ補間が及ぶようになった。補間後の実際の環境変数名を updatedVars 経由で Help の補間にも渡しているため、ヘルプ文言中で `${env}` と書けば実際に使われる環境変数名がそのまま表示される。" }
+    ],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [
+      { "type": "pr", "number": 234, "url": "https://github.com/alecthomas/kong/pull/234" },
+      { "type": "issue", "number": 233, "url": "https://github.com/alecthomas/kong/issues/233" }
+    ],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

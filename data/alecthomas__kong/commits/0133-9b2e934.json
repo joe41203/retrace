@@ -1,0 +1,96 @@
+{
+  "seq": 133,
+  "sha": "9b2e9343a0776986b78d872b09b8a04caf873071",
+  "parents": [
+    "886c2d7b01d8c57baabf8dc26fb48264e6ab50dc"
+  ],
+  "author": {
+    "name": "Alec Thomas",
+    "email": "alec@swapoff.org",
+    "date": "2019-01-12T21:20:54+11:00"
+  },
+  "message": "Fix circle.",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 1,
+    "deletions": 1
+  },
+  "files": [
+    {
+      "path": ".circleci/config.yml",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/.circleci/config.yml b/.circleci/config.yml\nindex 31d2bd3..1a59803 100644\n--- a/.circleci/config.yml\n+++ b/.circleci/config.yml\n@@ -22,7 +22,7 @@ jobs:\n       - run:\n           name: Test\n           command: |\n-            go test -v ./... 2>&1 | tee report.txt && go-junit-report report.txt > ~/report/junit.xml\n+            go test -v ./... 2>&1 | tee report.txt && go-junit-report < report.txt > ~/report/junit.xml\n       - store_test_results:\n           path: ~/report\n \n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    ".golangci.yml",
+    "COPYING",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/console.go",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/main.go",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "config_test.go",
+    "context.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "go.mod",
+    "go.sum",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "util.go",
+    "util_test.go",
+    "visit.go"
+  ],
+  "explanation": {
+    "what": ".circleci/config.ymlのテストコマンドを修正した。`go-junit-report report.txt > ...` から `go-junit-report < report.txt > ...` へ変更し、report.txtを引数ではなく標準入力として渡すようにした。",
+    "why": "おそらくgo-junit-reportがファイル引数ではなく標準入力からテスト結果を読み取る仕様のため、CIでのJUnitレポート生成が壊れていたのをリダイレクトの修正で直したものと見られる。commit messageは\"Fix circle.\"のみで詳細は不明。",
+    "highlights": [
+      { "file": ".circleci/config.yml", "note": "report.txtの渡し方を引数からstdinリダイレクトに変更" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "inferred",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

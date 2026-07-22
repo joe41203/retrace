@@ -1,0 +1,80 @@
+{
+  "seq": 48,
+  "sha": "9cc18722972481cac2e2a89e996a4edc41f72b5e",
+  "parents": [
+    "9498118314b147dfe326534541197ec63e7abb1e"
+  ],
+  "author": {
+    "name": "Alec Thomas",
+    "email": "alec@swapoff.org",
+    "date": "2018-06-06T19:07:01+10:00"
+  },
+  "message": "Fix short flags.",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 21,
+    "deletions": 9
+  },
+  "files": [
+    {
+      "path": "context.go",
+      "status": "M",
+      "additions": 9,
+      "deletions": 9,
+      "binary": false
+    },
+    {
+      "path": "kong_test.go",
+      "status": "M",
+      "additions": 12,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/context.go b/context.go\nindex b23cef8..e809b86 100644\n--- a/context.go\n+++ b/context.go\n@@ -215,7 +215,9 @@ func (c *Context) trace(node *Node) (err error) { // nolint: gocyclo\n \t\t\tcase strings.HasPrefix(token.Value, \"-\"):\n \t\t\t\tc.scan.Pop()\n \t\t\t\t// Note: tokens must be pushed in reverse order.\n-\t\t\t\tc.scan.PushTyped(token.Value[2:], ShortFlagTailToken)\n+\t\t\t\tif tail := token.Value[2:]; tail != \"\" {\n+\t\t\t\t\tc.scan.PushTyped(tail, ShortFlagTailToken)\n+\t\t\t\t}\n \t\t\t\tc.scan.PushTyped(token.Value[1:2], ShortFlagToken)\n \n \t\t\tdefault:\n@@ -226,20 +228,18 @@ func (c *Context) trace(node *Node) (err error) { // nolint: gocyclo\n \t\tcase ShortFlagTailToken:\n \t\t\tc.scan.Pop()\n \t\t\t// Note: tokens must be pushed in reverse order.\n-\t\t\tc.scan.PushTyped(token.Value[1:], ShortFlagTailToken)\n+\t\t\tif tail := token.Value[1:]; tail != \"\" {\n+\t\t\t\tc.scan.PushTyped(tail, ShortFlagTailToken)\n+\t\t\t}\n \t\t\tc.scan.PushTyped(token.Value[0:1], ShortFlagToken)\n \n \t\tcase FlagToken:\n-\t\t\tif err := c.matchFlags(flags, func(f *Flag) bool {\n-\t\t\t\treturn f.Name == token.Value\n-\t\t\t}); err != nil {\n+\t\t\tif err := c.matchFlags(flags, func(f *Flag) bool { return f.Name == token.Value }); err != nil {\n \t\t\t\treturn err\n \t\t\t}\n \n \t\tcase ShortFlagToken:\n-\t\t\tif err := c.matchFlags(flags, func(f *Flag) bool {\n-\t\t\t\treturn string(f.Name) == token.Value\n-\t\t\t}); err != nil {\n+\t\t\tif err := c.matchFlags(flags, func(f *Flag) bool { return string(f.Short) == token.Value }); err != nil {\n \t\t\t\treturn err\n \t\t\t}\n \n@@ -326,7 +326,7 @@ func (c *Context) matchFlags(flags []*Flag, matcher func(f *Flag) bool) (err err\n \ttoken := c.scan.Peek()\n \tfor _, flag := range flags {\n \t\t// Found a matching flag.\n-\t\tif flag.Name == token.Value {\n+\t\tif matcher(flag) {\n \t\t\tc.scan.Pop()\n \t\t\tvalue, err := flag.Parse(c.scan)\n \t\t\tif err != nil {\ndiff --git a/kong_test.go b/kong_test.go\nindex 0c0badf..460bbd0 100644\n--- a/kong_test.go\n+++ b/kong_test.go\n@@ -344,3 +344,15 @@ func TestHooks(t *testing.T) {\n \t\t})\n \t}\n }\n+\n+func TestShort(t *testing.T) {\n+\tvar cli struct {\n+\t\tBool   bool   `short:\"b\"`\n+\t\tString string `short:\"s\"`\n+\t}\n+\tapp := mustNew(t, &cli)\n+\t_, err := app.Parse([]string{\"-b\", \"-shello\"})\n+\trequire.NoError(t, err)\n+\trequire.True(t, cli.Bool)\n+\trequire.Equal(t, \"hello\", cli.String)\n+}\n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    "README.md",
+    "_examples/shell/main.go",
+    "build.go",
+    "camelcase.go",
+    "context.go",
+    "context_test.go",
+    "global.go",
+    "global_test.go",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "kong.go",
+    "kong_test.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "tokentype_string.go"
+  ],
+  "explanation": {
+    "what": "context.go の短いフラグ(-x)のトークン解析を修正した。ShortFlagTailToken(短いフラグをまとめて書いた残りの文字列、例 -shello の hello 部分)を空文字列のときにプッシュしないようにガードを追加し、ShortFlagToken の照合が f.Name(ロング名)ではなく f.Short(短縮文字)と比較するように直した。あわせて matchFlags 内の照合ロジックを呼び出し元から渡された matcher 関数に統一した。",
+    "why": "コミットメッセージ「Fix short flags.」の通り、短いフラグの分割処理と照合に不具合があった。以前は ShortFlagToken の一致判定が f.Name(例えば \"bool\")と1文字の token.Value を比較していたため、short タグで登録した1文字の名前(例 \"b\")と一致させる仕組みが機能していなかった。追加された TestShort テストが `-b -shello` のように bool フラグと文字列フラグの短縮形を連続指定するケースを検証しており、この不具合の実例になっている。",
+    "highlights": [
+      { "file": "context.go", "note": "ShortFlagToken の一致判定を f.Name から f.Short に修正。空の tail をプッシュしないガードも追加" },
+      { "file": "kong_test.go", "note": "TestShort が `-b -shello` の解析結果を検証する形で追加された" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

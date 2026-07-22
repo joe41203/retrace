@@ -1,0 +1,271 @@
+{
+  "seq": 249,
+  "sha": "6cebaa7b855f68bcad335f78da14f0747b9b078a",
+  "parents": [
+    "c4a8cb03a7f9f5bac6c6ada1fc7bcd77b657e0fc"
+  ],
+  "author": {
+    "name": "Alec Thomas",
+    "email": "alec@swapoff.org",
+    "date": "2021-06-09T12:37:06+10:00"
+  },
+  "message": "Hermitise and bump golangci-lint.",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 23,
+    "additions": 95,
+    "deletions": 28
+  },
+  "files": [
+    {
+      "path": ".golangci.yml",
+      "status": "M",
+      "additions": 21,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "bin/.go@latest.pkg",
+      "status": "A",
+      "additions": 1,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "bin/.golangci-lint-1.40.1.pkg",
+      "status": "A",
+      "additions": 1,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "bin/README.hermit.md",
+      "status": "A",
+      "additions": 7,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "bin/activate-hermit",
+      "status": "A",
+      "additions": 19,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "bin/go",
+      "status": "A",
+      "additions": 1,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "bin/gofmt",
+      "status": "A",
+      "additions": 1,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "bin/golangci-lint",
+      "status": "A",
+      "additions": 1,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "bin/hermit",
+      "status": "A",
+      "additions": 26,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "bin/hermit.hcl",
+      "status": "A",
+      "additions": 0,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "config_test.go",
+      "status": "M",
+      "additions": 3,
+      "deletions": 2,
+      "binary": false
+    },
+    {
+      "path": "context.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "defaults_test.go",
+      "status": "M",
+      "additions": 0,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "help_test.go",
+      "status": "M",
+      "additions": 0,
+      "deletions": 6,
+      "binary": false
+    },
+    {
+      "path": "kong.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "kong_test.go",
+      "status": "M",
+      "additions": 0,
+      "deletions": 3,
+      "binary": false
+    },
+    {
+      "path": "mapper.go",
+      "status": "M",
+      "additions": 4,
+      "deletions": 4,
+      "binary": false
+    },
+    {
+      "path": "model.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "options.go",
+      "status": "M",
+      "additions": 3,
+      "deletions": 3,
+      "binary": false
+    },
+    {
+      "path": "options_test.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "resolver.go",
+      "status": "M",
+      "additions": 3,
+      "deletions": 3,
+      "binary": false
+    },
+    {
+      "path": "resolver_test.go",
+      "status": "M",
+      "additions": 0,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "tag_test.go",
+      "status": "M",
+      "additions": 0,
+      "deletions": 3,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/.golangci.yml b/.golangci.yml\nindex af55257..0d2c6f8 100644\n--- a/.golangci.yml\n+++ b/.golangci.yml\n@@ -15,6 +15,25 @@ linters:\n     - gocognit\n     - gomnd\n     - goprintffuncname\n+    - paralleltest\n+    - nlreturn\n+    - goerr113\n+    - ifshort\n+    - testpackage\n+    - wrapcheck\n+    - exhaustivestruct\n+    - forbidigo\n+    - gci\n+    - godot\n+    - gofumpt\n+    - cyclop\n+    - errorlint\n+    - nestif\n+    - golint\n+    - scopelint\n+    - interfacer\n+    - tagliatelle\n+    - thelper\n \n linters-settings:\n   govet:\n@@ -26,6 +45,8 @@ linters-settings:\n     min-occurrences: 3\n   gocyclo:\n     min-complexity: 20\n+  exhaustive:\n+    default-signifies-exhaustive: true\n \n issues:\n   max-per-linter: 0\ndiff --git a/bin/.go@latest.pkg b/bin/.go@latest.pkg\nnew file mode 120000\nindex 0000000..383f451\n--- /dev/null\n+++ b/bin/.go@latest.pkg\n@@ -0,0 +1 @@\n+hermit\n\\ No newline at end of file\ndiff --git a/bin/.golangci-lint-1.40.1.pkg b/bin/.golangci-lint-1.40.1.pkg\nnew file mode 120000\nindex 0000000..383f451\n--- /dev/null\n+++ b/bin/.golangci-lint-1.40.1.pkg\n@@ -0,0 +1 @@\n+hermit\n\\ No newline at end of file\ndiff --git a/bin/README.hermit.md b/bin/README.hermit.md\nnew file mode 100644\nindex 0000000..e889550\n--- /dev/null\n+++ b/bin/README.hermit.md\n@@ -0,0 +1,7 @@\n+# Hermit environment\n+\n+This is a [Hermit](https://github.com/cashapp/hermit) bin directory.\n+\n+The symlinks in this directory are managed by Hermit and will automatically\n+download and install Hermit itself as well as packages. These packages are\n+local to this environment.\ndiff --git a/bin/activate-hermit b/bin/activate-hermit\nnew file mode 100755\nindex 0000000..3b191fb\n--- /dev/null\n+++ b/bin/activate-hermit\n@@ -0,0 +1,19 @@\n+#!/bin/bash\n+# This file must be used with \"source bin/activate-hermit\" from bash or zsh.\n+# You cannot run it directly\n+\n+if [ \"${BASH_SOURCE-}\" = \"$0\" ]; then\n+  echo \"You must source this script: \\$ source $0\" >&2\n+  exit 33\n+fi\n+\n+BIN_DIR=\"$(dirname \"${BASH_SOURCE[0]:-${(%):-%x}}\")\"\n+if \"${BIN_DIR}/hermit\" noop > /dev/null; then\n+  eval \"$(\"${BIN_DIR}/hermit\" activate \"${BIN_DIR}/..\")\"\n+\n+  if [ -n \"${BASH-}\" ] || [ -n \"${ZSH_VERSION-}\" ]; then\n+      hash -r 2>/dev/null\n+    fi\n+\n+    echo \"Hermit environment $(\"${HERMIT_ENV}\"/bin/hermit env HERMIT_ENV) activated\"\n+fi\ndiff --git a/bin/go b/bin/go\nnew file mode 120000\nindex 0000000..142d6ff\n--- /dev/null\n+++ b/bin/go\n@@ -0,0 +1 @@\n+.go@latest.pkg\n\\ No newline at end of file\ndiff --git a/bin/gofmt b/bin/gofmt\nnew file mode 120000\nindex 0000000..142d6ff\n--- /dev/null\n+++ b/bin/gofmt\n@@ -0,0 +1 @@\n+.go@latest.pkg\n\\ No newline at end of file\ndiff --git a/bin/golangci-lint b/bin/golangci-lint\nnew file mode 120000\nindex 0000000..09da506\n--- /dev/null\n+++ b/bin/golangci-lint\n@@ -0,0 +1 @@\n+.golangci-lint-1.40.1.pkg\n\\ No newline at end of file\ndiff --git a/bin/hermit b/bin/hermit\nnew file mode 100755\nindex 0000000..d13a24d\n--- /dev/null\n+++ b/bin/hermit\n@@ -0,0 +1,26 @@\n+#!/bin/bash\n+\n+set -eo pipefail\n+\n+if [ -z \"${HERMIT_STATE_DIR}\" ]; then\n+  case \"$(uname -s)\" in\n+  Darwin)\n+    export HERMIT_STATE_DIR=\"${HOME}/Library/Caches/hermit\"\n+    ;;\n+  Linux)\n+    export HERMIT_STATE_DIR=\"${XDG_CACHE_HOME:-${HOME}/.cache}/hermit\"\n+    ;;\n+  esac\n+fi\n+\n+export HERMIT_DIST_URL=\"${HERMIT_DIST_URL:-https://github.com/cashapp/hermit/releases/download/stable}\"\n+HERMIT_CHANNEL=\"$(basename \"${HERMIT_DIST_URL}\")\"\n+export HERMIT_CHANNEL\n+export HERMIT_EXE=${HERMIT_EXE:-${HERMIT_STATE_DIR}/pkg/hermit@${HERMIT_CHANNEL}/hermit}\n+\n+if [ ! -x \"${HERMIT_EXE}\" ]; then\n+  echo \"Bootstrapping ${HERMIT_EXE} from ${HERMIT_DIST_URL}\" 1>&2\n+  curl -fsSL \"${HERMIT_DIST_URL}/install.sh\" | /bin/bash 1>&2\n+fi\n+\n+exec \"${HERMIT_EXE}\" --level=fatal exec \"$0\" -- \"$@\"\ndiff --git a/bin/hermit.hcl b/bin/hermit.hcl\nnew file mode 100644\nindex 0000000..e69de29\ndiff --git a/config_test.go b/config_test.go\nindex 61d1b2e..69e279d 100644\n--- a/config_test.go\n+++ b/config_test.go\n@@ -6,8 +6,9 @@ import (\n \t\"os\"\n \t\"testing\"\n \n-\t\"github.com/alecthomas/kong\"\n \t\"github.com/stretchr/testify/require\"\n+\n+\t\"github.com/alecthomas/kong\"\n )\n \n func TestMultipleConfigLoading(t *testing.T) {\n@@ -47,7 +48,7 @@ func makeConfig(t *testing.T, config interface{}) (path string, cleanup func())\n \tt.Helper()\n \tw, err := ioutil.TempFile(\"\", \"\")\n \trequire.NoError(t, err)\n-\tdefer w.Close()\n+\tdefer w.Close() // nolint: gosec\n \terr = json.NewEncoder(w).Encode(config)\n \trequire.NoError(t, err)\n \treturn w.Name(), func() { os.Remove(w.Name()) }\ndiff --git a/context.go b/context.go\nindex d132b7d..1e5ae75 100644\n--- a/context.go\n+++ b/context.go\n@@ -585,6 +585,7 @@ func (c *Context) getValue(value *Value) reflect.Value {\n \t\t\tv.Set(reflect.MakeSlice(v.Type(), 0, 0))\n \t\tcase reflect.Map:\n \t\t\tv.Set(reflect.MakeMap(v.Type()))\n+\t\tdefault:\n \t\t}\n \t\tc.values[value] = v\n \t}\ndiff --git a/defaults_test.go b/defaults_test.go\nindex 11a2612..b67640d 100644\n--- a/defaults_test.go\n+++ b/defaults_test.go\n@@ -24,7 +24,6 @@ func TestApplyDefaults(t *testing.T) {\n \t\t\texpected: CLI{Str: \"str\", Duration: time.Second}},\n \t}\n \tfor _, tt := range tests {\n-\t\t// nolint: scopelint\n \t\tt.Run(tt.name, func(t *testing.T) {\n \t\t\terr := ApplyDefaults(&tt.target)\n \t\t\trequire.NoError(t, err)\ndiff --git a/help_test.go b/help_test.go\nindex 730c189..566cf73 100644\n--- a/help_test.go\n+++ b/help_test.go\n@@ -11,7 +11,6 @@ import (\n \t\"github.com/alecthomas/kong\"\n )\n \n-// nolint: govet\n type threeArg struct {\n \tRequiredThree bool   `required`\n \tThree         string `arg`\n@@ -54,7 +53,6 @@ Flags:\n }\n \n func TestHelp(t *testing.T) {\n-\t// nolint: govet\n \tvar cli struct {\n \t\tString   string         `help:\"A string flag.\"`\n \t\tBool     bool           `help:\"A bool flag with very long help that wraps a lot and is verbose and is really verbose.\"`\n@@ -163,7 +161,6 @@ Flags:\n }\n \n func TestFlagsLast(t *testing.T) {\n-\t// nolint: govet\n \tvar cli struct {\n \t\tString   string         `help:\"A string flag.\"`\n \t\tBool     bool           `help:\"A bool flag with very long help that wraps a lot and is verbose and is really verbose.\"`\n@@ -272,7 +269,6 @@ Flags:\n }\n \n func TestHelpTree(t *testing.T) {\n-\t// nolint: govet\n \tvar cli struct {\n \t\tOne struct {\n \t\t\tThing struct {\n@@ -367,7 +363,6 @@ Commands:\n }\n \n func TestHelpCompactNoExpand(t *testing.T) {\n-\t// nolint: govet\n \tvar cli struct {\n \t\tOne struct {\n \t\t\tThing struct {\n@@ -484,7 +479,6 @@ func TestCustomHelpFormatter(t *testing.T) {\n }\n \n func TestHelpGrouping(t *testing.T) {\n-\t// nolint: govet\n \tvar cli struct {\n \t\tGroupedAString string `help:\"A string flag grouped in A.\" group:\"Group A\"`\n \t\tFreeString     string `help:\"A non grouped string flag.\"`\ndiff --git a/kong.go b/kong.go\nindex 9c0e437..f02b867 100644\n--- a/kong.go\n+++ b/kong.go\n@@ -385,7 +385,7 @@ func (k *Kong) LoadConfig(path string) (Resolver, error) {\n \tif err != nil {\n \t\treturn nil, err\n \t}\n-\tdefer r.Close()\n+\tdefer r.Close() // nolint: gosec\n \n \treturn k.loader(r)\n }\ndiff --git a/kong_test.go b/kong_test.go\nindex 6dec560..857c6ca 100644\n--- a/kong_test.go\n+++ b/kong_test.go\n@@ -118,7 +118,6 @@ func TestFlagSliceWithSeparator(t *testing.T) {\n }\n \n func TestArgSlice(t *testing.T) {\n-\t// nolint: govet\n \tvar cli struct {\n \t\tSlice []int `arg`\n \t\tFlag  bool\n@@ -131,7 +130,6 @@ func TestArgSlice(t *testing.T) {\n }\n \n func TestArgSliceWithSeparator(t *testing.T) {\n-\t// nolint: govet\n \tvar cli struct {\n \t\tSlice []string `arg`\n \t\tFlag  bool\n@@ -498,7 +496,6 @@ func TestHooks(t *testing.T) {\n \tfor _, test := range tests {\n \t\t*ctx = hookContext{}\n \t\tcli.One = hookCmd{}\n-\t\t// nolint: scopelint\n \t\tt.Run(test.name, func(t *testing.T) {\n \t\t\t_, err := p.Parse(strings.Split(test.input, \" \"))\n \t\t\trequire.NoError(t, err)\ndiff --git a/mapper.go b/mapper.go\nindex f5e1a3f..4c1bb2b 100644\n--- a/mapper.go\n+++ b/mapper.go\n@@ -125,7 +125,7 @@ type BoolMapper interface {\n // A MapperFunc is a single function that complies with the Mapper interface.\n type MapperFunc func(ctx *DecodeContext, target reflect.Value) error\n \n-func (m MapperFunc) Decode(ctx *DecodeContext, target reflect.Value) error { // nolint: golint\n+func (m MapperFunc) Decode(ctx *DecodeContext, target reflect.Value) error { // nolint: revive\n \treturn m(ctx, target)\n }\n \n@@ -737,7 +737,7 @@ func SplitEscaped(s string, sep rune) (out []string) {\n func JoinEscaped(s []string, sep rune) string {\n \tescaped := []string{}\n \tfor _, e := range s {\n-\t\tescaped = append(escaped, strings.Replace(e, string(sep), `\\`+string(sep), -1))\n+\t\tescaped = append(escaped, strings.ReplaceAll(e, string(sep), `\\`+string(sep)))\n \t}\n \treturn strings.Join(escaped, string(sep))\n }\n@@ -748,7 +748,7 @@ type NamedFileContentFlag struct {\n \tContents []byte\n }\n \n-func (f *NamedFileContentFlag) Decode(ctx *DecodeContext) error { // nolint: golint\n+func (f *NamedFileContentFlag) Decode(ctx *DecodeContext) error { // nolint: revive\n \tvar filename string\n \terr := ctx.Scan.PopValueInto(\"filename\", &filename)\n \tif err != nil {\n@@ -772,7 +772,7 @@ func (f *NamedFileContentFlag) Decode(ctx *DecodeContext) error { // nolint: gol\n // FileContentFlag is a flag value that loads a file's contents into its value.\n type FileContentFlag []byte\n \n-func (f *FileContentFlag) Decode(ctx *DecodeContext) error { // nolint: golint\n+func (f *FileContentFlag) Decode(ctx *DecodeContext) error { // nolint: revive\n \tvar filename string\n \terr := ctx.Scan.PopValueInto(\"filename\", &filename)\n \tif err != nil {\ndiff --git a/model.go b/model.go\nindex da64356..928c613 100644\n--- a/model.go\n+++ b/model.go\n@@ -205,6 +205,7 @@ func (n *Node) Path() (out string) {\n \t\tout += \" \" + n.Name\n \tcase ArgumentNode:\n \t\tout += \" \" + \"<\" + n.Name + \">\"\n+\tdefault:\n \t}\n \treturn strings.TrimSpace(out)\n }\ndiff --git a/options.go b/options.go\nindex b7c4364..98620c5 100644\n--- a/options.go\n+++ b/options.go\n@@ -19,7 +19,7 @@ type Option interface {\n // OptionFunc is function that adheres to the Option interface.\n type OptionFunc func(k *Kong) error\n \n-func (o OptionFunc) Apply(k *Kong) error { return o(k) } // nolint: golint\n+func (o OptionFunc) Apply(k *Kong) error { return o(k) } // nolint: revive\n \n // Vars sets the variables to use for interpolation into help strings and default values.\n //\n@@ -198,7 +198,7 @@ func BindToProvider(provider interface{}) Option {\n \t\t\terrv := out[1]\n \t\t\tvar err error\n \t\t\tif !errv.IsNil() {\n-\t\t\t\terr = errv.Interface().(error)\n+\t\t\t\terr = errv.Interface().(error) // nolint\n \t\t\t}\n \t\t\treturn out[0], err\n \t\t}\n@@ -254,7 +254,7 @@ func ConfigureHelp(options HelpOptions) Option {\n // See also ExplicitGroups for a more structured alternative.\n type Groups map[string]string\n \n-func (g Groups) Apply(k *Kong) error { // nolint: golint\n+func (g Groups) Apply(k *Kong) error { // nolint: revive\n \tfor key, info := range g {\n \t\tlines := strings.Split(info, \"\\n\")\n \t\ttitle := strings.TrimSpace(lines[0])\ndiff --git a/options_test.go b/options_test.go\nindex 0924e50..c48949e 100644\n--- a/options_test.go\n+++ b/options_test.go\n@@ -28,7 +28,7 @@ func TestBindTo(t *testing.T) {\n \t}\n \n \tsaw := \"\"\n-\tmethod := func(i iface) error { // nolint: unparam\n+\tmethod := func(i iface) error {\n \t\tsaw = string(i.(impl))\n \t\treturn nil\n \t}\ndiff --git a/resolver.go b/resolver.go\nindex 8ef764d..623a734 100644\n--- a/resolver.go\n+++ b/resolver.go\n@@ -22,10 +22,10 @@ type ResolverFunc func(context *Context, parent *Path, flag *Flag) (interface{},\n \n var _ Resolver = ResolverFunc(nil)\n \n-func (r ResolverFunc) Resolve(context *Context, parent *Path, flag *Flag) (interface{}, error) { // nolint: golint\n+func (r ResolverFunc) Resolve(context *Context, parent *Path, flag *Flag) (interface{}, error) { // nolint: revive\n \treturn r(context, parent, flag)\n }\n-func (r ResolverFunc) Validate(app *Application) error { return nil } //  nolint: golint\n+func (r ResolverFunc) Validate(app *Application) error { return nil } // nolint: revive\n \n // JSON returns a Resolver that retrieves values from a JSON source.\n //\n@@ -37,7 +37,7 @@ func JSON(r io.Reader) (Resolver, error) {\n \t\treturn nil, err\n \t}\n \tvar f ResolverFunc = func(context *Context, parent *Path, flag *Flag) (interface{}, error) {\n-\t\tname := strings.Replace(flag.Name, \"-\", \"_\", -1)\n+\t\tname := strings.ReplaceAll(flag.Name, \"-\", \"_\")\n \t\traw, ok := values[name]\n \t\tif !ok {\n \t\t\treturn nil, nil\ndiff --git a/resolver_test.go b/resolver_test.go\nindex fa9f41b..f601544 100644\n--- a/resolver_test.go\n+++ b/resolver_test.go\n@@ -192,7 +192,6 @@ func TestLastResolverWins(t *testing.T) {\n }\n \n func TestResolverSatisfiesRequired(t *testing.T) {\n-\t// nolint: govet\n \tvar cli struct {\n \t\tInt int `required`\n \t}\ndiff --git a/tag_test.go b/tag_test.go\nindex fc512c4..4da0bd0 100644\n--- a/tag_test.go\n+++ b/tag_test.go\n@@ -68,7 +68,6 @@ func TestEscapedQuote(t *testing.T) {\n }\n \n func TestBareTags(t *testing.T) {\n-\t// nolint: govet\n \tvar cli struct {\n \t\tCmd struct {\n \t\t\tArg  string `arg`\n@@ -84,7 +83,6 @@ func TestBareTags(t *testing.T) {\n }\n \n func TestBareTagsWithJsonTag(t *testing.T) {\n-\t// nolint: govet\n \tvar cli struct {\n \t\tCmd struct {\n \t\t\tArg  string `json:\"-\" optional arg`\n@@ -100,7 +98,6 @@ func TestBareTagsWithJsonTag(t *testing.T) {\n }\n \n func TestManySeps(t *testing.T) {\n-\t// nolint: govet\n \tvar cli struct {\n \t\tArg string `arg    optional    default:\"hi\"`\n \t}\n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    ".github/FUNDING.yml",
+    ".gitignore",
+    ".golangci.yml",
+    "COPYING",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/README.md",
+    "_examples/server/console.go",
+    "_examples/server/go.mod",
+    "_examples/server/go.sum",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/main.go",
+    "benchmark_test.go",
+    "bin/.go@latest.pkg",
+    "bin/.golangci-lint-1.40.1.pkg",
+    "bin/README.hermit.md",
+    "bin/activate-hermit",
+    "bin/go",
+    "bin/gofmt",
+    "bin/golangci-lint",
+    "bin/hermit",
+    "bin/hermit.hcl",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "config_test.go",
+    "context.go",
+    "defaults.go",
+    "defaults_test.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "go.mod",
+    "go.sum",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "testdata/file.txt",
+    "util.go",
+    "util_test.go",
+    "visit.go"
+  ],
+  "explanation": {
+    "what": "ビルドツールを Hermit で管理する構成(`bin/hermit` スクリプトと `bin/go`・`bin/gofmt`・`bin/golangci-lint` などのシンボリックリンク)を追加し、`.golangci.yml` に多数のリンターを有効化した。それに伴い、既存コードのリンター指摘を一括修正している(`strings.Replace(..., -1)` を `strings.ReplaceAll` に、`// nolint: golint` を `// nolint: revive` に、import の並び順修正、`switch` 文への `default:` 節追加など)。",
+    "why": "コミットメッセージの \"Hermitise\" は Hermit によるツールチェーンのバージョン固定化を指しており、おそらく golangci-lint のバージョンアップに伴って新たに有効化されたリンター群(paralleltest, gofumpt, errorlint 等)が検出した警告を合わせて解消したものと考えられる。",
+    "highlights": [
+      { "file": ".golangci.yml", "note": "有効化するリンターが大幅に増え、golint 後継の revive 系ルールなどが加わった" },
+      { "file": "bin/hermit", "note": "Hermit のブートストラップスクリプト。実行するとツール本体を自動ダウンロードしてくる" }
+    ],
+    "langNotes": [
+      { "topic": "Hermit(ツールチェーン管理)と golangci-lint", "note": "Hermit はプロジェクトごとに go や golangci-lint などのバイナリバージョンを固定・自動取得する仕組みで、`bin/` 配下のシンボリックリンク経由でコマンドを実行する。golangci-lint は複数の Go 静的解析ツール(govet, golint 後継の revive, errcheck 等)をまとめて実行するメタリンターで、`.golangci.yml` で有効/無効を設定する。" }
+    ],
+    "diagram": null,
+    "evidence": "inferred",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

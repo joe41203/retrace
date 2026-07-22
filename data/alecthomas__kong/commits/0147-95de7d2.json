@@ -1,0 +1,122 @@
+{
+  "seq": 147,
+  "sha": "95de7d2f0dd4cc5b9a74133e7117507bb3724a6e",
+  "parents": [
+    "1076f5ee1f54b8e1a61669b2b3ba64d3985ff71b"
+  ],
+  "author": {
+    "name": "Alec Thomas",
+    "email": "alec@swapoff.org",
+    "date": "2019-06-21T10:23:09+10:00"
+  },
+  "message": "Produce a more useful error when flag-like values are used for flag values.\n\neg.  myapp: error: --log-level: expected string value but got \"--foo\" (long flag); perhaps try --log-level=\"--foo\"?",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 4,
+    "additions": 28,
+    "deletions": 14
+  },
+  "files": [
+    {
+      "path": "context.go",
+      "status": "M",
+      "additions": 5,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "kong_test.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "model.go",
+      "status": "M",
+      "additions": 4,
+      "deletions": 2,
+      "binary": false
+    },
+    {
+      "path": "scanner.go",
+      "status": "M",
+      "additions": 18,
+      "deletions": 11,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/context.go b/context.go\nindex d4761dd..4861f00 100644\n--- a/context.go\n+++ b/context.go\n@@ -5,6 +5,8 @@ import (\n \t\"reflect\"\n \t\"strconv\"\n \t\"strings\"\n+\n+\t\"github.com/pkg/errors\"\n )\n \n // Path records the nodes and parsed values from the current command-line.\n@@ -504,6 +506,9 @@ func (c *Context) parseFlag(flags []*Flag, match string) (err error) {\n \t\tc.scan.Pop()\n \t\terr := flag.Parse(c.scan, c.getValue(flag.Value))\n \t\tif err != nil {\n+\t\t\tif e, ok := errors.Cause(err).(*expectedError); ok && e.token.InferredType().IsAny(FlagToken, ShortFlagToken) {\n+\t\t\t\treturn errors.Errorf(\"%s; perhaps try %s=%q?\", err, flag.ShortSummary(), e.token)\n+\t\t\t}\n \t\t\treturn err\n \t\t}\n \t\tc.Path = append(c.Path, &Path{Flag: flag})\ndiff --git a/kong_test.go b/kong_test.go\nindex a94a3c1..e6c3858 100644\n--- a/kong_test.go\n+++ b/kong_test.go\n@@ -715,7 +715,7 @@ func TestNumericParamErrors(t *testing.T) {\n \t}\n \tparser := mustNew(t, &cli)\n \t_, err := parser.Parse([]string{\"--name\", \"-10\"})\n-\trequire.EqualError(t, err, `--name: expected string value but got \"-10\" (short flag)`)\n+\trequire.EqualError(t, err, `--name: expected string value but got \"-10\" (short flag); perhaps try --name=\"-10\"?`)\n }\n \n func TestDefaultValueIsHyphen(t *testing.T) {\ndiff --git a/model.go b/model.go\nindex 5e72723..0fda877 100644\n--- a/model.go\n+++ b/model.go\n@@ -7,6 +7,8 @@ import (\n \t\"reflect\"\n \t\"strconv\"\n \t\"strings\"\n+\n+\t\"github.com/pkg/errors\"\n )\n \n // A Visitable component in the model.\n@@ -289,7 +291,7 @@ func (v *Value) Parse(scan *Scanner, target reflect.Value) (err error) {\n \t\tif rerr := recover(); rerr != nil {\n \t\t\tswitch rerr := rerr.(type) {\n \t\t\tcase Error:\n-\t\t\t\terr = fmt.Errorf(\"%s: %s\", v.ShortSummary(), rerr)\n+\t\t\t\terr = errors.Wrap(rerr, v.ShortSummary())\n \t\t\tdefault:\n \t\t\t\tpanic(fmt.Sprintf(\"mapper %T failed to apply to %s: %s\", v.Mapper, v.Summary(), rerr))\n \t\t\t}\n@@ -297,7 +299,7 @@ func (v *Value) Parse(scan *Scanner, target reflect.Value) (err error) {\n \t}()\n \terr = v.Mapper.Decode(&DecodeContext{Value: v, Scan: scan}, target)\n \tif err != nil {\n-\t\treturn fmt.Errorf(\"%s: %s\", v.ShortSummary(), err)\n+\t\treturn errors.Wrap(err, v.ShortSummary())\n \t}\n \tv.Set = true\n \treturn nil\ndiff --git a/scanner.go b/scanner.go\nindex c8c3636..d913d07 100644\n--- a/scanner.go\n+++ b/scanner.go\n@@ -3,8 +3,6 @@ package kong\n import (\n \t\"fmt\"\n \t\"strings\"\n-\n-\t\"github.com/pkg/errors\"\n )\n \n // TokenType is the type of a token.\n@@ -14,11 +12,11 @@ type TokenType int\n const (\n \tUntypedToken TokenType = iota\n \tEOLToken\n-\tFlagToken                // --<flag>\n-\tFlagValueToken           // =<value>\n-\tShortFlagToken           // -<short>[<tail]\n-\tShortFlagTailToken       // <tail>\n-\tPositionalArgumentToken  // <arg>\n+\tFlagToken               // --<flag>\n+\tFlagValueToken          // =<value>\n+\tShortFlagToken          // -<short>[<tail]\n+\tShortFlagTailToken      // <tail>\n+\tPositionalArgumentToken // <arg>\n )\n \n func (t TokenType) String() string {\n@@ -142,13 +140,22 @@ func (s *Scanner) Pop() Token {\n \treturn arg\n }\n \n+type expectedError struct {\n+\tcontext string\n+\ttoken   Token\n+}\n+\n+func (e *expectedError) Error() string {\n+\treturn fmt.Sprintf(\"expected %s value but got %q (%s)\", e.context, e.token, e.token.InferredType())\n+}\n+\n // PopValue pops a value token, or returns an error.\n //\n // \"context\" is used to assist the user if the value can not be popped, eg. \"expected <context> value but got <type>\"\n func (s *Scanner) PopValue(context string) (Token, error) {\n \tt := s.Pop()\n \tif !t.IsValue() {\n-\t\treturn t, errors.Errorf(\"expected %s value but got %q (%s)\", context, t, t.InferredType())\n+\t\treturn t, &expectedError{context, t}\n \t}\n \treturn t, nil\n }\n@@ -157,9 +164,9 @@ func (s *Scanner) PopValue(context string) (Token, error) {\n //\n // \"context\" is used to assist the user if the value can not be popped, eg. \"expected <context> value but got <type>\"\n func (s *Scanner) PopValueInto(context string, target interface{}) error {\n-\tt := s.Pop()\n-\tif !t.IsValue() {\n-\t\treturn errors.Errorf(\"expected %s value but got %q (%s)\", context, t, t.InferredType())\n+\tt, err := s.PopValue(context)\n+\tif err != nil {\n+\t\treturn err\n \t}\n \treturn jsonTranscode(t.Value, target)\n }\n",
+  "diffTruncated": false,
+  "tree": [
+    ".circleci/config.yml",
+    ".golangci.yml",
+    "COPYING",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/console.go",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/main.go",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "config_test.go",
+    "context.go",
+    "defaults.go",
+    "defaults_test.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "go.mod",
+    "go.sum",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "util.go",
+    "util_test.go",
+    "visit.go"
+  ],
+  "explanation": {
+    "what": "scanner.go に expectedError 型(context と token を保持し、\"expected %s value but got %q (%s)\" 形式のメッセージを返す独自エラー型)を追加し、PopValue/PopValueInto がこの型を返すよう変更した。context.go の parseFlag では errors.Cause(pkg/errors のヘルパーで、ラップされたエラー連鎖から元のエラーを取り出す)で expectedError を検出し、そのトークンが FlagToken/ShortFlagToken(つまりフラグの値として `--foo` のようなフラグっぽい文字列が渡された場合)であれば、`perhaps try --flag=\"--foo\"?` という具体的な修正案をエラーメッセージに追記する。",
+    "why": "コミットメッセージに記載の通り、`--log-level --foo` のように値がハイフンで始まる文字列を渡すと、パーサーはそれをフラグだと誤認識してしまいエラーになる。ユーザーがその原因と回避策(`--log-level=\"--foo\"` と `=` で明示的に値を渡す)に気づきにくいため、エラーメッセージにヒントを追加して分かりやすくした。",
+    "highlights": [
+      { "file": "scanner.go", "note": "expectedError という専用エラー型を新設し、context/token を保持したままエラー連鎖を辿れるようにした" },
+      { "file": "context.go", "note": "errors.Cause で元のエラー型を取り出し、フラグっぽい値だった場合だけ「=で渡してみて」の提案を追加" }
+    ],
+    "langNotes": [
+      { "topic": "errors.Cause", "note": "github.com/pkg/errors が提供する、Wrap で何重にもラップされたエラーから元のエラーを取り出す関数。Go 1.13 の errors.Unwrap/errors.As が標準化される以前によく使われたパターン。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

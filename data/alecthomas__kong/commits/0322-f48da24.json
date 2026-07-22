@@ -1,0 +1,133 @@
+{
+  "seq": 322,
+  "sha": "f48da244f54370c0cb63e22b0e500e5459a491bf",
+  "parents": [
+    "a05a0c20ba2d16bce52fbb6e5f59b25a08553880"
+  ],
+  "author": {
+    "name": "pyqlsa",
+    "email": "26353308+pyqlsa@users.noreply.github.com",
+    "date": "2022-07-27T18:12:26-07:00"
+  },
+  "message": "change VersionFlag to a BeforeReset hook",
+  "pr": {
+    "number": 321,
+    "title": "fix: change VersionFlag to a BeforeReset hook",
+    "body": "Similar to how `--help` was updated in https://github.com/alecthomas/kong/pull/298, `--version` changed to a BeforeReset hook so that it will always work.",
+    "url": "https://github.com/alecthomas/kong/pull/321"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 27,
+    "deletions": 3
+  },
+  "files": [
+    {
+      "path": "kong_test.go",
+      "status": "M",
+      "additions": 25,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "util.go",
+      "status": "M",
+      "additions": 2,
+      "deletions": 2,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/kong_test.go b/kong_test.go\nindex d66cbd6..18ac9f1 100644\n--- a/kong_test.go\n+++ b/kong_test.go\n@@ -1544,7 +1544,8 @@ func TestPassthroughCmdOnlyStringArgs(t *testing.T) {\n \n func TestHelpShouldStillWork(t *testing.T) {\n \ttype CLI struct {\n-\t\tDir string `type:\"existingdir\" default:\"missing-dir\"`\n+\t\tDir  string `type:\"existingdir\" default:\"missing-dir\"`\n+\t\tFile string `type:\"existingfile\" default:\"testdata/missing.txt\"`\n \t}\n \tvar cli CLI\n \tw := &strings.Builder{}\n@@ -1563,6 +1564,29 @@ func TestHelpShouldStillWork(t *testing.T) {\n \tassert.Error(t, err)\n }\n \n+func TestVersionFlagShouldStillWork(t *testing.T) {\n+\ttype CLI struct {\n+\t\tDir     string `type:\"existingdir\" default:\"missing-dir\"`\n+\t\tFile    string `type:\"existingfile\" default:\"testdata/missing.txt\"`\n+\t\tVersion kong.VersionFlag\n+\t}\n+\tvar cli CLI\n+\tw := &strings.Builder{}\n+\tk := mustNew(t, &cli, kong.Writers(w, w))\n+\trc := -1 // init nonzero to help assert help hook was called\n+\tk.Exit = func(i int) {\n+\t\trc = i\n+\t}\n+\t_, err := k.Parse([]string{\"--version\"})\n+\tt.Log(w.String())\n+\t// checking return code validates the help hook was called\n+\tassert.Zero(t, rc)\n+\t// allow for error propagation from other validation (only for the\n+\t// sake of this test, due to the exit function not actually exiting the\n+\t// program; errors will not propagate in the real world).\n+\tassert.Error(t, err)\n+}\n+\n func TestSliceDecoderHelpfulErrorMsg(t *testing.T) {\n \ttests := []struct {\n \t\tname string\ndiff --git a/util.go b/util.go\nindex 9468ef5..50b1dfe 100644\n--- a/util.go\n+++ b/util.go\n@@ -29,8 +29,8 @@ func (c ConfigFlag) BeforeResolve(kong *Kong, ctx *Context, trace *Path) error {\n // VersionFlag is a flag type that can be used to display a version number, stored in the \"version\" variable.\n type VersionFlag bool\n \n-// BeforeApply writes the version variable and terminates with a 0 exit status.\n-func (v VersionFlag) BeforeApply(app *Kong, vars Vars) error {\n+// BeforeReset writes the version variable and terminates with a 0 exit status.\n+func (v VersionFlag) BeforeReset(app *Kong, vars Vars) error {\n \tfmt.Fprintln(app.Stdout, vars[\"version\"])\n \tapp.Exit(0)\n \treturn nil\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/FUNDING.yml",
+    ".github/workflows/ci.yml",
+    ".gitignore",
+    ".golangci.yml",
+    "COPYING",
+    "README.md",
+    "_examples/docker/README.md",
+    "_examples/docker/commands.go",
+    "_examples/docker/main.go",
+    "_examples/server/README.md",
+    "_examples/server/console.go",
+    "_examples/server/go.mod",
+    "_examples/server/go.sum",
+    "_examples/server/main.go",
+    "_examples/server/server_rsa_key",
+    "_examples/server/server_rsa_key.pub",
+    "_examples/shell/commandstring/main.go",
+    "_examples/shell/help/README.md",
+    "_examples/shell/help/main.go",
+    "benchmark_test.go",
+    "bin/.go-1.18.3.pkg",
+    "bin/.golangci-lint-1.46.2.pkg",
+    "bin/README.hermit.md",
+    "bin/activate-hermit",
+    "bin/go",
+    "bin/gofmt",
+    "bin/golangci-lint",
+    "bin/hermit",
+    "bin/hermit.hcl",
+    "build.go",
+    "callbacks.go",
+    "camelcase.go",
+    "config_test.go",
+    "context.go",
+    "defaults.go",
+    "defaults_test.go",
+    "doc.go",
+    "error.go",
+    "global.go",
+    "global_test.go",
+    "go.mod",
+    "go.sum",
+    "guesswidth.go",
+    "guesswidth_unix.go",
+    "help.go",
+    "help_test.go",
+    "hooks.go",
+    "interpolate.go",
+    "interpolate_test.go",
+    "kong.go",
+    "kong.png",
+    "kong.sketch",
+    "kong_test.go",
+    "levenshtein.go",
+    "mapper.go",
+    "mapper_linux_test.go",
+    "mapper_test.go",
+    "mapper_windows_test.go",
+    "model.go",
+    "model_test.go",
+    "options.go",
+    "options_test.go",
+    "resolver.go",
+    "resolver_test.go",
+    "scanner.go",
+    "scanner_test.go",
+    "tag.go",
+    "tag_test.go",
+    "testdata/file.txt",
+    "util.go",
+    "util_test.go",
+    "visit.go"
+  ],
+  "explanation": {
+    "what": "VersionFlag の BeforeApply メソッドを BeforeReset にリネームした。util.go の VersionFlag.BeforeApply(app *Kong, vars Vars) を BeforeReset(app *Kong, vars Vars) に変更し、kong_test.go に TestVersionFlagShouldStillWork を追加して、existingdir/existingfile の default 値が存在しない場合でも --version が正常終了することを検証している。",
+    "why": "PR本文によれば、PR#298 で --help が同様の理由で BeforeReset フックに変更された前例に倣った修正。BeforeApply はコマンドの検証(default 値のファイル存在チェックなど)が完了した後に呼ばれるため、default 値が不正なフィールドがあると --version 実行前にバリデーションエラーで落ちてしまう。BeforeReset はより早い段階のフックで、グラムのリセット前に発火するため、他のフラグの検証状態に関わらず --version が常に機能するようになる。",
+    "highlights": [
+      { "file": "util.go", "note": "VersionFlag.BeforeApply → BeforeReset へのリネームのみ。フック名がそのまま Kong のフック実行順序の意味を持つ" },
+      { "file": "kong_test.go", "note": "TestVersionFlagShouldStillWork で existingdir/existingfile の default 不在でも --version が exit code 0 になることを確認" }
+    ],
+    "langNotes": [
+      { "topic": "BeforeReset フック", "note": "Kong の struct タグ型(VersionFlag など)はメソッド名がフックの種類を表す規約になっている。BeforeReset はコマンド確定・検証より前の早い段階で呼ばれるフックで、他フィールドの検証エラーに影響されず即座に処理を終えたい --version や --help のようなフラグに向く。" }
+    ],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [{ "type": "pr", "number": 321, "url": "https://github.com/alecthomas/kong/pull/321" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}
