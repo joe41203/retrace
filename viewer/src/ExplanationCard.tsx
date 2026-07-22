@@ -1,4 +1,5 @@
 // 右ペインの解説カード。explanation が null なら未生成プレースホルダを出す。
+import Diagram from "./Diagram";
 import type { Evidence, Explanation } from "./types";
 
 const EVIDENCE_LABEL: Record<Evidence, string> = {
@@ -72,6 +73,13 @@ export default function ExplanationCard({
 							</li>
 						))}
 					</ul>
+				</div>
+			)}
+
+			{explanation.diagram && (
+				<div className="exp-section">
+					<h3>構造</h3>
+					<Diagram diagram={explanation.diagram} />
 				</div>
 			)}
 

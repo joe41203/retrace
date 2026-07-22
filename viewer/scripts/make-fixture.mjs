@@ -185,6 +185,11 @@ const commits = [];
       highlights: [
         { file: 'attacker/attacker.go', note: 'Target と Rate を持つ最小の負荷生成コア。' },
       ],
+      diagram: {
+        mermaid:
+          'flowchart LR\n  A["CLI (main.go)"] --> B["attacker.New"]\n  B --> C["Attacker{Target, Rate}"]\n  C --> D["対象 URL へ負荷"]',
+        caption: 'CLI が attacker パッケージ経由で対象 URL に負荷をかける流れ。',
+      },
       evidence: 'pr',
       refs: [
         { type: 'pr', number: 12, url: 'https://github.com/demo/retrace/pull/12' },

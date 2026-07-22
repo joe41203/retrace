@@ -219,8 +219,10 @@ export default function App() {
 							entries={entries}
 							chapters={chapters}
 							activeSha={activeSha}
+							commit={commit}
 							isRead={isRead}
 							onSelect={selectEntry}
+							onSelectFile={scrollToFile}
 						/>
 					) : (
 						<div className="pane-status">{loadError ? "" : "読み込み中…"}</div>

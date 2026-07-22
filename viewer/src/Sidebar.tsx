@@ -1,7 +1,9 @@
-// 左ペイン: 章アコーディオン + コミット一覧。
-// chapters.json が無い場合は「全コミット」1グループにフォールバックする。
+// 左ペイン: 「コミットログ」/「ファイルツリー」の2タブ切替。
+// - コミットログ: 章アコーディオン + コミット一覧(chapters が無ければ「全コミット」1グループ)
+// - ファイルツリー: 選択中コミット時点の全ツリー。変更ファイルをクリックで中央 diff へスクロール
 import { useMemo, useState } from "react";
-import type { Chapter, IndexEntry } from "./types";
+import FileTree from "./FileTree";
+import type { Chapter, Commit, IndexEntry } from "./types";
 
 interface Group {
 	key: string;
@@ -49,7 +51,7 @@ function buildGroups(
 	return groups;
 }
 
-interface SidebarProps {
+interface CommitLogProps {
 	entries: IndexEntry[];
 	chapters: Chapter[] | null;
 	activeSha: string | null;
@@ -57,13 +59,13 @@ interface SidebarProps {
 	onSelect: (entry: IndexEntry) => void;
 }
 
-export default function Sidebar({
+function CommitLog({
 	entries,
 	chapters,
 	activeSha,
 	isRead,
 	onSelect,
-}: SidebarProps) {
+}: CommitLogProps) {
 	const groups = useMemo(
 		() => buildGroups(entries, chapters),
 		[entries, chapters],
@@ -145,6 +147,76 @@ export default function Sidebar({
 					</div>
 				);
 			})}
+		</div>
+	);
+}
+
+type LeftTab = "log" | "tree";
+
+interface SidebarProps {
+	entries: IndexEntry[];
+	chapters: Chapter[] | null;
+	activeSha: string | null;
+	commit: Commit | null;
+	isRead: (sha: string) => boolean;
+	onSelect: (entry: IndexEntry) => void;
+	onSelectFile: (path: string) => void;
+}
+
+export default function Sidebar({
+	entries,
+	chapters,
+	activeSha,
+	commit,
+	isRead,
+	onSelect,
+	onSelectFile,
+}: SidebarProps) {
+	const [tab, setTab] = useState<LeftTab>("log");
+
+	const changedPaths = useMemo(
+		() => new Set((commit?.files ?? []).map((f) => f.path)),
+		[commit],
+	);
+
+	return (
+		<div>
+			<div className="left-tabs">
+				<button
+					className={`left-tab${tab === "log" ? " active" : ""}`}
+					onClick={() => setTab("log")}
+				>
+					コミットログ
+				</button>
+				<button
+					className={`left-tab${tab === "tree" ? " active" : ""}`}
+					onClick={() => setTab("tree")}
+				>
+					ファイルツリー
+				</button>
+			</div>
+
+			{tab === "log" ? (
+				<CommitLog
+					entries={entries}
+					chapters={chapters}
+					activeSha={activeSha}
+					isRead={isRead}
+					onSelect={onSelect}
+				/>
+			) : commit ? (
+				<div className="left-tree-wrap">
+					<FileTree
+						tree={commit.tree}
+						changedPaths={changedPaths}
+						onSelectFile={onSelectFile}
+					/>
+				</div>
+			) : (
+				<div className="left-tree-hint">
+					コミットを選択するとツリーを表示します。
+				</div>
+			)}
 		</div>
 	);
 }

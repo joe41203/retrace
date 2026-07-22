@@ -63,10 +63,11 @@ export interface LinkedIssue {
 
 export interface CommitFile {
 	path: string;
-	status: string; // 'A' | 'M' | 'D' | 'R' | ...
+	status: string; // 'A' | 'M' | 'D' | 'R' | 'C' | ...
 	additions: number;
 	deletions: number;
 	binary: boolean;
+	oldPath?: string; // rename/copy 時の旧パス(generator が付与。スキーマ外の加算フィールド)
 }
 
 export type Evidence = "pr" | "issue" | "message" | "inferred";
@@ -82,10 +83,16 @@ export interface Ref {
 	url: string;
 }
 
+export interface Diagram {
+	mermaid: string;
+	caption: string;
+}
+
 export interface Explanation {
 	what: string;
 	why: string;
 	highlights: HighlightNote[];
+	diagram?: Diagram | null; // 任意。構造理解を助けるコミットのみ付く
 	evidence: Evidence;
 	refs: Ref[];
 	model: string;

@@ -7,7 +7,9 @@ import {
 	Diff,
 	Hunk,
 	parseDiff,
+	tokenize,
 	type FileData,
+	type HunkData,
 	type ViewType,
 } from "react-diff-view";
 import {
@@ -17,9 +19,25 @@ import {
 	useRef,
 	useState,
 } from "react";
+import { languageFromPath, refractor } from "./highlight";
 import type { Commit, CommitFile } from "./types";
 
 const BIG_FILE_LINES = 500;
+// これを超える変更行数のファイルはハイライトをスキップして描画コストを抑える。
+const HIGHLIGHT_MAX_CHANGES = 2000;
+
+// 指定ファイルの hunks をシンタックスハイライトした tokens を返す。
+// 未対応言語・巨大ファイル・失敗時は undefined(=ハイライトなしで素の diff を表示)。
+function tokenizeHunks(hunks: HunkData[], path: string, changes: number) {
+	if (changes > HIGHLIGHT_MAX_CHANGES) return undefined;
+	const language = languageFromPath(path);
+	if (!language) return undefined;
+	try {
+		return tokenize(hunks, { highlight: true, refractor, language });
+	} catch {
+		return undefined;
+	}
+}
 
 // parseDiff が返す FileData から、ビューア上のファイルパスを決める。
 // 追加は newPath、削除は oldPath、その他は new を優先。
@@ -52,6 +70,12 @@ function DiffFileCard({
 }: DiffFileCardProps) {
 	const [collapsed, setCollapsed] = useState(defaultCollapsed);
 	const path = pathOf(file);
+
+	// 折りたたみ中は tokenize しない(開いたときだけ計算)。
+	const tokens = useMemo(() => {
+		if (collapsed || meta?.binary) return undefined;
+		return tokenizeHunks(file.hunks, path, changeCount(file));
+	}, [collapsed, meta?.binary, file, path]);
 
 	return (
 		<div
@@ -92,6 +116,7 @@ function DiffFileCard({
 							viewType={viewType}
 							diffType={file.type}
 							hunks={file.hunks}
+							tokens={tokens}
 							optimizeSelection
 						>
 							{(hunks) =>
