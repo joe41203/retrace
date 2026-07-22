@@ -66,5 +66,19 @@
     "images/real-time.gif",
     "main.go"
   ],
-  "explanation": null
+  "explanation": {
+    "what": "attacker.Options に Workers と MaxWorkers の2フィールドを追加し、未指定時のデフォルト値(それぞれ10と math.MaxUint64)を設定。vegeta.NewAttacker の生成時に vegeta.Workers / vegeta.MaxWorkers オプションとして渡すようにした。",
+    "why": "PR件名「Ensure to give workers」が示す通り、これまで固定的だった内部の並行ワーカー数(vegetaがリクエストを送出する並行数)を外部から指定可能にする変更。PR本文自体は空だが、コミット履歴全体がCLIオプション経由での柔軟な設定(rate/duration/timeout等)を段階的に増やす流れの一環であり、その延長として妥当な追加。",
+    "highlights": [
+      { "file": "attacker/attacker.go", "note": "vegeta.Workers / vegeta.MaxWorkers を NewAttacker に渡す箇所" }
+    ],
+    "langNotes": [
+      { "topic": "math.MaxUint64", "note": "Go標準ライブラリ math パッケージの定数で、符号なし64bit整数の最大値を表す。「上限なし」を意味する値として DefaultMaxWorkers に使われている。" }
+    ],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [{ "type": "pr", "number": 17, "url": "https://github.com/nakabonne/ali/pull/17" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T06:30:00Z"
+  }
 }

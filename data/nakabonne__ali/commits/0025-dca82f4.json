@@ -66,5 +66,20 @@
     "gui/widgets.go",
     "main.go"
   ],
-  "explanation": null
+  "explanation": {
+    "what": "`gui.go`の`attack`関数に直接書かれていた入力値のパース処理(レート・duration・method・body・header)を、新設した`gui/input_handler.go`の`makeOptions`関数に切り出した。あわせてHTTPヘッダーを入力する`headerInput`ウィジェットと、まだ配線されていない`timeoutInput`ウィジェットを追加し、グリッドの3行目をmethod/header/bodyの3列構成に変更している。",
+    "why": "コミットメッセージの「入力ハンドラのモジュール化」の通り、`attack`関数が肥大化していた入力パース・バリデーションのロジックを`makeOptions`として分離し、`attacker.Options`を組み立てる責務を独立させた整理。あわせてヘッダー指定に対応させ、`attacker.Options.Header`(前コミットまでで既に定義済みだったフィールド)を実際に埋められるようにしたと見られる。",
+    "highlights": [
+      { "file": "gui/input_handler.go", "note": "新設された`makeOptions`が入力欄群から`attacker.Options`を組み立て、不正入力はerrorとして返す" },
+      { "file": "gui/gui.go", "note": "`attack`関数が`makeOptions`呼び出し1つと`redrawChart`/`redrawGauge`の起動に単純化された" }
+    ],
+    "langNotes": [
+      { "topic": "error wrapping (%w)", "note": "`fmt.Errorf(\"...: %w\", err)`は`%v`と違い元のerrorをラップし、`errors.Is`/`errors.As`で元のエラーを判定できる形にする。Go 1.13から導入されたエラーチェーンの慣習で、このコミットの`makeOptions`内のエラー生成で使われている。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T06:30:00Z"
+  }
 }

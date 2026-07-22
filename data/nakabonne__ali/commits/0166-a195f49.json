@@ -80,5 +80,20 @@
     "main_test.go",
     "testdata/body-1.json"
   ],
-  "explanation": null
+  "explanation": {
+    "what": "TLS関連のCLIオプションを追加した。`--insecure`(TLS検証スキップ)、`--cacert`(CA証明書ファイル)、`--cert`/`--key`(クライアント証明書と秘密鍵)の4つの新フラグを main.go に追加し、それらから構築した `tls.Config` を attacker の Options 経由で vegeta の attacker に渡すようにした。",
+    "why": "PR本文とリンクされたissueの通りで、相互TLS(mTLS)クライアント認証や、独自のルートCAを使う内部サービス、自己署名証明書を使う開発環境などへの負荷テストを可能にするための機能追加。",
+    "highlights": [
+      { "file": "attacker/attacker.go", "note": "Options に InsecureSkipVerify/CACertificatePool/TLSCertificates を追加し、tls.Config を組み立てて vegeta.TLSConfig() に渡す" },
+      { "file": "main.go", "note": "cacert/cert/key のPEMファイルをロードして x509.CertPool と tls.Certificate を構築する処理を追加" }
+    ],
+    "langNotes": [
+      { "topic": "crypto/tls と crypto/x509", "note": "Go標準ライブラリの crypto/tls パッケージはTLS接続設定を tls.Config で表し、crypto/x509 はPEM形式の証明書やCA証明書プールを扱う。x509.NewCertPool() で作ったプールに AppendCertsFromPEM で証明書を追加し、tls.Config.RootCAs に設定することでカスタムCAを信頼できる。" }
+    ],
+    "diagram": null,
+    "evidence": "issue",
+    "refs": [{ "type": "pr", "number": 104, "url": "https://github.com/nakabonne/ali/pull/104" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T06:30:00Z"
+  }
 }

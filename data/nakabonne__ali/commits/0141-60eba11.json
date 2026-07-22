@@ -131,5 +131,26 @@
     "main_test.go",
     "testdata/body-1.json"
   ],
-  "explanation": null
+  "explanation": {
+    "what": "vegeta.Metrics の P50/P90/P95/P99 をアタック中にリアルタイムで計算し、latency チャートの隣に percentiles チャート(4本のラインとレジェンド)を追加した。Ctrl-P / Ctrl-L でチャートを切り替えられるようにし、drawer.chartDrawing のフラグ型を bool から atomic.Bool に置き換えて goroutine 間の競合を防いだ。",
+    "why": "PR本文によれば、これまで vegeta.Metrics の P50 などのパーセンタイル値は Metrics.Close() を呼んだときにしか算出されておらず、attack 実行中の画面表示は正しく更新されていなかった。これを修正するため、newMetrics が呼ばれるたびに Metrics.Latencies.Quantile() でその場でパーセンタイルを再計算するように変更した。あわせて、ミリ秒への変換が time.Duration(int64)の整数除算で丸められて 500ms が 0 か 1.0s になってしまう既存のバグも appendValue ヘルパーで修正している。",
+    "highlights": [
+      { "file": "attacker/attacker.go", "note": "Attack 内で res ごとに mu(sync.Mutex)で保護しつつ Quantile(0.50/0.90/0.95/0.99) を都度計算し、Result に P50〜P99 を持たせて resCh に流す" },
+      { "file": "gui/gui.go", "note": "gridOpts に latency / percentiles 二種類の container.Option を持たせ、keybinds から c.Update(chartID, ...) でチャートを丸ごと差し替える設計" },
+      { "file": "gui/keybinds.go", "note": "navigateCharts はチャート描画関数のスライスを H/L キーで巡回するクロージャ。position のインクリメント/デクリメントで循環させている" }
+    ],
+    "langNotes": [
+      { "topic": "sync.Mutex による共有状態の保護", "note": "metrics(*vegeta.Metrics)は Attack 用 goroutine と sendMetrics 用 goroutine の両方から読み書きされるため、mu.Lock()/Unlock() で挟んで競合を防いでいる。Go の sync.Mutex は他言語の mutex と同様、Lock 後に必ず Unlock(通常は defer)する運用が基本。" },
+      { "topic": "go.uber.org/atomic", "note": "標準の sync/atomic は int32/int64 などプリミティブ型向けで bool を直接扱えないため、Uber 製の atomic パッケージが提供する atomic.Bool 型(Store/Load メソッドを持つラッパー)を使っている。素の bool フィールドへの並行アクセスによるデータ競合を型レベルで防ぐイディオム。" },
+      { "topic": "container.Container と grid ビルダー(termdash)", "note": "termdash の grid.New()/Add()/Build() は宣言的にレイアウトを組み立てて container.Option のスライスを得るビルダーパターン。ここでは同じ chartID 領域に latency 用と percentiles 用の Option セットを事前に構築しておき、キー入力で container.Update(chartID, opts...) と差し替えることで「別のグリッドへの切り替え」を実現している。" }
+    ],
+    "diagram": {
+      "mermaid": "flowchart LR\n  A[\"Attack goroutine\"] -->|\"res + P50..P99\"| B[\"resCh\"]\n  B --> C[\"drawer.redrawChart\"]\n  C -->|\"Series latency\"| D[\"latencyChart\"]\n  C -->|\"Series p50/p90/p95/p99\"| E[\"percentilesChart\"]\n  F[\"keybinds H/L\"] -->|\"navigateCharts\"| G[\"container.Update(chartID)\"]\n  G --> D\n  G --> E",
+      "caption": "パーセンタイル計算からチャート描画・切り替えまでのデータフロー"
+    },
+    "evidence": "pr",
+    "refs": [{ "type": "pr", "number": 66, "url": "https://github.com/nakabonne/ali/pull/66" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T06:30:00Z"
+  }
 }

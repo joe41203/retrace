@@ -70,5 +70,21 @@
     "main_test.go",
     "testdata/body-1.json"
   ],
-  "explanation": null
+  "explanation": {
+    "what": "ステータスコード別の集計を表示する部分で、map である m.StatusCodes のキーをそのまま順に出力していたのをやめ、キーをスライスに集めて sort.Strings でソートしてから出力するように変更した。既存の TODO コメント「Guaranteed to be in order.」も削除し、実際にソートを行うコメントに置き換えている。",
+    "why": "Go の map はイテレーション順序が保証されておらず、実行のたびにステータスコード(例: 200, 404, 500 など)の表示順がばらばらになる問題があった。issue #78 で報告された「GUI 上でステータスコードの順序が入れ替わる」不具合を修正するため、表示前にキーを明示的にソートするようにした。",
+    "highlights": [
+      { "file": "gui/drawer.go", "note": "map のキーを一旦 []string に集めてから sort.Strings で安定した表示順を作っている" }
+    ],
+    "langNotes": [
+      { "topic": "map iteration order", "note": "Go の map は for range で走査する順序が保証されておらず、意図的にランダム化されている。決まった順序で表示したい場合は、このコミットのようにキーをスライスに集めてから sort パッケージでソートするのが定石。" }
+    ],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [
+      { "type": "pr", "number": 83, "url": "https://github.com/nakabonne/ali/pull/83" }
+    ],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T06:30:00Z"
+  }
 }

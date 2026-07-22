@@ -49,5 +49,20 @@
     "gui/widgets.go",
     "main.go"
   ],
-  "explanation": null
+  "explanation": {
+    "what": "画面レイアウトを1枠(グラフのみ)から3段構成のグリッドに拡張した。plotChart(50%)、URL入力欄とmetrics表示を横並びにした行(47%)、操作案内のnavi行(2%)という構成。widgets構造体には urlInput・metrics・navi の3つのtext系ウィジェットが加わり、キーバインドはEnterキーからSpaceキーでの攻撃開始に変更されている。",
+    "why": "コミットメッセージ通り、テキスト表示用のウィジェット(URL入力・メトリクス表示・操作ガイド)を追加する目的。攻撃開始キーをEnterからSpaceに変えたのは、URL入力欄(textinput)がEnterキーで送信(OnSubmit)する仕様と衝突するのを避けるためと考えられる。",
+    "highlights": [
+      { "file": "gui/widgets.go", "note": "newTextInputのOnSubmitコールバックはまだTODOのままで、入力されたURLをどう攻撃処理に渡すかは未実装。urlInput自体は表示されるが機能としてはまだ繋がっていない" },
+      { "file": "gui/gui.go", "note": "gridLayoutが1行から3行(raw1/raw2/raw3)に増え、ColWidthPercで横方向の分割も組み合わせるようになった。termdashのgridは行と列のパーセンテージ指定を入れ子にしてレイアウトを組む" }
+    ],
+    "langNotes": [
+      { "topic": "構造体フィールドのエクスポート(大文字/小文字)", "note": "widgets構造体のフィールドが `URLInput` から `urlInput` のように小文字始まりに変わっている。Goでは識別子の先頭が大文字だとパッケージ外に公開(exported)され、小文字だとそのパッケージ内だけで使える非公開になる。widgetsはguiパッケージ内でしか使わないため小文字化は妥当な整理" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T06:12:04Z"
+  }
 }

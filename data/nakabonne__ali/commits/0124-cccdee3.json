@@ -82,5 +82,19 @@
     "main_test.go",
     "testdata/body-1.json"
   ],
-  "explanation": null
+  "explanation": {
+    "what": "PR #49 をマージし、サーバーがサポートしていればHTTP/2でリクエストを送る `--http2` フラグ(デフォルトtrue)を追加した。attacker.Options に HTTP2 フィールドを追加し、vegeta.HTTP2(opts.HTTP2) をアタッカー構築時に渡すようにしている。",
+    "why": "PR本文によれば、HTTP/2リクエストへの切り替えを可能にすることが主目的。加えてリベース中に発覚した、前コミットで追加したConnectionsがattacker.Optionsへ渡されていなかった不具合(makeOptions内で設定漏れ)も同じPRで修正されている。",
+    "highlights": [
+      { "file": "main.go", "note": "makeOptions内でConnectionsとHTTP2の両方をattacker.Optionsに設定するよう修正した箇所(Connectionsは前PRでの渡し忘れの修正を含む)" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [
+      { "type": "pr", "number": 49, "url": "https://github.com/nakabonne/ali/pull/49" }
+    ],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T06:30:00Z"
+  }
 }

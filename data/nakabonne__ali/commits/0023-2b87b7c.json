@@ -51,5 +51,19 @@
     "gui/widgets.go",
     "main.go"
   ],
-  "explanation": null
+  "explanation": {
+    "what": "自前で定義していた`Metrics`/`LatencyMetrics`構造体を、vegetaライブラリの`vegeta.LatencyMetrics`型をそのまま埋め込む形に置き換え、BytesIn/BytesOut/Requests/Rate/Throughput/Success/StatusCodes/Errorsなど多数のフィールドを追加した。あわせてグリッドレイアウトでprogressDonutとreportTextの表示順を入れ替えている。",
+    "why": "コミットメッセージの通り「すべてのメトリクスを表示できるようにする」ことが目的で、これまでレイテンシしか保持していなかった`Metrics`構造体を、vegetaが元々計算しているメトリクス一式(スループットや成功率、ステータスコード分布など)に対応させ、レポート欄でより詳細な結果を表示できるようにしたと見られる。",
+    "highlights": [
+      { "file": "attacker/metrics.go", "note": "独自定義していたフィールドを削り、`vegeta.LatencyMetrics`型を直接埋め込む形に変更" }
+    ],
+    "langNotes": [
+      { "topic": "struct field embedding的な再利用", "note": "ここでは埋め込み(embedding)そのものではなく、外部ライブラリの型(`vegeta.LatencyMetrics`)をフィールドの型として直接採用することで、独自の変換コードを削減している。Goでは外部型をそのままフィールドに使うことでラッパー構造体の保守コストを下げられる。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T06:30:00Z"
+  }
 }

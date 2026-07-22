@@ -67,5 +67,20 @@
     "main_test.go",
     "testdata/body-1.json"
   ],
-  "explanation": null
+  "explanation": {
+    "what": "Attack() 内で metricsCh へのメトリクス送信を、各レスポンス受信ごとの逐次送信から 250ms 間隔のティッカーによる定期送信に変更した。新設した sendMetrics ゴルーチンが context でキャンセル可能な子 goroutine として動作し、Attack 終了時に defer cancelChild() で停止する。",
+    "why": "PR タイトルの通り、これまではレスポンスを受信するたびに GUI へメトリクスを送っていたため、高レートの攻撃では更新頻度が過剰になりうる。一定間隔に絞ることで描画側の負荷を抑えつつ、リアルタイム表示は維持する狙いと考えられる。",
+    "highlights": [
+      { "file": "attacker/attacker.go", "note": "sendMetrics が context.WithCancel の子 context と time.Ticker を組み合わせて定期送信し、ctx.Done() で終了する" }
+    ],
+    "langNotes": [
+      { "topic": "context.WithCancel と defer cancelChild()", "note": "親の ctx から派生した子 context を作り、Attack() の終了時に defer で必ず cancel することで、バックグラウンドで動く sendMetrics ゴルーチンをリークさせずに停止させている。Go の並行処理でよく使われる「呼び出し元がゴルーチンの寿命を context で管理する」パターン。" },
+      { "topic": "time.Ticker の select ループ", "note": "for { select { case <-ctx.Done(): ...; case <-ticker.C: ... } } は、キャンセル信号と定期実行の両方を待ち受ける Go の定番イディオム。defer ticker.Stop() を忘れるとタイマーリソースがリークする点に注意。" }
+    ],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [{ "type": "pr", "number": 60, "url": "https://github.com/nakabonne/ali/pull/60" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T06:30:00Z"
+  }
 }

@@ -58,5 +58,17 @@
     "gui/widgets.go",
     "main.go"
   ],
-  "explanation": null
+  "explanation": {
+    "what": "攻撃開始のキーを Space から Enter に統一し(前コミットで追加した攻撃ボタンの GlobalKey と同じキーに揃えた)、Esc キーでの終了を廃止して Ctrl-C のみにした。ハードコードされていた target URL の代わりに dr.widgets.urlInput.Read() で入力欄の値を読み取り、net/url.ParseRequestURI で検証してから攻撃を開始するようにした。不正な URL の場合は reportCh にエラーメッセージを送って処理を中断する。textinput.OnSubmit の TODO 実装(pp.Println するだけ)は削除された。",
+    "why": "前コミットで攻撃ボタンを Enter キーに割り当てたため、キーバインドの攻撃トリガーも Enter に合わせる必要があった。またそれまで固定の URL に対してしか攻撃できなかったのを、実際に UI から入力された URL を使う実装に置き換えることで、UI 入力が実際の攻撃に反映されるようにしている。",
+    "highlights": [
+      { "file": "gui/gui.go", "note": "url.ParseRequestURI での検証と、失敗時に reportCh へエラーを送る処理" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T06:30:00Z"
+  }
 }

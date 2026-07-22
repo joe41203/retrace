@@ -97,5 +97,18 @@
     "storage/storage.go",
     "testdata/body-1.json"
   ],
-  "explanation": null
+  "explanation": {
+    "what": "GUI の再描画間隔(redraw interval)に 100ms という下限を設け、それを下回る値が指定された場合はエラーを返すようにした。あわせて `gui.Option` 型を `gui.Options`、`cli.makeOptions` メソッドを `cli.makeAttackerOptions` にリネームし、README のインストール例のバージョン表記も v0.7.0 に更新している。",
+    "why": "おそらく termdash による画面再描画は一定以上の頻度で行うと負荷やちらつきの原因になりうるため、あまりに短い redraw-interval を指定されないようにガードを入れたと考えられる。`Option`/`makeOptions` のリネームも、おそらく `attacker.Options` など他の設定用構造体と役割が紛らわしくなってきたための整理と見られる。",
+    "highlights": [
+      { "file": "gui/gui.go", "note": "minRedrawInterval(100ms)未満なら run() がエラーを返すガード処理" },
+      { "file": "main.go", "note": "makeOptions → makeAttackerOptions への改名で「attacker 用のオプション生成」であることを明示" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "inferred",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T06:30:00Z"
+  }
 }

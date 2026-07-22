@@ -68,5 +68,19 @@
     "main_test.go",
     "testdata/body-1.json"
   ],
-  "explanation": null
+  "explanation": {
+    "what": "makeOptions() 内の `if b, err := ioutil.ReadFile(...); err != nil { ... } else { body = b }` という if-else 構文を、early return スタイルの `b, err := ...; if err != nil { return ... }; body = b` に書き換えた。",
+    "why": "PRの説明に「linterの提案を満たすため。この方が読みやすいと思う」とある通り、golangci-lintの indent-error-flow(あるいは類似のスタイルチェック)が推奨する、エラー時は早期returnしてhappy pathをネストさせない書き方に揃えた。",
+    "highlights": [
+      { "file": "main.go", "note": "if-elseからearly returnへの書き換え。振る舞いは変えず可読性のみを改善するリファクタリング" }
+    ],
+    "langNotes": [
+      { "topic": "early return (ガード節)", "note": "Goでは `if err != nil { return err }` で早期returnし、以降をelseで包まずにフラットに書くのが一般的な作法。golangci-lintのスタイルルールもこれを推奨しており、このコミットはその指摘に従った修正。" }
+    ],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [{ "type": "pr", "number": 42, "url": "https://github.com/nakabonne/ali/pull/42" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T06:30:00Z"
+  }
 }

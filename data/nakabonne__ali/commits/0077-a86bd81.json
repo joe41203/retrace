@@ -67,5 +67,18 @@
     "images/real-time.gif",
     "main.go"
   ],
-  "explanation": null
+  "explanation": {
+    "what": "gui/drawer.go の redrawMetrics で、StatusCodes と Errors の見出し行(\"StatusCodes:\"・\"Errors:\")を、対応するマップ/スライスが空でない場合にのみ書き込むよう条件を追加した。テストの TestRedrawMetrics でも、ステータスコードとエラーの両方を含むメトリクスを渡し、見出し行と各エントリがそれぞれ期待通りに Write されることを検証するケースを追加した。",
+    "why": "以前は StatusCodes や Errors が空でも \"StatusCodes:\" という見出しだけが常に表示されてしまい(diff の othersTextFormat から固定の \"StatusCodes:\" 行が削除されていることからも分かる)、実際にはデータがない項目の見出しだけが残る見た目になっていた。中身がある場合にのみ見出しを出すようにすることで、othersText の表示内容を実態に合わせて整えている。",
+    "highlights": [
+      { "file": "gui/drawer.go", "note": "len(metrics.StatusCodes) > 0 / len(metrics.Errors) > 0 のガードを追加して見出し行の出力を条件付きにした部分" },
+      { "file": "gui/drawer_test.go", "note": "TestRedrawMetrics でモックの Write 呼び出し順序を EXPECT() で細かく指定し、見出しと本体行がそれぞれ別の Write 呼び出しとして送られることを確認している" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T06:30:00Z"
+  }
 }

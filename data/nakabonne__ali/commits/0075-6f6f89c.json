@@ -59,5 +59,19 @@
     "images/real-time.gif",
     "main.go"
   ],
-  "explanation": null
+  "explanation": {
+    "what": "TestRedrawChart 内で ctx.Done() による終了待ちのゴルーチンを、sync.WaitGroup を使った終了待ちに書き換えた。gaugeCh から end=true を受け取ったら wg.Done() を呼んで終了するようにし、テスト本体側でも d.chartCh に End:true の Result を送った後に wg.Wait() で監視用ゴルーチンの終了を待ってからテストを終える。",
+    "why": "直前のコミットで追加したテストは、監視用ゴルーチンが ctx.Done() でしか終了を検知できなかったため、テスト関数が先に終わるとゴルーチンの終了を確認しないまま次のテストケースに進んでしまう可能性があった。sync.WaitGroup で明示的に「監視ゴルーチンが終わるまで待つ」ようにすることで、ゴルーチンリークやテスト間の競合を防ぐ意図と考えられる(直前のコミットで goleak を有効化していることとも整合する)。",
+    "highlights": [
+      { "file": "gui/drawer_test.go", "note": "wg.Add(1) → ゴルーチン内で wg.Done() → テスト末尾で wg.Wait() という定型的な待ち合わせパターン" }
+    ],
+    "langNotes": [
+      { "topic": "sync.WaitGroup", "note": "複数のゴルーチンの終了を待ち合わせるための Go 標準ライブラリの同期プリミティブ。Add(n) でカウンタを増やし、各ゴルーチンが処理完了時に Done() でカウンタを1減らし、Wait() はカウンタが0になるまでブロックする。ここではテストが起動した監視用ゴルーチンの終了を、テストのアサーションより前に確実に待つために使われている。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T06:30:00Z"
+  }
 }

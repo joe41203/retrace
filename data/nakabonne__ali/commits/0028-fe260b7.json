@@ -59,5 +59,18 @@
     "gui/widgets.go",
     "main.go"
   ],
-  "explanation": null
+  "explanation": {
+    "what": "`attacker.Options`に`Timeout`フィールドと`DefaultTimeout`定数を追加し、`vegeta.NewAttacker`呼び出し時に`vegeta.Timeout(opts.Timeout)`を渡すようにした。`makeOptions`でも`timeoutInput`(既に存在していたが未使用だったウィジェット)を読んでtimeoutをパースする分岐を追加し、グリッドのrate/duration行にtimeout列を加えて3列構成にした。",
+    "why": "リクエストごとのタイムアウトをUIから指定できるようにする機能追加。`timeoutInput`ウィジェット自体は数コミット前(0025)で先に用意されていたが結線されておらず、このコミットで`makeOptions`のパース処理と`vegeta.Timeout`オプションへの反映が完成し、実際に機能するようになった。",
+    "highlights": [
+      { "file": "attacker/attacker.go", "note": "`vegeta.NewAttacker(vegeta.Timeout(opts.Timeout))`でリクエストタイムアウトを反映" },
+      { "file": "gui/input_handler.go", "note": "`timeoutInput.Read()`が空なら`DefaultTimeout`(30秒)にフォールバック" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T06:30:00Z"
+  }
 }

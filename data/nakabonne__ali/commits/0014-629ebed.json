@@ -72,5 +72,20 @@
     "gui/widgets.go",
     "main.go"
   ],
-  "explanation": null
+  "explanation": {
+    "what": "Metrics 型と LatencyMetrics 型、newMetrics 関数を attacker/attacker.go から新設した attacker/metrics.go に切り出した。仮実装だった Metrics.String() が \"foo\" を返すだけだったのを、gopkg.in/yaml.v2 で自身を YAML マーシャルして返す実装に置き換え、各フィールドに json タグを追加した。README にも Features/Alternatives の見出しを追加している。",
+    "why": "attacker.go に攻撃実行ロジックとメトリクスのデータ構造が混在していたため、メトリクス関連の型定義を専用ファイルに分離したと見られる。String() を YAML 出力にしたのは、drawer 経由でレポート欄に攻撃結果を人間が読める形で表示するため(前コミットで追加された reportCh 経由の表示に対応する実装)。",
+    "highlights": [
+      { "file": "attacker/metrics.go", "note": "Metrics.String() を yaml.Marshal ベースの実装に変更" }
+    ],
+    "langNotes": [
+      { "topic": "struct タグ (json:\"...\")", "note": "Go では構造体フィールドに `json:\"total\"` のようなタグを付与することで、エンコード時のキー名やシリアライズの挙動を制御できる。ここでは JSON タグを付けているが、実際のシリアライズは yaml.Marshal で行っている点に注意。" },
+      { "topic": "go.mod / go.sum への依存追加", "note": "新しい外部パッケージ(gopkg.in/yaml.v2)を import すると、go.mod に require 行が、go.sum にハッシュ検証用のエントリが追加される。go.sum はビルドの再現性・改ざん検知のために使われる。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T06:30:00Z"
+  }
 }

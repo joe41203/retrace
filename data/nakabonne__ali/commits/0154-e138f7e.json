@@ -69,5 +69,19 @@
     "main_test.go",
     "testdata/body-1.json"
   ],
-  "explanation": null
+  "explanation": {
+    "what": "duration オプションのバリデーションを `c.duration <= 0` でエラーにする実装から `c.duration < 0` に変更し、duration が 0 の場合を有効な入力として許容するようにした。エラーメッセージも「0より大きくなければならない」から「0以上でなければならない」に修正した。",
+    "why": "README や main.go の他の箇所では duration に 0 を渡すことで「無限に攻撃を続ける(infinite attack)」モードを意味させているが、このバリデーションが `<= 0` のままだと 0 を渡した時点でエラーになってしまい、意図した機能が使えなくなっていた。PR タイトルの「Re-enable infinite attack」の通り、この機能を復活させる修正。",
+    "highlights": [
+      { "file": "main.go", "note": "duration < 0 のみをエラーとすることで duration == 0 を「無限attack」として通す" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [
+      { "type": "pr", "number": 84, "url": "https://github.com/nakabonne/ali/pull/84" }
+    ],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T06:30:00Z"
+  }
 }

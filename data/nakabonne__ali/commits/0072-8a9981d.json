@@ -68,5 +68,22 @@
     "images/real-time.gif",
     "main.go"
   ],
-  "explanation": null
+  "explanation": {
+    "what": "run 関数の中で生成していた termbox.Terminal を Run() 側で生成し、run に引数として渡す形に変更した(run(t *termbox.Terminal, r runner))。あわせて gui_test.go では、コメントアウトされていた goleak.VerifyTestMain によるゴルーチンリーク検知の TestMain を有効化し、テストでは実物ではなく &termbox.Terminal{} を run に渡すようにした。",
+    "why": "前コミット(#71)で run 関数をテスト可能にしたが、termbox.Terminal の生成は依然として run 内部にあり、ターミナル(terminalapi.Terminal 実装)そのものを差し替える余地がなかった。PR タイトルの通り「terminal interface を pluggable にする」ため、Terminal の生成と run の実行を分離し、外部から具体的な terminal 実装を注入できる形にした。これによりテストでも実ターミナルデバイスに依存せずに run を呼び出せるようになった。",
+    "highlights": [
+      { "file": "gui/gui.go", "note": "termbox.New() の呼び出しを Run() 側に引き上げ、run の引数として terminal を受け取るよう変更" },
+      { "file": "gui/gui_test.go", "note": "goleak.VerifyTestMain(m) のコメントアウトを解除し、テスト全体でゴルーチンリークを検知するようにした" }
+    ],
+    "langNotes": [
+      { "topic": "go.uber.org/goleak (VerifyTestMain)", "note": "goleak はテスト終了時に残存ゴルーチンがないかを検査するライブラリ。TestMain 内で goleak.VerifyTestMain(m) を呼ぶと、パッケージ内の全テスト完了後にリークがあれば失敗させられる。TUI アプリのようにバックグラウンドで goroutine を多用するコードでは、テストが終わった後もゴルーチンが残り続けるバグを検出するのに使われる。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [
+      { "type": "pr", "number": 10, "url": "https://github.com/nakabonne/ali/pull/10" }
+    ],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T06:30:00Z"
+  }
 }

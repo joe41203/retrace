@@ -60,5 +60,21 @@
     "images/real-time.gif",
     "main.go"
   ],
-  "explanation": null
+  "explanation": {
+    "what": "GitHub Actions のワークフロー .github/workflows/release.yml と、GoReleaser の設定ファイル .goreleaser.yml を新規追加した。バージョンタグ(v[0-9]+.[0-9]+.[0-9]+ 形式)が push されたときに GoReleaser を実行し、freebsd/darwin/linux/windows × amd64/arm/arm64/386/ppc64le/s390x/mips64/mips64le という広範なクロスコンパイル対象でバイナリをビルドし、Homebrew tap(nakabonne/homebrew-ali)向けの formula も生成する設定になっている。",
+    "why": "コミットメッセージ「Add goreleaser」の通り、手動でのバイナリビルド・配布作業を自動化するための土台を整えた変更。直前のコミットで CI ワークフロー(test.yml)を整備したのに続き、今度はリリース自動化を導入しており、Go 製 CLI ツールを配布可能な形にするための一連の基盤整備の一環と見られる。",
+    "highlights": [
+      { "file": ".goreleaser.yml", "note": "builds でクロスコンパイル対象の goos/goarch を列挙し、brews でHomebrew tap への formula 公開まで設定している" },
+      { "file": ".github/workflows/release.yml", "note": "on.push.tags でセマンティックバージョンタグ形式にマッチしたときだけ実行される" }
+    ],
+    "langNotes": [
+      { "topic": "goreleaser", "note": "Go エコシステムでよく使われるリリース自動化ツール。単一の YAML 設定でクロスコンパイル・アーカイブ生成・チェックサム計算・Homebrew formula 公開・Docker イメージビルドまでを一括して行える。" },
+      { "topic": "ldflags -X", "note": "goreleaser の ldflags に見える `-X main.version={{.Version}}` は Go のリンカフラグで、ビルド時に main パッケージの変数へ値を注入する仕組み。バージョン情報をバイナリに埋め込む定番手法。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T06:30:00Z"
+  }
 }

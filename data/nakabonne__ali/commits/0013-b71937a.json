@@ -64,5 +64,20 @@
     "gui/widgets.go",
     "main.go"
   ],
-  "explanation": null
+  "explanation": {
+    "what": "新規ファイル gui/drawer.go を追加し、redrawChart と redrawReport をそれまでの gui/widgets.go 上の裸の関数から、新設した drawer 構造体のメソッドへ移した。drawer は widgets へのポインタと、チャート更新用チャンネル chartsCh、レポート表示用チャンネル reportCh を保持する。gui.go の Run() では drawer を1つ生成し、キー入力(Space)のたびに redrawChart と、攻撃実行後に reportCh へ結果文字列を送るゴルーチンを起動するようにした。あわせて attacker.Metrics に仮の String() メソッドを追加している。",
+    "why": "それまでは resultCh を都度 make し、チャート描画用のゴルーチンと攻撃実行用のゴルーチンを直接 gui.go に書いていたため、チャンネルの受け渡しや責務が gui.go に集中していた。drawer という単位にチャート・レポートの描画ロジックとチャンネルをまとめることで、gui.go 側はキー入力に応じて drawer のメソッドを呼ぶだけの薄い形に整理する狙いがあったと見られる。",
+    "highlights": [
+      { "file": "gui/drawer.go", "note": "新設された drawer 構造体。redrawChart と redrawReport をメソッド化" },
+      { "file": "gui/gui.go", "note": "drawer を1つ生成し、キー入力ハンドラから redrawChart 用ゴルーチンと攻撃実行用ゴルーチンを起動" }
+    ],
+    "langNotes": [
+      { "topic": "goroutine + channel によるUI更新", "note": "drawer.redrawChart は for-select ループでチャンネル chartsCh を待ち受け、届いた結果でチャートを更新し続ける。攻撃を実行する別のゴルーチンが chartsCh へ結果を送信し、両者はチャンネル経由で疎に連携する構成になっている。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T06:30:00Z"
+  }
 }

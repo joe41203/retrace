@@ -73,5 +73,20 @@
     "images/real-time.gif",
     "main.go"
   ],
-  "explanation": null
+  "explanation": {
+    "what": "`gui/keybinds_test.go` に `TestAttack` と `TestMakeOptions` という2つの表駆動テストを新規追加した(合計329行)。`TestMakeOptions` はレート制限・duration・timeout・method・header・bodyファイルパスの各入力が不正な場合にエラーになること、およびデフォルト値/指定値が正しく `attacker.Options` に反映されることを、モック化した `TextInput` を使って網羅的に検証する。body読み込みテスト用に `gui/testdata/body-1.json` も新規追加した。",
+    "why": "PRタイトルの「Ensure that the options passed correctly」が示す通り、フォーム入力(URL・レート・duration等)から `attacker.Options` を組み立てる `makeOptions` 関数が、様々な入力パターンで期待通りに動くことを保証するのが目的。TUIの入力欄はモックしないとテストが書けないため、`NewMockTextInput` を多用した表駆動テストになっている。",
+    "highlights": [
+      { "file": "gui/keybinds_test.go", "note": "TestMakeOptions: 不正入力→エラー、未入力→デフォルト値、指定入力→反映値、という3系統のケースが並ぶ" },
+      { "file": "gui/testdata/body-1.json", "note": "bodyInputでファイルパスを指定した際の読み込みテスト用フィクスチャ" }
+    ],
+    "langNotes": [
+      { "topic": "gomock (NewMockTextInput)", "note": "golang/mockが生成したモックに対して `m.EXPECT().Read().Return(...)` と期待値を設定してからテスト対象に渡す、Goでの典型的なインターフェースモックの使い方。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [{ "type": "pr", "number": 13, "url": "https://github.com/nakabonne/ali/pull/13" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T06:30:00Z"
+  }
 }

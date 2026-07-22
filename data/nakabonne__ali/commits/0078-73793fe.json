@@ -72,5 +72,20 @@
     "images/real-time.gif",
     "main.go"
   ],
-  "explanation": null
+  "explanation": {
+    "what": "gui/drawer.go の redrawMetrics で、othersText に対して見出し行・ステータスコード・エラーをそれぞれ個別に Write していた処理を、文字列連結でひとつの othersText 変数にまとめてから最後に1回だけ Write(othersText, text.WriteReplace()) を呼ぶ形に書き直した。あわせて latenciesTextFormat・bytesTextFormat・othersTextFormat の3つの const を redrawMetrics 関数の外に出し、関数トップの中身が長くなりすぎないよう整理した。テストの TestRedrawMetrics は、Write 呼び出し順序に依存する検証がしづらくなったため一時的にコメントアウトされている。",
+    "why": "コミットメッセージ(マージされた PR のコミット内訳)に \"Guarantee order to be called\" とある通り、複数回に分けて Write していた実装では termdash 側での描画順序やタイミングの保証が難しかったと見られる。1つの文字列に組み立ててから Write を1回だけ呼ぶことで、呼び出し順序への依存をなくし、意図した通りの1枚のテキストとして確実に描画されるようにしている。",
+    "highlights": [
+      { "file": "gui/drawer.go", "note": "othersText への複数回 Write を文字列連結にまとめ、最後に1回だけ Write する形に変更した箇所" },
+      { "file": "gui/drawer_test.go", "note": "TestRedrawMetrics 全体がコメントアウトされ、代わりに1回の Write 呼び出しを期待する形へのテスト書き直しは持ち越しになっている" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [
+      { "type": "pr", "number": 11, "url": "https://github.com/nakabonne/ali/pull/11" }
+    ],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T06:30:00Z"
+  }
 }

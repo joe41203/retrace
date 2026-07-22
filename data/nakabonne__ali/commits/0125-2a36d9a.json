@@ -89,5 +89,22 @@
     "main_test.go",
     "testdata/body-1.json"
   ],
-  "explanation": null
+  "explanation": {
+    "what": "PR #54 をマージし、リクエスト送信元のローカルIPアドレスを指定する `-L, --local-address` フラグを追加した。attacker.Options に net.IPAddr 型の LocalAddr フィールドを追加し、未指定時は vegeta.DefaultLocalAddr にフォールバックしたうえで vegeta.LocalAddr(opts.LocalAddr) をアタッカーに渡すようにしている。",
+    "why": "issue #50 に基づく要望で、vegetaのAPIにそのまま値を渡すだけで実現できる小さな変更として位置づけられていた。マルチホーム環境などで送信元アドレスを固定したいユースケースに応えるもの。",
+    "highlights": [
+      { "file": "main.go", "note": "net.ParseIP(c.localAddress) でCLI文字列引数からnet.IPAddrを組み立てる箇所" }
+    ],
+    "langNotes": [
+      { "topic": "net.IPAddr", "note": "Goの標準ライブラリnetパッケージが提供するIPアドレス表現の構造体。net.ParseIPで文字列からnet.IPへ変換し、net.IPAddr{IP: ...}でラップして各種ネットワークAPIに渡すのが定番パターン。" }
+    ],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [
+      { "type": "pr", "number": 54, "url": "https://github.com/nakabonne/ali/pull/54" },
+      { "type": "issue", "number": 50, "url": "https://github.com/nakabonne/ali/issues/50" }
+    ],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T06:30:00Z"
+  }
 }

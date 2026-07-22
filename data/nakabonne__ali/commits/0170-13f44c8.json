@@ -76,5 +76,20 @@
     "storage/storage.go",
     "testdata/body-1.json"
   ],
-  "explanation": null
+  "explanation": {
+    "what": "`storage.NewStorage()` に `partitionDuration` 引数を追加し、クエリ範囲(queryRange)の2倍の期間を渡すようにした。tstorage側の `WithPartitionDuration` オプションに渡すことで、その期間より古いデータポイントが自動的に破棄されるようにしている。",
+    "why": "直前のコミットで導入したtstorageは、データポイントを溜め続けると際限なくヒープメモリを消費してしまう。表示に必要なのは query-range で指定した直近の時間範囲のデータだけなので、その2倍の期間を保持境界として設定し、それより古いデータを破棄することでメモリ使用量を抑える意図とコメントに明記されている。",
+    "highlights": [
+      { "file": "storage/storage.go", "note": "NewStorageがpartitionDurationを受け取り、tstorage.WithPartitionDurationに渡す" },
+      { "file": "main.go", "note": "storage.NewStorage(c.queryRange * 2) という呼び出しと、その意図を説明するコメント" }
+    ],
+    "langNotes": [
+      { "topic": "tstorage の WithPartitionDuration", "note": "tstorageはデータを時間区分(パーティション)ごとにメモリ上に保持し、指定した保持期間(partition duration)を過ぎた古いパーティションを破棄することでメモリ使用量を一定に保つ。時系列DBでよく使われるパーティショニングによるデータ保持期間管理の仕組み。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T06:30:00Z"
+  }
 }

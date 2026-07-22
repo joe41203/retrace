@@ -81,5 +81,23 @@
     "images/real-time.gif",
     "main.go"
   ],
-  "explanation": null
+  "explanation": {
+    "what": "単一の Report テキストウィジェットに全メトリクスを詰め込んで表示していた構成をやめ、Latencies・Bytes・Others・Message という複数のテキストウィジェット(multi-widgets)に分割して描画するように変更した。drawer 構造体のチャネルを reportCh から metricsCh(*attacker.Metrics を流す)と messageCh(文字列を流す)の2本に分け、グリッドレイアウトも Report 用の1カラムから4分割のレイアウトに組み替えている。",
+    "why": "それまでは attacker.Metrics を String() で1本の文字列に整形してから1つのテキストウィジェットに書き込んでいたが、これだと項目ごとの視認性が悪い。レイテンシ・バイト数・その他の情報(ステータスコード等)を別々のウィジェットに分けることで、TUI 上で情報を読み取りやすくする狙いがある。PR body は空でタイトルのみだが、diff から見て取れる変更の意図はレイアウト改善であり、コミットメッセージの\"Use multi-widgets to show metrics\"がそのまま動機を表している。",
+    "highlights": [
+      { "file": "gui/drawer.go", "note": "reportCh を metricsCh と messageCh に分割し、redrawReport で Metrics の各フィールドを3つのテキストウィジェットへ振り分けて書き込む" },
+      { "file": "gui/gui.go", "note": "gridLayout のレイアウトを Report 用の1カラムから Latencies/Bytes/Others + Message の4分割構成に変更" },
+      { "file": "gui/widgets.go", "note": "widgets 構造体に latenciesText/bytesText/othersText/messageText を追加し、reportText を廃止" }
+    ],
+    "langNotes": [
+      { "topic": "channel の型分割によるデータフロー整理", "note": "Go では goroutine 間の受け渡しをチャネルの型で表現するため、責務が増えたら chan string 1本を意味の異なる複数のチャネル(ここでは *attacker.Metrics 用と string 用)に分けるのが定石。型を分けることで送信側・受信側のコードが自己文書化される。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [
+      { "type": "pr", "number": 4, "url": "https://github.com/nakabonne/ali/pull/4" }
+    ],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T06:30:00Z"
+  }
 }

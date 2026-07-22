@@ -69,5 +69,17 @@
     "main_test.go",
     "testdata/body-1.json"
   ],
-  "explanation": null
+  "explanation": {
+    "what": "attacker パッケージ独自の DefaultLocalAddr(net.IPAddr{IP: net.IPv4zero})を定義し、これまで参照していた vegeta.DefaultLocalAddr の代わりに使うよう変更した。また main.go の `--http2` のヘルプ文言から重複していた \"(default true)\" を除去し、`--local-address` フラグ名を `--local-addr` に短縮した。",
+    "why": "コミットメッセージの通り、vegetaパッケージの内部定数に依存する代わりに独自定数を持つことで、おそらくattackerパッケージがデフォルト値のためだけにvegetaの露出APIに依存する結合を減らす狙いだったと考えられる。",
+    "highlights": [
+      { "file": "attacker/attacker.go", "note": "var DefaultLocalAddr = net.IPAddr{IP: net.IPv4zero} でvegeta.DefaultLocalAddrの代替を自前定義した箇所" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "inferred",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T06:30:00Z"
+  }
 }

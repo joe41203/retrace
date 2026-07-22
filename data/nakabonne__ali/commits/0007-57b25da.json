@@ -41,11 +41,27 @@
     "LICENSE",
     "README.md",
     "attacker/attacker.go",
+    "attacker/attacker_test.go",
+    "attacker/fake_attacker.go",
     "go.mod",
     "go.sum",
     "gui/gui.go",
     "gui/widgets.go",
     "main.go"
   ],
-  "explanation": null
+  "explanation": {
+    "what": "前回コメントアウトされていた「contextが終了したら止める」処理を、実際に動くコードとして実装した。select文で `ctx.Done()` と `default` を組み合わせ、contextが終了していればvegetaのattacker.Stop()を呼び、そうでなければ結果をchannelに送って集計を続ける。あわせてグラフのX軸ラベルを \"zero\" から \"num\" に変更している。",
+    "why": "コミットメッセージの通り、負荷テストを途中で止められるようにすることが目的。前回のコミットのTODOコメントで示唆されていた「ctx expiredなら止める」を実装したかたちで、コメントアウトされたコードの構造(if <-ctx.Done())をselect+defaultの形に書き直している。",
+    "highlights": [
+      { "file": "attacker/attacker.go", "note": "`select { case <-ctx.Done(): attacker.Stop(); default: ... }` という書き方。defaultケースがあるselectは「channelが準備できていなければ即座にdefaultへ抜ける」ノンブロッキングな判定になる" }
+    ],
+    "langNotes": [
+      { "topic": "select文のdefaultケース", "note": "selectにdefaultを含めると、他のどのcaseも即座に実行可能でない場合にブロックせずdefaultへ進む。ここでは「ctx.Done()がまだ閉じていなければ(＝attackを続けてよければ)結果を送る」という条件分岐として使われている" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T06:12:04Z"
+  }
 }

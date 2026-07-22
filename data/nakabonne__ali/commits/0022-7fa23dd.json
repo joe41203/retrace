@@ -72,5 +72,20 @@
     "gui/widgets.go",
     "main.go"
   ],
-  "explanation": null
+  "explanation": {
+    "what": "攻撃の進捗を表示する円形の`donut`ウィジェットを追加し、`drawer`に新しい`donutCh`チャネルと`redrawDonut`メソッドを実装した。あわせて`attacker`パッケージの`defaultRate`等の非公開定数を`DefaultRate`のように公開(exported)化し、`attack`関数内で入力欄が空の場合にこれらのデフォルト値を使うよう分岐を追加している。README.mdにも使い方セクションと今後のロードマップを追記した。",
+    "why": "おそらく、リクエスト数の見積もり(`requestNum`)は既にレート×durationから計算できていたので、その値を分母に進捗率を`donutCh`経由で描画側に伝える仕組みを追加し、攻撃がどこまで進んだか視覚的に分かるようにする狙いと見られる。デフォルト値の定数を公開したのは、`gui`パッケージ側でも`attacker.DefaultRate`のように参照して、空欄入力時のフォールバック値として使うためと考えられる。",
+    "highlights": [
+      { "file": "gui/drawer.go", "note": "`redrawDonut`が`donutCh`から受け取ったboolを基にカウントを進め、`Percent()`で進捗率を描画" },
+      { "file": "attacker/attacker.go", "note": "`defaultRate`等を`DefaultRate`のように大文字化してパッケージ外から参照可能にした" }
+    ],
+    "langNotes": [
+      { "topic": "exported identifier", "note": "Goでは識別子の先頭を大文字にするとパッケージ外から参照できる(exported)。ここでは`gui`パッケージから`attacker`パッケージのデフォルト値定数を使うために公開化している。" }
+    ],
+    "diagram": null,
+    "evidence": "inferred",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T06:30:00Z"
+  }
 }

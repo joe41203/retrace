@@ -81,5 +81,19 @@
     "main_test.go",
     "testdata/body-1.json"
   ],
-  "explanation": null
+  "explanation": {
+    "what": "--http2 と --keepalive という「デフォルト true」のブールフラグを、--no-http2 と --no-keepalive という「デフォルト false」のフラグに置き換えた。内部的には noHTTP2 / noKeepAlive フィールドを保持し、Options 構築時に !c.noHTTP2 / !c.noKeepAlive で反転させている。README とテストも合わせて更新した。",
+    "why": "PR タイトルの通り、真偽値フラグのデフォルトを true にする設計は CLI の慣習として分かりにくい（フラグを指定しても実は何も変わらない、あるいは無効化の意図が伝わりにくい）ため、「明示的に指定したときだけ機能を無効化する」no-プレフィックスの否定フラグに統一したと考えられる。",
+    "highlights": [
+      { "file": "main.go", "note": "flagSet.BoolVarP の第3引数（デフォルト値）が true から false に変わり、noHTTP2 / noKeepAlive という否定形フィールド名に統一されている" }
+    ],
+    "langNotes": [
+      { "topic": "pflag の BoolVarP とデフォルト値", "note": "Go の CLI でよく使われる pflag（cobra 系）では BoolVarP(&dst, name, shorthand, default, usage) のようにデフォルト値を明示する。ブールフラグはデフォルト true にすると「フラグを立てても無効化できない」直感に反する挙動になりやすく、no-接頭辞の否定フラグ（デフォルト false）にする方が CLI の慣習として分かりやすいとされる。" }
+    ],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [{ "type": "pr", "number": 61, "url": "https://github.com/nakabonne/ali/pull/61" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T06:30:00Z"
+  }
 }

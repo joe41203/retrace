@@ -75,5 +75,21 @@
     "storage/storage.go",
     "testdata/body-1.json"
   ],
-  "explanation": null
+  "explanation": {
+    "what": "attacker/resolver.go の resolver 構造体で、フィールド `idx uint64` と `addrs []string` の宣言順序を入れ替え、uint64 のフィールドを構造体の先頭に配置した。",
+    "why": "PR本文にある通り、Alpine Linux 向けの apk パッケージとしてビルドしたところ 32bit アーキテクチャで失敗する問題が見つかり、その修正として構造体のフィールド順を変更している。32bit プラットフォームでは 64bit 値がメモリ上の8バイト境界にアラインされていないと `sync/atomic` 系のアトミック操作が正しく動作しない(パニックする)ことがあり、struct の中で uint64 を最初のフィールドに置くことでその境界保証を得る、という Go でよく知られた回避策に沿った修正。",
+    "highlights": [
+      { "file": "attacker/resolver.go", "note": "idx(uint64)を addrs より前に宣言し直しただけの1行差分だが、32bit環境でのクラッシュ回避に直結する変更" }
+    ],
+    "langNotes": [
+      { "topic": "64bit値のメモリアライメントと sync/atomic", "note": "Go の sync/atomic パッケージで64bit値をアトミックに読み書きするには、32bit環境ではその値が8バイト境界にアラインされている必要がある。構造体の先頭フィールドは常にアラインされるため、64bit値(uint64/int64)を struct の先頭に置くのが定番の回避策になっている。" }
+    ],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [
+      { "type": "pr", "number": 109, "url": "https://github.com/nakabonne/ali/pull/109" }
+    ],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T06:30:00Z"
+  }
 }

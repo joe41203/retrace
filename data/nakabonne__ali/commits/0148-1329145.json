@@ -104,5 +104,27 @@
     "main_test.go",
     "testdata/body-1.json"
   ],
-  "explanation": null
+  "explanation": {
+    "what": "drawer の描画方式を「結果が届くたびに termdash API を呼ぶ」方式から「結果はバッファに貯めておき、redrawInterval(250ms)ごとに一括で termdash API に反映する」方式に作り直した。appendChartValues(旧 redrawChart)は values 構造体に latencies/p50/p90/p95/p99 を溜めるだけにし、新設した redrawCharts が ticker で定期的に Series() を呼ぶ。メトリクスも同様に updateMetrics が受信して保持し、redrawMetrics が ticker 駆動でウィジェットに書き込むようになった。Result.End フィールドと sendMetrics goroutine を廃止し、代わりに doneCh(close で通知する完了シグナル)を導入した。",
+    "why": "PR本文に記載の issue #75 の修正として、attack ごとに termdash の描画APIを都度呼んでいたのがボトルネックになっていたため、値のバッファリングと定期描画に切り替えて負荷を下げた。あわせて attacker.Attack のシグナル方式を「Result.End フラグを流す」から「doneCh を close する」方式に変え、goroutine 間の完了通知をより Go らしいイディオムに統一している。",
+    "highlights": [
+      { "file": "gui/drawer.go", "note": "appendChartValues(値の蓄積)と redrawCharts(定期描画)への分離。sync.RWMutex(d.mu)で chartValues/metrics への並行アクセスを保護" },
+      { "file": "gui/keybinds.go", "note": "attack() で d.doneCh = make(chan struct{}) を都度生成し、アタック完了時に close(d.doneCh) することで appendChartValues/redrawCharts 双方に完了を伝搬" },
+      { "file": "attacker/attacker.go", "note": "resCh の型を chan *Result から chan<- *Result(送信専用)に変更し、Result.End と sendMetrics goroutine を削除" }
+    ],
+    "langNotes": [
+      { "topic": "close(channel) によるブロードキャスト通知", "note": "Go では close したチャンネルからの受信は即座にゼロ値を返し続けるため、doneCh を close するだけで appendChartValues と redrawCharts の両方の select 文が同時に反応できる。値を1回だけ送る chan struct{} への送信では複数の受信者に同時に届けられないため、複数goroutineへの完了通知にはcloseがよく使われるイディオム。" },
+      { "topic": "chan<- T(送信専用チャンネル型)", "note": "関数シグネチャで chan<- *Result と書くと、その関数はチャンネルへの送信のみ許可され受信はコンパイルエラーになる。呼び出し側の意図(このチャンネルは書き込み専用として渡す)を型で明示する Go のイディオム。" },
+      { "topic": "sync.RWMutex", "note": "d.mu.RLock()/RUnlock() は複数の読み取りを同時に許可しつつ書き込み時のみ排他するロック。redrawMetrics(読み取りのみ)と updateMetrics(書き込み)のように読み取りが多く書き込みが少ない場面で sync.Mutex より並行度を高められる。" },
+      { "topic": "time.NewTicker による定期実行", "note": "ticker.C から一定間隔で値を受け取れるチャンネルを使い、select 文の一分岐として組み込むことで「ctx.Done() か doneCh か ticker.C のいずれか」を待つ定期処理ループを書いている。defer ticker.Stop() を忘れるとタイマーリソースがリークする点に注意。" }
+    ],
+    "diagram": {
+      "mermaid": "flowchart LR\n  A[\"Attack goroutine\"] -->|\"Result\"| B[\"chartCh\"]\n  B --> C[\"appendChartValues\"]\n  C -->|\"貯める\"| D[\"chartValues (mu保護)\"]\n  E[\"time.Ticker 250ms\"] --> F[\"redrawCharts\"]\n  D --> F\n  F -->|\"Series()\"| G[\"termdash widgets\"]\n  A -->|\"close\"| H[\"doneCh\"]\n  H --> C\n  H --> F",
+      "caption": "値のバッファリングと ticker 駆動の定期描画への再設計"
+    },
+    "evidence": "pr",
+    "refs": [{ "type": "pr", "number": 77, "url": "https://github.com/nakabonne/ali/pull/77" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T06:30:00Z"
+  }
 }

@@ -51,5 +51,20 @@
     "gui/widgets.go",
     "main.go"
   ],
-  "explanation": null
+  "explanation": {
+    "what": "durationInput という新しいテキスト入力欄を widgets に追加し、rateLimitInput と合わせて画面上で rate と duration を指定できるようにした。keybinds では rateLimitInput.Read() を strconv.Atoi で、durationInput.Read() を time.ParseDuration でパースし、失敗時は reportCh にエラーメッセージを送るようにしている。gridLayout も urlInput・rateLimitInput・durationInput を1つの列にまとめた入れ子のグリッドへ変更した。前コミットで追加した attackButton の生成コードはコメントアウトされ、widgets 構造体からも一旦外された。",
+    "why": "レート・実行時間ともにこれまでコード上の固定値(rate=10, duration=2s)だったのを、UI 上の入力欄から指定できるようにする一連の変更(rate 制限は前コミットで、duration は今回)。attackButton を一旦外しているのは、この時点ではまだ攻撃トリガーを Enter キーのキーバインドだけに統一する方針だったためと考えられる(コード上に TODO 実装のまま残っており、以降のコミットで再整理される可能性がある)。",
+    "highlights": [
+      { "file": "gui/gui.go", "note": "rateLimitInput / durationInput の読み取りとパース、失敗時のエラー表示" },
+      { "file": "gui/widgets.go", "note": "durationInput の追加と attackButton 生成コードのコメントアウト" }
+    ],
+    "langNotes": [
+      { "topic": "time.ParseDuration", "note": "Go 標準ライブラリの time.ParseDuration は \"30s\" や \"2h45m\" のような単位付き文字列を time.Duration 値に変換する。ユーザー入力の実行時間指定など、人間が読み書きしやすい時間表現を扱う際によく使われる。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T06:30:00Z"
+  }
 }

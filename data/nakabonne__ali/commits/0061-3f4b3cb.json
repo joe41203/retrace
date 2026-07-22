@@ -60,5 +60,19 @@
     "images/real-time.gif",
     "main.go"
   ],
-  "explanation": null
+  "explanation": {
+    "what": "gui/drawer.go の redrawGauge 相当のチャート描画ループと redrawReport(のちの redrawMetrics)ループで、chartCh と metricsCh から受け取った値が nil の場合にそれぞれ break L / continue するガードを追加した。",
+    "why": "PR本文にある issue #5 の修正として、チャネルから nil が送られてきたときに nil ポインタとして扱われてパニックする不具合を防いでいる。この時点の drawer は攻撃終了(End)通知や統計情報を goroutine 経由でチャネル越しに受け取る作りになっており、送信側の実装次第でゼロ値の nil が送られてくるケースがあったと考えられる。",
+    "highlights": [
+      { "file": "gui/drawer.go", "note": "chartCh と metricsCh、両方の受信直後に nil チェックを追加している箇所" }
+    ],
+    "langNotes": [
+      { "topic": "nil channel value / select", "note": "Goのチャネルはポインタ型 *Result や *Metrics をそのまま運べるが、要素が nil であってもチャネル自体は正常に値を送受信できてしまう。select の受信直後に nil チェックを入れるのは、送信側のバグや初期化前の状態を受信側で防御的に弾く典型的なパターン。" }
+    ],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [{ "type": "pr", "number": 8, "url": "https://github.com/nakabonne/ali/pull/8" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T06:30:00Z"
+  }
 }

@@ -56,5 +56,19 @@
     "images/real-time.gif",
     "main.go"
   ],
-  "explanation": null
+  "explanation": {
+    "what": "gui/widgets.go の各テキスト入力欄の初期値を、これまでハードコードしていた文字列リテラル(\"50\", \"10s\", \"GET\", \"30s\")から attacker パッケージの公開定数(attacker.DefaultRate, attacker.DefaultDuration, attacker.DefaultMethod, attacker.DefaultTimeout)を参照する形に変更した。あわせて README の LoadMap の文言も「Plot Bytes In and Bytes Out」から「Plot more metrics in real-time」へ更新した。",
+    "why": "コミットメッセージ「Ensure to share default values」の通り、GUIの表示上のデフォルト値と attacker パッケージが実際に使うデフォルト値が別々の場所に重複定義されており、片方だけ変更すると表示と実際の挙動がずれる問題を防ぐため、単一の定義元(attacker パッケージの定数)を共有する形にリファクタリングした。",
+    "highlights": [
+      { "file": "gui/widgets.go", "note": "strconv.Itoa(attacker.DefaultRate) 等、attacker パッケージの定数を文字列化してテキスト入力の初期値に使用" }
+    ],
+    "langNotes": [
+      { "topic": "time.Duration の String() メソッド", "note": "Go の time.Duration 型は String() メソッドを持ち、\"10s\" のような人間可読な文字列表現を返す。ここでは attacker.DefaultDuration.String() のように呼び出し、GUI入力欄の初期値表示に使っている。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T06:30:00Z"
+  }
 }

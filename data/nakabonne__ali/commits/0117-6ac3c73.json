@@ -75,5 +75,20 @@
     "main_test.go",
     "testdata/body-1.json"
   ],
-  "explanation": null
+  "explanation": {
+    "what": "cli構造体に workers と maxWorkers フィールドを追加し、`-w`/`--workers` と `-W`/`--max-workers` フラグでVegetaの初期ワーカー数・最大ワーカー数を指定できるようにした。デフォルト値には attacker.DefaultWorkers / attacker.DefaultMaxWorkers を使う。",
+    "why": "issue #27 に「-w/--workers で初期ワーカー数、-W/--max-workers で最大ワーカー数を指定できるようにしたい。Vegeta APIにそのまま渡すだけの小さな変更で済むはず」という要望があり、PRはこれに応える実装。ワーカー数は負荷テストの並列度に直結するパラメータで、以前のコミット(#38の max-body、#43の keepalive)と同様にVegetaの既存オプションを露出させる流れの一環。",
+    "highlights": [
+      { "file": "main.go", "note": "workers/maxWorkers フィールド追加、フラグ定義、makeOptions() での Options.Workers / Options.MaxWorkers への受け渡し" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "issue",
+    "refs": [
+      { "type": "pr", "number": 44, "url": "https://github.com/nakabonne/ali/pull/44" },
+      { "type": "issue", "number": 27, "url": "https://github.com/nakabonne/ali/issues/27" }
+    ],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T06:30:00Z"
+  }
 }

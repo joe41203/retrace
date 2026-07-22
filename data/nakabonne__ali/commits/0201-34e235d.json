@@ -93,5 +93,18 @@
     "testdata/export/naninf/results.csv",
     "testdata/export/quotes/results.csv"
   ],
-  "explanation": null
+  "explanation": {
+    "what": ".goreleaser.ymlの先頭に`version: 2`を追加し、archivesセクションのYAML構文誤り(リストのインデントがずれていた`- replacements:`)を修正してname_templateベースの書き方に置き換えた。brewsのキーも`tap:`から`repository:`にリネームし、windows/armのビルドもignore対象に追加。Makefileには`release-dry-run`ターゲット(`goreleaser release --snapshot --clean`)を新設した。",
+    "why": "PRタイトルの「GoReleaser設定の修正」が示す通り、GoReleaser v2でスキーマが変わった項目(replacements廃止、tap→repositoryのリネーム)に追従するための設定修正。前のコミットで--rm-distから--cleanへ切り替えたのに続き、GoReleaser本体のメジャーバージョンアップに合わせて設定ファイル全体を書き直している。",
+    "highlights": [
+      { "file": ".goreleaser.yml", "note": "version: 2の宣言と、archivesのreplacements方式からname_templateの条件式方式への書き換え。" },
+      { "file": "Makefile", "note": "release-dry-runターゲットの追加で、実際にタグを打たずにgoreleaserの出力を手元で確認できるようになった。" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [{ "type": "pr", "number": 142, "url": "https://github.com/nakabonne/ali/pull/142" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T06:30:00Z"
+  }
 }

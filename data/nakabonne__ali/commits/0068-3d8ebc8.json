@@ -69,5 +69,19 @@
     "images/real-time.gif",
     "main.go"
   ],
-  "explanation": null
+  "explanation": {
+    "what": "go.uber.org/goleak を依存関係(go.mod / go.sum)に追加し、attacker/attacker_test.go に TestMain(m *testing.M) { goleak.VerifyTestMain(m) } を追加した。",
+    "why": "おそらく、直前のコミットで fake_attacker.go の Attack をgoroutineベースの非同期実装に変更したことで、テスト終了後にgoroutineが残留してしまうリークのリスクが生まれたため、パッケージのテスト全体でgoroutineリークを自動検知する仕組みを導入したと考えられる。",
+    "highlights": [
+      { "file": "attacker/attacker_test.go", "note": "TestMain を追加し、パッケージ内の全テスト実行後に goleak.VerifyTestMain がgoroutineリークを検査する" }
+    ],
+    "langNotes": [
+      { "topic": "goleak / TestMain", "note": "GoのtestingパッケージはTestMain(m *testing.M)という特別な関数を定義すると、そのパッケージ内のテスト実行全体をラップできる。goleak.VerifyTestMain(m) はこれを利用して、m.Run()でテストを実行した後に残っているgoroutineがないかを検査し、リークがあればテストを失敗させるライブラリ。goroutineは軽量だが明示的なcloseやcontext.Done()の伝播を忘れると終了せずに残り続けるため、テストで自動検知する仕組みが有用になる。" }
+    ],
+    "diagram": null,
+    "evidence": "inferred",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T06:30:00Z"
+  }
 }

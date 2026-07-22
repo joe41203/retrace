@@ -49,5 +49,20 @@
     "gui/widgets.go",
     "main.go"
   ],
-  "explanation": null
+  "explanation": {
+    "what": "画面起動と同時に攻撃(負荷生成)が始まっていた挙動をやめ、Enterキーを押したタイミングで attacker.Attack を起動するように変更した。newLineChart からattacker呼び出しのgoroutineを取り除き、代わりにgui.goのキーボードハンドラ(quitter→keybinds に改称)へ移設。keyboard.Keyの値でswitch文を使い、Esc/Ctrl-Cは終了、Enterキーは攻撃開始として分岐させている。",
+    "why": "コミットメッセージの通り、キー入力で攻撃を開始できるようにするための変更。以前は画面が表示された瞬間に固定URLへ攻撃が始まっていたが、ユーザー操作を起点に開始する方が対話的なTUIツールとして自然という判断が背景にあると見られる(URL入力欄からの取得はまだ未実装で、TODOコメントの通りURLは固定のまま)。",
+    "highlights": [
+      { "file": "gui/gui.go", "note": "if文だった quitter が switch k.Key { case ...: ...} の keybinds に変わった。分岐が増えるとswitchの方が見通しが良くなるGoでよくあるリファクタ" },
+      { "file": "gui/widgets.go", "note": "newLineChartからcontext引数とattacker起動処理が消え、グラフウィジェットの生成だけに責務が絞られた" }
+    ],
+    "langNotes": [
+      { "topic": "switch文でのキー値分岐", "note": "`switch k.Key { case keyboard.KeyEsc, keyboard.KeyCtrlC: ...; case keyboard.KeyEnter: ... }` のように、1つのcaseに複数の値をカンマ区切りで並べられる。Goのswitchはbreakを書かなくても自動でフォールスルーしない(他言語のswitchと違う点)" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T06:12:04Z"
+  }
 }

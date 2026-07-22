@@ -49,5 +49,20 @@
     "gui/widgets.go",
     "main.go"
   ],
-  "explanation": null
+  "explanation": {
+    "what": "アタック実行時に発生するリクエスト総数(rate * duration)を事前計算し、redrawChart 関数に maxSize として渡すよう変更した。redrawChart 内ではその値で values スライスを make([]float64, 0, maxSize) として容量付きで確保するようになった。",
+    "why": "それまでは values := []float64{} と容量0で宣言していたため、結果が届くたびに append でスライスが再確保・コピーされるコストが発生していた。攻撃のレート×秒数からリクエスト数の上限が事前にわかるので、その値を使って一度だけメモリを確保する形に変えている。",
+    "highlights": [
+      { "file": "gui/gui.go", "note": "rate と duration から requestNum を計算し、redrawChart の引数に追加している箇所" },
+      { "file": "gui/widgets.go", "note": "values := make([]float64, 0, maxSize) で容量を事前確保する変更" }
+    ],
+    "langNotes": [
+      { "topic": "make([]T, len, cap)", "note": "Go のスライスは make で長さ(len)と容量(cap)を分けて指定できる。容量を先に確保しておくと、append のたびに発生し得る内部配列の再確保・コピーを避けられる。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T06:30:00Z"
+  }
 }

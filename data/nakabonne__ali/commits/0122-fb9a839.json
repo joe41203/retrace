@@ -89,5 +89,20 @@
     "main_test.go",
     "testdata/body-1.json"
   ],
-  "explanation": null
+  "explanation": {
+    "what": "コントリビューターからの PR #48 をマージし、ホストごとの最大アイドルコネクション数を指定する `-c, --connections` フラグを追加した。attacker.Options に Connections フィールドと DefaultConnections(10000)定数を新設し、vegeta.NewAttacker の構築時に vegeta.Connections(opts.Connections) を渡すようにした。",
+    "why": "PR本文によれば、コネクション数に上限がなかったため最大アイドルコネクション数を指定できるようにし、デフォルトを10,000としたとのこと。issue #28 で「vegeta の API にそのまま渡すだけの小さな変更で済む」とされていた要望に応えたもの。",
+    "highlights": [
+      { "file": "attacker/attacker.go", "note": "Connections が0のときにDefaultConnectionsへフォールバックする既存パターン(MaxBody等と同様)を踏襲" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [
+      { "type": "pr", "number": 48, "url": "https://github.com/nakabonne/ali/pull/48" },
+      { "type": "issue", "number": 28, "url": "https://github.com/nakabonne/ali/issues/28" }
+    ],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T06:30:00Z"
+  }
 }

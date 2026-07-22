@@ -68,5 +68,20 @@
     "main_test.go",
     "testdata/body-1.json"
   ],
-  "explanation": null
+  "explanation": {
+    "what": "gui.Run() で実行時の OS が Windows かどうかを runtime.GOOS で判定し、Windows では termdash の tcell バックエンド、それ以外では従来通り termbox バックエンドを使って terminalapi.Terminal を生成するように変更した。run() の第一引数の型も具象型 *termbox.Terminal からインターフェース型 terminalapi.Terminal に緩めている。",
+    "why": "PR body に添付されたスクリーンショットと説明の通り、これまで使っていた termbox は Windows 環境でうまく動作しなかったため、Windows 向けに tcell という別のターミナル抽象化ライブラリを使うことで対応しようとした変更。ただし投稿者自身が「doesn't work properly, I need help」と書いており、この時点では完全な動作確認が取れていない実験的な対応だった。",
+    "highlights": [
+      { "file": "gui/gui.go", "note": "runtime.GOOS == \"windows\" の分岐で tcell.New() と termbox.New() を切り替え、run() の引数型を terminalapi.Terminal インターフェースに一般化" }
+    ],
+    "langNotes": [
+      { "topic": "runtime.GOOS によるビルド後のOS分岐", "note": "runtime.GOOS はコンパイル時ではなく実行時に現在の OS 名を文字列で返す。ここではビルドタグでファイルを分けるのではなく、実行時分岐で termbox と tcell という2つのターミナル実装を切り替えている。" },
+      { "topic": "interface 型への引数の一般化", "note": "run() の第一引数を具象型 *termbox.Terminal から terminalapi.Terminal インターフェースに変えることで、termbox・tcell のどちらの実装も同じ関数で受け取れるようにしている。Go では「呼び出し側が広いインターフェース型で受け取る」ことで実装の差し替えを可能にするのが典型的な設計。" }
+    ],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [{ "type": "pr", "number": 56, "url": "https://github.com/nakabonne/ali/pull/56" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T06:30:00Z"
+  }
 }

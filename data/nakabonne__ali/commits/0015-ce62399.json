@@ -65,5 +65,20 @@
     "gui/widgets.go",
     "main.go"
   ],
-  "explanation": null
+  "explanation": {
+    "what": "attacker.Result に End bool フィールドを追加し、攻撃終了時に End: true の結果を chartsCh へ送ることで redrawChart のループにラベル付き break で正常終了できるようにした。drawer に chartDrawing bool フィールドを追加し、チャート描画中は Space キーでの多重起動を防ぐガードを gui.go 側に入れている。あわせてデバッグ用の pp.Println を attacker.go から削除した。",
+    "why": "それまでは redrawChart のゴルーチンが ctx.Done() 以外に終了する手段を持たず、攻撃が終わっても goroutine が resultCh を待ち続けて残り続けていた(コメントにあった `//close(ch) TODO: Gracefully stop redrawChart goroutine.` を解消する変更)。攻撃実行中に再度攻撃を開始できてしまう不整合も chartDrawing フラグで防いでいる。",
+    "highlights": [
+      { "file": "gui/drawer.go", "note": "for ループに L: ラベルを付け、res.End で break L するグレースフルな終了処理" },
+      { "file": "gui/gui.go", "note": "chartsCh <- &attacker.Result{End: true} で描画終了を通知し、dr.chartDrawing で多重実行を防止" }
+    ],
+    "langNotes": [
+      { "topic": "ラベル付き break (L: for { ... break L })", "note": "Go では for や switch にラベルを付けておき、内側の select や switch から `break L` することで外側のループごと抜けられる。ラベルなしの break は直近の select/switch しか抜けないため、多重ループの脱出に使われるイディオム。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T06:30:00Z"
+  }
 }

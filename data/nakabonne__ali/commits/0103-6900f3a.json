@@ -166,5 +166,27 @@
     "main.go",
     "main_test.go"
   ],
-  "explanation": null
+  "explanation": {
+    "what": "PR #22をマージし、攻撃パラメータ(URL・rate・duration・timeout・method・header・body)の入力方式をTUI上のテキスト入力ウィジェット群から、起動時のCLIフラグ(`--rate`、`--duration`など、pflagベース)へ全面的に切り替えた。gui.Run/runやkeybinds、newWidgetsのシグネチャにtargetURLとattacker.Optionsを渡すよう変更し、urlInputやrateLimitInputなど7つのTextInputウィジェットとそれらのモックコードを削除。代わりにパラメータを一覧表示するだけのparamsTextウィジェットを追加した。main.goにはmakeOptions/validateMethodというCLIフラグ検証ロジックが新設され、以前gui/keybinds.goにあった同名ロジックはコメントアウトされたテストごと本体から除去された。あわせてattacker.Attackはmetrics算出結果をmetricsChへ随時送信するようになり、返り値としても最終結果を返す(この二重化はTODOコメント付きで暫定実装)。",
+    "why": "README(seq #101, #103直前のコミット群)で予告されていた通り、UIのフィールドベース設定を廃止しCLIフラグへ一本化するというRoadmap上の方針を実現するPR。GUI起動のたびに毎回URLやオプションをTUI上で手入力する必要をなくし、シェルスクリプトやCIから`ali --rate=100 http://host.xz`のように直接呼び出せるようにする狙いがあったとみられる。",
+    "highlights": [
+      { "file": "main.go", "note": "pflagでrate/duration/timeout/method/header/body等のフラグを定義し、makeOptionsでattacker.Optionsを組み立てる新設ロジック" },
+      { "file": "gui/widgets.go", "note": "7種のTextInputウィジェットとnewTextInputを削除し、paramsTextで受け取ったオプションを表示するだけに単純化" },
+      { "file": "gui/keybinds.go", "note": "attack()からURLパース・オプション組み立てロジックが消え、CLIから渡されたtarget/optsをそのまま使う形に" }
+    ],
+    "langNotes": [
+      { "topic": "spf13/pflag", "note": "GNU拡張構文のロングオプション(`--rate`)とショートオプション(`-r`)を両方サポートするコマンドラインフラグライブラリ。標準の`flag`パッケージ互換だが、`StringSliceVarP`のような複数値対応の型も持つ(次のPR #25で利用される)。" },
+      { "topic": "goroutine leak対策", "note": "attacker.Attackの呼び出しをgoroutineで包み、完了後にmetricsChへ送る設計。チャネルへの送受信がブロックしたまま残らないよう、テストではgo.uber.org/goleakで検出している(このコミット以前の#68で導入済み)。" }
+    ],
+    "diagram": {
+      "mermaid": "flowchart LR\n  A[\"main.go: pflagでCLIフラグをパース\"] --> B[\"cli.makeOptions()でattacker.Optionsを構築\"]\n  B --> C[\"gui.Run(targetURL, opts)\"]\n  C --> D[\"newWidgets(targetURL, opts)でparamsTextに表示\"]\n  C --> E[\"keybinds: Enterキーでattack(ctx, d, targetURL, opts)\"]\n  E --> F[\"attacker.Attack: 結果をchartCh/metricsChへ送信\"]",
+      "caption": "CLIフラグ入力からTUI描画・攻撃実行までのデータフロー"
+    },
+    "evidence": "message",
+    "refs": [
+      { "type": "pr", "number": 22, "url": "https://github.com/nakabonne/ali/pull/22" }
+    ],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T06:30:00Z"
+  }
 }

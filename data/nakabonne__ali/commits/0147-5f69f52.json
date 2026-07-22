@@ -69,5 +69,19 @@
     "main_test.go",
     "testdata/body-1.json"
   ],
-  "explanation": null
+  "explanation": {
+    "what": "Makefile の test ターゲットに `go test` の `-race` フラグを追加した。",
+    "why": "PRタイトルの「Enable race detector」の通り、CIでのテスト実行時にデータ競合を検出できるようにする変更。直近のコミットで chartDrawing の bool を atomic.Bool に置き換えるなど goroutine 間の共有状態を扱うコードが増えていたため、そうした箇所の競合を継続的に検出する体制を整えたとみられる。",
+    "highlights": [
+      { "file": "Makefile", "note": "go test に -race フラグを追加しただけの1行変更" }
+    ],
+    "langNotes": [
+      { "topic": "go test -race(データ競合検出器)", "note": "Go 標準の -race フラグはコンパイラが挿入する計装コードにより、実行時に同一メモリ位置への同期されていない並行アクセスを検出する仕組み(ThreadSanitizerベース)。実行速度とメモリ使用量が増えるためCIでのみ有効化されることが多い。" }
+    ],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [{ "type": "pr", "number": 76, "url": "https://github.com/nakabonne/ali/pull/76" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T06:30:00Z"
+  }
 }

@@ -89,5 +89,23 @@
     "main.go",
     "main_test.go"
   ],
-  "explanation": null
+  "explanation": {
+    "what": "PR #26をマージし、無限攻撃(duration=0s)の途中でCtrl-Cを押して停止した際にpanicが起きていた問題を修正した。attacker.Attackの返り値を`*Metrics`からvoidに変え、ctx.Done()で抜ける際は既にクローズされているmetricsChへ送信せずreturnするように変更。呼び出し側のgui/keybinds.goでも、attack()内でAttackの戻り値をmetricsChへ再送していた冗長な行を削除した。",
+    "why": "issue #23の通り、`gui/keybinds.go:36`でpanicが発生していた。原因は、Attackがctx.Done()で早期returnする際にもmetricsChへ送信しようとする経路が残っており、かつ呼び出し側のattack()でもAttackの戻り値を同じmetricsChへ送っていたため、クローズ済み(またはクローズ処理中)のチャネルへの二重送信が起きていたと考えられる。PRの説明にある通り、Attack内部からmetricsChへ直接送るよう一本化し、呼び出し側の重複送信を取り除くことで解消した。",
+    "highlights": [
+      { "file": "attacker/attacker.go", "note": "ctx.Done()時はmetricsChへ送らずreturnする分岐と、正常終了時のみmetricsChへ送信する処理" },
+      { "file": "gui/keybinds.go", "note": "Attackの戻り値をmetricsChへ再送していた行を削除し、二重送信を解消" }
+    ],
+    "langNotes": [
+      { "topic": "closeされたchannelへの送信", "note": "Goではcloseされたchannelへ送信(send)するとpanicになる(受信は可能)。ctx.Done()による中断と、chan送信のタイミングが競合するとこの種のpanicが起きやすく、このコミットはselect内のctx.Done()分岐で早期returnすることでchannel操作の経路を一本化して回避している。" }
+    ],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [
+      { "type": "pr", "number": 26, "url": "https://github.com/nakabonne/ali/pull/26" },
+      { "type": "issue", "number": 23, "url": "https://github.com/nakabonne/ali/issues/23" }
+    ],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T06:30:00Z"
+  }
 }

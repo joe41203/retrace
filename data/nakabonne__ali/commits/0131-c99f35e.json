@@ -74,5 +74,18 @@
     "main_test.go",
     "testdata/body-1.json"
   ],
-  "explanation": null
+  "explanation": {
+    "what": "cli.makeOptions() に \"duration must be greater than 0\" のバリデーションを追加し、CLI から 0 以下の duration が渡された場合にエラーを返すようにした。main_test.go にも duration が -1 のケースを追加している。",
+    "why": "duration は攻撃を続ける時間を表すオプションであり、負の値は意味を持たない。これまでバリデーションが無かったため、負数を渡すと未定義の挙動（無限攻撃扱いなど）になり得た。PR タイトルが示す通り、この不整合な入力を明示的に拒否することが目的。",
+    "highlights": [
+      { "file": "main.go", "note": "duration <= 0 のチェックを method の検証に続けて追加している" },
+      { "file": "main_test.go", "note": "既存テストケースに duration: 1 を補って副作用を防ぎつつ、duration less than 0 のケースを新設" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [{ "type": "pr", "number": 58, "url": "https://github.com/nakabonne/ali/pull/58" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T06:30:00Z"
+  }
 }

@@ -121,5 +121,24 @@
     "main_test.go",
     "testdata/body-1.json"
   ],
-  "explanation": null
+  "explanation": {
+    "what": "attacker.Options に Resolvers フィールドを追加し、新設した attacker/resolver.go の NewResolver で複数の DNS サーバーアドレスをラウンドロビンで使う net.Resolver を生成できるようにした。main.go には `--resolvers` フラグと、カンマ区切り文字列をパースしつつ IP・ポート形式を検証する parseResolvers 関数を追加している。",
+    "why": "issue #85 で要望されていた「カスタム DNS リゾルバのアドレス一覧を指定できるようにしてほしい」という機能を実装したもの。issue には参考実装として vegeta の該当コードへのリンクも示されており、それに倣う形で net.Resolver の Dial をカスタム DNS サーバーに向ける実装を追加している。",
+    "highlights": [
+      { "file": "attacker/resolver.go", "note": "atomic.AddUint64 でインデックスを進めるラウンドロビン方式のアドレス選択" },
+      { "file": "main.go", "note": "parseResolvers でポート省略時に \":53\" を補完しつつ IP とポートの妥当性を検証している" }
+    ],
+    "langNotes": [
+      { "topic": "net.Resolver", "note": "Go の net.Resolver は PreferGo: true と Dial フィールドを指定すると、名前解決に使う DNS サーバーへの接続方法を自前で差し替えられる。標準のシステムリゾルバではなく、指定した DNS サーバー群を使いたい場合にこの仕組みが使われる。" },
+      { "topic": "sync/atomic", "note": "atomic.AddUint64(&r.idx, 1) は複数ゴルーチンから同時に呼ばれても安全にカウンタをインクリメントできる操作。ここではリゾルバのアドレス一覧を順番に(ラウンドロビンで)選ぶためのインデックス管理に使われている。" }
+    ],
+    "diagram": null,
+    "evidence": "issue",
+    "refs": [
+      { "type": "pr", "number": 87, "url": "https://github.com/nakabonne/ali/pull/87" },
+      { "type": "issue", "number": 85, "url": "https://github.com/nakabonne/ali/issues/85" }
+    ],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T06:30:00Z"
+  }
 }

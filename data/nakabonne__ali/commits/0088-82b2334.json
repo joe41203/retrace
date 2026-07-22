@@ -80,5 +80,20 @@
     "images/real-time.gif",
     "main.go"
   ],
-  "explanation": null
+  "explanation": {
+    "what": "goroutineの終了検知に使っていた `sync.WaitGroup` + 監視用goroutine構成を廃止し、代わりにテスト側で十分なバッファを持つchannel(`make(chan T, 100)`)を使うように書き換えた。`attacker_test.go` では結果を数える専用の `watcher` 型と `countRes` goroutineを削除し、`resCh := make(chan *Result, 100)` に送信された件数を `len(resCh)` で直接検証する形にした。`drawer_test.go` と `keybinds_test.go` でも同様に、終了待ち用のgoroutine・WaitGroupを削除し、bufferedな `gaugeCh` / `messageCh` に置き換えている。",
+    "why": "PRタイトルの「Use buffered channels for goroutine testing」通り、goroutineの終了を待つための補助goroutine・WaitGroupという間接的な仕組みをテストから排除し、bufferedチャネルへの送信結果を直接検証するシンプルな形にするのが目的。前段のコミット群でWaitGroupベースの終了待ちを導入していたが、テストごとに監視用goroutineを書く必要があり複雑だったため、この設計に置き換えられたと考えられる。",
+    "highlights": [
+      { "file": "attacker/attacker_test.go", "note": "watcher型とcountResごと削除し、len(resCh)で送信件数を直接確認する形に単純化" },
+      { "file": "gui/keybinds_test.go", "note": "messageChの終了待ちgoroutineを削除し、bufferedなchan string(100)に置き換え" }
+    ],
+    "langNotes": [
+      { "topic": "buffered channel", "note": "`make(chan T, N)` のようにバッファサイズを指定したchannelは、受信側がいなくても最大N件までブロックせず送信できる。ここではテストのgoroutine側の送信をブロックさせない代わりに、終了待ちの同期処理そのものを省く目的で使われている。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [{ "type": "pr", "number": 14, "url": "https://github.com/nakabonne/ali/pull/14" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T06:30:00Z"
+  }
 }

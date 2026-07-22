@@ -91,5 +91,21 @@
     "main_test.go",
     "testdata/body-1.json"
   ],
-  "explanation": null
+  "explanation": {
+    "what": "プログレスゲージの更新方式を、攻撃結果が1件届くたびに gaugeCh 経由でカウントアップする方式から、time.Ticker で一定間隔ごとに経過時間 / 総時間の比率を計算して Percent() に渡す方式に置き換えた。gaugeCh フィールドと関連コードは削除され、appendChartValues と redrawGauge のシグネチャも rate・duration ベースに変更されている。テストも Gauge.Percent の呼び出し回数を厳密に検証する形から AnyTimes() で緩めた形に変わった。",
+    "why": "PR 本文によれば、rate フラグの値がマシンの処理能力を超えている場合にプログレスバーが100%まで到達せず止まってしまう不具合があった。従来の実装はリクエスト数(件数ベース)でカウントしていたため、実際に処理しきれなかったリクエストがあると母数に届かず進捗が止まって見えていた。時間の経過(time.Duration)を基準にすることで、実際の処理件数に依存せず、経過時間だけで確実に100%まで進む表示に直した。",
+    "highlights": [
+      { "file": "gui/drawer.go", "note": "redrawGauge が time.Ticker ベースの経過時間計算に変わり、gaugeCh を使わなくなった" }
+    ],
+    "langNotes": [
+      { "topic": "time.Ticker", "note": "time.NewTicker(interval) は指定間隔で時刻を送り続けるチャネルを返す。for-select の中で <-ticker.C を待つことで「一定間隔ごとに処理を実行する」定期実行ループを実装できる。defer ticker.Stop() で確実に停止させるのが定石。" }
+    ],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [
+      { "type": "pr", "number": 86, "url": "https://github.com/nakabonne/ali/pull/86" }
+    ],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T06:30:00Z"
+  }
 }

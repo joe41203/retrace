@@ -82,5 +82,22 @@
     "main_test.go",
     "testdata/body-1.json"
   ],
-  "explanation": null
+  "explanation": {
+    "what": "gui/drawer.go の redrawMetrics で Earliest/Latest/End の各 time.Time 値を、それまでの String() によるデフォルト表示から `time.Format(time.RFC3339)` に変更した。テストの期待値も `2009-11-10 23:00:00 +0000 UTC` 形式から `2009-11-10T23:00:00Z` 形式に合わせて更新している。",
+    "why": "issue #33 で、time.Time の String() 表示はMonotonic clock読み取りの影響でノイズが多く読みにくいという指摘があり、複数の代替フォーマット案が画像付きで議論された。最終的にミリ秒やナノ秒を含まないRFC3339形式(Tを含む)に落ち着いた。",
+    "highlights": [
+      { "file": "gui/drawer.go", "note": "3箇所の time.Time 値に .Format(time.RFC3339) を追加するだけの変更" }
+    ],
+    "langNotes": [
+      { "topic": "time.Time.String() と Monotonic clock", "note": "Goの time.Time は内部にモノトニック時計の読み取りを保持することがあり、String() で表示するとタイムゾーン情報の後に読みにくい内部表現が付くことがある。time.Format(time.RFC3339) のように明示的なレイアウトを指定するとモノトニック部分を含まない整形済み文字列になる。" }
+    ],
+    "diagram": null,
+    "evidence": "issue",
+    "refs": [
+      { "type": "pr", "number": 47, "url": "https://github.com/nakabonne/ali/pull/47" },
+      { "type": "issue", "number": 33, "url": "https://github.com/nakabonne/ali/issues/33" }
+    ],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T06:30:00Z"
+  }
 }

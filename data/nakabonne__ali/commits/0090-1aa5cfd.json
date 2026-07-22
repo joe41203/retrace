@@ -80,5 +80,20 @@
     "images/real-time.gif",
     "main.go"
   ],
-  "explanation": null
+  "explanation": {
+    "what": "`redrawMetrics` / `redrawMessage` から `*sync.WaitGroup` 引数を取り除き、代わりに `defer close(d.metricsCh)` / `defer close(d.messageCh)` でgoroutine終了時に自身が受信していたchannelをcloseするようにした。呼び出し側の `gui.go` の `run()` からも `wg` 関連のコードを全て削除。テスト側もWaitGroupではなく `<-d.metricsCh` (closeされたchannelからの受信は即座に返る)で終了を待つ形に変更した。",
+    "why": "PRタイトルの「Avoid to block quitting」通り、WaitGroupによる終了待ちが何らかの形でquit処理をブロックしてしまう問題を避けるための変更と考えられる。goroutine側が自分の使うchannelをcloseするだけで完結する設計にすることで、WaitGroupという追加の同期プリミティブと、それを保持し続ける必要性自体をなくしている。",
+    "highlights": [
+      { "file": "gui/drawer.go", "note": "defer close(d.metricsCh) で、ctx.Done()時にWaitGroupではなくchannelのcloseで終了を伝える" },
+      { "file": "gui/drawer_test.go", "note": "wg.Wait()の代わりに <-d.metricsCh でclose済みchannelからの受信により終了を待つ" }
+    ],
+    "langNotes": [
+      { "topic": "close(channel) と受信", "note": "closeされたchannelからの受信 `<-ch` は、送信を待たずゼロ値を即座に返す。この性質を使い、WaitGroupを使わずとも「goroutineがchannelをcloseした=終了した」ことを受信側で検知できる。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [{ "type": "pr", "number": 16, "url": "https://github.com/nakabonne/ali/pull/16" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T06:30:00Z"
+  }
 }

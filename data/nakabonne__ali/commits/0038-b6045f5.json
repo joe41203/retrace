@@ -64,5 +64,18 @@
     "images/real-time.gif",
     "main.go"
   ],
-  "explanation": null
+  "explanation": {
+    "what": "attacker.Attack 内で Rate/Duration/Timeout が 0 のときにデフォルト値へ上書きしていたロジックを削除し、0 を「有効な指定値」として扱えるようにした。README の Options 節に Rate Limit・Duration・Timeout それぞれの説明文(0を指定した場合の挙動を含む)を追記し、見出しレベルも `##` から `###` などに整理した。gui/widgets.go ではナビゲーションテキストの表記を \"Ctrl-c\" から \"Ctrl-C\" に修正した。",
+    "why": "コミットメッセージ「Allow zero values」の通り、これまで Rate=0 や Duration=0 は「未指定」として自動的にデフォルト値に置き換えられていたが、vegeta のセマンティクスでは Rate=0 は「無制限に高速で送信」、Duration=0 は「無限に攻撃を継続」を意味する。この上書きにより意図的な0指定ができなかったため、上書き処理自体を取り除きユーザーが明示的に0を指定できるようにした。",
+    "highlights": [
+      { "file": "attacker/attacker.go", "note": "Rate/Duration/Timeout を0からデフォルト値に置き換える3つのif文を削除" },
+      { "file": "README.md", "note": "0指定時の挙動(無制限送信・無限攻撃・タイムアウト無効)を明文化" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T06:30:00Z"
+  }
 }

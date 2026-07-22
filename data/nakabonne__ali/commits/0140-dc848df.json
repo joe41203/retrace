@@ -96,5 +96,23 @@
     "main_test.go",
     "testdata/body-1.json"
   ],
-  "explanation": null
+  "explanation": {
+    "what": "--buckets フラグを新設し、\"1ms, 10ms, 100ms, 500ms\" のようなカンマ区切りの文字列を parseBucketOptions() で []time.Duration に変換して attacker.Options.Buckets に渡せるようにした。Attack() 側では Buckets が指定されていれば vegeta.Histogram を組み込んだ vegeta.Metrics を使うよう分岐している。",
+    "why": "リンクされた issue #63 で、SLA（例: リクエストの95%が500ms以内に返る）を確認するためにレイテンシのヒストグラムバケットを表示したいという要望があり、この PR はその第一段階として、まず CLI からバケット境界値を受け取ってパースする部分を実装したもの。PR 本文にもある通り、実際にバケットをどう描画するかはまだ未着手で、issue 側の TODO に「バケットを解析できるようにする」と「バーチャートで描画する」の2段階が示されている。",
+    "highlights": [
+      { "file": "main.go", "note": "parseBucketOptions がカンマ区切り文字列を time.ParseDuration で1つずつ Duration に変換する" },
+      { "file": "attacker/attacker.go", "note": "Buckets が指定されている場合のみ vegeta.Histogram を組み込んだ Metrics を生成する分岐" }
+    ],
+    "langNotes": [
+      { "topic": "time.ParseDuration", "note": "\"10ms\" や \"500ms\" のような単位付き文字列を time.Duration 値に変換する標準ライブラリ関数。不正な形式を与えると error を返すため、CLI 側でバリデーションとして活用できる。" }
+    ],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [
+      { "type": "pr", "number": 68, "url": "https://github.com/nakabonne/ali/pull/68" },
+      { "type": "issue", "number": 63, "url": "https://github.com/nakabonne/ali/issues/63" }
+    ],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T06:30:00Z"
+  }
 }

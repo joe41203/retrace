@@ -73,5 +73,19 @@
     "main_test.go",
     "testdata/body-1.json"
   ],
-  "explanation": null
+  "explanation": {
+    "what": "`--header` / `-H` フラグのパース方式を、pflag の `StringSliceVarP` から `StringArrayVarP` に変更した。",
+    "why": "PRの説明によると、`StringSliceVarP` はカンマ区切りで自動的に複数値に分割してしまうため、ヘッダーの値自体にカンマが含まれるケース(例: `Accept: text/html,application/xhtml+xml`)を正しく扱えなかった。`StringArrayVarP` はフラグを複数回指定したときだけ複数値として扱い、各値の中身を分割しないため、この問題を修正できる。",
+    "highlights": [
+      { "file": "main.go", "note": "StringSliceVarP → StringArrayVarP へ1行変更。挙動の違いはpflagのドキュメント参照とPR本文にリンクあり" }
+    ],
+    "langNotes": [
+      { "topic": "pflag の StringSlice と StringArray の違い", "note": "spf13/pflag には似た名前の2種類のマルチ値フラグがある。StringSlice系は値をカンマで分割して複数要素にする一方、StringArray系はフラグ自体を複数回指定したときのみ複数要素になり、各値の中身はそのまま保持される。カンマを含む値を扱うにはStringArray系が適する。" }
+    ],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [{ "type": "pr", "number": 102, "url": "https://github.com/nakabonne/ali/pull/102" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T06:30:00Z"
+  }
 }

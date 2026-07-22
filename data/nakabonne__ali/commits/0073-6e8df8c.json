@@ -63,5 +63,19 @@
     "images/real-time.gif",
     "main.go"
   ],
-  "explanation": null
+  "explanation": {
+    "what": "gui/widgets.go に TextInput・LineChart・Text・Gauge の4つのインターフェースを新設し、widgets 構造体のフィールド型を termdash の具象型(*textinput.TextInput など)からこれらのインターフェース型に変更した。newLineChart・newText・newTextInput・newGauge といったコンストラクタ関数の戻り値もインターフェース型に揃えた。",
+    "why": "widgets 構造体が termdash の具象ウィジェット型に直接依存していると、描画ロジックをテストする際に本物のウィジェットを生成する必要があり、ユニットテストがしづらい。各ウィジェットが実際に使うメソッド(Read、Series、Write、Percent など)だけを切り出したインターフェースを定義することで、後続コミットでモック実装に差し替えてテストできるようにする土台を作った。",
+    "highlights": [
+      { "file": "gui/widgets.go", "note": "TextInput/LineChart/Text/Gauge の4インターフェース定義と、widgets 構造体フィールドのインターフェース型への置き換え" }
+    ],
+    "langNotes": [
+      { "topic": "widgetapi.Widget の埋め込み(struct/interface embedding)", "note": "TextInput interface { widgetapi.Widget; Read() string } のように、既存のインターフェースを別のインターフェース定義の中に無名で埋め込むと、埋め込んだインターフェースが持つメソッド群(Draw、Keyboard、Mouse、Options など)がそのまま昇格して新しいインターフェースの一部になる。Go にはクラス継承がない代わりに、この埋め込みによってインターフェースやメソッドセットを合成するのが定石。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T06:30:00Z"
+  }
 }

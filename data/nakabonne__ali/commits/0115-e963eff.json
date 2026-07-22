@@ -75,5 +75,18 @@
     "main_test.go",
     "testdata/body-1.json"
   ],
-  "explanation": null
+  "explanation": {
+    "what": "attacker.Options に KeepAlive フィールドを追加し、cliに `-K`/`--keepalive` フラグを新設して、TCP接続の使い回し(persistent connections)をVegeta側の vegeta.KeepAlive() オプションに渡せるようにした。",
+    "why": "PRの説明に「リクエストに永続的な接続を使うための -K/--keepalive という新しいbooleanフラグを追加する」とある。負荷テストツールにおいてkeep-aliveの有無は計測結果に大きく影響するため、ユーザーが明示的に制御できるようにする目的。",
+    "highlights": [
+      { "file": "main.go", "note": "cli構造体に keepAlive フィールドを追加し、他のbool系フラグ(debug, version)と並べてフィールドのアライメントも整えている" },
+      { "file": "attacker/attacker.go", "note": "vegeta.KeepAlive(opts.KeepAlive) を Vegeta の Attacker 生成オプションに1行追加するだけの薄いラッパー" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [{ "type": "pr", "number": 43, "url": "https://github.com/nakabonne/ali/pull/43" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T06:30:00Z"
+  }
 }

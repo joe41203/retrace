@@ -51,5 +51,19 @@
     "images/real-time.gif",
     "main.go"
   ],
-  "explanation": null
+  "explanation": {
+    "what": "GitHub Actions のワークフロー定義 .github/workflows/test.yml を新規追加した。master ブランチへの push と pull request をトリガーに、Go 1.14.x/1.15.x × ubuntu-latest/macos-latest のマトリクスで go build と go test -v ./... を実行する。README.md/.github/ ディレクトリ配下/images/ 配下のみの変更では実行しないよう paths-ignore を設定している。",
+    "why": "コミットメッセージ「Add workflows」の通り、これまで手元でしか実行していなかったテストをCIで自動実行し、複数のGoバージョン・OS環境での動作を継続的に検証できるようにした。ドキュメントや画像だけの変更でCIを走らせないようにすることで、無駄なビルドを避けている。",
+    "highlights": [
+      { "file": ".github/workflows/test.yml", "note": "matrix.go-version / matrix.platform によるクロス環境テストと、paths-ignore によるCIスキップ条件" }
+    ],
+    "langNotes": [
+      { "topic": "GitHub Actions matrix strategy", "note": "strategy.matrix に複数の go-version と platform を列挙すると、その直積の数だけジョブが並列実行される。Goのようにマイナーバージョン間の互換性やOS差異(改行コード・パス区切りなど)を気にする言語では、CIで組み合わせを網羅する定番構成。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T06:30:00Z"
+  }
 }

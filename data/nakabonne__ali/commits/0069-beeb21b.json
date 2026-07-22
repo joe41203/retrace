@@ -55,5 +55,19 @@
     "images/real-time.gif",
     "main.go"
   ],
-  "explanation": null
+  "explanation": {
+    "what": "gui/drawer.go の redrawGauge(chartCh受信ループ)内で、res が nil のときの処理を break L(ラベル付きループを抜ける)から continue(ループを継続する)に変更した。",
+    "why": "おそらく、以前の break L では nil を1回受け取っただけでチャート描画ループ全体が終了してしまい、以降の正常な描画更新が止まってしまう問題があったため、nilを無視してループを継続させ、ctx.Doneやres.Endによる正規の終了経路だけでループを抜けるように修正したと考えられる。",
+    "highlights": [
+      { "file": "gui/drawer.go", "note": "break L → continue の1行変更。ラベル付きループを抜けず次のselectへ戻る" }
+    ],
+    "langNotes": [
+      { "topic": "ラベル付きbreak/continue", "note": "Goのbreak/continueはfor文やswitch/selectにラベル(ここでは L:)を付けることで、直接の囲みブロックだけでなく指定したラベルのループに対して作用させられる。break L はループ全体を終了させるのに対し、continueはラベルを付けなければ最も内側のselect/switchの次の分岐評価には影響せず、forループの次のイテレーションに進む。" }
+    ],
+    "diagram": null,
+    "evidence": "inferred",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T06:30:00Z"
+  }
 }

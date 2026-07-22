@@ -85,5 +85,21 @@
     "main_test.go",
     "testdata/body-1.json"
   ],
-  "explanation": null
+  "explanation": {
+    "what": "デバッグ用ログファイルの出力先を、カレントディレクトリの `ali-debug.log` から `~/.config/ali/debug.log` に変更した。あわせて、デバッグ出力に使っていたサードパーティ製の pretty-printer `github.com/k0kubun/pp` を標準ライブラリの `log` パッケージに置き換え、不要になった依存(pp・colorstring・go-colorable・go-isatty)を go.mod/go.sum から削除している。",
+    "why": "実行するたびにカレントディレクトリにログファイルが散らばるのを避け、他の多くの CLI ツールと同様に OS 標準の設定ディレクトリ配下に集約する意図と考えられる。あわせて外部の pretty-printer への依存をやめて標準の `log` パッケージに寄せることで、依存関係を減らしビルドを軽量化する狙いもうかがえる。",
+    "highlights": [
+      { "file": "main.go", "note": "setDebug が configDir() で ~/.config/ali を解決し、MkdirAll してから debug.log を開くように変更" },
+      { "file": "go.mod", "note": "pp・colorstring 等の間接依存が削除され、依存グラフがすっきりしている" }
+    ],
+    "langNotes": [
+      { "topic": "os/user.Current", "note": "Go では `os/user` パッケージの `user.Current()` でOSのホームディレクトリ等を取得できる。cgo無効時など環境によっては失敗し得るため、このコミットでは失敗時に `$HOME` 環境変数へフォールバックしている。" },
+      { "topic": "log.SetOutput", "note": "標準ライブラリ `log` パッケージのデフォルトロガーは `log.SetOutput(w)` で出力先の io.Writer を差し替えられる。サードパーティのpretty-printerを使わずファイル出力に切り替えるのに使われている。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [{ "type": "pr", "number": 89, "url": "https://github.com/nakabonne/ali/pull/89" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T06:30:00Z"
+  }
 }

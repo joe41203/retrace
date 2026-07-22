@@ -81,5 +81,22 @@
     "storage/storage.go",
     "testdata/body-1.json"
   ],
-  "explanation": null
+  "explanation": {
+    "what": "依存パッケージ miekg/dns を v1.1.17 から v1.1.43 に更新した。go.sum には miekg/dns 本体だけでなく、それが間接的に引き込む golang.org/x/net・x/sync・x/sys・x/text などの推移的依存(transitive dependency)のバージョンも連鎖して更新されている。",
+    "why": "PR本文に明記されている通り、miekg/dns の v1.1.25 未満には math/rand を使って DNS の TXID(トランザクションID)を生成してしまう脆弱性があり、TXID が予測可能になることでDNS応答の偽造(response forgery)を許してしまう問題があった(GHSA-44r7-7p62-q3fr)。ali は DNS 名前解決にこのパッケージを利用しているため、セキュリティ修正として更新している。",
+    "highlights": [
+      { "file": "go.mod", "note": "miekg/dns v1.1.17 → v1.1.43 への更新が今回の主目的" },
+      { "file": "go.sum", "note": "miekg/dns の更新に伴い x/net・x/sync・x/sys・x/text 等の間接依存のチェックサムも連鎖更新" }
+    ],
+    "langNotes": [
+      { "topic": "go.sum の推移的依存", "note": "go.sum には直接 import していないパッケージ(golang.org/x/net など)のハッシュも並ぶ。これは依存先の依存(推移的依存)まで含めてバージョンとハッシュを固定し、ビルドの再現性と改ざん検知を保証する go modules の仕組みによるもの。" }
+    ],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [
+      { "type": "pr", "number": 108, "url": "https://github.com/nakabonne/ali/pull/108" }
+    ],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T06:30:00Z"
+  }
 }

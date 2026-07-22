@@ -89,5 +89,20 @@
     "main_test.go",
     "testdata/body-1.json"
   ],
-  "explanation": null
+  "explanation": {
+    "what": "Makefileのテストカバレッジ対象を `./attacker/... ./gui/...` から `./...` に広げ、main.go のトップレベルにあった usage クロージャを `cli` 構造体のメソッド `(c *cli) usage()` に変換した。main_test.go には CLI 全体を駆動する TestRun と TestMakeOptions を追加し、testdata/body-1.json を gui配下からリポジトリ直下へ移動している。",
+    "why": "それまで main パッケージはカバレッジ計測の対象外(attacker と gui のみ)だったが、main.go に配置ロジック(引数検証・オプション組み立て)が増えてきたため単体テストの対象に含めるようにした。usage をクロージャからメソッドに変えたのは、テストから `cli` の状態(stdout/stderrなど)を差し替えつつ呼び出せるようにするための下準備。",
+    "highlights": [
+      { "file": "main.go", "note": "パッケージ変数のクロージャだった usage を c.usage() メソッド化。flagSet.FlagUsages() を使って動的にヘルプ文字列を組み立てている" },
+      { "file": "main_test.go", "note": "TestRun は cli.stdout/stderr をバッファに差し替えて run() の戻り値(終了コード)を検証する、CLIのブラックボックステストパターン" }
+    ],
+    "langNotes": [
+      { "topic": "flagSet.FlagUsages()", "note": "pflag(spf13/pflag)が提供するヘルパーで、登録済みフラグの説明を整形済み文字列として返す。Goの標準 flag パッケージには無い機能で、Cobra系CLIでよく使われるpflag特有のAPI。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [{ "type": "pr", "number": 41, "url": "https://github.com/nakabonne/ali/pull/41" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T06:30:00Z"
+  }
 }

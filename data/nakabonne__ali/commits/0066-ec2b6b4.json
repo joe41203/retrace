@@ -69,5 +69,20 @@
     "images/real-time.gif",
     "main.go"
   ],
-  "explanation": null
+  "explanation": {
+    "what": "attacker/attacker_test.go でコメントアウトされていた「2件の結果が返るケース」のテストを有効化し、期待値を実際のフィールド(Requests, Rate, Throughput, Success, StatusCodes)に合わせて書き直した。あわせて fake_attacker.go の Attack を、結果をチャネルに送る処理をgoroutineの中に入れて非同期化し(以前は同期的にresultCh <- rしてからdeferでcloseしていた)、metrics.go では Metrics.Latencies / BytesIn / BytesOut の型を vegeta パッケージの型から自前定義の LatencyMetrics / ByteMetrics 構造体に置き換えた。",
+    "why": "おそらく、コメントアウトされていたテストが動かなかったのは、Metrics構造体がvegetaパッケージの型を直接埋め込んでいたためJSONタグや依存関係の面で扱いにくく、テストの期待値も古い実装(Attackフィールドを使う版)を前提にしていたためと考えられる。fake_attacker.go の変更も、おそらく実際のvegeta.Attackerの実装(内部でgoroutineを使って結果をストリーミングする)に近づけることで、テストでチャネル受信のタイミングやブロッキングの挙動をより正確に再現する狙いだと考えられる。",
+    "highlights": [
+      { "file": "attacker/metrics.go", "note": "vegeta.LatencyMetrics / vegeta.ByteMetrics を自前の LatencyMetrics / ByteMetrics 構造体でラップし直し、外部パッケージへの型依存を切り離した" },
+      { "file": "attacker/fake_attacker.go", "note": "Attack内の送信処理をgoroutineに包んで非同期化、呼び出し側は即座にチャネルを受け取れるようになった" }
+    ],
+    "langNotes": [
+      { "topic": "型のラッピングによる依存関係の分離", "note": "vegeta.LatencyMetrics をそのまま公開フィールドの型に使うと、aliの公開APIが外部ライブラリの型に縛られてしまう。フィールドを1つずつコピーする自前構造体(LatencyMetrics, ByteMetrics)を定義することで、将来vegetaの型が変わってもaliのMetrics構造体のJSON出力形式を独立して保てるようにしている。" }
+    ],
+    "diagram": null,
+    "evidence": "inferred",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T06:30:00Z"
+  }
 }

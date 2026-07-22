@@ -74,5 +74,18 @@
     "main_test.go",
     "testdata/body-1.json"
   ],
-  "explanation": null
+  "explanation": {
+    "what": "main() 関数に埋め込まれていたフラグ定義とパースの処理を `parseFlags(stdout, stderr io.Writer) (*cli, error)` という独立した関数に切り出した。main() は parseFlags を呼んでエラー時に os.Exit(0) するだけの薄い関数になり、main_test.go には parseFlags の戻り値を検証する TestParseFlags と、setDebug の TestSetDebug を追加した。",
+    "why": "従来はフラグのパース処理が main() の中に直接書かれており、os.Args や os.Exit に依存するためテストがしづらい構造だった。parseFlags を独立関数として切り出し、stdout/stderrを引数として受け取れるようにすることで、フラグパースのロジック単体をテストできるようにした。",
+    "highlights": [
+      { "file": "main.go", "note": "main() から parseFlags() を分離。main() は薄いエントリーポイントになり、テスト容易性のためにロジックを関数として抽出する典型的なリファクタリング" },
+      { "file": "main_test.go", "note": "TestParseFlags はデフォルト値がすべて期待通り(workers:10, maxWorkers:math.MaxUint64 など)であることを構造体の完全一致で検証している" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [{ "type": "pr", "number": 45, "url": "https://github.com/nakabonne/ali/pull/45" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T06:30:00Z"
+  }
 }

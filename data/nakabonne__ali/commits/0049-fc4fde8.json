@@ -62,5 +62,22 @@
     "images/real-time.gif",
     "main.go"
   ],
-  "explanation": null
+  "explanation": {
+    "what": "attacker_test.go に、Attack 関数が結果チャネルへ流した件数を検証するテストの仕組みを追加した。テスト内に watcher という補助型を定義し、そのメソッド countRes をゴルーチンとして起動して select 文で resCh からの受信と ctx.Done() を待ち受け、受信件数を数える。あわせて fake_attacker.go の Attack 実装に `defer close(resultCh)` を追加し、テスト対象の関数がチャネルを使い終わったら確実にクローズされるようにした。既存のタイムアウト付き context もテストケースごとに派生させる形に変更している。",
+    "why": "コミットメッセージ「Enable to test response count」の通り、それまでは Attack の戻り値(Metrics)しか検証していなかったが、内部でチャネル経由何件の結果が流れてきたかも検証できるようにテストを拡張した。fake_attacker のチャネルクローズ漏れは、この検証を成立させる(受信側のループが終了できる)ために必要な修正と見られる。",
+    "highlights": [
+      { "file": "attacker/attacker_test.go", "note": "watcher.countRes が select で ctx.Done() と resCh 受信を待ち受け、sync.WaitGroup でゴルーチンの終了をテスト側から待機している" },
+      { "file": "attacker/fake_attacker.go", "note": "defer close(resultCh) の追加で、値を送り終えたチャネルを閉じ忘れないようにしている" }
+    ],
+    "langNotes": [
+      { "topic": "channel close", "note": "Go のチャネルは送信側が close() で明示的に閉じないと、受信側の for-range やゴルーチンが値を待ち続けてしまう。defer close(ch) は関数を抜ける際に確実にチャネルを閉じる定石パターン。" },
+      { "topic": "sync.WaitGroup", "note": "起動したゴルーチンの終了をメイン(テスト)側で待ち合わせるための同期プリミティブ。wg.Add(1) で待つ数を登録し、ゴルーチン側で wg.Done() を呼び、wg.Wait() が全ての Done() 呼び出しを待って戻る。" },
+      { "topic": "select + ctx.Done()", "note": "select 文で複数のチャネル受信を待ち受け、ctx.Done() が閉じられたらループを終了するのは、Go の並行処理でキャンセル可能なゴルーチンを書く定番パターン。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T06:30:00Z"
+  }
 }

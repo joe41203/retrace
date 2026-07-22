@@ -68,5 +68,18 @@
     "images/real-time.gif",
     "main.go"
   ],
-  "explanation": null
+  "explanation": {
+    "what": "4行だけの最小限の Dockerfile(alpine ベースに ali バイナリをコピーして CMD で起動)を追加し、.goreleaser.yml の dockers セクションで GoReleaser がリリース時に nakabonne/ali:latest・nakabonne/ali:{{ .Tag }}・nakabonne/ali:v{{ .Major }}.{{ .Minor }} という3種類のタグでイメージをビルド・push するよう設定した。README にも Homebrew・Go に加えて Docker でのインストール手順を追記している。",
+    "why": "コミットメッセージ「Enable to install with docker」の通り、前コミットで導入した GoReleaser のリリースフローに Docker イメージ配布を組み込み、インストール手段の選択肢を増やす変更。",
+    "highlights": [
+      { "file": "Dockerfile", "note": "COPY ali /usr/bin/ の一行だけで、ビルド済みバイナリを GoReleaser 側で用意する前提の最小構成" },
+      { "file": ".goreleaser.yml", "note": "image_templates に Go テンプレート構文({{ .Tag }} 等)でバージョンタグを埋め込んでいる" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T06:30:00Z"
+  }
 }

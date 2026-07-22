@@ -247,5 +247,24 @@
     "testdata/export/naninf/results.csv",
     "testdata/export/quotes/results.csv"
   ],
-  "explanation": null
+  "explanation": {
+    "what": "負荷テスト結果を外部ファイルへ書き出すエクスポート機能を追加した大型PR。新規の`export`パッケージ(export.go/export_test.go)と`attacker/summary.go`でエクスポート用のサマリー構造を定義し、CLIに`--export-to`フラグ(main.go)、GUIにエクスポート実行のキーバインド(gui/keybinds.go, gui/drawer.go)を追加している。実行すると指定ディレクトリに全データポイントを記録した`results.csv`と、集計結果の`summary-<id>.json`が出力される。golden test方式のテスト(export_golden_test.go)とtestdata/export/配下のゴールデンファイル(basic/empty/naninf/quotes)も追加され、設計はdocs/rfc/001-export.mdというRFCドキュメントとしてまとめられている。",
+    "why": "PR本文が示す通り、issue #96をcloseするための機能追加。ali自体はTUIで負荷テストの様子をリアルタイム表示するツールだが、テスト結果をCSVやJSONとして永続化し、後続の分析パイプラインに渡せるようにすることが目的。コミットメッセージのサブコミット履歴(Add spec doc→Add golden→Add export feature→Allow multi summaries→...)から、まずRFCで設計を固めてからgolden testを整備し、実装を進めるという段階を踏んでいることが読み取れる。golangci-lintの設定変更(v8へのbump→revert→再度bump、gocriticの無効化)は本筋のexport機能とは別に、CI環境の追従作業として同じPR内で行われている。",
+    "highlights": [
+      { "file": "export/export.go", "note": "エクスポート機能の中核。results.csvとsummary-<id>.jsonの書き出しロジック。" },
+      { "file": "docs/rfc/001-export.md", "note": "実装前に書かれた設計ドキュメント(RFC)。何を・なぜエクスポートするかの意思決定が記録されている。" },
+      { "file": "export_golden_test.go", "note": "testdata/export/配下の期待値ファイルと実際の出力を比較するgolden test。" }
+    ],
+    "langNotes": [
+      { "topic": "golden test (ゴールデンテスト)", "note": "期待される出力をtestdata配下にファイルとして事前に用意しておき、テスト実行時の実際の出力と突き合わせる手法。CSVやJSONのような構造化出力のフォーマット崩れを検出しやすい。Goの標準ライブラリやCLIツールでよく使われるテストパターンで、このコミットでもtestdata/export/basic, empty, naninf, quotesという複数のケース別ディレクトリが用意されている。" }
+    ],
+    "diagram": {
+      "mermaid": "flowchart LR\n  A[\"attacker (負荷テスト実行)\"] --> B[\"attacker/summary.go\"]\n  B --> C[\"export/export.go\"]\n  C --> D[\"results.csv\"]\n  C --> E[\"summary-<id>.json\"]\n  F[\"CLI --export-to フラグ\"] --> C\n  G[\"GUI キーバインド\"] --> C",
+      "caption": "エクスポート機能のデータフロー: 負荷テスト結果がsummary経由でexportパッケージに渡り、CSVとJSONの2形式で書き出される"
+    },
+    "evidence": "pr",
+    "refs": [{ "type": "pr", "number": 140, "url": "https://github.com/nakabonne/ali/pull/140" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T06:30:00Z"
+  }
 }

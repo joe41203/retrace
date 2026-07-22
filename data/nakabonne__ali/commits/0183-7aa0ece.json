@@ -75,5 +75,21 @@
     "storage/storage.go",
     "testdata/body-1.json"
   ],
-  "explanation": null
+  "explanation": {
+    "what": "attacker/metrics.go の newMetrics 関数で、vegeta.Metrics が持つ StatusCodes map をそのまま参照代入するのではなく、新しい map を作成して要素をコピーしてから Metrics 構造体に詰めるように変更した。",
+    "why": "PR本文に \"Fixes occasional fatal error: concurrent map iteration and map write\" とあり、複数のゴルーチンが同じ StatusCodes map を共有・並行アクセスすることで発生していたクラッシュ(#111)を修正するための変更。参照をそのまま渡すと呼び出し元とmetrics構造体が同じmapの実体を共有してしまい、片方が読み取り中にもう片方が書き込むとGoランタイムがfatal errorで停止する。",
+    "highlights": [
+      { "file": "attacker/metrics.go", "note": "newMetrics 内で make + for range によるmapのディープコピーを追加し、元のm.StatusCodesへの参照共有を断ち切っている" }
+    ],
+    "langNotes": [
+      { "topic": "concurrent map access", "note": "Goの組み込みmapはスレッドセーフではなく、複数ゴルーチンから同時に読み書きされるとランタイムが \"fatal error: concurrent map iteration and map write\" を出してプロセスごと落とす(パニックではなく回復不能なfatal error)。対策の基本は、mutexで保護するか、このコミットのように共有せず値をコピーして独立させること。" }
+    ],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [
+      { "type": "pr", "number": 115, "url": "https://github.com/nakabonne/ali/pull/115" }
+    ],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T06:30:00Z"
+  }
 }

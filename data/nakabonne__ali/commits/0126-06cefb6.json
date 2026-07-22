@@ -81,5 +81,22 @@
     "main_test.go",
     "testdata/body-1.json"
   ],
-  "explanation": null
+  "explanation": {
+    "what": "PR #55 をマージし、drawer.redrawMetrics 内で defer close(d.metricsCh) していた処理を削除した。あわせて attacker.go 側のコメント(metricsChが既にcloseされているため送信すべきでない旨)も削除し、テストは <-d.metricsCh によるチャネル待ち合わせから time.Sleep(2秒) に変更している。",
+    "why": "PR本文はissue #52の修正を目的として挙げている。metricsChをdrawer側でcloseすると、既にcloseされたチャネルへ送信してpanicになる、またはcloseの二重呼び出しでpanicになる競合が起きていたと考えられ、drawer側でのcloseをやめることで解消したとみられる。",
+    "highlights": [
+      { "file": "gui/drawer.go", "note": "defer close(d.metricsCh) を削除し、チャネルのクローズ責務を呼び出し側に委ねるよう変更した箇所" },
+      { "file": "gui/drawer_test.go", "note": "チャネルクローズ待ちからtime.Sleepへ変更し、TODOコメントで検証方法の粗さを自認している箇所" }
+    ],
+    "langNotes": [
+      { "topic": "channel close", "note": "Goのchannelはcloseされた後に送信するとpanicになる。close漏れよりもclose箇所の重複や責務の所在があいまいなことがバグの原因になりやすく、このコミットはdrawer側でのcloseをやめることでその競合を避けている。" }
+    ],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [
+      { "type": "pr", "number": 55, "url": "https://github.com/nakabonne/ali/pull/55" }
+    ],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T06:30:00Z"
+  }
 }

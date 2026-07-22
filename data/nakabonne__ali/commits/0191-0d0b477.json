@@ -89,5 +89,19 @@
     "storage/storage.go",
     "testdata/body-1.json"
   ],
-  "explanation": null
+  "explanation": {
+    "what": "termdash(TUI描画ライブラリ)をv0.12.2からv0.16.0へ引き上げるPRをマージしたコミット。go.mod/go.sumの依存関係が一括更新され、gomockで生成されたモックファイル gui/widgets.mock.go が新しいtermdashのインターフェースに合わせて再生成されている。",
+    "why": "2020年の初期開発以来、termdashの新しいAPIに追随できていなかった依存を最新化する目的。特にwidgetapi.Meta系のイベントハンドラのシグネチャがtermdash側で変わっており(KeyboardとMouseにEventMetaが追加)、それに追従するためにモックの再生成が必須になっている。",
+    "highlights": [
+      { "file": "gui/widgets.mock.go", "note": "Keyboard/Mouseメソッドの引数にwidgetapi.EventMetaが増えている。termdashのイベント処理APIの変更点。" }
+    ],
+    "langNotes": [
+      { "topic": "gomock (mockgen)", "note": "gui/widgets.mock.goはMakefileのmockgenターゲットで自動生成されるファイル。インターフェース(gui/widgets.go)のシグネチャが変わると、生成されたモックのメソッドシグネチャも合わせて再生成する必要がある。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [{ "type": "pr", "number": 119, "url": "https://github.com/nakabonne/ali/pull/119" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T06:30:00Z"
+  }
 }

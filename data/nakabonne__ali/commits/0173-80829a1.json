@@ -74,5 +74,19 @@
     "storage/storage.go",
     "testdata/body-1.json"
   ],
-  "explanation": null
+  "explanation": {
+    "what": "goreleaser の設定(.goreleaser.yml)からビルド対象プラットフォームの Windows を一時的に除外し、あわせて 386(32bit)アーキテクチャ向けに \"32-bit\" というリネームを行っていた archives セクションも削除した。",
+    "why": "PR本文にある通り、依存先の nakabonne/tstorage が mmap システムコールに依存しており、当時の tstorage は Windows をサポートしていなかった。CI のクロスビルドを通すため、対応するまでの暫定処置として Windows 向けビルドを止めている。",
+    "highlights": [
+      { "file": ".goreleaser.yml", "note": "windows をコメントアウトしてビルド対象から除外" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [
+      { "type": "pr", "number": 107, "url": "https://github.com/nakabonne/ali/pull/107" }
+    ],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T06:30:00Z"
+  }
 }

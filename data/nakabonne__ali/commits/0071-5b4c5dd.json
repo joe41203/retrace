@@ -63,5 +63,20 @@
     "images/real-time.gif",
     "main.go"
   ],
-  "explanation": null
+  "explanation": {
+    "what": "gui/gui.go の Run 関数を、termdash.Run 呼び出しを行う本体ロジック run に切り出し、run が受け取る termdash 実行関数の型として runner を定義した。Run() は run(termdash.Run) を呼ぶだけの薄いラッパーになる。新設した gui/gui_test.go では、runner に成功・失敗それぞれを返すダミー関数を渡して run の戻り値を検証する TestRun を追加した。",
+    "why": "これまで Run 内で直接 termdash.Run を呼んでいたため、実際のターミナル描画なしには gui パッケージの制御フローをテストできなかった。termdash.Run と同じシグネチャの関数型 runner を導入して差し替え可能にすることで、本物のターミナルを起動せずに run の成功/失敗パスを単体テストできるようにした。",
+    "highlights": [
+      { "file": "gui/gui.go", "note": "runner 型と、それを引数に取る run 関数への分離が今回の核心" },
+      { "file": "gui/gui_test.go", "note": "テーブル駆動テストで runner にスタブ関数を注入し、run の戻り値だけを検証している" }
+    ],
+    "langNotes": [
+      { "topic": "関数型(type runner func(...) error)", "note": "Go では関数もファーストクラスの値であり、`type runner func(...) error` のように関数シグネチャに名前を付けられる。これにより本物の実装(termdash.Run)とテスト用のスタブ関数を同じ型として扱い、引数として差し替えることができる。インターフェースを使わない、関数単位の軽量な依存性注入(DI)パターン。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T06:30:00Z"
+  }
 }

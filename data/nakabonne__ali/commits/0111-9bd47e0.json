@@ -109,5 +109,18 @@
     "main.go",
     "main_test.go"
   ],
-  "explanation": null
+  "explanation": {
+    "what": "gui配下で使われていた「メッセージ表示」用の仕組み(messageCh チャネル、drawer.redrawMessage ゴルーチン、widgets.messageText)を丸ごと削除した。あわせてそれに依存していたテスト(TestRedrawMessage)や、main.go に残っていた未使用の target フィールドも削除している。",
+    "why": "drawer.go には `messageCh chan string // TODO: Remove` というTODOコメントが残っており、以前から不要と分かっていたコードだった。攻撃中に「Wait until the attack is over」や「Attack completed」といったメッセージをUIに出す仕組みだったが、他のウィジェット(進捗ゲージなど)で状態が分かるようになり、実質使われなくなっていたため整理した。",
+    "highlights": [
+      { "file": "gui/drawer.go", "note": "TODOコメント付きだった messageCh フィールドと redrawMessage メソッドを削除。ゴルーチンとチャネルのペアがまるごと消えている" },
+      { "file": "gui/widgets.go", "note": "messageText ウィジェットの生成コードと構造体フィールドを削除" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [{ "type": "pr", "number": 40, "url": "https://github.com/nakabonne/ali/pull/40" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T06:30:00Z"
+  }
 }

@@ -62,5 +62,19 @@
     "images/real-time.gif",
     "main.go"
   ],
-  "explanation": null
+  "explanation": {
+    "what": ".github/workflows/test.yml の go test コマンドを -coverpkg=./... -covermode=atomic -coverprofile=coverage.txt 付きに変更し、codecov/codecov-action@v1 でカバレッジレポートをCodecovにアップロードするステップを追加した。.gitignore に coverage.txt を追加してこの生成物をリポジトリから除外した。",
+    "why": "コミットメッセージの通り、テストカバレッジを計測してCodecovにレポートできるようにするための CI 設定変更。-coverpkg=./... で対象パッケージ全体、-covermode=atomic は並行実行されるgoroutineを含むコードでもカバレッジ計測を正しく行うためのモード指定。",
+    "highlights": [
+      { "file": ".github/workflows/test.yml", "note": "coverageフラグ付きのgo testとcodecov-actionによるアップロードステップの追加" }
+    ],
+    "langNotes": [
+      { "topic": "go test -covermode=atomic", "note": "go testのカバレッジ計測モードには set/count/atomicがある。atomicは実行カウンタへのインクリメントをアトミック操作にすることで、goroutineが並行して同じコード行を実行してもカバレッジカウントが競合(データレース)しないようにする。このプロジェクトはgoroutineを多用するため、より正確な計測のためにatomicを選んでいる。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T06:30:00Z"
+  }
 }

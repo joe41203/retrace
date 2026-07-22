@@ -76,5 +76,21 @@
     "main_test.go",
     "testdata/body-1.json"
   ],
-  "explanation": null
+  "explanation": {
+    "what": "drawer が受け取る chartCh を無バッファのチャネルから容量10000のバッファ付きチャネルに変更し、drawer 構造体内のフィールド順も整理した。",
+    "why": "無バッファチャネルは送信側(攻撃を実行するゴルーチン)と受信側(チャート描画ゴルーチン)の両方が同時に準備できていないと送受信がブロックされる。攻撃のリクエストレートが描画処理より速い場合、結果を送るたびに攻撃側がブロックされてしまうため、ある程度の件数をバッファしてチャート値の追加が詰まらないようにしたと考えられる。PR タイトルの通り「チャート値を追加するためにバッファ付きチャネルを使う」ことが主目的。",
+    "highlights": [
+      { "file": "gui/gui.go", "note": "make(chan *attacker.Result, 10000) でバッファサイズ10000を指定" }
+    ],
+    "langNotes": [
+      { "topic": "buffered channel", "note": "Go のチャネルは make(chan T) だと無バッファで送受信が同期(ランデブー)するが、make(chan T, N) のように容量を指定すると、バッファが埋まるまで送信側がブロックされずに済む。高頻度で結果を送り続ける攻撃処理と、間欠的にしか消費できない描画処理の速度差を吸収する目的でよく使われる。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [
+      { "type": "pr", "number": 79, "url": "https://github.com/nakabonne/ali/pull/79" }
+    ],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T06:30:00Z"
+  }
 }

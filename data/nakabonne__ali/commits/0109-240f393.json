@@ -75,5 +75,22 @@
     "main.go",
     "main_test.go"
   ],
-  "explanation": null
+  "explanation": {
+    "what": "PR #37をマージし、main.goのusage関数内で`fmt.Fprintln`に渡す文字列リテラルの末尾にある余分な改行を除去した。バッククォート文字列の閉じを直前の行に詰めることで、`Fprintln`が自動で付け足す改行と合わせて二重改行になっていた問題を解消した。",
+    "why": "issue #36の通り、`go test`実行時にgo vetの静的解析が「Fprintln arg list ends with redundant newline」を検出してビルド自体が失敗していた。`Fprintln`は出力の末尾に改行を1つ自動付加するため、渡す文字列側にも改行を残しているとvetが冗長と判定してエラーになる。CIやローカルでテストが通らない状態を解消するための修正。",
+    "highlights": [
+      { "file": "main.go", "note": "usage内のバッククォート文字列の末尾から改行を除去し、Fprintlnの自動改行と重複しないようにした箇所" }
+    ],
+    "langNotes": [
+      { "topic": "go vet と Fprintln の冗長改行検査", "note": "`go test`は暗黙に`go vet`の一部チェックを実行する。`fmt.Fprintln`は引数の末尾に改行を追加するため、渡す文字列リテラル自体が改行で終わっていると「二重改行になる」として静的解析エラーになり、ビルド自体が失敗する。" }
+    ],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [
+      { "type": "pr", "number": 37, "url": "https://github.com/nakabonne/ali/pull/37" },
+      { "type": "issue", "number": 36, "url": "https://github.com/nakabonne/ali/issues/36" }
+    ],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T06:30:00Z"
+  }
 }

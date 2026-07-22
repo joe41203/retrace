@@ -75,5 +75,22 @@
     "gui/widgets.go",
     "main.go"
   ],
-  "explanation": null
+  "explanation": {
+    "what": "attacker パッケージに初のテーブル駆動テスト(TestAttack)を追加し、fakeAttacker にダミーの vegeta.Result 列を保持・送出できるフィールドを持たせた。また gui/input_handler.go を gui/keybinds.go にリネームし、gui.go に直書きされていた keybinds/attack 関数をそちらへ移動、対応する gui/keybinds_test.go(TestValidateMethod)も新設した。",
+    "why": "コミットメッセージ「Add tests for attacker」の通り、テストが書けるようにまず fakeAttacker(実際にHTTPを叩かないモック実装)を拡張し、attacker.Attack の入力検証(空target時にnilを返す)を検証できるようにした。ファイル名を keybinds.go に変え、キーバインド関連のロジックを1ファイルにまとめたことで、対応するテストファイルも作りやすくしている。",
+    "highlights": [
+      { "file": "attacker/attacker_test.go", "note": "context.WithTimeout を使い、空URL時にAttackがnilを返すケースをテスト" },
+      { "file": "attacker/fake_attacker.go", "note": "fakeAttacker.Attack がフィールド results の内容をchannel経由で返すように変更" },
+      { "file": "gui/keybinds.go", "note": "gui.go から keybinds/attack 関数を移設(input_handler.go からのリネーム)" }
+    ],
+    "langNotes": [
+      { "topic": "table-driven tests", "note": "Go では構造体スライスに name/input/want をまとめ、for range と t.Run(tt.name, ...) でサブテストとして回すのが定番パターン。ここでも tests スライス + t.Run で1ケースずつ独立実行・レポートしている。" },
+      { "topic": "interface によるモック差し替え", "note": "fakeAttacker は attacker パッケージが要求する Attacker interface(vegeta.Attacker相当)を満たすダミー実装。実際のHTTP送信を行わずに channel 経由で任意の Result を返せるため、ネットワークに依存しないユニットテストが書ける。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T06:30:00Z"
+  }
 }

@@ -79,5 +79,20 @@
     "images/real-time.gif",
     "main.go"
   ],
-  "explanation": null
+  "explanation": {
+    "what": "画面描画を担う `redrawMetrics` と `redrawMessage` のシグネチャに `*sync.WaitGroup` を追加し、`ctx.Done()` で抜けるときに `wg.Done()` を呼ぶようにした。呼び出し側の `gui.go` では `run()` の冒頭で `var wg sync.WaitGroup; defer wg.Wait()` を用意し、goroutine起動時に `wg.Add(1)` する。あわせて `drawer_test.go` ではコメントアウトされていた `TestRedrawMetrics` を復活させ、`wg.Wait()` でgoroutineの終了を待ってからテストを終える形に書き換えた。",
+    "why": "PRタイトルの通り、再描画用のgoroutineの終了をWaitGroupで待ち合わせることでブロックする(=きちんと終了を待つ)のが目的。それまでは `ctx` をキャンセルしてもgoroutineの終了タイミングが保証されず、テストが不安定だったりgoroutineリークの検知ができなかったと考えられる。実際、直前にコメントアウトされていた `TestRedrawMetrics` がこのコミットで復活しており、WaitGroup導入がテスト復旧の前提条件になっている。",
+    "highlights": [
+      { "file": "gui/gui.go", "note": "run() の先頭で defer wg.Wait() し、goroutine起動のたびに wg.Add(1) する典型パターン" },
+      { "file": "gui/drawer_test.go", "note": "コメントアウトされていた TestRedrawMetrics が wg.Wait() 付きで復活している" }
+    ],
+    "langNotes": [
+      { "topic": "sync.WaitGroup", "note": "複数のgoroutineの終了を1箇所で待ち合わせるための型。Add(n)で待つ数を登録し、各goroutine側でDone()を呼び、Wait()で全て完了するまでブロックする。ここでは終了検知のためにcontextのキャンセルとセットで使われている。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [{ "type": "pr", "number": 12, "url": "https://github.com/nakabonne/ali/pull/12" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T06:30:00Z"
+  }
 }

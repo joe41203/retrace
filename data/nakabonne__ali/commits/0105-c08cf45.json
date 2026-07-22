@@ -82,5 +82,22 @@
     "main.go",
     "main_test.go"
   ],
-  "explanation": null
+  "explanation": {
+    "what": "PR #25をマージし、`--header`フラグを1回しか指定できなかった`string`型から、複数回指定できる`[]string`型(`StringSliceVarP`)に変更した。main.goのcli構造体のフィールドをheaderからheadersにリネームし、makeOptions内でループしてhttp.Headerへ追加するよう修正。READMEの説明文にも「複数回指定できる」旨を追記した。",
+    "why": "issue #24でユーザーから「複数ヘッダーに対応させたい」という要望があり、それに応える形でコントリビューターが実装しPRを送った。1コマンドで複数の`-H`フラグを使ってAuthorizationとContent-Typeのような複数ヘッダーを同時に送れるようにする狙い。",
+    "highlights": [
+      { "file": "main.go", "note": "`StringVarP`から`StringSliceVarP`への変更と、header単数からheaders複数形へのフィールド名変更" }
+    ],
+    "langNotes": [
+      { "topic": "pflag.StringSliceVarP", "note": "同じフラグを複数回指定すると値を`[]string`に蓄積する。カンマ区切り1回指定でも複数値扱いになる点が標準の`flag`パッケージにはない挙動。" }
+    ],
+    "diagram": null,
+    "evidence": "issue",
+    "refs": [
+      { "type": "pr", "number": 25, "url": "https://github.com/nakabonne/ali/pull/25" },
+      { "type": "issue", "number": 24, "url": "https://github.com/nakabonne/ali/issues/24" }
+    ],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T06:30:00Z"
+  }
 }

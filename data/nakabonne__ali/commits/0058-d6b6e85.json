@@ -69,5 +69,20 @@
     "images/real-time.gif",
     "main.go"
   ],
-  "explanation": null
+  "explanation": {
+    "what": "attacker.Metrics 型の String() メソッド(yaml.Marshal で YAML 文字列化していた)を削除し、それに伴い go.mod/go.sum から gopkg.in/yaml.v2 への依存も除去した。",
+    "why": "おそらく直前の multi-widgets 化(#4)で Metrics は String() で1本の文字列に整形するのではなく、各フィールドを個別にテキストウィジェットへ書き込む方式に変わったため、String() メソッドは呼び出し元が無くなり不要になった。使われなくなったメソッドとその実装が依存していた yaml.v2 パッケージをあわせて削除し、依存関係を整理している。",
+    "highlights": [
+      { "file": "attacker/metrics.go", "note": "Metrics.String() を削除。yaml.Marshal での文字列化ロジックが不要になった" },
+      { "file": "go.mod", "note": "gopkg.in/yaml.v2 の require エントリを削除" }
+    ],
+    "langNotes": [
+      { "topic": "go.mod/go.sum の依存整理", "note": "Go では未使用になった import を削除すると、go mod tidy 相当の作業で go.mod の require 行と go.sum のハッシュエントリも合わせて除去する必要がある。このコミットでは metrics.go から yaml.v2 の import を消し、go.mod/go.sum からも該当行を手動で削っている。" }
+    ],
+    "diagram": null,
+    "evidence": "inferred",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T06:30:00Z"
+  }
 }

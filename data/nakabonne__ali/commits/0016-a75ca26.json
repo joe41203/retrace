@@ -51,5 +51,19 @@
     "gui/widgets.go",
     "main.go"
   ],
-  "explanation": null
+  "explanation": {
+    "what": "Run() 関数の中に無名関数として直書きされていたキー入力ハンドラを、keybinds(ctx, cancel, dr) という独立したトップレベル関数に切り出した。この関数は func(*terminalapi.Keyboard) を返すクロージャで、Run() からは k := keybinds(ctx, cancel, d) として呼び出し、termdash.KeyboardSubscriber(k) に渡す形に変えている。",
+    "why": "Run() 関数がキーバインド処理・攻撃実行・チャート描画の起動まで一手に担っていたため、キーバインドのロジックを別関数に切り出して Run() の見通しを良くする意図と見られる(コミットメッセージ通りの整理)。",
+    "highlights": [
+      { "file": "gui/gui.go", "note": "keybinds 関数として切り出され、ctx・cancel・drawer を引数に取るクロージャを返す構造" }
+    ],
+    "langNotes": [
+      { "topic": "関数を返す関数(クロージャ)", "note": "keybinds は func(*terminalapi.Keyboard) 型の関数を返す。Go では関数も第一級の値として扱えるため、こうして引数(ctx, cancel, drawer)をクロージャに閉じ込めた上でコールバックとして渡すパターンがよく使われる。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T06:30:00Z"
+  }
 }

@@ -71,5 +71,20 @@
     "images/real-time.gif",
     "main.go"
   ],
-  "explanation": null
+  "explanation": {
+    "what": "attacker.Options の Body フィールド([]byte、GUIから直接入力される本文)を BodyFile(string、ファイルパス)に置き換え、attacker.Attack 内で ioutil.ReadFile によりファイル内容を読み込んで vegeta.Target の Body にセットするよう変更した。gui/keybinds.go 側は Body用テキスト入力の値をそのまま BodyFile として渡すだけになった。README にも Method/Header/Body オプションの説明文を追記した。",
+    "why": "コミットメッセージ「Enable to read body from file」の通り、リクエストボディをGUI上のテキスト欄に直接タイプするのではなく、ファイルパスを指定してその中身を読み込む方式に変更した。長大なJSONペイロード等をTUIの1行入力欄に手打ちするのは非現実的なため、ファイル経由の指定に切り替えたと考えられる。",
+    "highlights": [
+      { "file": "attacker/attacker.go", "note": "Options.Body([]byte)をOptions.BodyFile(string)に変更し、ioutil.ReadFileでファイル内容を読み込む処理を追加" },
+      { "file": "gui/keybinds.go", "note": "bodyInput.Read()の戻り値をそのままBodyFileとして渡すよう簡略化" }
+    ],
+    "langNotes": [
+      { "topic": "io/ioutil.ReadFile", "note": "指定パスのファイルを丸ごと読み込んで[]byteを返す関数。Go 1.16以降ではos.ReadFileへの移行が推奨されるが、本コミット当時(Go 1.14/1.15)はio/ioutilが標準的な選択肢だった。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T06:30:00Z"
+  }
 }

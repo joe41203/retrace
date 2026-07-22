@@ -58,5 +58,18 @@
     "gui/widgets.go",
     "main.go"
   ],
-  "explanation": null
+  "explanation": {
+    "what": "攻撃開始時のキーバインド処理から実際の攻撃実行ロジックを`attack`関数として切り出し、HTTPメソッドと本文(body)を入力するテキストウィジェットを追加した。あわせて未使用のボタンウィジェット(`newButton`)とその関連importを削除し、グリッドレイアウトを2列3行構成に組み替えて`methodInput`と`bodyInput`を配置している。",
+    "why": "これまでURL・レート制限・durationの3項目しか入力できなかったが、HTTPメソッドとリクエストボディを指定できるようにして、GET以外のリクエスト(POST等)を攻撃対象にできるようにする狙い。`keybinds`関数に埋め込まれていた攻撃処理を`attack`という独立関数に分離したのは、直後にメソッド検証(`validateMethod`)を追加するための整理と見られる。",
+    "highlights": [
+      { "file": "gui/gui.go", "note": "`keybinds`内にあった攻撃処理を`attack`関数へ抽出し、末尾に`validateMethod`を新設" },
+      { "file": "gui/widgets.go", "note": "`methodInput`と`bodyInput`を追加し、未使用だったボタン生成コード`newButton`を削除" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T06:30:00Z"
+  }
 }

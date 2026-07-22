@@ -74,5 +74,20 @@
     "images/real-time.gif",
     "main.go"
   ],
-  "explanation": null
+  "explanation": {
+    "what": "attacker.Options の BodyFile フィールドを廃止して Body []byte に置き換え、ファイル読み込みの責務を attacker パッケージから gui/keybinds.go の makeOptions に移動した。makeOptions では ioutil.ReadFile が失敗した場合に fmt.Errorf でラップしたエラーを呼び出し元に返すようにし、以前は無視されて nil を返すだけだった失敗経路にエラーハンドリングを追加した。あわせて lint.yml に args: --issues-exit-code=0 と only-new-issues: true を追加している。",
+    "why": "従来の Attack 関数はファイル読み込み失敗時にコメント付きで \"TODO: Report to report widget\" としつつ黙って nil を返しており、ユーザーにエラーが伝わらなかった。この修正でファイル読み込みとそのエラーハンドリングを呼び出し側(GUIの入力確定処理)に寄せることで、無効なbodyファイルパスが指定された際にエラーとして扱えるようにしている。lint.yml の変更は既存コードに対する新規lint警告でCIを落とさないための調整と見られる。",
+    "highlights": [
+      { "file": "attacker/attacker.go", "note": "BodyFile ではなく読み込み済みの Body []byte を受け取る形に変更、ファイルI/Oの責務を排除" },
+      { "file": "gui/keybinds.go", "note": "makeOptions 内でファイル読み込みを行い、失敗時に fmt.Errorf(\"...: %w\", err) でエラーを返す" }
+    ],
+    "langNotes": [
+      { "topic": "error wrapping (%w)", "note": "fmt.Errorf の書式指定子 %w は Go 1.13 以降で使えるエラーラッピング構文で、元のエラーを保持したまま errors.Is / errors.Unwrap で後から検査できるようにする。ここでは ioutil.ReadFile が返すエラーに \"Unable to open %q\" という文脈情報を付加している。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [{ "type": "pr", "number": 9, "url": "https://github.com/nakabonne/ali/pull/9" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T06:30:00Z"
+  }
 }

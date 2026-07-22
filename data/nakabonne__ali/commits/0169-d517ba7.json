@@ -116,5 +116,18 @@
     "storage/storage.go",
     "testdata/body-1.json"
   ],
-  "explanation": null
+  "explanation": {
+    "what": "termdashのチャート再描画間隔(redrawInterval)を、これまでハードコードされていた定数から `--redraw-interval` フラグで変更可能な値にした。gui.Option に RedrawInternal フィールドを追加し、drawer構造体にも redrawInterval フィールドを持たせて各redraw系メソッドで参照するようにしている。あわせて `setDebug` がデバッグ無効時にログ出力を `io.Discard` に切り替えるようにし、main_test.go のテストも出力バッファの内容を検証する形に書き換えている。",
+    "why": "PRが解決するとリンクされている2件のissue(#39, #35)の通り、再描画間隔がハードコードされていて調整できないという要望に応えたもの。直前のコミット(#105)でstorageからの定期クエリという仕組みが入ったばかりで、そのクエリ・再描画の頻度をユーザーが用途に応じて変えられるようにする自然な追加といえる。",
+    "highlights": [
+      { "file": "gui/gui.go", "note": "redrawInterval定数がDefaultRedrawIntervalにリネームされ、Option.RedrawInternal経由で上書き可能に" },
+      { "file": "main.go", "note": "--redraw-interval フラグを追加し、gui.Runへ渡す" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "issue",
+    "refs": [{ "type": "pr", "number": 106, "url": "https://github.com/nakabonne/ali/pull/106" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T06:30:00Z"
+  }
 }

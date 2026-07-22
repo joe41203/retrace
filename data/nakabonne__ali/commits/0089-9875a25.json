@@ -66,5 +66,19 @@
     "images/real-time.gif",
     "main.go"
   ],
-  "explanation": null
+  "explanation": {
+    "what": "`gui/keybinds_test.go` に `TestKeybinds` を新規追加した。`keybinds(ctx, cancel, nil)` で得たキーハンドラ関数に対して `keyboard.KeyCtrlC` を渡し、Ctrl-Cで `cancel()` が呼ばれて渡した `ctx` が期限切れになることを、goleakによるgoroutineリーク検知に委ねる形で確認している。",
+    "why": "PRタイトルの「Add test for quitting with Ctrl-C」通り、Ctrl-C押下でアプリを終了させるキーバインド処理に対するテストが存在しなかったため追加された。テスト内のコメント「If ctx wasn't expired, goleak will find it.」が示す通り、cancelが呼ばれずcontextが生き続けた場合は監視用goroutineが終了しないため、TestMain内のgoleak.VerifyTestMainがリークとして検出する設計になっている。",
+    "highlights": [
+      { "file": "gui/keybinds_test.go", "note": "TestKeybinds: goleakへのリーク検知任せでcancel呼び出しの成否を間接的に検証する構成" }
+    ],
+    "langNotes": [
+      { "topic": "go.uber.org/goleak", "note": "テスト終了時点で残っているgoroutineを検出するライブラリ。TestMainでVerifyTestMainを呼んでおくと、後片付けされずに残ったgoroutineがあるテストが失敗扱いになる。ここではcontextキャンセル漏れの検知に使われている。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [{ "type": "pr", "number": 15, "url": "https://github.com/nakabonne/ali/pull/15" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T06:30:00Z"
+  }
 }

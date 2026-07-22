@@ -73,5 +73,19 @@
     "images/real-time.gif",
     "main.go"
   ],
-  "explanation": null
+  "explanation": {
+    "what": "attacker.Options に MaxBody フィールド(デフォルト値 int64(-1)、無制限を意味する)を追加し、vegeta.NewAttacker に vegeta.MaxBody オプションとして渡すようにした。あわせて fake_attacker.go の Stop() 末尾にあった不要な `return` 文を削除した。",
+    "why": "PR件名「Ensure to give max body」が示す通り、直前のdf3d759でworkers数を外部指定可能にしたのと同じ流れで、レスポンスボディの読み取り上限(MaxBody)も設定可能にした。PR本文自体は空だが、変更内容と直近の傾向から動機は明確に読み取れる。",
+    "highlights": [
+      { "file": "attacker/attacker.go", "note": "DefaultMaxBody = int64(-1) と vegeta.MaxBody(opts.MaxBody) の追加" }
+    ],
+    "langNotes": [
+      { "topic": "空のreturn文", "note": "Goでは戻り値のない関数末尾の `return` は省略可能で、golangci-lintなどのリンターがこの種の冗長な記述を指摘することがある。fake_attacker.go の Stop() から削除されたのはその類の整理。" }
+    ],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [{ "type": "pr", "number": 19, "url": "https://github.com/nakabonne/ali/pull/19" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T06:30:00Z"
+  }
 }

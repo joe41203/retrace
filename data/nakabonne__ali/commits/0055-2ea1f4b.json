@@ -62,5 +62,18 @@
     "images/real-time.gif",
     "main.go"
   ],
-  "explanation": null
+  "explanation": {
+    "what": "gauge.Gauge のボーダーとタイトル(\"Progress\")を newGauge() 側から削除し(コメントアウト)、代わりにグリッドレイアウト側(gridLayout)で Progress ウィジェットを囲む container.Border と container.BorderTitle(\"Progress\") を追加した。二重にボーダーが描かれていた箇所を1つに整理する変更。",
+    "why": "おそらく gauge.Gauge 自体が持つボーダーと、それを配置するグリッドセル(container.Border)側のボーダーが二重になっていたため、内側の gauge 側のボーダー・タイトルを外すことで見た目をすっきりさせ、タイトル表示の責務をグリッドセル側に一本化したと考えられる。",
+    "highlights": [
+      { "file": "gui/widgets.go", "note": "newGauge() で gauge.Border と gauge.BorderTitle をコメントアウトし、gauge.Height(1) も無効化" },
+      { "file": "gui/gui.go", "note": "raw3 の progressGauge ウィジェットに container.Border(linestyle.Light) と container.BorderTitle(\"Progress\") を付与" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "inferred",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T06:30:00Z"
+  }
 }

@@ -62,5 +62,20 @@
     "images/real-time.gif",
     "main.go"
   ],
-  "explanation": null
+  "explanation": {
+    "what": "drawer に redrawMessage(ctx) メソッドを追加し、messageCh から受け取った文字列を messageText ウィジェットへ書き込むループ処理を実装した。Run() 内で go d.redrawMessage(ctx) として新しい goroutine として起動している。",
+    "why": "multi-widgets 化(#4)で messageCh というチャネル自体はキーバインド側(gui/keybinds.go)からエラーメッセージ等を送信するために既に用意されていたが、それを受信して画面に反映する側の処理がまだ実装されていなかった。おそらくこのコミットでその受信ループを追加し、メッセージが実際に TUI 上で更新されるようにしたと考えられる。",
+    "highlights": [
+      { "file": "gui/drawer.go", "note": "redrawMessage: messageCh を受信して messageText.Write するループを新設" },
+      { "file": "gui/gui.go", "note": "go d.redrawMessage(ctx) を追加してメッセージ描画用の goroutine を起動" }
+    ],
+    "langNotes": [
+      { "topic": "goroutine + channel によるUIの非同期更新", "note": "ali の GUI は redrawReport・redrawGauge・redrawMessage のように、描画対象ごとに専用の goroutine を1つ立ち上げ、対応するチャネルからの受信をトリガーに termdash のウィジェットを更新するパターンを繰り返し使っている。ctx.Done() での終了検知も各ループで共通の作法になっている。" }
+    ],
+    "diagram": null,
+    "evidence": "inferred",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T06:30:00Z"
+  }
 }

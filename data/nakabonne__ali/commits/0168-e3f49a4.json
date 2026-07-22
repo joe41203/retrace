@@ -193,5 +193,24 @@
     "storage/storage.go",
     "testdata/body-1.json"
   ],
-  "explanation": null
+  "explanation": {
+    "what": "attacker から drawer(GUI描画側)へ結果を直接送っていたデータフローを廃止し、新設した `storage` パッケージ(nakabonne/tstorage という時系列データベースをバックエンドに使う)を間に挟む構成に変更した。attacker は結果を storage に書き込むだけになり、drawer は定期的に storage へクエリを投げてグラフ用データを取得するようになった。あわせて storage.go・fake_storage.go を新規追加し、drawer.go や drawer_test.go は直接結果を保持していたロジックが不要になった分、大幅に削減されている。",
+    "why": "PR本文に明記の通り、attacker が結果を drawer に直接送りつける従来方式をやめ、時系列ストレージ層を仲介させる設計に変更した。ストレージ層を挟むことで、任意の時間範囲のデータ点をクエリし直せるようになり、後続コミット(#106 の redraw-interval や query-range の変更)のような柔軟な表示制御の土台になっている。",
+    "highlights": [
+      { "file": "storage/storage.go", "note": "tstorageをラップする新規Storageインターフェースの実装。NewStorage/Insert/Query相当のAPIを提供" },
+      { "file": "attacker/attacker.go", "note": "resCh/metricsChへの直接送信から、storageへの書き込みに置き換え" },
+      { "file": "gui/drawer.go", "note": "自前で結果を貯めていたロジックが、storageへの定期クエリに置き換わり大幅に簡素化" }
+    ],
+    "langNotes": [
+      { "topic": "tstorage (時系列データベースライブラリ)", "note": "nakabonne/tstorage はこの作者自身が開発したインメモリの時系列データストアで、Prometheusのようにタイムスタンプ付きデータ点を高速に挿入・範囲クエリできる。ここではHTTP負荷テストのレイテンシ等の時系列データを保持する用途で使われている。" }
+    ],
+    "diagram": {
+      "mermaid": "flowchart LR\n  A[\"attacker\"] -->|\"Insert\"| B[\"storage (tstorage)\"]\n  B -->|\"Query (periodic)\"| C[\"drawer (GUI)\"]",
+      "caption": "attackerがstorageに書き込み、drawerが定期的にstorageへクエリする新しいデータフロー"
+    },
+    "evidence": "pr",
+    "refs": [{ "type": "pr", "number": 105, "url": "https://github.com/nakabonne/ali/pull/105" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T06:30:00Z"
+  }
 }
