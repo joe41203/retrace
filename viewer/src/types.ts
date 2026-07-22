@@ -88,10 +88,16 @@ export interface Diagram {
 	caption: string;
 }
 
+export interface LangNote {
+	topic: string;
+	note: string;
+}
+
 export interface Explanation {
 	what: string;
 	why: string;
 	highlights: HighlightNote[];
+	langNotes?: LangNote[] | null; // 任意。言語・フレームワーク固有概念の学習メモ(0〜4件)
 	diagram?: Diagram | null; // 任意。構造理解を助けるコミットのみ付く
 	evidence: Evidence;
 	refs: Ref[];

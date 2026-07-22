@@ -76,6 +76,20 @@ export default function ExplanationCard({
 				</div>
 			)}
 
+			{explanation.langNotes && explanation.langNotes.length > 0 && (
+				<div className="exp-section">
+					<h3>言語メモ</h3>
+					<ul className="langnote-list">
+						{explanation.langNotes.map((n, i) => (
+							<li key={`${n.topic}-${i}`}>
+								<span className="langnote-topic">{n.topic}</span>
+								<span className="langnote-note">{n.note}</span>
+							</li>
+						))}
+					</ul>
+				</div>
+			)}
+
 			{explanation.diagram && (
 				<div className="exp-section">
 					<h3>構造</h3>
