@@ -1,0 +1,86 @@
+{
+  "seq": 47,
+  "sha": "dc0d34a34c0edb5bbefef3edae3d2860abf7ad94",
+  "parents": [
+    "16514f6b9e64ffc7ddf5b5b9338326766da06c76"
+  ],
+  "author": {
+    "name": "Camden Cheek",
+    "email": "camden@ccheek.com",
+    "date": "2023-01-02T13:44:21-07:00"
+  },
+  "message": "simplify iter package",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 3,
+    "additions": 39,
+    "deletions": 92
+  },
+  "files": [
+    {
+      "path": "iter/iter.go",
+      "status": "M",
+      "additions": 21,
+      "deletions": 46,
+      "binary": false
+    },
+    {
+      "path": "iter/iter_test.go",
+      "status": "M",
+      "additions": 9,
+      "deletions": 46,
+      "binary": false
+    },
+    {
+      "path": "pool/pool_test.go",
+      "status": "M",
+      "additions": 9,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/iter/iter.go b/iter/iter.go\nindex c4811f0..a6c942a 100644\n--- a/iter/iter.go\n+++ b/iter/iter.go\n@@ -9,90 +9,65 @@ import (\n \t\"github.com/sourcegraph/sourcegraph/lib/errors\"\n )\n \n-type GoWaiter interface {\n-\tGo(func())\n-\tWait()\n-}\n-\n-func ForEachIdx[T any](input []T, f func(int, *T)) {\n-\tvar wg conc.WaitGroup\n-\tdefer wg.Wait()\n-\n-\tForEachIdxIn(&wg, input, f)\n-}\n-\n+// ForEach executes f in parallel over each element in input.\n+//\n+// It is safe to mutate the input parameter, which makes it\n+// possible to map in place.\n+//\n+// ForEach always uses at most runtime.GOMAXPROCS goroutines.\n+// It takes roughly 2µs to start up the goroutines and adds\n+// an overhead of roughly 50ns per element of input.\n func ForEach[T any](input []T, f func(*T)) {\n-\tvar wg conc.WaitGroup\n-\tdefer wg.Wait()\n-\n-\tForEachIdxIn(&wg, input, func(_ int, t *T) {\n+\tForEachIdx(input, func(_ int, t *T) {\n \t\tf(t)\n \t})\n }\n \n-func Map[T any, R any](input []T, f func(*T) R) []R {\n-\tvar wg conc.WaitGroup\n-\tdefer wg.Wait()\n-\n-\treturn MapIn(&wg, input, f)\n-}\n-\n-func MapErr[T any, R any](input []T, f func(*T) (R, error)) ([]R, error) {\n+// ForEachIdx is the same as ForEach except it also provides the\n+// index of the element to the callback.\n+func ForEachIdx[T any](input []T, f func(int, *T)) {\n \tvar wg conc.WaitGroup\n \tdefer wg.Wait()\n \n-\treturn MapErrIn(&wg, input, f)\n-}\n-\n-func ForEachIdxIn[T any](goer GoWaiter, input []T, f func(int, *T)) {\n \tnumTasks := runtime.GOMAXPROCS(0)\n-\tif m, ok := goer.(interface{ MaxGoroutines() int }); ok && m.MaxGoroutines() > numTasks {\n-\t\t// No more tasks than the pool's max concurrency\n-\t\tnumTasks = m.MaxGoroutines()\n-\t}\n \tif numTasks > len(input) {\n \t\t// No more tasks than the number of input items\n \t\tnumTasks = len(input)\n \t}\n \n \tvar idx atomic.Int64\n-\tvar wg sync.WaitGroup\n+\t// create the task outside the loop to avoid extra allocations\n \ttask := func() {\n-\t\tdefer wg.Done()\n \t\ti := int(idx.Add(1) - 1)\n \t\tfor ; i < len(input); i = int(idx.Add(1) - 1) {\n \t\t\tf(i, &input[i])\n \t\t}\n \t}\n \n-\twg.Add(numTasks)\n \tfor i := 0; i < numTasks; i++ {\n-\t\tgoer.Go(task)\n+\t\twg.Go(task)\n \t}\n \twg.Wait()\n }\n \n-func ForEachIn[T any](goer GoWaiter, input []T, f func(*T)) {\n-\tForEachIdxIn(goer, input, func(_ int, t *T) {\n-\t\tf(t)\n-\t})\n-}\n-\n-func MapIn[T any, R any](goer GoWaiter, input []T, f func(*T) R) []R {\n+// Map applies f to each element of input, returning the mapped result.\n+func Map[T, R any](input []T, f func(*T) R) []R {\n \tres := make([]R, len(input))\n-\tForEachIdxIn(goer, input, func(i int, t *T) {\n+\tForEachIdx(input, func(i int, t *T) {\n \t\tres[i] = f(t)\n \t})\n \treturn res\n }\n \n-func MapErrIn[T any, R any](goer GoWaiter, input []T, f func(*T) (R, error)) ([]R, error) {\n+// MapErr applies f to each element of the input, returning the mapped result\n+// and a combined error of all returned errors.\n+func MapErr[T any, R any](input []T, f func(*T) (R, error)) ([]R, error) {\n \tvar (\n \t\tres    = make([]R, len(input))\n \t\terrMux sync.Mutex\n \t\terrs   error\n \t)\n-\tForEachIdxIn(goer, input, func(i int, t *T) {\n+\tForEachIdx(input, func(i int, t *T) {\n \t\tvar err error\n \t\tres[i], err = f(t)\n \t\tif err != nil {\ndiff --git a/iter/iter_test.go b/iter/iter_test.go\nindex 1007b37..de2820a 100644\n--- a/iter/iter_test.go\n+++ b/iter/iter_test.go\n@@ -238,52 +238,15 @@ func TestMapErr(t *testing.T) {\n \t})\n }\n \n-func BenchmarkForEachIdx(b *testing.B) {\n-\tb.Run(\"simple mutation\", func(b *testing.B) {\n-\t\tfor _, n := range []int{10, 1000, 1000000} {\n-\t\t\tarr := make([]int, n)\n-\t\t\tb.Run(strconv.Itoa(n), func(b *testing.B) {\n-\t\t\t\tb.Run(\"baseline\", func(b *testing.B) {\n-\t\t\t\t\tfor i := 0; i < b.N; i++ {\n-\t\t\t\t\t\tfor j := 0; j < len(arr); j++ {\n-\t\t\t\t\t\t\tarr[j] = j\n-\t\t\t\t\t\t}\n-\t\t\t\t\t}\n-\t\t\t\t})\n-\n-\t\t\t\tb.Run(\"parallel\", func(b *testing.B) {\n-\t\t\t\t\tfor i := 0; i < b.N; i++ {\n-\t\t\t\t\t\tForEachIdx(arr, func(i int, val *int) {\n-\t\t\t\t\t\t\t*val = i\n-\t\t\t\t\t\t})\n-\t\t\t\t\t}\n-\t\t\t\t})\n-\t\t\t})\n-\t\t}\n-\t})\n-}\n-\n func BenchmarkForEach(b *testing.B) {\n-\tb.Run(\"simple mutation\", func(b *testing.B) {\n-\t\tfor _, n := range []int{10, 1000, 1000000} {\n-\t\t\tarr := make([]int, n)\n-\t\t\tb.Run(strconv.Itoa(n), func(b *testing.B) {\n-\t\t\t\tb.Run(\"baseline\", func(b *testing.B) {\n-\t\t\t\t\tfor i := 0; i < b.N; i++ {\n-\t\t\t\t\t\tfor j := 0; j < len(arr); j++ {\n-\t\t\t\t\t\t\tarr[j] = j\n-\t\t\t\t\t\t}\n-\t\t\t\t\t}\n+\tfor _, count := range []int{0, 1, 8, 100, 1000, 10000, 100000} {\n+\t\tb.Run(strconv.Itoa(count), func(b *testing.B) {\n+\t\t\tints := make([]int, count)\n+\t\t\tfor i := 0; i < b.N; i++ {\n+\t\t\t\tForEach(ints, func(i *int) {\n+\t\t\t\t\t*i = 0\n \t\t\t\t})\n-\n-\t\t\t\tb.Run(\"parallel\", func(b *testing.B) {\n-\t\t\t\t\tfor i := 0; i < b.N; i++ {\n-\t\t\t\t\t\tForEach(arr, func(val *int) {\n-\t\t\t\t\t\t\t*val = i\n-\t\t\t\t\t\t})\n-\t\t\t\t\t}\n-\t\t\t\t})\n-\t\t\t})\n-\t\t}\n-\t})\n+\t\t\t}\n+\t\t})\n+\t}\n }\ndiff --git a/pool/pool_test.go b/pool/pool_test.go\nindex fda363e..8aa676b 100644\n--- a/pool/pool_test.go\n+++ b/pool/pool_test.go\n@@ -75,6 +75,15 @@ func TestPool(t *testing.T) {\n \t\t}\n \t\trequire.Panics(t, g.Wait)\n \t})\n+\n+\tt.Run(\"panics on invalid WithMaxGoroutines\", func(t *testing.T) {\n+\t\trequire.Panics(t, func() { New().WithMaxGoroutines(0) })\n+\t})\n+\n+\tt.Run(\"returns correct MaxGoroutines\", func(t *testing.T) {\n+\t\tp := New().WithMaxGoroutines(42)\n+\t\trequire.Equal(t, 42, p.MaxGoroutines())\n+\t})\n }\n \n func BenchmarkPool(b *testing.B) {\n",
+  "diffTruncated": false,
+  "tree": [
+    "LICENSE",
+    "go.mod",
+    "go.sum",
+    "iter/iter.go",
+    "iter/iter_test.go",
+    "limiter.go",
+    "panic.go",
+    "panic_test.go",
+    "pool/context_pool.go",
+    "pool/context_pool_test.go",
+    "pool/error_pool.go",
+    "pool/error_pool_test.go",
+    "pool/pool.go",
+    "pool/pool_test.go",
+    "pool/result_context_pool.go",
+    "pool/result_context_pool_test.go",
+    "pool/result_error_pool.go",
+    "pool/result_error_pool_test.go",
+    "pool/result_pool.go",
+    "pool/result_pool_test.go",
+    "stream/stream.go",
+    "stream/stream_test.go",
+    "waitgroup.go",
+    "waitgroup_test.go"
+  ],
+  "explanation": {
+    "what": "iter パッケージから GoWaiter インターフェースと、任意の GoWaiter を受け取る ForEachIdxIn/ForEachIn/MapIn/MapErrIn の4関数を削除し、ForEach/ForEachIdx/Map/MapErr が内部で直接 conc.WaitGroup を使う形に一本化した。ForEachIdx は pool の MaxGoroutines を参照する分岐も削除し、常に runtime.GOMAXPROCS(0) と入力長の小さい方を並行数として使うようにした。テストからは対応するベンチマークの baseline/parallel 比較部分を削除し、より単純なサイズ別ベンチマークに置き換えている。pool/pool_test.go には WithMaxGoroutines の異常系・正常系テストを追加した。",
+    "why": "コミットメッセージの通り、iter パッケージの簡略化が目的。GoWaiter 経由で外部の pool と連携できる汎用設計は柔軟だが型アサーション(interface{ MaxGoroutines() int })を伴う複雑な実装になっており、おそらく実際に必要とされていなかったため、単純な runtime.GOMAXPROCS ベースの並行数決定に絞ってAPIを縮小したと考えられる。",
+    "highlights": [
+      { "file": "iter/iter.go", "note": "GoWaiter インターフェースと *In系関数群の削除。ForEachIdx が conc.WaitGroup を直接使う形に" }
+    ],
+    "langNotes": [
+      { "topic": "型アサーションによるオプショナルインターフェース", "note": "削除された旧コードの if m, ok := goer.(interface{ MaxGoroutines() int }); ok は、Go でよく使われる『インターフェースが特定のメソッドを追加で持つかを実行時にチェックする』パターン。このコミットでは複雑さを避けるため丸ごと削除された。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

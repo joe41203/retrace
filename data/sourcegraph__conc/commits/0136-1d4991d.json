@@ -1,0 +1,85 @@
+{
+  "seq": 136,
+  "sha": "1d4991d2948a7f92cd28fb63ba08f22e9f58797d",
+  "parents": [
+    "ba7ce516f375fe6d8c9267a2dcc68a729bfec506"
+  ],
+  "author": {
+    "name": "Camden Cheek",
+    "email": "camden@ccheek.com",
+    "date": "2023-03-03T10:24:14-07:00"
+  },
+  "message": "fix result_pool_test.go (#99)\n\nFixes https://github.com/sourcegraph/conc/issues/98",
+  "pr": {
+    "number": 99,
+    "title": "fix result_pool_test.go",
+    "body": "Fixes https://github.com/sourcegraph/conc/issues/98",
+    "url": "https://github.com/sourcegraph/conc/pull/99"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 1,
+    "deletions": 0
+  },
+  "files": [
+    {
+      "path": "pool/result_pool_test.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/pool/result_pool_test.go b/pool/result_pool_test.go\nindex 1663968..bb31ba8 100644\n--- a/pool/result_pool_test.go\n+++ b/pool/result_pool_test.go\n@@ -43,6 +43,7 @@ func TestResultGroup(t *testing.T) {\n \t\t\tt.Parallel()\n \t\t\tg := NewWithResults[int]()\n \t\t\tg.Go(func() int { return 0 })\n+\t\t\t_ = g.Wait()\n \t\t\trequire.Panics(t, func() { g.WithMaxGoroutines(10) })\n \t\t})\n \t})\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/go.yml",
+    ".golangci.yml",
+    "LICENSE",
+    "README.md",
+    "go.mod",
+    "go.sum",
+    "internal/multierror/multierror_go119.go",
+    "internal/multierror/multierror_go120.go",
+    "iter/iter.go",
+    "iter/iter_test.go",
+    "iter/map.go",
+    "iter/map_test.go",
+    "panics/panics.go",
+    "panics/panics_test.go",
+    "panics/try.go",
+    "panics/try_test.go",
+    "pool/context_pool.go",
+    "pool/context_pool_test.go",
+    "pool/error_pool.go",
+    "pool/error_pool_test.go",
+    "pool/pool.go",
+    "pool/pool_test.go",
+    "pool/result_context_pool.go",
+    "pool/result_context_pool_test.go",
+    "pool/result_error_pool.go",
+    "pool/result_error_pool_test.go",
+    "pool/result_pool.go",
+    "pool/result_pool_test.go",
+    "stream/stream.go",
+    "stream/stream_test.go",
+    "waitgroup.go",
+    "waitgroup_test.go"
+  ],
+  "explanation": {
+    "what": "pool/result_pool_test.go の \"WithMaxGoroutines after start\" 系テストに `_ = g.Wait()` を1行追加した。ResultGroup に Go でタスクを積んだ後、Wait を呼ばずに WithMaxGoroutines を呼んで panic を期待するテストで、先に Wait を呼び切ってから panic 検証するように直した。",
+    "why": "コミットメッセージが参照する issue #98 のタイトルは \"fix result_pool_test.go\" で、詳細な issue 本文は JSON 内に含まれていない。diff からは、Wait 未実行のままテストが終わるとゴルーチンリークやレースが起き得る状態だったため、Wait を明示的に呼んでから panic 挙動を検証する形に修正したと考えられる。",
+    "highlights": [
+      { "file": "pool/result_pool_test.go", "note": "panic を期待する前に g.Wait() を呼ぶ1行追加" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [
+      { "type": "pr", "number": 99, "url": "https://github.com/sourcegraph/conc/pull/99" }
+    ],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

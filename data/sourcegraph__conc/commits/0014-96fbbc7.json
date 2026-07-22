@@ -1,0 +1,151 @@
+{
+  "seq": 14,
+  "sha": "96fbbc7e2c7259cd215f20768418ac165666619b",
+  "parents": [
+    "d63d096b2987c0dc5b8306bcc78bc15a2c3f27f8"
+  ],
+  "author": {
+    "name": "Camden Cheek",
+    "email": "camden@ccheek.com",
+    "date": "2022-12-16T13:11:41-07:00"
+  },
+  "message": "some fixes, benchmarks, and tests",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 11,
+    "additions": 295,
+    "deletions": 16
+  },
+  "files": [
+    {
+      "path": "group/error_group_test.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "group/iter.go",
+      "status": "M",
+      "additions": 15,
+      "deletions": 3,
+      "binary": false
+    },
+    {
+      "path": "group/iter_test.go",
+      "status": "A",
+      "additions": 122,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "iter.go",
+      "status": "M",
+      "additions": 9,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "limiter.go",
+      "status": "M",
+      "additions": 3,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "pool/context_pool.go",
+      "status": "M",
+      "additions": 4,
+      "deletions": 4,
+      "binary": false
+    },
+    {
+      "path": "pool/error_pool.go",
+      "status": "M",
+      "additions": 4,
+      "deletions": 4,
+      "binary": false
+    },
+    {
+      "path": "pool/iter_test.go",
+      "status": "A",
+      "additions": 76,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "pool/pool.go",
+      "status": "M",
+      "additions": 3,
+      "deletions": 3,
+      "binary": false
+    },
+    {
+      "path": "stream/stream.go",
+      "status": "M",
+      "additions": 2,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "waitgroup_test.go",
+      "status": "A",
+      "additions": 56,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/group/error_group_test.go b/group/error_group_test.go\nindex f896db7..68aea49 100644\n--- a/group/error_group_test.go\n+++ b/group/error_group_test.go\n@@ -13,6 +13,7 @@ import (\n \n func TestErrorGroup(t *testing.T) {\n \tt.Parallel()\n+\n \terr1 := errors.New(\"err1\")\n \terr2 := errors.New(\"err2\")\n \ndiff --git a/group/iter.go b/group/iter.go\nindex b7c7bd1..141f0b3 100644\n--- a/group/iter.go\n+++ b/group/iter.go\n@@ -5,19 +5,31 @@ import (\n )\n \n func ForEachIdx[T any](input []T, f func(int, *T)) {\n-\tconc.ForEachIdxIn(New(), input, f)\n+\tg := New()\n+\tdefer g.Wait()\n+\n+\tconc.ForEachIdxIn(g, input, f)\n }\n \n func ForEach[T any](input []T, f func(*T)) {\n-\tconc.ForEachIdxIn(New(), input, func(_ int, t *T) {\n+\tg := New()\n+\tdefer g.Wait()\n+\n+\tconc.ForEachIn(g, input, func(t *T) {\n \t\tf(t)\n \t})\n }\n \n func Map[T any, R any](input []T, f func(*T) R) []R {\n-\treturn conc.MapIn(New(), input, f)\n+\tg := New()\n+\tdefer g.Wait()\n+\n+\treturn conc.MapIn(g, input, f)\n }\n \n func MapErr[T any, R any](input []T, f func(*T) (R, error)) ([]R, error) {\n+\tg := New()\n+\tdefer g.Wait()\n+\n \treturn conc.MapErrIn(New(), input, f)\n }\ndiff --git a/group/iter_test.go b/group/iter_test.go\nnew file mode 100644\nindex 0000000..cbbf0b6\n--- /dev/null\n+++ b/group/iter_test.go\n@@ -0,0 +1,122 @@\n+package group\n+\n+import (\n+\t\"strconv\"\n+\t\"testing\"\n+\n+\t\"github.com/stretchr/testify/require\"\n+\n+\t\"github.com/camdencheek/conc\"\n+)\n+\n+func TestForEachIdx(t *testing.T) {\n+\tt.Parallel()\n+\n+\tt.Run(\"empty\", func(t *testing.T) {\n+\t\tf := func() {\n+\t\t\tints := []int{}\n+\t\t\tForEachIdx(ints, func(i int, val *int) {\n+\t\t\t\tpanic(\"this should never be called\")\n+\t\t\t})\n+\t\t}\n+\t\trequire.NotPanics(t, f)\n+\t})\n+\n+\tt.Run(\"panic is propagated\", func(t *testing.T) {\n+\t\tf := func() {\n+\t\t\tints := []int{1}\n+\t\t\tForEachIdx(ints, func(i int, val *int) {\n+\t\t\t\tpanic(\"super bad thing happened\")\n+\t\t\t})\n+\t\t}\n+\t\trequire.Panics(t, f)\n+\t})\n+\n+\tt.Run(\"mutating inputs is fine\", func(t *testing.T) {\n+\t\tints := []int{1, 2, 3, 4, 5}\n+\t\tForEachIdx(ints, func(i int, val *int) {\n+\t\t\t*val += 1\n+\t\t})\n+\t\trequire.Equal(t, []int{2, 3, 4, 5, 6}, ints)\n+\t})\n+\n+\tt.Run(\"huge inputs\", func(t *testing.T) {\n+\t\tints := make([]int, 10000)\n+\t\tForEachIdx(ints, func(i int, val *int) {\n+\t\t\t*val = i\n+\t\t})\n+\t\texpected := make([]int, 10000)\n+\t\tfor i := 0; i < 10000; i++ {\n+\t\t\texpected[i] = i\n+\t\t}\n+\t\trequire.Equal(t, expected, ints)\n+\t})\n+}\n+\n+func BenchmarkForEachIdx(b *testing.B) {\n+\tb.Run(\"simple mutation\", func(b *testing.B) {\n+\t\tfor _, n := range []int{10, 1000, 1000000} {\n+\t\t\tarr := make([]int, n)\n+\t\t\tb.Run(strconv.Itoa(n), func(b *testing.B) {\n+\t\t\t\tb.Run(\"baseline\", func(b *testing.B) {\n+\t\t\t\t\tfor i := 0; i < b.N; i++ {\n+\t\t\t\t\t\tfor j := 0; j < len(arr); j++ {\n+\t\t\t\t\t\t\tarr[j] = j\n+\t\t\t\t\t\t}\n+\t\t\t\t\t}\n+\t\t\t\t})\n+\n+\t\t\t\tb.Run(\"parallel\", func(b *testing.B) {\n+\t\t\t\t\tfor i := 0; i < b.N; i++ {\n+\t\t\t\t\t\tForEachIdx(arr, func(i int, val *int) {\n+\t\t\t\t\t\t\t*val = i\n+\t\t\t\t\t\t})\n+\t\t\t\t\t}\n+\t\t\t\t})\n+\n+\t\t\t\tg := New()\n+\t\t\t\tb.Run(\"share group\", func(b *testing.B) {\n+\t\t\t\t\tfor i := 0; i < b.N; i++ {\n+\t\t\t\t\t\tconc.ForEachIdxIn(g, arr, func(i int, val *int) {\n+\t\t\t\t\t\t\t*val = i\n+\t\t\t\t\t\t})\n+\t\t\t\t\t}\n+\t\t\t\t})\n+\t\t\t})\n+\t\t}\n+\t})\n+}\n+\n+func BenchmarkForEach(b *testing.B) {\n+\tb.Run(\"simple mutation\", func(b *testing.B) {\n+\t\tfor _, n := range []int{10, 1000, 1000000} {\n+\t\t\tarr := make([]int, n)\n+\t\t\tb.Run(strconv.Itoa(n), func(b *testing.B) {\n+\t\t\t\tb.Run(\"baseline\", func(b *testing.B) {\n+\t\t\t\t\tfor i := 0; i < b.N; i++ {\n+\t\t\t\t\t\tfor j := 0; j < len(arr); j++ {\n+\t\t\t\t\t\t\tarr[j] = j\n+\t\t\t\t\t\t}\n+\t\t\t\t\t}\n+\t\t\t\t})\n+\n+\t\t\t\tb.Run(\"parallel\", func(b *testing.B) {\n+\t\t\t\t\tfor i := 0; i < b.N; i++ {\n+\t\t\t\t\t\tForEach(arr, func(val *int) {\n+\t\t\t\t\t\t\t*val = i\n+\t\t\t\t\t\t})\n+\t\t\t\t\t}\n+\t\t\t\t})\n+\n+\t\t\t\tg := New()\n+\t\t\t\tb.Run(\"share group\", func(b *testing.B) {\n+\t\t\t\t\tfor i := 0; i < b.N; i++ {\n+\t\t\t\t\t\tconc.ForEachIn(g, arr, func(val *int) {\n+\t\t\t\t\t\t\t*val = i\n+\t\t\t\t\t\t})\n+\t\t\t\t\t}\n+\t\t\t\t})\n+\t\t\t})\n+\t\t}\n+\t})\n+}\ndiff --git a/iter.go b/iter.go\nindex d485ac1..9075c5c 100644\n--- a/iter.go\n+++ b/iter.go\n@@ -1,6 +1,7 @@\n package conc\n \n import (\n+\t\"runtime\"\n \t\"sync\"\n \t\"sync/atomic\"\n \n@@ -18,12 +19,19 @@ func ForEachIdxIn[T any](goer Goer, input []T, f func(int, *T)) {\n \tvar wg sync.WaitGroup\n \ttask := func() {\n \t\tdefer wg.Done()\n-\t\tfor i := int(idx.Add(1) - 1); i < len(input); i = int(idx.Add(1) - 1) {\n+\t\ti := int(idx.Add(1) - 1)\n+\t\tfor ; i < len(input); i = int(idx.Add(1) - 1) {\n \t\t\tf(i, &input[i])\n \t\t}\n \t}\n \n \tn := goer.MaxGoroutines()\n+\tif n > len(input) {\n+\t\tn = len(input)\n+\t} else if n == 0 {\n+\t\tn = runtime.GOMAXPROCS(0)\n+\t}\n+\n \twg.Add(n)\n \tfor i := 0; i < n; i++ {\n \t\tgoer.Go(task)\ndiff --git a/limiter.go b/limiter.go\nindex 4c69545..a6e513f 100644\n--- a/limiter.go\n+++ b/limiter.go\n@@ -1,6 +1,9 @@\n package conc\n \n func NewLimiter(n int) Limiter {\n+\tif n < 1 {\n+\t\treturn nil\n+\t}\n \treturn make(Limiter, n)\n }\n \ndiff --git a/pool/context_pool.go b/pool/context_pool.go\nindex c9448b2..6f843a4 100644\n--- a/pool/context_pool.go\n+++ b/pool/context_pool.go\n@@ -5,20 +5,20 @@ import (\n )\n \n type ContextPool struct {\n-\tErrorPool\n+\terrorPool ErrorPool\n \n \tctx    context.Context\n \tcancel context.CancelFunc\n }\n \n func (g *ContextPool) Go(f func(ctx context.Context) error) {\n-\tg.ErrorPool.Go(func() error {\n+\tg.errorPool.Go(func() error {\n \t\terr := f(g.ctx)\n \t\tif err != nil && g.cancel != nil {\n \t\t\t// Add the error directly because otherwise, canceling could cause\n \t\t\t// another goroutine to exit and return an error before this error\n \t\t\t// was added, which breaks the expectations of WithFirstError().\n-\t\t\tg.ErrorPool.addErr(err)\n+\t\t\tg.errorPool.addErr(err)\n \t\t\tg.cancel()\n \t\t\treturn nil\n \t\t}\n@@ -27,7 +27,7 @@ func (g *ContextPool) Go(f func(ctx context.Context) error) {\n }\n \n func (p *ContextPool) Wait() error {\n-\treturn p.ErrorPool.Wait()\n+\treturn p.errorPool.Wait()\n }\n \n func (p *ContextPool) WithCancelOnError() *ContextPool {\ndiff --git a/pool/error_pool.go b/pool/error_pool.go\nindex 652e00a..7871bed 100644\n--- a/pool/error_pool.go\n+++ b/pool/error_pool.go\n@@ -8,7 +8,7 @@ import (\n )\n \n type ErrorPool struct {\n-\tPool\n+\tpool Pool\n \n \tonlyFirst bool\n \n@@ -17,19 +17,19 @@ type ErrorPool struct {\n }\n \n func (p *ErrorPool) Go(f func() error) {\n-\tp.Pool.Go(func() {\n+\tp.pool.Go(func() {\n \t\tp.addErr(f())\n \t})\n }\n \n func (p *ErrorPool) Wait() error {\n-\tp.Pool.Wait()\n+\tp.pool.Wait()\n \treturn p.errs\n }\n \n func (p *ErrorPool) WithContext(ctx context.Context) *ContextPool {\n \treturn &ContextPool{\n-\t\tErrorPool: *p,\n+\t\terrorPool: *p,\n \t\tctx:       ctx,\n \t}\n }\ndiff --git a/pool/iter_test.go b/pool/iter_test.go\nnew file mode 100644\nindex 0000000..1e1f1a2\n--- /dev/null\n+++ b/pool/iter_test.go\n@@ -0,0 +1,76 @@\n+package pool\n+\n+import (\n+\t\"strconv\"\n+\t\"testing\"\n+\n+\t\"github.com/camdencheek/conc\"\n+)\n+\n+func BenchmarkForEachIdx(b *testing.B) {\n+\tb.Run(\"simple mutation\", func(b *testing.B) {\n+\t\tfor _, n := range []int{10, 1000, 1000000} {\n+\t\t\tarr := make([]int, n)\n+\t\t\tb.Run(strconv.Itoa(n), func(b *testing.B) {\n+\t\t\t\tb.Run(\"baseline\", func(b *testing.B) {\n+\t\t\t\t\tfor i := 0; i < b.N; i++ {\n+\t\t\t\t\t\tfor j := 0; j < len(arr); j++ {\n+\t\t\t\t\t\t\tarr[j] = j\n+\t\t\t\t\t\t}\n+\t\t\t\t\t}\n+\t\t\t\t})\n+\n+\t\t\t\tb.Run(\"parallel\", func(b *testing.B) {\n+\t\t\t\t\tfor i := 0; i < b.N; i++ {\n+\t\t\t\t\t\tForEachIdx(arr, func(i int, val *int) {\n+\t\t\t\t\t\t\t*val = i\n+\t\t\t\t\t\t})\n+\t\t\t\t\t}\n+\t\t\t\t})\n+\n+\t\t\t\tg := New()\n+\t\t\t\tb.Run(\"share group\", func(b *testing.B) {\n+\t\t\t\t\tfor i := 0; i < b.N; i++ {\n+\t\t\t\t\t\tconc.ForEachIdxIn(g, arr, func(i int, val *int) {\n+\t\t\t\t\t\t\t*val = i\n+\t\t\t\t\t\t})\n+\t\t\t\t\t}\n+\t\t\t\t})\n+\t\t\t})\n+\t\t}\n+\t})\n+}\n+\n+func BenchmarkForEach(b *testing.B) {\n+\tb.Run(\"simple mutation\", func(b *testing.B) {\n+\t\tfor _, n := range []int{10, 1000, 1000000} {\n+\t\t\tarr := make([]int, n)\n+\t\t\tb.Run(strconv.Itoa(n), func(b *testing.B) {\n+\t\t\t\tb.Run(\"baseline\", func(b *testing.B) {\n+\t\t\t\t\tfor i := 0; i < b.N; i++ {\n+\t\t\t\t\t\tfor j := 0; j < len(arr); j++ {\n+\t\t\t\t\t\t\tarr[j] = j\n+\t\t\t\t\t\t}\n+\t\t\t\t\t}\n+\t\t\t\t})\n+\n+\t\t\t\tb.Run(\"parallel\", func(b *testing.B) {\n+\t\t\t\t\tfor i := 0; i < b.N; i++ {\n+\t\t\t\t\t\tForEach(arr, func(val *int) {\n+\t\t\t\t\t\t\t*val = i\n+\t\t\t\t\t\t})\n+\t\t\t\t\t}\n+\t\t\t\t})\n+\n+\t\t\t\tg := New()\n+\t\t\t\tb.Run(\"share group\", func(b *testing.B) {\n+\t\t\t\t\tfor i := 0; i < b.N; i++ {\n+\t\t\t\t\t\tconc.ForEachIn(g, arr, func(val *int) {\n+\t\t\t\t\t\t\t*val = i\n+\t\t\t\t\t\t})\n+\t\t\t\t\t}\n+\t\t\t\t})\n+\t\t\t})\n+\t\t}\n+\t})\n+}\ndiff --git a/pool/pool.go b/pool/pool.go\nindex b2cd885..f6c843c 100644\n--- a/pool/pool.go\n+++ b/pool/pool.go\n@@ -47,13 +47,13 @@ func (p *Pool) WithMaxGoroutines(n int) *Pool {\n \n func (p *Pool) WithErrors() *ErrorPool {\n \treturn &ErrorPool{\n-\t\tPool: *p,\n+\t\tpool: *p,\n \t}\n }\n \n-func (p Pool) WithContext(ctx context.Context) *ContextPool {\n+func (p *Pool) WithContext(ctx context.Context) *ContextPool {\n \treturn &ContextPool{\n-\t\tErrorPool: *p.WithErrors(),\n+\t\terrorPool: *p.WithErrors(),\n \t\tctx:       ctx,\n \t}\n }\ndiff --git a/stream/stream.go b/stream/stream.go\nindex 9aeb7a0..90d24ff 100644\n--- a/stream/stream.go\n+++ b/stream/stream.go\n@@ -1,9 +1,10 @@\n package stream\n \n import (\n+\t\"sync\"\n+\n \t\"github.com/camdencheek/conc\"\n \t\"github.com/camdencheek/conc/pool\"\n-\t\"sync\"\n )\n \n func New() *Stream {\ndiff --git a/waitgroup_test.go b/waitgroup_test.go\nnew file mode 100644\nindex 0000000..5fec4dc\n--- /dev/null\n+++ b/waitgroup_test.go\n@@ -0,0 +1,56 @@\n+package conc\n+\n+import (\n+\t\"sync/atomic\"\n+\t\"testing\"\n+\n+\t\"github.com/stretchr/testify/require\"\n+)\n+\n+func TestWaitgroup(t *testing.T) {\n+\tt.Parallel()\n+\n+\tt.Run(\"all spawned run\", func(t *testing.T) {\n+\t\tvar count atomic.Int64\n+\t\tvar wg WaitGroup\n+\t\tfor i := 0; i < 100; i++ {\n+\t\t\twg.Go(func() {\n+\t\t\t\tcount.Add(1)\n+\t\t\t})\n+\t\t}\n+\t\twg.Wait()\n+\t\trequire.Equal(t, count.Load(), int64(100))\n+\t})\n+\n+\tt.Run(\"panic\", func(t *testing.T) {\n+\t\tt.Run(\"is propagated\", func(t *testing.T) {\n+\t\t\tvar wg WaitGroup\n+\t\t\twg.Go(func() {\n+\t\t\t\tpanic(\"super bad thing\")\n+\t\t\t})\n+\t\t\trequire.Panics(t, wg.Wait)\n+\t\t})\n+\n+\t\tt.Run(\"one is propagated\", func(t *testing.T) {\n+\t\t\tvar wg WaitGroup\n+\t\t\twg.Go(func() {\n+\t\t\t\tpanic(\"super bad thing\")\n+\t\t\t})\n+\t\t\twg.Go(func() {\n+\t\t\t\tpanic(\"super badder thing\")\n+\t\t\t})\n+\t\t\trequire.Panics(t, wg.Wait)\n+\t\t})\n+\n+\t\tt.Run(\"nonpanics do not overwrite panic\", func(t *testing.T) {\n+\t\t\tvar wg WaitGroup\n+\t\t\twg.Go(func() {\n+\t\t\t\tpanic(\"super bad thing\")\n+\t\t\t})\n+\t\t\tfor i := 0; i < 10; i++ {\n+\t\t\t\twg.Go(func() {})\n+\t\t\t}\n+\t\t\trequire.Panics(t, wg.Wait)\n+\t\t})\n+\t})\n+}\n",
+  "diffTruncated": false,
+  "tree": [
+    "LICENSE",
+    "go.mod",
+    "go.sum",
+    "group/context_group.go",
+    "group/context_group_test.go",
+    "group/error_group.go",
+    "group/error_group_test.go",
+    "group/group.go",
+    "group/group_test.go",
+    "group/iter.go",
+    "group/iter_test.go",
+    "group/result_context_group.go",
+    "group/result_context_group_test.go",
+    "group/result_error_group.go",
+    "group/result_error_group_test.go",
+    "group/result_group.go",
+    "group/result_group_test.go",
+    "iter.go",
+    "limiter.go",
+    "pool/context_pool.go",
+    "pool/error_pool.go",
+    "pool/iter.go",
+    "pool/iter_test.go",
+    "pool/pool.go",
+    "pool/result_context_pool.go",
+    "pool/result_error_pool.go",
+    "pool/result_pool.go",
+    "stream/stream.go",
+    "waitgroup.go",
+    "waitgroup_test.go"
+  ],
+  "explanation": {
+    "what": "iter.go の ForEachIdxIn にワーカー数の下限保証(未設定なら runtime.GOMAXPROCS(0)、入力より多ければ入力長に丸める)を追加し、NewLimiter(n) は n<1 のとき nil Limiter を返すよう変更した。group/pool 双方の iter ヘルパー(ForEachIdx・ForEach・Map・MapErr)は、内部で作った group/pool の Wait() を defer で確実に呼ぶよう修正。waitgroup_test.go・group/iter_test.go・pool/iter_test.go を新規追加し、panic 伝播や巨大入力に対するベンチマークも用意した。",
+    "why": "MaxGoroutines が未設定(ゼロ値)のままだと goroutine が1つも起動されず ForEachIdxIn がハングしていた不具合を、GOMAXPROCS へのフォールバックで解消したとみられる(おそらく)。また `MapErr` 内で `conc.MapErrIn(New(), ...)` と、defer で Wait すべき group とは別の New() を渡していたのは見た目上の不整合で、後続コミットで修正される前段階にあたる。",
+    "highlights": [
+      { "file": "iter.go", "note": "n==0 なら GOMAXPROCS、n>入力長なら入力長に丸めるワーカー数決定ロジック" },
+      { "file": "waitgroup_test.go", "note": "複数 panic が起きても最初の1つだけが伝播することを確認するテスト" },
+      { "file": "limiter.go", "note": "NewLimiter(n) が n<1 のとき nil を返すよう変更" }
+    ],
+    "langNotes": [
+      { "topic": "runtime.GOMAXPROCS(0)", "note": "GOMAXPROCS(0) は値を変更せず現在の設定(通常は論理CPU数)を取得するイディオム。並行処理ライブラリでデフォルトの並列度を決める際によく使われる。" },
+      { "topic": "-race フラグとの関係", "note": "waitgroup_test.go の panic 伝播テストは複数 goroutine が同時に panic した場合に1つだけが記録されることを検証しており、内部的には mutex 保護されたフィールドへの競合書き込みが起きうる箇所。`go test -race` で検出するデータ競合の典型的な対象になる。" }
+    ],
+    "diagram": null,
+    "evidence": "inferred",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

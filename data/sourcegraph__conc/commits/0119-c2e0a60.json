@@ -1,0 +1,80 @@
+{
+  "seq": 119,
+  "sha": "c2e0a60ae6cd62a32d33819fe72eb70dd0e934b7",
+  "parents": [
+    "77718332d4a01f20f26052e0e1c15e70b00dd4f8",
+    "91cf2ee3eea30672be8cbb8ef7deefe718b53f01"
+  ],
+  "author": {
+    "name": "Robert Lin",
+    "email": "robertlin1@gmail.com",
+    "date": "2023-01-17T07:58:31-08:00"
+  },
+  "message": "Merge pull request #71 from sourcegraph/panics-docstring\n\npanics: fix outdated reference to Recovered()",
+  "pr": {
+    "number": 71,
+    "title": "panics: fix outdated reference to Recovered()",
+    "body": "There is no longer a `.Value()` on `panics.Catcher`, presumably this is what `.Recovered()` used to be",
+    "url": "https://github.com/sourcegraph/conc/pull/71"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 1,
+    "deletions": 1
+  },
+  "files": [
+    {
+      "path": "panics/panics.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/panics/panics.go b/panics/panics.go\nindex 829a218..1486815 100644\n--- a/panics/panics.go\n+++ b/panics/panics.go\n@@ -10,7 +10,7 @@ import (\n // Catcher is used to catch panics. You can execute a function with Try,\n // which will catch any spawned panic. Try can be called any number of times,\n // from any number of goroutines. Once all calls to Try have completed, you can\n-// get the value of the first panic (if any) with Value(), or you can just\n+// get the value of the first panic (if any) with Recovered(), or you can just\n // propagate the panic (re-panic) with Repanic().\n type Catcher struct {\n \trecovered atomic.Pointer[RecoveredPanic]\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/go.yml",
+    ".golangci.yml",
+    "LICENSE",
+    "README.md",
+    "go.mod",
+    "go.sum",
+    "iter/iter.go",
+    "iter/iter_test.go",
+    "iter/map.go",
+    "iter/map_test.go",
+    "panics/panics.go",
+    "panics/panics_test.go",
+    "pool/context_pool.go",
+    "pool/context_pool_test.go",
+    "pool/error_pool.go",
+    "pool/error_pool_test.go",
+    "pool/pool.go",
+    "pool/pool_test.go",
+    "pool/result_context_pool.go",
+    "pool/result_context_pool_test.go",
+    "pool/result_error_pool.go",
+    "pool/result_error_pool_test.go",
+    "pool/result_pool.go",
+    "pool/result_pool_test.go",
+    "stream/stream.go",
+    "stream/stream_test.go",
+    "waitgroup.go",
+    "waitgroup_test.go"
+  ],
+  "explanation": {
+    "what": "panics.Catcher の docstring 内で、存在しない Value() メソッドへの言及を実際に存在する Recovered() に修正した。コードの変更はなくコメント1行のみの修正。",
+    "why": "PR本文の通り、panics.Catcher には .Value() というメソッドは既になく(過去のリネームで Recovered() に変わったと推測される)、docstring だけが追随していなかったための修正。",
+    "highlights": [],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [
+      { "type": "pr", "number": 71, "url": "https://github.com/sourcegraph/conc/pull/71" }
+    ],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

@@ -1,0 +1,78 @@
+{
+  "seq": 98,
+  "sha": "6e152f9f2875c602f891237e9e89c17ece26d5ac",
+  "parents": [
+    "916b1072bbabf5a6ab60691781d9b9ff56c40f32",
+    "e1071d50a7e051ec53518b8247342edfb6536d18"
+  ],
+  "author": {
+    "name": "Camden Cheek",
+    "email": "camden@ccheek.com",
+    "date": "2023-01-07T20:16:09-07:00"
+  },
+  "message": "Merge pull request #33 from XiaoConstantine/xiao/fix_example\n\ndoc: fix missing resource cleanup in README",
+  "pr": {
+    "number": 33,
+    "title": "doc: fix missing resource cleanup in README",
+    "body": "The `stdlib` example in demonstrate `iter.ForEach` missed cleanup `channel` afterwards",
+    "url": "https://github.com/sourcegraph/conc/pull/33"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 1,
+    "deletions": 1
+  },
+  "files": [
+    {
+      "path": "README.md",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/README.md b/README.md\nindex 6e0d8e7..6461137 100644\n--- a/README.md\n+++ b/README.md\n@@ -302,7 +302,7 @@ func process(values []int) {\n     for _, value := range values {\n         feeder <- value\n     }\n-\n+    close(feeder)\n     wg.Wait()\n }\n ```\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/go.yml",
+    ".golangci.yml",
+    "LICENSE",
+    "README.md",
+    "go.mod",
+    "go.sum",
+    "iter/iter.go",
+    "iter/iter_test.go",
+    "panic.go",
+    "panic_test.go",
+    "pool/context_pool.go",
+    "pool/context_pool_test.go",
+    "pool/error_pool.go",
+    "pool/error_pool_test.go",
+    "pool/pool.go",
+    "pool/pool_test.go",
+    "pool/result_context_pool.go",
+    "pool/result_context_pool_test.go",
+    "pool/result_error_pool.go",
+    "pool/result_error_pool_test.go",
+    "pool/result_pool.go",
+    "pool/result_pool_test.go",
+    "stream/stream.go",
+    "stream/stream_test.go",
+    "waitgroup.go",
+    "waitgroup_test.go"
+  ],
+  "explanation": {
+    "what": "README.md の iter.ForEach を使った stdlib 比較例で、feeder チャネルへの送信ループの後に close(feeder) を追加した。",
+    "why": "PR本文の通り、この README の例は feeder チャネルを閉じ忘れており、受信側の goroutine がチャネルクローズを待って終了する設計であればリソースリークや処理の停止につながりうる。サンプルコードとしての正しさを保つための修正。",
+    "highlights": [
+      { "file": "README.md", "note": "feeder への送信後に close(feeder) を追加しただけの1行差分" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [{ "type": "pr", "number": 33, "url": "https://github.com/sourcegraph/conc/pull/33" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

@@ -1,0 +1,95 @@
+{
+  "seq": 26,
+  "sha": "825d77a427dd86781f2ad2016148c3821eb97286",
+  "parents": [
+    "3abf4ab233c3dfddd68aa84b13270ca20140b322"
+  ],
+  "author": {
+    "name": "Camden Cheek",
+    "email": "camden@ccheek.com",
+    "date": "2022-12-24T19:09:10-07:00"
+  },
+  "message": "simplify panic code a bit",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 20,
+    "deletions": 9
+  },
+  "files": [
+    {
+      "path": "panic.go",
+      "status": "M",
+      "additions": 19,
+      "deletions": 6,
+      "binary": false
+    },
+    {
+      "path": "waitgroup.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 3,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/panic.go b/panic.go\nindex 1ff3d46..9b1cebd 100644\n--- a/panic.go\n+++ b/panic.go\n@@ -7,6 +7,11 @@ import (\n \t\"sync/atomic\"\n )\n \n+// PanicCatcher is used to catch panics. You can execute a function with Try,\n+// which will catch any spawned panic. Try can be called any number of times,\n+// from any number of goroutines. Once all calls to Try have completed, you can\n+// get the value of the first panic (if any) with Value(), or you can just\n+// propagate the panic (re-panic) with Propagate()\n type PanicCatcher struct {\n \tcaught atomic.Value\n }\n@@ -29,15 +34,16 @@ func (p *PanicCatcher) Try(f func()) {\n }\n \n // Propagate panics if any calls to Try caught a panic. It will\n-// panic with the value of the first panic caught.\n+// panic with the value of the first panic caught, wrapped with\n+// caller information.\n func (p *PanicCatcher) Propagate() {\n-\tif p.caught.Load() != nil {\n-\t\tpanic(p.caught)\n+\tif val := p.Value(); val != nil {\n+\t\tpanic(val)\n \t}\n }\n \n // Value returns the value of the first panic caught by Try, or nil if\n-// no calls to Try panicked\n+// no calls to Try panicked.\n func (p *PanicCatcher) Value() *CaughtPanic {\n \tval := p.caught.Load()\n \tif val == nil {\n@@ -46,10 +52,17 @@ func (p *PanicCatcher) Value() *CaughtPanic {\n \treturn val.(*CaughtPanic)\n }\n \n+// CaughtPanic is a panic that was caught with recover().\n type CaughtPanic struct {\n-\tValue   any\n+\t// The original value of the panic\n+\tValue any\n+\t// The caller list as returned by runtime.Callers when the panic was\n+\t// recovered. Can be used to produce a more detailed stack information with\n+\t// runtime.CallersFrames.\n \tCallers []uintptr\n-\tStack   []byte\n+\t// The formatted stacktrace from the goroutine where the panic was recovered.\n+\t// Easier to use than Callers.\n+\tStack []byte\n }\n \n func (c *CaughtPanic) Error() string {\ndiff --git a/waitgroup.go b/waitgroup.go\nindex c246076..5c9ed8f 100644\n--- a/waitgroup.go\n+++ b/waitgroup.go\n@@ -29,9 +29,7 @@ func (h *WaitGroup) Wait() {\n \th.wg.Wait()\n \n \t// Propagate a panic if we caught one from a child goroutine\n-\tif r := h.pc.Value(); r != nil {\n-\t\tpanic(r.Value)\n-\t}\n+\th.pc.Propagate()\n }\n \n // done should be called in a defer statement in a child goroutine.\n",
+  "diffTruncated": false,
+  "tree": [
+    "LICENSE",
+    "go.mod",
+    "go.sum",
+    "group/context_group.go",
+    "group/context_group_test.go",
+    "group/error_group.go",
+    "group/error_group_test.go",
+    "group/group.go",
+    "group/group_test.go",
+    "group/iter.go",
+    "group/iter_test.go",
+    "group/result_context_group.go",
+    "group/result_context_group_test.go",
+    "group/result_error_group.go",
+    "group/result_error_group_test.go",
+    "group/result_group.go",
+    "group/result_group_test.go",
+    "iter.go",
+    "limiter.go",
+    "panic.go",
+    "pool/context_pool.go",
+    "pool/context_pool_test.go",
+    "pool/error_pool.go",
+    "pool/error_pool_test.go",
+    "pool/iter.go",
+    "pool/iter_test.go",
+    "pool/pool.go",
+    "pool/pool_test.go",
+    "pool/result_context_pool.go",
+    "pool/result_context_pool_test.go",
+    "pool/result_error_pool.go",
+    "pool/result_error_pool_test.go",
+    "pool/result_pool.go",
+    "pool/result_pool_test.go",
+    "stream/stream.go",
+    "stream/stream_test.go",
+    "waitgroup.go",
+    "waitgroup_test.go"
+  ],
+  "explanation": {
+    "what": "PanicCatcher、CaughtPanic の各フィールド・メソッドに doc コメントを追加。Propagate() の実装を `p.caught.Load()` の直接判定から `p.Value()` を呼んで nil チェックする形に変更(Value() のキャスト処理を再利用)。WaitGroup.Wait() 内の panic 再送出も、手動の `if r := h.pc.Value(); r != nil { panic(r.Value) }` から `h.pc.Propagate()` の呼び出し1行に置き換えた。",
+    "why": "直前のコミットで CaughtPanic 型と Value()/Propagate() を整備した結果、Propagate() 自身が Value() の重複ロジック(型アサーション)を抱えていたのを解消し、WaitGroup 側も自前でpanicを組み立てず PanicCatcher に完全に委譲する形にして、panic捕捉から再送出までの処理を一箇所(PanicCatcher)に集約している。",
+    "highlights": [
+      { "file": "panic.go", "note": "Propagate() が Value() 経由になり型アサーションの重複が解消された" },
+      { "file": "waitgroup.go", "note": "Wait() が h.pc.Propagate() の1行に簡略化" }
+    ],
+    "langNotes": [],
+    "diagram": {
+      "mermaid": "flowchart TD\n  A[\"goroutine内でpanic発生\"] --> B[\"PanicCatcher.Try(f)のdeferでrecover\"]\n  B --> C[\"runtime.Callers + debug.Stack()でスタック情報を取得\"]\n  C --> D[\"CaughtPanicとしてatomic.Valueに格納(CompareAndSwapで最初の1件のみ)\"]\n  D --> E[\"WaitGroup.Wait()がpc.Propagate()を呼ぶ\"]\n  E --> F[\"CaughtPanic.Valueで再panic(呼び出し元に伝播)\"]",
+      "caption": "panic捕捉から再送出までの流れ(PanicCatcher経由)"
+    },
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

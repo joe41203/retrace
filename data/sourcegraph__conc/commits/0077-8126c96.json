@@ -1,0 +1,85 @@
+{
+  "seq": 77,
+  "sha": "8126c968bc3328297ebadcbdc82b584ce9a896f2",
+  "parents": [
+    "3919e527cd0f3862b58b3c714e4044bbb3fc134a",
+    "719d23569ccdf2cbeb6dad239e89d7cc337bb9b4"
+  ],
+  "author": {
+    "name": "Camden Cheek",
+    "email": "camden@ccheek.com",
+    "date": "2023-01-03T10:07:04-07:00"
+  },
+  "message": "Merge pull request #9 from sourcegraph/cc/appease-linters\n\nappease golangci-lint",
+  "pr": {
+    "number": 9,
+    "title": "appease golangci-lint",
+    "body": "Just fixes some unchecked errors and removes an unused method. ",
+    "url": "https://github.com/sourcegraph/conc/pull/9"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 7,
+    "deletions": 7
+  },
+  "files": [
+    {
+      "path": "iter/iter_test.go",
+      "status": "M",
+      "additions": 7,
+      "deletions": 3,
+      "binary": false
+    },
+    {
+      "path": "pool/pool.go",
+      "status": "M",
+      "additions": 0,
+      "deletions": 4,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/iter/iter_test.go b/iter/iter_test.go\nindex de2820a..227a901 100644\n--- a/iter/iter_test.go\n+++ b/iter/iter_test.go\n@@ -156,9 +156,11 @@ func TestMapErr(t *testing.T) {\n \tt.Run(\"empty\", func(t *testing.T) {\n \t\tf := func() {\n \t\t\tints := []int{}\n-\t\t\tMapErr(ints, func(val *int) (int, error) {\n+\t\t\tres, err := MapErr(ints, func(val *int) (int, error) {\n \t\t\t\tpanic(\"this should never be called\")\n \t\t\t})\n+\t\t\trequire.NoError(t, err)\n+\t\t\trequire.Equal(t, ints, res)\n \t\t}\n \t\trequire.NotPanics(t, f)\n \t})\n@@ -166,7 +168,7 @@ func TestMapErr(t *testing.T) {\n \tt.Run(\"panic is propagated\", func(t *testing.T) {\n \t\tf := func() {\n \t\t\tints := []int{1}\n-\t\t\tMapErr(ints, func(val *int) (int, error) {\n+\t\t\t_, _ = MapErr(ints, func(val *int) (int, error) {\n \t\t\t\tpanic(\"super bad thing happened\")\n \t\t\t})\n \t\t}\n@@ -175,11 +177,13 @@ func TestMapErr(t *testing.T) {\n \n \tt.Run(\"mutating inputs is fine, though not recommended\", func(t *testing.T) {\n \t\tints := []int{1, 2, 3, 4, 5}\n-\t\tMapErr(ints, func(val *int) (int, error) {\n+\t\tres, err := MapErr(ints, func(val *int) (int, error) {\n \t\t\t*val += 1\n \t\t\treturn 0, nil\n \t\t})\n+\t\trequire.NoError(t, err)\n \t\trequire.Equal(t, []int{2, 3, 4, 5, 6}, ints)\n+\t\trequire.Equal(t, []int{0, 0, 0, 0, 0}, res)\n \t})\n \n \tt.Run(\"basic increment\", func(t *testing.T) {\ndiff --git a/pool/pool.go b/pool/pool.go\nindex 3835627..b201ac0 100644\n--- a/pool/pool.go\n+++ b/pool/pool.go\n@@ -133,10 +133,6 @@ func (l limiter) limit() int {\n \treturn cap(l)\n }\n \n-func (l limiter) acquire() {\n-\tl <- struct{}{}\n-}\n-\n func (l limiter) release() {\n \t<-l\n }\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/go.yml",
+    "LICENSE",
+    "README.md",
+    "go.mod",
+    "go.sum",
+    "iter/iter.go",
+    "iter/iter_test.go",
+    "panic.go",
+    "panic_test.go",
+    "pool/context_pool.go",
+    "pool/context_pool_test.go",
+    "pool/error_pool.go",
+    "pool/error_pool_test.go",
+    "pool/pool.go",
+    "pool/pool_test.go",
+    "pool/result_context_pool.go",
+    "pool/result_context_pool_test.go",
+    "pool/result_error_pool.go",
+    "pool/result_error_pool_test.go",
+    "pool/result_pool.go",
+    "pool/result_pool_test.go",
+    "stream/stream.go",
+    "stream/stream_test.go",
+    "waitgroup.go",
+    "waitgroup_test.go"
+  ],
+  "explanation": {
+    "what": "iter パッケージのテストで MapErr の戻り値(結果とエラー)を無視していた箇所に `_, _ =` や変数受け取りを追加してチェック漏れを解消し、あわせてテストの意図(戻り値が空スライスになる・エラーがないこと)も明示的に検証するようにした。また pool.go から未使用の `limiter.acquire()` メソッドを削除した。",
+    "why": "PR body の通り、golangci-lint(おそらく errcheck や unused ルール)が指摘していた「戻り値のチェック漏れ」と「未使用メソッド」を解消するための対応。",
+    "highlights": [
+      { "file": "iter/iter_test.go", "note": "MapErr の戻り値を明示的に受け取り、require で検証" },
+      { "file": "pool/pool.go", "note": "未使用の limiter.acquire() を削除" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [{ "type": "pr", "number": 9, "url": "https://github.com/sourcegraph/conc/pull/9" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

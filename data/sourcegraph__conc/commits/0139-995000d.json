@@ -1,0 +1,106 @@
+{
+  "seq": 139,
+  "sha": "995000de22b50c624ad56b313bbe5ce200fac4f6",
+  "parents": [
+    "8e5ba59e78214e2d8d3ea2c78ef6cf2693bedaa8"
+  ],
+  "author": {
+    "name": "Camden Cheek",
+    "email": "camden@ccheek.com",
+    "date": "2023-06-01T15:50:57-06:00"
+  },
+  "message": "Add `WithFailFast()` (#118)\n\nIn https://github.com/sourcegraph/conc/pull/104, a \"FailFast\" option is\r\nlikely going to be added to iterators that, on error, stops running\r\nadditional tasks and returns the error that caused the first failure.\r\n\r\n\"FailFast\" seems is a pretty standard description for this behavior, and\r\ncombining two common options into a single option with a more\r\ndiscoverable name seems like a nice thing to do before 1.0.",
+  "pr": {
+    "number": 118,
+    "title": "Add `WithFailFast()`",
+    "body": "In https://github.com/sourcegraph/conc/pull/104, a \"FailFast\" option is likely going to be added to iterators that, on error, stops running additional tasks and returns the error that caused the first failure. \r\n\r\n\"FailFast\" seems is a pretty standard description for this behavior, and combining two common options into a single option with a more discoverable name seems like a nice thing to do before 1.0.",
+    "url": "https://github.com/sourcegraph/conc/pull/118"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 4,
+    "additions": 37,
+    "deletions": 2
+  },
+  "files": [
+    {
+      "path": "pool/context_pool.go",
+      "status": "M",
+      "additions": 10,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "pool/context_pool_test.go",
+      "status": "M",
+      "additions": 2,
+      "deletions": 2,
+      "binary": false
+    },
+    {
+      "path": "pool/result_context_pool.go",
+      "status": "M",
+      "additions": 9,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "pool/result_context_pool_test.go",
+      "status": "M",
+      "additions": 16,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/pool/context_pool.go b/pool/context_pool.go\nindex b2d7f8a..85c34e5 100644\n--- a/pool/context_pool.go\n+++ b/pool/context_pool.go\n@@ -81,6 +81,16 @@ func (p *ContextPool) WithCancelOnError() *ContextPool {\n \treturn p\n }\n \n+// WithFailFast is an alias for the combination of WithFirstError and\n+// WithCancelOnError. By default, the errors from all tasks are returned and\n+// the pool's context is not canceled until the parent context is canceled.\n+func (p *ContextPool) WithFailFast() *ContextPool {\n+\tp.panicIfInitialized()\n+\tp.WithFirstError()\n+\tp.WithCancelOnError()\n+\treturn p\n+}\n+\n // WithMaxGoroutines limits the number of goroutines in a pool.\n // Defaults to unlimited. Panics if n < 1.\n func (p *ContextPool) WithMaxGoroutines(n int) *ContextPool {\ndiff --git a/pool/context_pool_test.go b/pool/context_pool_test.go\nindex 326e481..f9254b9 100644\n--- a/pool/context_pool_test.go\n+++ b/pool/context_pool_test.go\n@@ -187,9 +187,9 @@ func TestContextPool(t *testing.T) {\n \t\trequire.NotErrorIs(t, err, err2)\n \t})\n \n-\tt.Run(\"WithFirstError and WithCancelOnError\", func(t *testing.T) {\n+\tt.Run(\"WithFailFast\", func(t *testing.T) {\n \t\tt.Parallel()\n-\t\tp := New().WithContext(bgctx).WithFirstError().WithCancelOnError()\n+\t\tp := New().WithContext(bgctx).WithFailFast()\n \t\tp.Go(func(ctx context.Context) error {\n \t\t\treturn err1\n \t\t})\ndiff --git a/pool/result_context_pool.go b/pool/result_context_pool.go\nindex 55dc3bc..9cac635 100644\n--- a/pool/result_context_pool.go\n+++ b/pool/result_context_pool.go\n@@ -62,6 +62,15 @@ func (p *ResultContextPool[T]) WithCancelOnError() *ResultContextPool[T] {\n \treturn p\n }\n \n+// WithFailFast is an alias for the combination of WithFirstError and\n+// WithCancelOnError. By default, the errors from all tasks are returned and\n+// the pool's context is not canceled until the parent context is canceled.\n+func (p *ResultContextPool[T]) WithFailFast() *ResultContextPool[T] {\n+\tp.panicIfInitialized()\n+\tp.contextPool.WithFailFast()\n+\treturn p\n+}\n+\n // WithMaxGoroutines limits the number of goroutines in a pool.\n // Defaults to unlimited. Panics if n < 1.\n func (p *ResultContextPool[T]) WithMaxGoroutines(n int) *ResultContextPool[T] {\ndiff --git a/pool/result_context_pool_test.go b/pool/result_context_pool_test.go\nindex a116d93..ad74b20 100644\n--- a/pool/result_context_pool_test.go\n+++ b/pool/result_context_pool_test.go\n@@ -101,6 +101,22 @@ func TestResultContextPool(t *testing.T) {\n \t\trequire.ErrorIs(t, err, err1)\n \t})\n \n+\tt.Run(\"WithFailFast\", func(t *testing.T) {\n+\t\tt.Parallel()\n+\t\tp := NewWithResults[int]().WithContext(context.Background()).WithFailFast()\n+\t\tp.Go(func(ctx context.Context) (int, error) {\n+\t\t\treturn 0, err1\n+\t\t})\n+\t\tp.Go(func(ctx context.Context) (int, error) {\n+\t\t\t<-ctx.Done()\n+\t\t\treturn 1, ctx.Err()\n+\t\t})\n+\t\tresults, err := p.Wait()\n+\t\trequire.ErrorIs(t, err, err1)\n+\t\trequire.NotErrorIs(t, err, context.Canceled)\n+\t\trequire.Empty(t, results)\n+\t})\n+\n \tt.Run(\"WithCancelOnError and panic\", func(t *testing.T) {\n \t\tt.Parallel()\n \t\tp := NewWithResults[int]().\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/go.yml",
+    ".golangci.yml",
+    "LICENSE",
+    "README.md",
+    "go.mod",
+    "go.sum",
+    "internal/multierror/multierror_go119.go",
+    "internal/multierror/multierror_go120.go",
+    "iter/iter.go",
+    "iter/iter_test.go",
+    "iter/map.go",
+    "iter/map_test.go",
+    "panics/panics.go",
+    "panics/panics_test.go",
+    "panics/try.go",
+    "panics/try_test.go",
+    "pool/context_pool.go",
+    "pool/context_pool_test.go",
+    "pool/error_pool.go",
+    "pool/error_pool_test.go",
+    "pool/pool.go",
+    "pool/pool_test.go",
+    "pool/result_context_pool.go",
+    "pool/result_context_pool_test.go",
+    "pool/result_error_pool.go",
+    "pool/result_error_pool_test.go",
+    "pool/result_pool.go",
+    "pool/result_pool_test.go",
+    "stream/stream.go",
+    "stream/stream_test.go",
+    "waitgroup.go",
+    "waitgroup_test.go"
+  ],
+  "explanation": {
+    "what": "ContextPool と ResultContextPool に `WithFailFast()` メソッドを追加した。中身は `WithFirstError()` と `WithCancelOnError()` を組み合わせて呼ぶだけのエイリアス。既存テストの \"WithFirstError and WithCancelOnError\" は \"WithFailFast\" に置き換えられ、ResultContextPool 側にも同種のテストを新設した。",
+    "why": "PR本文によると、#104 で iterator 側にエラー時に以降のタスクを止めて最初のエラーを返す \"FailFast\" オプションが追加される見込みであり、それに先立って pool 側でも「最初のエラーで打ち切り、そのエラーを返す」という2つの既存オプションの組み合わせに、より発見しやすい名前を付けて 1.0 リリース前に整理しておく狙いがあった。",
+    "highlights": [
+      { "file": "pool/context_pool.go", "note": "WithFirstError+WithCancelOnError を束ねる WithFailFast の追加" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [
+      { "type": "pr", "number": 118, "url": "https://github.com/sourcegraph/conc/pull/118" }
+    ],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

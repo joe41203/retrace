@@ -1,0 +1,76 @@
+{
+  "seq": 126,
+  "sha": "90aae322b299f917c75515b1393d094bb225b47b",
+  "parents": [
+    "8be2d19adeb8fc65d6241a72f69f3bba27108485"
+  ],
+  "author": {
+    "name": "Luenci",
+    "email": "sheng.lu@yo-star.com",
+    "date": "2023-01-30T16:21:53+08:00"
+  },
+  "message": "add WaitAndRecover Example",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 15,
+    "deletions": 2
+  },
+  "files": [
+    {
+      "path": "waitgroup_test.go",
+      "status": "M",
+      "additions": 15,
+      "deletions": 2,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/waitgroup_test.go b/waitgroup_test.go\nindex 331cff5..1cc808b 100644\n--- a/waitgroup_test.go\n+++ b/waitgroup_test.go\n@@ -24,6 +24,19 @@ func ExampleWaitGroup() {\n \t// 10\n }\n \n+func ExampleWaitGroup_WaitAndRecover() {\n+\tvar wg WaitGroup\n+\n+\twg.Go(func() {\n+\t\tpanic(\"super bad thing\")\n+\t})\n+\n+\trecoveredPanic := wg.WaitAndRecover()\n+\tfmt.Println(recoveredPanic.Value)\n+\t// Output:\n+\t// super bad thing\n+}\n+\n func TestWaitGroup(t *testing.T) {\n \tt.Parallel()\n \n@@ -70,7 +83,7 @@ func TestWaitGroup(t *testing.T) {\n \t\t\trequire.Panics(t, wg.Wait)\n \t\t})\n \n-\t\tt.Run(\"nonpanics do not overwrite panic\", func(t *testing.T) {\n+\t\tt.Run(\"non-panics do not overwrite panic\", func(t *testing.T) {\n \t\t\tt.Parallel()\n \t\t\tvar wg WaitGroup\n \t\t\twg.Go(func() {\n@@ -82,7 +95,7 @@ func TestWaitGroup(t *testing.T) {\n \t\t\trequire.Panics(t, wg.Wait)\n \t\t})\n \n-\t\tt.Run(\"nonpanics run successfully\", func(t *testing.T) {\n+\t\tt.Run(\"non-panics run successfully\", func(t *testing.T) {\n \t\t\tt.Parallel()\n \t\t\tvar wg WaitGroup\n \t\t\tvar i atomic.Int64\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/go.yml",
+    ".golangci.yml",
+    "LICENSE",
+    "README.md",
+    "go.mod",
+    "go.sum",
+    "iter/iter.go",
+    "iter/iter_test.go",
+    "iter/map.go",
+    "iter/map_test.go",
+    "panics/panics.go",
+    "panics/panics_test.go",
+    "panics/try.go",
+    "panics/try_test.go",
+    "pool/context_pool.go",
+    "pool/context_pool_test.go",
+    "pool/error_pool.go",
+    "pool/error_pool_test.go",
+    "pool/pool.go",
+    "pool/pool_test.go",
+    "pool/result_context_pool.go",
+    "pool/result_context_pool_test.go",
+    "pool/result_error_pool.go",
+    "pool/result_error_pool_test.go",
+    "pool/result_pool.go",
+    "pool/result_pool_test.go",
+    "stream/stream.go",
+    "stream/stream_test.go",
+    "waitgroup.go",
+    "waitgroup_test.go"
+  ],
+  "explanation": {
+    "what": "waitgroup_test.go に ExampleWaitGroup_WaitAndRecover を追加した。wg.Go でパニックするタスクを1つ登録し、wg.WaitAndRecover() の戻り値(RecoveredPanic)の Value フィールドを出力する例になっている。あわせて既存テストの \"nonpanics\" という表記を \"non-panics\" にハイフン付きへ修正している。",
+    "why": "コミットメッセージの通り、WaitAndRecover の使い方を示す godoc の Example を追加することが目的。パニックを Wait() のように再送出するのではなく、RecoveredPanic として受け取って自前でハンドリングしたい場合の使用例を godoc 上で示している。",
+    "highlights": [
+      { "file": "waitgroup_test.go", "note": "ExampleWaitGroup_WaitAndRecover — panicしたタスクの戻り値をRecoveredPanic.Valueとして取得する例" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

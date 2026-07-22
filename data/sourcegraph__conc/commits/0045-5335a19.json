@@ -1,0 +1,70 @@
+{
+  "seq": 45,
+  "sha": "5335a19a5e9164e0dd3def32a1c3bbef0c44a6ef",
+  "parents": [
+    "416cad34c0be7fa4c282cf17b6690875ec18082b"
+  ],
+  "author": {
+    "name": "Camden Cheek",
+    "email": "camden@ccheek.com",
+    "date": "2023-01-02T12:21:53-07:00"
+  },
+  "message": "simplify WaitGroup done",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 1,
+    "deletions": 7
+  },
+  "files": [
+    {
+      "path": "waitgroup.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 7,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/waitgroup.go b/waitgroup.go\nindex 2306877..d2a8f91 100644\n--- a/waitgroup.go\n+++ b/waitgroup.go\n@@ -18,7 +18,7 @@ type WaitGroup struct {\n func (h *WaitGroup) Go(f func()) {\n \th.wg.Add(1)\n \tgo func() {\n-\t\tdefer h.done()\n+\t\tdefer h.wg.Done()\n \t\th.pc.Try(f)\n \t}()\n }\n@@ -31,9 +31,3 @@ func (h *WaitGroup) Wait() {\n \t// Propagate a panic if we caught one from a child goroutine\n \th.pc.Repanic()\n }\n-\n-// done should be called in a defer statement in a child goroutine.\n-// It catches any panics and decrements the counter.\n-func (h *WaitGroup) done() {\n-\th.wg.Done()\n-}\n",
+  "diffTruncated": false,
+  "tree": [
+    "LICENSE",
+    "go.mod",
+    "go.sum",
+    "iter/iter.go",
+    "iter/iter_test.go",
+    "limiter.go",
+    "panic.go",
+    "panic_test.go",
+    "pool/context_pool.go",
+    "pool/context_pool_test.go",
+    "pool/error_pool.go",
+    "pool/error_pool_test.go",
+    "pool/pool.go",
+    "pool/pool_test.go",
+    "pool/result_context_pool.go",
+    "pool/result_context_pool_test.go",
+    "pool/result_error_pool.go",
+    "pool/result_error_pool_test.go",
+    "pool/result_pool.go",
+    "pool/result_pool_test.go",
+    "stream/stream.go",
+    "stream/stream_test.go",
+    "waitgroup.go",
+    "waitgroup_test.go"
+  ],
+  "explanation": {
+    "what": "WaitGroup.Go 内で呼んでいた非公開ヘルパー done() を削除し、defer h.wg.Done() を直接呼ぶように書き換えた。done() は sync.WaitGroup の Done を呼ぶだけの1行ラッパーだった。",
+    "why": "コミットメッセージ通り、単なる薄いラッパーメソッドを削除してコードを簡潔にする整理。done() のドキュメントコメントには panic 捕捉についての記述もあったが、実際の panic 捕捉は既に PanicCatcher(h.pc.Try)側が担っており、done() 自体はカウンタ減算しかしていなかったため、直接呼び出しに置き換えても挙動は変わらない。",
+    "highlights": [
+      { "file": "waitgroup.go", "note": "defer h.done() → defer h.wg.Done() へ。done() 定義ごと削除" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

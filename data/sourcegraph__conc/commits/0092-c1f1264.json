@@ -1,0 +1,79 @@
+{
+  "seq": 92,
+  "sha": "c1f12645a920fbaa55ea63275bd9d0efb21967ef",
+  "parents": [
+    "d2e8f281d59afd74fe74147af8531ce628ef23aa",
+    "83c48610d74025a4847754d8dec5956d61d893d4"
+  ],
+  "author": {
+    "name": "Camden Cheek",
+    "email": "camden@ccheek.com",
+    "date": "2023-01-07T14:14:54-07:00"
+  },
+  "message": "Merge pull request #26 from sashamelentyev/testrace\n\nAdd race flag to tests",
+  "pr": {
+    "number": 26,
+    "title": "Add race",
+    "body": "",
+    "url": "https://github.com/sourcegraph/conc/pull/26"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 1,
+    "deletions": 1
+  },
+  "files": [
+    {
+      "path": ".github/workflows/go.yml",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/.github/workflows/go.yml b/.github/workflows/go.yml\nindex 667fda2..411db25 100644\n--- a/.github/workflows/go.yml\n+++ b/.github/workflows/go.yml\n@@ -25,7 +25,7 @@ jobs:\n       run: go build -v ./...\n \n     - name: Test\n-      run: go test -v ./... -coverprofile ./coverage.txt\n+      run: go test -race -v ./... -coverprofile ./coverage.txt\n \n     - name: Codecov\n       uses: codecov/codecov-action@v3.1.1\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/go.yml",
+    "LICENSE",
+    "README.md",
+    "go.mod",
+    "go.sum",
+    "iter/iter.go",
+    "iter/iter_test.go",
+    "panic.go",
+    "panic_test.go",
+    "pool/context_pool.go",
+    "pool/context_pool_test.go",
+    "pool/error_pool.go",
+    "pool/error_pool_test.go",
+    "pool/pool.go",
+    "pool/pool_test.go",
+    "pool/result_context_pool.go",
+    "pool/result_context_pool_test.go",
+    "pool/result_error_pool.go",
+    "pool/result_error_pool_test.go",
+    "pool/result_pool.go",
+    "pool/result_pool_test.go",
+    "stream/stream.go",
+    "stream/stream_test.go",
+    "waitgroup.go",
+    "waitgroup_test.go"
+  ],
+  "explanation": {
+    "what": "CI ワークフロー(.github/workflows/go.yml)のテスト実行コマンドに -race フラグを追加し、go test -v ./... -coverprofile ./coverage.txt を go test -race -v ./... -coverprofile ./coverage.txt に変更した。",
+    "why": "PR本文に詳細な説明はないが、conc は goroutine を用いた並行処理ライブラリであり、データ競合はまさにこのライブラリが対象とするバグの種類にあたる。CI で -race を常時有効にすることで、テストが並行処理の不具合を検出しやすくなる。",
+    "highlights": [
+      { "file": ".github/workflows/go.yml", "note": "go test コマンドに -race を追加した1行だけの変更" }
+    ],
+    "langNotes": [
+      { "topic": "go test -race", "note": "Go の Race Detector を有効にするフラグ。実行時に goroutine 間の同期されていないメモリアクセスを検出する。並行処理ライブラリのテストでは事実上必須の設定。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [{ "type": "pr", "number": 26, "url": "https://github.com/sourcegraph/conc/pull/26" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

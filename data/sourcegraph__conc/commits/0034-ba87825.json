@@ -1,0 +1,80 @@
+{
+  "seq": 34,
+  "sha": "ba878256583a27245ee44f6a559e60489294ca0c",
+  "parents": [
+    "b1a227a23a104b0b49f74c78377aaa6db0a3a929"
+  ],
+  "author": {
+    "name": "Camden Cheek",
+    "email": "camden@ccheek.com",
+    "date": "2022-12-24T22:24:51-07:00"
+  },
+  "message": "add PanicCatcher example",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 24,
+    "deletions": 4
+  },
+  "files": [
+    {
+      "path": "panic.go",
+      "status": "M",
+      "additions": 4,
+      "deletions": 4,
+      "binary": false
+    },
+    {
+      "path": "panic_test.go",
+      "status": "A",
+      "additions": 20,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/panic.go b/panic.go\nindex 6df3f52..2d525f4 100644\n--- a/panic.go\n+++ b/panic.go\n@@ -21,7 +21,7 @@ type PanicCatcher struct {\n func (p *PanicCatcher) Try(f func()) {\n \tdefer func() {\n \t\tif val := recover(); val != nil {\n-\t\t\tvar callers [32]uintptr\n+\t\t\tvar callers [64]uintptr\n \t\t\tn := runtime.Callers(1, callers[:])\n \t\t\tp.recovered.CompareAndSwap(nil, &RecoveredPanic{\n \t\t\t\tValue:   val,\n@@ -37,14 +37,14 @@ func (p *PanicCatcher) Try(f func()) {\n // panic with the value of the first panic caught, wrapped with\n // caller information.\n func (p *PanicCatcher) Propagate() {\n-\tif val := p.Value(); val != nil {\n+\tif val := p.Recovered(); val != nil {\n \t\tpanic(val)\n \t}\n }\n \n-// Value returns the value of the first panic caught by Try, or nil if\n+// Recovered returns the value of the first panic caught by Try, or nil if\n // no calls to Try panicked.\n-func (p *PanicCatcher) Value() *RecoveredPanic {\n+func (p *PanicCatcher) Recovered() *RecoveredPanic {\n \treturn p.recovered.Load()\n }\n \ndiff --git a/panic_test.go b/panic_test.go\nnew file mode 100644\nindex 0000000..1caa27e\n--- /dev/null\n+++ b/panic_test.go\n@@ -0,0 +1,20 @@\n+package conc\n+\n+import \"fmt\"\n+\n+func ExamplePanicCatcher() {\n+\tvar pc PanicCatcher\n+\ti := 0\n+\tpc.Try(func() { i += 1 })\n+\tpc.Try(func() { panic(\"abort!\") })\n+\tpc.Try(func() { i += 1 })\n+\n+\trc := pc.Recovered()\n+\n+\tfmt.Println(i)\n+\tfmt.Println(rc.Value.(string))\n+\n+\t// Output:\n+\t// 2\n+\t// abort!\n+}\n",
+  "diffTruncated": false,
+  "tree": [
+    "LICENSE",
+    "go.mod",
+    "go.sum",
+    "iter.go",
+    "limiter.go",
+    "panic.go",
+    "panic_test.go",
+    "pool/context_pool.go",
+    "pool/context_pool_test.go",
+    "pool/error_pool.go",
+    "pool/error_pool_test.go",
+    "pool/iter.go",
+    "pool/iter_test.go",
+    "pool/pool.go",
+    "pool/pool_test.go",
+    "pool/result_context_pool.go",
+    "pool/result_context_pool_test.go",
+    "pool/result_error_pool.go",
+    "pool/result_error_pool_test.go",
+    "pool/result_pool.go",
+    "pool/result_pool_test.go",
+    "stream/stream.go",
+    "stream/stream_test.go",
+    "waitgroup.go",
+    "waitgroup_test.go"
+  ],
+  "explanation": {
+    "what": "panic.go の Value() メソッドを Recovered() にリネームし、Propagate() 内の呼び出しも追従させた。スタックトレース収集用の callers 配列を [32]uintptr から [64]uintptr に拡大した。新規ファイル panic_test.go に ExamplePanicCatcher という Example 関数を追加し、複数回 Try を呼んで最初の panic のみが記録されることを godoc の Output コメントで検証できるようにした。",
+    "why": "コミットメッセージの通り PanicCatcher の使い方を示す実行可能な例(Example関数)を追加する変更。Value() から Recovered() への改名は、panicの捕捉先が「値」ではなく「recover された panic」であることをより明確にするためとみられる。",
+    "highlights": [
+      { "file": "panic_test.go", "note": "Go の ExampleXxx 関数。// Output: コメントと実際の標準出力を go test が突き合わせ、godoc にも使用例として表示される" }
+    ],
+    "langNotes": [
+      { "topic": "Example関数", "note": "Go のテストファイルで func ExampleXxx() の形式で書くと、末尾の \"// Output:\" コメントと実行時の標準出力を go test が比較し一致しなければ失敗する。テストとドキュメントを兼ねる Go 特有の仕組みで、godoc にもそのまま使用例として表示される。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

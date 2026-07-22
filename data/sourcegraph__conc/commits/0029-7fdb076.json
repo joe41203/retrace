@@ -1,0 +1,107 @@
+{
+  "seq": 29,
+  "sha": "7fdb0765f6c5b9f2dd4f99ba4c6aacdc45a62bfa",
+  "parents": [
+    "0c121d47b63052555063eba41137aa6ba785efed"
+  ],
+  "author": {
+    "name": "Camden Cheek",
+    "email": "camden@ccheek.com",
+    "date": "2022-12-24T21:43:11-07:00"
+  },
+  "message": "not working limiter",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 4,
+    "additions": 138,
+    "deletions": 6
+  },
+  "files": [
+    {
+      "path": "group/group_test.go",
+      "status": "M",
+      "additions": 62,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "limiter.go",
+      "status": "M",
+      "additions": 2,
+      "deletions": 6,
+      "binary": false
+    },
+    {
+      "path": "pool/pool.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "pool/pool_test.go",
+      "status": "M",
+      "additions": 73,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/group/group_test.go b/group/group_test.go\nindex d7cab74..fff23d5 100644\n--- a/group/group_test.go\n+++ b/group/group_test.go\n@@ -1,7 +1,9 @@\n package group\n \n import (\n+\t\"runtime\"\n \t\"strconv\"\n+\t\"sync\"\n \t\"sync/atomic\"\n \t\"testing\"\n \t\"time\"\n@@ -76,3 +78,63 @@ func BenchmarkGroup(b *testing.B) {\n \t}\n \tg.Wait()\n }\n+\n+func BenchmarkGroup2(b *testing.B) {\n+\tg := New()\n+\tvar ai atomic.Uint32\n+\tfor i := 0; i < b.N; i++ {\n+\t\tg.Go(func() {\n+\t\t\tai.Add(1)\n+\t\t})\n+\t}\n+\tg.Wait()\n+}\n+\n+func BenchmarkGroup21(b *testing.B) {\n+\tg := New().WithMaxGoroutines(runtime.GOMAXPROCS(0))\n+\tfor i := 0; i < b.N; i++ {\n+\t\tg.Go(func() {\n+\t\t\ttime.Sleep(10 * time.Nanosecond)\n+\t\t})\n+\t}\n+\tg.Wait()\n+}\n+\n+func BenchmarkGroup22(b *testing.B) {\n+\tfor i := 0; i < b.N; i++ {\n+\t\tg := New().WithMaxGoroutines(runtime.GOMAXPROCS(0))\n+\t\tvar ai atomic.Int32\n+\t\tf := func() {\n+\t\t\ttime.Sleep(100 * time.Nanosecond)\n+\t\t\tai.Add(1)\n+\t\t\ttime.Sleep(100 * time.Nanosecond)\n+\t\t}\n+\t\tfor j := 0; j < 500; j++ {\n+\t\t\tg.Go(f)\n+\t\t}\n+\t\tg.Wait()\n+\t}\n+}\n+\n+func BenchmarkGroup3(b *testing.B) {\n+\tg := New().WithMaxGoroutines(runtime.GOMAXPROCS(0))\n+\tvar ai atomic.Uint32\n+\tfor i := 0; i < b.N; i++ {\n+\t\tai.Add(1)\n+\t}\n+\tg.Wait()\n+}\n+\n+func BenchmarkGroup4(b *testing.B) {\n+\tvar wg sync.WaitGroup\n+\tvar ai atomic.Uint32\n+\tf := func() {\n+\t\tdefer wg.Done()\n+\t\tai.Add(1)\n+\t}\n+\tfor i := 0; i < b.N; i++ {\n+\t\twg.Add(1)\n+\t\tgo f()\n+\t}\n+\twg.Wait()\n+}\ndiff --git a/limiter.go b/limiter.go\nindex c3f87a5..b7a0677 100644\n--- a/limiter.go\n+++ b/limiter.go\n@@ -12,13 +12,9 @@ func (l Limiter) Limit() int {\n }\n \n func (l Limiter) Acquire() {\n-\tif l != nil {\n-\t\tl <- struct{}{}\n-\t}\n+\tl <- struct{}{}\n }\n \n func (l Limiter) Release() {\n-\tif l != nil {\n-\t\t<-l\n-\t}\n+\t<-l\n }\ndiff --git a/pool/pool.go b/pool/pool.go\nindex e52a4cd..c5eea57 100644\n--- a/pool/pool.go\n+++ b/pool/pool.go\n@@ -40,6 +40,7 @@ func (p *Pool) Go(f func()) {\n \n func (p *Pool) Wait() {\n \tp.init()\n+\n \tclose(p.tasks)\n \tp.handle.Wait()\n }\ndiff --git a/pool/pool_test.go b/pool/pool_test.go\nindex f0ae05b..32e9408 100644\n--- a/pool/pool_test.go\n+++ b/pool/pool_test.go\n@@ -2,6 +2,7 @@ package pool\n \n import (\n \t\"strconv\"\n+\t\"sync\"\n \t\"sync/atomic\"\n \t\"testing\"\n \t\"time\"\n@@ -125,3 +126,75 @@ func BenchmarkPool(b *testing.B) {\n \t})\n \n }\n+\n+func BenchmarkGroup(b *testing.B) {\n+\tg := New()\n+\tfor i := 0; i < b.N; i++ {\n+\t\tg.Go(func() {\n+\t\t\ti := 0\n+\t\t\ti = 1\n+\t\t\t_ = i\n+\t\t})\n+\t}\n+\tg.Wait()\n+}\n+\n+func BenchmarkGroup2(b *testing.B) {\n+\tg := New()\n+\tvar ai atomic.Uint32\n+\tfor i := 0; i < b.N; i++ {\n+\t\tg.Go(func() {\n+\t\t\tai.Add(1)\n+\t\t})\n+\t}\n+\tg.Wait()\n+}\n+\n+func BenchmarkGroup21(b *testing.B) {\n+\tg := New()\n+\tfor i := 0; i < b.N; i++ {\n+\t\tg.Go(func() {\n+\t\t\ttime.Sleep(10 * time.Nanosecond)\n+\t\t})\n+\t}\n+\tg.Wait()\n+}\n+\n+func BenchmarkGroup22(b *testing.B) {\n+\tfor i := 0; i < b.N; i++ {\n+\t\tg := New()\n+\t\tvar ai atomic.Int32\n+\t\tf := func() {\n+\t\t\ttime.Sleep(100 * time.Nanosecond)\n+\t\t\tai.Add(1)\n+\t\t\ttime.Sleep(100 * time.Nanosecond)\n+\t\t}\n+\t\tfor j := 0; j < 500; j++ {\n+\t\t\tg.Go(f)\n+\t\t}\n+\t\tg.Wait()\n+\t}\n+}\n+\n+func BenchmarkGroup3(b *testing.B) {\n+\tg := New()\n+\tvar ai atomic.Uint32\n+\tfor i := 0; i < b.N; i++ {\n+\t\tai.Add(1)\n+\t}\n+\tg.Wait()\n+}\n+\n+func BenchmarkGroup4(b *testing.B) {\n+\tvar wg sync.WaitGroup\n+\tvar ai atomic.Uint32\n+\tf := func() {\n+\t\tdefer wg.Done()\n+\t\tai.Add(1)\n+\t}\n+\tfor i := 0; i < b.N; i++ {\n+\t\twg.Add(1)\n+\t\tgo f()\n+\t}\n+\twg.Wait()\n+}\n",
+  "diffTruncated": false,
+  "tree": [
+    "LICENSE",
+    "go.mod",
+    "go.sum",
+    "group/context_group.go",
+    "group/context_group_test.go",
+    "group/error_group.go",
+    "group/error_group_test.go",
+    "group/group.go",
+    "group/group_test.go",
+    "group/iter.go",
+    "group/iter_test.go",
+    "group/result_context_group.go",
+    "group/result_context_group_test.go",
+    "group/result_error_group.go",
+    "group/result_error_group_test.go",
+    "group/result_group.go",
+    "group/result_group_test.go",
+    "iter.go",
+    "limiter.go",
+    "panic.go",
+    "pool/context_pool.go",
+    "pool/context_pool_test.go",
+    "pool/error_pool.go",
+    "pool/error_pool_test.go",
+    "pool/iter.go",
+    "pool/iter_test.go",
+    "pool/pool.go",
+    "pool/pool_test.go",
+    "pool/result_context_pool.go",
+    "pool/result_context_pool_test.go",
+    "pool/result_error_pool.go",
+    "pool/result_error_pool_test.go",
+    "pool/result_pool.go",
+    "pool/result_pool_test.go",
+    "stream/stream.go",
+    "stream/stream_test.go",
+    "waitgroup.go",
+    "waitgroup_test.go"
+  ],
+  "explanation": {
+    "what": "Limiter.Acquire()/Release() から `if l != nil` のnilガードを削除し、nilチャネルへの送受信をそのまま行うようにした。group パッケージと pool パッケージのテストに BenchmarkGroup2/21/22/3/4 など複数のベンチマークを追加している。コミットメッセージは「not working limiter」。",
+    "why": "直前のコミット(0028)でPoolのゼロ値対応時に、limiterが未設定ならinit()でデフォルト値を設定する前提に変わったため、Acquire/Release側のnilガードは不要になったとおそらく考えられる。ただしコミット件名が「not working limiter」であることから、この時点のLimiterの実装は何らかの理由で意図通り動作していない状態だったとおそらく考えられ、後続コミットでの修正を前提とした中間状態である。",
+    "highlights": [
+      { "file": "limiter.go", "note": "Acquire/Releaseからnilチェックが消え、nilチャネル操作の挙動に依存する形になった" }
+    ],
+    "langNotes": [
+      { "topic": "nilチャネルへの送受信", "note": "Go では nil のchannelに対する送信・受信操作は永遠にブロックする(パニックにはならない)。nilガードを外すと、limiterチャネルが未初期化のまま使われた場合に見た目上ハングする挙動になる点に注意が必要。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

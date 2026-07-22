@@ -1,0 +1,79 @@
+{
+  "seq": 16,
+  "sha": "f29484edac90a036c739786b78e4d5b735fb6bed",
+  "parents": [
+    "e6b1deb4e32eaef7812011bc44d2f250f0c45889"
+  ],
+  "author": {
+    "name": "Camden Cheek",
+    "email": "camden@ccheek.com",
+    "date": "2022-12-16T14:09:35-07:00"
+  },
+  "message": "remove closeTasksOnce",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 1,
+    "deletions": 4
+  },
+  "files": [
+    {
+      "path": "pool/pool.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 4,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/pool/pool.go b/pool/pool.go\nindex 51a9cc4..0734d7b 100644\n--- a/pool/pool.go\n+++ b/pool/pool.go\n@@ -3,7 +3,6 @@ package pool\n import (\n \t\"context\"\n \t\"runtime\"\n-\t\"sync\"\n \n \t\"github.com/camdencheek/conc\"\n )\n@@ -21,9 +20,7 @@ func New() *Pool {\n type Pool struct {\n \thandle  conc.WaitGroup\n \tlimiter conc.Limiter\n-\n-\tcloseTasksOnce sync.Once\n-\ttasks          chan func()\n+\ttasks   chan func()\n }\n \n func (p *Pool) Go(f func()) {\n",
+  "diffTruncated": false,
+  "tree": [
+    "LICENSE",
+    "go.mod",
+    "go.sum",
+    "group/context_group.go",
+    "group/context_group_test.go",
+    "group/error_group.go",
+    "group/error_group_test.go",
+    "group/group.go",
+    "group/group_test.go",
+    "group/iter.go",
+    "group/iter_test.go",
+    "group/result_context_group.go",
+    "group/result_context_group_test.go",
+    "group/result_error_group.go",
+    "group/result_error_group_test.go",
+    "group/result_group.go",
+    "group/result_group_test.go",
+    "iter.go",
+    "limiter.go",
+    "pool/context_pool.go",
+    "pool/context_pool_test.go",
+    "pool/error_pool.go",
+    "pool/error_pool_test.go",
+    "pool/iter.go",
+    "pool/iter_test.go",
+    "pool/pool.go",
+    "pool/pool_test.go",
+    "pool/result_context_pool.go",
+    "pool/result_error_pool.go",
+    "pool/result_pool.go",
+    "stream/stream.go",
+    "waitgroup.go",
+    "waitgroup_test.go"
+  ],
+  "explanation": {
+    "what": "直前のコミットで pool/pool.go に追加した closeTasksOnce(sync.Once)フィールドと、それに伴う sync import を削除した。tasks チャネルの close 自体はそのまま残っている。",
+    "why": "コミットメッセージ「remove closeTasksOnce」の通り、追加したばかりの Once ガードを撤回している。tasks チャネルが Wait() 経路でしか close されない(1回しか呼ばれない)ことが確認できたため不要と判断したとみられる(おそらく)。",
+    "highlights": [
+      { "file": "pool/pool.go", "note": "sync.Once フィールドと import の削除のみの小さな差分" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "inferred",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

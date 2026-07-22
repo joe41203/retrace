@@ -1,0 +1,101 @@
+{
+  "seq": 50,
+  "sha": "5ad46bc2ac01211c036c4cd7b7411db174c3c235",
+  "parents": [
+    "249ab38d60d718ae2a6185d102c423e04b4b837a"
+  ],
+  "author": {
+    "name": "Camden Cheek",
+    "email": "camden@ccheek.com",
+    "date": "2023-01-02T13:55:35-07:00"
+  },
+  "message": "rename to sourcegraph/conc",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 5,
+    "additions": 9,
+    "deletions": 9
+  },
+  "files": [
+    {
+      "path": "go.mod",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "iter/iter.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "panic_test.go",
+      "status": "M",
+      "additions": 4,
+      "deletions": 4,
+      "binary": false
+    },
+    {
+      "path": "pool/pool.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "stream/stream.go",
+      "status": "M",
+      "additions": 2,
+      "deletions": 2,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/go.mod b/go.mod\nindex 687b1eb..bb7ae75 100644\n--- a/go.mod\n+++ b/go.mod\n@@ -1,4 +1,4 @@\n-module github.com/camdencheek/conc\n+module github.com/sourcegraph/conc\n \n go 1.19\n \ndiff --git a/iter/iter.go b/iter/iter.go\nindex 9d26521..cbd605b 100644\n--- a/iter/iter.go\n+++ b/iter/iter.go\n@@ -5,7 +5,7 @@ import (\n \t\"sync\"\n \t\"sync/atomic\"\n \n-\t\"github.com/camdencheek/conc\"\n+\t\"github.com/sourcegraph/conc\"\n \t\"github.com/sourcegraph/sourcegraph/lib/errors\"\n )\n \ndiff --git a/panic_test.go b/panic_test.go\nindex c53b13c..ab245b3 100644\n--- a/panic_test.go\n+++ b/panic_test.go\n@@ -47,11 +47,11 @@ func ExamplePanicCatcher_callers() {\n \t\t}\n \t}\n \t// Output:\n-\t// github.com/camdencheek/conc.(*PanicCatcher).tryRecover\n+\t// github.com/sourcegraph/conc.(*PanicCatcher).tryRecover\n \t// runtime.gopanic\n-\t// github.com/camdencheek/conc.ExamplePanicCatcher_callers.func1\n-\t// github.com/camdencheek/conc.(*PanicCatcher).Try\n-\t// github.com/camdencheek/conc.ExamplePanicCatcher_callers\n+\t// github.com/sourcegraph/conc.ExamplePanicCatcher_callers.func1\n+\t// github.com/sourcegraph/conc.(*PanicCatcher).Try\n+\t// github.com/sourcegraph/conc.ExamplePanicCatcher_callers\n \t// testing.runExample\n \t// testing.runExamples\n \t// testing.(*M).Run\ndiff --git a/pool/pool.go b/pool/pool.go\nindex 4b06545..2fec55b 100644\n--- a/pool/pool.go\n+++ b/pool/pool.go\n@@ -5,7 +5,7 @@ import (\n \t\"runtime\"\n \t\"sync\"\n \n-\t\"github.com/camdencheek/conc\"\n+\t\"github.com/sourcegraph/conc\"\n )\n \n // New creates a new Pool.\ndiff --git a/stream/stream.go b/stream/stream.go\nindex 49c5e63..891d077 100644\n--- a/stream/stream.go\n+++ b/stream/stream.go\n@@ -4,8 +4,8 @@ package stream\n import (\n \t\"sync\"\n \n-\t\"github.com/camdencheek/conc\"\n-\t\"github.com/camdencheek/conc/pool\"\n+\t\"github.com/sourcegraph/conc\"\n+\t\"github.com/sourcegraph/conc/pool\"\n )\n \n // Create a new Stream with default settings\n",
+  "diffTruncated": false,
+  "tree": [
+    "LICENSE",
+    "go.mod",
+    "go.sum",
+    "iter/iter.go",
+    "iter/iter_test.go",
+    "limiter.go",
+    "panic.go",
+    "panic_test.go",
+    "pool/context_pool.go",
+    "pool/context_pool_test.go",
+    "pool/error_pool.go",
+    "pool/error_pool_test.go",
+    "pool/pool.go",
+    "pool/pool_test.go",
+    "pool/result_context_pool.go",
+    "pool/result_context_pool_test.go",
+    "pool/result_error_pool.go",
+    "pool/result_error_pool_test.go",
+    "pool/result_pool.go",
+    "pool/result_pool_test.go",
+    "stream/stream.go",
+    "stream/stream_test.go",
+    "waitgroup.go",
+    "waitgroup_test.go"
+  ],
+  "explanation": {
+    "what": "go.mod の module 宣言を github.com/camdencheek/conc から github.com/sourcegraph/conc に変更し、iter/iter.go・panic_test.go・pool/pool.go・stream/stream.go 内の import パスと Example の期待出力文字列を新モジュールパスに合わせて一括で書き換えた。",
+    "why": "コミットメッセージ「rename to sourcegraph/conc」および章文脈にある『sourcegraph/conc への改名と公開準備』の通り、個人アカウント camdencheek 配下で書かれていたライブラリを sourcegraph 組織配下のリポジトリとして公開するための改名。",
+    "highlights": [
+      { "file": "go.mod", "note": "module 宣言のパス変更が全 import 書き換えの起点" },
+      { "file": "panic_test.go", "note": "Example のコメント末尾 // Output: に書かれた期待値(スタックトレースの関数フルパス)も新パスに追従が必要だった" }
+    ],
+    "langNotes": [
+      { "topic": "go.mod のモジュールパス", "note": "Go では module 宣言(go.mod 1行目)がそのままリポジトリ内の全パッケージの import パスの接頭辞になる。ホスティング先やアカウントを変えると、この1箇所の変更が全ファイルの import 文とテストの期待値に波及する。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

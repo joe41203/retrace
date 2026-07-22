@@ -1,0 +1,80 @@
+{
+  "seq": 42,
+  "sha": "73ab4d957d627e17150b755380a08ad59bbf28e7",
+  "parents": [
+    "dd643b40c429dd5a8b1082e38933b2b470c97635"
+  ],
+  "author": {
+    "name": "Camden Cheek",
+    "email": "camden@ccheek.com",
+    "date": "2023-01-02T11:27:02-07:00"
+  },
+  "message": "make limiter methods private",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 16,
+    "deletions": 14
+  },
+  "files": [
+    {
+      "path": "pool/limiter.go",
+      "status": "M",
+      "additions": 0,
+      "deletions": 12,
+      "binary": false
+    },
+    {
+      "path": "pool/pool.go",
+      "status": "M",
+      "additions": 16,
+      "deletions": 2,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/pool/limiter.go b/pool/limiter.go\nindex 7ca9ce3..737b4dd 100644\n--- a/pool/limiter.go\n+++ b/pool/limiter.go\n@@ -1,15 +1,3 @@\n package pool\n \n type limiter chan struct{}\n-\n-func (l limiter) Limit() int {\n-\treturn cap(l)\n-}\n-\n-func (l limiter) Acquire() {\n-\tl <- struct{}{}\n-}\n-\n-func (l limiter) Release() {\n-\t<-l\n-}\ndiff --git a/pool/pool.go b/pool/pool.go\nindex 0fe39fa..8c3a532 100644\n--- a/pool/pool.go\n+++ b/pool/pool.go\n@@ -46,7 +46,7 @@ func (p *Pool) Wait() {\n }\n \n func (p *Pool) MaxGoroutines() int {\n-\treturn p.limiter.Limit()\n+\treturn p.limiter.limit()\n }\n \n // init ensures that the pool is initialized before use. This makes the\n@@ -88,9 +88,23 @@ func (p *Pool) WithContext(ctx context.Context) *ContextPool {\n func (p *Pool) worker() {\n \t// The only time this matters is if the task panics.\n \t// This makes it possible to spin up new workers in that case.\n-\tdefer p.limiter.Release()\n+\tdefer p.limiter.release()\n \n \tfor f := range p.tasks {\n \t\tf()\n \t}\n }\n+\n+type limiter chan struct{}\n+\n+func (l limiter) limit() int {\n+\treturn cap(l)\n+}\n+\n+func (l limiter) acquire() {\n+\tl <- struct{}{}\n+}\n+\n+func (l limiter) release() {\n+\t<-l\n+}\n",
+  "diffTruncated": false,
+  "tree": [
+    "LICENSE",
+    "go.mod",
+    "go.sum",
+    "limiter.go",
+    "panic.go",
+    "panic_test.go",
+    "pariter/iter.go",
+    "pariter/iter_test.go",
+    "pool/context_pool.go",
+    "pool/context_pool_test.go",
+    "pool/error_pool.go",
+    "pool/error_pool_test.go",
+    "pool/limiter.go",
+    "pool/pool.go",
+    "pool/pool_test.go",
+    "pool/result_context_pool.go",
+    "pool/result_context_pool_test.go",
+    "pool/result_error_pool.go",
+    "pool/result_error_pool_test.go",
+    "pool/result_pool.go",
+    "pool/result_pool_test.go",
+    "stream/stream.go",
+    "stream/stream_test.go",
+    "waitgroup.go",
+    "waitgroup_test.go"
+  ],
+  "explanation": {
+    "what": "limiter 型の Limit/Acquire/Release メソッドを小文字始まりの limit/acquire/release にリネームし、パッケージ外から呼べないようにした。呼び出し元の pool.go も合わせて修正している。",
+    "why": "直前のコミットで limiter を pool パッケージ内部に移したものの、メソッド名は公開(大文字始まり)のままだった。おそらく、limiter が pool パッケージの実装詳細でしかなく外部に呼び出させる必要がないため、Go の可視性規則(先頭大文字=exported)に合わせて非公開化したと考えられる。",
+    "highlights": [
+      { "file": "pool/pool.go", "note": "p.limiter.Limit() → p.limiter.limit() など呼び出し側の追従" }
+    ],
+    "langNotes": [
+      { "topic": "exported identifiers", "note": "Go では識別子の先頭が大文字かどうかだけでパッケージ外への公開/非公開が決まる。このコミットは Limit/Acquire/Release → limit/acquire/release への改名だけで、他言語のような private キーワードは不要という点が現れている。" }
+    ],
+    "diagram": null,
+    "evidence": "inferred",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

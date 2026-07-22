@@ -1,0 +1,70 @@
+{
+  "seq": 55,
+  "sha": "1f9fc4150f2bb1737d529cce7ebf4afd9c66f81e",
+  "parents": [
+    "e6e82cf1996ba6ac0c24f5db21df5742a298696b"
+  ],
+  "author": {
+    "name": "Camden Cheek",
+    "email": "camden@ccheek.com",
+    "date": "2023-01-02T16:09:27-07:00"
+  },
+  "message": "add an example",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 47,
+    "deletions": 0
+  },
+  "files": [
+    {
+      "path": "README.md",
+      "status": "M",
+      "additions": 47,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/README.md b/README.md\nindex 44c3d54..25172f1 100644\n--- a/README.md\n+++ b/README.md\n@@ -277,6 +277,53 @@ func main() {\n </tr>\n </table>\n \n+Concurrently map a slice:\n+\n+<table>\n+<tr>\n+<th><code>stdlib</code></th>\n+<th><code>conc</code></th>\n+</tr>\n+<tr>\n+<td>\n+\n+```go\n+func concMap(input []int, f func(int) int) []int {\n+\tres := make([]int, len(input))\n+\tvar idx atomic.Int64\n+\n+\tvar wg sync.WaitGroup\n+\tfor i := 0; i < 10; i++ {\n+\t\twg.Add(1)\n+\t\tgo func() {\n+\t\t\tdefer wg.Done()\n+\n+\t\t\tfor {\n+\t\t\t\ti := int(idx.Add(1) - 1)\n+\t\t\t\tif i >= len(input) {\n+\t\t\t\t\treturn\n+\t\t\t\t}\n+\n+\t\t\t\tres[i] = f(input[i])\n+\t\t\t}\n+\t\t}()\n+\t}\n+\twg.Wait()\n+\treturn res\n+}\n+```\n+</td>\n+<td>\n+\n+```go\n+func concMap(input []int, f func(int) int) []int {\n+\titer.Map(input, f)\n+}\n+```\n+</td>\n+</tr>\n+</table>\n+\n Process an ordered stream concurrently:\n \n \n",
+  "diffTruncated": false,
+  "tree": [
+    "LICENSE",
+    "README.md",
+    "go.mod",
+    "go.sum",
+    "iter/iter.go",
+    "iter/iter_test.go",
+    "panic.go",
+    "panic_test.go",
+    "pool/context_pool.go",
+    "pool/context_pool_test.go",
+    "pool/error_pool.go",
+    "pool/error_pool_test.go",
+    "pool/pool.go",
+    "pool/pool_test.go",
+    "pool/result_context_pool.go",
+    "pool/result_context_pool_test.go",
+    "pool/result_error_pool.go",
+    "pool/result_error_pool_test.go",
+    "pool/result_pool.go",
+    "pool/result_pool_test.go",
+    "stream/stream.go",
+    "stream/stream_test.go",
+    "waitgroup.go",
+    "waitgroup_test.go"
+  ],
+  "explanation": {
+    "what": "README.md に「Concurrently map a slice」という新しい比較例を追加した。stdlib側は atomic.Int64 のインデックスカウンタで手動負荷分散するworker pool実装、conc側は `iter.Map(input, f)` の1行呼び出しを対比させている。",
+    "why": "おそらく直前の seq 53〜54 で整備したREADMEの比較例セクションに、まだ紹介されていなかった iter パッケージの Map 機能の実例を追加し、conc が提供する主要機能を一通り網羅する狙いがあったと考えられる。",
+    "highlights": [
+      { "file": "README.md", "note": "stdlib側の atomic.Int64 によるインデックス分配ロジックと conc 側の iter.Map 呼び出し1行との対比" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "inferred",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

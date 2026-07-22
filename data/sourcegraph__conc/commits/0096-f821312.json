@@ -1,0 +1,105 @@
+{
+  "seq": 96,
+  "sha": "f82131227f42bd8d08d987348bb3ab8bcdaf643a",
+  "parents": [
+    "ca46029c8fc71cf58d4f1d10d0595467d5579ea4",
+    "f13fcd7487e8cdc94e06350f7cd98c1ea4d36461"
+  ],
+  "author": {
+    "name": "Camden Cheek",
+    "email": "camden@ccheek.com",
+    "date": "2023-01-07T16:52:44-07:00"
+  },
+  "message": "Merge pull request #23 from sourcegraph/cc/fail-fast\n\nAdd CancelOnError option to ContextPool",
+  "pr": {
+    "number": 23,
+    "title": "Add CancelOnError option to ContextPool",
+    "body": "This adds the `WithCancelOnError()` configuration method to `ContextPool` and `ResultContextPool`, and changes the default behavior to not cancel the pool's context on error.\r\n\r\n`ContextPool` initially canceled by default because otherwise, it's no different than an `ErrorPool` that captures a context from its environment. However, doing this by default is surprising and should be explicitly opt-in.",
+    "url": "https://github.com/sourcegraph/conc/pull/23"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 4,
+    "additions": 106,
+    "deletions": 18
+  },
+  "files": [
+    {
+      "path": "pool/context_pool.go",
+      "status": "M",
+      "additions": 12,
+      "deletions": 7,
+      "binary": false
+    },
+    {
+      "path": "pool/context_pool_test.go",
+      "status": "M",
+      "additions": 51,
+      "deletions": 5,
+      "binary": false
+    },
+    {
+      "path": "pool/result_context_pool.go",
+      "status": "M",
+      "additions": 8,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "pool/result_context_pool_test.go",
+      "status": "M",
+      "additions": 35,
+      "deletions": 6,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/pool/context_pool.go b/pool/context_pool.go\nindex b88f554..250c21b 100644\n--- a/pool/context_pool.go\n+++ b/pool/context_pool.go\n@@ -5,25 +5,22 @@ import (\n )\n \n // ContextPool is a pool that runs tasks that take a context.\n-// The context passed to the task will be canceled if any\n-// of the tasks return an error, which makes its functionality\n-// different than just capturing a context with the task closure.\n-//\n // A new ContextPool should be created with `New().WithContext(ctx)`.\n type ContextPool struct {\n \terrorPool ErrorPool\n \n \tctx    context.Context\n \tcancel context.CancelFunc\n+\n+\tfailFast bool\n }\n \n // Go submits a task. If it returns an error, the error will be\n-// collected and returned by Wait() and the context passed to other\n-// tasks will be canceled.\n+// collected and returned by Wait().\n func (p *ContextPool) Go(f func(ctx context.Context) error) {\n \tp.errorPool.Go(func() error {\n \t\terr := f(p.ctx)\n-\t\tif err != nil {\n+\t\tif err != nil && p.failFast {\n \t\t\t// Leaky abstraction warning: We add the error directly because\n \t\t\t// otherwise, canceling could cause another goroutine to exit and\n \t\t\t// return an error before this error was added, which breaks the\n@@ -51,6 +48,14 @@ func (p *ContextPool) WithFirstError() *ContextPool {\n \treturn p\n }\n \n+// WithCancelOnError configures the pool to cancel its context as soon as\n+// any task returns an error. By default, the pool's context is not\n+// canceled until the parent context is canceled.\n+func (p *ContextPool) WithCancelOnError() *ContextPool {\n+\tp.failFast = true\n+\treturn p\n+}\n+\n // WithMaxGoroutines limits the number of goroutines in a pool.\n // Defaults to unlimited. Panics if n < 1.\n func (p *ContextPool) WithMaxGoroutines(n int) *ContextPool {\ndiff --git a/pool/context_pool_test.go b/pool/context_pool_test.go\nindex b78156d..199cc0e 100644\n--- a/pool/context_pool_test.go\n+++ b/pool/context_pool_test.go\n@@ -13,8 +13,11 @@ import (\n \t\"github.com/sourcegraph/sourcegraph/lib/errors\"\n )\n \n-func ExampleContextPool() {\n-\tp := New().WithMaxGoroutines(4).WithContext(context.Background())\n+func ExampleContextPool_WithCancelOnError() {\n+\tp := New().\n+\t\tWithMaxGoroutines(4).\n+\t\tWithContext(context.Background()).\n+\t\tWithCancelOnError()\n \tfor i := 0; i < 3; i++ {\n \t\ti := i\n \t\tp.Go(func(ctx context.Context) error {\n@@ -86,8 +89,8 @@ func TestContextPool(t *testing.T) {\n \t\t})\n \t})\n \n-\tt.Run(\"cancel on error\", func(t *testing.T) {\n-\t\tp := New().WithMaxGoroutines(2).WithContext(bgctx)\n+\tt.Run(\"WithCancelOnError\", func(t *testing.T) {\n+\t\tp := New().WithContext(bgctx).WithCancelOnError()\n \t\tp.Go(func(ctx context.Context) error {\n \t\t\t<-ctx.Done()\n \t\t\treturn ctx.Err()\n@@ -100,15 +103,58 @@ func TestContextPool(t *testing.T) {\n \t\trequire.ErrorIs(t, err, err1)\n \t})\n \n+\tt.Run(\"no WithCancelOnError\", func(t *testing.T) {\n+\t\tp := New().WithContext(bgctx)\n+\t\tp.Go(func(ctx context.Context) error {\n+\t\t\tselect {\n+\t\t\tcase <-ctx.Done():\n+\t\t\t\treturn ctx.Err()\n+\t\t\tcase <-time.After(10 * time.Millisecond):\n+\t\t\t\treturn nil\n+\t\t\t}\n+\t\t})\n+\t\tp.Go(func(ctx context.Context) error {\n+\t\t\treturn err1\n+\t\t})\n+\t\terr := p.Wait()\n+\t\trequire.ErrorIs(t, err, err1)\n+\t\trequire.NotErrorIs(t, err, context.Canceled)\n+\t})\n+\n \tt.Run(\"WithFirstError\", func(t *testing.T) {\n+\t\tt.Parallel()\n \t\tp := New().WithContext(bgctx).WithFirstError()\n+\t\tsync := make(chan struct{})\n \t\tp.Go(func(ctx context.Context) error {\n-\t\t\t<-ctx.Done()\n+\t\t\tdefer close(sync)\n+\t\t\treturn err1\n+\t\t})\n+\t\tp.Go(func(ctx context.Context) error {\n+\t\t\t// This test has a race condition. After the first goroutine\n+\t\t\t// completes, this goroutine is woken up because sync is closed.\n+\t\t\t// However, this goroutine might be woken up before the error from\n+\t\t\t// the first goroutine is registered. To prevent that, we sleep for\n+\t\t\t// another 10 milliseconds, giving the other goroutine time to return\n+\t\t\t// and register its error before this goroutine returns its error.\n+\t\t\t<-sync\n+\t\t\ttime.Sleep(10 * time.Millisecond)\n \t\t\treturn err2\n \t\t})\n+\t\terr := p.Wait()\n+\t\trequire.ErrorIs(t, err, err1)\n+\t\trequire.NotErrorIs(t, err, err2)\n+\t})\n+\n+\tt.Run(\"WithFirstError and WithCancelOnError\", func(t *testing.T) {\n+\t\tt.Parallel()\n+\t\tp := New().WithContext(bgctx).WithFirstError().WithCancelOnError()\n \t\tp.Go(func(ctx context.Context) error {\n \t\t\treturn err1\n \t\t})\n+\t\tp.Go(func(ctx context.Context) error {\n+\t\t\t<-ctx.Done()\n+\t\t\treturn ctx.Err()\n+\t\t})\n \t\terr := p.Wait()\n \t\trequire.ErrorIs(t, err, err1)\n \t\trequire.NotErrorIs(t, err, context.Canceled)\ndiff --git a/pool/result_context_pool.go b/pool/result_context_pool.go\nindex db988eb..43f864c 100644\n--- a/pool/result_context_pool.go\n+++ b/pool/result_context_pool.go\n@@ -47,6 +47,14 @@ func (p *ResultContextPool[T]) WithFirstError() *ResultContextPool[T] {\n \treturn p\n }\n \n+// WithCancelOnError configures the pool to cancel its context as soon as\n+// any task returns an error. By default, the pool's context is not\n+// canceled until the parent context is canceled.\n+func (p *ResultContextPool[T]) WithCancelOnError() *ResultContextPool[T] {\n+\tp.contextPool.WithCancelOnError()\n+\treturn p\n+}\n+\n // WithMaxGoroutines limits the number of goroutines in a pool.\n // Defaults to unlimited. Panics if n < 1.\n func (p *ResultContextPool[T]) WithMaxGoroutines(n int) *ResultContextPool[T] {\ndiff --git a/pool/result_context_pool_test.go b/pool/result_context_pool_test.go\nindex 5312c0c..cb1e666 100644\n--- a/pool/result_context_pool_test.go\n+++ b/pool/result_context_pool_test.go\n@@ -63,9 +63,9 @@ func TestResultContextPool(t *testing.T) {\n \t\trequire.ErrorIs(t, err, context.Canceled)\n \t})\n \n-\tt.Run(\"cancel on error\", func(t *testing.T) {\n+\tt.Run(\"WithCancelOnError\", func(t *testing.T) {\n \t\tt.Parallel()\n-\t\tg := NewWithResults[int]().WithContext(context.Background())\n+\t\tg := NewWithResults[int]().WithContext(context.Background()).WithCancelOnError()\n \t\tg.Go(func(ctx context.Context) (int, error) {\n \t\t\t<-ctx.Done()\n \t\t\treturn 0, ctx.Err()\n@@ -79,6 +79,26 @@ func TestResultContextPool(t *testing.T) {\n \t\trequire.ErrorIs(t, err, err1)\n \t})\n \n+\tt.Run(\"no WithCancelOnError\", func(t *testing.T) {\n+\t\tt.Parallel()\n+\t\tg := NewWithResults[int]().WithContext(context.Background())\n+\t\tg.Go(func(ctx context.Context) (int, error) {\n+\t\t\tselect {\n+\t\t\tcase <-ctx.Done():\n+\t\t\t\treturn 0, ctx.Err()\n+\t\t\tcase <-time.After(10 * time.Millisecond):\n+\t\t\t\treturn 0, nil\n+\t\t\t}\n+\t\t})\n+\t\tg.Go(func(ctx context.Context) (int, error) {\n+\t\t\treturn 0, err1\n+\t\t})\n+\t\tres, err := g.Wait()\n+\t\trequire.Len(t, res, 1)\n+\t\trequire.NotErrorIs(t, err, context.Canceled)\n+\t\trequire.ErrorIs(t, err, err1)\n+\t})\n+\n \tt.Run(\"WithCollectErrored\", func(t *testing.T) {\n \t\tg := NewWithResults[int]().WithContext(context.Background()).WithCollectErrored()\n \t\tg.Go(func(context.Context) (int, error) { return 0, err1 })\n@@ -90,17 +110,26 @@ func TestResultContextPool(t *testing.T) {\n \tt.Run(\"WithFirstError\", func(t *testing.T) {\n \t\tt.Parallel()\n \t\tg := NewWithResults[int]().WithContext(context.Background()).WithFirstError()\n+\t\tsync := make(chan struct{})\n \t\tg.Go(func(ctx context.Context) (int, error) {\n-\t\t\t<-ctx.Done()\n-\t\t\treturn 0, err2\n+\t\t\tdefer close(sync)\n+\t\t\treturn 0, err1\n \t\t})\n \t\tg.Go(func(ctx context.Context) (int, error) {\n-\t\t\treturn 0, err1\n+\t\t\t// This test has a race condition. After the first goroutine\n+\t\t\t// completes, this goroutine is woken up because sync is closed.\n+\t\t\t// However, this goroutine might be woken up before the error from\n+\t\t\t// the first goroutine is registered. To prevent that, we sleep for\n+\t\t\t// another 10 milliseconds, giving the other goroutine time to return\n+\t\t\t// and register its error before this goroutine returns its error.\n+\t\t\t<-sync\n+\t\t\ttime.Sleep(10 * time.Millisecond)\n+\t\t\treturn 0, err2\n \t\t})\n \t\tres, err := g.Wait()\n \t\trequire.Len(t, res, 0)\n \t\trequire.ErrorIs(t, err, err1)\n-\t\trequire.NotErrorIs(t, err, context.Canceled)\n+\t\trequire.NotErrorIs(t, err, err2)\n \t})\n \n \tt.Run(\"limit\", func(t *testing.T) {\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/go.yml",
+    ".golangci.yml",
+    "LICENSE",
+    "README.md",
+    "go.mod",
+    "go.sum",
+    "iter/iter.go",
+    "iter/iter_test.go",
+    "panic.go",
+    "panic_test.go",
+    "pool/context_pool.go",
+    "pool/context_pool_test.go",
+    "pool/error_pool.go",
+    "pool/error_pool_test.go",
+    "pool/pool.go",
+    "pool/pool_test.go",
+    "pool/result_context_pool.go",
+    "pool/result_context_pool_test.go",
+    "pool/result_error_pool.go",
+    "pool/result_error_pool_test.go",
+    "pool/result_pool.go",
+    "pool/result_pool_test.go",
+    "stream/stream.go",
+    "stream/stream_test.go",
+    "waitgroup.go",
+    "waitgroup_test.go"
+  ],
+  "explanation": {
+    "what": "ContextPool と ResultContextPool に WithCancelOnError() メソッドを追加し、内部フラグ failFast が true のときだけタスクのエラーで pool の context をキャンセルするよう変更した。従来はタスクがエラーを返すと常に context がキャンセルされていたが、この変更でデフォルトの挙動は「キャンセルしない」に切り替わる。context_pool_test.go / result_context_pool_test.go にも WithCancelOnError() あり/なしのケースを追加している。",
+    "why": "PR本文によると、ContextPool は従来デフォルトでエラー時に context をキャンセルしていたが、これでは環境から context を受け取るだけの ErrorPool と実質的に違いがなくなってしまう。また、エラー時に即座にキャンセルするという挙動は利用者にとって直感的でなく、意図せず他のタスクを巻き込んで中断させてしまう驚きのある(surprising)デフォルトだった。そのため、キャンセルは明示的にオプトインする設計に変更し、必要な場合のみ WithCancelOnError() を呼ぶ形にした。",
+    "highlights": [
+      { "file": "pool/context_pool.go", "note": "failFast フィールドと WithCancelOnError() を追加。Go() 内の判定が「エラーなら常にキャンセル」から「エラーかつ failFast の場合のみキャンセル」に変わった" },
+      { "file": "pool/context_pool_test.go", "note": "\"no WithCancelOnError\" のテストケースが新設のデフォルト挙動(キャンセルされない)を検証している" }
+    ],
+    "langNotes": [
+      { "topic": "fail-fast (WithCancelOnError)", "note": "複数タスクを並行実行するとき、1つがエラーを返した時点で残りのタスクに渡す context をキャンセルし早期に打ち切る挙動を指す。conc ではこれをデフォルト無効のオプトイン機能とし、必要なときだけ WithCancelOnError() で有効化する設計にした。" }
+    ],
+    "diagram": {
+      "mermaid": "flowchart TD\n  A[\"task が context.Context を受け取って実行\"] --> B{\"エラーを返したか\"}\n  B -- \"いいえ\" --> C[\"通常終了\"]\n  B -- \"はい\" --> D{\"WithCancelOnError() 設定済みか\"}\n  D -- \"いいえ (デフォルト)\" --> E[\"context は生きたまま。他タスクは続行\"]\n  D -- \"はい\" --> F[\"pool の context をキャンセル。他タスクへ伝播\"]",
+      "caption": "WithCancelOnError の有無によるエラー時の context キャンセル挙動の分岐"
+    },
+    "evidence": "pr",
+    "refs": [{ "type": "pr", "number": 23, "url": "https://github.com/sourcegraph/conc/pull/23" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

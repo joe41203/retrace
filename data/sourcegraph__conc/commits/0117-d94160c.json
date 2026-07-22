@@ -1,0 +1,82 @@
+{
+  "seq": 117,
+  "sha": "d94160cc60e537a5a4c73411d7c449053131dadb",
+  "parents": [
+    "2f96f8668baa223dcfea4cc164112116ff116c0f",
+    "471bb28b31e142f448a0a4ce7a7ad65c68e4570f"
+  ],
+  "author": {
+    "name": "Camden Cheek",
+    "email": "camden@ccheek.com",
+    "date": "2023-01-16T12:35:42-07:00"
+  },
+  "message": "Merge pull request #70 from sashamelentyev/tparallel\n\nMark tests as parallel when it possible. Add tparallel lint",
+  "pr": {
+    "number": 70,
+    "title": "Mark tests as parallel when it possible. Add tparallel lint",
+    "body": "",
+    "url": "https://github.com/sourcegraph/conc/pull/70"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 5,
+    "deletions": 0
+  },
+  "files": [
+    {
+      "path": "panics/panics_test.go",
+      "status": "M",
+      "additions": 5,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/panics/panics_test.go b/panics/panics_test.go\nindex 81b40b6..a6a1eba 100644\n--- a/panics/panics_test.go\n+++ b/panics/panics_test.go\n@@ -61,9 +61,12 @@ func ExampleCatcher_callers() {\n }\n \n func TestCatcher(t *testing.T) {\n+\tt.Parallel()\n+\n \terr1 := errors.New(\"SOS\")\n \n \tt.Run(\"error\", func(t *testing.T) {\n+\t\tt.Parallel()\n \t\tvar pc Catcher\n \t\tpc.Try(func() { panic(err1) })\n \t\trecovered := pc.Recovered()\n@@ -91,12 +94,14 @@ func TestCatcher(t *testing.T) {\n \t})\n \n \tt.Run(\"repanic does not panic without child panic\", func(t *testing.T) {\n+\t\tt.Parallel()\n \t\tvar pc Catcher\n \t\tpc.Try(func() { _ = 1 })\n \t\trequire.NotPanics(t, pc.Repanic)\n \t})\n \n \tt.Run(\"is goroutine safe\", func(t *testing.T) {\n+\t\tt.Parallel()\n \t\tvar wg sync.WaitGroup\n \t\tvar pc Catcher\n \t\tfor i := 0; i < 100; i++ {\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/go.yml",
+    ".golangci.yml",
+    "LICENSE",
+    "README.md",
+    "go.mod",
+    "go.sum",
+    "iter/iter.go",
+    "iter/iter_test.go",
+    "iter/map.go",
+    "iter/map_test.go",
+    "panics/panics.go",
+    "panics/panics_test.go",
+    "pool/context_pool.go",
+    "pool/context_pool_test.go",
+    "pool/error_pool.go",
+    "pool/error_pool_test.go",
+    "pool/pool.go",
+    "pool/pool_test.go",
+    "pool/result_context_pool.go",
+    "pool/result_context_pool_test.go",
+    "pool/result_error_pool.go",
+    "pool/result_error_pool_test.go",
+    "pool/result_pool.go",
+    "pool/result_pool_test.go",
+    "stream/stream.go",
+    "stream/stream_test.go",
+    "waitgroup.go",
+    "waitgroup_test.go"
+  ],
+  "explanation": {
+    "what": "panics/panics_test.go のトップレベルテスト TestCatcher と、その中の error / repanic does not panic without child panic / is goroutine safe の各サブテストに t.Parallel() を追加した。",
+    "why": "コミットメッセージ「Mark tests as parallel when it possible. Add tparallel lint」の通り、独立して実行できるテストを並列実行させることでテスト全体の実行時間を短縮する目的の変更と考えられる。あわせて tparallel lint(t.Parallel() の付け忘れを検出する golangci-lint のルール)を導入したことが件名からうかがえるが、この PR 内の diff には lint 設定ファイル自体の変更は含まれていない。",
+    "highlights": [],
+    "langNotes": [
+      { "topic": "t.Parallel() とサブテスト", "note": "Go の testing パッケージでは t.Run で作ったサブテストの中で t.Parallel() を呼ぶと、そのサブテストは親テスト関数が最後まで到達した時点で他の並列サブテストと同時に実行される。相互に依存しないテストを並列化することでCI時間を短縮できる。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [
+      { "type": "pr", "number": 70, "url": "https://github.com/sourcegraph/conc/pull/70" }
+    ],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

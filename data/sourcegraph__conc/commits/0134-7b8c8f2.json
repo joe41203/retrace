@@ -1,0 +1,111 @@
+{
+  "seq": 134,
+  "sha": "7b8c8f2875cb861bb61844c9bcaa1aed070adbd4",
+  "parents": [
+    "e2914e5ae705e88c2362977152afd214d4c67b82",
+    "4d3065d26d787b410492670f1f3b3121e5d8e36f"
+  ],
+  "author": {
+    "name": "Camden Cheek",
+    "email": "camden@ccheek.com",
+    "date": "2023-02-24T21:04:07-07:00"
+  },
+  "message": "Merge pull request #97 from sourcegraph/multierror-internal\n\nmultierror: move to internal package",
+  "pr": {
+    "number": 97,
+    "title": "multierror: move to internal package",
+    "body": "The `multierror` package was introduced in #76 to help us have a multierror option both pre- and post-1.20, but it's an internal detail - I don't think we should expose it as an importable package",
+    "url": "https://github.com/sourcegraph/conc/pull/97"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 4,
+    "additions": 2,
+    "deletions": 2
+  },
+  "files": [
+    {
+      "path": "internal/multierror/multierror_go119.go",
+      "status": "R",
+      "additions": 0,
+      "deletions": 0,
+      "binary": false,
+      "oldPath": "multierror/multierror_go119.go"
+    },
+    {
+      "path": "internal/multierror/multierror_go120.go",
+      "status": "R",
+      "additions": 0,
+      "deletions": 0,
+      "binary": false,
+      "oldPath": "multierror/multierror_go120.go"
+    },
+    {
+      "path": "iter/map.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "pool/error_pool.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/multierror/multierror_go119.go b/internal/multierror/multierror_go119.go\nsimilarity index 100%\nrename from multierror/multierror_go119.go\nrename to internal/multierror/multierror_go119.go\ndiff --git a/multierror/multierror_go120.go b/internal/multierror/multierror_go120.go\nsimilarity index 100%\nrename from multierror/multierror_go120.go\nrename to internal/multierror/multierror_go120.go\ndiff --git a/iter/map.go b/iter/map.go\nindex 36801ff..efbe6bf 100644\n--- a/iter/map.go\n+++ b/iter/map.go\n@@ -3,7 +3,7 @@ package iter\n import (\n \t\"sync\"\n \n-\t\"github.com/sourcegraph/conc/multierror\"\n+\t\"github.com/sourcegraph/conc/internal/multierror\"\n )\n \n // Mapper is an Iterator with a result type R. It can be used to configure\ndiff --git a/pool/error_pool.go b/pool/error_pool.go\nindex 5d584f3..6e5aa99 100644\n--- a/pool/error_pool.go\n+++ b/pool/error_pool.go\n@@ -4,7 +4,7 @@ import (\n \t\"context\"\n \t\"sync\"\n \n-\t\"github.com/sourcegraph/conc/multierror\"\n+\t\"github.com/sourcegraph/conc/internal/multierror\"\n )\n \n // ErrorPool is a pool that runs tasks that may return an error.\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/go.yml",
+    ".golangci.yml",
+    "LICENSE",
+    "README.md",
+    "go.mod",
+    "go.sum",
+    "internal/multierror/multierror_go119.go",
+    "internal/multierror/multierror_go120.go",
+    "iter/iter.go",
+    "iter/iter_test.go",
+    "iter/map.go",
+    "iter/map_test.go",
+    "panics/panics.go",
+    "panics/panics_test.go",
+    "panics/try.go",
+    "panics/try_test.go",
+    "pool/context_pool.go",
+    "pool/context_pool_test.go",
+    "pool/error_pool.go",
+    "pool/error_pool_test.go",
+    "pool/pool.go",
+    "pool/pool_test.go",
+    "pool/result_context_pool.go",
+    "pool/result_context_pool_test.go",
+    "pool/result_error_pool.go",
+    "pool/result_error_pool_test.go",
+    "pool/result_pool.go",
+    "pool/result_pool_test.go",
+    "stream/stream.go",
+    "stream/stream_test.go",
+    "waitgroup.go",
+    "waitgroup_test.go"
+  ],
+  "explanation": {
+    "what": "multierror パッケージを `multierror/` から `internal/multierror/` へ移動(rename)し、iter/map.go と pool/error_pool.go の import パスをそれに合わせて書き換えた。",
+    "why": "PR本文によると、multierror パッケージは以前 #76 で Go 1.19/1.20 双方に対応するための multierror 実装として導入されたが、これはあくまで conc 内部の実装詳細であり、外部から import 可能な公開パッケージとして晒すべきではないという判断から internal 化した。",
+    "highlights": [
+      { "file": "internal/multierror/multierror_go119.go", "note": "multierror/ から internal/multierror/ への移動(rename)" }
+    ],
+    "langNotes": [
+      { "topic": "内部 multierror(internal パッケージ)", "note": "Go のビルドツールは `internal/` という名前のディレクトリを特別扱いし、その配下のパッケージは internal の直上の親ディレクトリ以下からしか import できない。multierror を internal 化することで「公開APIではない実装詳細」であることをコンパイラレベルで強制できる。" }
+    ],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [
+      { "type": "pr", "number": 97, "url": "https://github.com/sourcegraph/conc/pull/97" }
+    ],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

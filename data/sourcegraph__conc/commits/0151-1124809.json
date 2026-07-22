@@ -1,0 +1,102 @@
+{
+  "seq": 151,
+  "sha": "112480952b6cb69917aa102aa14f35f360b1f75c",
+  "parents": [
+    "e454401b0a476b708561a7c10d4b3f268b33e604"
+  ],
+  "author": {
+    "name": "Maria Ines Parnisari",
+    "email": "maria.inesparnisari@okta.com",
+    "date": "2024-01-21T16:42:30-05:00"
+  },
+  "message": "add Makefile and run benchmarks as part of PRs (#130)\n\nThis:\r\n- Adds a Makefile with `make test` and `make lint` and `make bench`\r\n- Adds a new workflow for `main` that runs benchmarks and saves them\r\n- Adds a new workflow for PRs that runs benchmarks and compares against\r\n`main`. When a benchmark regression occurs, it should fail the workflow",
+  "pr": {
+    "number": 130,
+    "title": "feat: add Makefile and run benchmarks as part of PRs",
+    "body": "This PR:\r\n\r\n- Adds a Makefile with `make test` and `make lint` and `make bench`\r\n- Adds a new workflow for `main` that runs benchmarks and saves them\r\n- Adds a new workflow for PRs that runs benchmarks and compares against `main`. When a benchmark regression occurs, it should fail the workflow, like so:\r\n   \r\n<img width=\"1917\" alt=\"image\" src=\"https://github.com/sourcegraph/conc/assets/5374887/d09d5fbc-15de-409d-952d-f3c14ff50efc\">\r\n\r\n",
+    "url": "https://github.com/sourcegraph/conc/pull/130"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 3,
+    "additions": 156,
+    "deletions": 0
+  },
+  "files": [
+    {
+      "path": ".github/workflows/bench.yml",
+      "status": "A",
+      "additions": 80,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": ".github/workflows/main.yml",
+      "status": "A",
+      "additions": 52,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "Makefile",
+      "status": "A",
+      "additions": 24,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/.github/workflows/bench.yml b/.github/workflows/bench.yml\nnew file mode 100644\nindex 0000000..302d303\n--- /dev/null\n+++ b/.github/workflows/bench.yml\n@@ -0,0 +1,80 @@\n+name: Benchmark\n+\n+on:\n+  pull_request:\n+    branches: [ \"main\" ]\n+\n+permissions:\n+  contents: read\n+\n+jobs:\n+  go-bench:\n+    strategy:\n+      matrix:\n+        go-version: [ '1.19', 'stable' ]\n+    runs-on: ubuntu-latest\n+    timeout-minutes: 15\n+    steps:\n+      - name: Checkout code\n+        uses: actions/checkout@v3\n+        with:\n+          fetch-depth: 0 # to be able to retrieve the last commit in main\n+\n+      - name: Set up Go\n+        uses: actions/setup-go@v5\n+        with:\n+          go-version: ${{ matrix.go-version }}\n+\n+      - name: Run benchmark and store the output to a file\n+        run: |\n+          set -o pipefail\n+          make bench | tee ${{ github.sha }}_bench_output.txt\n+\n+      - name: Get CPU information\n+        uses: kenchan0130/actions-system-info@v1.2.1\n+        id: system-info\n+\n+      - name: Get Main branch SHA\n+        id: get-main-branch-sha\n+        run: |\n+          SHA=$(git rev-parse origin/main)\n+          echo \"sha=$SHA\" >> $GITHUB_OUTPUT\n+\n+      - name: Get benchmark JSON from main branch\n+        id: cache\n+        uses: actions/cache/restore@v3\n+        with:\n+          path: ./cache/benchmark-data.json\n+          key: ${{ steps.get-main-branch-sha.outputs.sha }}-${{ runner.os }}-${{ steps.system-info.outputs.cpu-model }}-go-benchmark\n+\n+      - name: Compare benchmarks with Main\n+        uses: benchmark-action/github-action-benchmark@v1\n+        if: steps.cache.outputs.cache-hit == 'true'\n+        with:\n+          # What benchmark tool the output.txt came from\n+          tool: 'go'\n+          # Where the output from the benchmark tool is stored\n+          output-file-path: ${{ github.sha }}_bench_output.txt\n+          # Where the benchmarks in main are (to compare)\n+          external-data-json-path: ./cache/benchmark-data.json\n+          # Do not save the data\n+          save-data-file: false\n+          # Workflow will fail when an alert happens\n+          fail-on-alert: true\n+          github-token: ${{ secrets.GITHUB_TOKEN }}\n+          # Enable Job Summary for PRs\n+          summary-always: true\n+\n+      - name: Run benchmarks but don't compare to Main branch\n+        uses: benchmark-action/github-action-benchmark@v1\n+        if: steps.cache.outputs.cache-hit != 'true'\n+        with:\n+          # What benchmark tool the output.txt came from\n+          tool: 'go'\n+          # Where the output from the benchmark tool is stored\n+          output-file-path: ${{ github.sha }}_bench_output.txt\n+          # Write benchmarks to this file, do not publish to GitHub Pages\n+          save-data-file: false\n+          external-data-json-path: ./cache/benchmark-data.json\n+          # Enable Job Summary for PRs\n+          summary-always: true\n\\ No newline at end of file\ndiff --git a/.github/workflows/main.yml b/.github/workflows/main.yml\nnew file mode 100644\nindex 0000000..157e612\n--- /dev/null\n+++ b/.github/workflows/main.yml\n@@ -0,0 +1,52 @@\n+name: Main\n+on:\n+  push:\n+    branches:\n+      - main\n+\n+permissions:\n+  contents: read\n+\n+jobs:\n+  go-bench:\n+    strategy:\n+      matrix:\n+        go-version: [ '1.19', 'stable' ]\n+    runs-on: ubuntu-latest\n+    timeout-minutes: 15\n+    steps:\n+      - uses: actions/checkout@v3\n+\n+      - uses: actions/setup-go@v5\n+        with:\n+          go-version: ${{ matrix.go-version }}\n+\n+      - name: Run benchmark and store the output to a file\n+        run: |\n+          set -o pipefail\n+          make bench | tee bench_output.txt\n+\n+      - name: Get benchmark as JSON\n+        uses: benchmark-action/github-action-benchmark@v1\n+        with:\n+          # What benchmark tool the output.txt came from\n+          tool: 'go'\n+          # Where the output from the benchmark tool is stored\n+          output-file-path: bench_output.txt\n+          # Write benchmarks to this file\n+          external-data-json-path: ./cache/benchmark-data.json\n+          # Workflow will fail when an alert happens\n+          fail-on-alert: true\n+          github-token: ${{ secrets.GITHUB_TOKEN }}\n+\n+      - name: Get CPU information\n+        uses: kenchan0130/actions-system-info@v1.2.1\n+        id: system-info\n+\n+      - name: Save benchmark JSON to cache\n+        uses: actions/cache/save@v3\n+        with:\n+          path: ./cache/benchmark-data.json\n+          # Save with commit hash to avoid \"cache already exists\"\n+          # Save with OS & CPU info to prevent comparing against results from different CPUs\n+          key: ${{ github.sha }}-${{ runner.os }}-${{ steps.system-info.outputs.cpu-model }}-go-benchmark\n\\ No newline at end of file\ndiff --git a/Makefile b/Makefile\nnew file mode 100644\nindex 0000000..3e0720a\n--- /dev/null\n+++ b/Makefile\n@@ -0,0 +1,24 @@\n+.DEFAULT_GOAL := help\n+\n+GO_BIN ?= $(shell go env GOPATH)/bin\n+\n+.PHONY: help\n+help:\n+\t@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = \":.*?## \"}; {printf \"\\033[36m%-30s\\033[0m %s\\n\", $$1, $$2}'\n+\n+$(GO_BIN)/golangci-lint:\n+\t@echo \"==> Installing golangci-lint within \"${GO_BIN}\"\"\n+\t@go install -v github.com/golangci/golangci-lint/cmd/golangci-lint@latest\n+\n+.PHONY: lint\n+lint: $(GO_BIN)/golangci-lint ## Run linting on Go files\n+\t@echo \"==> Linting Go source files\"\n+\t@golangci-lint run -v --fix -c .golangci.yml ./...\n+\n+.PHONY: test\n+test: ## Run tests\n+\tgo test -race -v ./... -coverprofile ./coverage.txt\n+\n+.PHONY: bench\n+bench: ## Run benchmarks. See https://pkg.go.dev/cmd/go#hdr-Testing_flags\n+\tgo test ./... -bench . -benchtime 5s -timeout 0 -run=XXX -cpu 1 -benchmem\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/bench.yml",
+    ".github/workflows/go.yml",
+    ".github/workflows/main.yml",
+    ".golangci.yml",
+    "LICENSE",
+    "Makefile",
+    "README.md",
+    "go.mod",
+    "go.sum",
+    "iter/export_test.go",
+    "iter/iter.go",
+    "iter/iter_test.go",
+    "iter/map.go",
+    "iter/map_test.go",
+    "panics/panics.go",
+    "panics/panics_test.go",
+    "panics/try.go",
+    "panics/try_test.go",
+    "pool/context_pool.go",
+    "pool/context_pool_test.go",
+    "pool/error_pool.go",
+    "pool/error_pool_test.go",
+    "pool/pool.go",
+    "pool/pool_test.go",
+    "pool/result_context_pool.go",
+    "pool/result_context_pool_test.go",
+    "pool/result_error_pool.go",
+    "pool/result_error_pool_test.go",
+    "pool/result_pool.go",
+    "pool/result_pool_test.go",
+    "stream/stream.go",
+    "stream/stream_test.go",
+    "waitgroup.go",
+    "waitgroup_test.go"
+  ],
+  "explanation": {
+    "what": "Makefile(help/lint/test/bench ターゲット)と、GitHub Actions のワークフロー2本(.github/workflows/main.yml, .github/workflows/bench.yml)を新規追加した。main.yml は main ブランチへの push 時にベンチマークを実行して結果を benchmark-data.json としてキャッシュに保存し、bench.yml は PR時にベンチマークを実行して main のキャッシュと比較し、性能が退行(regression)していればワークフローを失敗させる。",
+    "why": "PR本文に明記されている通り、ベンチマークによる性能退行を人手のレビューに頼らず CI で自動検知できるようにするための追加。benchmark-action/github-action-benchmark という既存の GitHub Action を使い、比較対象となる main ブランチのベンチマーク結果は actions/cache でコミットSHA・OS・CPUモデルをキーにキャッシュしている。",
+    "highlights": [
+      { "file": "Makefile", "note": "make bench は go test ./... -bench . -benchtime 5s -run=XXX -cpu 1 -benchmem。-run=XXX で通常のテストを走らせずベンチマークだけを実行させている" },
+      { "file": ".github/workflows/bench.yml", "note": "PRの度に main ブランチの直近ベンチマーク結果をキャッシュから復元し、benchmark-action で比較。fail-on-alert: true で退行時にジョブを失敗させる" }
+    ],
+    "langNotes": [
+      { "topic": "Makefile と go test -bench", "note": "Go のベンチマークは _test.go 内に func BenchmarkXxx(b *testing.B) として書き、go test -bench <pattern> で実行する。-run=XXX は通常の Test 関数にマッチしない正規表現を指定して除外するイディオムで、ベンチマークだけを走らせたいときに使う。Makefile の help ターゲットはコメント `## 説明` を grep して一覧表示する、Go プロジェクトでよく見る自己文書化パターン。" }
+    ],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [{ "type": "pr", "number": 130, "url": "https://github.com/sourcegraph/conc/pull/130" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

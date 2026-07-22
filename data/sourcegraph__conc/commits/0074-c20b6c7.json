@@ -1,0 +1,79 @@
+{
+  "seq": 74,
+  "sha": "c20b6c73d6ee070032f5d9ff34a11a8c2d98b125",
+  "parents": [
+    "ef16d383db6e9c17a8462b8a0acf995c2a21fa98",
+    "cc32cbf7e099e22e60e37e3bc870e34abf6e880a"
+  ],
+  "author": {
+    "name": "Camden Cheek",
+    "email": "camden@ccheek.com",
+    "date": "2023-01-03T09:22:11-07:00"
+  },
+  "message": "Merge pull request #5 from moonD4rk/main\n\nstyle: rename all receivers to some name",
+  "pr": {
+    "number": 5,
+    "title": "style: rename all receivers to some name",
+    "body": "rename pointer receivers from `g` to `p`",
+    "url": "https://github.com/sourcegraph/conc/pull/5"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 5,
+    "deletions": 5
+  },
+  "files": [
+    {
+      "path": "pool/context_pool.go",
+      "status": "M",
+      "additions": 5,
+      "deletions": 5,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/pool/context_pool.go b/pool/context_pool.go\nindex e000028..8d7fef6 100644\n--- a/pool/context_pool.go\n+++ b/pool/context_pool.go\n@@ -20,16 +20,16 @@ type ContextPool struct {\n // Go submits a task. If it returns an error, the error will be\n // collected and returned by Wait() and the context passed to other\n // tasks will be canceled.\n-func (g *ContextPool) Go(f func(ctx context.Context) error) {\n-\tg.errorPool.Go(func() error {\n-\t\terr := f(g.ctx)\n+func (p *ContextPool) Go(f func(ctx context.Context) error) {\n+\tp.errorPool.Go(func() error {\n+\t\terr := f(p.ctx)\n \t\tif err != nil {\n \t\t\t// Leaky abstraction warning: We add the error directly because\n \t\t\t// otherwise, canceling could cause another goroutine to exit and\n \t\t\t// return an error before this error was added, which breaks the\n \t\t\t// expectations of WithFirstError().\n-\t\t\tg.errorPool.addErr(err)\n-\t\t\tg.cancel()\n+\t\t\tp.errorPool.addErr(err)\n+\t\t\tp.cancel()\n \t\t\treturn nil\n \t\t}\n \t\treturn err\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/go.yml",
+    "LICENSE",
+    "README.md",
+    "go.mod",
+    "go.sum",
+    "iter/iter.go",
+    "iter/iter_test.go",
+    "panic.go",
+    "panic_test.go",
+    "pool/context_pool.go",
+    "pool/context_pool_test.go",
+    "pool/error_pool.go",
+    "pool/error_pool_test.go",
+    "pool/pool.go",
+    "pool/pool_test.go",
+    "pool/result_context_pool.go",
+    "pool/result_context_pool_test.go",
+    "pool/result_error_pool.go",
+    "pool/result_error_pool_test.go",
+    "pool/result_pool.go",
+    "pool/result_pool_test.go",
+    "stream/stream.go",
+    "stream/stream_test.go",
+    "waitgroup.go",
+    "waitgroup_test.go"
+  ],
+  "explanation": {
+    "what": "ContextPool のメソッドレシーバ名を `g` から `p` にリネームした。PR body に明記されている通り、他のメソッドとレシーバ名を揃えるスタイル修正。",
+    "why": "PR body に「rename pointer receivers from `g` to `p`」とある通り、命名の一貫性を取るためのスタイル修正。ContextPool 自身は `p` で統一されているパッケージ内の他の型(Pool, ErrorPool)に合わせたと見られる。",
+    "highlights": [
+      { "file": "pool/context_pool.go", "note": "レシーバ名 g→p の一括リネーム" }
+    ],
+    "langNotes": [
+      { "topic": "レシーバ名の慣習", "note": "Go では慣習としてメソッドレシーバに型名を表す短い1〜2文字の変数名を使う(例: Pool→p)。長い説明的な名前(this や self)は使わないのが一般的で、このコミットはパッケージ内でその慣習を統一する修正。" }
+    ],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [{ "type": "pr", "number": 5, "url": "https://github.com/sourcegraph/conc/pull/5" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

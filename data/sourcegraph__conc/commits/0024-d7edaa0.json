@@ -1,0 +1,107 @@
+{
+  "seq": 24,
+  "sha": "d7edaa024a0555608e21c398a39ab713f66cd082",
+  "parents": [
+    "f219fdb839c1f35e8d0d5026a837be0c25ff83c4"
+  ],
+  "author": {
+    "name": "Camden Cheek",
+    "email": "camden@ccheek.com",
+    "date": "2022-12-24T18:32:53-07:00"
+  },
+  "message": "make PanicCatcher goroutine-safe",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 4,
+    "additions": 74,
+    "deletions": 6
+  },
+  "files": [
+    {
+      "path": "group/group_test.go",
+      "status": "M",
+      "additions": 12,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "panic.go",
+      "status": "M",
+      "additions": 11,
+      "deletions": 5,
+      "binary": false
+    },
+    {
+      "path": "pool/pool_test.go",
+      "status": "M",
+      "additions": 49,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "waitgroup.go",
+      "status": "M",
+      "additions": 2,
+      "deletions": 1,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/group/group_test.go b/group/group_test.go\nindex ca47928..d7cab74 100644\n--- a/group/group_test.go\n+++ b/group/group_test.go\n@@ -64,3 +64,15 @@ func TestGroup(t *testing.T) {\n \t\trequire.Panics(t, func() { g.Wait() })\n \t})\n }\n+\n+func BenchmarkGroup(b *testing.B) {\n+\tg := New()\n+\tfor i := 0; i < b.N; i++ {\n+\t\tg.Go(func() {\n+\t\t\ti := 0\n+\t\t\ti = 1\n+\t\t\t_ = i\n+\t\t})\n+\t}\n+\tg.Wait()\n+}\ndiff --git a/panic.go b/panic.go\nindex 07e4a7a..3191720 100644\n--- a/panic.go\n+++ b/panic.go\n@@ -1,20 +1,26 @@\n package conc\n \n+import \"sync/atomic\"\n+\n type PanicCatcher struct {\n-\tpanicVal any\n+\tpanicVal atomic.Value\n }\n \n+// Try executes f, catching any panic it might spawn. It is safe\n+// to call from multiple goroutines simultaneously.\n func (p *PanicCatcher) Try(f func()) {\n \tdefer func() {\n-\t\tif r := recover(); r != nil && p.panicVal == nil {\n-\t\t\tp.panicVal = r\n+\t\tif r := recover(); r != nil {\n+\t\t\tp.panicVal.CompareAndSwap(nil, r)\n \t\t}\n \t}()\n \tf()\n }\n \n-func (p *PanicCatcher) MaybePanic() {\n-\tif p.panicVal != nil {\n+// Propagate panics if any calls to Try caught a panic. It will\n+// panic with the value of the first panic caught.\n+func (p *PanicCatcher) Propagate() {\n+\tif p.panicVal.Load() != nil {\n \t\tpanic(p.panicVal)\n \t}\n }\ndiff --git a/pool/pool_test.go b/pool/pool_test.go\nindex 6c2ce89..f0ae05b 100644\n--- a/pool/pool_test.go\n+++ b/pool/pool_test.go\n@@ -6,6 +6,7 @@ import (\n \t\"testing\"\n \t\"time\"\n \n+\t\"github.com/camdencheek/conc\"\n \t\"github.com/stretchr/testify/require\"\n )\n \n@@ -76,3 +77,51 @@ func TestPool(t *testing.T) {\n \t\trequire.Panics(t, g.Wait)\n \t})\n }\n+\n+func BenchmarkPool(b *testing.B) {\n+\tb.Run(\"simplest\", func(b *testing.B) {\n+\t\tp := New()\n+\t\tfor i := 0; i < b.N; i++ {\n+\t\t\tp.Go(func() {\n+\t\t\t\ti := 0\n+\t\t\t\ti = 1\n+\t\t\t\t_ = i\n+\t\t\t})\n+\t\t}\n+\t\tp.Wait()\n+\t})\n+\n+\tb.Run(\"atomic increment\", func(b *testing.B) {\n+\t\tp := New()\n+\t\tvar j atomic.Int64\n+\t\tfor i := 0; i < b.N; i++ {\n+\t\t\tp.Go(func() {\n+\t\t\t\tj.Add(1)\n+\t\t\t})\n+\t\t}\n+\t\tp.Wait()\n+\t\t_ = j.Load()\n+\t})\n+\n+\tb.Run(\"atomic increment preallocated closure\", func(b *testing.B) {\n+\t\tp := New()\n+\t\tvar j atomic.Int64\n+\t\tf := func() { j.Add(1) }\n+\t\tfor i := 0; i < b.N; i++ {\n+\t\t\tp.Go(f)\n+\t\t}\n+\t\tp.Wait()\n+\t\t_ = j.Load()\n+\t})\n+\n+\tb.Run(\"conc\", func(b *testing.B) {\n+\t\tvar p conc.WaitGroup\n+\t\tvar j atomic.Int64\n+\t\tfor i := 0; i < b.N; i++ {\n+\t\t\tp.Go(func() { j.Add(1) })\n+\t\t}\n+\t\tp.Wait()\n+\t\t_ = j.Load()\n+\t})\n+\n+}\ndiff --git a/waitgroup.go b/waitgroup.go\nindex de3db84..c51b0d7 100644\n--- a/waitgroup.go\n+++ b/waitgroup.go\n@@ -38,7 +38,8 @@ func (h *WaitGroup) Wait() {\n \t}\n }\n \n-// done should be called in a defer statement in a child goroutine\n+// done should be called in a defer statement in a child goroutine.\n+// It catches any panics and decrements the counter.\n func (h *WaitGroup) done() {\n \tif r := recover(); r != nil {\n \t\terr := errors.Newf(\n",
+  "diffTruncated": false,
+  "tree": [
+    "LICENSE",
+    "go.mod",
+    "go.sum",
+    "group/context_group.go",
+    "group/context_group_test.go",
+    "group/error_group.go",
+    "group/error_group_test.go",
+    "group/group.go",
+    "group/group_test.go",
+    "group/iter.go",
+    "group/iter_test.go",
+    "group/result_context_group.go",
+    "group/result_context_group_test.go",
+    "group/result_error_group.go",
+    "group/result_error_group_test.go",
+    "group/result_group.go",
+    "group/result_group_test.go",
+    "iter.go",
+    "limiter.go",
+    "panic.go",
+    "pool/context_pool.go",
+    "pool/context_pool_test.go",
+    "pool/error_pool.go",
+    "pool/error_pool_test.go",
+    "pool/iter.go",
+    "pool/iter_test.go",
+    "pool/pool.go",
+    "pool/pool_test.go",
+    "pool/result_context_pool.go",
+    "pool/result_context_pool_test.go",
+    "pool/result_error_pool.go",
+    "pool/result_error_pool_test.go",
+    "pool/result_pool.go",
+    "pool/result_pool_test.go",
+    "stream/stream.go",
+    "stream/stream_test.go",
+    "waitgroup.go",
+    "waitgroup_test.go"
+  ],
+  "explanation": {
+    "what": "PanicCatcher の内部フィールド panicVal を素の `any` から `atomic.Value` に変更し、Try() 内の recover 処理を `p.panicVal.CompareAndSwap(nil, r)` によるアトミックな一回限りの書き込みに変更した。MaybePanic という名前だったメソッドを Propagate に改名し、Try/Propagate 双方に「複数goroutineから同時に呼んでよい」ことを明記する doc コメントを追加。あわせて group と pool それぞれにベンチマーク(BenchmarkGroup/BenchmarkPool)を追加している。",
+    "why": "変更前の PanicCatcher はフィールドへの直接代入だったため、複数の goroutine が同時に Try() 経由で panic を捕捉するとデータ競合になり得た。atomic.Value + CompareAndSwap により、複数goroutineから安全に「最初のpanicだけ」を記録できるようにしている。MaybePanic→Propagate の改名は、単に判定するだけでなく実際に再panicする(伝播させる)という意味を明確にする意図だとおそらく考えられる。",
+    "highlights": [
+      { "file": "panic.go", "note": "atomic.Value と CompareAndSwap(nil, r) によるgoroutine-safeな一回限りのpanic捕捉" }
+    ],
+    "langNotes": [
+      { "topic": "atomic.Value と CompareAndSwap", "note": "sync/atomic の Value は任意の型の値をアトミックに読み書きできる型消去コンテナ。CompareAndSwap(old, new) は現在値が old のときだけ new に置き換える操作で、ここでは『最初に捕捉した panic だけを記録し、以降のTryの結果は捨てる』という一回性を複数goroutineから安全に実現するのに使われている。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

@@ -1,0 +1,80 @@
+{
+  "seq": 121,
+  "sha": "f9df11e3fd9527ed72e7b2c8c9f23f77ab952260",
+  "parents": [
+    "ee6e48f20b51ca7aa454d374a36d09e916477b55",
+    "0979df3e488d1fc5bdb790f8b483a9a03adbc21c"
+  ],
+  "author": {
+    "name": "Robert Lin",
+    "email": "robertlin1@gmail.com",
+    "date": "2023-01-17T09:27:40-08:00"
+  },
+  "message": "Merge pull request #73 from sourcegraph/iter/fix-example-determinism\n\niter: fix non-deterministic example",
+  "pr": {
+    "number": 73,
+    "title": "iter: fix non-deterministic example",
+    "body": "The example just failed in `main` due to ordering - this changes the example to be deterministic, and also work as an example of mutating the input.",
+    "url": "https://github.com/sourcegraph/conc/pull/73"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 5,
+    "deletions": 4
+  },
+  "files": [
+    {
+      "path": "iter/iter_test.go",
+      "status": "M",
+      "additions": 5,
+      "deletions": 4,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/iter/iter_test.go b/iter/iter_test.go\nindex eb06ad9..6309d98 100644\n--- a/iter/iter_test.go\n+++ b/iter/iter_test.go\n@@ -17,13 +17,14 @@ func ExampleIterator() {\n \t}\n \n \titerator.ForEach(input, func(v *int) {\n-\t\tif *v%2 == 0 {\n-\t\t\tfmt.Println(*v)\n+\t\tif *v%2 != 0 {\n+\t\t\t*v = -1\n \t\t}\n \t})\n+\n+\tfmt.Println(input)\n \t// Output:\n-\t// 2\n-\t// 4\n+\t// [-1 2 -1 4]\n }\n \n func TestIterator(t *testing.T) {\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/go.yml",
+    ".golangci.yml",
+    "LICENSE",
+    "README.md",
+    "go.mod",
+    "go.sum",
+    "iter/iter.go",
+    "iter/iter_test.go",
+    "iter/map.go",
+    "iter/map_test.go",
+    "panics/panics.go",
+    "panics/panics_test.go",
+    "pool/context_pool.go",
+    "pool/context_pool_test.go",
+    "pool/error_pool.go",
+    "pool/error_pool_test.go",
+    "pool/pool.go",
+    "pool/pool_test.go",
+    "pool/result_context_pool.go",
+    "pool/result_context_pool_test.go",
+    "pool/result_error_pool.go",
+    "pool/result_error_pool_test.go",
+    "pool/result_pool.go",
+    "pool/result_pool_test.go",
+    "stream/stream.go",
+    "stream/stream_test.go",
+    "waitgroup.go",
+    "waitgroup_test.go"
+  ],
+  "explanation": {
+    "what": "iter/iter_test.go の ExampleIterator を、実行順に依存しない形に書き換えた。ForEach 内で偶数判定して Println する代わりに、奇数要素を -1 に上書きしてから最後に input スライス全体をまとめて出力するようにしている。",
+    "why": "PR本文にある通り、main ブランチで example がゴルーチンの実行順序に依存して非決定的に失敗していた。ForEach は並行実行されるため goroutine ごとの Println の出力順序は保証されず、Output コメントと突き合わせるテストが不安定になっていた。出力順に依存しない集約結果(スライス全体)を1回だけ出力する形に変えることで、あわせて「ポインタ引数で入力を書き換えられる」という ForEach の使い方例にもなっている。",
+    "highlights": [
+      { "file": "iter/iter_test.go", "note": "*v の書き換え後に fmt.Println(input) でまとめて出力する形に変更。並行実行の出力順序に依存しないテストにする典型パターン" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [{ "type": "pr", "number": 73, "url": "https://github.com/sourcegraph/conc/pull/73" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

@@ -1,0 +1,86 @@
+{
+  "seq": 46,
+  "sha": "16514f6b9e64ffc7ddf5b5b9338326766da06c76",
+  "parents": [
+    "5335a19a5e9164e0dd3def32a1c3bbef0c44a6ef"
+  ],
+  "author": {
+    "name": "Camden Cheek",
+    "email": "camden@ccheek.com",
+    "date": "2023-01-02T12:32:41-07:00"
+  },
+  "message": "add comments to result pools",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 3,
+    "additions": 51,
+    "deletions": 0
+  },
+  "files": [
+    {
+      "path": "pool/result_context_pool.go",
+      "status": "M",
+      "additions": 14,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "pool/result_error_pool.go",
+      "status": "M",
+      "additions": 19,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "pool/result_pool.go",
+      "status": "M",
+      "additions": 18,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/pool/result_context_pool.go b/pool/result_context_pool.go\nindex 3a5f51e..0c47d30 100644\n--- a/pool/result_context_pool.go\n+++ b/pool/result_context_pool.go\n@@ -4,12 +4,17 @@ import (\n \t\"context\"\n )\n \n+// ResultContextPool is a pool that runs tasks that take a context and return a\n+// result. The context passed to the task will be canceled if any of the tasks\n+// return an error, which makes its functionality different than just capturing\n+// a context with the task closure.\n type ResultContextPool[T any] struct {\n \tcontextPool    ContextPool\n \tagg            resultAggregator[T]\n \tcollectErrored bool\n }\n \n+// Go submits a task to the pool\n func (p *ResultContextPool[T]) Go(f func(context.Context) (T, error)) {\n \tp.contextPool.Go(func(ctx context.Context) error {\n \t\tres, err := f(ctx)\n@@ -20,21 +25,30 @@ func (p *ResultContextPool[T]) Go(f func(context.Context) (T, error)) {\n \t})\n }\n \n+// Wait cleans up all spawned goroutines, propagates any panics, and\n+// returns an error if any of the tasks errored.\n func (p *ResultContextPool[T]) Wait() ([]T, error) {\n \terr := p.contextPool.Wait()\n \treturn p.agg.results, err\n }\n \n+// WithCollectErrored configures the pool to still collect the result of a task\n+// even if the task returned an error. By default, the result of tasks that errored\n+// are ignored and only the error is collected.\n func (p *ResultContextPool[T]) WithCollectErrored() *ResultContextPool[T] {\n \tp.collectErrored = true\n \treturn p\n }\n \n+// WithFirstError configures the pool to only return the first error\n+// returned by a task. By default, Wait() will return a combined error.\n func (p *ResultContextPool[T]) WithFirstError() *ResultContextPool[T] {\n \tp.contextPool.WithFirstError()\n \treturn p\n }\n \n+// WithMaxGoroutines limits the number of goroutines in a pool.\n+// Defaults to runtime.GOMAXPROCS(0). Panics if n < 1.\n func (p *ResultContextPool[T]) WithMaxGoroutines(n int) *ResultContextPool[T] {\n \tp.contextPool.WithMaxGoroutines(n)\n \treturn p\ndiff --git a/pool/result_error_pool.go b/pool/result_error_pool.go\nindex 0d59603..3f3df6e 100644\n--- a/pool/result_error_pool.go\n+++ b/pool/result_error_pool.go\n@@ -4,12 +4,20 @@ import (\n \t\"context\"\n )\n \n+// ResultErrorPool is a pool that executes tasks that return a generic result\n+// type and an error. Tasks are executed in the pool with Go(), then the\n+// results of the tasks are returned by Wait().\n+//\n+// The order of the results is not guaranteed to be the same as the order the\n+// tasks were submitted. If your use case requires consistent ordering,\n+// consider using the `stream` package or `Map` from the `iter` package.\n type ResultErrorPool[T any] struct {\n \terrorPool      ErrorPool\n \tagg            resultAggregator[T]\n \tcollectErrored bool\n }\n \n+// Go submits a task to the pool\n func (p *ResultErrorPool[T]) Go(f func() (T, error)) {\n \tp.errorPool.Go(func() error {\n \t\tres, err := f()\n@@ -20,27 +28,38 @@ func (p *ResultErrorPool[T]) Go(f func() (T, error)) {\n \t})\n }\n \n+// Wait cleans up any spawned goroutines, propagating any panics and\n+// returning the results and any errors from tasks.\n func (p *ResultErrorPool[T]) Wait() ([]T, error) {\n \terr := p.errorPool.Wait()\n \treturn p.agg.results, err\n }\n \n+// WithCollectErrored configures the pool to still collect the result of a task\n+// even if the task returned an error. By default, the result of tasks that errored\n+// are ignored and only the error is collected.\n func (p *ResultErrorPool[T]) WithCollectErrored() *ResultErrorPool[T] {\n \tp.collectErrored = true\n \treturn p\n }\n \n+// WithContext converts the pool to a ResultContextPool for tasks that should\n+// be canceled on first error.\n func (p *ResultErrorPool[T]) WithContext(ctx context.Context) *ResultContextPool[T] {\n \treturn &ResultContextPool[T]{\n \t\tcontextPool: *p.errorPool.WithContext(ctx),\n \t}\n }\n \n+// WithFirstError configures the pool to only return the first error\n+// returned by a task. By default, Wait() will return a combined error.\n func (p *ResultErrorPool[T]) WithFirstError() *ResultErrorPool[T] {\n \tp.errorPool.WithFirstError()\n \treturn p\n }\n \n+// WithMaxGoroutines limits the number of goroutines in a pool.\n+// Defaults to runtime.GOMAXPROCS(0). Panics if n < 1.\n func (p *ResultErrorPool[T]) WithMaxGoroutines(n int) *ResultErrorPool[T] {\n \tp.errorPool.WithMaxGoroutines(n)\n \treturn p\ndiff --git a/pool/result_pool.go b/pool/result_pool.go\nindex 9d3e229..1b4e14f 100644\n--- a/pool/result_pool.go\n+++ b/pool/result_pool.go\n@@ -5,44 +5,62 @@ import (\n \t\"sync\"\n )\n \n+// NewWithResults creates a new ResultPool for tasks with a result of type T.\n func NewWithResults[T any]() *ResultPool[T] {\n \treturn &ResultPool[T]{\n \t\tpool: *New(),\n \t}\n }\n \n+// ResultPool is a pool that executes tasks that return a generic result type.\n+// Tasks are executed in the pool with Go(), then the results of the tasks are\n+// returned by Wait().\n+//\n+// The order of the results is not guaranteed to be the same as the order the\n+// tasks were submitted. If your use case requires consistent ordering,\n+// consider using the `stream` package or `Map` from the `iter` package.\n type ResultPool[T any] struct {\n \tpool Pool\n \tagg  resultAggregator[T]\n }\n \n+// Go submits a task to the pool.\n func (p *ResultPool[T]) Go(f func() T) {\n \tp.pool.Go(func() {\n \t\tp.agg.add(f())\n \t})\n }\n \n+// Wait cleans up all spawned goroutines, propagating any panics, and returning\n+// a slice of results from tasks that did not panic.\n func (p *ResultPool[T]) Wait() []T {\n \tp.pool.Wait()\n \treturn p.agg.results\n }\n \n+// MaxGoroutines returns the maximum size of the pool.\n func (p *ResultPool[T]) MaxGoroutines() int {\n \treturn p.pool.MaxGoroutines()\n }\n \n+// WithErrors converts the pool to an ResultErrorPool so the submitted tasks\n+// can return errors.\n func (p *ResultPool[T]) WithErrors() *ResultErrorPool[T] {\n \treturn &ResultErrorPool[T]{\n \t\terrorPool: *p.pool.WithErrors(),\n \t}\n }\n \n+// WithContext converts the pool to a ContextPool for tasks that should be\n+// canceled on first error.\n func (p *ResultPool[T]) WithContext(ctx context.Context) *ResultContextPool[T] {\n \treturn &ResultContextPool[T]{\n \t\tcontextPool: *p.pool.WithContext(ctx),\n \t}\n }\n \n+// WithMaxGoroutines limits the number of goroutines in a pool.\n+// Defaults to runtime.GOMAXPROCS(0). Panics if n < 1.\n func (p *ResultPool[T]) WithMaxGoroutines(n int) *ResultPool[T] {\n \tp.pool.WithMaxGoroutines(n)\n \treturn p\n",
+  "diffTruncated": false,
+  "tree": [
+    "LICENSE",
+    "go.mod",
+    "go.sum",
+    "iter/iter.go",
+    "iter/iter_test.go",
+    "limiter.go",
+    "panic.go",
+    "panic_test.go",
+    "pool/context_pool.go",
+    "pool/context_pool_test.go",
+    "pool/error_pool.go",
+    "pool/error_pool_test.go",
+    "pool/pool.go",
+    "pool/pool_test.go",
+    "pool/result_context_pool.go",
+    "pool/result_context_pool_test.go",
+    "pool/result_error_pool.go",
+    "pool/result_error_pool_test.go",
+    "pool/result_pool.go",
+    "pool/result_pool_test.go",
+    "stream/stream.go",
+    "stream/stream_test.go",
+    "waitgroup.go",
+    "waitgroup_test.go"
+  ],
+  "explanation": {
+    "what": "ResultContextPool・ResultErrorPool・ResultPool の3型について、型自体と Go/Wait/WithCollectErrored/WithContext/WithFirstError/WithMaxGoroutines などのメソッドに GoDoc コメントを追加した。ResultErrorPool と ResultPool のコメントには『結果の順序はタスク投入順と一致しない。順序が必要なら stream パッケージか iter の Map を使うこと』という注意書きが含まれている。",
+    "why": "直前の seq43 で Pool/ErrorPool/ContextPool 系にコメントを付けたのに続き、おそらくジェネリクスで結果を集約する Result 系の型にも同様にドキュメントを行き渡らせる作業と考えられる。順序非保証の注意書きは、並行実行では完了順に結果が集まるため呼び出し順とは限らないという、このライブラリの並行処理モデル特有の制約を利用者に周知する目的と推測される。",
+    "highlights": [
+      { "file": "pool/result_pool.go", "note": "結果の順序が不定であることの明記と、順序が要る場合の代替(stream, iter.Map)への案内" }
+    ],
+    "langNotes": [
+      { "topic": "ジェネリクス型のGoDoc", "note": "ResultPool[T any] のようなジェネリック型でも GoDoc コメントの書き方は通常の型と同じで、型パラメータ T は特別扱いせず文章で説明する。Go 1.18 以降のジェネリクス対応パッケージでよく見る書き方。" }
+    ],
+    "diagram": null,
+    "evidence": "inferred",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

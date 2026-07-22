@@ -1,0 +1,118 @@
+{
+  "seq": 95,
+  "sha": "ca46029c8fc71cf58d4f1d10d0595467d5579ea4",
+  "parents": [
+    "43000fb2f0ae6ec895db4aa3a64f1026df6659c9",
+    "caa6862f5c4cd57a584ec2f98562b45ae5c79b8d"
+  ],
+  "author": {
+    "name": "Camden Cheek",
+    "email": "camden@ccheek.com",
+    "date": "2023-01-07T16:30:42-07:00"
+  },
+  "message": "Merge pull request #31 from sashamelentyev/dots\n\nAdd missed dots",
+  "pr": {
+    "number": 31,
+    "title": "Add missed dots",
+    "body": "",
+    "url": "https://github.com/sourcegraph/conc/pull/31"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 7,
+    "additions": 20,
+    "deletions": 20
+  },
+  "files": [
+    {
+      "path": "iter/iter.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "panic.go",
+      "status": "M",
+      "additions": 2,
+      "deletions": 2,
+      "binary": false
+    },
+    {
+      "path": "pool/pool.go",
+      "status": "M",
+      "additions": 2,
+      "deletions": 2,
+      "binary": false
+    },
+    {
+      "path": "pool/result_context_pool.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "pool/result_error_pool.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "stream/stream.go",
+      "status": "M",
+      "additions": 11,
+      "deletions": 11,
+      "binary": false
+    },
+    {
+      "path": "waitgroup.go",
+      "status": "M",
+      "additions": 2,
+      "deletions": 2,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/iter/iter.go b/iter/iter.go\nindex cbd605b..0198bd4 100644\n--- a/iter/iter.go\n+++ b/iter/iter.go\n@@ -33,7 +33,7 @@ func ForEachIdx[T any](input []T, f func(int, *T)) {\n \t}\n \n \tvar idx atomic.Int64\n-\t// create the task outside the loop to avoid extra closure allocations\n+\t// Create the task outside the loop to avoid extra closure allocations.\n \ttask := func() {\n \t\ti := int(idx.Add(1) - 1)\n \t\tfor ; i < len(input); i = int(idx.Add(1) - 1) {\ndiff --git a/panic.go b/panic.go\nindex 1c3d835..390e6d9 100644\n--- a/panic.go\n+++ b/panic.go\n@@ -11,7 +11,7 @@ import (\n // which will catch any spawned panic. Try can be called any number of times,\n // from any number of goroutines. Once all calls to Try have completed, you can\n // get the value of the first panic (if any) with Value(), or you can just\n-// propagate the panic (re-panic) with Repanic()\n+// propagate the panic (re-panic) with Repanic().\n type PanicCatcher struct {\n \trecovered atomic.Pointer[RecoveredPanic]\n }\n@@ -62,7 +62,7 @@ func NewRecoveredPanic(skip int, value any) RecoveredPanic {\n \n // RecoveredPanic is a panic that was caught with recover().\n type RecoveredPanic struct {\n-\t// The original value of the panic\n+\t// The original value of the panic.\n \tValue any\n \t// The caller list as returned by runtime.Callers when the panic was\n \t// recovered. Can be used to produce a more detailed stack information with\ndiff --git a/pool/pool.go b/pool/pool.go\nindex eac5918..f0494d3 100644\n--- a/pool/pool.go\n+++ b/pool/pool.go\n@@ -39,7 +39,7 @@ func (p *Pool) Go(f func()) {\n \t\t// No limit on the number of goroutines.\n \t\tselect {\n \t\tcase p.tasks <- f:\n-\t\t\t// A goroutine was available to handle the task\n+\t\t\t// A goroutine was available to handle the task.\n \t\tdefault:\n \t\t\t// No goroutine was available to handle the task.\n \t\t\t// Spawn a new one and send it the task.\n@@ -58,7 +58,7 @@ func (p *Pool) Go(f func()) {\n \t\t\t// more workers than the number of tasks.\n \t\t\tp.tasks <- f\n \t\tcase p.tasks <- f:\n-\t\t\t// A worker is available and has accepted the task\n+\t\t\t// A worker is available and has accepted the task.\n \t\t\treturn\n \t\t}\n \t}\ndiff --git a/pool/result_context_pool.go b/pool/result_context_pool.go\nindex f6ebaa9..db988eb 100644\n--- a/pool/result_context_pool.go\n+++ b/pool/result_context_pool.go\n@@ -14,7 +14,7 @@ type ResultContextPool[T any] struct {\n \tcollectErrored bool\n }\n \n-// Go submits a task to the pool\n+// Go submits a task to the pool.\n func (p *ResultContextPool[T]) Go(f func(context.Context) (T, error)) {\n \tp.contextPool.Go(func(ctx context.Context) error {\n \t\tres, err := f(ctx)\ndiff --git a/pool/result_error_pool.go b/pool/result_error_pool.go\nindex cf730b7..61658a9 100644\n--- a/pool/result_error_pool.go\n+++ b/pool/result_error_pool.go\n@@ -17,7 +17,7 @@ type ResultErrorPool[T any] struct {\n \tcollectErrored bool\n }\n \n-// Go submits a task to the pool\n+// Go submits a task to the pool.\n func (p *ResultErrorPool[T]) Go(f func() (T, error)) {\n \tp.errorPool.Go(func() error {\n \t\tres, err := f()\ndiff --git a/stream/stream.go b/stream/stream.go\nindex 891d077..bddf262 100644\n--- a/stream/stream.go\n+++ b/stream/stream.go\n@@ -8,7 +8,7 @@ import (\n \t\"github.com/sourcegraph/conc/pool\"\n )\n \n-// Create a new Stream with default settings\n+// Create a new Stream with default settings.\n func New() *Stream {\n \treturn &Stream{\n \t\tpool: *pool.New(),\n@@ -59,13 +59,13 @@ type Callback func()\n func (s *Stream) Go(f StreamTask) {\n \ts.init()\n \n-\t// Get a channel from the cache\n+\t// Get a channel from the cache.\n \tch := getCh()\n \n-\t// Queue the channel for the callbacker\n+\t// Queue the channel for the callbacker.\n \ts.queue <- ch\n \n-\t// Submit the task for execution\n+\t// Submit the task for execution.\n \ts.pool.Go(func() {\n \t\tdefer func() {\n \t\t\t// In the case of a panic from f, we don't want the callbacker to\n@@ -77,7 +77,7 @@ func (s *Stream) Go(f StreamTask) {\n \t\t\t}\n \t\t}()\n \n-\t\t// Run the task, sending its callback down this task's channel\n+\t\t// Run the task, sending its callback down this task's channel.\n \t\tcallback := f()\n \t\tch <- callback\n \t})\n@@ -89,13 +89,13 @@ func (s *Stream) Wait() {\n \ts.init()\n \n \t// Defer the callbacker cleanup so that it occurs even in the case\n-\t// that one of the tasks panics and is propagated up by s.pool.Wait()\n+\t// that one of the tasks panics and is propagated up by s.pool.Wait().\n \tdefer func() {\n \t\tclose(s.queue)\n \t\ts.callbackerHandle.Wait()\n \t}()\n \n-\t// Wait for all the workers to exit\n+\t// Wait for all the workers to exit.\n \ts.pool.Wait()\n }\n \n@@ -108,7 +108,7 @@ func (s *Stream) init() {\n \ts.initOnce.Do(func() {\n \t\ts.queue = make(chan callbackCh, s.pool.MaxGoroutines()+1)\n \n-\t\t// Start the callbacker\n+\t\t// Start the callbacker.\n \t\ts.callbackerHandle.Go(s.callbacker)\n \t})\n }\n@@ -121,13 +121,13 @@ func (s *Stream) callbacker() {\n \n \t// For every scheduled task, read that tasks channel from the queue.\n \tfor callbackCh := range s.queue {\n-\t\t// Wait for the task to complete and get its callback from the channel\n+\t\t// Wait for the task to complete and get its callback from the channel.\n \t\tcallback := <-callbackCh\n \n-\t\t// Execute the callback (with panic protection)\n+\t\t// Execute the callback (with panic protection).\n \t\tpanicCatcher.Try(callback)\n \n-\t\t// Return the channel to the pool of unused channels\n+\t\t// Return the channel to the pool of unused channels.\n \t\tputCh(callbackCh)\n \t}\n }\ndiff --git a/waitgroup.go b/waitgroup.go\nindex 11094c6..0403348 100644\n--- a/waitgroup.go\n+++ b/waitgroup.go\n@@ -22,7 +22,7 @@ type WaitGroup struct {\n \tpc PanicCatcher\n }\n \n-// Go spawns a new goroutine in the WaitGroup\n+// Go spawns a new goroutine in the WaitGroup.\n func (h *WaitGroup) Go(f func()) {\n \th.wg.Add(1)\n \tgo func() {\n@@ -36,6 +36,6 @@ func (h *WaitGroup) Go(f func()) {\n func (h *WaitGroup) Wait() {\n \th.wg.Wait()\n \n-\t// Propagate a panic if we caught one from a child goroutine\n+\t// Propagate a panic if we caught one from a child goroutine.\n \th.pc.Repanic()\n }\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/go.yml",
+    ".golangci.yml",
+    "LICENSE",
+    "README.md",
+    "go.mod",
+    "go.sum",
+    "iter/iter.go",
+    "iter/iter_test.go",
+    "panic.go",
+    "panic_test.go",
+    "pool/context_pool.go",
+    "pool/context_pool_test.go",
+    "pool/error_pool.go",
+    "pool/error_pool_test.go",
+    "pool/pool.go",
+    "pool/pool_test.go",
+    "pool/result_context_pool.go",
+    "pool/result_context_pool_test.go",
+    "pool/result_error_pool.go",
+    "pool/result_error_pool_test.go",
+    "pool/result_pool.go",
+    "pool/result_pool_test.go",
+    "stream/stream.go",
+    "stream/stream_test.go",
+    "waitgroup.go",
+    "waitgroup_test.go"
+  ],
+  "explanation": {
+    "what": "iter.go, panic.go, pool.go, result_context_pool.go, result_error_pool.go, stream.go, waitgroup.go の各所で、行末にピリオドがなかったコメントに一括でピリオドを補った。コードの挙動は変更していない。",
+    "why": "PR本文に詳細はないが、message「Add missed dots」の通り、直前で導入した golangci-lint(godot 系のコメント規約)に沿ってコメントの文体を統一する目的の変更と考えられる。",
+    "highlights": [],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [{ "type": "pr", "number": 31, "url": "https://github.com/sourcegraph/conc/pull/31" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

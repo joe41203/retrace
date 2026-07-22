@@ -1,0 +1,128 @@
+{
+  "seq": 115,
+  "sha": "c2a0b3dde7e99479fc28839624bfffe16c14d9cd",
+  "parents": [
+    "4023cd5c619c2398804b69238b09cd2361abbee4",
+    "5622201fba2e8dee1ea90ebe2e889332a7a0fa49"
+  ],
+  "author": {
+    "name": "Camden Cheek",
+    "email": "camden@ccheek.com",
+    "date": "2023-01-16T10:48:26-07:00"
+  },
+  "message": "Merge pull request #65 from sourcegraph/cc/document-blocking\n\nDocument that Go() blocks until the task can be started",
+  "pr": {
+    "number": 65,
+    "title": "Document that Go() blocks until the task can be started",
+    "body": "A call to `Go()` will block if all the goroutines in the underlying pool are already handling a task. This documents that behavior. \r\n\r\nFixes #61",
+    "url": "https://github.com/sourcegraph/conc/pull/65"
+  },
+  "linkedIssues": [
+    {
+      "number": 61,
+      "title": "Clarify if `Stream.Go` blocks while the pool is full?",
+      "body": "From what I can see `Stream` will block when calling `Go` if the internal pool is fully occupied, just wanted to make sure this was the case, and ask for it to be documented. If we're calling it for thousands for items for example, need to know that there will be automatic back-pressure. \r\n",
+      "url": "https://github.com/sourcegraph/conc/issues/61"
+    }
+  ],
+  "stats": {
+    "filesChanged": 7,
+    "additions": 15,
+    "deletions": 7
+  },
+  "files": [
+    {
+      "path": "pool/context_pool.go",
+      "status": "M",
+      "additions": 2,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "pool/error_pool.go",
+      "status": "M",
+      "additions": 2,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "pool/pool.go",
+      "status": "M",
+      "additions": 2,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "pool/result_context_pool.go",
+      "status": "M",
+      "additions": 2,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "pool/result_error_pool.go",
+      "status": "M",
+      "additions": 2,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "pool/result_pool.go",
+      "status": "M",
+      "additions": 2,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "stream/stream.go",
+      "status": "M",
+      "additions": 3,
+      "deletions": 1,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/pool/context_pool.go b/pool/context_pool.go\nindex aaaf36a..c119001 100644\n--- a/pool/context_pool.go\n+++ b/pool/context_pool.go\n@@ -16,7 +16,8 @@ type ContextPool struct {\n }\n \n // Go submits a task. If it returns an error, the error will be\n-// collected and returned by Wait().\n+// collected and returned by Wait(). If all goroutines in the pool\n+// are busy, a call to Go() will block until the task can be started.\n func (p *ContextPool) Go(f func(ctx context.Context) error) {\n \tp.errorPool.Go(func() error {\n \t\terr := f(p.ctx)\ndiff --git a/pool/error_pool.go b/pool/error_pool.go\nindex 5f702d5..3a646d8 100644\n--- a/pool/error_pool.go\n+++ b/pool/error_pool.go\n@@ -20,7 +20,8 @@ type ErrorPool struct {\n \terrs error\n }\n \n-// Go submits a task to the pool.\n+// Go submits a task to the pool. If all goroutines in the pool\n+// are busy, a call to Go() will block until the task can be started.\n func (p *ErrorPool) Go(f func() error) {\n \tp.pool.Go(func() {\n \t\tp.addErr(f())\ndiff --git a/pool/pool.go b/pool/pool.go\nindex f0494d3..2d0c261 100644\n--- a/pool/pool.go\n+++ b/pool/pool.go\n@@ -31,7 +31,8 @@ type Pool struct {\n \tinitOnce sync.Once\n }\n \n-// Go submits a task to be run in the pool.\n+// Go submits a task to be run in the pool. If all goroutines in the pool\n+// are busy, a call to Go() will block until the task can be started.\n func (p *Pool) Go(f func()) {\n \tp.init()\n \ndiff --git a/pool/result_context_pool.go b/pool/result_context_pool.go\nindex 43f864c..dbfa005 100644\n--- a/pool/result_context_pool.go\n+++ b/pool/result_context_pool.go\n@@ -14,7 +14,8 @@ type ResultContextPool[T any] struct {\n \tcollectErrored bool\n }\n \n-// Go submits a task to the pool.\n+// Go submits a task to the pool. If all goroutines in the pool\n+// are busy, a call to Go() will block until the task can be started.\n func (p *ResultContextPool[T]) Go(f func(context.Context) (T, error)) {\n \tp.contextPool.Go(func(ctx context.Context) error {\n \t\tres, err := f(ctx)\ndiff --git a/pool/result_error_pool.go b/pool/result_error_pool.go\nindex 61658a9..2c33a59 100644\n--- a/pool/result_error_pool.go\n+++ b/pool/result_error_pool.go\n@@ -17,7 +17,8 @@ type ResultErrorPool[T any] struct {\n \tcollectErrored bool\n }\n \n-// Go submits a task to the pool.\n+// Go submits a task to the pool. If all goroutines in the pool\n+// are busy, a call to Go() will block until the task can be started.\n func (p *ResultErrorPool[T]) Go(f func() (T, error)) {\n \tp.errorPool.Go(func() error {\n \t\tres, err := f()\ndiff --git a/pool/result_pool.go b/pool/result_pool.go\nindex 1f0f9c2..ab2b695 100644\n--- a/pool/result_pool.go\n+++ b/pool/result_pool.go\n@@ -24,7 +24,8 @@ type ResultPool[T any] struct {\n \tagg  resultAggregator[T]\n }\n \n-// Go submits a task to the pool.\n+// Go submits a task to the pool. If all goroutines in the pool\n+// are busy, a call to Go() will block until the task can be started.\n func (p *ResultPool[T]) Go(f func() T) {\n \tp.pool.Go(func() {\n \t\tp.agg.add(f())\ndiff --git a/stream/stream.go b/stream/stream.go\nindex 5af167e..d80a923 100644\n--- a/stream/stream.go\n+++ b/stream/stream.go\n@@ -56,7 +56,9 @@ type Callback func()\n // will be executed concurrently in worker goroutines. Then, the callbacks\n // returned by the tasks will be executed in the order that the tasks were\n // submitted. All callbacks will be executed by the same goroutine, so no\n-// synchronization is necessary between callbacks.\n+// synchronization is necessary between callbacks. If all goroutines in the\n+// stream's pool are busy, a call to Go() will block until the task can be\n+// started.\n func (s *Stream) Go(f Task) {\n \ts.init()\n \n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/go.yml",
+    ".golangci.yml",
+    "LICENSE",
+    "README.md",
+    "go.mod",
+    "go.sum",
+    "iter/iter.go",
+    "iter/iter_test.go",
+    "panics/panics.go",
+    "panics/panics_test.go",
+    "pool/context_pool.go",
+    "pool/context_pool_test.go",
+    "pool/error_pool.go",
+    "pool/error_pool_test.go",
+    "pool/pool.go",
+    "pool/pool_test.go",
+    "pool/result_context_pool.go",
+    "pool/result_context_pool_test.go",
+    "pool/result_error_pool.go",
+    "pool/result_error_pool_test.go",
+    "pool/result_pool.go",
+    "pool/result_pool_test.go",
+    "stream/stream.go",
+    "stream/stream_test.go",
+    "waitgroup.go",
+    "waitgroup_test.go"
+  ],
+  "explanation": {
+    "what": "pool・stream 配下の各型(Pool, ErrorPool, ContextPool, ResultPool, ResultErrorPool, ResultContextPool, Stream)の Go() メソッドの docstring に、「プール内の全 goroutine が使用中の場合、Go() はタスクを開始できるまでブロックする」という挙動の説明を追加した。コード自体の変更はなくコメントのみの追加。",
+    "why": "issue #61 で Stream.Go() がプールが埋まっている間ブロックするかどうかが利用者から見て不明瞭という指摘があり、実際にその通りの背圧(back-pressure)がかかる挙動であることをドキュメント化してほしいという要望が上がった。PR はこれに応え、Stream だけでなく他の Pool 系の型についても同様の説明を横展開している。",
+    "highlights": [],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [
+      { "type": "pr", "number": 65, "url": "https://github.com/sourcegraph/conc/pull/65" },
+      { "type": "issue", "number": 61, "url": "https://github.com/sourcegraph/conc/issues/61" }
+    ],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

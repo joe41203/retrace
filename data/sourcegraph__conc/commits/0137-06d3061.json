@@ -1,0 +1,103 @@
+{
+  "seq": 137,
+  "sha": "06d3061eb7cc571d833a2c0e75220ca1add74a19",
+  "parents": [
+    "1d4991d2948a7f92cd28fb63ba08f22e9f58797d"
+  ],
+  "author": {
+    "name": "Camden Cheek",
+    "email": "camden@ccheek.com",
+    "date": "2023-04-10T11:42:32-06:00"
+  },
+  "message": "Allow pools to be reusable (#108)\n\nFixes #103. See inline comments for rationale.",
+  "pr": {
+    "number": 108,
+    "title": "Allow pools to be reusable",
+    "body": "Fixes #103. See inline comments for rationale.",
+    "url": "https://github.com/sourcegraph/conc/pull/108"
+  },
+  "linkedIssues": [
+    {
+      "number": 103,
+      "title": "Panic: send on closed channel",
+      "body": "This happens randomly when using conc Pool (pool.New()).\r\n\r\npanic: send on closed channel\r\n\r\ngoroutine 17805 [running]:\r\nconfig-rd/vendor/github.com/sourcegraph/conc/pool.(*Pool).Go(0xc0005c2000, 0xc0a551e558)\r\n\tE:/go/src/config-rd/vendor/github.com/sourcegraph/conc/pool/pool.go:45 +0x113\r\nmain.doGGSN(0xc0e964b688?, 0x1)\r\n\tE:/go/src/config-rd/parser.go:63 +0xfd8\r\nmain.main.func3.1({{0xc031bbafc0, 0x10}, {0xc031bbafd0, 0x4}, {0xc03c3b36e0, 0x1a}, 0x1, 0x0, {0x0, 0x0}, ...})\r\n\tE:/go/src/config-rd/main.go:375 +0x1c5",
+      "url": "https://github.com/sourcegraph/conc/issues/103"
+    }
+  ],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 24,
+    "deletions": 0
+  },
+  "files": [
+    {
+      "path": "pool/pool.go",
+      "status": "M",
+      "additions": 4,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "pool/pool_test.go",
+      "status": "M",
+      "additions": 20,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/pool/pool.go b/pool/pool.go\nindex b63eb19..4b13469 100644\n--- a/pool/pool.go\n+++ b/pool/pool.go\n@@ -76,6 +76,10 @@ func (p *Pool) Wait() {\n \n \tclose(p.tasks)\n \n+\t// After Wait() returns, reset the struct so tasks will be reinitialized on\n+\t// next use. This better matches the behavior of sync.WaitGroup\n+\tdefer func() { p.initOnce = sync.Once{} }()\n+\n \tp.handle.Wait()\n }\n \ndiff --git a/pool/pool_test.go b/pool/pool_test.go\nindex a6e93da..3819230 100644\n--- a/pool/pool_test.go\n+++ b/pool/pool_test.go\n@@ -122,6 +122,26 @@ func TestPool(t *testing.T) {\n \t\tp := New().WithMaxGoroutines(42)\n \t\trequire.Equal(t, 42, p.MaxGoroutines())\n \t})\n+\n+\tt.Run(\"is reusable\", func(t *testing.T) {\n+\t\tt.Parallel()\n+\t\tvar count atomic.Int64\n+\t\tp := New()\n+\t\tfor i := 0; i < 10; i++ {\n+\t\t\tp.Go(func() {\n+\t\t\t\tcount.Add(1)\n+\t\t\t})\n+\t\t}\n+\t\tp.Wait()\n+\t\trequire.Equal(t, int64(10), count.Load())\n+\t\tfor i := 0; i < 10; i++ {\n+\t\t\tp.Go(func() {\n+\t\t\t\tcount.Add(1)\n+\t\t\t})\n+\t\t}\n+\t\tp.Wait()\n+\t\trequire.Equal(t, int64(20), count.Load())\n+\t})\n }\n \n func BenchmarkPool(b *testing.B) {\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/go.yml",
+    ".golangci.yml",
+    "LICENSE",
+    "README.md",
+    "go.mod",
+    "go.sum",
+    "internal/multierror/multierror_go119.go",
+    "internal/multierror/multierror_go120.go",
+    "iter/iter.go",
+    "iter/iter_test.go",
+    "iter/map.go",
+    "iter/map_test.go",
+    "panics/panics.go",
+    "panics/panics_test.go",
+    "panics/try.go",
+    "panics/try_test.go",
+    "pool/context_pool.go",
+    "pool/context_pool_test.go",
+    "pool/error_pool.go",
+    "pool/error_pool_test.go",
+    "pool/pool.go",
+    "pool/pool_test.go",
+    "pool/result_context_pool.go",
+    "pool/result_context_pool_test.go",
+    "pool/result_error_pool.go",
+    "pool/result_error_pool_test.go",
+    "pool/result_pool.go",
+    "pool/result_pool_test.go",
+    "stream/stream.go",
+    "stream/stream_test.go",
+    "waitgroup.go",
+    "waitgroup_test.go"
+  ],
+  "explanation": {
+    "what": "Pool.Wait() の末尾に `defer func() { p.initOnce = sync.Once{} }()` を追加し、Wait 完了後に initOnce を新しい sync.Once に差し替えて内部状態をリセットするようにした。pool_test.go に、同じ Pool インスタンスへ Go→Wait→Go→Wait を繰り返し、2回目以降もタスクが正しく実行されることを検証する \"is reusable\" テストを追加した。",
+    "why": "リンクされた issue #103 では、conc の Pool を使うコードで \"panic: send on closed channel\" がランダムに発生すると報告されていた。これは Wait() 呼び出しでタスクチャネルを close した後、同じ Pool を再利用して Go() を呼ぶと、既に close済みのチャネルへ送信してしまうために起きる。PR本文は「詳細は inline comments を参照」としており、Wait 後に initOnce をリセットして次回の Go 呼び出しで内部状態(チャネルなど)を再初期化させることで、sync.WaitGroup に近い「使い切ったら再利用できる」挙動に合わせたと述べている。",
+    "highlights": [
+      { "file": "pool/pool.go", "note": "Wait() 末尾で initOnce を sync.Once{} に差し替えて再利用可能にする defer" },
+      { "file": "pool/pool_test.go", "note": "同一 Pool で Go/Wait を2周させる \"is reusable\" テスト" }
+    ],
+    "langNotes": [
+      { "topic": "再利用可能な pool(sync.Once の使い回し)", "note": "sync.Once は一度 Do されると二度と実行されないため、Pool の内部初期化(タスクチャネル生成など)に使うと、Wait 後にそのまま Once を新しい sync.Once{} に差し替えるだけで「未初期化状態」に戻せる。標準の sync.WaitGroup が Wait 後に再利用できるのに合わせた設計判断。" }
+    ],
+    "diagram": null,
+    "evidence": "issue",
+    "refs": [
+      { "type": "pr", "number": 108, "url": "https://github.com/sourcegraph/conc/pull/108" },
+      { "type": "issue", "number": 103, "url": "https://github.com/sourcegraph/conc/issues/103" }
+    ],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

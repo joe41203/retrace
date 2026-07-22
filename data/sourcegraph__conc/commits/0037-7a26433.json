@@ -1,0 +1,109 @@
+{
+  "seq": 37,
+  "sha": "7a26433b0d2fd975c79f3419d42b0f59cb0bb37f",
+  "parents": [
+    "e34ecd8e1a6b6b1c4e8a2f2242dd736e04e6ce53"
+  ],
+  "author": {
+    "name": "Camden Cheek",
+    "email": "camden@ccheek.com",
+    "date": "2022-12-30T15:50:09-07:00"
+  },
+  "message": "move iter to pool package",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 6,
+    "additions": 102,
+    "deletions": 212
+  },
+  "files": [
+    {
+      "path": "iter.go",
+      "status": "D",
+      "additions": 0,
+      "deletions": 73,
+      "binary": false
+    },
+    {
+      "path": "panic.go",
+      "status": "M",
+      "additions": 19,
+      "deletions": 8,
+      "binary": false
+    },
+    {
+      "path": "panic_test.go",
+      "status": "M",
+      "additions": 14,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "pool/iter.go",
+      "status": "M",
+      "additions": 67,
+      "deletions": 5,
+      "binary": false
+    },
+    {
+      "path": "pool/iter_test.go",
+      "status": "M",
+      "additions": 2,
+      "deletions": 4,
+      "binary": false
+    },
+    {
+      "path": "pool/pool_test.go",
+      "status": "M",
+      "additions": 0,
+      "deletions": 122,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/iter.go b/iter.go\ndeleted file mode 100644\nindex 9075c5c..0000000\n--- a/iter.go\n+++ /dev/null\n@@ -1,73 +0,0 @@\n-package conc\n-\n-import (\n-\t\"runtime\"\n-\t\"sync\"\n-\t\"sync/atomic\"\n-\n-\t\"github.com/sourcegraph/sourcegraph/lib/errors\"\n-)\n-\n-type Goer interface {\n-\tGo(func())\n-\tMaxGoroutines() int\n-\tWait()\n-}\n-\n-func ForEachIdxIn[T any](goer Goer, input []T, f func(int, *T)) {\n-\tvar idx atomic.Int64\n-\tvar wg sync.WaitGroup\n-\ttask := func() {\n-\t\tdefer wg.Done()\n-\t\ti := int(idx.Add(1) - 1)\n-\t\tfor ; i < len(input); i = int(idx.Add(1) - 1) {\n-\t\t\tf(i, &input[i])\n-\t\t}\n-\t}\n-\n-\tn := goer.MaxGoroutines()\n-\tif n > len(input) {\n-\t\tn = len(input)\n-\t} else if n == 0 {\n-\t\tn = runtime.GOMAXPROCS(0)\n-\t}\n-\n-\twg.Add(n)\n-\tfor i := 0; i < n; i++ {\n-\t\tgoer.Go(task)\n-\t}\n-\n-\twg.Wait()\n-}\n-\n-func ForEachIn[T any](goer Goer, input []T, f func(*T)) {\n-\tForEachIdxIn(goer, input, func(_ int, t *T) {\n-\t\tf(t)\n-\t})\n-}\n-\n-func MapIn[T any, R any](goer Goer, input []T, f func(*T) R) []R {\n-\tres := make([]R, len(input))\n-\tForEachIdxIn(goer, input, func(i int, t *T) {\n-\t\tres[i] = f(t)\n-\t})\n-\treturn res\n-}\n-\n-func MapErrIn[T any, R any](goer Goer, input []T, f func(*T) (R, error)) ([]R, error) {\n-\tvar (\n-\t\tres    = make([]R, len(input))\n-\t\terrMux sync.Mutex\n-\t\terrs   error\n-\t)\n-\tForEachIdxIn(goer, input, func(i int, t *T) {\n-\t\tvar err error\n-\t\tres[i], err = f(t)\n-\t\tif err != nil {\n-\t\t\terrMux.Lock()\n-\t\t\terrs = errors.Append(errs, err)\n-\t\t\terrMux.Unlock()\n-\t\t}\n-\t})\n-\treturn res, errs\n-}\ndiff --git a/panic.go b/panic.go\nindex fc78248..e295402 100644\n--- a/panic.go\n+++ b/panic.go\n@@ -21,15 +21,11 @@ type PanicCatcher struct {\n func (p *PanicCatcher) Try(f func()) {\n \tdefer func() {\n \t\tif val := recover(); val != nil {\n-\t\t\tvar callers [64]uintptr\n-\t\t\tn := runtime.Callers(2, callers[:])\n-\t\t\tp.recovered.CompareAndSwap(nil, &RecoveredPanic{\n-\t\t\t\tValue:   val,\n-\t\t\t\tCallers: callers[:n],\n-\t\t\t\tStack:   debug.Stack(),\n-\t\t\t})\n+\t\t\trp := NewRecoveredPanic(1, val)\n+\t\t\tp.recovered.CompareAndSwap(nil, &rp)\n \t\t}\n \t}()\n+\n \tf()\n }\n \n@@ -48,6 +44,21 @@ func (p *PanicCatcher) Recovered() *RecoveredPanic {\n \treturn p.recovered.Load()\n }\n \n+// NewRecoveredPanic creates a RecoveredPanic from a panic value and a\n+// collected stacktrace. The skip parameter allows the caller to skip stack\n+// frames when collecting the stacktrace. Calling with a skip of 0 means\n+// include the call to NewRecoveredPanic in the stacktrace.\n+func NewRecoveredPanic(skip int, value any) RecoveredPanic {\n+\t// 64 frames should be plenty\n+\tvar callers [64]uintptr\n+\tn := runtime.Callers(skip+1, callers[:])\n+\treturn RecoveredPanic{\n+\t\tValue:   value,\n+\t\tCallers: callers[:n],\n+\t\tStack:   debug.Stack(),\n+\t}\n+}\n+\n // RecoveredPanic is a panic that was caught with recover().\n type RecoveredPanic struct {\n \t// The original value of the panic\n@@ -62,7 +73,7 @@ type RecoveredPanic struct {\n }\n \n func (c *RecoveredPanic) Error() string {\n-\treturn fmt.Sprintf(\"panic: %q\\nstacktrace:\\n%s\\n\", c.Value, c.Stack)\n+\treturn fmt.Sprintf(\"panic: %v\\nstacktrace:\\n%s\\n\", c.Value, c.Stack)\n }\n \n func (c *RecoveredPanic) Unwrap() error {\ndiff --git a/panic_test.go b/panic_test.go\nindex bc257ba..ddae224 100644\n--- a/panic_test.go\n+++ b/panic_test.go\n@@ -47,6 +47,7 @@ func ExamplePanicCatcher_callers() {\n \t\t}\n \t}\n \t// Output:\n+\t// github.com/camdencheek/conc.(*PanicCatcher).Try.func1\n \t// runtime.gopanic\n \t// github.com/camdencheek/conc.ExamplePanicCatcher_callers.func1\n \t// github.com/camdencheek/conc.(*PanicCatcher).Try\n@@ -68,6 +69,19 @@ func TestPanicCatcher(t *testing.T) {\n \t\trecovered := pc.Recovered()\n \t\trequire.ErrorIs(t, recovered, err1)\n \t\trequire.ErrorAs(t, recovered, &err1)\n+\t\t// The exact contents aren't tested because the stacktrace contains local file paths\n+\t\t// and even the structure of the stacktrace is bound to be unstable over time. Just\n+\t\t// test a couple of basics.\n+\t\trequire.Contains(t, recovered.Error(), \"SOS\", \"error should contain the panic message\")\n+\t\trequire.Contains(t, recovered.Error(), \"conc.(*PanicCatcher).Try\", recovered.Error(), \"error should contain the stack trace\")\n+\t})\n+\n+\tt.Run(\"not error\", func(t *testing.T) {\n+\t\tvar pc PanicCatcher\n+\t\tpc.Try(func() { panic(\"definitely not an error\") })\n+\t\trecovered := pc.Recovered()\n+\t\trequire.NotErrorIs(t, recovered, err1)\n+\t\trequire.Nil(t, recovered.Unwrap())\n \t})\n \n \tt.Run(\"repanic panics\", func(t *testing.T) {\ndiff --git a/pool/iter.go b/pool/iter.go\nindex f5cb0e3..15d576d 100644\n--- a/pool/iter.go\n+++ b/pool/iter.go\n@@ -1,21 +1,25 @@\n package pool\n \n import (\n-\t\"github.com/camdencheek/conc\"\n+\t\"runtime\"\n+\t\"sync\"\n+\t\"sync/atomic\"\n+\n+\t\"github.com/sourcegraph/sourcegraph/lib/errors\"\n )\n \n func ForEachIdx[T any](input []T, f func(int, *T)) {\n \tp := New()\n \tdefer p.Wait()\n \n-\tconc.ForEachIdxIn(p, input, f)\n+\tForEachIdxIn(p, input, f)\n }\n \n func ForEach[T any](input []T, f func(*T)) {\n \tp := New()\n \tdefer p.Wait()\n \n-\tconc.ForEachIdxIn(p, input, func(_ int, t *T) {\n+\tForEachIdxIn(p, input, func(_ int, t *T) {\n \t\tf(t)\n \t})\n }\n@@ -24,12 +28,70 @@ func Map[T any, R any](input []T, f func(*T) R) []R {\n \tp := New()\n \tdefer p.Wait()\n \n-\treturn conc.MapIn(p, input, f)\n+\treturn MapIn(p, input, f)\n }\n \n func MapErr[T any, R any](input []T, f func(*T) (R, error)) ([]R, error) {\n \tp := New()\n \tdefer p.Wait()\n \n-\treturn conc.MapErrIn(p, input, f)\n+\treturn MapErrIn(p, input, f)\n+}\n+\n+func ForEachIdxIn[T any](p *Pool, input []T, f func(int, *T)) {\n+\tvar idx atomic.Int64\n+\tvar wg sync.WaitGroup\n+\ttask := func() {\n+\t\tdefer wg.Done()\n+\t\ti := int(idx.Add(1) - 1)\n+\t\tfor ; i < len(input); i = int(idx.Add(1) - 1) {\n+\t\t\tf(i, &input[i])\n+\t\t}\n+\t}\n+\n+\tn := p.MaxGoroutines()\n+\tif n > len(input) {\n+\t\tn = len(input)\n+\t} else if n == 0 {\n+\t\tn = runtime.GOMAXPROCS(0)\n+\t}\n+\n+\twg.Add(n)\n+\tfor i := 0; i < n; i++ {\n+\t\tp.Go(task)\n+\t}\n+\n+\twg.Wait()\n+}\n+\n+func ForEachIn[T any](p *Pool, input []T, f func(*T)) {\n+\tForEachIdxIn(p, input, func(_ int, t *T) {\n+\t\tf(t)\n+\t})\n+}\n+\n+func MapIn[T any, R any](p *Pool, input []T, f func(*T) R) []R {\n+\tres := make([]R, len(input))\n+\tForEachIdxIn(p, input, func(i int, t *T) {\n+\t\tres[i] = f(t)\n+\t})\n+\treturn res\n+}\n+\n+func MapErrIn[T any, R any](p *Pool, input []T, f func(*T) (R, error)) ([]R, error) {\n+\tvar (\n+\t\tres    = make([]R, len(input))\n+\t\terrMux sync.Mutex\n+\t\terrs   error\n+\t)\n+\tForEachIdxIn(p, input, func(i int, t *T) {\n+\t\tvar err error\n+\t\tres[i], err = f(t)\n+\t\tif err != nil {\n+\t\t\terrMux.Lock()\n+\t\t\terrs = errors.Append(errs, err)\n+\t\t\terrMux.Unlock()\n+\t\t}\n+\t})\n+\treturn res, errs\n }\ndiff --git a/pool/iter_test.go b/pool/iter_test.go\nindex a66991a..5d552bb 100644\n--- a/pool/iter_test.go\n+++ b/pool/iter_test.go\n@@ -6,8 +6,6 @@ import (\n \n \t\"github.com/sourcegraph/sourcegraph/lib/errors\"\n \t\"github.com/stretchr/testify/require\"\n-\n-\t\"github.com/camdencheek/conc\"\n )\n \n func TestForEachIdx(t *testing.T) {\n@@ -264,7 +262,7 @@ func BenchmarkForEachIdx(b *testing.B) {\n \t\t\t\tg := New()\n \t\t\t\tb.Run(\"share group\", func(b *testing.B) {\n \t\t\t\t\tfor i := 0; i < b.N; i++ {\n-\t\t\t\t\t\tconc.ForEachIdxIn(g, arr, func(i int, val *int) {\n+\t\t\t\t\t\tForEachIdxIn(g, arr, func(i int, val *int) {\n \t\t\t\t\t\t\t*val = i\n \t\t\t\t\t\t})\n \t\t\t\t\t}\n@@ -298,7 +296,7 @@ func BenchmarkForEach(b *testing.B) {\n \t\t\t\tg := New()\n \t\t\t\tb.Run(\"share group\", func(b *testing.B) {\n \t\t\t\t\tfor i := 0; i < b.N; i++ {\n-\t\t\t\t\t\tconc.ForEachIn(g, arr, func(val *int) {\n+\t\t\t\t\t\tForEachIn(g, arr, func(val *int) {\n \t\t\t\t\t\t\t*val = i\n \t\t\t\t\t\t})\n \t\t\t\t\t}\ndiff --git a/pool/pool_test.go b/pool/pool_test.go\nindex 32e9408..6c2ce89 100644\n--- a/pool/pool_test.go\n+++ b/pool/pool_test.go\n@@ -2,12 +2,10 @@ package pool\n \n import (\n \t\"strconv\"\n-\t\"sync\"\n \t\"sync/atomic\"\n \t\"testing\"\n \t\"time\"\n \n-\t\"github.com/camdencheek/conc\"\n \t\"github.com/stretchr/testify/require\"\n )\n \n@@ -78,123 +76,3 @@ func TestPool(t *testing.T) {\n \t\trequire.Panics(t, g.Wait)\n \t})\n }\n-\n-func BenchmarkPool(b *testing.B) {\n-\tb.Run(\"simplest\", func(b *testing.B) {\n-\t\tp := New()\n-\t\tfor i := 0; i < b.N; i++ {\n-\t\t\tp.Go(func() {\n-\t\t\t\ti := 0\n-\t\t\t\ti = 1\n-\t\t\t\t_ = i\n-\t\t\t})\n-\t\t}\n-\t\tp.Wait()\n-\t})\n-\n-\tb.Run(\"atomic increment\", func(b *testing.B) {\n-\t\tp := New()\n-\t\tvar j atomic.Int64\n-\t\tfor i := 0; i < b.N; i++ {\n-\t\t\tp.Go(func() {\n-\t\t\t\tj.Add(1)\n-\t\t\t})\n-\t\t}\n-\t\tp.Wait()\n-\t\t_ = j.Load()\n-\t})\n-\n-\tb.Run(\"atomic increment preallocated closure\", func(b *testing.B) {\n-\t\tp := New()\n-\t\tvar j atomic.Int64\n-\t\tf := func() { j.Add(1) }\n-\t\tfor i := 0; i < b.N; i++ {\n-\t\t\tp.Go(f)\n-\t\t}\n-\t\tp.Wait()\n-\t\t_ = j.Load()\n-\t})\n-\n-\tb.Run(\"conc\", func(b *testing.B) {\n-\t\tvar p conc.WaitGroup\n-\t\tvar j atomic.Int64\n-\t\tfor i := 0; i < b.N; i++ {\n-\t\t\tp.Go(func() { j.Add(1) })\n-\t\t}\n-\t\tp.Wait()\n-\t\t_ = j.Load()\n-\t})\n-\n-}\n-\n-func BenchmarkGroup(b *testing.B) {\n-\tg := New()\n-\tfor i := 0; i < b.N; i++ {\n-\t\tg.Go(func() {\n-\t\t\ti := 0\n-\t\t\ti = 1\n-\t\t\t_ = i\n-\t\t})\n-\t}\n-\tg.Wait()\n-}\n-\n-func BenchmarkGroup2(b *testing.B) {\n-\tg := New()\n-\tvar ai atomic.Uint32\n-\tfor i := 0; i < b.N; i++ {\n-\t\tg.Go(func() {\n-\t\t\tai.Add(1)\n-\t\t})\n-\t}\n-\tg.Wait()\n-}\n-\n-func BenchmarkGroup21(b *testing.B) {\n-\tg := New()\n-\tfor i := 0; i < b.N; i++ {\n-\t\tg.Go(func() {\n-\t\t\ttime.Sleep(10 * time.Nanosecond)\n-\t\t})\n-\t}\n-\tg.Wait()\n-}\n-\n-func BenchmarkGroup22(b *testing.B) {\n-\tfor i := 0; i < b.N; i++ {\n-\t\tg := New()\n-\t\tvar ai atomic.Int32\n-\t\tf := func() {\n-\t\t\ttime.Sleep(100 * time.Nanosecond)\n-\t\t\tai.Add(1)\n-\t\t\ttime.Sleep(100 * time.Nanosecond)\n-\t\t}\n-\t\tfor j := 0; j < 500; j++ {\n-\t\t\tg.Go(f)\n-\t\t}\n-\t\tg.Wait()\n-\t}\n-}\n-\n-func BenchmarkGroup3(b *testing.B) {\n-\tg := New()\n-\tvar ai atomic.Uint32\n-\tfor i := 0; i < b.N; i++ {\n-\t\tai.Add(1)\n-\t}\n-\tg.Wait()\n-}\n-\n-func BenchmarkGroup4(b *testing.B) {\n-\tvar wg sync.WaitGroup\n-\tvar ai atomic.Uint32\n-\tf := func() {\n-\t\tdefer wg.Done()\n-\t\tai.Add(1)\n-\t}\n-\tfor i := 0; i < b.N; i++ {\n-\t\twg.Add(1)\n-\t\tgo f()\n-\t}\n-\twg.Wait()\n-}\n",
+  "diffTruncated": false,
+  "tree": [
+    "LICENSE",
+    "go.mod",
+    "go.sum",
+    "limiter.go",
+    "panic.go",
+    "panic_test.go",
+    "pool/context_pool.go",
+    "pool/context_pool_test.go",
+    "pool/error_pool.go",
+    "pool/error_pool_test.go",
+    "pool/iter.go",
+    "pool/iter_test.go",
+    "pool/pool.go",
+    "pool/pool_test.go",
+    "pool/result_context_pool.go",
+    "pool/result_context_pool_test.go",
+    "pool/result_error_pool.go",
+    "pool/result_error_pool_test.go",
+    "pool/result_pool.go",
+    "pool/result_pool_test.go",
+    "stream/stream.go",
+    "stream/stream_test.go",
+    "waitgroup.go",
+    "waitgroup_test.go"
+  ],
+  "explanation": {
+    "what": "ルート直下の iter.go (Goer インタフェースを受け取る ForEachIdxIn/ForEachIn/MapIn/MapErrIn の汎用実装)を削除し、同等のコードを pool/iter.go に移植した。移植先では Goer インタフェースではなく具体型 *Pool を直接受け取るシグネチャに変更されている。panic.go には NewRecoveredPanic(skip, value) というコンストラクタ関数を新設し、Try 内のパニック捕捉ロジックをそこへ切り出した。pool/pool_test.go からは大量のベンチマーク関数(BenchmarkGroup 等)を削除した。",
+    "why": "コミットメッセージの通り iter を pool パッケージへ移す整理。汎用インタフェース Goer を経由する設計から pool.Pool 型に直接依存する設計へ寄せることで、pool パッケージ内で完結する形にしたとみられる。不要になった比較用ベンチマークの削除も同時に行われている。",
+    "highlights": [
+      { "file": "pool/iter.go", "note": "conc.ForEachIdxIn 等の呼び出しを pool パッケージ内実装に置き換え、Goer から *Pool 直接依存へ" },
+      { "file": "panic.go", "note": "NewRecoveredPanic(skip, value) がスタックトレース収集ロジックを再利用可能な形に切り出した" }
+    ],
+    "langNotes": [],
+    "diagram": {
+      "mermaid": "flowchart LR\n  A[\"iter.go (ルート, Goer インタフェース経由)\"] -->|\"move\"| B[\"pool/iter.go (*Pool 直接依存)\"]\n",
+      "caption": "iter のジェネリック実装がルート直下から pool パッケージへ移動し、Goer インタフェースではなく *Pool に直接依存する形になった"
+    },
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

@@ -1,0 +1,80 @@
+{
+  "seq": 99,
+  "sha": "5de4f90b9e20f4c9f9d7a696139d409b38f2542f",
+  "parents": [
+    "6e152f9f2875c602f891237e9e89c17ece26d5ac",
+    "4b95d5c2322062486b6251764e5097e99abbe836"
+  ],
+  "author": {
+    "name": "Camden Cheek",
+    "email": "camden@ccheek.com",
+    "date": "2023-01-08T10:06:51-07:00"
+  },
+  "message": "Merge pull request #35 from sashamelentyev/rentype\n\nRemove redundant type",
+  "pr": {
+    "number": 35,
+    "title": "Remove redundant type",
+    "body": "",
+    "url": "https://github.com/sourcegraph/conc/pull/35"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 1,
+    "deletions": 1
+  },
+  "files": [
+    {
+      "path": "iter/iter.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/iter/iter.go b/iter/iter.go\nindex 0198bd4..58fad8d 100644\n--- a/iter/iter.go\n+++ b/iter/iter.go\n@@ -59,7 +59,7 @@ func Map[T, R any](input []T, f func(*T) R) []R {\n \n // MapErr applies f to each element of the input, returning the mapped result\n // and a combined error of all returned errors.\n-func MapErr[T any, R any](input []T, f func(*T) (R, error)) ([]R, error) {\n+func MapErr[T, R any](input []T, f func(*T) (R, error)) ([]R, error) {\n \tvar (\n \t\tres    = make([]R, len(input))\n \t\terrMux sync.Mutex\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/go.yml",
+    ".golangci.yml",
+    "LICENSE",
+    "README.md",
+    "go.mod",
+    "go.sum",
+    "iter/iter.go",
+    "iter/iter_test.go",
+    "panic.go",
+    "panic_test.go",
+    "pool/context_pool.go",
+    "pool/context_pool_test.go",
+    "pool/error_pool.go",
+    "pool/error_pool_test.go",
+    "pool/pool.go",
+    "pool/pool_test.go",
+    "pool/result_context_pool.go",
+    "pool/result_context_pool_test.go",
+    "pool/result_error_pool.go",
+    "pool/result_error_pool_test.go",
+    "pool/result_pool.go",
+    "pool/result_pool_test.go",
+    "stream/stream.go",
+    "stream/stream_test.go",
+    "waitgroup.go",
+    "waitgroup_test.go"
+  ],
+  "explanation": {
+    "what": "iter.go の MapErr のジェネリクス型パラメータ宣言を [T any, R any] から [T, R any] に変更した。挙動は変わらない。",
+    "why": "PR本文に詳細はないが、message「Remove redundant type」の通り、T と R は両方とも制約が any なので、Go のジェネリクス構文ではまとめて [T, R any] と書ける。冗長な記述を削っただけの整理。",
+    "highlights": [
+      { "file": "iter/iter.go", "note": "MapErr のシグネチャの型パラメータ宣言のみ変更。実装・挙動は同一" }
+    ],
+    "langNotes": [
+      { "topic": "型パラメータの制約の省略記法", "note": "Go のジェネリクスでは、複数の型パラメータが同じ制約を共有する場合、func F[T, R any](...) のように制約をまとめて1回だけ書ける。[T any, R any] と等価だが冗長でない。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [{ "type": "pr", "number": 35, "url": "https://github.com/sourcegraph/conc/pull/35" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

@@ -1,0 +1,71 @@
+{
+  "seq": 65,
+  "sha": "8495e5ad49b82b41da360bd8cd1a2800267709e9",
+  "parents": [
+    "9b3b6cdb40d185073c16701646d278f470820ec7"
+  ],
+  "author": {
+    "name": "Camden Cheek",
+    "email": "camden@ccheek.com",
+    "date": "2023-01-02T18:37:53-07:00"
+  },
+  "message": "add an \"at a glance\" section",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 23,
+    "deletions": 0
+  },
+  "files": [
+    {
+      "path": "README.md",
+      "status": "M",
+      "additions": 23,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/README.md b/README.md\nindex 9cdc0ef..0ce29f0 100644\n--- a/README.md\n+++ b/README.md\n@@ -7,6 +7,29 @@\n `conc` is your toolbelt for structured concurrency in go, making common tasks\n easier and safer.\n \n+# At a glance\n+\n+- Use [`conc.WaitGroup`](https://pkg.go.dev/github.com/sourcegraph/conc#WaitGroup) if you just want a safer version of `sync.WaitGroup`\n+- Use [`pool.Pool`](https://pkg.go.dev/github.com/sourcegraph/conc@v0.1.0/pool#Pool) if you want a concurrency-limited task runner\n+- Use [`pool.ResultPool`](https://pkg.go.dev/github.com/sourcegraph/conc@v0.1.0/pool#ResultPool) if you want a concurrent task runner that collects task results\n+- Use [`pool.(Result)?ErrorPool`](https://pkg.go.dev/github.com/sourcegraph/conc@v0.1.0/pool#ErrorPool) if your tasks are fallible\n+- Use [`pool.(Result)?ContextPool`](https://pkg.go.dev/github.com/sourcegraph/conc@v0.1.0/pool#ContextPool) if your tasks should be canceled on failure\n+- Use [`iter.Map`](https://pkg.go.dev/github.com/sourcegraph/conc@v0.1.0/iter#Map) if you want to concurrently map a slice\n+- Use [`iter.ForEach`](https://pkg.go.dev/github.com/sourcegraph/conc@v0.1.0/iter#Map) if you want to concurrently iterate over a slice\n+\n+All pools are created with\n+[`pool.New()`](https://pkg.go.dev/github.com/sourcegraph/conc@v0.1.0/pool#New)\n+or\n+[`pool.NewWithResults[T]()`](https://pkg.go.dev/github.com/sourcegraph/conc@v0.1.0/pool#NewWithResults),\n+then configured with methods:\n+- [`p.WithMaxGoroutines()`](https://pkg.go.dev/github.com/sourcegraph/conc@v0.1.0/pool#Pool.MaxGoroutines) configures the maximum number of goroutines in the pool\n+- [`p.WithErrors()`](https://pkg.go.dev/github.com/sourcegraph/conc@v0.1.0/pool#Pool.WithErrors) configures the pool to run tasks that return errors\n+- [`p.WithContext(ctx)`](https://pkg.go.dev/github.com/sourcegraph/conc@v0.1.0/pool#Pool.WithContext) configures the pool to run tasks that should be canceled on first error\n+- [`p.WithFirstError()`](https://pkg.go.dev/github.com/sourcegraph/conc@v0.1.0/pool#ErrorPool.WithFirstError) configures error pools to only keep the first returned error rather than an aggregated error\n+- [`p.WithCollectErrored()`](https://pkg.go.dev/github.com/sourcegraph/conc@v0.1.0/pool#ResultContextPool.WithCollectErrored) configures result pools to only collect results that did not error\n+\n+# Goals\n+\n The main goals of the package are:\n 1) Make it harder to leak goroutines\n 2) Handle panics gracefully\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/go.yml",
+    "LICENSE",
+    "README.md",
+    "go.mod",
+    "go.sum",
+    "iter/iter.go",
+    "iter/iter_test.go",
+    "panic.go",
+    "panic_test.go",
+    "pool/context_pool.go",
+    "pool/context_pool_test.go",
+    "pool/error_pool.go",
+    "pool/error_pool_test.go",
+    "pool/pool.go",
+    "pool/pool_test.go",
+    "pool/result_context_pool.go",
+    "pool/result_context_pool_test.go",
+    "pool/result_error_pool.go",
+    "pool/result_error_pool_test.go",
+    "pool/result_pool.go",
+    "pool/result_pool_test.go",
+    "stream/stream.go",
+    "stream/stream_test.go",
+    "waitgroup.go",
+    "waitgroup_test.go"
+  ],
+  "explanation": {
+    "what": "README に「At a glance」節を新設し、WaitGroup / Pool / ResultPool / ErrorPool / ContextPool / iter.Map / iter.ForEach の使い分け早見表と、各 pool 設定メソッド(WithMaxGoroutines・WithErrors・WithContext など)の一覧を追加した。",
+    "why": "コミットメッセージの通り、利用者が最初に読む位置に「どの型・関数をいつ使うべきか」の早見表を置く目的。README 冒頭の概要のすぐ後に配置しており、ライブラリの全体像を一目で把握させる公開準備の一環と考えられる。",
+    "highlights": [
+      { "file": "README.md", "note": "「At a glance」節: 型・関数ごとの使い分け早見表" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

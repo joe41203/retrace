@@ -1,0 +1,103 @@
+{
+  "seq": 83,
+  "sha": "021e3b31314d296ae1e172b4ad426ffa1957e62b",
+  "parents": [
+    "b81610a092e14678c73909ec1a3c42d73c4ab5c6"
+  ],
+  "author": {
+    "name": "Camden Cheek",
+    "email": "camden@ccheek.com",
+    "date": "2023-01-04T18:14:30-07:00"
+  },
+  "message": "make pool default to unlimited",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 5,
+    "additions": 35,
+    "deletions": 25
+  },
+  "files": [
+    {
+      "path": "pool/error_pool.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "pool/pool.go",
+      "status": "M",
+      "additions": 31,
+      "deletions": 21,
+      "binary": false
+    },
+    {
+      "path": "pool/result_context_pool.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "pool/result_error_pool.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "pool/result_pool.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/pool/error_pool.go b/pool/error_pool.go\nindex ed24216..5f702d5 100644\n--- a/pool/error_pool.go\n+++ b/pool/error_pool.go\n@@ -53,7 +53,7 @@ func (p *ErrorPool) WithFirstError() *ErrorPool {\n }\n \n // WithMaxGoroutines limits the number of goroutines in a pool.\n-// Defaults to runtime.GOMAXPROCS(0). Panics if n < 1.\n+// Defaults to unlimited. Panics if n < 1.\n func (p *ErrorPool) WithMaxGoroutines(n int) *ErrorPool {\n \tp.pool.WithMaxGoroutines(n)\n \treturn p\ndiff --git a/pool/pool.go b/pool/pool.go\nindex b201ac0..52964ce 100644\n--- a/pool/pool.go\n+++ b/pool/pool.go\n@@ -2,7 +2,6 @@ package pool\n \n import (\n \t\"context\"\n-\t\"runtime\"\n \t\"sync\"\n \n \t\"github.com/sourcegraph/conc\"\n@@ -36,20 +35,34 @@ type Pool struct {\n func (p *Pool) Go(f func()) {\n \tp.init()\n \n-\tselect {\n-\tcase p.limiter <- struct{}{}:\n-\t\t// If we are below our limit, spawn a new worker rather\n-\t\t// than waiting for one to become available.\n-\t\tp.handle.Go(p.worker)\n-\n-\t\t// We know there is a least one worker running, so wait\n-\t\t// for it to become available. This ensures we never spawn\n-\t\t// more workers than the number of tasks.\n-\t\tp.tasks <- f\n-\tcase p.tasks <- f:\n-\t\t// A worker is available and has accepted the task\n-\t\treturn\n+\tif p.limiter == nil {\n+\t\t// No limit on the number of goroutines.\n+\t\tselect {\n+\t\tcase p.tasks <- f:\n+\t\t\t// A goroutine was available to handle the task\n+\t\tdefault:\n+\t\t\t// No goroutine was available to handle the task.\n+\t\t\t// Spawn a new one and send it the task.\n+\t\t\tp.handle.Go(p.worker)\n+\t\t\tp.tasks <- f\n+\t\t}\n+\t} else {\n+\t\tselect {\n+\t\tcase p.limiter <- struct{}{}:\n+\t\t\t// If we are below our limit, spawn a new worker rather\n+\t\t\t// than waiting for one to become available.\n+\t\t\tp.handle.Go(p.worker)\n+\n+\t\t\t// We know there is a least one worker running, so wait\n+\t\t\t// for it to become available. This ensures we never spawn\n+\t\t\t// more workers than the number of tasks.\n+\t\t\tp.tasks <- f\n+\t\tcase p.tasks <- f:\n+\t\t\t// A worker is available and has accepted the task\n+\t\t\treturn\n+\t\t}\n \t}\n+\n }\n \n // Wait cleans up spawned goroutines, propagating any panics that were\n@@ -67,7 +80,7 @@ func (p *Pool) MaxGoroutines() int {\n }\n \n // WithMaxGoroutines limits the number of goroutines in a pool.\n-// Defaults to runtime.GOMAXPROCS(0). Panics if n < 1.\n+// Defaults to unlimited. Panics if n < 1.\n func (p *Pool) WithMaxGoroutines(n int) *Pool {\n \tif n < 1 {\n \t\tpanic(\"max goroutines in a pool must be greater than zero\")\n@@ -80,11 +93,6 @@ func (p *Pool) WithMaxGoroutines(n int) *Pool {\n // zero value of the pool usable.\n func (p *Pool) init() {\n \tp.initOnce.Do(func() {\n-\t\t// Do not override the limiter if set by WithMaxGoroutines\n-\t\tif p.limiter == nil {\n-\t\t\tp.limiter = make(limiter, runtime.GOMAXPROCS(0))\n-\t\t}\n-\n \t\tp.tasks = make(chan func())\n \t})\n }\n@@ -134,5 +142,7 @@ func (l limiter) limit() int {\n }\n \n func (l limiter) release() {\n-\t<-l\n+\tif l != nil {\n+\t\t<-l\n+\t}\n }\ndiff --git a/pool/result_context_pool.go b/pool/result_context_pool.go\nindex 0c47d30..f6ebaa9 100644\n--- a/pool/result_context_pool.go\n+++ b/pool/result_context_pool.go\n@@ -48,7 +48,7 @@ func (p *ResultContextPool[T]) WithFirstError() *ResultContextPool[T] {\n }\n \n // WithMaxGoroutines limits the number of goroutines in a pool.\n-// Defaults to runtime.GOMAXPROCS(0). Panics if n < 1.\n+// Defaults to unlimited. Panics if n < 1.\n func (p *ResultContextPool[T]) WithMaxGoroutines(n int) *ResultContextPool[T] {\n \tp.contextPool.WithMaxGoroutines(n)\n \treturn p\ndiff --git a/pool/result_error_pool.go b/pool/result_error_pool.go\nindex 3f3df6e..cf730b7 100644\n--- a/pool/result_error_pool.go\n+++ b/pool/result_error_pool.go\n@@ -59,7 +59,7 @@ func (p *ResultErrorPool[T]) WithFirstError() *ResultErrorPool[T] {\n }\n \n // WithMaxGoroutines limits the number of goroutines in a pool.\n-// Defaults to runtime.GOMAXPROCS(0). Panics if n < 1.\n+// Defaults to unlimited. Panics if n < 1.\n func (p *ResultErrorPool[T]) WithMaxGoroutines(n int) *ResultErrorPool[T] {\n \tp.errorPool.WithMaxGoroutines(n)\n \treturn p\ndiff --git a/pool/result_pool.go b/pool/result_pool.go\nindex 1b4e14f..1f0f9c2 100644\n--- a/pool/result_pool.go\n+++ b/pool/result_pool.go\n@@ -60,7 +60,7 @@ func (p *ResultPool[T]) WithContext(ctx context.Context) *ResultContextPool[T] {\n }\n \n // WithMaxGoroutines limits the number of goroutines in a pool.\n-// Defaults to runtime.GOMAXPROCS(0). Panics if n < 1.\n+// Defaults to unlimited. Panics if n < 1.\n func (p *ResultPool[T]) WithMaxGoroutines(n int) *ResultPool[T] {\n \tp.pool.WithMaxGoroutines(n)\n \treturn p\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/go.yml",
+    "LICENSE",
+    "README.md",
+    "go.mod",
+    "go.sum",
+    "iter/iter.go",
+    "iter/iter_test.go",
+    "panic.go",
+    "panic_test.go",
+    "pool/context_pool.go",
+    "pool/context_pool_test.go",
+    "pool/error_pool.go",
+    "pool/error_pool_test.go",
+    "pool/pool.go",
+    "pool/pool_test.go",
+    "pool/result_context_pool.go",
+    "pool/result_context_pool_test.go",
+    "pool/result_error_pool.go",
+    "pool/result_error_pool_test.go",
+    "pool/result_pool.go",
+    "pool/result_pool_test.go",
+    "stream/stream.go",
+    "stream/stream_test.go",
+    "waitgroup.go",
+    "waitgroup_test.go"
+  ],
+  "explanation": {
+    "what": "pool.Pool の goroutine 数上限のデフォルトを `runtime.GOMAXPROCS(0)` から「無制限」に変更した。init() で limiter チャネルを常に生成する処理を削除し、Go メソッドを limiter が nil かどうかで分岐させ、nil の場合は select/default で非ブロッキングに新規 worker を起動する経路を追加した。ErrorPool・ResultPool・ResultErrorPool・ResultContextPool の WithMaxGoroutines のドキュメントコメントも「Defaults to unlimited」に揃えて更新した。",
+    "why": "コミットメッセージは \"make pool default to unlimited\" のみで詳細な経緯は書かれていない。従来は明示的に WithMaxGoroutines を呼ばない限り CPU コア数で自動的に上限がかかっていたが、それは呼び出し側から見えない暗黙の制約であり、goroutine を明示的に制限したい場合にだけ WithMaxGoroutines を呼ぶという設計の方が pool の「デフォルトは素の go 文と同じ挙動」という意図に合致すると判断したものと考えられる。",
+    "highlights": [
+      { "file": "pool/pool.go", "note": "Go メソッド内で limiter == nil のケースを追加し、select/default で新規 goroutine を即座に起動する非ブロッキング経路を実装" },
+      { "file": "pool/pool.go", "note": "limiter.release() に nil チェックを追加(無制限モードでは release がno-opになる)" }
+    ],
+    "langNotes": [
+      { "topic": "limiter (buffered channel as semaphore)", "note": "`type limiter chan struct{}` は空構造体のバッファ付きチャネルを使い、送信できる数=同時実行数の上限として機能するセマフォパターン。Go でよく使われる並行数制御の慣用手法。" },
+      { "topic": "nil channel", "note": "Go では nil のチャネルへの送受信は永久にブロックするが、select 文の中で nil チャネルを含む case は単に選ばれなくなる(このコミットでは limiter が nil のときに select 節をスキップして無制限モード分岐へ振り分けている)。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

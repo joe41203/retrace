@@ -1,0 +1,73 @@
+{
+  "seq": 62,
+  "sha": "a0427ddec80425b68250f7fbb10bcab0bc34a879",
+  "parents": [
+    "28c547794267d60c75428ea92d8c36236ef99f60"
+  ],
+  "author": {
+    "name": "Camden Cheek",
+    "email": "camden@ccheek.com",
+    "date": "2023-01-02T17:11:09-07:00"
+  },
+  "message": "fix go example",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 2,
+    "deletions": 1
+  },
+  "files": [
+    {
+      "path": "README.md",
+      "status": "M",
+      "additions": 2,
+      "deletions": 1,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/README.md b/README.md\nindex bd0584d..a606524 100644\n--- a/README.md\n+++ b/README.md\n@@ -223,8 +223,9 @@ func process(stream chan int) {\n func process(stream chan int) {\n \tp := pool.New().WithMaxGoroutines(10)\n \tfor elem := range stream {\n+        elem := elem\n \t\tp.Go(func() {\n-\t\t\thandle(values[i])\n+\t\t\thandle(elem)\n \t\t})\n \t}\n \tp.Wait()\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/go.yml",
+    "LICENSE",
+    "README.md",
+    "go.mod",
+    "go.sum",
+    "iter/iter.go",
+    "iter/iter_test.go",
+    "panic.go",
+    "panic_test.go",
+    "pool/context_pool.go",
+    "pool/context_pool_test.go",
+    "pool/error_pool.go",
+    "pool/error_pool_test.go",
+    "pool/pool.go",
+    "pool/pool_test.go",
+    "pool/result_context_pool.go",
+    "pool/result_context_pool_test.go",
+    "pool/result_error_pool.go",
+    "pool/result_error_pool_test.go",
+    "pool/result_pool.go",
+    "pool/result_pool_test.go",
+    "stream/stream.go",
+    "stream/stream_test.go",
+    "waitgroup.go",
+    "waitgroup_test.go"
+  ],
+  "explanation": {
+    "what": "README 内の pool.Go 使用例のコード片を修正した。ループ変数 elem をクロージャに渡す前に `elem := elem` でシャドーイングし、また存在しない変数 `values[i]` を参照していた誤りを `handle(elem)` に修正した。",
+    "why": "コミットメッセージが示す通り、README の Go サンプルコードに残っていた誤り(未定義の values/i を参照)を修正する目的。goroutine 内でループ変数を安全に扱うためのシャドーイングイディオムも合わせて明示している。",
+    "highlights": [
+      { "file": "README.md", "note": "`elem := elem` によるループ変数のシャドーイングと handle(elem) への修正" }
+    ],
+    "langNotes": [
+      { "topic": "ループ変数のシャドーイングとgoroutineキャプチャ", "note": "Go 1.21 以前は for ループの変数が全イテレーションで共有されるため、goroutine 内でそのままキャプチャすると意図しない値を参照してしまう。`elem := elem` はループ内で新しいローカル変数を作り、各 goroutine に固有の値を持たせる定番の回避策。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

@@ -1,0 +1,78 @@
+{
+  "seq": 113,
+  "sha": "f6e77d4bcec80a1316616a4cc8e34f41596f26ff",
+  "parents": [
+    "f7fb299140474a453fb8b49161ed4258110c7610",
+    "975f0c27d37a6dc772f89fe6764e16190e884eef"
+  ],
+  "author": {
+    "name": "Camden Cheek",
+    "email": "camden@ccheek.com",
+    "date": "2023-01-15T13:54:09-07:00"
+  },
+  "message": "Merge pull request #64 from zdyxry/main\n\ndoc: fix `mapStream` function error",
+  "pr": {
+    "number": 64,
+    "title": "doc: fix `mapStream` function error",
+    "body": "",
+    "url": "https://github.com/sourcegraph/conc/pull/64"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 4,
+    "deletions": 3
+  },
+  "files": [
+    {
+      "path": "README.md",
+      "status": "M",
+      "additions": 4,
+      "deletions": 3,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/README.md b/README.md\nindex 93e89a5..55cf08c 100644\n--- a/README.md\n+++ b/README.md\n@@ -383,7 +383,7 @@ Process an ordered stream concurrently:\n <td>\n \n ```go\n-func mapStream\n+func mapStream(\n     in chan int,\n     out chan int,\n     f func(int) int,\n@@ -409,9 +409,10 @@ func mapStream\n     go func() {\n         defer readerWg.Done()\n         for result := range taskResults {\n-            out <- result\n+            item := <-result\n+            out <- item\n         }\n-    }\n+    }()\n \n     // Feed the workers with tasks\n     for elem := range in {\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/go.yml",
+    ".golangci.yml",
+    "LICENSE",
+    "README.md",
+    "go.mod",
+    "go.sum",
+    "iter/iter.go",
+    "iter/iter_test.go",
+    "panics/panics.go",
+    "panics/panics_test.go",
+    "pool/context_pool.go",
+    "pool/context_pool_test.go",
+    "pool/error_pool.go",
+    "pool/error_pool_test.go",
+    "pool/pool.go",
+    "pool/pool_test.go",
+    "pool/result_context_pool.go",
+    "pool/result_context_pool_test.go",
+    "pool/result_error_pool.go",
+    "pool/result_error_pool_test.go",
+    "pool/result_pool.go",
+    "pool/result_pool_test.go",
+    "stream/stream.go",
+    "stream/stream_test.go",
+    "waitgroup.go",
+    "waitgroup_test.go"
+  ],
+  "explanation": {
+    "what": "README.md の mapStream 関数のサンプルコード中の複数の誤りを修正した。関数シグネチャの閉じ括弧の欠落(func mapStream → func mapStream()に相当する形)、結果チャネルからの受信漏れ(out <- result を item := <-result; out <- item に変更)、goroutine の即時実行(defer readerWg.Done() を含む無名関数の呼び出し漏れ func(){...} → func(){...}())を修正した。",
+    "why": "コミットメッセージ「doc: fix mapStream function error」の通り、ドキュメント上のサンプルコードのタイプミス・実行漏れを修正するための変更。PR本文は空でタイトルのみが根拠。",
+    "highlights": [],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [
+      { "type": "pr", "number": 64, "url": "https://github.com/sourcegraph/conc/pull/64" }
+    ],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

@@ -1,0 +1,94 @@
+{
+  "seq": 22,
+  "sha": "2e891e0f183da04f9a17f384924ce1a265d24f51",
+  "parents": [
+    "26b602bfef649acbdab5b6a92cb24ee18d56774e"
+  ],
+  "author": {
+    "name": "Camden Cheek",
+    "email": "camden@ccheek.com",
+    "date": "2022-12-16T18:41:50-07:00"
+  },
+  "message": "add stacktrace to caught panic",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 19,
+    "deletions": 3
+  },
+  "files": [
+    {
+      "path": "waitgroup.go",
+      "status": "M",
+      "additions": 18,
+      "deletions": 2,
+      "binary": false
+    },
+    {
+      "path": "waitgroup_test.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/waitgroup.go b/waitgroup.go\nindex db5d1b9..de3db84 100644\n--- a/waitgroup.go\n+++ b/waitgroup.go\n@@ -1,15 +1,24 @@\n package conc\n \n import (\n+\t\"runtime/debug\"\n \t\"sync\"\n \t\"sync/atomic\"\n+\n+\t\"github.com/sourcegraph/sourcegraph/lib/errors\"\n )\n \n+// WaitGroup is the primary building block for scoped concurrency.\n+// Goroutines can be spawned in the WaitGroup with the Go method,\n+// and calling Wait() will ensure that each of those goroutines exits\n+// before continuing. Any panics in a child goroutine will be caught\n+// and propagated to the caller of Wait().\n type WaitGroup struct {\n \twg          sync.WaitGroup\n-\tcaughtPanic atomic.Pointer[any]\n+\tcaughtPanic atomic.Pointer[error]\n }\n \n+// Go spawns a new goroutine in the WaitGroup\n func (h *WaitGroup) Go(f func()) {\n \th.wg.Add(1)\n \tgo func() {\n@@ -18,6 +27,8 @@ func (h *WaitGroup) Go(f func()) {\n \t}()\n }\n \n+// Wait will block until all goroutines spawned with Go exit and will\n+// propagate any panics spawned in a child goroutine.\n func (h *WaitGroup) Wait() {\n \th.wg.Wait()\n \n@@ -30,7 +41,12 @@ func (h *WaitGroup) Wait() {\n // done should be called in a defer statement in a child goroutine\n func (h *WaitGroup) done() {\n \tif r := recover(); r != nil {\n-\t\th.caughtPanic.Store(&r)\n+\t\terr := errors.Newf(\n+\t\t\t\"recovered from panic in child goroutine: %#v\\n\\nchild stacktrace:\\n%s\\n\",\n+\t\t\tr,\n+\t\t\tdebug.Stack(),\n+\t\t)\n+\t\th.caughtPanic.Store(&err)\n \t}\n \th.wg.Done()\n }\ndiff --git a/waitgroup_test.go b/waitgroup_test.go\nindex 5fec4dc..4874885 100644\n--- a/waitgroup_test.go\n+++ b/waitgroup_test.go\n@@ -7,7 +7,7 @@ import (\n \t\"github.com/stretchr/testify/require\"\n )\n \n-func TestWaitgroup(t *testing.T) {\n+func TestWaitGroup(t *testing.T) {\n \tt.Parallel()\n \n \tt.Run(\"all spawned run\", func(t *testing.T) {\n",
+  "diffTruncated": false,
+  "tree": [
+    "LICENSE",
+    "go.mod",
+    "go.sum",
+    "group/context_group.go",
+    "group/context_group_test.go",
+    "group/error_group.go",
+    "group/error_group_test.go",
+    "group/group.go",
+    "group/group_test.go",
+    "group/iter.go",
+    "group/iter_test.go",
+    "group/result_context_group.go",
+    "group/result_context_group_test.go",
+    "group/result_error_group.go",
+    "group/result_error_group_test.go",
+    "group/result_group.go",
+    "group/result_group_test.go",
+    "iter.go",
+    "limiter.go",
+    "panic.go",
+    "pool/context_pool.go",
+    "pool/context_pool_test.go",
+    "pool/error_pool.go",
+    "pool/error_pool_test.go",
+    "pool/iter.go",
+    "pool/iter_test.go",
+    "pool/pool.go",
+    "pool/pool_test.go",
+    "pool/result_context_pool.go",
+    "pool/result_context_pool_test.go",
+    "pool/result_error_pool.go",
+    "pool/result_error_pool_test.go",
+    "pool/result_pool.go",
+    "pool/result_pool_test.go",
+    "stream/stream.go",
+    "stream/stream_test.go",
+    "waitgroup.go",
+    "waitgroup_test.go"
+  ],
+  "explanation": {
+    "what": "WaitGroup が保持する caughtPanic フィールドの型を `atomic.Pointer[any]` から `atomic.Pointer[error]` に変更し、done() 内で recover した値をそのまま格納するのではなく、`errors.Newf` で「recovered from panic in child goroutine」というメッセージと `debug.Stack()` によるスタックトレースを埋め込んだ error にラップしてから格納するようにした。WaitGroup と done() に doc コメントも追加している。",
+    "why": "panic の値だけを保持していると、Wait() 側で re-panic したときに元の panic がどの goroutine のどの箇所で起きたのか追跡できない。runtime/debug.Stack() で子goroutineのスタックトレースを文字列化して同梱することで、デバッグ時に原因箇所を特定しやすくしている。",
+    "highlights": [
+      { "file": "waitgroup.go", "note": "done() 内の errors.Newf(...) + debug.Stack() でスタックトレース付きエラーを生成する部分" }
+    ],
+    "langNotes": [
+      { "topic": "panic/recover とスタックトレース", "note": "Go の panic は捕捉(recover)すると元のスタック情報は失われるため、必要なら recover 時点で runtime/debug.Stack() を呼んで文字列として保存しておく必要がある。これは他言語の例外オブジェクトが自動でスタックトレースを保持するのと対照的な設計。" },
+      { "topic": "atomic.Pointer[T]", "note": "Go 1.19 で追加されたジェネリクス版の atomic ラッパー。型消去された atomic.Value と異なり、格納する型(ここでは error)をコンパイル時に固定できる。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

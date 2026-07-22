@@ -1,0 +1,87 @@
+{
+  "seq": 39,
+  "sha": "d1654930aa03f3a158fe62d1210c64a5db1b4e9e",
+  "parents": [
+    "0085dc073f58cf4dc2f0bf7f809dbf250ef7ec8a"
+  ],
+  "author": {
+    "name": "Camden Cheek",
+    "email": "camden@ccheek.com",
+    "date": "2023-01-02T11:18:42-07:00"
+  },
+  "message": "use a sync.Pool for channels",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 3,
+    "additions": 39,
+    "deletions": 28
+  },
+  "files": [
+    {
+      "path": "limiter.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "stream/stream.go",
+      "status": "M",
+      "additions": 25,
+      "deletions": 27,
+      "binary": false
+    },
+    {
+      "path": "stream/stream_test.go",
+      "status": "M",
+      "additions": 13,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/limiter.go b/limiter.go\nindex b7a0677..b9354e9 100644\n--- a/limiter.go\n+++ b/limiter.go\n@@ -1,6 +1,6 @@\n package conc\n \n-// Limiter is a simple channel-based semaphore.\n+// Limiter is a simple, goroutine-safe, channel-based semaphore.\n func NewLimiter(n int) Limiter {\n \treturn make(Limiter, n)\n }\ndiff --git a/stream/stream.go b/stream/stream.go\nindex 67c2d48..090d0bf 100644\n--- a/stream/stream.go\n+++ b/stream/stream.go\n@@ -32,12 +32,25 @@ func New() *Stream {\n type Stream struct {\n \tpool             pool.Pool\n \tcallbackerHandle conc.WaitGroup\n-\tfree             freePool\n \tqueue            chan callbackCh\n \n \tinitOnce sync.Once\n }\n \n+var callbackChPool = sync.Pool{\n+\tNew: func() any {\n+\t\treturn make(callbackCh, 1)\n+\t},\n+}\n+\n+func getCh() callbackCh {\n+\treturn callbackChPool.Get().(callbackCh)\n+}\n+\n+func putCh(ch callbackCh) {\n+\tcallbackChPool.Put(ch)\n+}\n+\n // Stream task is a task that is submitted to the stream. Submitted tasks will\n // be executed concurrently. It returns a callback that will be called after\n // the task has completed.\n@@ -53,10 +66,10 @@ type Callback func()\n // submitted. All callbacks will be executed by the same goroutine, so no\n // synchronization is necessary between callbacks.\n func (s *Stream) Go(f StreamTask) {\n-\ts.initOnce.Do(s.init)\n+\ts.init()\n \n \t// Get a channel from the cache\n-\tch := s.free.get()\n+\tch := getCh()\n \n \t// Queue the channel for the callbacker\n \ts.queue <- ch\n@@ -82,13 +95,12 @@ func (s *Stream) Go(f StreamTask) {\n // Wait signals to the stream that all tasks have been submitted. Wait will\n // not return until all tasks and callbacks have been run.\n func (s *Stream) Wait() {\n+\ts.init()\n+\n \t// Defer the callbacker cleanup so that it occurs even in the case\n \t// that one of the tasks panics and is propagated up by s.pool.Wait()\n \tdefer func() {\n-\t\t// queue may be nil if Go was never called and init never ran\n-\t\tif s.queue != nil {\n-\t\t\tclose(s.queue)\n-\t\t}\n+\t\tclose(s.queue)\n \t\ts.callbackerHandle.Wait()\n \t}()\n \n@@ -102,16 +114,12 @@ func (s *Stream) WithMaxGoroutines(n int) *Stream {\n }\n \n func (s *Stream) init() {\n-\ts.free = make(chan callbackCh, s.pool.MaxGoroutines()+1)\n-\ts.queue = make(chan callbackCh, s.pool.MaxGoroutines()+1)\n+\ts.initOnce.Do(func() {\n+\t\ts.queue = make(chan callbackCh, s.pool.MaxGoroutines()+1)\n \n-\t// Pre-populate the free list with channels\n-\tfor i := 0; i < cap(s.free); i++ {\n-\t\ts.free <- make(callbackCh, 1)\n-\t}\n-\n-\t// Start the callbacker\n-\ts.callbackerHandle.Go(s.callbacker)\n+\t\t// Start the callbacker\n+\t\ts.callbackerHandle.Go(s.callbacker)\n+\t})\n }\n \n // callbacker is responsible for calling the returned callbacks in the order\n@@ -129,18 +137,8 @@ func (s *Stream) callbacker() {\n \t\tpanicCatcher.Try(callback)\n \n \t\t// Return the channel to the pool of unused channels\n-\t\ts.free.put(callbackCh)\n+\t\tputCh(callbackCh)\n \t}\n }\n \n type callbackCh chan func()\n-\n-type freePool chan callbackCh\n-\n-func (fp freePool) get() callbackCh {\n-\treturn <-fp\n-}\n-\n-func (fp freePool) put(ch callbackCh) {\n-\tfp <- ch\n-}\ndiff --git a/stream/stream_test.go b/stream/stream_test.go\nindex 7df49ef..d62fe74 100644\n--- a/stream/stream_test.go\n+++ b/stream/stream_test.go\n@@ -112,3 +112,16 @@ func TestStream(t *testing.T) {\n \t\trequire.Panics(t, s.Wait)\n \t})\n }\n+\n+func BenchmarkStream(b *testing.B) {\n+\tn := 0\n+\ts := New()\n+\tfor i := 0; i < b.N; i++ {\n+\t\ts.Go(func() Callback {\n+\t\t\treturn func() {\n+\t\t\t\tn += 1\n+\t\t\t}\n+\t\t})\n+\t}\n+\ts.Wait()\n+}\n",
+  "diffTruncated": false,
+  "tree": [
+    "LICENSE",
+    "go.mod",
+    "go.sum",
+    "limiter.go",
+    "panic.go",
+    "panic_test.go",
+    "pariter/iter.go",
+    "pariter/iter_test.go",
+    "pool/context_pool.go",
+    "pool/context_pool_test.go",
+    "pool/error_pool.go",
+    "pool/error_pool_test.go",
+    "pool/pool.go",
+    "pool/pool_test.go",
+    "pool/result_context_pool.go",
+    "pool/result_context_pool_test.go",
+    "pool/result_error_pool.go",
+    "pool/result_error_pool_test.go",
+    "pool/result_pool.go",
+    "pool/result_pool_test.go",
+    "stream/stream.go",
+    "stream/stream_test.go",
+    "waitgroup.go",
+    "waitgroup_test.go"
+  ],
+  "explanation": {
+    "what": "stream/stream.go の自前実装だったチャネルの再利用プール freePool(chan callbackCh とその get/put メソッド)を削除し、標準ライブラリの sync.Pool を使う callbackChPool + getCh()/putCh() に置き換えた。あわせて Stream.init() を sync.Once.Do の中に事前確保していたチャネル生成ロジックごと包んで、Go/Wait のどちらから呼ばれても一度だけ初期化されるようにし、Wait() 冒頭にも s.init() 呼び出しを追加した。limiter.go のコメントには「goroutine-safe」の一言を補足した。",
+    "why": "コミットメッセージの通り、自作の固定長チャネルによるプール(freePool)を標準ライブラリの sync.Pool に置き換える変更。sync.Pool は GC と連動して不要なオブジェクトを回収する仕組みを持ち、freePool のように容量固定のチャネルを事前に埋めておく必要がなくなる。init() を initOnce.Do でくくり直したのは、Wait() が Go() を経由せず単独で呼ばれてもチャネルが確実に初期化されるようにするためとみられる。",
+    "highlights": [
+      { "file": "stream/stream.go", "note": "freePool(自作チャネルプール)を sync.Pool + getCh/putCh に置き換え。s.init() を initOnce.Do でラップし Wait() 単独呼び出しにも対応" }
+    ],
+    "langNotes": [
+      { "topic": "sync.Pool でのチャネル再利用", "note": "sync.Pool は一時オブジェクトを goroutine 間で再利用するための仕組みで、Get()/Put() で貸し借りし、GC のタイミングで中身が回収されうる。ここでは callbackCh(1バッファのチャネル)を毎回 make するコストを避けるために使われている。New フィールドに供給元の関数を渡しておくと、プールが空のときに自動生成される。" },
+      { "topic": "sync.Once", "note": "Do(f) を複数回呼んでも f がちょうど一度だけ実行されることを保証する型。ここでは Stream の初期化(チャネル生成・callbacker goroutine 起動)を Go() と Wait() のどちらが先に呼ばれても安全に一度だけ行うために使われている。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

@@ -1,0 +1,91 @@
+{
+  "seq": 11,
+  "sha": "edd948da79ec01e6b6c24f5ca09baf6031631cf3",
+  "parents": [
+    "73310b2ce4f31e9c534632f71f973fbf7688b76a"
+  ],
+  "author": {
+    "name": "Camden Cheek",
+    "email": "camden@ccheek.com",
+    "date": "2022-12-16T10:17:11-07:00"
+  },
+  "message": "do -> go",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 4,
+    "additions": 8,
+    "deletions": 18
+  },
+  "files": [
+    {
+      "path": "pool/context_pool.go",
+      "status": "M",
+      "additions": 0,
+      "deletions": 5,
+      "binary": false
+    },
+    {
+      "path": "pool/error_pool.go",
+      "status": "M",
+      "additions": 5,
+      "deletions": 10,
+      "binary": false
+    },
+    {
+      "path": "pool/result_context_pool.go",
+      "status": "M",
+      "additions": 2,
+      "deletions": 2,
+      "binary": false
+    },
+    {
+      "path": "pool/result_pool.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/pool/context_pool.go b/pool/context_pool.go\nindex b7a0055..dca7e1f 100644\n--- a/pool/context_pool.go\n+++ b/pool/context_pool.go\n@@ -34,8 +34,3 @@ func (p *ContextPool) WithCancelOnError() *ContextPool {\n \tp.ctx, p.cancel = context.WithCancel(p.ctx)\n \treturn p\n }\n-\n-func (p *ContextPool) WithMaxGoroutines(limit int) *ContextPool {\n-\tp.ErrorPool = *p.ErrorPool.WithMaxGoroutines(limit)\n-\treturn p\n-}\ndiff --git a/pool/error_pool.go b/pool/error_pool.go\nindex 5fb5580..652e00a 100644\n--- a/pool/error_pool.go\n+++ b/pool/error_pool.go\n@@ -8,7 +8,7 @@ import (\n )\n \n type ErrorPool struct {\n-\tpool Pool\n+\tPool\n \n \tonlyFirst bool\n \n@@ -17,25 +17,20 @@ type ErrorPool struct {\n }\n \n func (p *ErrorPool) Go(f func() error) {\n-\tp.pool.Go(func() {\n+\tp.Pool.Go(func() {\n \t\tp.addErr(f())\n \t})\n }\n \n func (p *ErrorPool) Wait() error {\n-\tp.pool.Wait()\n+\tp.Pool.Wait()\n \treturn p.errs\n }\n \n-func (p *ErrorPool) WithMaxGoroutines(n int) *ErrorPool {\n-\tp.pool = *p.pool.WithMaxGoroutines(n)\n-\treturn p\n-}\n-\n func (p *ErrorPool) WithContext(ctx context.Context) *ContextPool {\n \treturn &ContextPool{\n-\t\terrPool: *p,\n-\t\tctx:     ctx,\n+\t\tErrorPool: *p,\n+\t\tctx:       ctx,\n \t}\n }\n \ndiff --git a/pool/result_context_pool.go b/pool/result_context_pool.go\nindex 59117f6..70f8d60 100644\n--- a/pool/result_context_pool.go\n+++ b/pool/result_context_pool.go\n@@ -10,8 +10,8 @@ type ResultContextPool[T any] struct {\n \tcollectErrored bool\n }\n \n-func (p *ResultContextPool[T]) Do(f func(context.Context) (T, error)) {\n-\tp.ContextPool.Do(func(ctx context.Context) error {\n+func (p *ResultContextPool[T]) Go(f func(context.Context) (T, error)) {\n+\tp.ContextPool.Go(func(ctx context.Context) error {\n \t\tres, err := f(ctx)\n \t\tif err == nil || p.collectErrored {\n \t\t\tp.agg.add(res)\ndiff --git a/pool/result_pool.go b/pool/result_pool.go\nindex 7d8bd1e..76b8148 100644\n--- a/pool/result_pool.go\n+++ b/pool/result_pool.go\n@@ -10,7 +10,7 @@ type ResultPool[T any] struct {\n \tagg resultAggregator[T]\n }\n \n-func (p *ResultPool[T]) Do(f func() T) {\n+func (p *ResultPool[T]) Go(f func() T) {\n \tp.Pool.Go(func() {\n \t\tp.agg.add(f())\n \t})\n",
+  "diffTruncated": false,
+  "tree": [
+    "LICENSE",
+    "go.mod",
+    "go.sum",
+    "group/context_group.go",
+    "group/error_group.go",
+    "group/group.go",
+    "group/iter.go",
+    "group/result_context_group.go",
+    "group/result_error_group.go",
+    "group/result_group.go",
+    "iter.go",
+    "limiter.go",
+    "pool/context_pool.go",
+    "pool/error_pool.go",
+    "pool/iter.go",
+    "pool/pool.go",
+    "pool/result_context_pool.go",
+    "pool/result_error_pool.go",
+    "pool/result_pool.go",
+    "stream/stream.go",
+    "waitgroup.go"
+  ],
+  "explanation": {
+    "what": "pool パッケージの各 Pool 型(ErrorPool・ResultPool・ResultErrorPool・ResultContextPool)で、タスク投入用メソッド名を `Do` から `Go` に統一した。あわせて ErrorPool の埋め込みフィールド `pool Pool` を `Pool`(型名そのまま埋め込み)に変えて `p.pool.Go` を `p.Pool.Go` に置き換え、ContextPool から重複していた `WithMaxGoroutines` を削除している。",
+    "why": "コミットメッセージ「do -> go」が示す通り、標準ライブラリの sync.WaitGroup や errgroup に近い `Go(f)` という命名に揃える意図と読める。ErrorPool 側は struct embedding にすることで `p.Pool.Go` のようにフィールド名でなく型名でアクセスできるようにし、ContextPool の重複メソッドを消して ErrorPool 側の実装に一本化している。",
+    "highlights": [
+      { "file": "pool/error_pool.go", "note": "`pool Pool` → `Pool` への埋め込みで p.Pool.Go と書けるようになった箇所" },
+      { "file": "pool/result_pool.go", "note": "Do → Go のリネームの典型例" }
+    ],
+    "langNotes": [
+      { "topic": "struct embedding", "note": "Go では構造体に型名だけをフィールドとして書く(例: `Pool` を `type ErrorPool struct { Pool }`)と、その型のメソッドやフィールドが埋め込み先に「昇格」し、`p.Go()` のように直接呼べる。名前付きフィールド(`pool Pool`)にすると昇格せず `p.pool.Go()` と明示的に辿る必要がある。このコミットは後者から前者への書き換え。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

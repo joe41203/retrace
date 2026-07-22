@@ -1,0 +1,86 @@
+{
+  "seq": 90,
+  "sha": "c0ad5066e2da7075e07fbdaa402bd80d9f57d450",
+  "parents": [
+    "dfbfa258e467a3001bee100d355db7f947563089",
+    "d660b463c5d6df2fdbf8ad361dc651dba9bcd1b2"
+  ],
+  "author": {
+    "name": "Camden Cheek",
+    "email": "camden@ccheek.com",
+    "date": "2023-01-06T17:43:27-07:00"
+  },
+  "message": "Merge pull request #22 from sashamelentyev/waitgroupctor\n\nAdd WaitGroup constructor",
+  "pr": {
+    "number": 22,
+    "title": "Add WaitGroup constructor",
+    "body": "",
+    "url": "https://github.com/sourcegraph/conc/pull/22"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 10,
+    "deletions": 0
+  },
+  "files": [
+    {
+      "path": "waitgroup.go",
+      "status": "M",
+      "additions": 5,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "waitgroup_test.go",
+      "status": "M",
+      "additions": 5,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/waitgroup.go b/waitgroup.go\nindex d2a8f91..b5a099d 100644\n--- a/waitgroup.go\n+++ b/waitgroup.go\n@@ -4,6 +4,11 @@ import (\n \t\"sync\"\n )\n \n+// NewWaitGroup creates a new WaitGroup.\n+func NewWaitGroup() *WaitGroup {\n+\treturn &WaitGroup{}\n+}\n+\n // WaitGroup is the primary building block for scoped concurrency.\n // Goroutines can be spawned in the WaitGroup with the Go method,\n // and calling Wait() will ensure that each of those goroutines exits\ndiff --git a/waitgroup_test.go b/waitgroup_test.go\nindex aa56933..d88513d 100644\n--- a/waitgroup_test.go\n+++ b/waitgroup_test.go\n@@ -27,6 +27,11 @@ func ExampleWaitGroup() {\n func TestWaitGroup(t *testing.T) {\n \tt.Parallel()\n \n+\tt.Run(\"ctor\", func(t *testing.T) {\n+\t\twg := NewWaitGroup()\n+\t\trequire.IsType(t, &WaitGroup{}, wg)\n+\t})\n+\n \tt.Run(\"all spawned run\", func(t *testing.T) {\n \t\tvar count atomic.Int64\n \t\tvar wg WaitGroup\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/go.yml",
+    "LICENSE",
+    "README.md",
+    "go.mod",
+    "go.sum",
+    "iter/iter.go",
+    "iter/iter_test.go",
+    "panic.go",
+    "panic_test.go",
+    "pool/context_pool.go",
+    "pool/context_pool_test.go",
+    "pool/error_pool.go",
+    "pool/error_pool_test.go",
+    "pool/pool.go",
+    "pool/pool_test.go",
+    "pool/result_context_pool.go",
+    "pool/result_context_pool_test.go",
+    "pool/result_error_pool.go",
+    "pool/result_error_pool_test.go",
+    "pool/result_pool.go",
+    "pool/result_pool_test.go",
+    "stream/stream.go",
+    "stream/stream_test.go",
+    "waitgroup.go",
+    "waitgroup_test.go"
+  ],
+  "explanation": {
+    "what": "外部PR #22をマージし、`NewWaitGroup() *WaitGroup` コンストラクタ関数を追加し、対応するテスト(`ctor` サブテストで型を検証)を waitgroup_test.go に追加した。",
+    "why": "PRタイトルは \"Add WaitGroup constructor\" のみで詳細な説明は無い。WaitGroup はゼロ値(`var wg conc.WaitGroup`)のままでも動作するが、他の pool 系の型(pool.New() など)がコンストラクタ関数を提供しているのに対しWaitGroupだけ無かったため、おそらくAPIの一貫性を高める目的の追加と考えられる。",
+    "highlights": [
+      { "file": "waitgroup.go", "note": "`NewWaitGroup()` は `&WaitGroup{}` を返すだけで、実質はゼロ値と同じものを明示的に生成するAPI" }
+    ],
+    "langNotes": [
+      { "topic": "zero-value usable struct + constructor", "note": "Go では `var wg conc.WaitGroup` のようにゼロ値のままでも安全に使える構造体を設計するのが慣用的だが、その一方で `pool.New()` のような他の型に合わせて `New*()` 系のコンストラクタ関数も併設し、呼び出し側のスタイルを統一できるようにすることがある。このコミットはその後者のパターンをWaitGroupにも追加したもの。" }
+    ],
+    "diagram": null,
+    "evidence": "inferred",
+    "refs": [{ "type": "pr", "number": 22, "url": "https://github.com/sourcegraph/conc/pull/22" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

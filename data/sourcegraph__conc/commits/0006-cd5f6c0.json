@@ -1,0 +1,69 @@
+{
+  "seq": 6,
+  "sha": "cd5f6c01401ba1d7b084e00741c5097141c181ee",
+  "parents": [
+    "adba4b45276a8b1a7611e38a0ae127a784ea728d"
+  ],
+  "author": {
+    "name": "Camden Cheek",
+    "email": "camden@ccheek.com",
+    "date": "2022-12-15T20:57:18-07:00"
+  },
+  "message": "generalize map functions",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 81,
+    "deletions": 55
+  },
+  "files": [
+    {
+      "path": "pool/iter.go",
+      "status": "A",
+      "additions": 81,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "pool/pool.go",
+      "status": "M",
+      "additions": 0,
+      "deletions": 55,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/pool/iter.go b/pool/iter.go\nnew file mode 100644\nindex 0000000..5e1700b\n--- /dev/null\n+++ b/pool/iter.go\n@@ -0,0 +1,81 @@\n+package pool\n+\n+import (\n+\t\"sync\"\n+\t\"sync/atomic\"\n+\n+\t\"github.com/sourcegraph/sourcegraph/lib/errors\"\n+)\n+\n+func ForEachIdx[T any](input []T, f func(int, *T)) {\n+\tp := New()\n+\tForEachIdxIn(&p, input, f)\n+}\n+\n+func ForEachIdxIn[T any](p *Pool, input []T, f func(int, *T)) {\n+\tvar idx atomic.Int64\n+\tvar wg sync.WaitGroup\n+\ttask := func() {\n+\t\tdefer wg.Done()\n+\t\tfor i := int(idx.Add(1) - 1); i < len(input); i = int(idx.Add(1) - 1) {\n+\t\t\tf(i, &input[i])\n+\t\t}\n+\t}\n+\n+\tn := p.MaxGoroutines()\n+\twg.Add(n)\n+\tfor i := 0; i < p.MaxGoroutines(); i++ {\n+\t\tp.Do(task)\n+\t}\n+\n+\twg.Wait()\n+}\n+\n+func ForEach[T any](input []T, f func(*T)) {\n+\tp := New()\n+\tForEachIdxIn(&p, input, func(_ int, t *T) {\n+\t\tf(t)\n+\t})\n+}\n+\n+func ForEachIn[T any](p *Pool, input []T, f func(*T)) {\n+\tForEachIdxIn(p, input, func(_ int, t *T) {\n+\t\tf(t)\n+\t})\n+}\n+\n+func Map[T any, R any](input []T, f func(*T) R) []R {\n+\tp := New()\n+\treturn MapIn(&p, input, f)\n+}\n+\n+func MapIn[T any, R any](p *Pool, input []T, f func(*T) R) []R {\n+\tres := make([]R, len(input))\n+\tForEachIdxIn(p, input, func(i int, t *T) {\n+\t\tres[i] = f(t)\n+\t})\n+\treturn res\n+}\n+\n+func MapErrIn[T any, R any](input []T, f func(*T) (R, error)) ([]R, error) {\n+\tp := New()\n+\treturn MapErrIn(&p, input, f)\n+}\n+\n+func MapErrIn[T any, R any](p *Pool, input []T, f func(*T) (R, error)) ([]R, error) {\n+\tvar (\n+\t\tres    = make([]R, len(input))\n+\t\terrMux sync.Mutex\n+\t\terrs   error\n+\t)\n+\tForEachIdxIn(p, input, func(i int, t *T) {\n+\t\tvar err error\n+\t\tres[i], err = f(t)\n+\t\tif err != nil {\n+\t\t\terrMux.Lock()\n+\t\t\terrs = errors.Append(errs, err)\n+\t\t\terrMux.Unlock()\n+\t\t}\n+\t})\n+\treturn res, errs\n+}\ndiff --git a/pool/pool.go b/pool/pool.go\nindex 1bf8bce..22ffd5c 100644\n--- a/pool/pool.go\n+++ b/pool/pool.go\n@@ -2,12 +2,8 @@ package pool\n \n import (\n \t\"runtime\"\n-\t\"sync\"\n-\t\"sync/atomic\"\n \n \t\"github.com/camdencheek/conc\"\n-\n-\t\"github.com/sourcegraph/sourcegraph/lib/errors\"\n )\n \n func New() Pool {\n@@ -53,54 +49,3 @@ func (p *Pool) worker() {\n \t\tf()\n \t}\n }\n-\n-func ForEachIdx[T any](p *Pool, input []T, f func(int, *T)) {\n-\tvar idx atomic.Int64\n-\tvar wg sync.WaitGroup\n-\ttask := func() {\n-\t\tdefer wg.Done()\n-\t\tfor i := int(idx.Add(1) - 1); i < len(input); i = int(idx.Add(1) - 1) {\n-\t\t\tf(i, &input[i])\n-\t\t}\n-\t}\n-\n-\tn := p.MaxGoroutines()\n-\twg.Add(n)\n-\tfor i := 0; i < p.MaxGoroutines(); i++ {\n-\t\tp.Do(task)\n-\t}\n-\n-\twg.Wait()\n-}\n-\n-func ForEach[T any](p *Pool, input []T, f func(*T)) {\n-\tForEachIdx(p, input, func(_ int, t *T) {\n-\t\tf(t)\n-\t})\n-}\n-\n-func Map[T any, R any](p *Pool, input []T, f func(*T) R) []R {\n-\tres := make([]R, len(input))\n-\tForEachIdx(p, input, func(i int, t *T) {\n-\t\tres[i] = f(t)\n-\t})\n-\treturn res\n-}\n-\n-func MapErr[T any, R any](p *Pool, input []T, f func(*T) (R, error)) ([]R, error) {\n-\tvar (\n-\t\tres    = make([]R, len(input))\n-\t\terrMux sync.Mutex\n-\t\terrs   error\n-\t)\n-\tForEachIdx(p, input, func(i int, t *T) {\n-\t\tvar err error\n-\t\tres[i], err = f(t)\n-\t\tif err != nil {\n-\t\t\terrMux.Lock()\n-\t\t\terrs = errors.Append(errs, err)\n-\t\t\terrMux.Unlock()\n-\t\t}\n-\t})\n-\treturn res, errs\n-}\n",
+  "diffTruncated": false,
+  "tree": [
+    "LICENSE",
+    "go.mod",
+    "go.sum",
+    "group/context_group.go",
+    "group/error_group.go",
+    "group/group.go",
+    "limiter.go",
+    "pool/context_pool.go",
+    "pool/error_pool.go",
+    "pool/iter.go",
+    "pool/pool.go",
+    "stream/stream.go",
+    "waitgroup.go"
+  ],
+  "explanation": {
+    "what": "pool/pool.go に直書きされていた ForEachIdx / ForEach / Map / MapErr をジェネリック関数として pool/iter.go に切り出し、Pool を明示的に受け取る *In 系関数(ForEachIdxIn, MapIn 等)を新設した。ForEachIdxIn はワーカー数ぶんの goroutine を起動し、atomic.Int64 のインデックスカウンタを共有して入力スライスを分担処理する。",
+    "why": "コミットメッセージ「generalize map functions」のとおり、それまで Pool 内部に固定だった並行イテレーション処理を、任意の *Pool を受け取れる汎用形にして再利用性を高めた。MapErrIn は各要素の処理結果とエラーをまとめて返す形で、エラー処理をユーザー側に委ねる設計になっている。",
+    "highlights": [
+      { "file": "pool/iter.go", "note": "ForEachIdxIn が atomic.Int64 でインデックスを配りながら p.MaxGoroutines() 個の goroutine で分担実行する中核ロジック。" }
+    ],
+    "langNotes": [
+      { "topic": "ジェネリクス([T any])", "note": "Go 1.18 で導入された型パラメータ。ForEachIdx[T any] のように書くことで、要素の型を問わず同じ処理ロジックを使い回せる。Map[T any, R any] のように入出力で異なる型パラメータを持つ関数も定義できる。" },
+      { "topic": "atomic.Int64 による作業分配", "note": "複数 goroutine が同じスライスをロックなしで分担処理するために、共有カウンタを atomic.Add で安全にインクリメントしながら次に処理すべきインデックスを取り合う実装パターン。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

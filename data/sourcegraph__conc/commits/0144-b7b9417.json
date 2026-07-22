@@ -1,0 +1,79 @@
+{
+  "seq": 144,
+  "sha": "b7b9417b089c652d00a4e9e05c2cc12173b6161f",
+  "parents": [
+    "b528efd34e509ef017ddedb47be85292d54ac024"
+  ],
+  "author": {
+    "name": "Camden Cheek",
+    "email": "camden@ccheek.com",
+    "date": "2023-11-12T09:09:25-07:00"
+  },
+  "message": "add test for nil callback in stream",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 14,
+    "deletions": 0
+  },
+  "files": [
+    {
+      "path": "stream/stream_test.go",
+      "status": "M",
+      "additions": 14,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/stream/stream_test.go b/stream/stream_test.go\nindex f1e1701..9f5bce1 100644\n--- a/stream/stream_test.go\n+++ b/stream/stream_test.go\n@@ -54,6 +54,20 @@ func TestStream(t *testing.T) {\n \t\trequire.Equal(t, []int{0, 2, 4, 6, 8}, res)\n \t})\n \n+\tt.Run(\"nil callback\", func(t *testing.T) {\n+\t\tt.Parallel()\n+\t\ts := stream.New()\n+\t\tvar totalCount atomic.Int64\n+\t\tfor i := 0; i < 5; i++ {\n+\t\t\ts.Go(func() stream.Callback {\n+\t\t\t\ttotalCount.Add(1)\n+\t\t\t\treturn nil\n+\t\t\t})\n+\t\t}\n+\t\ts.Wait()\n+\t\trequire.Equal(t, int64(5), totalCount.Load())\n+\t})\n+\n \tt.Run(\"max goroutines\", func(t *testing.T) {\n \t\tt.Parallel()\n \t\ts := stream.New().WithMaxGoroutines(5)\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/go.yml",
+    ".golangci.yml",
+    "LICENSE",
+    "README.md",
+    "go.mod",
+    "go.sum",
+    "internal/multierror/multierror_go119.go",
+    "internal/multierror/multierror_go120.go",
+    "iter/export_test.go",
+    "iter/iter.go",
+    "iter/iter_test.go",
+    "iter/map.go",
+    "iter/map_test.go",
+    "panics/panics.go",
+    "panics/panics_test.go",
+    "panics/try.go",
+    "panics/try_test.go",
+    "pool/context_pool.go",
+    "pool/context_pool_test.go",
+    "pool/error_pool.go",
+    "pool/error_pool_test.go",
+    "pool/pool.go",
+    "pool/pool_test.go",
+    "pool/result_context_pool.go",
+    "pool/result_context_pool_test.go",
+    "pool/result_error_pool.go",
+    "pool/result_error_pool_test.go",
+    "pool/result_pool.go",
+    "pool/result_pool_test.go",
+    "stream/stream.go",
+    "stream/stream_test.go",
+    "waitgroup.go",
+    "waitgroup_test.go"
+  ],
+  "explanation": {
+    "what": "stream_test.go に「nil callback」というサブテストを追加した。stream.Go に渡すジョブが stream.Callback として nil を返すケースを5回実行し、s.Wait() 後に totalCount が期待通り5になることを検証する。",
+    "why": "コミットメッセージが示す通り、直前のコミット(nil コールバックで panic していたのを修正)にテストが伴っていなかったため、後追いでカバレッジを補っている。",
+    "highlights": [
+      { "file": "stream/stream_test.go", "note": "\"nil callback\" サブテスト。s.Go の戻り値を nil にしても Wait() が panic せず完了することを確認" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

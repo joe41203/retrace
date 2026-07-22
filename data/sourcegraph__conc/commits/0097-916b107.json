@@ -1,0 +1,78 @@
+{
+  "seq": 97,
+  "sha": "916b1072bbabf5a6ab60691781d9b9ff56c40f32",
+  "parents": [
+    "f82131227f42bd8d08d987348bb3ab8bcdaf643a",
+    "41392451aaba8050c74a53e7c544febb07e28d63"
+  ],
+  "author": {
+    "name": "Robert Lin",
+    "email": "robertlin1@gmail.com",
+    "date": "2023-01-07T18:48:07-08:00"
+  },
+  "message": "Merge pull request #32 from sourcegraph/cancel-on-error-docstring\n\npool: update WithFirstError docs for WithCancelOnError",
+  "pr": {
+    "number": 32,
+    "title": "pool: update WithFirstError docs for WithCancelOnError",
+    "body": "Updates docstrings for #23 ",
+    "url": "https://github.com/sourcegraph/conc/pull/32"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 10,
+    "deletions": 5
+  },
+  "files": [
+    {
+      "path": "pool/context_pool.go",
+      "status": "M",
+      "additions": 10,
+      "deletions": 5,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/pool/context_pool.go b/pool/context_pool.go\nindex 250c21b..aaaf36a 100644\n--- a/pool/context_pool.go\n+++ b/pool/context_pool.go\n@@ -12,7 +12,7 @@ type ContextPool struct {\n \tctx    context.Context\n \tcancel context.CancelFunc\n \n-\tfailFast bool\n+\tcancelOnError bool\n }\n \n // Go submits a task. If it returns an error, the error will be\n@@ -20,7 +20,7 @@ type ContextPool struct {\n func (p *ContextPool) Go(f func(ctx context.Context) error) {\n \tp.errorPool.Go(func() error {\n \t\terr := f(p.ctx)\n-\t\tif err != nil && p.failFast {\n+\t\tif err != nil && p.cancelOnError {\n \t\t\t// Leaky abstraction warning: We add the error directly because\n \t\t\t// otherwise, canceling could cause another goroutine to exit and\n \t\t\t// return an error before this error was added, which breaks the\n@@ -41,8 +41,8 @@ func (p *ContextPool) Wait() error {\n \n // WithFirstError configures the pool to only return the first error\n // returned by a task. By default, Wait() will return a combined error.\n-// This is particularly useful for ContextPool where all errors after the\n-// first are likely to be context.Canceled.\n+// This is particularly useful for (*ContextPool).WithCancelOnError(),\n+// where all errors after the first are likely to be context.Canceled.\n func (p *ContextPool) WithFirstError() *ContextPool {\n \tp.errorPool.WithFirstError()\n \treturn p\n@@ -51,8 +51,13 @@ func (p *ContextPool) WithFirstError() *ContextPool {\n // WithCancelOnError configures the pool to cancel its context as soon as\n // any task returns an error. By default, the pool's context is not\n // canceled until the parent context is canceled.\n+//\n+// In this case, all errors returned from the pool after the first will\n+// likely be context.Canceled - you may want to also use\n+// (*ContextPool).WithFirstError() to configure the pool to only return\n+// the first error.\n func (p *ContextPool) WithCancelOnError() *ContextPool {\n-\tp.failFast = true\n+\tp.cancelOnError = true\n \treturn p\n }\n \n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/go.yml",
+    ".golangci.yml",
+    "LICENSE",
+    "README.md",
+    "go.mod",
+    "go.sum",
+    "iter/iter.go",
+    "iter/iter_test.go",
+    "panic.go",
+    "panic_test.go",
+    "pool/context_pool.go",
+    "pool/context_pool_test.go",
+    "pool/error_pool.go",
+    "pool/error_pool_test.go",
+    "pool/pool.go",
+    "pool/pool_test.go",
+    "pool/result_context_pool.go",
+    "pool/result_context_pool_test.go",
+    "pool/result_error_pool.go",
+    "pool/result_error_pool_test.go",
+    "pool/result_pool.go",
+    "pool/result_pool_test.go",
+    "stream/stream.go",
+    "stream/stream_test.go",
+    "waitgroup.go",
+    "waitgroup_test.go"
+  ],
+  "explanation": {
+    "what": "ContextPool の内部フィールド failFast を cancelOnError にリネームし、WithFirstError() と WithCancelOnError() のドキュメントコメントを、両者を組み合わせて使うことを推奨する内容に更新した。",
+    "why": "PR本文の通り、直前の #23(WithCancelOnError の導入)に対するドキュメント面のフォローアップ。フィールド名を機能名(WithCancelOnError)に合わせて分かりやすくし、WithCancelOnError() 使用時は他のタスクのエラーが context.Canceled に化けやすいため WithFirstError() の併用を勧める、という運用上の注意をコメントとして残した。",
+    "highlights": [
+      { "file": "pool/context_pool.go", "note": "failFast → cancelOnError のリネームと、WithCancelOnError/WithFirstError のドキュメントコメント拡充" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [{ "type": "pr", "number": 32, "url": "https://github.com/sourcegraph/conc/pull/32" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

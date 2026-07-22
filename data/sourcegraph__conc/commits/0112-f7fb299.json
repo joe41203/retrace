@@ -1,0 +1,78 @@
+{
+  "seq": 112,
+  "sha": "f7fb299140474a453fb8b49161ed4258110c7610",
+  "parents": [
+    "ec1413e244f2d1c6eef8162bb7b19ef4227e9687",
+    "a6e02d5f55ea51bb28b6a37af8fa52ee1ba6331f"
+  ],
+  "author": {
+    "name": "Camden Cheek",
+    "email": "camden@ccheek.com",
+    "date": "2023-01-13T06:59:31-07:00"
+  },
+  "message": "Merge pull request #62 from honkkki/main\n\nfix README panic example",
+  "pr": {
+    "number": 62,
+    "title": "fix README panic example",
+    "body": "",
+    "url": "https://github.com/sourcegraph/conc/pull/62"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 1,
+    "deletions": 1
+  },
+  "files": [
+    {
+      "path": "README.md",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/README.md b/README.md\nindex 2a2e31f..93e89a5 100644\n--- a/README.md\n+++ b/README.md\n@@ -140,7 +140,7 @@ func main() {\n     go func() {\n         defer func() {\n             if v := recover(); v != nil {\n-                done <- caughtPanicError{\n+                done <- &caughtPanicError{\n                     val: v,\n                     stack: debug.Stack()\n                 }\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/go.yml",
+    ".golangci.yml",
+    "LICENSE",
+    "README.md",
+    "go.mod",
+    "go.sum",
+    "iter/iter.go",
+    "iter/iter_test.go",
+    "panics/panics.go",
+    "panics/panics_test.go",
+    "pool/context_pool.go",
+    "pool/context_pool_test.go",
+    "pool/error_pool.go",
+    "pool/error_pool_test.go",
+    "pool/pool.go",
+    "pool/pool_test.go",
+    "pool/result_context_pool.go",
+    "pool/result_context_pool_test.go",
+    "pool/result_error_pool.go",
+    "pool/result_error_pool_test.go",
+    "pool/result_pool.go",
+    "pool/result_pool_test.go",
+    "stream/stream.go",
+    "stream/stream_test.go",
+    "waitgroup.go",
+    "waitgroup_test.go"
+  ],
+  "explanation": {
+    "what": "README.md 内の panic 捕捉サンプルコードの誤りを修正した。caughtPanicError{...} をチャネル done に送っていた箇所を &caughtPanicError{...} に変更し、値ではなくポインタを送るようにした。",
+    "why": "コミットメッセージ「fix README panic example」の通り、ドキュメント中のサンプルコードの型不整合(おそらくエラー型が *caughtPanicError として定義されているのに値型を送っていた)を修正するための変更と考えられる。PR本文は空でコード差分と件名のみが根拠。",
+    "highlights": [],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [
+      { "type": "pr", "number": 62, "url": "https://github.com/sourcegraph/conc/pull/62" }
+    ],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

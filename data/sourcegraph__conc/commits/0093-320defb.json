@@ -1,0 +1,85 @@
+{
+  "seq": 93,
+  "sha": "320defbfd77641e3d5d7aefe988f49f7072f4781",
+  "parents": [
+    "c1f12645a920fbaa55ea63275bd9d0efb21967ef",
+    "fb239577a7553a22296ada6e5ced5f204248637b"
+  ],
+  "author": {
+    "name": "Camden Cheek",
+    "email": "camden@ccheek.com",
+    "date": "2023-01-07T14:15:50-07:00"
+  },
+  "message": "Merge pull request #27 from sashamelentyev/lint\n\nAdd lint",
+  "pr": {
+    "number": 27,
+    "title": "Add lint",
+    "body": "",
+    "url": "https://github.com/sourcegraph/conc/pull/27"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 7,
+    "deletions": 1
+  },
+  "files": [
+    {
+      "path": ".github/workflows/go.yml",
+      "status": "M",
+      "additions": 6,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "pool/error_pool_test.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/.github/workflows/go.yml b/.github/workflows/go.yml\nindex 411db25..b9b9b29 100644\n--- a/.github/workflows/go.yml\n+++ b/.github/workflows/go.yml\n@@ -24,6 +24,12 @@ jobs:\n     - name: Build\n       run: go build -v ./...\n \n+    - name: Lint\n+      uses: golangci/golangci-lint-action@v3.3.1\n+      with:\n+        version: latest\n+        args: --timeout 5m\n+\n     - name: Test\n       run: go test -race -v ./... -coverprofile ./coverage.txt\n \ndiff --git a/pool/error_pool_test.go b/pool/error_pool_test.go\nindex 825c00f..85fd9f5 100644\n--- a/pool/error_pool_test.go\n+++ b/pool/error_pool_test.go\n@@ -68,7 +68,7 @@ func TestErrorPool(t *testing.T) {\n \t\t\t\treturn nil\n \t\t\t})\n \t\t}\n-\t\trequire.Panics(t, func() { g.Wait() })\n+\t\trequire.Panics(t, func() { _ = g.Wait() })\n \t})\n \n \tt.Run(\"limit\", func(t *testing.T) {\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/go.yml",
+    "LICENSE",
+    "README.md",
+    "go.mod",
+    "go.sum",
+    "iter/iter.go",
+    "iter/iter_test.go",
+    "panic.go",
+    "panic_test.go",
+    "pool/context_pool.go",
+    "pool/context_pool_test.go",
+    "pool/error_pool.go",
+    "pool/error_pool_test.go",
+    "pool/pool.go",
+    "pool/pool_test.go",
+    "pool/result_context_pool.go",
+    "pool/result_context_pool_test.go",
+    "pool/result_error_pool.go",
+    "pool/result_error_pool_test.go",
+    "pool/result_pool.go",
+    "pool/result_pool_test.go",
+    "stream/stream.go",
+    "stream/stream_test.go",
+    "waitgroup.go",
+    "waitgroup_test.go"
+  ],
+  "explanation": {
+    "what": "CI ワークフローに golangci-lint-action を使ったリントステップを追加し、pool/error_pool_test.go の require.Panics(t, func() { g.Wait() }) を require.Panics(t, func() { _ = g.Wait() }) に修正した(戻り値の明示的な破棄)。",
+    "why": "PR本文に詳細はないが、message「Add lint」の通り CI にリンターを導入する変更であり、それに伴い戻り値未使用を指摘するリンタールール(errcheck 等)に抵触していたテストコードを修正したと考えられる。",
+    "highlights": [
+      { "file": ".github/workflows/go.yml", "note": "golangci-lint-action を Build と Test の間に追加" },
+      { "file": "pool/error_pool_test.go", "note": "g.Wait() の戻り値(エラー)を _ で明示的に捨てる修正。リント導入に伴う付随修正" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [{ "type": "pr", "number": 27, "url": "https://github.com/sourcegraph/conc/pull/27" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

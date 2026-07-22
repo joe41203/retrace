@@ -1,0 +1,176 @@
+{
+  "seq": 8,
+  "sha": "3b16ae8884a4ae7d83cc081292d78d41763fca3c",
+  "parents": [
+    "d640147ff86bffec0a4bed28cf909b222afa25e3"
+  ],
+  "author": {
+    "name": "Camden Cheek",
+    "email": "camden@ccheek.com",
+    "date": "2022-12-16T09:40:59-07:00"
+  },
+  "message": "misc",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 16,
+    "additions": 213,
+    "deletions": 213
+  },
+  "files": [
+    {
+      "path": "group/context_group.go",
+      "status": "M",
+      "additions": 5,
+      "deletions": 5,
+      "binary": false
+    },
+    {
+      "path": "group/error_group.go",
+      "status": "M",
+      "additions": 10,
+      "deletions": 8,
+      "binary": false
+    },
+    {
+      "path": "group/group.go",
+      "status": "M",
+      "additions": 9,
+      "deletions": 9,
+      "binary": false
+    },
+    {
+      "path": "group/result_context_group.go",
+      "status": "M",
+      "additions": 9,
+      "deletions": 9,
+      "binary": false
+    },
+    {
+      "path": "group/result_error_group.go",
+      "status": "M",
+      "additions": 8,
+      "deletions": 8,
+      "binary": false
+    },
+    {
+      "path": "group/result_group.go",
+      "status": "M",
+      "additions": 8,
+      "deletions": 8,
+      "binary": false
+    },
+    {
+      "path": "iter.go",
+      "status": "A",
+      "additions": 65,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "limiter.go",
+      "status": "M",
+      "additions": 4,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "pool/context_pool.go",
+      "status": "M",
+      "additions": 6,
+      "deletions": 6,
+      "binary": false
+    },
+    {
+      "path": "pool/error_pool.go",
+      "status": "M",
+      "additions": 8,
+      "deletions": 8,
+      "binary": false
+    },
+    {
+      "path": "pool/iter.go",
+      "status": "M",
+      "additions": 5,
+      "deletions": 63,
+      "binary": false
+    },
+    {
+      "path": "pool/pool.go",
+      "status": "M",
+      "additions": 15,
+      "deletions": 15,
+      "binary": false
+    },
+    {
+      "path": "pool/result_context_pool.go",
+      "status": "M",
+      "additions": 9,
+      "deletions": 9,
+      "binary": false
+    },
+    {
+      "path": "pool/result_error_pool.go",
+      "status": "M",
+      "additions": 13,
+      "deletions": 13,
+      "binary": false
+    },
+    {
+      "path": "pool/result_pool.go",
+      "status": "M",
+      "additions": 9,
+      "deletions": 9,
+      "binary": false
+    },
+    {
+      "path": "stream/stream.go",
+      "status": "M",
+      "additions": 30,
+      "deletions": 43,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/group/context_group.go b/group/context_group.go\nindex a6a0273..dde5006 100644\n--- a/group/context_group.go\n+++ b/group/context_group.go\n@@ -30,17 +30,17 @@ func (g *ContextGroup) Wait() error {\n \treturn g.errGroup.Wait()\n }\n \n-func (g ContextGroup) WithCancelOnError() ContextGroup {\n+func (g *ContextGroup) WithCancelOnError() *ContextGroup {\n \tg.ctx, g.cancel = context.WithCancel(g.ctx)\n \treturn g\n }\n \n-func (g ContextGroup) WithMaxConcurrency(limit int) ContextGroup {\n-\tg.errGroup = g.errGroup.WithMaxConcurrency(limit)\n+func (g *ContextGroup) WithMaxConcurrency(limit int) *ContextGroup {\n+\tg.errGroup = *g.errGroup.WithMaxConcurrency(limit)\n \treturn g\n }\n \n-func (g ContextGroup) WithFirstError() ContextGroup {\n-\tg.errGroup = g.errGroup.WithFirstError()\n+func (g *ContextGroup) WithFirstError() *ContextGroup {\n+\tg.errGroup = *g.errGroup.WithFirstError()\n \treturn g\n }\ndiff --git a/group/error_group.go b/group/error_group.go\nindex 4ad9956..d19bee5 100644\n--- a/group/error_group.go\n+++ b/group/error_group.go\n@@ -10,10 +10,10 @@ import (\n type ErrorGroup struct {\n \tgroup Group\n \n-\tonlyFirst bool\n-\n \tmu   sync.Mutex\n \terrs error\n+\n+\tonlyFirst bool\n }\n \n func (g *ErrorGroup) Go(f func() error) {\n@@ -27,19 +27,21 @@ func (g *ErrorGroup) Wait() error {\n \treturn g.errs\n }\n \n-func (g ErrorGroup) WithMaxConcurrency(limit int) ErrorGroup {\n-\tg.group = g.group.WithMaxConcurrency(limit)\n+func (g *ErrorGroup) WithMaxConcurrency(limit int) *ErrorGroup {\n+\tg.group = *g.group.WithMaxConcurrency(limit)\n \treturn g\n }\n \n-func (g ErrorGroup) WithContext(ctx context.Context) ContextGroup {\n-\treturn ContextGroup{\n-\t\terrGroup: g,\n+//nolint\n+func (g *ErrorGroup) WithContext(ctx context.Context) *ContextGroup {\n+\t//abc\n+\treturn &ContextGroup{\n+\t\terrGroup: *g,\n \t\tctx:      ctx,\n \t}\n }\n \n-func (g ErrorGroup) WithFirstError() ErrorGroup {\n+func (g *ErrorGroup) WithFirstError() *ErrorGroup {\n \tg.onlyFirst = true\n \treturn g\n }\ndiff --git a/group/group.go b/group/group.go\nindex 8a0d1b5..c73f12b 100644\n--- a/group/group.go\n+++ b/group/group.go\n@@ -6,8 +6,8 @@ import (\n \t\"github.com/camdencheek/conc\"\n )\n \n-func New() Group {\n-\treturn Group{}\n+func New() *Group {\n+\treturn &Group{}\n }\n \n type Group struct {\n@@ -27,20 +27,20 @@ func (g *Group) Wait() {\n \tg.handle.Wait()\n }\n \n-func (g Group) WithMaxConcurrency(limit int) Group {\n+func (g *Group) WithMaxConcurrency(limit int) *Group {\n \tg.limiter = make(chan struct{}, limit)\n \treturn g\n }\n \n-func (g Group) WithErrors() ErrorGroup {\n-\treturn ErrorGroup{\n-\t\tgroup: g,\n+func (g *Group) WithErrors() *ErrorGroup {\n+\treturn &ErrorGroup{\n+\t\tgroup: *g,\n \t}\n }\n \n-func (g Group) WithContext(ctx context.Context) ContextGroup {\n-\treturn ContextGroup{\n-\t\terrGroup: g.WithErrors(),\n+func (g *Group) WithContext(ctx context.Context) *ContextGroup {\n+\treturn &ContextGroup{\n+\t\terrGroup: *g.WithErrors(),\n \t\tctx:      ctx,\n \t}\n }\ndiff --git a/group/result_context_group.go b/group/result_context_group.go\nindex 2c4a181..49b3cd7 100644\n--- a/group/result_context_group.go\n+++ b/group/result_context_group.go\n@@ -10,7 +10,7 @@ type ResultContextGroup[T any] struct {\n \tcollectErrored bool\n }\n \n-func (g ResultContextGroup[T]) Go(f func(context.Context) (T, error)) {\n+func (g *ResultContextGroup[T]) Go(f func(context.Context) (T, error)) {\n \tg.contextGroup.Go(func(ctx context.Context) error {\n \t\tres, err := f(ctx)\n \t\tif err == nil || g.collectErrored {\n@@ -20,27 +20,27 @@ func (g ResultContextGroup[T]) Go(f func(context.Context) (T, error)) {\n \t})\n }\n \n-func (g ResultContextGroup[T]) Wait() ([]T, error) {\n+func (g *ResultContextGroup[T]) Wait() ([]T, error) {\n \terr := g.contextGroup.Wait()\n \treturn g.agg.results, err\n }\n \n-func (g ResultContextGroup[T]) WithCollectErrored() ResultContextGroup[T] {\n+func (g *ResultContextGroup[T]) WithCollectErrored() *ResultContextGroup[T] {\n \tg.collectErrored = true\n \treturn g\n }\n \n-func (g ResultContextGroup[T]) WithMaxConcurrency(limit int) ResultContextGroup[T] {\n-\tg.contextGroup = g.contextGroup.WithMaxConcurrency(limit)\n+func (g *ResultContextGroup[T]) WithMaxConcurrency(limit int) *ResultContextGroup[T] {\n+\tg.contextGroup = *g.contextGroup.WithMaxConcurrency(limit)\n \treturn g\n }\n \n-func (g ResultContextGroup[T]) WithCancelOnError() ResultContextGroup[T] {\n-\tg.contextGroup = g.contextGroup.WithCancelOnError()\n+func (g *ResultContextGroup[T]) WithCancelOnError() *ResultContextGroup[T] {\n+\tg.contextGroup = *g.contextGroup.WithCancelOnError()\n \treturn g\n }\n \n-func (g ResultContextGroup[T]) WithFirstError() ResultContextGroup[T] {\n-\tg.contextGroup = g.contextGroup.WithFirstError()\n+func (g *ResultContextGroup[T]) WithFirstError() *ResultContextGroup[T] {\n+\tg.contextGroup = *g.contextGroup.WithFirstError()\n \treturn g\n }\ndiff --git a/group/result_error_group.go b/group/result_error_group.go\nindex 2f5cc35..9cb01b5 100644\n--- a/group/result_error_group.go\n+++ b/group/result_error_group.go\n@@ -25,23 +25,23 @@ func (g *ResultErrorGroup[T]) Wait() ([]T, error) {\n \treturn g.agg.results, err\n }\n \n-func (g ResultErrorGroup[T]) WithCollectErrored() ResultErrorGroup[T] {\n+func (g *ResultErrorGroup[T]) WithCollectErrored() *ResultErrorGroup[T] {\n \tg.collectErrored = true\n \treturn g\n }\n \n-func (g ResultErrorGroup[T]) WithFirstError() ResultErrorGroup[T] {\n-\tg.errGroup = g.errGroup.WithFirstError()\n+func (g *ResultErrorGroup[T]) WithFirstError() *ResultErrorGroup[T] {\n+\tg.errGroup = *g.errGroup.WithFirstError()\n \treturn g\n }\n \n-func (g ResultErrorGroup[T]) WithMaxConcurrency(limit int) ResultErrorGroup[T] {\n-\tg.errGroup = g.errGroup.WithMaxConcurrency(limit)\n+func (g *ResultErrorGroup[T]) WithMaxConcurrency(limit int) *ResultErrorGroup[T] {\n+\tg.errGroup = *g.errGroup.WithMaxConcurrency(limit)\n \treturn g\n }\n \n-func (g ResultErrorGroup[T]) WithContext(ctx context.Context) ResultContextGroup[T] {\n-\treturn ResultContextGroup[T]{\n-\t\tcontextGroup: g.errGroup.WithContext(ctx),\n+func (g *ResultErrorGroup[T]) WithContext(ctx context.Context) *ResultContextGroup[T] {\n+\treturn &ResultContextGroup[T]{\n+\t\tcontextGroup: *g.errGroup.WithContext(ctx),\n \t}\n }\ndiff --git a/group/result_group.go b/group/result_group.go\nindex dcdb478..192015c 100644\n--- a/group/result_group.go\n+++ b/group/result_group.go\n@@ -21,20 +21,20 @@ func (g *ResultGroup[T]) Wait() []T {\n \treturn g.agg.results\n }\n \n-func (g ResultGroup[T]) WithErrors() ResultErrorGroup[T] {\n-\treturn ResultErrorGroup[T]{\n-\t\terrGroup: g.group.WithErrors(),\n+func (g *ResultGroup[T]) WithErrors() *ResultErrorGroup[T] {\n+\treturn &ResultErrorGroup[T]{\n+\t\terrGroup: *g.group.WithErrors(),\n \t}\n }\n \n-func (g ResultGroup[T]) WithContext(ctx context.Context) ResultContextGroup[T] {\n-\treturn ResultContextGroup[T]{\n-\t\tcontextGroup: g.group.WithContext(ctx),\n+func (g *ResultGroup[T]) WithContext(ctx context.Context) *ResultContextGroup[T] {\n+\treturn &ResultContextGroup[T]{\n+\t\tcontextGroup: *g.group.WithContext(ctx),\n \t}\n }\n \n-func (g ResultGroup[T]) WithMaxConcurrency(limit int) ResultGroup[T] {\n-\tg.group = g.group.WithMaxConcurrency(limit)\n+func (g *ResultGroup[T]) WithMaxConcurrency(limit int) *ResultGroup[T] {\n+\tg.group = *g.group.WithMaxConcurrency(limit)\n \treturn g\n }\n \ndiff --git a/iter.go b/iter.go\nnew file mode 100644\nindex 0000000..d485ac1\n--- /dev/null\n+++ b/iter.go\n@@ -0,0 +1,65 @@\n+package conc\n+\n+import (\n+\t\"sync\"\n+\t\"sync/atomic\"\n+\n+\t\"github.com/sourcegraph/sourcegraph/lib/errors\"\n+)\n+\n+type Goer interface {\n+\tGo(func())\n+\tMaxGoroutines() int\n+\tWait()\n+}\n+\n+func ForEachIdxIn[T any](goer Goer, input []T, f func(int, *T)) {\n+\tvar idx atomic.Int64\n+\tvar wg sync.WaitGroup\n+\ttask := func() {\n+\t\tdefer wg.Done()\n+\t\tfor i := int(idx.Add(1) - 1); i < len(input); i = int(idx.Add(1) - 1) {\n+\t\t\tf(i, &input[i])\n+\t\t}\n+\t}\n+\n+\tn := goer.MaxGoroutines()\n+\twg.Add(n)\n+\tfor i := 0; i < n; i++ {\n+\t\tgoer.Go(task)\n+\t}\n+\n+\twg.Wait()\n+}\n+\n+func ForEachIn[T any](goer Goer, input []T, f func(*T)) {\n+\tForEachIdxIn(goer, input, func(_ int, t *T) {\n+\t\tf(t)\n+\t})\n+}\n+\n+func MapIn[T any, R any](goer Goer, input []T, f func(*T) R) []R {\n+\tres := make([]R, len(input))\n+\tForEachIdxIn(goer, input, func(i int, t *T) {\n+\t\tres[i] = f(t)\n+\t})\n+\treturn res\n+}\n+\n+func MapErrIn[T any, R any](goer Goer, input []T, f func(*T) (R, error)) ([]R, error) {\n+\tvar (\n+\t\tres    = make([]R, len(input))\n+\t\terrMux sync.Mutex\n+\t\terrs   error\n+\t)\n+\tForEachIdxIn(goer, input, func(i int, t *T) {\n+\t\tvar err error\n+\t\tres[i], err = f(t)\n+\t\tif err != nil {\n+\t\t\terrMux.Lock()\n+\t\t\terrs = errors.Append(errs, err)\n+\t\t\terrMux.Unlock()\n+\t\t}\n+\t})\n+\treturn res, errs\n+}\ndiff --git a/limiter.go b/limiter.go\nindex 061ff58..f827c05 100644\n--- a/limiter.go\n+++ b/limiter.go\n@@ -6,6 +6,10 @@ func NewLimiter(n int) Limiter {\n \n type Limiter chan struct{}\n \n+func (l Limiter) Limit() int {\n+\tcap(l)\n+}\n+\n func (l Limiter) Acquire() {\n \tl <- struct{}{}\n }\ndiff --git a/pool/context_pool.go b/pool/context_pool.go\nindex 91771a3..d1b09cc 100644\n--- a/pool/context_pool.go\n+++ b/pool/context_pool.go\n@@ -26,21 +26,21 @@ func (g *ContextPool) Do(f func(ctx context.Context) error) {\n \t})\n }\n \n-func (p ContextPool) Wait() error {\n+func (p *ContextPool) Wait() error {\n \treturn p.errPool.Wait()\n }\n \n-func (p ContextPool) WithCancelOnError() ContextPool {\n+func (p *ContextPool) WithCancelOnError() *ContextPool {\n \tp.ctx, p.cancel = context.WithCancel(p.ctx)\n \treturn p\n }\n \n-func (p ContextPool) WithMaxGoroutines(limit int) ContextPool {\n-\tp.errPool = p.errPool.WithMaxGoroutines(limit)\n+func (p *ContextPool) WithMaxGoroutines(limit int) *ContextPool {\n+\tp.errPool = *p.errPool.WithMaxGoroutines(limit)\n \treturn p\n }\n \n-func (p ContextPool) WithFirstError() ContextPool {\n-\tp.errPool = p.errPool.WithFirstError()\n+func (p *ContextPool) WithFirstError() *ContextPool {\n+\tp.errPool = *p.errPool.WithFirstError()\n \treturn p\n }\ndiff --git a/pool/error_pool.go b/pool/error_pool.go\nindex 83b9687..5fb5580 100644\n--- a/pool/error_pool.go\n+++ b/pool/error_pool.go\n@@ -16,8 +16,8 @@ type ErrorPool struct {\n \terrs error\n }\n \n-func (p *ErrorPool) Do(f func() error) {\n-\tp.pool.Do(func() {\n+func (p *ErrorPool) Go(f func() error) {\n+\tp.pool.Go(func() {\n \t\tp.addErr(f())\n \t})\n }\n@@ -27,19 +27,19 @@ func (p *ErrorPool) Wait() error {\n \treturn p.errs\n }\n \n-func (p ErrorPool) WithMaxGoroutines(n int) ErrorPool {\n-\tp.pool = p.pool.WithMaxGoroutines(n)\n+func (p *ErrorPool) WithMaxGoroutines(n int) *ErrorPool {\n+\tp.pool = *p.pool.WithMaxGoroutines(n)\n \treturn p\n }\n \n-func (p ErrorPool) WithContext(ctx context.Context) ContextPool {\n-\treturn ContextPool{\n-\t\terrPool: p,\n+func (p *ErrorPool) WithContext(ctx context.Context) *ContextPool {\n+\treturn &ContextPool{\n+\t\terrPool: *p,\n \t\tctx:     ctx,\n \t}\n }\n \n-func (p ErrorPool) WithFirstError() ErrorPool {\n+func (p *ErrorPool) WithFirstError() *ErrorPool {\n \tp.onlyFirst = true\n \treturn p\n }\ndiff --git a/pool/iter.go b/pool/iter.go\nindex d9502b3..a7fb75d 100644\n--- a/pool/iter.go\n+++ b/pool/iter.go\n@@ -1,81 +1,23 @@\n package pool\n \n import (\n-\t\"sync\"\n-\t\"sync/atomic\"\n-\n-\t\"github.com/sourcegraph/sourcegraph/lib/errors\"\n+\t\"github.com/camdencheek/conc\"\n )\n \n func ForEachIdx[T any](input []T, f func(int, *T)) {\n-\tp := New()\n-\tForEachIdxIn(&p, input, f)\n-}\n-\n-func ForEachIdxIn[T any](p *Pool, input []T, f func(int, *T)) {\n-\tvar idx atomic.Int64\n-\tvar wg sync.WaitGroup\n-\ttask := func() {\n-\t\tdefer wg.Done()\n-\t\tfor i := int(idx.Add(1) - 1); i < len(input); i = int(idx.Add(1) - 1) {\n-\t\t\tf(i, &input[i])\n-\t\t}\n-\t}\n-\n-\tn := p.MaxGoroutines()\n-\twg.Add(n)\n-\tfor i := 0; i < p.MaxGoroutines(); i++ {\n-\t\tp.Do(task)\n-\t}\n-\n-\twg.Wait()\n+\tconc.ForEachIdxIn(New(), input, f)\n }\n \n func ForEach[T any](input []T, f func(*T)) {\n-\tp := New()\n-\tForEachIdxIn(&p, input, func(_ int, t *T) {\n-\t\tf(t)\n-\t})\n-}\n-\n-func ForEachIn[T any](p *Pool, input []T, f func(*T)) {\n-\tForEachIdxIn(p, input, func(_ int, t *T) {\n+\tconc.ForEachIdxIn(New(), input, func(_ int, t *T) {\n \t\tf(t)\n \t})\n }\n \n func Map[T any, R any](input []T, f func(*T) R) []R {\n-\tp := New()\n-\treturn MapIn(&p, input, f)\n-}\n-\n-func MapIn[T any, R any](p *Pool, input []T, f func(*T) R) []R {\n-\tres := make([]R, len(input))\n-\tForEachIdxIn(p, input, func(i int, t *T) {\n-\t\tres[i] = f(t)\n-\t})\n-\treturn res\n+\treturn conc.MapIn(New(), input, f)\n }\n \n func MapErr[T any, R any](input []T, f func(*T) (R, error)) ([]R, error) {\n-\tp := New()\n-\treturn MapErrIn(&p, input, f)\n-}\n-\n-func MapErrIn[T any, R any](p *Pool, input []T, f func(*T) (R, error)) ([]R, error) {\n-\tvar (\n-\t\tres    = make([]R, len(input))\n-\t\terrMux sync.Mutex\n-\t\terrs   error\n-\t)\n-\tForEachIdxIn(p, input, func(i int, t *T) {\n-\t\tvar err error\n-\t\tres[i], err = f(t)\n-\t\tif err != nil {\n-\t\t\terrMux.Lock()\n-\t\t\terrs = errors.Append(errs, err)\n-\t\t\terrMux.Unlock()\n-\t\t}\n-\t})\n-\treturn res, errs\n+\treturn conc.MapErrIn(New(), input, f)\n }\ndiff --git a/pool/pool.go b/pool/pool.go\nindex 38cf0a1..58a0699 100644\n--- a/pool/pool.go\n+++ b/pool/pool.go\n@@ -7,10 +7,10 @@ import (\n \t\"github.com/camdencheek/conc\"\n )\n \n-func New() Pool {\n-\treturn Pool{\n+func New() *Pool {\n+\treturn &Pool{\n \t\tlimiter: make(conc.Limiter, runtime.GOMAXPROCS(0)),\n-\t\ttasks:   make(chan func()),\n+\t\ttasks:   make(chan func(), 8),\n \t}\n }\n \n@@ -20,7 +20,7 @@ type Pool struct {\n \ttasks   chan func()\n }\n \n-func (p *Pool) Do(f func()) {\n+func (p *Pool) Go(f func()) {\n \tfor {\n \t\tselect {\n \t\tcase p.limiter <- struct{}{}:\n@@ -31,33 +31,33 @@ func (p *Pool) Do(f func()) {\n \t}\n }\n \n+func (p *Pool) MaxGoroutines() int {\n+\treturn p.limiter.Limit()\n+}\n+\n func (p *Pool) Wait() {\n \tclose(p.tasks)\n \tp.handle.Wait()\n }\n \n-func (p Pool) WithMaxGoroutines(n int) Pool {\n+func (p *Pool) WithMaxGoroutines(n int) *Pool {\n \tp.limiter = make(chan struct{}, n)\n \treturn p\n }\n \n-func (p Pool) WithErrors() ErrorPool {\n-\treturn ErrorPool{\n-\t\tpool: p,\n+func (p *Pool) WithErrors() *ErrorPool {\n+\treturn &ErrorPool{\n+\t\tpool: *p,\n \t}\n }\n \n-func (p Pool) WithContext(ctx context.Context) ContextPool {\n-\treturn ContextPool{\n-\t\terrPool: p.WithErrors(),\n+func (p Pool) WithContext(ctx context.Context) *ContextPool {\n+\treturn &ContextPool{\n+\t\terrPool: *p.WithErrors(),\n \t\tctx:     ctx,\n \t}\n }\n \n-func (p *Pool) MaxGoroutines() int {\n-\treturn cap(p.limiter)\n-}\n-\n func (p *Pool) worker() {\n \tfor f := range p.tasks {\n \t\tf()\ndiff --git a/pool/result_context_pool.go b/pool/result_context_pool.go\nindex c3b7818..c7651ea 100644\n--- a/pool/result_context_pool.go\n+++ b/pool/result_context_pool.go\n@@ -10,7 +10,7 @@ type ResultContextPool[T any] struct {\n \tcollectErrored bool\n }\n \n-func (p ResultContextPool[T]) Do(f func(context.Context) (T, error)) {\n+func (p *ResultContextPool[T]) Do(f func(context.Context) (T, error)) {\n \tp.contextPool.Do(func(ctx context.Context) error {\n \t\tres, err := f(ctx)\n \t\tif err == nil || p.collectErrored {\n@@ -20,27 +20,27 @@ func (p ResultContextPool[T]) Do(f func(context.Context) (T, error)) {\n \t})\n }\n \n-func (p ResultContextPool[T]) Wait() ([]T, error) {\n+func (p *ResultContextPool[T]) Wait() ([]T, error) {\n \terr := p.contextPool.Wait()\n \treturn p.agg.results, err\n }\n \n-func (p ResultContextPool[T]) WithCollectErrored() ResultContextPool[T] {\n+func (p *ResultContextPool[T]) WithCollectErrored() *ResultContextPool[T] {\n \tp.collectErrored = true\n \treturn p\n }\n \n-func (p ResultContextPool[T]) WithMaxGoroutines(limit int) ResultContextPool[T] {\n-\tp.contextPool = p.contextPool.WithMaxGoroutines(limit)\n+func (p *ResultContextPool[T]) WithMaxGoroutines(limit int) *ResultContextPool[T] {\n+\tp.contextPool = *p.contextPool.WithMaxGoroutines(limit)\n \treturn p\n }\n \n-func (p ResultContextPool[T]) WithCancelOnError() ResultContextPool[T] {\n-\tp.contextPool = p.contextPool.WithCancelOnError()\n+func (p *ResultContextPool[T]) WithCancelOnError() *ResultContextPool[T] {\n+\tp.contextPool = *p.contextPool.WithCancelOnError()\n \treturn p\n }\n \n-func (p ResultContextPool[T]) WithFirstError() ResultContextPool[T] {\n-\tp.contextPool = p.contextPool.WithFirstError()\n+func (p *ResultContextPool[T]) WithFirstError() *ResultContextPool[T] {\n+\tp.contextPool = *p.contextPool.WithFirstError()\n \treturn p\n }\ndiff --git a/pool/result_error_pool.go b/pool/result_error_pool.go\nindex 8084ede..cecbdb4 100644\n--- a/pool/result_error_pool.go\n+++ b/pool/result_error_pool.go\n@@ -11,7 +11,7 @@ type ResultErrorPool[T any] struct {\n }\n \n func (p *ResultErrorPool[T]) Do(f func() (T, error)) {\n-\tp.errPool.Do(func() error {\n+\tp.errPool.Go(func() error {\n \t\tres, err := f()\n \t\tif err == nil || p.collectErrored {\n \t\t\tp.agg.add(res)\n@@ -25,23 +25,23 @@ func (p *ResultErrorPool[T]) Wait() ([]T, error) {\n \treturn p.agg.results, err\n }\n \n-func (g ResultErrorPool[T]) WithCollectErrored() ResultErrorPool[T] {\n-\tg.collectErrored = true\n-\treturn g\n+func (p *ResultErrorPool[T]) WithCollectErrored() *ResultErrorPool[T] {\n+\tp.collectErrored = true\n+\treturn p\n }\n \n-func (g ResultErrorPool[T]) WithFirstError() ResultErrorPool[T] {\n-\tg.errPool = g.errPool.WithFirstError()\n-\treturn g\n+func (p *ResultErrorPool[T]) WithFirstError() *ResultErrorPool[T] {\n+\tp.errPool = *p.errPool.WithFirstError()\n+\treturn p\n }\n \n-func (g ResultErrorPool[T]) WithMaxGoroutines(limit int) ResultErrorPool[T] {\n-\tg.errPool = g.errPool.WithMaxGoroutines(limit)\n-\treturn g\n+func (p *ResultErrorPool[T]) WithMaxGoroutines(limit int) *ResultErrorPool[T] {\n+\tp.errPool = *p.errPool.WithMaxGoroutines(limit)\n+\treturn p\n }\n \n-func (g ResultErrorPool[T]) WithContext(ctx context.Context) ResultContextPool[T] {\n-\treturn ResultContextPool[T]{\n-\t\tcontextPool: g.errPool.WithContext(ctx),\n+func (p *ResultErrorPool[T]) WithContext(ctx context.Context) *ResultContextPool[T] {\n+\treturn &ResultContextPool[T]{\n+\t\tcontextPool: *p.errPool.WithContext(ctx),\n \t}\n }\ndiff --git a/pool/result_pool.go b/pool/result_pool.go\nindex 6ea1a45..2a61916 100644\n--- a/pool/result_pool.go\n+++ b/pool/result_pool.go\n@@ -11,7 +11,7 @@ type ResultPool[T any] struct {\n }\n \n func (p *ResultPool[T]) Do(f func() T) {\n-\tp.pool.Do(func() {\n+\tp.pool.Go(func() {\n \t\tp.agg.add(f())\n \t})\n }\n@@ -21,20 +21,20 @@ func (p *ResultPool[T]) Wait() []T {\n \treturn p.agg.results\n }\n \n-func (p ResultPool[T]) WithErrors() ResultErrorPool[T] {\n-\treturn ResultErrorPool[T]{\n-\t\terrPool: p.pool.WithErrors(),\n+func (p *ResultPool[T]) WithErrors() *ResultErrorPool[T] {\n+\treturn &ResultErrorPool[T]{\n+\t\terrPool: *p.pool.WithErrors(),\n \t}\n }\n \n-func (p ResultPool[T]) WithContext(ctx context.Context) ResultContextPool[T] {\n-\treturn ResultContextPool[T]{\n-\t\tcontextPool: p.pool.WithContext(ctx),\n+func (p *ResultPool[T]) WithContext(ctx context.Context) *ResultContextPool[T] {\n+\treturn &ResultContextPool[T]{\n+\t\tcontextPool: *p.pool.WithContext(ctx),\n \t}\n }\n \n-func (p ResultPool[T]) WithMaxGoroutines(limit int) ResultPool[T] {\n-\tp.pool = p.pool.WithMaxGoroutines(limit)\n+func (p *ResultPool[T]) WithMaxGoroutines(limit int) *ResultPool[T] {\n+\tp.pool = *p.pool.WithMaxGoroutines(limit)\n \treturn p\n }\n \ndiff --git a/stream/stream.go b/stream/stream.go\nindex 07afd97..c701782 100644\n--- a/stream/stream.go\n+++ b/stream/stream.go\n@@ -3,47 +3,59 @@ package stream\n import (\n \t\"github.com/camdencheek/conc\"\n \t\"github.com/camdencheek/conc/pool\"\n+\t\"sync\"\n )\n \n-func New(maxGoroutines int) Stream {\n-\ts := Stream{\n-\t\tpool:  pool.New().WithMaxGoroutines(maxGoroutines),\n-\t\tfree:  make(chan callbackCh, maxGoroutines+1),\n-\t\tqueue: make(chan callbackCh, maxGoroutines+1),\n+func New() *Stream {\n+\treturn &Stream{\n+\t\tpool: *pool.New(),\n \t}\n-\t// Pre-populate the free list with channels\n-\tfor i := 0; i < cap(s.free); i++ {\n-\t\ts.free <- make(callbackCh, 1)\n-\t}\n-\n-\t// Start the callbacker\n-\ts.callbackerHandle.Go(s.callbacker)\n-\n-\treturn s\n }\n \n+type StreamTask func() Callback\n+type Callback func()\n+\n type Stream struct {\n \tpool             pool.Pool\n \tcallbackerHandle conc.WaitGroup\n \tfree             chan callbackCh\n \tqueue            chan callbackCh\n+\n+\tinitOnce sync.Once\n }\n \n-func (s *Stream) Do(f func(), callback func()) {\n+func (s *Stream) Do(f StreamTask) {\n+\ts.initOnce.Do(s.init)\n+\n \tch := <-s.free\n \ts.queue <- ch\n-\ts.pool.Do(func() {\n-\t\tdefer func() { ch <- callback }()\n-\t\tf()\n+\ts.pool.Go(func() {\n+\t\tch <- f()\n \t})\n }\n \n func (s *Stream) Wait() {\n+\ts.initOnce.Do(s.init)\n+\n \ts.pool.Wait()\n \tclose(s.queue)\n \ts.callbackerHandle.Wait()\n }\n \n+func (s *Stream) init() {\n+\ts.free = make(chan callbackCh, s.pool.MaxGoroutines()+1)\n+\ts.queue = make(chan callbackCh, s.pool.MaxGoroutines()+1)\n+\n+\t// Pre-populate the free list with channels\n+\tfor i := 0; i < cap(s.free); i++ {\n+\t\ts.free <- make(callbackCh, 1)\n+\t}\n+\n+\t// Start the callbacker\n+\ts.callbackerHandle.Go(s.callbacker)\n+\n+}\n+\n func (s *Stream) callbacker() {\n \tfor callbackCh := range s.queue {\n \t\tcallback := <-callbackCh\n@@ -53,28 +65,3 @@ func (s *Stream) callbacker() {\n }\n \n type callbackCh chan func()\n-\n-func Submit[T, R any](s *Stream, f func() T, callback func(T)) {\n-\tvar res T\n-\tnewF := func() {\n-\t\tres = f()\n-\t}\n-\tnewCallback := func() {\n-\t\tcallback(res)\n-\t}\n-\ts.Do(newF, newCallback)\n-}\n-\n-func SubmitErr[T, R any](s *Stream, f func() (T, error), callback func(T, error)) {\n-\tvar (\n-\t\tres T\n-\t\terr error\n-\t)\n-\tnewF := func() {\n-\t\tres, err = f()\n-\t}\n-\tnewCallback := func() {\n-\t\tcallback(res, err)\n-\t}\n-\ts.Do(newF, newCallback)\n-}\n",
+  "diffTruncated": false,
+  "tree": [
+    "LICENSE",
+    "go.mod",
+    "go.sum",
+    "group/context_group.go",
+    "group/error_group.go",
+    "group/group.go",
+    "group/result_context_group.go",
+    "group/result_error_group.go",
+    "group/result_group.go",
+    "iter.go",
+    "limiter.go",
+    "pool/context_pool.go",
+    "pool/error_pool.go",
+    "pool/iter.go",
+    "pool/pool.go",
+    "pool/result_context_pool.go",
+    "pool/result_error_pool.go",
+    "pool/result_pool.go",
+    "stream/stream.go",
+    "waitgroup.go"
+  ],
+  "explanation": {
+    "what": "group / pool 配下の With* 系メソッドを値レシーバからポインタレシーバに統一し、戻り値もポインタ(*Group 等)に変更した。加えて、pool/iter.go にあったジェネリックな並行イテレーション処理を Goer インターフェース(Go/MaxGoroutines/Wait を持つ)経由のトップレベル iter.go に一般化し、pool.Pool の Do を Go に改名、Stream は New() 時点でチャネルを作らず初回 Do/Wait 呼び出し時に sync.Once で遅延初期化するよう変更した。",
+    "why": "値レシーバのメソッドチェーン(WithXxx().WithYyy())は呼ぶたびに構造体をコピーするため、内部に mutex や WaitGroup を持つ型では意図しない挙動やコピーコストが生じやすい。ポインタレシーバに統一することで一貫した参照セマンティクスにしたと考えられる。iter.go の Goer インターフェース抽出は、pool パッケージにしかなかった並行イテレーションのロジックを group など他パッケージからも再利用可能にする狙いがある。Stream の遅延初期化は maxGoroutines 引数なしで New() できるようにするための布石と見られる。",
+    "highlights": [
+      { "file": "iter.go", "note": "Goer インターフェースを介して Pool/Group いずれの実装にも依存しない ForEachIdxIn / MapIn / MapErrIn を定義。" },
+      { "file": "stream/stream.go", "note": "initOnce sync.Once による遅延初期化で、New() の引数なし化に対応。" }
+    ],
+    "langNotes": [
+      { "topic": "値レシーバ vs ポインタレシーバ", "note": "Go のメソッドは値レシーバ func (g Group) M() だと呼び出し時に構造体がコピーされ、ポインタレシーバ func (g *Group) M() だと元のインスタンスを直接操作する。sync.Mutex や channel を含む構造体はコピーすると壊れやすいため、この commit では一括してポインタレシーバに統一している。" },
+      { "topic": "インターフェースによる抽象化(Goer)", "note": "Go のインターフェースは暗黙的に満たされる(implements 宣言不要)。Goer は Go(func()) / MaxGoroutines() int / Wait() という3メソッドの集合で、これを満たす型なら Pool でも Group でも同じ ForEachIdxIn ロジックに渡せる。" },
+      { "topic": "sync.Once による遅延初期化", "note": "Do() は複数 goroutine から呼ばれる可能性があるため、初期化処理を initOnce.Do(s.init) で包むことで、どのゴルーチンが先に呼んでも一度だけ安全に初期化が走ることを保証している。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

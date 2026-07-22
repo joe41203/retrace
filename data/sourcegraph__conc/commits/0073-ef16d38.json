@@ -1,0 +1,77 @@
+{
+  "seq": 73,
+  "sha": "ef16d383db6e9c17a8462b8a0acf995c2a21fa98",
+  "parents": [
+    "2445245b157dd714f93dabe899ab743e58ae7ca7",
+    "44d135388504711851b2748f835bf3eaad6903cc"
+  ],
+  "author": {
+    "name": "Camden Cheek",
+    "email": "camden@ccheek.com",
+    "date": "2023-01-03T09:21:22-07:00"
+  },
+  "message": "Merge pull request #3 from SimonRichardson/patch-1\n\nStream example was missing type annotation",
+  "pr": {
+    "number": 3,
+    "title": "Stream example was missing type annotation",
+    "body": "",
+    "url": "https://github.com/sourcegraph/conc/pull/3"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 1,
+    "deletions": 1
+  },
+  "files": [
+    {
+      "path": "README.md",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/README.md b/README.md\nindex 504e658..d0c4384 100644\n--- a/README.md\n+++ b/README.md\n@@ -437,7 +437,7 @@ func mapStream(\n     s := stream.New().WithMaxGoroutines(10)\n     for elem := range in {\n         elem := elem\n-        s.Go(func() {\n+        s.Go(func() stream.Callback {\n             res := f(elem)\n             return func() { out <- res }\n         })\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/go.yml",
+    "LICENSE",
+    "README.md",
+    "go.mod",
+    "go.sum",
+    "iter/iter.go",
+    "iter/iter_test.go",
+    "panic.go",
+    "panic_test.go",
+    "pool/context_pool.go",
+    "pool/context_pool_test.go",
+    "pool/error_pool.go",
+    "pool/error_pool_test.go",
+    "pool/pool.go",
+    "pool/pool_test.go",
+    "pool/result_context_pool.go",
+    "pool/result_context_pool_test.go",
+    "pool/result_error_pool.go",
+    "pool/result_error_pool_test.go",
+    "pool/result_pool.go",
+    "pool/result_pool_test.go",
+    "stream/stream.go",
+    "stream/stream_test.go",
+    "waitgroup.go",
+    "waitgroup_test.go"
+  ],
+  "explanation": {
+    "what": "README.md の stream 使用例で、`s.Go(func() { ... })` のクロージャの戻り値型注釈 `stream.Callback` が欠けていたのを補った。",
+    "why": "PR タイトル「Stream example was missing type annotation」の通り、コード例が実際の stream.Stream.Go のシグネチャ(戻り値として stream.Callback 型のクロージャを要求する)と一致していなかったための修正。",
+    "highlights": [
+      { "file": "README.md", "note": "stream パッケージの使用例で戻り値の型注釈を追加" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [{ "type": "pr", "number": 3, "url": "https://github.com/sourcegraph/conc/pull/3" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

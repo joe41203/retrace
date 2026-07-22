@@ -1,0 +1,85 @@
+{
+  "seq": 36,
+  "sha": "e34ecd8e1a6b6b1c4e8a2f2242dd736e04e6ce53",
+  "parents": [
+    "c984ba451c1651076a611349672666ea66d530d6"
+  ],
+  "author": {
+    "name": "Camden Cheek",
+    "email": "camden@ccheek.com",
+    "date": "2022-12-24T23:07:09-07:00"
+  },
+  "message": "add test",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 3,
+    "additions": 35,
+    "deletions": 2
+  },
+  "files": [
+    {
+      "path": "panic_test.go",
+      "status": "M",
+      "additions": 33,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "stream/stream.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "waitgroup.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/panic_test.go b/panic_test.go\nindex 69ebc0b..bc257ba 100644\n--- a/panic_test.go\n+++ b/panic_test.go\n@@ -4,6 +4,7 @@ import (\n \t\"errors\"\n \t\"fmt\"\n \t\"runtime\"\n+\t\"sync\"\n \t\"testing\"\n \n \t\"github.com/stretchr/testify/require\"\n@@ -68,4 +69,36 @@ func TestPanicCatcher(t *testing.T) {\n \t\trequire.ErrorIs(t, recovered, err1)\n \t\trequire.ErrorAs(t, recovered, &err1)\n \t})\n+\n+\tt.Run(\"repanic panics\", func(t *testing.T) {\n+\t\tvar pc PanicCatcher\n+\t\tpc.Try(func() { panic(err1) })\n+\t\trequire.Panics(t, pc.Repanic)\n+\t})\n+\n+\tt.Run(\"repanic does not panic without child panic\", func(t *testing.T) {\n+\t\tvar pc PanicCatcher\n+\t\tpc.Try(func() { _ = 1 })\n+\t\trequire.NotPanics(t, pc.Repanic)\n+\t})\n+\n+\tt.Run(\"is goroutine safe\", func(t *testing.T) {\n+\t\tvar wg sync.WaitGroup\n+\t\tvar pc PanicCatcher\n+\t\tfor i := 0; i < 100; i++ {\n+\t\t\ti := i\n+\t\t\twg.Add(1)\n+\t\t\tfunc() {\n+\t\t\t\tdefer wg.Done()\n+\t\t\t\tpc.Try(func() {\n+\t\t\t\t\tif i == 50 {\n+\t\t\t\t\t\tpanic(\"50\")\n+\t\t\t\t\t}\n+\n+\t\t\t\t})\n+\t\t\t}()\n+\t\t}\n+\t\twg.Wait()\n+\t\trequire.Equal(t, \"50\", pc.Recovered().Value)\n+\t})\n }\ndiff --git a/stream/stream.go b/stream/stream.go\nindex 0196df0..67c2d48 100644\n--- a/stream/stream.go\n+++ b/stream/stream.go\n@@ -118,7 +118,7 @@ func (s *Stream) init() {\n // they were submitted. There is only a single instance of callbacker running.\n func (s *Stream) callbacker() {\n \tvar panicCatcher conc.PanicCatcher\n-\tdefer panicCatcher.Propagate()\n+\tdefer panicCatcher.Repanic()\n \n \t// For every scheduled task, read that tasks channel from the queue.\n \tfor callbackCh := range s.queue {\ndiff --git a/waitgroup.go b/waitgroup.go\nindex 5c9ed8f..2306877 100644\n--- a/waitgroup.go\n+++ b/waitgroup.go\n@@ -29,7 +29,7 @@ func (h *WaitGroup) Wait() {\n \th.wg.Wait()\n \n \t// Propagate a panic if we caught one from a child goroutine\n-\th.pc.Propagate()\n+\th.pc.Repanic()\n }\n \n // done should be called in a defer statement in a child goroutine.\n",
+  "diffTruncated": false,
+  "tree": [
+    "LICENSE",
+    "go.mod",
+    "go.sum",
+    "iter.go",
+    "limiter.go",
+    "panic.go",
+    "panic_test.go",
+    "pool/context_pool.go",
+    "pool/context_pool_test.go",
+    "pool/error_pool.go",
+    "pool/error_pool_test.go",
+    "pool/iter.go",
+    "pool/iter_test.go",
+    "pool/pool.go",
+    "pool/pool_test.go",
+    "pool/result_context_pool.go",
+    "pool/result_context_pool_test.go",
+    "pool/result_error_pool.go",
+    "pool/result_error_pool_test.go",
+    "pool/result_pool.go",
+    "pool/result_pool_test.go",
+    "stream/stream.go",
+    "stream/stream_test.go",
+    "waitgroup.go",
+    "waitgroup_test.go"
+  ],
+  "explanation": {
+    "what": "panic_test.go に「repanic panics」「repanic does not panic without child panic」「is goroutine safe」の3テストを追加した。「is goroutine safe」テストは sync.WaitGroup で100個の goroutine から同じ PanicCatcher.Try を並行に呼び、最初に panic した1件だけが Recovered() に記録されることを確認する。stream/stream.go と waitgroup.go では旧名 Propagate() の呼び出し残りを Repanic() に置き換えた。",
+    "why": "コミットメッセージの通りテスト追加が主目的。前コミットの Repanic への rename が stream.go と waitgroup.go の呼び出し側に反映しきれていなかった箇所を修正し、PanicCatcher の中核の安全性保証(複数goroutineから同時にTryを呼んでも最初のpanicだけが記録される)を「is goroutine safe」テストで明示的に固定した。",
+    "highlights": [
+      { "file": "panic_test.go", "note": "100 goroutine から同時に Try を呼ぶ並行性テストで CompareAndSwap による『最初の panic だけ勝つ』保証を検証" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

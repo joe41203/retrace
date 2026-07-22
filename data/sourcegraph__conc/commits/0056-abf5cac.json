@@ -1,0 +1,73 @@
+{
+  "seq": 56,
+  "sha": "abf5cac3c4d808bf476b08f33175ef18449bbab5",
+  "parents": [
+    "1f9fc4150f2bb1737d529cce7ebf4afd9c66f81e"
+  ],
+  "author": {
+    "name": "Camden Cheek",
+    "email": "camden@ccheek.com",
+    "date": "2023-01-02T16:13:08-07:00"
+  },
+  "message": "Create go.yml",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 28,
+    "deletions": 0
+  },
+  "files": [
+    {
+      "path": ".github/workflows/go.yml",
+      "status": "A",
+      "additions": 28,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/.github/workflows/go.yml b/.github/workflows/go.yml\nnew file mode 100644\nindex 0000000..3e9a76d\n--- /dev/null\n+++ b/.github/workflows/go.yml\n@@ -0,0 +1,28 @@\n+# This workflow will build a golang project\n+# For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-go\n+\n+name: Go\n+\n+on:\n+  push:\n+    branches: [ \"main\" ]\n+  pull_request:\n+    branches: [ \"main\" ]\n+\n+jobs:\n+\n+  build:\n+    runs-on: ubuntu-latest\n+    steps:\n+    - uses: actions/checkout@v3\n+\n+    - name: Set up Go\n+      uses: actions/setup-go@v3\n+      with:\n+        go-version: 1.19\n+\n+    - name: Build\n+      run: go build -v ./...\n+\n+    - name: Test\n+      run: go test -v ./...\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/go.yml",
+    "LICENSE",
+    "README.md",
+    "go.mod",
+    "go.sum",
+    "iter/iter.go",
+    "iter/iter_test.go",
+    "panic.go",
+    "panic_test.go",
+    "pool/context_pool.go",
+    "pool/context_pool_test.go",
+    "pool/error_pool.go",
+    "pool/error_pool_test.go",
+    "pool/pool.go",
+    "pool/pool_test.go",
+    "pool/result_context_pool.go",
+    "pool/result_context_pool_test.go",
+    "pool/result_error_pool.go",
+    "pool/result_error_pool_test.go",
+    "pool/result_pool.go",
+    "pool/result_pool_test.go",
+    "stream/stream.go",
+    "stream/stream_test.go",
+    "waitgroup.go",
+    "waitgroup_test.go"
+  ],
+  "explanation": {
+    "what": "GitHub Actions のワークフローファイル `.github/workflows/go.yml` を新規追加した。main ブランチへの push と pull request をトリガーに、Ubuntu ランナー上で actions/setup-go@v3(Go 1.19)をセットアップし、`go build -v ./...` と `go test -v ./...` を実行する。",
+    "why": "おそらく README 整備(seq 53〜55)に続く公開準備の一環として、コミット・PR ごとにビルドとテストを自動検証するCIを導入したものと考えられる。",
+    "highlights": [
+      { "file": ".github/workflows/go.yml", "note": "actions/setup-go@v3 で Go 1.19 を指定し、build→test の順で実行する最小構成のワークフロー" }
+    ],
+    "langNotes": [
+      { "topic": "GitHub Actions ワークフロー", "note": "`.github/workflows/*.yml` に置いたYAMLファイルがCI定義になる。`on:` でトリガー(push/pull_request等のブランチ条件)、`jobs:` で実行環境とステップ列を指定する。actions/checkout や actions/setup-go は GitHub 公式が提供する再利用可能なアクション。" }
+    ],
+    "diagram": null,
+    "evidence": "inferred",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

@@ -1,0 +1,71 @@
+{
+  "seq": 58,
+  "sha": "79946b716ee70dc04b649d272663149cf7dee9b9",
+  "parents": [
+    "272807fece45bddeb19a5da13ab18a1c57e7ed87"
+  ],
+  "author": {
+    "name": "Camden Cheek",
+    "email": "camden@ccheek.com",
+    "date": "2023-01-02T17:01:41-07:00"
+  },
+  "message": "fix example for environments with no concurrency",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 1,
+    "deletions": 1
+  },
+  "files": [
+    {
+      "path": "pool/context_pool_test.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/pool/context_pool_test.go b/pool/context_pool_test.go\nindex 2665885..15addc2 100644\n--- a/pool/context_pool_test.go\n+++ b/pool/context_pool_test.go\n@@ -14,7 +14,7 @@ import (\n )\n \n func ExampleContextPool() {\n-\tp := New().WithContext(context.Background())\n+\tp := New().WithMaxGoroutines(4).WithContext(context.Background())\n \tfor i := 0; i < 3; i++ {\n \t\ti := i\n \t\tp.Go(func(ctx context.Context) error {\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/go.yml",
+    "LICENSE",
+    "README.md",
+    "go.mod",
+    "go.sum",
+    "iter/iter.go",
+    "iter/iter_test.go",
+    "panic.go",
+    "panic_test.go",
+    "pool/context_pool.go",
+    "pool/context_pool_test.go",
+    "pool/error_pool.go",
+    "pool/error_pool_test.go",
+    "pool/pool.go",
+    "pool/pool_test.go",
+    "pool/result_context_pool.go",
+    "pool/result_context_pool_test.go",
+    "pool/result_error_pool.go",
+    "pool/result_error_pool_test.go",
+    "pool/result_pool.go",
+    "pool/result_pool_test.go",
+    "stream/stream.go",
+    "stream/stream_test.go",
+    "waitgroup.go",
+    "waitgroup_test.go"
+  ],
+  "explanation": {
+    "what": "pool/context_pool_test.go の ExampleContextPool を修正し、`New().WithContext(ctx)` を `New().WithMaxGoroutines(4).WithContext(ctx)` に変更した。",
+    "why": "コミットメッセージ「fix example for environments with no concurrency」の通り、GOMAXPROCS=1などゴルーチン並行度が制限された環境ではデフォルト設定のPoolがタスクを1つずつ順番にしか実行できず、他の2つのタスクがcontext.Done()を待ち続けている間に3番目のタスク(エラーを返す)が実行されず `// Output:` の期待値と食い違ってテストが不安定になっていたと考えられる。WithMaxGoroutines(4)で3つのタスクを確実に同時実行させ、Exampleの決定性を確保する修正とみられる。",
+    "highlights": [
+      { "file": "pool/context_pool_test.go", "note": "WithMaxGoroutines(4) を明示してExampleの並行実行を保証する修正" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

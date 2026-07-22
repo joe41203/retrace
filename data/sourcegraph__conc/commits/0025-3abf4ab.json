@@ -1,0 +1,101 @@
+{
+  "seq": 25,
+  "sha": "3abf4ab233c3dfddd68aa84b13270ca20140b322",
+  "parents": [
+    "d7edaa024a0555608e21c398a39ab713f66cd082"
+  ],
+  "author": {
+    "name": "Camden Cheek",
+    "email": "camden@ccheek.com",
+    "date": "2022-12-24T18:50:53-07:00"
+  },
+  "message": "use PanicCatcher in WaitGroup",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 3,
+    "additions": 43,
+    "deletions": 24
+  },
+  "files": [
+    {
+      "path": "panic.go",
+      "status": "M",
+      "additions": 37,
+      "deletions": 6,
+      "binary": false
+    },
+    {
+      "path": "stream/stream.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "waitgroup.go",
+      "status": "M",
+      "additions": 5,
+      "deletions": 17,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/panic.go b/panic.go\nindex 3191720..1ff3d46 100644\n--- a/panic.go\n+++ b/panic.go\n@@ -1,17 +1,28 @@\n package conc\n \n-import \"sync/atomic\"\n+import (\n+\t\"fmt\"\n+\t\"runtime\"\n+\t\"runtime/debug\"\n+\t\"sync/atomic\"\n+)\n \n type PanicCatcher struct {\n-\tpanicVal atomic.Value\n+\tcaught atomic.Value\n }\n \n // Try executes f, catching any panic it might spawn. It is safe\n // to call from multiple goroutines simultaneously.\n func (p *PanicCatcher) Try(f func()) {\n \tdefer func() {\n-\t\tif r := recover(); r != nil {\n-\t\t\tp.panicVal.CompareAndSwap(nil, r)\n+\t\tif val := recover(); val != nil {\n+\t\t\tvar callers [32]uintptr\n+\t\t\tn := runtime.Callers(1, callers[:])\n+\t\t\tp.caught.CompareAndSwap(nil, &CaughtPanic{\n+\t\t\t\tValue:   val,\n+\t\t\t\tCallers: callers[:n],\n+\t\t\t\tStack:   debug.Stack(),\n+\t\t\t})\n \t\t}\n \t}()\n \tf()\n@@ -20,7 +31,27 @@ func (p *PanicCatcher) Try(f func()) {\n // Propagate panics if any calls to Try caught a panic. It will\n // panic with the value of the first panic caught.\n func (p *PanicCatcher) Propagate() {\n-\tif p.panicVal.Load() != nil {\n-\t\tpanic(p.panicVal)\n+\tif p.caught.Load() != nil {\n+\t\tpanic(p.caught)\n \t}\n }\n+\n+// Value returns the value of the first panic caught by Try, or nil if\n+// no calls to Try panicked\n+func (p *PanicCatcher) Value() *CaughtPanic {\n+\tval := p.caught.Load()\n+\tif val == nil {\n+\t\treturn nil\n+\t}\n+\treturn val.(*CaughtPanic)\n+}\n+\n+type CaughtPanic struct {\n+\tValue   any\n+\tCallers []uintptr\n+\tStack   []byte\n+}\n+\n+func (c *CaughtPanic) Error() string {\n+\treturn fmt.Sprintf(\"original value: %q\\nstacktrace: %s\", c.Value, c.Stack)\n+}\ndiff --git a/stream/stream.go b/stream/stream.go\nindex 9d52aa3..0196df0 100644\n--- a/stream/stream.go\n+++ b/stream/stream.go\n@@ -118,7 +118,7 @@ func (s *Stream) init() {\n // they were submitted. There is only a single instance of callbacker running.\n func (s *Stream) callbacker() {\n \tvar panicCatcher conc.PanicCatcher\n-\tdefer panicCatcher.MaybePanic()\n+\tdefer panicCatcher.Propagate()\n \n \t// For every scheduled task, read that tasks channel from the queue.\n \tfor callbackCh := range s.queue {\ndiff --git a/waitgroup.go b/waitgroup.go\nindex c51b0d7..c246076 100644\n--- a/waitgroup.go\n+++ b/waitgroup.go\n@@ -1,11 +1,7 @@\n package conc\n \n import (\n-\t\"runtime/debug\"\n \t\"sync\"\n-\t\"sync/atomic\"\n-\n-\t\"github.com/sourcegraph/sourcegraph/lib/errors\"\n )\n \n // WaitGroup is the primary building block for scoped concurrency.\n@@ -14,8 +10,8 @@ import (\n // before continuing. Any panics in a child goroutine will be caught\n // and propagated to the caller of Wait().\n type WaitGroup struct {\n-\twg          sync.WaitGroup\n-\tcaughtPanic atomic.Pointer[error]\n+\twg sync.WaitGroup\n+\tpc PanicCatcher\n }\n \n // Go spawns a new goroutine in the WaitGroup\n@@ -23,7 +19,7 @@ func (h *WaitGroup) Go(f func()) {\n \th.wg.Add(1)\n \tgo func() {\n \t\tdefer h.done()\n-\t\tf()\n+\t\th.pc.Try(f)\n \t}()\n }\n \n@@ -33,21 +29,13 @@ func (h *WaitGroup) Wait() {\n \th.wg.Wait()\n \n \t// Propagate a panic if we caught one from a child goroutine\n-\tif r := h.caughtPanic.Load(); r != nil {\n-\t\tpanic(*r)\n+\tif r := h.pc.Value(); r != nil {\n+\t\tpanic(r.Value)\n \t}\n }\n \n // done should be called in a defer statement in a child goroutine.\n // It catches any panics and decrements the counter.\n func (h *WaitGroup) done() {\n-\tif r := recover(); r != nil {\n-\t\terr := errors.Newf(\n-\t\t\t\"recovered from panic in child goroutine: %#v\\n\\nchild stacktrace:\\n%s\\n\",\n-\t\t\tr,\n-\t\t\tdebug.Stack(),\n-\t\t)\n-\t\th.caughtPanic.Store(&err)\n-\t}\n \th.wg.Done()\n }\n",
+  "diffTruncated": false,
+  "tree": [
+    "LICENSE",
+    "go.mod",
+    "go.sum",
+    "group/context_group.go",
+    "group/context_group_test.go",
+    "group/error_group.go",
+    "group/error_group_test.go",
+    "group/group.go",
+    "group/group_test.go",
+    "group/iter.go",
+    "group/iter_test.go",
+    "group/result_context_group.go",
+    "group/result_context_group_test.go",
+    "group/result_error_group.go",
+    "group/result_error_group_test.go",
+    "group/result_group.go",
+    "group/result_group_test.go",
+    "iter.go",
+    "limiter.go",
+    "panic.go",
+    "pool/context_pool.go",
+    "pool/context_pool_test.go",
+    "pool/error_pool.go",
+    "pool/error_pool_test.go",
+    "pool/iter.go",
+    "pool/iter_test.go",
+    "pool/pool.go",
+    "pool/pool_test.go",
+    "pool/result_context_pool.go",
+    "pool/result_context_pool_test.go",
+    "pool/result_error_pool.go",
+    "pool/result_error_pool_test.go",
+    "pool/result_pool.go",
+    "pool/result_pool_test.go",
+    "stream/stream.go",
+    "stream/stream_test.go",
+    "waitgroup.go",
+    "waitgroup_test.go"
+  ],
+  "explanation": {
+    "what": "PanicCatcher に CaughtPanic 型(Value/Callers/Stack を保持し、Error() string を実装)を新設し、Try() の recover 時に runtime.Callers でコールスタックを、debug.Stack() で整形済みスタックトレースを取得して CaughtPanic として atomic.Value に保存するようにした。Value() メソッドで捕捉した CaughtPanic を取り出せるようにし、WaitGroup 自前だった panic 捕捉ロジック(caughtPanic フィールド、独自の errors.Newf 呼び出し)を削除して PanicCatcher (pc フィールド) に置き換えた。stream パッケージの呼び出しも MaybePanic から Propagate に追従修正。",
+    "why": "WaitGroup が持っていたスタックトレース付与ロジック(seq22で追加)と、PanicCatcher が持つ goroutine-safe な捕捉ロジック(seq24)が別々に実装され重複していたため、CaughtPanic という共通の型に統合し、WaitGroup を PanicCatcher の薄いラッパーにしている。runtime.Callers による生のコールスタック(Callers)と debug.Stack() による文字列化済みスタック(Stack)の両方を保持することで、利用側が用途に応じて runtime.CallersFrames で詳細を組み立てるか、そのまま文字列として使うかを選べるようにしたとおそらく考えられる。",
+    "highlights": [
+      { "file": "panic.go", "note": "CaughtPanic{Value, Callers, Stack} の新設とTry()内でのruntime.Callers呼び出し" },
+      { "file": "waitgroup.go", "note": "WaitGroupが独自実装をやめてPanicCatcher(pcフィールド)に一本化された差分" }
+    ],
+    "langNotes": [
+      { "topic": "runtime.Callers とスタックトレース", "note": "runtime.Callers(skip, pc[]) は呼び出し元のプログラムカウンタ列を取得する低レベルAPIで、後から runtime.CallersFrames で関数名・ファイル名・行番号に変換できる。debug.Stack() は同種の情報を人間が読める文字列としてその場で返す簡易版。両方を保持しておくと、即座に表示する用途と後から詳細解析する用途の両方に対応できる。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

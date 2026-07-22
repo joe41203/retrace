@@ -1,0 +1,105 @@
+{
+  "seq": 19,
+  "sha": "b2ac8980e9b68c755670a4e00c2cadcf7c4bc2a4",
+  "parents": [
+    "87d4babe8444a6edffc0bef0d1911a59f2646680"
+  ],
+  "author": {
+    "name": "Camden Cheek",
+    "email": "camden@ccheek.com",
+    "date": "2022-12-16T15:26:01-07:00"
+  },
+  "message": "add some simple stream tests",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 4,
+    "additions": 336,
+    "deletions": 7
+  },
+  "files": [
+    {
+      "path": "pool/iter.go",
+      "status": "M",
+      "additions": 16,
+      "deletions": 4,
+      "binary": false
+    },
+    {
+      "path": "pool/iter_test.go",
+      "status": "M",
+      "additions": 233,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "stream/stream.go",
+      "status": "M",
+      "additions": 42,
+      "deletions": 3,
+      "binary": false
+    },
+    {
+      "path": "stream/stream_test.go",
+      "status": "A",
+      "additions": 45,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/pool/iter.go b/pool/iter.go\nindex a7fb75d..f5cb0e3 100644\n--- a/pool/iter.go\n+++ b/pool/iter.go\n@@ -5,19 +5,31 @@ import (\n )\n \n func ForEachIdx[T any](input []T, f func(int, *T)) {\n-\tconc.ForEachIdxIn(New(), input, f)\n+\tp := New()\n+\tdefer p.Wait()\n+\n+\tconc.ForEachIdxIn(p, input, f)\n }\n \n func ForEach[T any](input []T, f func(*T)) {\n-\tconc.ForEachIdxIn(New(), input, func(_ int, t *T) {\n+\tp := New()\n+\tdefer p.Wait()\n+\n+\tconc.ForEachIdxIn(p, input, func(_ int, t *T) {\n \t\tf(t)\n \t})\n }\n \n func Map[T any, R any](input []T, f func(*T) R) []R {\n-\treturn conc.MapIn(New(), input, f)\n+\tp := New()\n+\tdefer p.Wait()\n+\n+\treturn conc.MapIn(p, input, f)\n }\n \n func MapErr[T any, R any](input []T, f func(*T) (R, error)) ([]R, error) {\n-\treturn conc.MapErrIn(New(), input, f)\n+\tp := New()\n+\tdefer p.Wait()\n+\n+\treturn conc.MapErrIn(p, input, f)\n }\ndiff --git a/pool/iter_test.go b/pool/iter_test.go\nindex 1e1f1a2..a66991a 100644\n--- a/pool/iter_test.go\n+++ b/pool/iter_test.go\n@@ -4,9 +4,242 @@ import (\n \t\"strconv\"\n \t\"testing\"\n \n+\t\"github.com/sourcegraph/sourcegraph/lib/errors\"\n+\t\"github.com/stretchr/testify/require\"\n+\n \t\"github.com/camdencheek/conc\"\n )\n \n+func TestForEachIdx(t *testing.T) {\n+\tt.Parallel()\n+\n+\tt.Run(\"empty\", func(t *testing.T) {\n+\t\tf := func() {\n+\t\t\tints := []int{}\n+\t\t\tForEachIdx(ints, func(i int, val *int) {\n+\t\t\t\tpanic(\"this should never be called\")\n+\t\t\t})\n+\t\t}\n+\t\trequire.NotPanics(t, f)\n+\t})\n+\n+\tt.Run(\"panic is propagated\", func(t *testing.T) {\n+\t\tf := func() {\n+\t\t\tints := []int{1}\n+\t\t\tForEachIdx(ints, func(i int, val *int) {\n+\t\t\t\tpanic(\"super bad thing happened\")\n+\t\t\t})\n+\t\t}\n+\t\trequire.Panics(t, f)\n+\t})\n+\n+\tt.Run(\"mutating inputs is fine\", func(t *testing.T) {\n+\t\tints := []int{1, 2, 3, 4, 5}\n+\t\tForEachIdx(ints, func(i int, val *int) {\n+\t\t\t*val += 1\n+\t\t})\n+\t\trequire.Equal(t, []int{2, 3, 4, 5, 6}, ints)\n+\t})\n+\n+\tt.Run(\"huge inputs\", func(t *testing.T) {\n+\t\tints := make([]int, 10000)\n+\t\tForEachIdx(ints, func(i int, val *int) {\n+\t\t\t*val = i\n+\t\t})\n+\t\texpected := make([]int, 10000)\n+\t\tfor i := 0; i < 10000; i++ {\n+\t\t\texpected[i] = i\n+\t\t}\n+\t\trequire.Equal(t, expected, ints)\n+\t})\n+}\n+\n+func TestForEach(t *testing.T) {\n+\tt.Parallel()\n+\n+\tt.Run(\"empty\", func(t *testing.T) {\n+\t\tf := func() {\n+\t\t\tints := []int{}\n+\t\t\tForEach(ints, func(val *int) {\n+\t\t\t\tpanic(\"this should never be called\")\n+\t\t\t})\n+\t\t}\n+\t\trequire.NotPanics(t, f)\n+\t})\n+\n+\tt.Run(\"panic is propagated\", func(t *testing.T) {\n+\t\tf := func() {\n+\t\t\tints := []int{1}\n+\t\t\tForEach(ints, func(val *int) {\n+\t\t\t\tpanic(\"super bad thing happened\")\n+\t\t\t})\n+\t\t}\n+\t\trequire.Panics(t, f)\n+\t})\n+\n+\tt.Run(\"mutating inputs is fine\", func(t *testing.T) {\n+\t\tints := []int{1, 2, 3, 4, 5}\n+\t\tForEach(ints, func(val *int) {\n+\t\t\t*val += 1\n+\t\t})\n+\t\trequire.Equal(t, []int{2, 3, 4, 5, 6}, ints)\n+\t})\n+\n+\tt.Run(\"huge inputs\", func(t *testing.T) {\n+\t\tints := make([]int, 10000)\n+\t\tForEach(ints, func(val *int) {\n+\t\t\t*val = 1\n+\t\t})\n+\t\texpected := make([]int, 10000)\n+\t\tfor i := 0; i < 10000; i++ {\n+\t\t\texpected[i] = 1\n+\t\t}\n+\t\trequire.Equal(t, expected, ints)\n+\t})\n+}\n+\n+func TestMap(t *testing.T) {\n+\tt.Parallel()\n+\n+\tt.Run(\"empty\", func(t *testing.T) {\n+\t\tf := func() {\n+\t\t\tints := []int{}\n+\t\t\tMap(ints, func(val *int) int {\n+\t\t\t\tpanic(\"this should never be called\")\n+\t\t\t})\n+\t\t}\n+\t\trequire.NotPanics(t, f)\n+\t})\n+\n+\tt.Run(\"panic is propagated\", func(t *testing.T) {\n+\t\tf := func() {\n+\t\t\tints := []int{1}\n+\t\t\tMap(ints, func(val *int) int {\n+\t\t\t\tpanic(\"super bad thing happened\")\n+\t\t\t})\n+\t\t}\n+\t\trequire.Panics(t, f)\n+\t})\n+\n+\tt.Run(\"mutating inputs is fine, though not recommended\", func(t *testing.T) {\n+\t\tints := []int{1, 2, 3, 4, 5}\n+\t\tMap(ints, func(val *int) int {\n+\t\t\t*val += 1\n+\t\t\treturn 0\n+\t\t})\n+\t\trequire.Equal(t, []int{2, 3, 4, 5, 6}, ints)\n+\t})\n+\n+\tt.Run(\"basic increment\", func(t *testing.T) {\n+\t\tints := []int{1, 2, 3, 4, 5}\n+\t\tres := Map(ints, func(val *int) int {\n+\t\t\treturn *val + 1\n+\t\t})\n+\t\trequire.Equal(t, []int{2, 3, 4, 5, 6}, res)\n+\t\trequire.Equal(t, []int{1, 2, 3, 4, 5}, ints)\n+\t})\n+\n+\tt.Run(\"huge inputs\", func(t *testing.T) {\n+\t\tints := make([]int, 10000)\n+\t\tres := Map(ints, func(val *int) int {\n+\t\t\treturn 1\n+\t\t})\n+\t\texpected := make([]int, 10000)\n+\t\tfor i := 0; i < 10000; i++ {\n+\t\t\texpected[i] = 1\n+\t\t}\n+\t\trequire.Equal(t, expected, res)\n+\t})\n+}\n+\n+func TestMapErr(t *testing.T) {\n+\tt.Parallel()\n+\n+\tt.Run(\"empty\", func(t *testing.T) {\n+\t\tf := func() {\n+\t\t\tints := []int{}\n+\t\t\tMapErr(ints, func(val *int) (int, error) {\n+\t\t\t\tpanic(\"this should never be called\")\n+\t\t\t})\n+\t\t}\n+\t\trequire.NotPanics(t, f)\n+\t})\n+\n+\tt.Run(\"panic is propagated\", func(t *testing.T) {\n+\t\tf := func() {\n+\t\t\tints := []int{1}\n+\t\t\tMapErr(ints, func(val *int) (int, error) {\n+\t\t\t\tpanic(\"super bad thing happened\")\n+\t\t\t})\n+\t\t}\n+\t\trequire.Panics(t, f)\n+\t})\n+\n+\tt.Run(\"mutating inputs is fine, though not recommended\", func(t *testing.T) {\n+\t\tints := []int{1, 2, 3, 4, 5}\n+\t\tMapErr(ints, func(val *int) (int, error) {\n+\t\t\t*val += 1\n+\t\t\treturn 0, nil\n+\t\t})\n+\t\trequire.Equal(t, []int{2, 3, 4, 5, 6}, ints)\n+\t})\n+\n+\tt.Run(\"basic increment\", func(t *testing.T) {\n+\t\tints := []int{1, 2, 3, 4, 5}\n+\t\tres, err := MapErr(ints, func(val *int) (int, error) {\n+\t\t\treturn *val + 1, nil\n+\t\t})\n+\t\trequire.NoError(t, err)\n+\t\trequire.Equal(t, []int{2, 3, 4, 5, 6}, res)\n+\t\trequire.Equal(t, []int{1, 2, 3, 4, 5}, ints)\n+\t})\n+\n+\terr1 := errors.New(\"error1\")\n+\terr2 := errors.New(\"error1\")\n+\n+\tt.Run(\"error is propagated\", func(t *testing.T) {\n+\t\tints := []int{1, 2, 3, 4, 5}\n+\t\tres, err := MapErr(ints, func(val *int) (int, error) {\n+\t\t\tif *val == 3 {\n+\t\t\t\treturn 0, err1\n+\t\t\t}\n+\t\t\treturn *val + 1, nil\n+\t\t})\n+\t\trequire.ErrorIs(t, err, err1)\n+\t\trequire.Equal(t, []int{2, 3, 0, 5, 6}, res)\n+\t\trequire.Equal(t, []int{1, 2, 3, 4, 5}, ints)\n+\t})\n+\n+\tt.Run(\"multiple errors are propagated\", func(t *testing.T) {\n+\t\tints := []int{1, 2, 3, 4, 5}\n+\t\tres, err := MapErr(ints, func(val *int) (int, error) {\n+\t\t\tif *val == 3 {\n+\t\t\t\treturn 0, err1\n+\t\t\t}\n+\t\t\tif *val == 4 {\n+\t\t\t\treturn 0, err2\n+\t\t\t}\n+\t\t\treturn *val + 1, nil\n+\t\t})\n+\t\trequire.ErrorIs(t, err, err1)\n+\t\trequire.ErrorIs(t, err, err2)\n+\t\trequire.Equal(t, []int{2, 3, 0, 0, 6}, res)\n+\t\trequire.Equal(t, []int{1, 2, 3, 4, 5}, ints)\n+\t})\n+\n+\tt.Run(\"huge inputs\", func(t *testing.T) {\n+\t\tints := make([]int, 10000)\n+\t\tres := Map(ints, func(val *int) int {\n+\t\t\treturn 1\n+\t\t})\n+\t\texpected := make([]int, 10000)\n+\t\tfor i := 0; i < 10000; i++ {\n+\t\t\texpected[i] = 1\n+\t\t}\n+\t\trequire.Equal(t, expected, res)\n+\t})\n+}\n+\n func BenchmarkForEachIdx(b *testing.B) {\n \tb.Run(\"simple mutation\", func(b *testing.B) {\n \t\tfor _, n := range []int{10, 1000, 1000000} {\ndiff --git a/stream/stream.go b/stream/stream.go\nindex 90d24ff..85d0022 100644\n--- a/stream/stream.go\n+++ b/stream/stream.go\n@@ -1,3 +1,4 @@\n+// Package stream provides a concurrent, ordered stream implementation.\n package stream\n \n import (\n@@ -13,9 +14,13 @@ func New() *Stream {\n \t}\n }\n \n-type StreamTask func() Callback\n-type Callback func()\n-\n+// Stream is used to exectue a stream of tasks concurrently while maintaining\n+// the order of the results.\n+//\n+// To use a stream, you submit any number of `StreamTask`s, each of which\n+// return a callback. Each task will be executed concurrently in the stream's\n+// associated Pool, but the callbacks will be executed sequentially, in the\n+// order the tasks were submitted.\n type Stream struct {\n \tpool             pool.Pool\n \tcallbackerHandle conc.WaitGroup\n@@ -25,21 +30,49 @@ type Stream struct {\n \tinitOnce sync.Once\n }\n \n+// Stream task is a task that is submitted to the stream. Submitted tasks will\n+// be executed concurrently. It returns a callback that will be called after\n+// the task has completed.\n+type StreamTask func() Callback\n+\n+// Callback is a function that is returned by a StreamTask. Callbacks are\n+// called in the same order that tasks are submitted.\n+type Callback func()\n+\n+// Go schedules a task to be run in the stream's pool. All submitted tasks\n+// will be executed concurrently in worker goroutines. Then, the callbacks\n+// returned by the tasks will be executed in the order that the tasks were\n+// submitted. All callbacks will be executed by the same goroutine, so no\n+// synchronization is necessary between callbacks.\n func (s *Stream) Go(f StreamTask) {\n \ts.initOnce.Do(s.init)\n \n+\t// Get a channel from the cache\n \tch := s.free.get()\n+\n+\t// Queue the channel for the callbacker\n \ts.queue <- ch\n+\n+\t// Submit the task for execution\n \ts.pool.Go(func() {\n+\t\t// Run the task, sending its callback down this task's channel\n \t\tch <- f()\n \t})\n }\n \n+// Wait signals to the stream that all tasks have been submitted. Wait will\n+// not return until all tasks and callbacks have been run.\n func (s *Stream) Wait() {\n \ts.initOnce.Do(s.init)\n \n+\t// Wait for all the workers to exit\n \ts.pool.Wait()\n+\n+\t// Now that all the workers have finished, close the\n+\t// callback queue, signalling the callbacker to exit.\n \tclose(s.queue)\n+\n+\t// Wait for the callbacker to finish.\n \ts.callbackerHandle.Wait()\n }\n \n@@ -57,9 +90,15 @@ func (s *Stream) init() {\n }\n \n func (s *Stream) callbacker() {\n+\t// For every scheduled task, read that tasks channel from the queue.\n \tfor callbackCh := range s.queue {\n+\t\t// Wait for the task to complete and get its callback from the channel\n \t\tcallback := <-callbackCh\n+\n+\t\t// Execute the callback\n \t\tcallback()\n+\n+\t\t// Return the channel to the pool of unused channels\n \t\ts.free.put(callbackCh)\n \t}\n }\ndiff --git a/stream/stream_test.go b/stream/stream_test.go\nnew file mode 100644\nindex 0000000..51de643\n--- /dev/null\n+++ b/stream/stream_test.go\n@@ -0,0 +1,45 @@\n+package stream\n+\n+import (\n+\t\"fmt\"\n+\t\"testing\"\n+\n+\t\"github.com/stretchr/testify/require\"\n+)\n+\n+func ExampleStream() {\n+\ts := New()\n+\tfor i := 0; i < 5; i++ {\n+\t\ti := i\n+\t\ts.Go(func() Callback {\n+\t\t\ti *= 2\n+\t\t\treturn func() { fmt.Println(i) }\n+\t\t})\n+\t}\n+\ts.Wait()\n+\t// Output:\n+\t// 0\n+\t// 2\n+\t// 4\n+\t// 6\n+\t// 8\n+}\n+\n+func TestStream(t *testing.T) {\n+\tt.Run(\"simple\", func(t *testing.T) {\n+\t\ts := New()\n+\t\tvar res []int\n+\t\tfor i := 0; i < 5; i++ {\n+\t\t\ti := i\n+\t\t\ts.Go(func() Callback {\n+\t\t\t\ti *= 2\n+\t\t\t\treturn func() {\n+\t\t\t\t\tres = append(res, i)\n+\t\t\t\t}\n+\t\t\t})\n+\t\t}\n+\t\ts.Wait()\n+\t\trequire.Equal(t, []int{0, 2, 4, 6, 8}, res)\n+\t})\n+\n+}\n",
+  "diffTruncated": false,
+  "tree": [
+    "LICENSE",
+    "go.mod",
+    "go.sum",
+    "group/context_group.go",
+    "group/context_group_test.go",
+    "group/error_group.go",
+    "group/error_group_test.go",
+    "group/group.go",
+    "group/group_test.go",
+    "group/iter.go",
+    "group/iter_test.go",
+    "group/result_context_group.go",
+    "group/result_context_group_test.go",
+    "group/result_error_group.go",
+    "group/result_error_group_test.go",
+    "group/result_group.go",
+    "group/result_group_test.go",
+    "iter.go",
+    "limiter.go",
+    "pool/context_pool.go",
+    "pool/context_pool_test.go",
+    "pool/error_pool.go",
+    "pool/error_pool_test.go",
+    "pool/iter.go",
+    "pool/iter_test.go",
+    "pool/pool.go",
+    "pool/pool_test.go",
+    "pool/result_context_pool.go",
+    "pool/result_context_pool_test.go",
+    "pool/result_error_pool.go",
+    "pool/result_error_pool_test.go",
+    "pool/result_pool.go",
+    "pool/result_pool_test.go",
+    "stream/stream.go",
+    "stream/stream_test.go",
+    "waitgroup.go",
+    "waitgroup_test.go"
+  ],
+  "explanation": {
+    "what": "pool/iter.go の ForEachIdx・ForEach・Map・MapErr すべてで、内部生成した pool `p` を変数に保持して defer p.Wait() し、以降の処理にも同じ `p` を渡すよう統一した(以前は一部が New() を再度呼んでいた)。group/iter_test.go 相当のテスト(ForEachIdx・ForEach・Map・MapErr)を pool/iter_test.go にも追加。stream パッケージには package doc・Stream/StreamTask/Callback/Go/Wait 各所に doc comment を追加し、stream/stream_test.go に簡単な動作確認テストを追加した。",
+    "why": "group パッケージ側で既に修正した「New() の取り違え」と同種のバグが pool パッケージ側にも残っていたため、同じ修正を横展開したと考えられる(おそらく)。stream への doc comment 追加は、Stream の使い方(タスクは並行実行・コールバックは投入順に逐次実行)という非自明な設計をコード上に明文化する目的とみられる。",
+    "highlights": [
+      { "file": "pool/iter.go", "note": "ForEachIdx/ForEach/Map/MapErr すべてで p := New(); defer p.Wait() のパターンに統一" },
+      { "file": "stream/stream.go", "note": "Stream の設計意図(タスクは並行、コールバックは投入順に逐次実行)を説明する doc comment" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "inferred",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

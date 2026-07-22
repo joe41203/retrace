@@ -1,0 +1,115 @@
+{
+  "seq": 51,
+  "sha": "17ed184e23015d01be5fa063adfa20ae5a5fdf51",
+  "parents": [
+    "5ad46bc2ac01211c036c4cd7b7411db174c3c235"
+  ],
+  "author": {
+    "name": "Camden Cheek",
+    "email": "camden@ccheek.com",
+    "date": "2023-01-02T14:08:12-07:00"
+  },
+  "message": "add some examples",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 7,
+    "additions": 77,
+    "deletions": 0
+  },
+  "files": [
+    {
+      "path": "pool/context_pool.go",
+      "status": "M",
+      "additions": 2,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "pool/context_pool_test.go",
+      "status": "M",
+      "additions": 19,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "pool/error_pool.go",
+      "status": "M",
+      "additions": 2,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "pool/error_pool_test.go",
+      "status": "M",
+      "additions": 18,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "pool/pool_test.go",
+      "status": "M",
+      "additions": 17,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "pool/result_pool_test.go",
+      "status": "M",
+      "additions": 18,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "stream/stream_test.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/pool/context_pool.go b/pool/context_pool.go\nindex 8d9fea0..e000028 100644\n--- a/pool/context_pool.go\n+++ b/pool/context_pool.go\n@@ -8,6 +8,8 @@ import (\n // The context passed to the task will be canceled if any\n // of the tasks return an error, which makes its functionality\n // different than just capturing a context with the task closure.\n+//\n+// A new ContextPool should be created with `New().WithContext(ctx)`.\n type ContextPool struct {\n \terrorPool ErrorPool\n \ndiff --git a/pool/context_pool_test.go b/pool/context_pool_test.go\nindex 71677ee..2665885 100644\n--- a/pool/context_pool_test.go\n+++ b/pool/context_pool_test.go\n@@ -2,6 +2,7 @@ package pool\n \n import (\n \t\"context\"\n+\t\"fmt\"\n \t\"strconv\"\n \t\"sync/atomic\"\n \t\"testing\"\n@@ -12,6 +13,24 @@ import (\n \t\"github.com/sourcegraph/sourcegraph/lib/errors\"\n )\n \n+func ExampleContextPool() {\n+\tp := New().WithContext(context.Background())\n+\tfor i := 0; i < 3; i++ {\n+\t\ti := i\n+\t\tp.Go(func(ctx context.Context) error {\n+\t\t\tif i == 2 {\n+\t\t\t\treturn errors.New(\"I will cancel all other tasks!\")\n+\t\t\t}\n+\t\t\t<-ctx.Done()\n+\t\t\treturn nil\n+\t\t})\n+\t}\n+\terr := p.Wait()\n+\tfmt.Println(err)\n+\t// Output:\n+\t// I will cancel all other tasks!\n+}\n+\n func TestContextPool(t *testing.T) {\n \tt.Parallel()\n \ndiff --git a/pool/error_pool.go b/pool/error_pool.go\nindex b8164d9..a538f1e 100644\n--- a/pool/error_pool.go\n+++ b/pool/error_pool.go\n@@ -9,6 +9,8 @@ import (\n \n // ErrorPool is a pool that runs tasks that may return an error.\n // Errors are collected and returned by Wait().\n+//\n+// A new ErrorPool should be created using `New().WithErrors()`.\n type ErrorPool struct {\n \tpool Pool\n \ndiff --git a/pool/error_pool_test.go b/pool/error_pool_test.go\nindex 7c1e586..9723c55 100644\n--- a/pool/error_pool_test.go\n+++ b/pool/error_pool_test.go\n@@ -1,6 +1,7 @@\n package pool\n \n import (\n+\t\"fmt\"\n \t\"strconv\"\n \t\"sync/atomic\"\n \t\"testing\"\n@@ -11,6 +12,23 @@ import (\n \t\"github.com/sourcegraph/sourcegraph/lib/errors\"\n )\n \n+func ExampleErrorPool() {\n+\tp := New().WithErrors()\n+\tfor i := 0; i < 3; i++ {\n+\t\ti := i\n+\t\tp.Go(func() error {\n+\t\t\tif i == 2 {\n+\t\t\t\treturn errors.New(\"oh no!\")\n+\t\t\t}\n+\t\t\treturn nil\n+\t\t})\n+\t}\n+\terr := p.Wait()\n+\tfmt.Println(err)\n+\t// Output:\n+\t// oh no!\n+}\n+\n func TestErrorPool(t *testing.T) {\n \tt.Parallel()\n \ndiff --git a/pool/pool_test.go b/pool/pool_test.go\nindex 8aa676b..819ec22 100644\n--- a/pool/pool_test.go\n+++ b/pool/pool_test.go\n@@ -1,6 +1,7 @@\n package pool\n \n import (\n+\t\"fmt\"\n \t\"strconv\"\n \t\"sync/atomic\"\n \t\"testing\"\n@@ -9,6 +10,22 @@ import (\n \t\"github.com/stretchr/testify/require\"\n )\n \n+func ExamplePool() {\n+\tp := New().WithMaxGoroutines(3)\n+\tfor i := 0; i < 5; i++ {\n+\t\tp.Go(func() {\n+\t\t\tfmt.Println(\"conc\")\n+\t\t})\n+\t}\n+\tp.Wait()\n+\t// Output:\n+\t// conc\n+\t// conc\n+\t// conc\n+\t// conc\n+\t// conc\n+}\n+\n func TestPool(t *testing.T) {\n \tt.Parallel()\n \ndiff --git a/pool/result_pool_test.go b/pool/result_pool_test.go\nindex b31fbea..5b370f1 100644\n--- a/pool/result_pool_test.go\n+++ b/pool/result_pool_test.go\n@@ -1,6 +1,7 @@\n package pool\n \n import (\n+\t\"fmt\"\n \t\"sort\"\n \t\"strconv\"\n \t\"sync/atomic\"\n@@ -10,6 +11,23 @@ import (\n \t\"github.com/stretchr/testify/require\"\n )\n \n+func ExampleResultPool() {\n+\tp := NewWithResults[int]()\n+\tfor i := 0; i < 10; i++ {\n+\t\ti := i\n+\t\tp.Go(func() int {\n+\t\t\treturn i * 2\n+\t\t})\n+\t}\n+\tres := p.Wait()\n+\t// Result order is nondeterministic, so sort them first\n+\tsort.Ints(res)\n+\tfmt.Println(res)\n+\n+\t// Output:\n+\t// [0 2 4 6 8 10 12 14 16 18]\n+}\n+\n func TestResultGroup(t *testing.T) {\n \tt.Parallel()\n \ndiff --git a/stream/stream_test.go b/stream/stream_test.go\nindex 6c4c4db..cc2c437 100644\n--- a/stream/stream_test.go\n+++ b/stream/stream_test.go\n@@ -17,6 +17,7 @@ func ExampleStream() {\n \t\tdur := time.Duration(millis) * time.Millisecond\n \t\tstream.Go(func() Callback {\n \t\t\ttime.Sleep(dur)\n+\t\t\t// This will print in the order the tasks were submitted\n \t\t\treturn func() { fmt.Println(dur) }\n \t\t})\n \t}\n",
+  "diffTruncated": false,
+  "tree": [
+    "LICENSE",
+    "go.mod",
+    "go.sum",
+    "iter/iter.go",
+    "iter/iter_test.go",
+    "limiter.go",
+    "panic.go",
+    "panic_test.go",
+    "pool/context_pool.go",
+    "pool/context_pool_test.go",
+    "pool/error_pool.go",
+    "pool/error_pool_test.go",
+    "pool/pool.go",
+    "pool/pool_test.go",
+    "pool/result_context_pool.go",
+    "pool/result_context_pool_test.go",
+    "pool/result_error_pool.go",
+    "pool/result_error_pool_test.go",
+    "pool/result_pool.go",
+    "pool/result_pool_test.go",
+    "stream/stream.go",
+    "stream/stream_test.go",
+    "waitgroup.go",
+    "waitgroup_test.go"
+  ],
+  "explanation": {
+    "what": "pool パッケージの ContextPool・ErrorPool・Pool・ResultPool と stream パッケージに、Go の Example 関数(ExampleContextPool、ExampleErrorPool、ExamplePool、ExampleResultPool)を追加した。各 Example は `// Output:` コメントで期待される標準出力を明示し、go test 実行時に検証される。あわせて ContextPool と ErrorPool のドキュメントコメントに、それぞれ `New().WithContext(ctx)` と `New().WithErrors()` で生成すべきというコンストラクタの使い方を追記した。",
+    "why": "おそらく sourcegraph/conc へのリネーム(直前の seq 50)に続く公開準備の一環で、pkg.go.dev に表示される実行可能なサンプルコードを各主要 API に揃えたと考えられる。Example 関数は godoc 上でそのままドキュメントとして表示されるため、利用者が各プールの使い方を一目で理解できるようにする狙いがあったとみられる。",
+    "highlights": [
+      { "file": "pool/error_pool_test.go", "note": "ExampleErrorPool が Wait() でエラーを集約して返す挙動を Output コメントで検証している" },
+      { "file": "pool/result_pool_test.go", "note": "ExampleResultPool は結果順序が非決定的なため sort.Ints でソートしてから出力している" }
+    ],
+    "langNotes": [
+      { "topic": "Example関数", "note": "Go の testing パッケージは `func ExampleXxx()` という命名規則の関数を特別扱いし、末尾の `// Output:` コメントと実際の標準出力を比較してテストとして実行する。godoc/pkg.go.dev にも実行可能なサンプルとしてそのまま表示される。" }
+    ],
+    "diagram": null,
+    "evidence": "inferred",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

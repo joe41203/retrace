@@ -1,0 +1,125 @@
+{
+  "seq": 148,
+  "sha": "8427ccd11dde5f56ccacfbbd184f42ce865d2f0d",
+  "parents": [
+    "4afefce20f9b00e927315b4c3cdc792fb824780c"
+  ],
+  "author": {
+    "name": "Camden Cheek",
+    "email": "camden@ccheek.com",
+    "date": "2024-01-19T10:50:06-07:00"
+  },
+  "message": "Make result order deterministic (#126)\n\nThis makes the order of results in a `Result.*Pool` deterministic so\r\nthat the order of the result slice corresponds with the order of tasks\r\nsubmitted. As an example of why this would be useful, it makes it easy\r\nto rewrite `iter.Map` in terms of `ResultPool`. Additionally, it's a\r\ngenerally nice and intuitive property to be able to match the index of\r\nthe result slice with the index of the input slice.",
+  "pr": {
+    "number": 126,
+    "title": "Make result order deterministic",
+    "body": "This PR makes the order of results in a `Result.*Pool` deterministic so that the order of the result slice corresponds with the order of tasks submitted. As an example of why this would be useful, it makes it easy to rewrite `iter.Map` in terms of `ResultPool`. Additionally, it's a generally nice and intuitive property to be able to match the index of the result slice with the index of the input slice. \r\n\r\nComments inline.",
+    "url": "https://github.com/sourcegraph/conc/pull/126"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 6,
+    "additions": 85,
+    "deletions": 27
+  },
+  "files": [
+    {
+      "path": "pool/result_context_pool.go",
+      "status": "M",
+      "additions": 3,
+      "deletions": 4,
+      "binary": false
+    },
+    {
+      "path": "pool/result_context_pool_test.go",
+      "status": "M",
+      "additions": 0,
+      "deletions": 2,
+      "binary": false
+    },
+    {
+      "path": "pool/result_error_pool.go",
+      "status": "M",
+      "additions": 5,
+      "deletions": 7,
+      "binary": false
+    },
+    {
+      "path": "pool/result_error_pool_test.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "pool/result_pool.go",
+      "status": "M",
+      "additions": 55,
+      "deletions": 8,
+      "binary": false
+    },
+    {
+      "path": "pool/result_pool_test.go",
+      "status": "M",
+      "additions": 21,
+      "deletions": 5,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/pool/result_context_pool.go b/pool/result_context_pool.go\nindex 9cac635..8560c6a 100644\n--- a/pool/result_context_pool.go\n+++ b/pool/result_context_pool.go\n@@ -20,11 +20,10 @@ type ResultContextPool[T any] struct {\n // Go submits a task to the pool. If all goroutines in the pool\n // are busy, a call to Go() will block until the task can be started.\n func (p *ResultContextPool[T]) Go(f func(context.Context) (T, error)) {\n+\tidx := p.agg.nextIndex()\n \tp.contextPool.Go(func(ctx context.Context) error {\n \t\tres, err := f(ctx)\n-\t\tif err == nil || p.collectErrored {\n-\t\t\tp.agg.add(res)\n-\t\t}\n+\t\tp.agg.save(idx, res, err != nil)\n \t\treturn err\n \t})\n }\n@@ -33,7 +32,7 @@ func (p *ResultContextPool[T]) Go(f func(context.Context) (T, error)) {\n // returns an error if any of the tasks errored.\n func (p *ResultContextPool[T]) Wait() ([]T, error) {\n \terr := p.contextPool.Wait()\n-\treturn p.agg.results, err\n+\treturn p.agg.collect(p.collectErrored), err\n }\n \n // WithCollectErrored configures the pool to still collect the result of a task\ndiff --git a/pool/result_context_pool_test.go b/pool/result_context_pool_test.go\nindex d98e0c8..ceae5e8 100644\n--- a/pool/result_context_pool_test.go\n+++ b/pool/result_context_pool_test.go\n@@ -4,7 +4,6 @@ import (\n \t\"context\"\n \t\"errors\"\n \t\"fmt\"\n-\t\"sort\"\n \t\"strconv\"\n \t\"sync/atomic\"\n \t\"testing\"\n@@ -223,7 +222,6 @@ func TestResultContextPool(t *testing.T) {\n \t\t\t\t\t})\n \t\t\t\t}\n \t\t\t\tres, err := g.Wait()\n-\t\t\t\tsort.Ints(res)\n \t\t\t\trequire.Equal(t, expected, res)\n \t\t\t\trequire.NoError(t, err)\n \t\t\t\trequire.Equal(t, int64(0), currentConcurrent.Load())\ndiff --git a/pool/result_error_pool.go b/pool/result_error_pool.go\nindex 4caaadc..5a0bfb9 100644\n--- a/pool/result_error_pool.go\n+++ b/pool/result_error_pool.go\n@@ -8,9 +8,8 @@ import (\n // type and an error. Tasks are executed in the pool with Go(), then the\n // results of the tasks are returned by Wait().\n //\n-// The order of the results is not guaranteed to be the same as the order the\n-// tasks were submitted. If your use case requires consistent ordering,\n-// consider using the `stream` package or `Map` from the `iter` package.\n+// The order of the results is guaranteed to be the same as the order the\n+// tasks were submitted.\n //\n // The configuration methods (With*) will panic if they are used after calling\n // Go() for the first time.\n@@ -23,11 +22,10 @@ type ResultErrorPool[T any] struct {\n // Go submits a task to the pool. If all goroutines in the pool\n // are busy, a call to Go() will block until the task can be started.\n func (p *ResultErrorPool[T]) Go(f func() (T, error)) {\n+\tidx := p.agg.nextIndex()\n \tp.errorPool.Go(func() error {\n \t\tres, err := f()\n-\t\tif err == nil || p.collectErrored {\n-\t\t\tp.agg.add(res)\n-\t\t}\n+\t\tp.agg.save(idx, res, err != nil)\n \t\treturn err\n \t})\n }\n@@ -36,7 +34,7 @@ func (p *ResultErrorPool[T]) Go(f func() (T, error)) {\n // returning the results and any errors from tasks.\n func (p *ResultErrorPool[T]) Wait() ([]T, error) {\n \terr := p.errorPool.Wait()\n-\treturn p.agg.results, err\n+\treturn p.agg.collect(p.collectErrored), err\n }\n \n // WithCollectErrored configures the pool to still collect the result of a task\ndiff --git a/pool/result_error_pool_test.go b/pool/result_error_pool_test.go\nindex 84d83b9..c9b1b08 100644\n--- a/pool/result_error_pool_test.go\n+++ b/pool/result_error_pool_test.go\n@@ -13,7 +13,7 @@ import (\n \t\"github.com/stretchr/testify/require\"\n )\n \n-func TestResultErrorGroup(t *testing.T) {\n+func TestResultErrorPool(t *testing.T) {\n \tt.Parallel()\n \n \terr1 := errors.New(\"err1\")\ndiff --git a/pool/result_pool.go b/pool/result_pool.go\nindex ea304cb..16d8b46 100644\n--- a/pool/result_pool.go\n+++ b/pool/result_pool.go\n@@ -2,6 +2,7 @@ package pool\n \n import (\n \t\"context\"\n+\t\"sort\"\n \t\"sync\"\n )\n \n@@ -19,9 +20,8 @@ func NewWithResults[T any]() *ResultPool[T] {\n // Tasks are executed in the pool with Go(), then the results of the tasks are\n // returned by Wait().\n //\n-// The order of the results is not guaranteed to be the same as the order the\n-// tasks were submitted. If your use case requires consistent ordering,\n-// consider using the `stream` package or `Map` from the `iter` package.\n+// The order of the results is guaranteed to be the same as the order the\n+// tasks were submitted.\n type ResultPool[T any] struct {\n \tpool Pool\n \tagg  resultAggregator[T]\n@@ -30,8 +30,9 @@ type ResultPool[T any] struct {\n // Go submits a task to the pool. If all goroutines in the pool\n // are busy, a call to Go() will block until the task can be started.\n func (p *ResultPool[T]) Go(f func() T) {\n+\tidx := p.agg.nextIndex()\n \tp.pool.Go(func() {\n-\t\tp.agg.add(f())\n+\t\tp.agg.save(idx, f(), false)\n \t})\n }\n \n@@ -39,7 +40,7 @@ func (p *ResultPool[T]) Go(f func() T) {\n // a slice of results from tasks that did not panic.\n func (p *ResultPool[T]) Wait() []T {\n \tp.pool.Wait()\n-\treturn p.agg.results\n+\treturn p.agg.collect(true)\n }\n \n // MaxGoroutines returns the maximum size of the pool.\n@@ -83,11 +84,57 @@ func (p *ResultPool[T]) panicIfInitialized() {\n // goroutines. The zero value is valid and ready to use.\n type resultAggregator[T any] struct {\n \tmu      sync.Mutex\n+\tlen     int\n \tresults []T\n+\terrored []int\n }\n \n-func (r *resultAggregator[T]) add(res T) {\n+// nextIndex reserves a slot for a result. The returned value should be passed\n+// to save() when adding a result to the aggregator.\n+func (r *resultAggregator[T]) nextIndex() int {\n \tr.mu.Lock()\n-\tr.results = append(r.results, res)\n-\tr.mu.Unlock()\n+\tdefer r.mu.Unlock()\n+\n+\tnextIdx := r.len\n+\tr.len += 1\n+\treturn nextIdx\n+}\n+\n+func (r *resultAggregator[T]) save(i int, res T, errored bool) {\n+\tr.mu.Lock()\n+\tdefer r.mu.Unlock()\n+\n+\tif i >= len(r.results) {\n+\t\told := r.results\n+\t\tr.results = make([]T, r.len)\n+\t\tcopy(r.results, old)\n+\t}\n+\n+\tr.results[i] = res\n+\n+\tif errored {\n+\t\tr.errored = append(r.errored, i)\n+\t}\n+}\n+\n+// collect returns the set of aggregated results.\n+func (r *resultAggregator[T]) collect(collectErrored bool) []T {\n+\tif !r.mu.TryLock() {\n+\t\tpanic(\"collect should not be called until all goroutines have exited\")\n+\t}\n+\n+\tif collectErrored || len(r.errored) == 0 {\n+\t\treturn r.results\n+\t}\n+\n+\tfiltered := r.results[:0]\n+\tsort.Ints(r.errored)\n+\tfor i, e := range r.errored {\n+\t\tif i == 0 {\n+\t\t\tfiltered = append(filtered, r.results[:e]...)\n+\t\t} else {\n+\t\t\tfiltered = append(filtered, r.results[r.errored[i-1]+1:e]...)\n+\t\t}\n+\t}\n+\treturn filtered\n }\ndiff --git a/pool/result_pool_test.go b/pool/result_pool_test.go\nindex 10b3096..ccd7892 100644\n--- a/pool/result_pool_test.go\n+++ b/pool/result_pool_test.go\n@@ -2,7 +2,7 @@ package pool_test\n \n import (\n \t\"fmt\"\n-\t\"sort\"\n+\t\"math/rand\"\n \t\"strconv\"\n \t\"sync/atomic\"\n \t\"testing\"\n@@ -22,8 +22,6 @@ func ExampleResultPool() {\n \t\t})\n \t}\n \tres := p.Wait()\n-\t// Result order is nondeterministic, so sort them first\n-\tsort.Ints(res)\n \tfmt.Println(res)\n \n \t// Output:\n@@ -62,10 +60,29 @@ func TestResultGroup(t *testing.T) {\n \t\t\t})\n \t\t}\n \t\tres := g.Wait()\n-\t\tsort.Ints(res)\n \t\trequire.Equal(t, expected, res)\n \t})\n \n+\tt.Run(\"deterministic order\", func(t *testing.T) {\n+\t\tt.Parallel()\n+\t\tp := pool.NewWithResults[int]()\n+\t\tresults := make([]int, 100)\n+\t\tfor i := 0; i < 100; i++ {\n+\t\t\tresults[i] = i\n+\t\t}\n+\t\tfor _, result := range results {\n+\t\t\tresult := result\n+\t\t\tp.Go(func() int {\n+\t\t\t\t// Add a random sleep to make it exceedingly unlikely that the\n+\t\t\t\t// results are returned in the order they are submitted.\n+\t\t\t\ttime.Sleep(time.Duration(rand.Int()%100) * time.Millisecond)\n+\t\t\t\treturn result\n+\t\t\t})\n+\t\t}\n+\t\tgot := p.Wait()\n+\t\trequire.Equal(t, results, got)\n+\t})\n+\n \tt.Run(\"limit\", func(t *testing.T) {\n \t\tt.Parallel()\n \t\tfor _, maxGoroutines := range []int{1, 10, 100} {\n@@ -90,7 +107,6 @@ func TestResultGroup(t *testing.T) {\n \t\t\t\t\t})\n \t\t\t\t}\n \t\t\t\tres := g.Wait()\n-\t\t\t\tsort.Ints(res)\n \t\t\t\trequire.Equal(t, expected, res)\n \t\t\t\trequire.Equal(t, int64(0), errCount.Load())\n \t\t\t\trequire.Equal(t, int64(0), currentConcurrent.Load())\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/go.yml",
+    ".golangci.yml",
+    "LICENSE",
+    "README.md",
+    "go.mod",
+    "go.sum",
+    "internal/multierror/multierror_go119.go",
+    "internal/multierror/multierror_go120.go",
+    "iter/export_test.go",
+    "iter/iter.go",
+    "iter/iter_test.go",
+    "iter/map.go",
+    "iter/map_test.go",
+    "panics/panics.go",
+    "panics/panics_test.go",
+    "panics/try.go",
+    "panics/try_test.go",
+    "pool/context_pool.go",
+    "pool/context_pool_test.go",
+    "pool/error_pool.go",
+    "pool/error_pool_test.go",
+    "pool/pool.go",
+    "pool/pool_test.go",
+    "pool/result_context_pool.go",
+    "pool/result_context_pool_test.go",
+    "pool/result_error_pool.go",
+    "pool/result_error_pool_test.go",
+    "pool/result_pool.go",
+    "pool/result_pool_test.go",
+    "stream/stream.go",
+    "stream/stream_test.go",
+    "waitgroup.go",
+    "waitgroup_test.go"
+  ],
+  "explanation": {
+    "what": "Result.*Pool 系(ResultPool / ResultErrorPool / ResultContextPool)の内部集約器 resultAggregator を、単純な append ベースの add() から、タスク投入順のインデックスを予約する nextIndex() とそのインデックスへ書き込む save() に置き換えた。Go() 呼び出し時にタスクの投入順インデックスを取得しておき、タスク完了時にそのインデックスへ結果を書き込むことで、実行完了順ではなく投入順に結果配列が並ぶようにした。collect() はエラーになったタスクの結果を除外するかどうかも扱う。",
+    "why": "PR本文に明記されている。以前は結果の順序が保証されておらず(ゴルーチンの完了順で決まる)、テスト側で sort.Ints して比較する必要があった。順序を投入順で確定させることで、iter.Map を ResultPool 実装に書き換えやすくなり、また利用者にとっても「入力スライスのインデックスと結果スライスのインデックスが対応する」という直感的な性質が得られる。",
+    "highlights": [
+      { "file": "pool/result_pool.go", "note": "resultAggregator の nextIndex()/save()/collect() が本体。errored なインデックスを記録し、collectErrored=false のときは collect() でその位置を除いて詰め直す" },
+      { "file": "pool/result_pool_test.go", "note": "\"deterministic order\" テスト。各タスクにランダムな sleep を仕込み、完了順がバラけても結果が投入順になることを検証している" }
+    ],
+    "langNotes": [
+      { "topic": "ジェネリクスと sync.Mutex による決定的な結果順序", "note": "resultAggregator[T any] はミューテックスで保護された結果スライスを持つ。Go() 呼び出し時点(まだゴルーチンが動く前)に nextIndex() でスロットのインデックスを確保し、ゴルーチン内では save(i, ...) でそのインデックスに書き込むことで、完了順に関わらず投入順を保つ。TryLock() を使った collect() 内の防御的 panic は、Wait() 完了前に collect が呼ばれる誤用を検出する仕組み。" }
+    ],
+    "diagram": {
+      "mermaid": "sequenceDiagram\n  participant Caller as \"呼び出し元\"\n  participant Pool as \"ResultPool\"\n  participant Agg as \"resultAggregator\"\n  participant G as \"goroutine\"\n  Caller->>Pool: \"Go(f1)\"\n  Pool->>Agg: \"nextIndex() -> 0\"\n  Pool->>G: \"起動(idx=0)\"\n  Caller->>Pool: \"Go(f2)\"\n  Pool->>Agg: \"nextIndex() -> 1\"\n  Pool->>G: \"起動(idx=1)\"\n  G-->>Agg: \"save(1, f2の結果)\"\n  G-->>Agg: \"save(0, f1の結果)\"\n  Caller->>Pool: \"Wait()\"\n  Pool->>Agg: \"collect(true)\"\n  Agg-->>Caller: \"[f1の結果, f2の結果]\"",
+      "caption": "投入順にインデックスを予約しておくことで、完了順(f2が先に終わる)に関わらず結果配列は投入順(f1, f2)になる"
+    },
+    "evidence": "pr",
+    "refs": [{ "type": "pr", "number": 126, "url": "https://github.com/sourcegraph/conc/pull/126" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

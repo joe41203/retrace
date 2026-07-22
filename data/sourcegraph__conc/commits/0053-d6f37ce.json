@@ -1,0 +1,70 @@
+{
+  "seq": 53,
+  "sha": "d6f37cedd458ec258ae9e6c219ae464e9a96de65",
+  "parents": [
+    "dc642a951611c1e6191fae7c118a1dcfbd6dc97c"
+  ],
+  "author": {
+    "name": "Camden Cheek",
+    "email": "camden@ccheek.com",
+    "date": "2023-01-02T15:50:57-07:00"
+  },
+  "message": "add README",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 362,
+    "deletions": 0
+  },
+  "files": [
+    {
+      "path": "README.md",
+      "status": "A",
+      "additions": 362,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/README.md b/README.md\nnew file mode 100644\nindex 0000000..ddd5535\n--- /dev/null\n+++ b/README.md\n@@ -0,0 +1,362 @@\n+# `conc`: better structured concurrency for go\n+\n+`conc` is your toolbelt for structured concurrency in go, making common tasks\n+easier and safer.\n+\n+The main goals of the package are:\n+1) Make it harder to leak goroutines\n+2) Handle panics gracefully\n+3) Make concurrent code easier to read\n+\n+## Goal #1: Make it harder to leak goroutines\n+\n+A common pain point when working with goroutines is cleaning them up. It's\n+really easy to fire off a `go` statement and fail to properly wait for it to\n+complete.\n+\n+`conc` takes the opinionated stance that all concurrency should be scoped.\n+That is, goroutines should have an owner and that owner should always\n+ensure that its owned goroutines exit properly.\n+\n+In `conc`, the owner of a goroutine is always a `conc.WaitGroup`. Goroutines\n+are spawned in a `WaitGroup` with `(*WaitGroup).Go()`, and\n+`(*WaitGroup).Wait()` should always be called before the `WaitGroup` goes out\n+of scope.\n+\n+In some cases, you might want a spawned goroutine to outlast the scope of the\n+caller. In that case, you could pass a `WaitGroup` into the spawning function.\n+\n+```go\n+func main() {\n+    var wg conc.WaitGroup\n+    defer wg.Wait()\n+\n+    startTheThing(&wg)\n+}\n+\n+func startTheThing(wg *conc.WaitGroup) {\n+    wg.Go(func() { ... })\n+}\n+```\n+\n+For some more discussion on why scoped concurrency is nice, check out [this\n+blog\n+post](https://vorpus.org/blog/notes-on-structured-concurrency-or-go-statement-considered-harmful/).\n+\n+## Goal #2: Handle panics gracefully\n+\n+A frequent problem with goroutines in long-running applications is handling\n+panics. A goroutine spawned without a panic handler will crash the whole process\n+on panic. This is usually undesirable. \n+\n+However, if you do add a panic handler to a goroutine, what do you do with the\n+panic once you catch it? Some options:\n+1) Ignore it\n+2) Log it\n+3) Turn it into an error and return that to the goroutine spawner\n+4) Propagate the panic to the goroutine spawner\n+\n+Ignoring panics is a bad idea since panics usually mean there is actually\n+something wrong and someone should fix it.\n+\n+Just logging panics isn't great either because then there is no indication to the spawner\n+that something bad happened, and it might just continue on as normal even though your\n+program is in a really bad state.\n+\n+Both (3) and (4) are reasonable options, but both require the goroutine to have\n+an owner that can actually receive the message that something went wrong. This\n+is generally not true with a goroutine spawned with `go`, but in the `conc`\n+package, all goroutines have an owner that must collect the spawned goroutine. \n+In the conc package, any call to `Wait()` will panic if any of the spawned goroutines\n+panicked. Additionally, it decorates the panic value with a stacktrace from the child\n+goroutine so that you don't lose information about what caused the panic.\n+\n+Doing this all correctly every time you spawn something with `go` is not\n+trivial and it requires a lot of boilerplate that makes the important parts of\n+the code more difficult to read, so `conc` does this for you.\n+\n+<table>\n+    <tr>\n+        <th>\n+        `stdlib`\n+        </th>\n+        <th>\n+        `conc`\n+        </th>\n+    </tr>\n+    <tr>\n+        <td>\n+```go\n+type caughtPanicError struct {\n+\tval   any\n+\tstack []byte\n+}\n+\n+func (e *caughtPanicError) Error() string {\n+\treturn fmt.Sprintf(\"panic: %q\\n%s\", e.val, string(e.stack))\n+}\n+\n+func spawn() {\n+\tdone := make(chan error)\n+\tgo func() {\n+\t\tdefer func() {\n+\t\t\tif val := recover(); val != nil {\n+\t\t\t\tdone <- caughtPanicError{\n+\t\t\t\t\tval: val, \n+\t\t\t\t\tstack: debug.Stack()\n+\t\t\t\t}\n+\t\t\t} else {\n+\t\t\t\tdone <- nil\n+\t\t\t}\n+\t\t}()\n+\t\tdoSomethingThatMightPanic()\n+\t}()\n+\terr := <-done\n+\tif err != nil {\n+\t\tpanic(err)\n+\t}\n+}\n+```\n+        </td>\n+        <td>\n+```go\n+func spawn() {\n+    var wg conc.WaitGroup\n+    wg.Go(doSomethingThatMightPanic)\n+    wg.Wait()\n+}\n+```\n+        </td>\n+    </tr>\n+</table>\n+\n+## Goal #3: Make concurrent code easier to read\n+\n+Doing concurrency correctly is difficult. Doing it in a way that doesn't\n+obfuscate what the code is actually doing is more difficult. The `conc` package\n+attempts to make common operations easier by abstracting as much boilerplate\n+complexity as possible.\n+\n+Want to run a set of concurrent tasks with a bounded set of goroutines? Use\n+`pool.New()`. Want to process an ordered stream of results concurrently, but\n+still maintain order? Try `stream.New()`. What about a concurrent map over\n+a slice? Take a peek at `iter.Map()`.\n+\n+Browse some examples below for some comparisons with doing these by hand.\n+\n+# Examples\n+\n+Each of these examples forgoes propagating panics for simplicity. To see\n+what kind of complexity that would add, check out the \"Goal #2\" header above.\n+\n+Spawn a set of goroutines and waiting for them to finish:\n+\n+<table>\n+    <tr>\n+        <th>\n+        `stdlib`\n+        </th>\n+        <th>\n+        `conc`\n+        </th>\n+    </tr>\n+    <tr>\n+        <td>\n+```go\n+func main() {\n+\tvar wg sync.WaitGroup\n+\tfor i := 0; i < 10; i++ {\n+\t\twg.Add(1)\n+\t\tgo func() {\n+\t\t\tdefer wg.Done()\n+\t\t\t// if doSomething panics, the process crashes!\n+\t\t\tdoSomething()\n+\t\t}()\n+\t}\n+\twg.Wait()\n+}\n+```\n+        </td>\n+        <td>\n+```go\n+func main() {\n+\tvar wg conc.WaitGroup\n+\tfor i := 0; i < 10; i++ {\n+\t\twg.Go(doSomething)\n+\t}\n+\twg.Wait()\n+}\n+```\n+        </td>\n+    </tr>\n+</table>\n+\n+Process each element of a stream in a static pool of goroutines:\n+\n+<table>\n+    <tr>\n+        <th>\n+        `stdlib`\n+        </th>\n+        <th>\n+        `conc`\n+        </th>\n+    </tr>\n+    <tr>\n+        <td>\n+```go\n+func process(stream chan int) {\n+\tvar wg sync.WaitGroup\n+\tfor i := 0; i < 10; i++ {\n+\t\twg.Add(1)\n+\t\tgo func() {\n+\t\t\tdefer wg.Done()\n+\t\t\tfor elem := range stream {\n+\t\t\t\thandle(elem)\n+\t\t\t}\n+\t\t}()\n+\t}\n+\twg.Wait()\n+}\n+```\n+        </td>\n+        <td>\n+```go\n+func process(stream chan int) {\n+\tp := pool.New().WithMaxGoroutines(10)\n+\tfor elem := range stream {\n+\t\tp.Go(func() {\n+\t\t\thandle(values[i])\n+\t\t})\n+\t}\n+\tp.Wait()\n+}\n+```\n+        </td>\n+    </tr>\n+</table>\n+\n+Process each element of a slice in a static pool of goroutines:\n+\n+<table>\n+    <tr>\n+        <th>\n+        `stdlib`\n+        </th>\n+        <th>\n+        `conc`\n+        </th>\n+    </tr>\n+    <tr>\n+        <td>\n+```go\n+func main() {\n+\tvalues := []int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10}\n+\n+\tfeeder := make(chan int, 8)\n+\n+\tvar wg sync.WaitGroup\n+\tfor i := 0; i < 10; i++ {\n+\t\twg.Add(1)\n+\t\tgo func() {\n+\t\t\tdefer wg.Done()\n+\t\t\tfor elem := range feeder {\n+\t\t\t\thandle(elem)\n+\t\t\t}\n+\t\t}()\n+\t}\n+\n+\tfor _, value := range values {\n+\t\tfeeder <- value\n+\t}\n+\n+\twg.Wait()\n+}\n+```\n+        </td>\n+        <td>\n+```go\n+func main() {\n+\tvalues := []int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10}\n+\titer.ForEach(values, handle)\n+}\n+```\n+        </td>\n+    </tr>\n+</table>\n+\n+Process an ordered stream concurrently:\n+\n+\n+<table>\n+    <tr>\n+        <th>\n+        `stdlib`\n+        </th>\n+        <th>\n+        `conc`\n+        </th>\n+    </tr>\n+    <tr>\n+        <td>\n+```go\n+func mapStream(input chan int, output chan int, f func(int) int) {\n+\ttasks := make(chan func())\n+\ttaskResults := make(chan chan int)\n+\n+\t// Spawn the worker goroutines\n+\tvar workerWg sync.WaitGroup\n+\tfor i := 0; i < 10; i++ {\n+\t\tworkerWg.Add(1)\n+\t\tgo func() {\n+\t\t\tdefer workerWg.Done()\n+\t\t\tfor task := range tasks {\n+\t\t\t\ttask()\n+\t\t\t}\n+\t\t}()\n+\t}\n+\n+\t// Spawn the goroutine that reads results in order\n+\tvar readerWg sync.WaitGroup\n+\treaderWg.Add(1)\n+\tgo func() {\n+\t\tdefer readerWg.Done()\n+\t\tfor taskResult := range taskResults {\n+\t\t\toutput <- taskResult\n+\t\t}\n+\t}\n+\n+\t// Feed the workers with tasks\n+\tfor elem := range input {\n+\t\tresultCh := make(chan int, 1)\n+\t\ttaskResults <- resultCh\n+\t\ttasks <- func() {\n+\t\t\tresultCh <- f(elem)\n+\t\t}\n+\t}\n+\n+\t// We've exhausted input. Wait for everything to finish\n+\tclose(tasks)\n+\tworkerWg.Wait()\n+\tclose(taskResults)\n+\treaderWg.Wait()\n+}\n+```\n+        </td>\n+        <td>\n+```go\n+func mapStream(input chan int, output chan int, f func(int) int) {\n+\ts := stream.New().WithMaxGoroutines(10)\n+\tfor elem := range input {\n+\t\telem := elem\n+\t\ts.Go(func() {\n+\t\t\tres := f(elem)\n+\t\t\treturn func() { output <- res }\n+\t\t})\n+\t}\n+\ts.Wait()\n+}\n+```\n+        </td>\n+    </tr>\n+</table>\n",
+  "diffTruncated": false,
+  "tree": [
+    "LICENSE",
+    "README.md",
+    "go.mod",
+    "go.sum",
+    "iter/iter.go",
+    "iter/iter_test.go",
+    "panic.go",
+    "panic_test.go",
+    "pool/context_pool.go",
+    "pool/context_pool_test.go",
+    "pool/error_pool.go",
+    "pool/error_pool_test.go",
+    "pool/pool.go",
+    "pool/pool_test.go",
+    "pool/result_context_pool.go",
+    "pool/result_context_pool_test.go",
+    "pool/result_error_pool.go",
+    "pool/result_error_pool_test.go",
+    "pool/result_pool.go",
+    "pool/result_pool_test.go",
+    "stream/stream.go",
+    "stream/stream_test.go",
+    "waitgroup.go",
+    "waitgroup_test.go"
+  ],
+  "explanation": {
+    "what": "362行のREADME.mdを新規追加した。conc の3つの目標(ゴルーチンリークの防止・panicの適切なハンドリング・並行コードの可読性向上)を説明し、標準ライブラリの sync.WaitGroup を直接使うコードと conc.WaitGroup / pool.New() / stream.New() / iter.ForEach() を使うコードを HTML テーブルで並べて比較する形式で複数の実例を示している。",
+    "why": "おそらく sourcegraph/conc へのリネーム(seq 50)と Example 関数の追加(seq 51)に続く公開準備の一段階として、リポジトリ初訪問者が構造化並行処理の意義とライブラリの使い方を掴めるドキュメントを整備したものと考えられる。stdlib版とconc版の対比という構成自体が「ボイラープレートの削減」という価値を直接的に示す狙いだったとみられる。",
+    "highlights": [
+      { "file": "README.md", "note": "「Goal #1〜#3」の3節構成と、stdlib/concを並べるHTMLテーブル形式の比較例" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "inferred",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

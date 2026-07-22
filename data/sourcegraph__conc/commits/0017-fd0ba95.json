@@ -1,0 +1,125 @@
+{
+  "seq": 17,
+  "sha": "fd0ba95fcc6fd8abae7a26edfef57230876ac70e",
+  "parents": [
+    "f29484edac90a036c739786b78e4d5b735fb6bed"
+  ],
+  "author": {
+    "name": "Camden Cheek",
+    "email": "camden@ccheek.com",
+    "date": "2022-12-16T14:23:10-07:00"
+  },
+  "message": "some map tests",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 7,
+    "additions": 458,
+    "deletions": 13
+  },
+  "files": [
+    {
+      "path": "group/iter_test.go",
+      "status": "M",
+      "additions": 98,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "pool/result_context_pool.go",
+      "status": "M",
+      "additions": 18,
+      "deletions": 3,
+      "binary": false
+    },
+    {
+      "path": "pool/result_context_pool_test.go",
+      "status": "A",
+      "additions": 138,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "pool/result_error_pool.go",
+      "status": "M",
+      "additions": 14,
+      "deletions": 4,
+      "binary": false
+    },
+    {
+      "path": "pool/result_error_pool_test.go",
+      "status": "A",
+      "additions": 107,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "pool/result_pool.go",
+      "status": "M",
+      "additions": 21,
+      "deletions": 6,
+      "binary": false
+    },
+    {
+      "path": "pool/result_pool_test.go",
+      "status": "A",
+      "additions": 62,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/group/iter_test.go b/group/iter_test.go\nindex cbbf0b6..9081133 100644\n--- a/group/iter_test.go\n+++ b/group/iter_test.go\n@@ -53,6 +53,104 @@ func TestForEachIdx(t *testing.T) {\n \t})\n }\n \n+func TestForEach(t *testing.T) {\n+\tt.Parallel()\n+\n+\tt.Run(\"empty\", func(t *testing.T) {\n+\t\tf := func() {\n+\t\t\tints := []int{}\n+\t\t\tForEach(ints, func(val *int) {\n+\t\t\t\tpanic(\"this should never be called\")\n+\t\t\t})\n+\t\t}\n+\t\trequire.NotPanics(t, f)\n+\t})\n+\n+\tt.Run(\"panic is propagated\", func(t *testing.T) {\n+\t\tf := func() {\n+\t\t\tints := []int{1}\n+\t\t\tForEach(ints, func(val *int) {\n+\t\t\t\tpanic(\"super bad thing happened\")\n+\t\t\t})\n+\t\t}\n+\t\trequire.Panics(t, f)\n+\t})\n+\n+\tt.Run(\"mutating inputs is fine\", func(t *testing.T) {\n+\t\tints := []int{1, 2, 3, 4, 5}\n+\t\tForEach(ints, func(val *int) {\n+\t\t\t*val += 1\n+\t\t})\n+\t\trequire.Equal(t, []int{2, 3, 4, 5, 6}, ints)\n+\t})\n+\n+\tt.Run(\"huge inputs\", func(t *testing.T) {\n+\t\tints := make([]int, 10000)\n+\t\tForEach(ints, func(val *int) {\n+\t\t\t*val = 1\n+\t\t})\n+\t\texpected := make([]int, 10000)\n+\t\tfor i := 0; i < 10000; i++ {\n+\t\t\texpected[i] = 1\n+\t\t}\n+\t\trequire.Equal(t, expected, ints)\n+\t})\n+}\n+\n+func TestMap(t *testing.T) {\n+\tt.Parallel()\n+\n+\tt.Run(\"empty\", func(t *testing.T) {\n+\t\tf := func() {\n+\t\t\tints := []int{}\n+\t\t\tMap(ints, func(val *int) int {\n+\t\t\t\tpanic(\"this should never be called\")\n+\t\t\t})\n+\t\t}\n+\t\trequire.NotPanics(t, f)\n+\t})\n+\n+\tt.Run(\"panic is propagated\", func(t *testing.T) {\n+\t\tf := func() {\n+\t\t\tints := []int{1}\n+\t\t\tMap(ints, func(val *int) int {\n+\t\t\t\tpanic(\"super bad thing happened\")\n+\t\t\t})\n+\t\t}\n+\t\trequire.Panics(t, f)\n+\t})\n+\n+\tt.Run(\"mutating inputs is fine, though not recommended\", func(t *testing.T) {\n+\t\tints := []int{1, 2, 3, 4, 5}\n+\t\tMap(ints, func(val *int) int {\n+\t\t\t*val += 1\n+\t\t\treturn 0\n+\t\t})\n+\t\trequire.Equal(t, []int{2, 3, 4, 5, 6}, ints)\n+\t})\n+\n+\tt.Run(\"basic increment\", func(t *testing.T) {\n+\t\tints := []int{1, 2, 3, 4, 5}\n+\t\tres := Map(ints, func(val *int) int {\n+\t\t\treturn *val + 1\n+\t\t})\n+\t\trequire.Equal(t, []int{2, 3, 4, 5, 6}, res)\n+\t\trequire.Equal(t, []int{1, 2, 3, 4, 5}, ints)\n+\t})\n+\n+\tt.Run(\"huge inputs\", func(t *testing.T) {\n+\t\tints := make([]int, 10000)\n+\t\tres := Map(ints, func(val *int) int {\n+\t\t\treturn 1\n+\t\t})\n+\t\texpected := make([]int, 10000)\n+\t\tfor i := 0; i < 10000; i++ {\n+\t\t\texpected[i] = 1\n+\t\t}\n+\t\trequire.Equal(t, expected, res)\n+\t})\n+}\n+\n func BenchmarkForEachIdx(b *testing.B) {\n \tb.Run(\"simple mutation\", func(b *testing.B) {\n \t\tfor _, n := range []int{10, 1000, 1000000} {\ndiff --git a/pool/result_context_pool.go b/pool/result_context_pool.go\nindex 70f8d60..31be030 100644\n--- a/pool/result_context_pool.go\n+++ b/pool/result_context_pool.go\n@@ -5,13 +5,13 @@ import (\n )\n \n type ResultContextPool[T any] struct {\n-\tContextPool\n+\tcontextPool    ContextPool\n \tagg            resultAggregator[T]\n \tcollectErrored bool\n }\n \n func (p *ResultContextPool[T]) Go(f func(context.Context) (T, error)) {\n-\tp.ContextPool.Go(func(ctx context.Context) error {\n+\tp.contextPool.Go(func(ctx context.Context) error {\n \t\tres, err := f(ctx)\n \t\tif err == nil || p.collectErrored {\n \t\t\tp.agg.add(res)\n@@ -21,7 +21,7 @@ func (p *ResultContextPool[T]) Go(f func(context.Context) (T, error)) {\n }\n \n func (p *ResultContextPool[T]) Wait() ([]T, error) {\n-\terr := p.ContextPool.Wait()\n+\terr := p.contextPool.Wait()\n \treturn p.agg.results, err\n }\n \n@@ -29,3 +29,18 @@ func (p *ResultContextPool[T]) WithCollectErrored() *ResultContextPool[T] {\n \tp.collectErrored = true\n \treturn p\n }\n+\n+func (p *ResultContextPool[T]) WithCancelOnError() *ResultContextPool[T] {\n+\tp.contextPool.WithCancelOnError()\n+\treturn p\n+}\n+\n+func (p *ResultContextPool[T]) WithFirstError() *ResultContextPool[T] {\n+\tp.contextPool.WithFirstError()\n+\treturn p\n+}\n+\n+func (p *ResultContextPool[T]) WithMaxGoroutines(n int) *ResultContextPool[T] {\n+\tp.contextPool.WithMaxGoroutines(n)\n+\treturn p\n+}\ndiff --git a/pool/result_context_pool_test.go b/pool/result_context_pool_test.go\nnew file mode 100644\nindex 0000000..50fa038\n--- /dev/null\n+++ b/pool/result_context_pool_test.go\n@@ -0,0 +1,138 @@\n+package pool\n+\n+import (\n+\t\"context\"\n+\t\"sort\"\n+\t\"strconv\"\n+\t\"sync/atomic\"\n+\t\"testing\"\n+\t\"time\"\n+\n+\t\"github.com/stretchr/testify/require\"\n+\n+\t\"github.com/sourcegraph/sourcegraph/lib/errors\"\n+)\n+\n+func TestResultContextPool(t *testing.T) {\n+\tt.Parallel()\n+\n+\terr1 := errors.New(\"err1\")\n+\terr2 := errors.New(\"err2\")\n+\n+\tt.Run(\"behaves the same as ErrorGroup\", func(t *testing.T) {\n+\t\tbgctx := context.Background()\n+\t\tt.Run(\"wait returns no error if no errors\", func(t *testing.T) {\n+\t\t\tg := NewWithResults[int]().WithContext(bgctx)\n+\t\t\tg.Go(func(context.Context) (int, error) { return 0, nil })\n+\t\t\tres, err := g.Wait()\n+\t\t\trequire.Len(t, res, 1)\n+\t\t\trequire.NoError(t, err)\n+\t\t})\n+\n+\t\tt.Run(\"wait error if func returns error\", func(t *testing.T) {\n+\t\t\tg := NewWithResults[int]().WithContext(bgctx)\n+\t\t\tg.Go(func(context.Context) (int, error) { return 0, err1 })\n+\t\t\tres, err := g.Wait()\n+\t\t\trequire.Len(t, res, 0)\n+\t\t\trequire.ErrorIs(t, err, err1)\n+\t\t})\n+\n+\t\tt.Run(\"wait error is all returned errors\", func(t *testing.T) {\n+\t\t\tg := NewWithResults[int]().WithErrors().WithContext(bgctx)\n+\t\t\tg.Go(func(context.Context) (int, error) { return 0, err1 })\n+\t\t\tg.Go(func(context.Context) (int, error) { return 0, nil })\n+\t\t\tg.Go(func(context.Context) (int, error) { return 0, err2 })\n+\t\t\tres, err := g.Wait()\n+\t\t\trequire.Len(t, res, 1)\n+\t\t\trequire.ErrorIs(t, err, err1)\n+\t\t\trequire.ErrorIs(t, err, err2)\n+\t\t})\n+\t})\n+\n+\tt.Run(\"context cancel propagates\", func(t *testing.T) {\n+\t\tt.Parallel()\n+\t\tctx, cancel := context.WithCancel(context.Background())\n+\t\tg := NewWithResults[int]().WithContext(ctx)\n+\t\tg.Go(func(ctx context.Context) (int, error) {\n+\t\t\t<-ctx.Done()\n+\t\t\treturn 0, ctx.Err()\n+\t\t})\n+\t\tcancel()\n+\t\tres, err := g.Wait()\n+\t\trequire.Len(t, res, 0)\n+\t\trequire.ErrorIs(t, err, context.Canceled)\n+\t})\n+\n+\tt.Run(\"CancelOnError\", func(t *testing.T) {\n+\t\tt.Parallel()\n+\t\tg := NewWithResults[int]().WithContext(context.Background()).WithCancelOnError()\n+\t\tg.Go(func(ctx context.Context) (int, error) {\n+\t\t\t<-ctx.Done()\n+\t\t\treturn 0, ctx.Err()\n+\t\t})\n+\t\tg.Go(func(ctx context.Context) (int, error) {\n+\t\t\treturn 0, err1\n+\t\t})\n+\t\tres, err := g.Wait()\n+\t\trequire.Len(t, res, 0)\n+\t\trequire.ErrorIs(t, err, context.Canceled)\n+\t\trequire.ErrorIs(t, err, err1)\n+\t})\n+\n+\tt.Run(\"WithCollectErrored\", func(t *testing.T) {\n+\t\tg := NewWithResults[int]().WithContext(context.Background()).WithCollectErrored()\n+\t\tg.Go(func(context.Context) (int, error) { return 0, err1 })\n+\t\tres, err := g.Wait()\n+\t\trequire.Len(t, res, 1) // errored value is collected\n+\t\trequire.ErrorIs(t, err, err1)\n+\t})\n+\n+\tt.Run(\"WithFirstError\", func(t *testing.T) {\n+\t\tt.Parallel()\n+\t\tg := NewWithResults[int]().WithContext(context.Background()).WithCancelOnError().WithFirstError()\n+\t\tg.Go(func(ctx context.Context) (int, error) {\n+\t\t\t<-ctx.Done()\n+\t\t\treturn 0, err2\n+\t\t})\n+\t\tg.Go(func(ctx context.Context) (int, error) {\n+\t\t\treturn 0, err1\n+\t\t})\n+\t\tres, err := g.Wait()\n+\t\trequire.Len(t, res, 0)\n+\t\trequire.ErrorIs(t, err, err1)\n+\t\trequire.NotErrorIs(t, err, context.Canceled)\n+\t})\n+\n+\tt.Run(\"limit\", func(t *testing.T) {\n+\t\tt.Parallel()\n+\t\tfor _, maxConcurrency := range []int{1, 10, 100} {\n+\t\t\tt.Run(strconv.Itoa(maxConcurrency), func(t *testing.T) {\n+\t\t\t\tt.Parallel()\n+\t\t\t\tctx := context.Background()\n+\t\t\t\tg := NewWithResults[int]().WithContext(ctx).WithMaxGoroutines(maxConcurrency)\n+\n+\t\t\t\tvar currentConcurrent atomic.Int64\n+\t\t\t\ttaskCount := maxConcurrency * 10\n+\t\t\t\texpected := make([]int, taskCount)\n+\t\t\t\tfor i := 0; i < taskCount; i++ {\n+\t\t\t\t\ti := i\n+\t\t\t\t\texpected[i] = i\n+\t\t\t\t\tg.Go(func(context.Context) (int, error) {\n+\t\t\t\t\t\tcur := currentConcurrent.Add(1)\n+\t\t\t\t\t\tif cur > int64(maxConcurrency) {\n+\t\t\t\t\t\t\treturn 0, errors.Newf(\"expected no more than %d concurrent goroutines\", maxConcurrency)\n+\t\t\t\t\t\t}\n+\t\t\t\t\t\ttime.Sleep(time.Millisecond)\n+\t\t\t\t\t\tcurrentConcurrent.Add(-1)\n+\t\t\t\t\t\treturn i, nil\n+\t\t\t\t\t})\n+\t\t\t\t}\n+\t\t\t\tres, err := g.Wait()\n+\t\t\t\tsort.Ints(res)\n+\t\t\t\trequire.Equal(t, expected, res)\n+\t\t\t\trequire.NoError(t, err)\n+\t\t\t\trequire.Equal(t, int64(0), currentConcurrent.Load())\n+\t\t\t})\n+\t\t}\n+\t})\n+}\ndiff --git a/pool/result_error_pool.go b/pool/result_error_pool.go\nindex 68433bf..0d59603 100644\n--- a/pool/result_error_pool.go\n+++ b/pool/result_error_pool.go\n@@ -5,13 +5,13 @@ import (\n )\n \n type ResultErrorPool[T any] struct {\n-\tErrorPool\n+\terrorPool      ErrorPool\n \tagg            resultAggregator[T]\n \tcollectErrored bool\n }\n \n func (p *ResultErrorPool[T]) Go(f func() (T, error)) {\n-\tp.ErrorPool.Go(func() error {\n+\tp.errorPool.Go(func() error {\n \t\tres, err := f()\n \t\tif err == nil || p.collectErrored {\n \t\t\tp.agg.add(res)\n@@ -21,7 +21,7 @@ func (p *ResultErrorPool[T]) Go(f func() (T, error)) {\n }\n \n func (p *ResultErrorPool[T]) Wait() ([]T, error) {\n-\terr := p.ErrorPool.Wait()\n+\terr := p.errorPool.Wait()\n \treturn p.agg.results, err\n }\n \n@@ -32,6 +32,16 @@ func (p *ResultErrorPool[T]) WithCollectErrored() *ResultErrorPool[T] {\n \n func (p *ResultErrorPool[T]) WithContext(ctx context.Context) *ResultContextPool[T] {\n \treturn &ResultContextPool[T]{\n-\t\tContextPool: *p.ErrorPool.WithContext(ctx),\n+\t\tcontextPool: *p.errorPool.WithContext(ctx),\n \t}\n }\n+\n+func (p *ResultErrorPool[T]) WithFirstError() *ResultErrorPool[T] {\n+\tp.errorPool.WithFirstError()\n+\treturn p\n+}\n+\n+func (p *ResultErrorPool[T]) WithMaxGoroutines(n int) *ResultErrorPool[T] {\n+\tp.errorPool.WithMaxGoroutines(n)\n+\treturn p\n+}\ndiff --git a/pool/result_error_pool_test.go b/pool/result_error_pool_test.go\nnew file mode 100644\nindex 0000000..456d4c7\n--- /dev/null\n+++ b/pool/result_error_pool_test.go\n@@ -0,0 +1,107 @@\n+package pool\n+\n+import (\n+\t\"strconv\"\n+\t\"sync/atomic\"\n+\t\"testing\"\n+\t\"time\"\n+\n+\t\"github.com/stretchr/testify/require\"\n+\n+\t\"github.com/sourcegraph/sourcegraph/lib/errors\"\n+)\n+\n+func TestResultErrorGroup(t *testing.T) {\n+\tt.Parallel()\n+\n+\terr1 := errors.New(\"err1\")\n+\terr2 := errors.New(\"err2\")\n+\n+\tt.Run(\"wait returns no error if no errors\", func(t *testing.T) {\n+\t\tg := NewWithResults[int]().WithErrors()\n+\t\tg.Go(func() (int, error) { return 1, nil })\n+\t\tres, err := g.Wait()\n+\t\trequire.NoError(t, err)\n+\t\trequire.Equal(t, []int{1}, res)\n+\t})\n+\n+\tt.Run(\"wait error if func returns error\", func(t *testing.T) {\n+\t\tg := NewWithResults[int]().WithErrors()\n+\t\tg.Go(func() (int, error) { return 0, err1 })\n+\t\tres, err := g.Wait()\n+\t\trequire.Len(t, res, 0) // errored value is ignored\n+\t\trequire.ErrorIs(t, err, err1)\n+\t})\n+\n+\tt.Run(\"WithCollectErrored\", func(t *testing.T) {\n+\t\tg := NewWithResults[int]().WithErrors().WithCollectErrored()\n+\t\tg.Go(func() (int, error) { return 0, err1 })\n+\t\tres, err := g.Wait()\n+\t\trequire.Len(t, res, 1) // errored value is collected\n+\t\trequire.ErrorIs(t, err, err1)\n+\t})\n+\n+\tt.Run(\"WithFirstError\", func(t *testing.T) {\n+\t\tt.Parallel()\n+\t\tg := NewWithResults[int]().WithErrors().WithFirstError()\n+\t\tsynchronizer := make(chan struct{})\n+\t\tg.Go(func() (int, error) {\n+\t\t\t<-synchronizer\n+\t\t\t// This test has an intrinsic race condition that can be reproduced\n+\t\t\t// by adding a `defer time.Sleep(time.Second)` before the `defer\n+\t\t\t// close(synchronizer)`. We cannot guarantee that the group processes\n+\t\t\t// the return value of the second goroutine before the first goroutine\n+\t\t\t// exits in response to synchronizer, so we add a sleep here to make\n+\t\t\t// this race condition vanishingly unlikely. Note that this is a race\n+\t\t\t// in the test, not in the library.\n+\t\t\ttime.Sleep(100 * time.Millisecond)\n+\t\t\treturn 0, err1\n+\t\t})\n+\t\tg.Go(func() (int, error) {\n+\t\t\tdefer close(synchronizer)\n+\t\t\treturn 0, err2\n+\t\t})\n+\t\tres, err := g.Wait()\n+\t\trequire.Len(t, res, 0)\n+\t\trequire.ErrorIs(t, err, err2)\n+\t\trequire.NotErrorIs(t, err, err1)\n+\t})\n+\n+\tt.Run(\"wait error is all returned errors\", func(t *testing.T) {\n+\t\tg := NewWithResults[int]().WithErrors()\n+\t\tg.Go(func() (int, error) { return 0, err1 })\n+\t\tg.Go(func() (int, error) { return 0, nil })\n+\t\tg.Go(func() (int, error) { return 0, err2 })\n+\t\tres, err := g.Wait()\n+\t\trequire.Len(t, res, 1)\n+\t\trequire.ErrorIs(t, err, err1)\n+\t\trequire.ErrorIs(t, err, err2)\n+\t})\n+\n+\tt.Run(\"limit\", func(t *testing.T) {\n+\t\tfor _, maxConcurrency := range []int{1, 10, 100} {\n+\t\t\tt.Run(strconv.Itoa(maxConcurrency), func(t *testing.T) {\n+\t\t\t\tt.Parallel()\n+\t\t\t\tg := NewWithResults[int]().WithErrors().WithMaxGoroutines(maxConcurrency)\n+\n+\t\t\t\tvar currentConcurrent atomic.Int64\n+\t\t\t\ttaskCount := maxConcurrency * 10\n+\t\t\t\tfor i := 0; i < taskCount; i++ {\n+\t\t\t\t\tg.Go(func() (int, error) {\n+\t\t\t\t\t\tcur := currentConcurrent.Add(1)\n+\t\t\t\t\t\tif cur > int64(maxConcurrency) {\n+\t\t\t\t\t\t\treturn 0, errors.Newf(\"expected no more than %d concurrent goroutine\", maxConcurrency)\n+\t\t\t\t\t\t}\n+\t\t\t\t\t\ttime.Sleep(time.Millisecond)\n+\t\t\t\t\t\tcurrentConcurrent.Add(-1)\n+\t\t\t\t\t\treturn 0, nil\n+\t\t\t\t\t})\n+\t\t\t\t}\n+\t\t\t\tres, err := g.Wait()\n+\t\t\t\trequire.Len(t, res, taskCount)\n+\t\t\t\trequire.NoError(t, err)\n+\t\t\t\trequire.Equal(t, int64(0), currentConcurrent.Load())\n+\t\t\t})\n+\t\t}\n+\t})\n+}\ndiff --git a/pool/result_pool.go b/pool/result_pool.go\nindex 76b8148..9d3e229 100644\n--- a/pool/result_pool.go\n+++ b/pool/result_pool.go\n@@ -5,34 +5,49 @@ import (\n \t\"sync\"\n )\n \n+func NewWithResults[T any]() *ResultPool[T] {\n+\treturn &ResultPool[T]{\n+\t\tpool: *New(),\n+\t}\n+}\n+\n type ResultPool[T any] struct {\n-\tPool\n-\tagg resultAggregator[T]\n+\tpool Pool\n+\tagg  resultAggregator[T]\n }\n \n func (p *ResultPool[T]) Go(f func() T) {\n-\tp.Pool.Go(func() {\n+\tp.pool.Go(func() {\n \t\tp.agg.add(f())\n \t})\n }\n \n func (p *ResultPool[T]) Wait() []T {\n-\tp.Pool.Wait()\n+\tp.pool.Wait()\n \treturn p.agg.results\n }\n \n+func (p *ResultPool[T]) MaxGoroutines() int {\n+\treturn p.pool.MaxGoroutines()\n+}\n+\n func (p *ResultPool[T]) WithErrors() *ResultErrorPool[T] {\n \treturn &ResultErrorPool[T]{\n-\t\tErrorPool: *p.Pool.WithErrors(),\n+\t\terrorPool: *p.pool.WithErrors(),\n \t}\n }\n \n func (p *ResultPool[T]) WithContext(ctx context.Context) *ResultContextPool[T] {\n \treturn &ResultContextPool[T]{\n-\t\tContextPool: *p.Pool.WithContext(ctx),\n+\t\tcontextPool: *p.pool.WithContext(ctx),\n \t}\n }\n \n+func (p *ResultPool[T]) WithMaxGoroutines(n int) *ResultPool[T] {\n+\tp.pool.WithMaxGoroutines(n)\n+\treturn p\n+}\n+\n // resultAggregator is a utility type that lets us safely append from multiple\n // goroutines. The zero value is valid and ready to use.\n type resultAggregator[T any] struct {\ndiff --git a/pool/result_pool_test.go b/pool/result_pool_test.go\nnew file mode 100644\nindex 0000000..b31fbea\n--- /dev/null\n+++ b/pool/result_pool_test.go\n@@ -0,0 +1,62 @@\n+package pool\n+\n+import (\n+\t\"sort\"\n+\t\"strconv\"\n+\t\"sync/atomic\"\n+\t\"testing\"\n+\t\"time\"\n+\n+\t\"github.com/stretchr/testify/require\"\n+)\n+\n+func TestResultGroup(t *testing.T) {\n+\tt.Parallel()\n+\n+\tt.Run(\"basic\", func(t *testing.T) {\n+\t\tg := NewWithResults[int]()\n+\t\texpected := []int{}\n+\t\tfor i := 0; i < 100; i++ {\n+\t\t\ti := i\n+\t\t\texpected = append(expected, i)\n+\t\t\tg.Go(func() int {\n+\t\t\t\treturn i\n+\t\t\t})\n+\t\t}\n+\t\tres := g.Wait()\n+\t\tsort.Ints(res)\n+\t\trequire.Equal(t, expected, res)\n+\t})\n+\n+\tt.Run(\"limit\", func(t *testing.T) {\n+\t\tt.Parallel()\n+\t\tfor _, maxGoroutines := range []int{1, 10, 100} {\n+\t\t\tt.Run(strconv.Itoa(maxGoroutines), func(t *testing.T) {\n+\t\t\t\tg := NewWithResults[int]().WithMaxGoroutines(maxGoroutines)\n+\n+\t\t\t\tvar currentConcurrent atomic.Int64\n+\t\t\t\tvar errCount atomic.Int64\n+\t\t\t\ttaskCount := maxGoroutines * 10\n+\t\t\t\texpected := make([]int, taskCount)\n+\t\t\t\tfor i := 0; i < taskCount; i++ {\n+\t\t\t\t\ti := i\n+\t\t\t\t\texpected[i] = i\n+\t\t\t\t\tg.Go(func() int {\n+\t\t\t\t\t\tcur := currentConcurrent.Add(1)\n+\t\t\t\t\t\tif cur > int64(maxGoroutines) {\n+\t\t\t\t\t\t\terrCount.Add(1)\n+\t\t\t\t\t\t}\n+\t\t\t\t\t\ttime.Sleep(time.Millisecond)\n+\t\t\t\t\t\tcurrentConcurrent.Add(-1)\n+\t\t\t\t\t\treturn i\n+\t\t\t\t\t})\n+\t\t\t\t}\n+\t\t\t\tres := g.Wait()\n+\t\t\t\tsort.Ints(res)\n+\t\t\t\trequire.Equal(t, expected, res)\n+\t\t\t\trequire.Equal(t, int64(0), errCount.Load())\n+\t\t\t\trequire.Equal(t, int64(0), currentConcurrent.Load())\n+\t\t\t})\n+\t\t}\n+\t})\n+}\n",
+  "diffTruncated": false,
+  "tree": [
+    "LICENSE",
+    "go.mod",
+    "go.sum",
+    "group/context_group.go",
+    "group/context_group_test.go",
+    "group/error_group.go",
+    "group/error_group_test.go",
+    "group/group.go",
+    "group/group_test.go",
+    "group/iter.go",
+    "group/iter_test.go",
+    "group/result_context_group.go",
+    "group/result_context_group_test.go",
+    "group/result_error_group.go",
+    "group/result_error_group_test.go",
+    "group/result_group.go",
+    "group/result_group_test.go",
+    "iter.go",
+    "limiter.go",
+    "pool/context_pool.go",
+    "pool/context_pool_test.go",
+    "pool/error_pool.go",
+    "pool/error_pool_test.go",
+    "pool/iter.go",
+    "pool/iter_test.go",
+    "pool/pool.go",
+    "pool/pool_test.go",
+    "pool/result_context_pool.go",
+    "pool/result_context_pool_test.go",
+    "pool/result_error_pool.go",
+    "pool/result_error_pool_test.go",
+    "pool/result_pool.go",
+    "pool/result_pool_test.go",
+    "stream/stream.go",
+    "waitgroup.go",
+    "waitgroup_test.go"
+  ],
+  "explanation": {
+    "what": "group/iter_test.go に TestForEach・TestMap を追加し、pool パッケージの ResultContextPool・ResultErrorPool・ResultPool にそれぞれテストファイルを新規追加した。あわせて ResultContextPool・ResultErrorPool の埋め込みフィールドを named field(contextPool ContextPool 等)に変更し、WithCancelOnError・WithFirstError・WithMaxGoroutines を明示的に転送するメソッドとして追加。ResultPool には NewWithResults コンストラクタと MaxGoroutines()・WithMaxGoroutines() を追加している。",
+    "why": "group パッケージで既に行った named field への統一(コミット13)と同じリファクタリングを pool パッケージ側にも適用し、ResultPool 系の API を group 系と揃えたと考えられる(おそらく)。テストは Map/ForEach 系のふるまい(空入力・panic 伝播・巨大入力)を確認する内容で、group と pool 両方の iter ヘルパーに同一パターンのテストを揃えている。",
+    "highlights": [
+      { "file": "pool/result_pool.go", "note": "NewWithResults コンストラクタと WithMaxGoroutines の追加" },
+      { "file": "pool/result_context_pool.go", "note": "ContextPool を named field 化し、必要なメソッドを転送する形に変更" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "inferred",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

@@ -1,0 +1,78 @@
+{
+  "seq": 102,
+  "sha": "460b2089ea79e3e7c0131ff7b2d8029cb7e8ff45",
+  "parents": [
+    "9ce3f41e47664d6ecaf05e6257fa14b2e9d49079",
+    "a453739890a505b1f72ff57284fe923478f7926c"
+  ],
+  "author": {
+    "name": "Camden Cheek",
+    "email": "camden@ccheek.com",
+    "date": "2023-01-09T09:48:46-07:00"
+  },
+  "message": "Merge pull request #39 from sashamelentyev/rmpanic\n\nRemove panic from root",
+  "pr": {
+    "number": 39,
+    "title": "Remove panic from root",
+    "body": "",
+    "url": "https://github.com/sourcegraph/conc/pull/39"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 0,
+    "deletions": 85
+  },
+  "files": [
+    {
+      "path": "panic.go",
+      "status": "D",
+      "additions": 0,
+      "deletions": 85,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/panic.go b/panic.go\ndeleted file mode 100644\nindex 2b02986..0000000\n--- a/panic.go\n+++ /dev/null\n@@ -1,85 +0,0 @@\n-package conc\n-\n-import (\n-\t\"fmt\"\n-\t\"runtime\"\n-\t\"runtime/debug\"\n-\t\"sync/atomic\"\n-)\n-\n-// PanicCatcher is used to catch panics. You can execute a function with Try,\n-// which will catch any spawned panic. Try can be called any number of times,\n-// from any number of goroutines. Once all calls to Try have completed, you can\n-// get the value of the first panic (if any) with Recovered(), or you can just\n-// propagate the panic (re-panic) with Repanic().\n-type PanicCatcher struct {\n-\trecovered atomic.Pointer[RecoveredPanic]\n-}\n-\n-// Try executes f, catching any panic it might spawn. It is safe\n-// to call from multiple goroutines simultaneously.\n-func (p *PanicCatcher) Try(f func()) {\n-\tdefer p.tryRecover()\n-\tf()\n-}\n-\n-func (p *PanicCatcher) tryRecover() {\n-\tif val := recover(); val != nil {\n-\t\trp := NewRecoveredPanic(1, val)\n-\t\tp.recovered.CompareAndSwap(nil, &rp)\n-\t}\n-}\n-\n-// Repanic panics if any calls to Try caught a panic. It will panic with the\n-// value of the first panic caught, wrapped in a RecoveredPanic with caller\n-// information.\n-func (p *PanicCatcher) Repanic() {\n-\tif val := p.Recovered(); val != nil {\n-\t\tpanic(val)\n-\t}\n-}\n-\n-// Recovered returns the value of the first panic caught by Try, or nil if\n-// no calls to Try panicked.\n-func (p *PanicCatcher) Recovered() *RecoveredPanic {\n-\treturn p.recovered.Load()\n-}\n-\n-// NewRecoveredPanic creates a RecoveredPanic from a panic value and a\n-// collected stacktrace. The skip parameter allows the caller to skip stack\n-// frames when collecting the stacktrace. Calling with a skip of 0 means\n-// include the call to NewRecoveredPanic in the stacktrace.\n-func NewRecoveredPanic(skip int, value any) RecoveredPanic {\n-\t// 64 frames should be plenty\n-\tvar callers [64]uintptr\n-\tn := runtime.Callers(skip+1, callers[:])\n-\treturn RecoveredPanic{\n-\t\tValue:   value,\n-\t\tCallers: callers[:n],\n-\t\tStack:   debug.Stack(),\n-\t}\n-}\n-\n-// RecoveredPanic is a panic that was caught with recover().\n-type RecoveredPanic struct {\n-\t// The original value of the panic.\n-\tValue any\n-\t// The caller list as returned by runtime.Callers when the panic was\n-\t// recovered. Can be used to produce a more detailed stack information with\n-\t// runtime.CallersFrames.\n-\tCallers []uintptr\n-\t// The formatted stacktrace from the goroutine where the panic was recovered.\n-\t// Easier to use than Callers.\n-\tStack []byte\n-}\n-\n-func (c *RecoveredPanic) Error() string {\n-\treturn fmt.Sprintf(\"panic: %v\\nstacktrace:\\n%s\\n\", c.Value, c.Stack)\n-}\n-\n-func (c *RecoveredPanic) Unwrap() error {\n-\tif err, ok := c.Value.(error); ok {\n-\t\treturn err\n-\t}\n-\treturn nil\n-}\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/go.yml",
+    ".golangci.yml",
+    "LICENSE",
+    "README.md",
+    "go.mod",
+    "go.sum",
+    "iter/iter.go",
+    "iter/iter_test.go",
+    "panics/panics.go",
+    "panics/panics_test.go",
+    "pool/context_pool.go",
+    "pool/context_pool_test.go",
+    "pool/error_pool.go",
+    "pool/error_pool_test.go",
+    "pool/pool.go",
+    "pool/pool_test.go",
+    "pool/result_context_pool.go",
+    "pool/result_context_pool_test.go",
+    "pool/result_error_pool.go",
+    "pool/result_error_pool_test.go",
+    "pool/result_pool.go",
+    "pool/result_pool_test.go",
+    "stream/stream.go",
+    "stream/stream_test.go",
+    "waitgroup.go",
+    "waitgroup_test.go"
+  ],
+  "explanation": {
+    "what": "ルート直下に残っていた panic.go(旧 PanicCatcher/RecoveredPanic の定義)を丸ごと削除した。前コミットで内容は panics/panics.go に複製・移動済みで、この panic.go は使われていない残骸だった。",
+    "why": "直前のコミット(#38)で panics サブパッケージへの移行が行われたが、その際に旧ファイル panic.go 自体の削除が漏れていたため、その後始末として削除されたと考えられる。PR本文は空でタイトルのみだが、diff の内容(旧ファイルの全削除のみ)から意図は明確。",
+    "highlights": [
+      { "file": "panic.go", "note": "panics サブパッケージへ既に移動済みの内容がそのまま残っていた旧ファイル。削除のみで新規追加はない" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [{ "type": "pr", "number": 39, "url": "https://github.com/sourcegraph/conc/pull/39" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

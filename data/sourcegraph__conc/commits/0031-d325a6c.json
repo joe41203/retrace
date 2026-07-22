@@ -1,0 +1,72 @@
+{
+  "seq": 31,
+  "sha": "d325a6c56acf593775c4ef1a05fb5aeb2c584e1a",
+  "parents": [
+    "e84cbde6baf54e550d0c1124420d6a9db43c048e"
+  ],
+  "author": {
+    "name": "Camden Cheek",
+    "email": "camden@ccheek.com",
+    "date": "2022-12-24T21:49:58-07:00"
+  },
+  "message": "use atomic.Pointer",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 3,
+    "deletions": 7
+  },
+  "files": [
+    {
+      "path": "panic.go",
+      "status": "M",
+      "additions": 3,
+      "deletions": 7,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/panic.go b/panic.go\nindex 9b1cebd..4167329 100644\n--- a/panic.go\n+++ b/panic.go\n@@ -13,7 +13,7 @@ import (\n // get the value of the first panic (if any) with Value(), or you can just\n // propagate the panic (re-panic) with Propagate()\n type PanicCatcher struct {\n-\tcaught atomic.Value\n+\trecovered atomic.Pointer[CaughtPanic]\n }\n \n // Try executes f, catching any panic it might spawn. It is safe\n@@ -23,7 +23,7 @@ func (p *PanicCatcher) Try(f func()) {\n \t\tif val := recover(); val != nil {\n \t\t\tvar callers [32]uintptr\n \t\t\tn := runtime.Callers(1, callers[:])\n-\t\t\tp.caught.CompareAndSwap(nil, &CaughtPanic{\n+\t\t\tp.recovered.CompareAndSwap(nil, &CaughtPanic{\n \t\t\t\tValue:   val,\n \t\t\t\tCallers: callers[:n],\n \t\t\t\tStack:   debug.Stack(),\n@@ -45,11 +45,7 @@ func (p *PanicCatcher) Propagate() {\n // Value returns the value of the first panic caught by Try, or nil if\n // no calls to Try panicked.\n func (p *PanicCatcher) Value() *CaughtPanic {\n-\tval := p.caught.Load()\n-\tif val == nil {\n-\t\treturn nil\n-\t}\n-\treturn val.(*CaughtPanic)\n+\treturn p.recovered.Load()\n }\n \n // CaughtPanic is a panic that was caught with recover().\n",
+  "diffTruncated": false,
+  "tree": [
+    "LICENSE",
+    "go.mod",
+    "go.sum",
+    "iter.go",
+    "limiter.go",
+    "panic.go",
+    "pool/context_pool.go",
+    "pool/context_pool_test.go",
+    "pool/error_pool.go",
+    "pool/error_pool_test.go",
+    "pool/iter.go",
+    "pool/iter_test.go",
+    "pool/pool.go",
+    "pool/pool_test.go",
+    "pool/result_context_pool.go",
+    "pool/result_context_pool_test.go",
+    "pool/result_error_pool.go",
+    "pool/result_error_pool_test.go",
+    "pool/result_pool.go",
+    "pool/result_pool_test.go",
+    "stream/stream.go",
+    "stream/stream_test.go",
+    "waitgroup.go",
+    "waitgroup_test.go"
+  ],
+  "explanation": {
+    "what": "panic.go の PanicCatcher が保持するフィールドを atomic.Value から atomic.Pointer[CaughtPanic] に変更した。Value() 内で行っていた型アサーション(val.(*CaughtPanic))が不要になり、Load() の戻り値をそのまま返せるようになった。",
+    "why": "おそらく、直前のコミット群で group パッケージを削除し PanicCatcher 中心の構成に整理したところで、Go 1.19 で追加されたジェネリックな atomic.Pointer[T] を使うことで型安全性を高め、コード量を削減する狙いだったとみられる。atomic.Value は any 型を保持するため呼び出し側で型アサーションが必要だったが、atomic.Pointer[T] なら型が固定されコンパイル時に保証される。",
+    "highlights": [
+      { "file": "panic.go", "note": "atomic.Value → atomic.Pointer[CaughtPanic] への置き換えで Value() の型アサーションが消えた" }
+    ],
+    "langNotes": [
+      { "topic": "atomic.Pointer[T]", "note": "Go 1.19 で導入されたジェネリックなアトミックポインタ型。sync/atomic.Value は any を保持し読み出し時に型アサーションが必要だが、atomic.Pointer[T] は型パラメータで保持する型を固定でき、Load()/Store()/CompareAndSwap() が *T を直接返す。ロックフリーに goroutine 間で安全に値を共有する用途に使う。" }
+    ],
+    "diagram": null,
+    "evidence": "inferred",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

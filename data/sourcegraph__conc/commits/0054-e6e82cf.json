@@ -1,0 +1,68 @@
+{
+  "seq": 54,
+  "sha": "e6e82cf1996ba6ac0c24f5db21df5742a298696b",
+  "parents": [
+    "d6f37cedd458ec258ae9e6c219ae464e9a96de65"
+  ],
+  "author": {
+    "name": "Camden Cheek",
+    "email": "camden@ccheek.com",
+    "date": "2023-01-02T15:53:28-07:00"
+  },
+  "message": "try to fix formatting",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 60,
+    "deletions": 70
+  },
+  "files": [
+    {
+      "path": "README.md",
+      "status": "M",
+      "additions": 60,
+      "deletions": 70,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/README.md b/README.md\nindex ddd5535..44c3d54 100644\n--- a/README.md\n+++ b/README.md\n@@ -76,16 +76,13 @@ trivial and it requires a lot of boilerplate that makes the important parts of\n the code more difficult to read, so `conc` does this for you.\n \n <table>\n-    <tr>\n-        <th>\n-        `stdlib`\n-        </th>\n-        <th>\n-        `conc`\n-        </th>\n-    </tr>\n-    <tr>\n-        <td>\n+<tr>\n+<th><code>stdlib</code></th>\n+<th><code>conc</code></th>\n+</tr>\n+<tr>\n+<td>\n+\n ```go\n type caughtPanicError struct {\n \tval   any\n@@ -117,8 +114,9 @@ func spawn() {\n \t}\n }\n ```\n-        </td>\n-        <td>\n+</td>\n+<td>\n+\n ```go\n func spawn() {\n     var wg conc.WaitGroup\n@@ -126,8 +124,8 @@ func spawn() {\n     wg.Wait()\n }\n ```\n-        </td>\n-    </tr>\n+</td>\n+</tr>\n </table>\n \n ## Goal #3: Make concurrent code easier to read\n@@ -152,16 +150,13 @@ what kind of complexity that would add, check out the \"Goal #2\" header above.\n Spawn a set of goroutines and waiting for them to finish:\n \n <table>\n-    <tr>\n-        <th>\n-        `stdlib`\n-        </th>\n-        <th>\n-        `conc`\n-        </th>\n-    </tr>\n-    <tr>\n-        <td>\n+<tr>\n+<th><code>stdlib</code></th>\n+<th><code>conc</code></th>\n+</tr>\n+<tr>\n+<td>\n+\n ```go\n func main() {\n \tvar wg sync.WaitGroup\n@@ -176,8 +171,9 @@ func main() {\n \twg.Wait()\n }\n ```\n-        </td>\n-        <td>\n+</td>\n+<td>\n+\n ```go\n func main() {\n \tvar wg conc.WaitGroup\n@@ -187,23 +183,20 @@ func main() {\n \twg.Wait()\n }\n ```\n-        </td>\n-    </tr>\n+</td>\n+</tr>\n </table>\n \n Process each element of a stream in a static pool of goroutines:\n \n <table>\n-    <tr>\n-        <th>\n-        `stdlib`\n-        </th>\n-        <th>\n-        `conc`\n-        </th>\n-    </tr>\n-    <tr>\n-        <td>\n+<tr>\n+<th><code>stdlib</code></th>\n+<th><code>conc</code></th>\n+</tr>\n+<tr>\n+<td>\n+\n ```go\n func process(stream chan int) {\n \tvar wg sync.WaitGroup\n@@ -219,8 +212,9 @@ func process(stream chan int) {\n \twg.Wait()\n }\n ```\n-        </td>\n-        <td>\n+</td>\n+<td>\n+\n ```go\n func process(stream chan int) {\n \tp := pool.New().WithMaxGoroutines(10)\n@@ -232,23 +226,20 @@ func process(stream chan int) {\n \tp.Wait()\n }\n ```\n-        </td>\n-    </tr>\n+</td>\n+</tr>\n </table>\n \n Process each element of a slice in a static pool of goroutines:\n \n <table>\n-    <tr>\n-        <th>\n-        `stdlib`\n-        </th>\n-        <th>\n-        `conc`\n-        </th>\n-    </tr>\n-    <tr>\n-        <td>\n+<tr>\n+<th><code>stdlib</code></th>\n+<th><code>conc</code></th>\n+</tr>\n+<tr>\n+<td>\n+\n ```go\n func main() {\n \tvalues := []int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10}\n@@ -273,32 +264,30 @@ func main() {\n \twg.Wait()\n }\n ```\n-        </td>\n-        <td>\n+</td>\n+<td>\n+\n ```go\n func main() {\n \tvalues := []int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10}\n \titer.ForEach(values, handle)\n }\n ```\n-        </td>\n-    </tr>\n+</td>\n+</tr>\n </table>\n \n Process an ordered stream concurrently:\n \n \n <table>\n-    <tr>\n-        <th>\n-        `stdlib`\n-        </th>\n-        <th>\n-        `conc`\n-        </th>\n-    </tr>\n-    <tr>\n-        <td>\n+<tr>\n+<th><code>stdlib</code></th>\n+<th><code>conc</code></th>\n+</tr>\n+<tr>\n+<td>\n+\n ```go\n func mapStream(input chan int, output chan int, f func(int) int) {\n \ttasks := make(chan func())\n@@ -342,8 +331,9 @@ func mapStream(input chan int, output chan int, f func(int) int) {\n \treaderWg.Wait()\n }\n ```\n-        </td>\n-        <td>\n+</td>\n+<td>\n+\n ```go\n func mapStream(input chan int, output chan int, f func(int) int) {\n \ts := stream.New().WithMaxGoroutines(10)\n@@ -357,6 +347,6 @@ func mapStream(input chan int, output chan int, f func(int) int) {\n \ts.Wait()\n }\n ```\n-        </td>\n-    </tr>\n+</td>\n+</tr>\n </table>\n",
+  "diffTruncated": false,
+  "tree": [
+    "LICENSE",
+    "README.md",
+    "go.mod",
+    "go.sum",
+    "iter/iter.go",
+    "iter/iter_test.go",
+    "panic.go",
+    "panic_test.go",
+    "pool/context_pool.go",
+    "pool/context_pool_test.go",
+    "pool/error_pool.go",
+    "pool/error_pool_test.go",
+    "pool/pool.go",
+    "pool/pool_test.go",
+    "pool/result_context_pool.go",
+    "pool/result_context_pool_test.go",
+    "pool/result_error_pool.go",
+    "pool/result_error_pool_test.go",
+    "pool/result_pool.go",
+    "pool/result_pool_test.go",
+    "stream/stream.go",
+    "stream/stream_test.go",
+    "waitgroup.go",
+    "waitgroup_test.go"
+  ],
+  "explanation": {
+    "what": "README.md 内のHTMLテーブル記法を修正した。各 `<tr>`/`<th>`/`<td>` タグのインデントを除去して行頭に揃え、`<th>` の中身を Markdown のバッククォート表記からタグ内 `<code>` 表記に変更し、`<td>` の直後に空行を挿入した。",
+    "why": "コミットメッセージ「try to fix formatting」の通り、GitHub上でのREADMEレンダリング崩れ(インデント付きHTMLタグ内でMarkdownのコードブロックやバッククォートが正しく解釈されない問題)を修正する意図と考えられる。",
+    "highlights": [],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

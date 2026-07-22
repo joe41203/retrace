@@ -1,0 +1,78 @@
+{
+  "seq": 100,
+  "sha": "4e988f8ab38cf3069b9ed0579ad2ecb0490b302f",
+  "parents": [
+    "5de4f90b9e20f4c9f9d7a696139d409b38f2542f",
+    "fefc57062f90ba1c1698891550e3a6ecafad24e3"
+  ],
+  "author": {
+    "name": "Camden Cheek",
+    "email": "camden@ccheek.com",
+    "date": "2023-01-08T18:08:07-07:00"
+  },
+  "message": "Merge pull request #37 from sourcegraph/doc-no-version\n\ndoc: do not include version in godoc links",
+  "pr": {
+    "number": 37,
+    "title": "doc: do not include version in godoc links",
+    "body": "Omitting the version automatically points to the latest version, i.e. https://pkg.go.dev/github.com/sourcegraph/conc/pool#Pool",
+    "url": "https://github.com/sourcegraph/conc/pull/37"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 15,
+    "deletions": 15
+  },
+  "files": [
+    {
+      "path": "README.md",
+      "status": "M",
+      "additions": 15,
+      "deletions": 15,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/README.md b/README.md\nindex 6461137..5df21a6 100644\n--- a/README.md\n+++ b/README.md\n@@ -1,6 +1,5 @@\n ![conch](https://user-images.githubusercontent.com/12631702/210295964-785cc63d-d697-420c-99ff-f492eb81dec9.svg)\n \n-\n # `conc`: better structured concurrency for go\n \n [![Go Reference](https://pkg.go.dev/badge/github.com/sourcegraph/conc.svg)](https://pkg.go.dev/github.com/sourcegraph/conc)\n@@ -19,25 +18,26 @@ go get github.com/sourcegraph/conc\n # At a glance\n \n - Use [`conc.WaitGroup`](https://pkg.go.dev/github.com/sourcegraph/conc#WaitGroup) if you just want a safer version of `sync.WaitGroup`\n-- Use [`pool.Pool`](https://pkg.go.dev/github.com/sourcegraph/conc@v0.1.0/pool#Pool) if you want a concurrency-limited task runner\n-- Use [`pool.ResultPool`](https://pkg.go.dev/github.com/sourcegraph/conc@v0.1.0/pool#ResultPool) if you want a concurrent task runner that collects task results\n-- Use [`pool.(Result)?ErrorPool`](https://pkg.go.dev/github.com/sourcegraph/conc@v0.1.0/pool#ErrorPool) if your tasks are fallible\n-- Use [`pool.(Result)?ContextPool`](https://pkg.go.dev/github.com/sourcegraph/conc@v0.1.0/pool#ContextPool) if your tasks should be canceled on failure\n-- Use [`stream.Stream`](https://pkg.go.dev/github.com/sourcegraph/conc@v0.1.0/stream#Stream) if you want to process an ordered stream of tasks in parallel with serial callbacks\n-- Use [`iter.Map`](https://pkg.go.dev/github.com/sourcegraph/conc@v0.1.0/iter#Map) if you want to concurrently map a slice\n-- Use [`iter.ForEach`](https://pkg.go.dev/github.com/sourcegraph/conc@v0.1.0/iter#ForEach) if you want to concurrently iterate over a slice\n+- Use [`pool.Pool`](https://pkg.go.dev/github.com/sourcegraph/conc/pool#Pool) if you want a concurrency-limited task runner\n+- Use [`pool.ResultPool`](https://pkg.go.dev/github.com/sourcegraph/conc/pool#ResultPool) if you want a concurrent task runner that collects task results\n+- Use [`pool.(Result)?ErrorPool`](https://pkg.go.dev/github.com/sourcegraph/conc/pool#ErrorPool) if your tasks are fallible\n+- Use [`pool.(Result)?ContextPool`](https://pkg.go.dev/github.com/sourcegraph/conc/pool#ContextPool) if your tasks should be canceled on failure\n+- Use [`stream.Stream`](https://pkg.go.dev/github.com/sourcegraph/conc/stream#Stream) if you want to process an ordered stream of tasks in parallel with serial callbacks\n+- Use [`iter.Map`](https://pkg.go.dev/github.com/sourcegraph/conc/iter#Map) if you want to concurrently map a slice\n+- Use [`iter.ForEach`](https://pkg.go.dev/github.com/sourcegraph/conc/iter#ForEach) if you want to concurrently iterate over a slice\n - Use [`conc.PanicCatcher`](https://pkg.go.dev/github.com/sourcegraph/conc#PanicCatcher) if you want to catch panics in your own goroutines\n \n All pools are created with\n-[`pool.New()`](https://pkg.go.dev/github.com/sourcegraph/conc@v0.1.0/pool#New)\n+[`pool.New()`](https://pkg.go.dev/github.com/sourcegraph/conc/pool#New)\n or\n-[`pool.NewWithResults[T]()`](https://pkg.go.dev/github.com/sourcegraph/conc@v0.1.0/pool#NewWithResults),\n+[`pool.NewWithResults[T]()`](https://pkg.go.dev/github.com/sourcegraph/conc/pool#NewWithResults),\n then configured with methods:\n-- [`p.WithMaxGoroutines()`](https://pkg.go.dev/github.com/sourcegraph/conc@v0.1.0/pool#Pool.MaxGoroutines) configures the maximum number of goroutines in the pool\n-- [`p.WithErrors()`](https://pkg.go.dev/github.com/sourcegraph/conc@v0.1.0/pool#Pool.WithErrors) configures the pool to run tasks that return errors\n-- [`p.WithContext(ctx)`](https://pkg.go.dev/github.com/sourcegraph/conc@v0.1.0/pool#Pool.WithContext) configures the pool to run tasks that should be canceled on first error\n-- [`p.WithFirstError()`](https://pkg.go.dev/github.com/sourcegraph/conc@v0.1.0/pool#ErrorPool.WithFirstError) configures error pools to only keep the first returned error rather than an aggregated error\n-- [`p.WithCollectErrored()`](https://pkg.go.dev/github.com/sourcegraph/conc@v0.1.0/pool#ResultContextPool.WithCollectErrored) configures result pools to only collect results that did not error\n+\n+- [`p.WithMaxGoroutines()`](https://pkg.go.dev/github.com/sourcegraph/conc/pool#Pool.MaxGoroutines) configures the maximum number of goroutines in the pool\n+- [`p.WithErrors()`](https://pkg.go.dev/github.com/sourcegraph/conc/pool#Pool.WithErrors) configures the pool to run tasks that return errors\n+- [`p.WithContext(ctx)`](https://pkg.go.dev/github.com/sourcegraph/conc/pool#Pool.WithContext) configures the pool to run tasks that should be canceled on first error\n+- [`p.WithFirstError()`](https://pkg.go.dev/github.com/sourcegraph/conc/pool#ErrorPool.WithFirstError) configures error pools to only keep the first returned error rather than an aggregated error\n+- [`p.WithCollectErrored()`](https://pkg.go.dev/github.com/sourcegraph/conc/pool#ResultContextPool.WithCollectErrored) configures result pools to only collect results that did not error\n \n # Goals\n \n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/go.yml",
+    ".golangci.yml",
+    "LICENSE",
+    "README.md",
+    "go.mod",
+    "go.sum",
+    "iter/iter.go",
+    "iter/iter_test.go",
+    "panic.go",
+    "panic_test.go",
+    "pool/context_pool.go",
+    "pool/context_pool_test.go",
+    "pool/error_pool.go",
+    "pool/error_pool_test.go",
+    "pool/pool.go",
+    "pool/pool_test.go",
+    "pool/result_context_pool.go",
+    "pool/result_context_pool_test.go",
+    "pool/result_error_pool.go",
+    "pool/result_error_pool_test.go",
+    "pool/result_pool.go",
+    "pool/result_pool_test.go",
+    "stream/stream.go",
+    "stream/stream_test.go",
+    "waitgroup.go",
+    "waitgroup_test.go"
+  ],
+  "explanation": {
+    "what": "README.md 内の pkg.go.dev へのリンクから @v0.1.0 のバージョン指定を取り除き、バージョンなしの URL(例: https://pkg.go.dev/github.com/sourcegraph/conc/pool#Pool)に統一した。",
+    "why": "PR本文の通り、pkg.go.dev はバージョンを省略すると自動的に最新版のドキュメントを指すため、README にバージョンを固定して書いてしまうと将来のリリースで内容が古いまま参照され続けてしまう。バージョンなしリンクにすることで常に最新のドキュメントに誘導できるようにした。",
+    "highlights": [
+      { "file": "README.md", "note": "複数の pkg.go.dev リンクから @v0.1.0 を一括除去" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [{ "type": "pr", "number": 37, "url": "https://github.com/sourcegraph/conc/pull/37" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

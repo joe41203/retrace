@@ -1,0 +1,136 @@
+{
+  "seq": 107,
+  "sha": "da1a381ab40b97b4736f02d22d1f45a25c95cd6a",
+  "parents": [
+    "df84809bd8d4325cf1d90383cfe805aedeab425c",
+    "f0a11b13b9352bba0063eacea35562bc52706b62"
+  ],
+  "author": {
+    "name": "Camden Cheek",
+    "email": "camden@ccheek.com",
+    "date": "2023-01-09T21:34:36-07:00"
+  },
+  "message": "Merge pull request #45 from sashamelentyev/paralleltest\n\nMark more tests as parallel",
+  "pr": {
+    "number": 45,
+    "title": "Mark more tests as parallel",
+    "body": "",
+    "url": "https://github.com/sourcegraph/conc/pull/45"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 9,
+    "additions": 63,
+    "deletions": 0
+  },
+  "files": [
+    {
+      "path": "iter/iter_test.go",
+      "status": "M",
+      "additions": 20,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "pool/context_pool_test.go",
+      "status": "M",
+      "additions": 11,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "pool/error_pool_test.go",
+      "status": "M",
+      "additions": 4,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "pool/pool_test.go",
+      "status": "M",
+      "additions": 4,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "pool/result_context_pool_test.go",
+      "status": "M",
+      "additions": 5,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "pool/result_error_pool_test.go",
+      "status": "M",
+      "additions": 5,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "pool/result_pool_test.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "stream/stream_test.go",
+      "status": "M",
+      "additions": 5,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "waitgroup_test.go",
+      "status": "M",
+      "additions": 8,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/iter/iter_test.go b/iter/iter_test.go\nindex 227a901..b171352 100644\n--- a/iter/iter_test.go\n+++ b/iter/iter_test.go\n@@ -12,6 +12,7 @@ func TestForEachIdx(t *testing.T) {\n \tt.Parallel()\n \n \tt.Run(\"empty\", func(t *testing.T) {\n+\t\tt.Parallel()\n \t\tf := func() {\n \t\t\tints := []int{}\n \t\t\tForEachIdx(ints, func(i int, val *int) {\n@@ -22,6 +23,7 @@ func TestForEachIdx(t *testing.T) {\n \t})\n \n \tt.Run(\"panic is propagated\", func(t *testing.T) {\n+\t\tt.Parallel()\n \t\tf := func() {\n \t\t\tints := []int{1}\n \t\t\tForEachIdx(ints, func(i int, val *int) {\n@@ -32,6 +34,7 @@ func TestForEachIdx(t *testing.T) {\n \t})\n \n \tt.Run(\"mutating inputs is fine\", func(t *testing.T) {\n+\t\tt.Parallel()\n \t\tints := []int{1, 2, 3, 4, 5}\n \t\tForEachIdx(ints, func(i int, val *int) {\n \t\t\t*val += 1\n@@ -40,6 +43,7 @@ func TestForEachIdx(t *testing.T) {\n \t})\n \n \tt.Run(\"huge inputs\", func(t *testing.T) {\n+\t\tt.Parallel()\n \t\tints := make([]int, 10000)\n \t\tForEachIdx(ints, func(i int, val *int) {\n \t\t\t*val = i\n@@ -56,6 +60,7 @@ func TestForEach(t *testing.T) {\n \tt.Parallel()\n \n \tt.Run(\"empty\", func(t *testing.T) {\n+\t\tt.Parallel()\n \t\tf := func() {\n \t\t\tints := []int{}\n \t\t\tForEach(ints, func(val *int) {\n@@ -66,6 +71,7 @@ func TestForEach(t *testing.T) {\n \t})\n \n \tt.Run(\"panic is propagated\", func(t *testing.T) {\n+\t\tt.Parallel()\n \t\tf := func() {\n \t\t\tints := []int{1}\n \t\t\tForEach(ints, func(val *int) {\n@@ -76,6 +82,7 @@ func TestForEach(t *testing.T) {\n \t})\n \n \tt.Run(\"mutating inputs is fine\", func(t *testing.T) {\n+\t\tt.Parallel()\n \t\tints := []int{1, 2, 3, 4, 5}\n \t\tForEach(ints, func(val *int) {\n \t\t\t*val += 1\n@@ -84,6 +91,7 @@ func TestForEach(t *testing.T) {\n \t})\n \n \tt.Run(\"huge inputs\", func(t *testing.T) {\n+\t\tt.Parallel()\n \t\tints := make([]int, 10000)\n \t\tForEach(ints, func(val *int) {\n \t\t\t*val = 1\n@@ -100,6 +108,7 @@ func TestMap(t *testing.T) {\n \tt.Parallel()\n \n \tt.Run(\"empty\", func(t *testing.T) {\n+\t\tt.Parallel()\n \t\tf := func() {\n \t\t\tints := []int{}\n \t\t\tMap(ints, func(val *int) int {\n@@ -110,6 +119,7 @@ func TestMap(t *testing.T) {\n \t})\n \n \tt.Run(\"panic is propagated\", func(t *testing.T) {\n+\t\tt.Parallel()\n \t\tf := func() {\n \t\t\tints := []int{1}\n \t\t\tMap(ints, func(val *int) int {\n@@ -120,6 +130,7 @@ func TestMap(t *testing.T) {\n \t})\n \n \tt.Run(\"mutating inputs is fine, though not recommended\", func(t *testing.T) {\n+\t\tt.Parallel()\n \t\tints := []int{1, 2, 3, 4, 5}\n \t\tMap(ints, func(val *int) int {\n \t\t\t*val += 1\n@@ -129,6 +140,7 @@ func TestMap(t *testing.T) {\n \t})\n \n \tt.Run(\"basic increment\", func(t *testing.T) {\n+\t\tt.Parallel()\n \t\tints := []int{1, 2, 3, 4, 5}\n \t\tres := Map(ints, func(val *int) int {\n \t\t\treturn *val + 1\n@@ -138,6 +150,7 @@ func TestMap(t *testing.T) {\n \t})\n \n \tt.Run(\"huge inputs\", func(t *testing.T) {\n+\t\tt.Parallel()\n \t\tints := make([]int, 10000)\n \t\tres := Map(ints, func(val *int) int {\n \t\t\treturn 1\n@@ -154,6 +167,7 @@ func TestMapErr(t *testing.T) {\n \tt.Parallel()\n \n \tt.Run(\"empty\", func(t *testing.T) {\n+\t\tt.Parallel()\n \t\tf := func() {\n \t\t\tints := []int{}\n \t\t\tres, err := MapErr(ints, func(val *int) (int, error) {\n@@ -166,6 +180,7 @@ func TestMapErr(t *testing.T) {\n \t})\n \n \tt.Run(\"panic is propagated\", func(t *testing.T) {\n+\t\tt.Parallel()\n \t\tf := func() {\n \t\t\tints := []int{1}\n \t\t\t_, _ = MapErr(ints, func(val *int) (int, error) {\n@@ -176,6 +191,7 @@ func TestMapErr(t *testing.T) {\n \t})\n \n \tt.Run(\"mutating inputs is fine, though not recommended\", func(t *testing.T) {\n+\t\tt.Parallel()\n \t\tints := []int{1, 2, 3, 4, 5}\n \t\tres, err := MapErr(ints, func(val *int) (int, error) {\n \t\t\t*val += 1\n@@ -187,6 +203,7 @@ func TestMapErr(t *testing.T) {\n \t})\n \n \tt.Run(\"basic increment\", func(t *testing.T) {\n+\t\tt.Parallel()\n \t\tints := []int{1, 2, 3, 4, 5}\n \t\tres, err := MapErr(ints, func(val *int) (int, error) {\n \t\t\treturn *val + 1, nil\n@@ -200,6 +217,7 @@ func TestMapErr(t *testing.T) {\n \terr2 := errors.New(\"error1\")\n \n \tt.Run(\"error is propagated\", func(t *testing.T) {\n+\t\tt.Parallel()\n \t\tints := []int{1, 2, 3, 4, 5}\n \t\tres, err := MapErr(ints, func(val *int) (int, error) {\n \t\t\tif *val == 3 {\n@@ -213,6 +231,7 @@ func TestMapErr(t *testing.T) {\n \t})\n \n \tt.Run(\"multiple errors are propagated\", func(t *testing.T) {\n+\t\tt.Parallel()\n \t\tints := []int{1, 2, 3, 4, 5}\n \t\tres, err := MapErr(ints, func(val *int) (int, error) {\n \t\t\tif *val == 3 {\n@@ -230,6 +249,7 @@ func TestMapErr(t *testing.T) {\n \t})\n \n \tt.Run(\"huge inputs\", func(t *testing.T) {\n+\t\tt.Parallel()\n \t\tints := make([]int, 10000)\n \t\tres := Map(ints, func(val *int) int {\n \t\t\treturn 1\ndiff --git a/pool/context_pool_test.go b/pool/context_pool_test.go\nindex 199cc0e..85c629f 100644\n--- a/pool/context_pool_test.go\n+++ b/pool/context_pool_test.go\n@@ -42,19 +42,24 @@ func TestContextPool(t *testing.T) {\n \tbgctx := context.Background()\n \n \tt.Run(\"behaves the same as ErrorGroup\", func(t *testing.T) {\n+\t\tt.Parallel()\n+\n \t\tt.Run(\"wait returns no error if no errors\", func(t *testing.T) {\n+\t\t\tt.Parallel()\n \t\t\tp := New().WithContext(bgctx)\n \t\t\tp.Go(func(context.Context) error { return nil })\n \t\t\trequire.NoError(t, p.Wait())\n \t\t})\n \n \t\tt.Run(\"wait errors if func returns error\", func(t *testing.T) {\n+\t\t\tt.Parallel()\n \t\t\tp := New().WithContext(bgctx)\n \t\t\tp.Go(func(context.Context) error { return err1 })\n \t\t\trequire.ErrorIs(t, p.Wait(), err1)\n \t\t})\n \n \t\tt.Run(\"wait error is all returned errors\", func(t *testing.T) {\n+\t\t\tt.Parallel()\n \t\t\tp := New().WithErrors().WithContext(bgctx)\n \t\t\tp.Go(func(context.Context) error { return err1 })\n \t\t\tp.Go(func(context.Context) error { return nil })\n@@ -66,7 +71,10 @@ func TestContextPool(t *testing.T) {\n \t})\n \n \tt.Run(\"context error propagates\", func(t *testing.T) {\n+\t\tt.Parallel()\n+\n \t\tt.Run(\"canceled\", func(t *testing.T) {\n+\t\t\tt.Parallel()\n \t\t\tctx, cancel := context.WithCancel(bgctx)\n \t\t\tp := New().WithContext(ctx)\n \t\t\tp.Go(func(ctx context.Context) error {\n@@ -78,6 +86,7 @@ func TestContextPool(t *testing.T) {\n \t\t})\n \n \t\tt.Run(\"timed out\", func(t *testing.T) {\n+\t\t\tt.Parallel()\n \t\t\tctx, cancel := context.WithTimeout(bgctx, time.Millisecond)\n \t\t\tdefer cancel()\n \t\t\tp := New().WithContext(ctx)\n@@ -90,6 +99,7 @@ func TestContextPool(t *testing.T) {\n \t})\n \n \tt.Run(\"WithCancelOnError\", func(t *testing.T) {\n+\t\tt.Parallel()\n \t\tp := New().WithContext(bgctx).WithCancelOnError()\n \t\tp.Go(func(ctx context.Context) error {\n \t\t\t<-ctx.Done()\n@@ -104,6 +114,7 @@ func TestContextPool(t *testing.T) {\n \t})\n \n \tt.Run(\"no WithCancelOnError\", func(t *testing.T) {\n+\t\tt.Parallel()\n \t\tp := New().WithContext(bgctx)\n \t\tp.Go(func(ctx context.Context) error {\n \t\t\tselect {\ndiff --git a/pool/error_pool_test.go b/pool/error_pool_test.go\nindex 85fd9f5..f6a2ec4 100644\n--- a/pool/error_pool_test.go\n+++ b/pool/error_pool_test.go\n@@ -36,18 +36,21 @@ func TestErrorPool(t *testing.T) {\n \terr2 := errors.New(\"err2\")\n \n \tt.Run(\"wait returns no error if no errors\", func(t *testing.T) {\n+\t\tt.Parallel()\n \t\tg := New().WithErrors()\n \t\tg.Go(func() error { return nil })\n \t\trequire.NoError(t, g.Wait())\n \t})\n \n \tt.Run(\"wait error if func returns error\", func(t *testing.T) {\n+\t\tt.Parallel()\n \t\tg := New().WithErrors()\n \t\tg.Go(func() error { return err1 })\n \t\trequire.ErrorIs(t, g.Wait(), err1)\n \t})\n \n \tt.Run(\"wait error is all returned errors\", func(t *testing.T) {\n+\t\tt.Parallel()\n \t\tg := New().WithErrors()\n \t\tg.Go(func() error { return err1 })\n \t\tg.Go(func() error { return nil })\n@@ -58,6 +61,7 @@ func TestErrorPool(t *testing.T) {\n \t})\n \n \tt.Run(\"propagates panics\", func(t *testing.T) {\n+\t\tt.Parallel()\n \t\tg := New().WithErrors()\n \t\tfor i := 0; i < 10; i++ {\n \t\t\ti := i\ndiff --git a/pool/pool_test.go b/pool/pool_test.go\nindex 819ec22..fc74d9d 100644\n--- a/pool/pool_test.go\n+++ b/pool/pool_test.go\n@@ -71,6 +71,7 @@ func TestPool(t *testing.T) {\n \t})\n \n \tt.Run(\"propagate panic\", func(t *testing.T) {\n+\t\tt.Parallel()\n \t\tg := New()\n \t\tfor i := 0; i < 10; i++ {\n \t\t\ti := i\n@@ -84,6 +85,7 @@ func TestPool(t *testing.T) {\n \t})\n \n \tt.Run(\"panics do not exhaust goroutines\", func(t *testing.T) {\n+\t\tt.Parallel()\n \t\tg := New().WithMaxGoroutines(2)\n \t\tfor i := 0; i < 10; i++ {\n \t\t\tg.Go(func() {\n@@ -94,10 +96,12 @@ func TestPool(t *testing.T) {\n \t})\n \n \tt.Run(\"panics on invalid WithMaxGoroutines\", func(t *testing.T) {\n+\t\tt.Parallel()\n \t\trequire.Panics(t, func() { New().WithMaxGoroutines(0) })\n \t})\n \n \tt.Run(\"returns correct MaxGoroutines\", func(t *testing.T) {\n+\t\tt.Parallel()\n \t\tp := New().WithMaxGoroutines(42)\n \t\trequire.Equal(t, 42, p.MaxGoroutines())\n \t})\ndiff --git a/pool/result_context_pool_test.go b/pool/result_context_pool_test.go\nindex cb1e666..4f2f40f 100644\n--- a/pool/result_context_pool_test.go\n+++ b/pool/result_context_pool_test.go\n@@ -20,8 +20,10 @@ func TestResultContextPool(t *testing.T) {\n \terr2 := errors.New(\"err2\")\n \n \tt.Run(\"behaves the same as ErrorGroup\", func(t *testing.T) {\n+\t\tt.Parallel()\n \t\tbgctx := context.Background()\n \t\tt.Run(\"wait returns no error if no errors\", func(t *testing.T) {\n+\t\t\tt.Parallel()\n \t\t\tg := NewWithResults[int]().WithContext(bgctx)\n \t\t\tg.Go(func(context.Context) (int, error) { return 0, nil })\n \t\t\tres, err := g.Wait()\n@@ -30,6 +32,7 @@ func TestResultContextPool(t *testing.T) {\n \t\t})\n \n \t\tt.Run(\"wait error if func returns error\", func(t *testing.T) {\n+\t\t\tt.Parallel()\n \t\t\tg := NewWithResults[int]().WithContext(bgctx)\n \t\t\tg.Go(func(context.Context) (int, error) { return 0, err1 })\n \t\t\tres, err := g.Wait()\n@@ -38,6 +41,7 @@ func TestResultContextPool(t *testing.T) {\n \t\t})\n \n \t\tt.Run(\"wait error is all returned errors\", func(t *testing.T) {\n+\t\t\tt.Parallel()\n \t\t\tg := NewWithResults[int]().WithErrors().WithContext(bgctx)\n \t\t\tg.Go(func(context.Context) (int, error) { return 0, err1 })\n \t\t\tg.Go(func(context.Context) (int, error) { return 0, nil })\n@@ -100,6 +104,7 @@ func TestResultContextPool(t *testing.T) {\n \t})\n \n \tt.Run(\"WithCollectErrored\", func(t *testing.T) {\n+\t\tt.Parallel()\n \t\tg := NewWithResults[int]().WithContext(context.Background()).WithCollectErrored()\n \t\tg.Go(func(context.Context) (int, error) { return 0, err1 })\n \t\tres, err := g.Wait()\ndiff --git a/pool/result_error_pool_test.go b/pool/result_error_pool_test.go\nindex 4474ce5..26db0da 100644\n--- a/pool/result_error_pool_test.go\n+++ b/pool/result_error_pool_test.go\n@@ -18,6 +18,7 @@ func TestResultErrorGroup(t *testing.T) {\n \terr2 := errors.New(\"err2\")\n \n \tt.Run(\"wait returns no error if no errors\", func(t *testing.T) {\n+\t\tt.Parallel()\n \t\tg := NewWithResults[int]().WithErrors()\n \t\tg.Go(func() (int, error) { return 1, nil })\n \t\tres, err := g.Wait()\n@@ -26,6 +27,7 @@ func TestResultErrorGroup(t *testing.T) {\n \t})\n \n \tt.Run(\"wait error if func returns error\", func(t *testing.T) {\n+\t\tt.Parallel()\n \t\tg := NewWithResults[int]().WithErrors()\n \t\tg.Go(func() (int, error) { return 0, err1 })\n \t\tres, err := g.Wait()\n@@ -34,6 +36,7 @@ func TestResultErrorGroup(t *testing.T) {\n \t})\n \n \tt.Run(\"WithCollectErrored\", func(t *testing.T) {\n+\t\tt.Parallel()\n \t\tg := NewWithResults[int]().WithErrors().WithCollectErrored()\n \t\tg.Go(func() (int, error) { return 0, err1 })\n \t\tres, err := g.Wait()\n@@ -68,6 +71,7 @@ func TestResultErrorGroup(t *testing.T) {\n \t})\n \n \tt.Run(\"wait error is all returned errors\", func(t *testing.T) {\n+\t\tt.Parallel()\n \t\tg := NewWithResults[int]().WithErrors()\n \t\tg.Go(func() (int, error) { return 0, err1 })\n \t\tg.Go(func() (int, error) { return 0, nil })\n@@ -79,6 +83,7 @@ func TestResultErrorGroup(t *testing.T) {\n \t})\n \n \tt.Run(\"limit\", func(t *testing.T) {\n+\t\tt.Parallel()\n \t\tfor _, maxConcurrency := range []int{1, 10, 100} {\n \t\t\tt.Run(strconv.Itoa(maxConcurrency), func(t *testing.T) {\n \t\t\t\tmaxConcurrency := maxConcurrency // copy\ndiff --git a/pool/result_pool_test.go b/pool/result_pool_test.go\nindex 5b370f1..c7ed5d5 100644\n--- a/pool/result_pool_test.go\n+++ b/pool/result_pool_test.go\n@@ -32,6 +32,7 @@ func TestResultGroup(t *testing.T) {\n \tt.Parallel()\n \n \tt.Run(\"basic\", func(t *testing.T) {\n+\t\tt.Parallel()\n \t\tg := NewWithResults[int]()\n \t\texpected := []int{}\n \t\tfor i := 0; i < 100; i++ {\ndiff --git a/stream/stream_test.go b/stream/stream_test.go\nindex cc2c437..48c8c85 100644\n--- a/stream/stream_test.go\n+++ b/stream/stream_test.go\n@@ -36,6 +36,7 @@ func TestStream(t *testing.T) {\n \tt.Parallel()\n \n \tt.Run(\"simple\", func(t *testing.T) {\n+\t\tt.Parallel()\n \t\ts := New()\n \t\tvar res []int\n \t\tfor i := 0; i < 5; i++ {\n@@ -52,6 +53,7 @@ func TestStream(t *testing.T) {\n \t})\n \n \tt.Run(\"max goroutines\", func(t *testing.T) {\n+\t\tt.Parallel()\n \t\ts := New().WithMaxGoroutines(5)\n \t\tvar currentTaskCount atomic.Int64\n \t\tvar currentCallbackCount atomic.Int64\n@@ -81,6 +83,7 @@ func TestStream(t *testing.T) {\n \t})\n \n \tt.Run(\"panic in task is propagated\", func(t *testing.T) {\n+\t\tt.Parallel()\n \t\ts := New().WithMaxGoroutines(5)\n \t\ts.Go(func() Callback {\n \t\t\tpanic(\"something really bad happened in the task\")\n@@ -89,6 +92,7 @@ func TestStream(t *testing.T) {\n \t})\n \n \tt.Run(\"panic in callback is propagated\", func(t *testing.T) {\n+\t\tt.Parallel()\n \t\ts := New().WithMaxGoroutines(5)\n \t\ts.Go(func() Callback {\n \t\t\treturn func() {\n@@ -99,6 +103,7 @@ func TestStream(t *testing.T) {\n \t})\n \n \tt.Run(\"panic in callback does not block producers\", func(t *testing.T) {\n+\t\tt.Parallel()\n \t\ts := New().WithMaxGoroutines(5)\n \t\ts.Go(func() Callback {\n \t\t\treturn func() {\ndiff --git a/waitgroup_test.go b/waitgroup_test.go\nindex d88513d..74e1dfd 100644\n--- a/waitgroup_test.go\n+++ b/waitgroup_test.go\n@@ -28,11 +28,13 @@ func TestWaitGroup(t *testing.T) {\n \tt.Parallel()\n \n \tt.Run(\"ctor\", func(t *testing.T) {\n+\t\tt.Parallel()\n \t\twg := NewWaitGroup()\n \t\trequire.IsType(t, &WaitGroup{}, wg)\n \t})\n \n \tt.Run(\"all spawned run\", func(t *testing.T) {\n+\t\tt.Parallel()\n \t\tvar count atomic.Int64\n \t\tvar wg WaitGroup\n \t\tfor i := 0; i < 100; i++ {\n@@ -45,7 +47,10 @@ func TestWaitGroup(t *testing.T) {\n \t})\n \n \tt.Run(\"panic\", func(t *testing.T) {\n+\t\tt.Parallel()\n+\n \t\tt.Run(\"is propagated\", func(t *testing.T) {\n+\t\t\tt.Parallel()\n \t\t\tvar wg WaitGroup\n \t\t\twg.Go(func() {\n \t\t\t\tpanic(\"super bad thing\")\n@@ -54,6 +59,7 @@ func TestWaitGroup(t *testing.T) {\n \t\t})\n \n \t\tt.Run(\"one is propagated\", func(t *testing.T) {\n+\t\t\tt.Parallel()\n \t\t\tvar wg WaitGroup\n \t\t\twg.Go(func() {\n \t\t\t\tpanic(\"super bad thing\")\n@@ -65,6 +71,7 @@ func TestWaitGroup(t *testing.T) {\n \t\t})\n \n \t\tt.Run(\"nonpanics do not overwrite panic\", func(t *testing.T) {\n+\t\t\tt.Parallel()\n \t\t\tvar wg WaitGroup\n \t\t\twg.Go(func() {\n \t\t\t\tpanic(\"super bad thing\")\n@@ -76,6 +83,7 @@ func TestWaitGroup(t *testing.T) {\n \t\t})\n \n \t\tt.Run(\"nonpanics run successfully\", func(t *testing.T) {\n+\t\t\tt.Parallel()\n \t\t\tvar wg WaitGroup\n \t\t\tvar i atomic.Int64\n \t\t\twg.Go(func() {\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/go.yml",
+    ".golangci.yml",
+    "LICENSE",
+    "README.md",
+    "go.mod",
+    "go.sum",
+    "iter/iter.go",
+    "iter/iter_test.go",
+    "panics/panics.go",
+    "panics/panics_test.go",
+    "pool/context_pool.go",
+    "pool/context_pool_test.go",
+    "pool/error_pool.go",
+    "pool/error_pool_test.go",
+    "pool/pool.go",
+    "pool/pool_test.go",
+    "pool/result_context_pool.go",
+    "pool/result_context_pool_test.go",
+    "pool/result_error_pool.go",
+    "pool/result_error_pool_test.go",
+    "pool/result_pool.go",
+    "pool/result_pool_test.go",
+    "stream/stream.go",
+    "stream/stream_test.go",
+    "waitgroup.go",
+    "waitgroup_test.go"
+  ],
+  "explanation": {
+    "what": "iter・pool・stream・waitgroup 各パッケージのテストにある t.Run のサブテストへ t.Parallel() 呼び出しを追加し、既に並列化されていたトップレベルテストの下にあるサブテストも並列実行されるようにした。9ファイル・63行の追加のみで、テストロジック自体は変更していない。",
+    "why": "コミット件名「Mark more tests as parallel」の通り、すでに一部で使われていた t.Parallel() のパターンを、まだ付いていなかったサブテストにも網羅的に広げてテストスイート全体の実行時間短縮を狙った変更と考えられる。PR本文は空だが、diff は t.Parallel() の追加のみで意図は明確。",
+    "highlights": [
+      { "file": "waitgroup_test.go", "note": "ネストした t.Run(\"panic\", ...) の中の各サブテストにも t.Parallel() が追加され、親子両方で並列化されている例" }
+    ],
+    "langNotes": [
+      { "topic": "t.Parallel() とサブテストの並列実行", "note": "Go の testing パッケージでは t.Run で作ったサブテストの中でも t.Parallel() を呼ぶとそのサブテストが並列実行対象になる。親テストが t.Parallel() 済みでも、子で改めて呼ばないと子は逐次実行のままなので、ネストごとに明示的に付ける必要がある。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [{ "type": "pr", "number": 45, "url": "https://github.com/sourcegraph/conc/pull/45" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

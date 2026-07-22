@@ -1,0 +1,79 @@
+{
+  "seq": 146,
+  "sha": "30a99cd85b339bce498627582d604740385a3ba8",
+  "parents": [
+    "a68c69faf592d2da20745b1088d091ac5b635649"
+  ],
+  "author": {
+    "name": "Camden Cheek",
+    "email": "camden@ccheek.com",
+    "date": "2023-11-12T10:16:38-07:00"
+  },
+  "message": "simplify collection of errors",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 9,
+    "deletions": 9
+  },
+  "files": [
+    {
+      "path": "pool/error_pool.go",
+      "status": "M",
+      "additions": 9,
+      "deletions": 9,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/pool/error_pool.go b/pool/error_pool.go\nindex 6e5aa99..2e999a5 100644\n--- a/pool/error_pool.go\n+++ b/pool/error_pool.go\n@@ -20,7 +20,7 @@ type ErrorPool struct {\n \tonlyFirstError bool\n \n \tmu   sync.Mutex\n-\terrs error\n+\terrs []error\n }\n \n // Go submits a task to the pool. If all goroutines in the pool\n@@ -35,7 +35,13 @@ func (p *ErrorPool) Go(f func() error) {\n // returning any errors from tasks.\n func (p *ErrorPool) Wait() error {\n \tp.pool.Wait()\n-\treturn p.errs\n+\tif len(p.errs) == 0 {\n+\t\treturn nil\n+\t} else if p.onlyFirstError {\n+\t\treturn p.errs[0]\n+\t} else {\n+\t\treturn multierror.Join(p.errs...)\n+\t}\n }\n \n // WithContext converts the pool to a ContextPool for tasks that should\n@@ -85,13 +91,7 @@ func (p *ErrorPool) panicIfInitialized() {\n func (p *ErrorPool) addErr(err error) {\n \tif err != nil {\n \t\tp.mu.Lock()\n-\t\tif p.onlyFirstError {\n-\t\t\tif p.errs == nil {\n-\t\t\t\tp.errs = err\n-\t\t\t}\n-\t\t} else {\n-\t\t\tp.errs = multierror.Join(p.errs, err)\n-\t\t}\n+\t\tp.errs = append(p.errs, err)\n \t\tp.mu.Unlock()\n \t}\n }\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/go.yml",
+    ".golangci.yml",
+    "LICENSE",
+    "README.md",
+    "go.mod",
+    "go.sum",
+    "internal/multierror/multierror_go119.go",
+    "internal/multierror/multierror_go120.go",
+    "iter/export_test.go",
+    "iter/iter.go",
+    "iter/iter_test.go",
+    "iter/map.go",
+    "iter/map_test.go",
+    "panics/panics.go",
+    "panics/panics_test.go",
+    "panics/try.go",
+    "panics/try_test.go",
+    "pool/context_pool.go",
+    "pool/context_pool_test.go",
+    "pool/error_pool.go",
+    "pool/error_pool_test.go",
+    "pool/pool.go",
+    "pool/pool_test.go",
+    "pool/result_context_pool.go",
+    "pool/result_context_pool_test.go",
+    "pool/result_error_pool.go",
+    "pool/result_error_pool_test.go",
+    "pool/result_pool.go",
+    "pool/result_pool_test.go",
+    "stream/stream.go",
+    "stream/stream_test.go",
+    "waitgroup.go",
+    "waitgroup_test.go"
+  ],
+  "explanation": {
+    "what": "ErrorPool の内部フィールド errs を単一の error から []error(スライス)に変更し、addErr は常に append するだけにした。onlyFirstError かどうかの分岐と multierror.Join の呼び出しは Wait() 側に一本化した。",
+    "why": "おそらく、これまで addErr 内で「1件目だけ保持するか」「都度 Join するか」を分岐していたロジックを、単純に全エラーを蓄積してから Wait() で一度だけ集約する形に単純化する意図だと考えられる。次のコミット(#132)で iter.MapErr 側にも同じパターンが適用されており、この設計変更の先行例にあたる。",
+    "highlights": [
+      { "file": "pool/error_pool.go", "note": "addErr が単純な append になり、Wait() 側で errs の長さ・onlyFirstError に応じて nil / errs[0] / multierror.Join(errs...) を返し分ける" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "inferred",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

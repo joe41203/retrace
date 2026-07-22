@@ -1,0 +1,77 @@
+{
+  "seq": 91,
+  "sha": "d2e8f281d59afd74fe74147af8531ce628ef23aa",
+  "parents": [
+    "c0ad5066e2da7075e07fbdaa402bd80d9f57d450",
+    "e86cd4e065245526688b1a156b04749717bd0e93"
+  ],
+  "author": {
+    "name": "Camden Cheek",
+    "email": "camden@ccheek.com",
+    "date": "2023-01-06T17:50:28-07:00"
+  },
+  "message": "Merge pull request #24 from sourcegraph/cc/waitgroupctor\n\nAdd note to WaitGroup docs about zero values and copying",
+  "pr": {
+    "number": 24,
+    "title": "Add note to WaitGroup docs about zero values and copying",
+    "body": "The zero-value of a WaitGroup is usable, but we have a constructor to parallel the construction of pools and streams. This might be confusing, so this clarifies in the WaitGroup docs that it works similarly to sync.WaitGroup.",
+    "url": "https://github.com/sourcegraph/conc/pull/24"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 3,
+    "deletions": 0
+  },
+  "files": [
+    {
+      "path": "waitgroup.go",
+      "status": "M",
+      "additions": 3,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/waitgroup.go b/waitgroup.go\nindex b5a099d..11094c6 100644\n--- a/waitgroup.go\n+++ b/waitgroup.go\n@@ -14,6 +14,9 @@ func NewWaitGroup() *WaitGroup {\n // and calling Wait() will ensure that each of those goroutines exits\n // before continuing. Any panics in a child goroutine will be caught\n // and propagated to the caller of Wait().\n+//\n+// The zero value of WaitGroup is usable, just like sync.WaitGroup.\n+// Also like sync.WaitGroup, it must not be copied after first use.\n type WaitGroup struct {\n \twg sync.WaitGroup\n \tpc PanicCatcher\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/go.yml",
+    "LICENSE",
+    "README.md",
+    "go.mod",
+    "go.sum",
+    "iter/iter.go",
+    "iter/iter_test.go",
+    "panic.go",
+    "panic_test.go",
+    "pool/context_pool.go",
+    "pool/context_pool_test.go",
+    "pool/error_pool.go",
+    "pool/error_pool_test.go",
+    "pool/pool.go",
+    "pool/pool_test.go",
+    "pool/result_context_pool.go",
+    "pool/result_context_pool_test.go",
+    "pool/result_error_pool.go",
+    "pool/result_error_pool_test.go",
+    "pool/result_pool.go",
+    "pool/result_pool_test.go",
+    "stream/stream.go",
+    "stream/stream_test.go",
+    "waitgroup.go",
+    "waitgroup_test.go"
+  ],
+  "explanation": {
+    "what": "waitgroup.go の WaitGroup 型のドキュメントコメントに、ゼロ値のまま使える点と、使用開始後にコピーしてはいけない点を追記した。",
+    "why": "PR本文によると、WaitGroup にはコンストラクタ NewWaitGroup() があるが、ゼロ値でもそのまま使える。pool や stream はコンストラクタ経由の生成が前提のため、WaitGroup も同様にコンストラクタが必須であるかのように誤解されやすい。そこで sync.WaitGroup と同じ挙動であることを明示し、混乱を防ぐ意図でコメントを追加した。",
+    "highlights": [
+      { "file": "waitgroup.go", "note": "型の直前コメントに「ゼロ値で使える」「コピー禁止」の注記を追加。振る舞い自体は変えていない" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [{ "type": "pr", "number": 24, "url": "https://github.com/sourcegraph/conc/pull/24" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

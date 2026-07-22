@@ -1,0 +1,68 @@
+{
+  "seq": 33,
+  "sha": "b1a227a23a104b0b49f74c78377aaa6db0a3a929",
+  "parents": [
+    "6ab95c49ac14abaea16e4fccee630b1dbfbf9280"
+  ],
+  "author": {
+    "name": "Camden Cheek",
+    "email": "camden@ccheek.com",
+    "date": "2022-12-24T22:02:20-07:00"
+  },
+  "message": "rename CaughtPanic to RecoveredPanic",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 7,
+    "deletions": 7
+  },
+  "files": [
+    {
+      "path": "panic.go",
+      "status": "M",
+      "additions": 7,
+      "deletions": 7,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/panic.go b/panic.go\nindex f827322..6df3f52 100644\n--- a/panic.go\n+++ b/panic.go\n@@ -13,7 +13,7 @@ import (\n // get the value of the first panic (if any) with Value(), or you can just\n // propagate the panic (re-panic) with Propagate()\n type PanicCatcher struct {\n-\trecovered atomic.Pointer[CaughtPanic]\n+\trecovered atomic.Pointer[RecoveredPanic]\n }\n \n // Try executes f, catching any panic it might spawn. It is safe\n@@ -23,7 +23,7 @@ func (p *PanicCatcher) Try(f func()) {\n \t\tif val := recover(); val != nil {\n \t\t\tvar callers [32]uintptr\n \t\t\tn := runtime.Callers(1, callers[:])\n-\t\t\tp.recovered.CompareAndSwap(nil, &CaughtPanic{\n+\t\t\tp.recovered.CompareAndSwap(nil, &RecoveredPanic{\n \t\t\t\tValue:   val,\n \t\t\t\tCallers: callers[:n],\n \t\t\t\tStack:   debug.Stack(),\n@@ -44,12 +44,12 @@ func (p *PanicCatcher) Propagate() {\n \n // Value returns the value of the first panic caught by Try, or nil if\n // no calls to Try panicked.\n-func (p *PanicCatcher) Value() *CaughtPanic {\n+func (p *PanicCatcher) Value() *RecoveredPanic {\n \treturn p.recovered.Load()\n }\n \n-// CaughtPanic is a panic that was caught with recover().\n-type CaughtPanic struct {\n+// RecoveredPanic is a panic that was caught with recover().\n+type RecoveredPanic struct {\n \t// The original value of the panic\n \tValue any\n \t// The caller list as returned by runtime.Callers when the panic was\n@@ -61,11 +61,11 @@ type CaughtPanic struct {\n \tStack []byte\n }\n \n-func (c *CaughtPanic) Error() string {\n+func (c *RecoveredPanic) Error() string {\n \treturn fmt.Sprintf(\"panic: %q\\nstacktrace:\\n%s\\n\", c.Value, c.Stack)\n }\n \n-func (c *CaughtPanic) Unwrap() error {\n+func (c *RecoveredPanic) Unwrap() error {\n \tif err, ok := c.Value.(error); ok {\n \t\treturn err\n \t}\n",
+  "diffTruncated": false,
+  "tree": [
+    "LICENSE",
+    "go.mod",
+    "go.sum",
+    "iter.go",
+    "limiter.go",
+    "panic.go",
+    "pool/context_pool.go",
+    "pool/context_pool_test.go",
+    "pool/error_pool.go",
+    "pool/error_pool_test.go",
+    "pool/iter.go",
+    "pool/iter_test.go",
+    "pool/pool.go",
+    "pool/pool_test.go",
+    "pool/result_context_pool.go",
+    "pool/result_context_pool_test.go",
+    "pool/result_error_pool.go",
+    "pool/result_error_pool_test.go",
+    "pool/result_pool.go",
+    "pool/result_pool_test.go",
+    "stream/stream.go",
+    "stream/stream_test.go",
+    "waitgroup.go",
+    "waitgroup_test.go"
+  ],
+  "explanation": {
+    "what": "panic.go 内で型名 CaughtPanic を RecoveredPanic に一括リネームした。フィールドや振る舞いに変更はなく、構造体・コンストラクタ呼び出し・メソッドレシーバの型名を置き換えるのみ。",
+    "why": "コミットメッセージが示す通り単純なリネーム。「捕まえた」よりも「recover() で回収した」panic であることを名前で明確にする意図とみられる。",
+    "highlights": [],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

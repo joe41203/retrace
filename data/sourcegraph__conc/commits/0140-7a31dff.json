@@ -1,0 +1,88 @@
+{
+  "seq": 140,
+  "sha": "7a31dff5fbd84f1529c53c6f59170d8c31ee0a44",
+  "parents": [
+    "995000de22b50c624ad56b313bbe5ce200fac4f6"
+  ],
+  "author": {
+    "name": "Camden Cheek",
+    "email": "camden@ccheek.com",
+    "date": "2023-06-01T15:56:05-06:00"
+  },
+  "message": "Add note about errors (#116)\n\nClarifies questions in https://github.com/sourcegraph/conc/issues/101",
+  "pr": {
+    "number": 116,
+    "title": "Add note about errors",
+    "body": "Clarifies questions in https://github.com/sourcegraph/conc/issues/101",
+    "url": "https://github.com/sourcegraph/conc/pull/116"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 11,
+    "deletions": 0
+  },
+  "files": [
+    {
+      "path": "README.md",
+      "status": "M",
+      "additions": 11,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/README.md b/README.md\nindex 1c87c3c..c0c3014 100644\n--- a/README.md\n+++ b/README.md\n@@ -455,6 +455,17 @@ func mapStream(\n </tr>\n </table>\n \n+# Errors\n+\n+In general, `conc` handles multiple errors from tasks by joining them into\n+a single \"multierror\". In go 1.19, we use Uber's multierror package, but\n+in version 1.20, go added native support for joining errors so we use that\n+instead. Note that, if you are relying on converting an error back into its\n+component errors, the behavior changes between go 1.19 and go 1.20 and\n+you should use the `Unwrap() []error` method instead of casting the error\n+as a `*multierror.Error`. `errors.As` and `errors.Is` should continue\n+to work as expected.\n+\n # Status\n \n This package is currently pre-1.0. There are likely to be minor breaking\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/go.yml",
+    ".golangci.yml",
+    "LICENSE",
+    "README.md",
+    "go.mod",
+    "go.sum",
+    "internal/multierror/multierror_go119.go",
+    "internal/multierror/multierror_go120.go",
+    "iter/iter.go",
+    "iter/iter_test.go",
+    "iter/map.go",
+    "iter/map_test.go",
+    "panics/panics.go",
+    "panics/panics_test.go",
+    "panics/try.go",
+    "panics/try_test.go",
+    "pool/context_pool.go",
+    "pool/context_pool_test.go",
+    "pool/error_pool.go",
+    "pool/error_pool_test.go",
+    "pool/pool.go",
+    "pool/pool_test.go",
+    "pool/result_context_pool.go",
+    "pool/result_context_pool_test.go",
+    "pool/result_error_pool.go",
+    "pool/result_error_pool_test.go",
+    "pool/result_pool.go",
+    "pool/result_pool_test.go",
+    "stream/stream.go",
+    "stream/stream_test.go",
+    "waitgroup.go",
+    "waitgroup_test.go"
+  ],
+  "explanation": {
+    "what": "README.md に「Errors」節を追加した。conc は複数タスクのエラーを1つの multierror にまとめること、Go 1.19 では Uber の multierror ライブラリを、Go 1.20 以降ではネイティブの errors.Join 相当を使うこと、エラーを個別のエラー群に戻したい場合は `*multierror.Error` へのキャストではなく `Unwrap() []error` メソッドを使うべきこと、`errors.As`/`errors.Is` は従来通り動作することを説明している。",
+    "why": "PR本文によると、issue #101 で寄せられた疑問(Go バージョンによってエラーの扱いが変わることについて)を解消するためのドキュメント追加。",
+    "highlights": [
+      { "file": "README.md", "note": "multierror の Go 1.19/1.20 差異と Unwrap() []error の使い分けの説明" }
+    ],
+    "langNotes": [
+      { "topic": "内部 multierror", "note": "Go 1.20 で標準ライブラリに複数エラーを束ねる errors.Join が入ったため、conc は Go 1.19 では独自/外部の multierror 実装、1.20 以降は標準機能を使うようビルドタグで切り替えている。束ねられたエラーから元のエラー群を取り出すには型アサーションではなく `Unwrap() []error` という Go 1.20 で規定されたインターフェースを呼ぶのが移行後も安定する方法とされる。" }
+    ],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [
+      { "type": "pr", "number": 116, "url": "https://github.com/sourcegraph/conc/pull/116" },
+      { "type": "issue", "number": 101, "url": "https://github.com/sourcegraph/conc/issues/101" }
+    ],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

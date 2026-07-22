@@ -1,0 +1,86 @@
+{
+  "seq": 147,
+  "sha": "4afefce20f9b00e927315b4c3cdc792fb824780c",
+  "parents": [
+    "30a99cd85b339bce498627582d604740385a3ba8"
+  ],
+  "author": {
+    "name": "Camden Cheek",
+    "email": "camden@ccheek.com",
+    "date": "2024-01-08T11:24:09-07:00"
+  },
+  "message": "Multierror: join errors at the end (#132)\n\nThis fixes `MapErr` so that it does not create recursive `joinError`s.\r\nBy repeatedly calling `errors.Join(`, we create a nested set of\r\n`joinError`s rather than a single, flat `joinError`. Then, when\r\n`Error()` is called, it allocates a new string for each nested error\r\nbecause `joinError` calls `Error()` recursively on each of its children.\r\n\r\nInstead, this PR updates `MapErr` to just collect a slice of errors and\r\nreturn the flat joined error.",
+  "pr": {
+    "number": 132,
+    "title": "Multierror: join errors at the end",
+    "body": "This fixes `MapErr` so that it does not create recursive `joinError`s. By repeatedly calling `errors.Join(`, we create a nested set of `joinError`s rather than a single, flat `joinError`. Then, when `Error()` is called, it allocates a new string for each nested error because `joinError` calls `Error()` recursively on each of its children.\r\n\r\nInstead, this PR updates `MapErr` to just collect a slice of errors and return the flat joined error.",
+    "url": "https://github.com/sourcegraph/conc/pull/132"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 3,
+    "deletions": 3
+  },
+  "files": [
+    {
+      "path": "iter/map.go",
+      "status": "M",
+      "additions": 3,
+      "deletions": 3,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/iter/map.go b/iter/map.go\nindex b311287..c5462c0 100644\n--- a/iter/map.go\n+++ b/iter/map.go\n@@ -49,16 +49,16 @@ func (m Mapper[T, R]) MapErr(input []T, f func(*T) (R, error)) ([]R, error) {\n \tvar (\n \t\tres    = make([]R, len(input))\n \t\terrMux sync.Mutex\n-\t\terrs   error\n+\t\terrs   []error\n \t)\n \tIterator[T](m).ForEachIdx(input, func(i int, t *T) {\n \t\tvar err error\n \t\tres[i], err = f(t)\n \t\tif err != nil {\n \t\t\terrMux.Lock()\n-\t\t\terrs = multierror.Join(errs, err)\n+\t\t\terrs = append(errs, err)\n \t\t\terrMux.Unlock()\n \t\t}\n \t})\n-\treturn res, errs\n+\treturn res, multierror.Join(errs...)\n }\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/go.yml",
+    ".golangci.yml",
+    "LICENSE",
+    "README.md",
+    "go.mod",
+    "go.sum",
+    "internal/multierror/multierror_go119.go",
+    "internal/multierror/multierror_go120.go",
+    "iter/export_test.go",
+    "iter/iter.go",
+    "iter/iter_test.go",
+    "iter/map.go",
+    "iter/map_test.go",
+    "panics/panics.go",
+    "panics/panics_test.go",
+    "panics/try.go",
+    "panics/try_test.go",
+    "pool/context_pool.go",
+    "pool/context_pool_test.go",
+    "pool/error_pool.go",
+    "pool/error_pool_test.go",
+    "pool/pool.go",
+    "pool/pool_test.go",
+    "pool/result_context_pool.go",
+    "pool/result_context_pool_test.go",
+    "pool/result_error_pool.go",
+    "pool/result_error_pool_test.go",
+    "pool/result_pool.go",
+    "pool/result_pool_test.go",
+    "stream/stream.go",
+    "stream/stream_test.go",
+    "waitgroup.go",
+    "waitgroup_test.go"
+  ],
+  "explanation": {
+    "what": "iter.MapErr を修正し、ループの都度 multierror.Join(errs, err) を呼んでいたのをやめ、エラーを []error のスライスに集めておいて最後に一度だけ multierror.Join(errs...) を呼ぶように変更した。",
+    "why": "PR本文に理由が明記されている。errors.Join を繰り返し呼ぶと、返り値の joinError がネストした木構造になり、Error() を呼んだときに各ネストで再帰的に子の Error() を呼ぶため文字列アロケーションが余計に発生していた。エラーをスライスに貯めてから一括で Join すればフラットな1段の joinError になり、この無駄がなくなる。",
+    "highlights": [
+      { "file": "iter/map.go", "note": "errs error(単一値の毎回Join)から errs []error(蓄積して最後にJoin)への変更" }
+    ],
+    "langNotes": [
+      { "topic": "errors.Join のネスト", "note": "go 1.20 の errors.Join(a, b) は内部で a と b をまとめた joinError を返す。これを繰り返し Join(Join(a,b), c) のように呼ぶと joinError の中に joinError が入れ子になり、Error() 文字列生成のたびに再帰でコストがかさむ。errs をスライスに集めてから一度だけ Join(errs...) するのがイディオム。" }
+    ],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [{ "type": "pr", "number": 132, "url": "https://github.com/sourcegraph/conc/pull/132" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

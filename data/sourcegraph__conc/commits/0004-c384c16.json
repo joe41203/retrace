@@ -1,0 +1,111 @@
+{
+  "seq": 4,
+  "sha": "c384c1669f79f44e7311c6648e128fc495abb95a",
+  "parents": [
+    "81da4df2ad0d456aac29f27674af82b9b99616cd"
+  ],
+  "author": {
+    "name": "Camden Cheek",
+    "email": "camden@ccheek.com",
+    "date": "2022-12-15T20:29:34-07:00"
+  },
+  "message": "add pools",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 8,
+    "additions": 211,
+    "deletions": 23
+  },
+  "files": [
+    {
+      "path": "conc.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "group/context_group.go",
+      "status": "M",
+      "additions": 3,
+      "deletions": 3,
+      "binary": false
+    },
+    {
+      "path": "group/group.go",
+      "status": "M",
+      "additions": 5,
+      "deletions": 16,
+      "binary": false
+    },
+    {
+      "path": "limiter.go",
+      "status": "A",
+      "additions": 15,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "pool/context_pool.go",
+      "status": "A",
+      "additions": 46,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "pool/error_pool.go",
+      "status": "A",
+      "additions": 59,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "pool/pool.go",
+      "status": "M",
+      "additions": 3,
+      "deletions": 3,
+      "binary": false
+    },
+    {
+      "path": "stream/stream.go",
+      "status": "M",
+      "additions": 79,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/conc.go b/conc.go\nindex adce5fa..db5d1b9 100644\n--- a/conc.go\n+++ b/conc.go\n@@ -10,7 +10,7 @@ type WaitGroup struct {\n \tcaughtPanic atomic.Pointer[any]\n }\n \n-func (h *WaitGroup) Spawn(f func()) {\n+func (h *WaitGroup) Go(f func()) {\n \th.wg.Add(1)\n \tgo func() {\n \t\tdefer h.done()\ndiff --git a/group/context_group.go b/group/context_group.go\nindex 3265f89..a6a0273 100644\n--- a/group/context_group.go\n+++ b/group/context_group.go\n@@ -30,17 +30,17 @@ func (g *ContextGroup) Wait() error {\n \treturn g.errGroup.Wait()\n }\n \n-func (g *ContextGroup) WithCancelOnError() *ContextGroup {\n+func (g ContextGroup) WithCancelOnError() ContextGroup {\n \tg.ctx, g.cancel = context.WithCancel(g.ctx)\n \treturn g\n }\n \n-func (g *ContextGroup) WithMaxConcurrency(limit int) *ContextGroup {\n+func (g ContextGroup) WithMaxConcurrency(limit int) ContextGroup {\n \tg.errGroup = g.errGroup.WithMaxConcurrency(limit)\n \treturn g\n }\n \n-func (g *ContextGroup) WithFirstError() *ContextGroup {\n+func (g ContextGroup) WithFirstError() ContextGroup {\n \tg.errGroup = g.errGroup.WithFirstError()\n \treturn g\n }\ndiff --git a/group/group.go b/group/group.go\nindex 83e25be..8a0d1b5 100644\n--- a/group/group.go\n+++ b/group/group.go\n@@ -11,29 +11,18 @@ func New() Group {\n }\n \n type Group struct {\n-\thandle conc.WaitGroup\n-\n-\t// A nil channel means no limit.\n-\t// A full channel means the limit is exhausted.\n-\tlimiter chan struct{}\n+\thandle  conc.WaitGroup\n+\tlimiter conc.Limiter\n }\n \n func (g *Group) Go(f func()) {\n-\tg.acquire()\n-\tg.handle.Spawn(func() {\n-\t\tdefer g.release()\n+\tg.limiter.Acquire()\n+\tg.handle.Go(func() {\n+\t\tdefer g.limiter.Release()\n \t\tf()\n \t})\n }\n \n-func (g *Group) acquire() {\n-\tg.limiter <- struct{}{}\n-}\n-\n-func (g *Group) release() {\n-\t<-g.limiter\n-}\n-\n func (g *Group) Wait() {\n \tg.handle.Wait()\n }\ndiff --git a/limiter.go b/limiter.go\nnew file mode 100644\nindex 0000000..061ff58\n--- /dev/null\n+++ b/limiter.go\n@@ -0,0 +1,15 @@\n+package conc\n+\n+func NewLimiter(n int) Limiter {\n+\treturn make(Limiter, n)\n+}\n+\n+type Limiter chan struct{}\n+\n+func (l Limiter) Acquire() {\n+\tl <- struct{}{}\n+}\n+\n+func (l Limiter) Release() {\n+\t<-l\n+}\ndiff --git a/pool/context_pool.go b/pool/context_pool.go\nnew file mode 100644\nindex 0000000..91771a3\n--- /dev/null\n+++ b/pool/context_pool.go\n@@ -0,0 +1,46 @@\n+package pool\n+\n+import (\n+\t\"context\"\n+)\n+\n+type ContextPool struct {\n+\terrPool ErrorPool\n+\n+\tctx    context.Context\n+\tcancel context.CancelFunc\n+}\n+\n+func (g *ContextPool) Do(f func(ctx context.Context) error) {\n+\tg.errPool.Do(func() error {\n+\t\terr := f(g.ctx)\n+\t\tif err != nil && g.cancel != nil {\n+\t\t\t// Add the error directly because otherwise, canceling could cause\n+\t\t\t// another goroutine to exit and return an error before this error\n+\t\t\t// was added, which breaks the expectations of WithFirstError().\n+\t\t\tg.errPool.addErr(err)\n+\t\t\tg.cancel()\n+\t\t\treturn nil\n+\t\t}\n+\t\treturn err\n+\t})\n+}\n+\n+func (p ContextPool) Wait() error {\n+\treturn p.errPool.Wait()\n+}\n+\n+func (p ContextPool) WithCancelOnError() ContextPool {\n+\tp.ctx, p.cancel = context.WithCancel(p.ctx)\n+\treturn p\n+}\n+\n+func (p ContextPool) WithMaxGoroutines(limit int) ContextPool {\n+\tp.errPool = p.errPool.WithMaxGoroutines(limit)\n+\treturn p\n+}\n+\n+func (p ContextPool) WithFirstError() ContextPool {\n+\tp.errPool = p.errPool.WithFirstError()\n+\treturn p\n+}\ndiff --git a/pool/error_pool.go b/pool/error_pool.go\nnew file mode 100644\nindex 0000000..83b9687\n--- /dev/null\n+++ b/pool/error_pool.go\n@@ -0,0 +1,59 @@\n+package pool\n+\n+import (\n+\t\"context\"\n+\t\"sync\"\n+\n+\t\"github.com/sourcegraph/sourcegraph/lib/errors\"\n+)\n+\n+type ErrorPool struct {\n+\tpool Pool\n+\n+\tonlyFirst bool\n+\n+\tmu   sync.Mutex\n+\terrs error\n+}\n+\n+func (p *ErrorPool) Do(f func() error) {\n+\tp.pool.Do(func() {\n+\t\tp.addErr(f())\n+\t})\n+}\n+\n+func (p *ErrorPool) Wait() error {\n+\tp.pool.Wait()\n+\treturn p.errs\n+}\n+\n+func (p ErrorPool) WithMaxGoroutines(n int) ErrorPool {\n+\tp.pool = p.pool.WithMaxGoroutines(n)\n+\treturn p\n+}\n+\n+func (p ErrorPool) WithContext(ctx context.Context) ContextPool {\n+\treturn ContextPool{\n+\t\terrPool: p,\n+\t\tctx:     ctx,\n+\t}\n+}\n+\n+func (p ErrorPool) WithFirstError() ErrorPool {\n+\tp.onlyFirst = true\n+\treturn p\n+}\n+\n+func (p *ErrorPool) addErr(err error) {\n+\tif err != nil {\n+\t\tp.mu.Lock()\n+\t\tif p.onlyFirst {\n+\t\t\tif p.errs == nil {\n+\t\t\t\tp.errs = err\n+\t\t\t}\n+\t\t} else {\n+\t\t\tp.errs = errors.Append(p.errs, err)\n+\t\t}\n+\t\tp.mu.Unlock()\n+\t}\n+}\ndiff --git a/pool/pool.go b/pool/pool.go\nindex f832520..1bf8bce 100644\n--- a/pool/pool.go\n+++ b/pool/pool.go\n@@ -12,14 +12,14 @@ import (\n \n func New() Pool {\n \treturn Pool{\n-\t\tlimiter: make(chan struct{}, runtime.GOMAXPROCS(0)),\n+\t\tlimiter: make(conc.Limiter, runtime.GOMAXPROCS(0)),\n \t\ttasks:   make(chan func()),\n \t}\n }\n \n type Pool struct {\n \thandle  conc.WaitGroup\n-\tlimiter chan struct{}\n+\tlimiter conc.Limiter\n \ttasks   chan func()\n }\n \n@@ -27,7 +27,7 @@ func (p *Pool) Do(f func()) {\n \tfor {\n \t\tselect {\n \t\tcase p.limiter <- struct{}{}:\n-\t\t\tp.handle.Spawn(p.worker)\n+\t\t\tp.handle.Go(p.worker)\n \t\tcase p.tasks <- f:\n \t\t\treturn\n \t\t}\ndiff --git a/stream/stream.go b/stream/stream.go\nindex 11541cc..07afd97 100644\n--- a/stream/stream.go\n+++ b/stream/stream.go\n@@ -1 +1,80 @@\n package stream\n+\n+import (\n+\t\"github.com/camdencheek/conc\"\n+\t\"github.com/camdencheek/conc/pool\"\n+)\n+\n+func New(maxGoroutines int) Stream {\n+\ts := Stream{\n+\t\tpool:  pool.New().WithMaxGoroutines(maxGoroutines),\n+\t\tfree:  make(chan callbackCh, maxGoroutines+1),\n+\t\tqueue: make(chan callbackCh, maxGoroutines+1),\n+\t}\n+\t// Pre-populate the free list with channels\n+\tfor i := 0; i < cap(s.free); i++ {\n+\t\ts.free <- make(callbackCh, 1)\n+\t}\n+\n+\t// Start the callbacker\n+\ts.callbackerHandle.Go(s.callbacker)\n+\n+\treturn s\n+}\n+\n+type Stream struct {\n+\tpool             pool.Pool\n+\tcallbackerHandle conc.WaitGroup\n+\tfree             chan callbackCh\n+\tqueue            chan callbackCh\n+}\n+\n+func (s *Stream) Do(f func(), callback func()) {\n+\tch := <-s.free\n+\ts.queue <- ch\n+\ts.pool.Do(func() {\n+\t\tdefer func() { ch <- callback }()\n+\t\tf()\n+\t})\n+}\n+\n+func (s *Stream) Wait() {\n+\ts.pool.Wait()\n+\tclose(s.queue)\n+\ts.callbackerHandle.Wait()\n+}\n+\n+func (s *Stream) callbacker() {\n+\tfor callbackCh := range s.queue {\n+\t\tcallback := <-callbackCh\n+\t\tcallback()\n+\t\ts.free <- callbackCh\n+\t}\n+}\n+\n+type callbackCh chan func()\n+\n+func Submit[T, R any](s *Stream, f func() T, callback func(T)) {\n+\tvar res T\n+\tnewF := func() {\n+\t\tres = f()\n+\t}\n+\tnewCallback := func() {\n+\t\tcallback(res)\n+\t}\n+\ts.Do(newF, newCallback)\n+}\n+\n+func SubmitErr[T, R any](s *Stream, f func() (T, error), callback func(T, error)) {\n+\tvar (\n+\t\tres T\n+\t\terr error\n+\t)\n+\tnewF := func() {\n+\t\tres, err = f()\n+\t}\n+\tnewCallback := func() {\n+\t\tcallback(res, err)\n+\t}\n+\ts.Do(newF, newCallback)\n+}\n",
+  "diffTruncated": false,
+  "tree": [
+    "LICENSE",
+    "conc.go",
+    "go.mod",
+    "go.sum",
+    "group/context_group.go",
+    "group/error_group.go",
+    "group/group.go",
+    "limiter.go",
+    "pool/context_pool.go",
+    "pool/error_pool.go",
+    "pool/pool.go",
+    "stream/stream.go"
+  ],
+  "explanation": {
+    "what": "pool パッケージに ErrorPool と ContextPool を追加し、limiter の実装を chan struct{} の生ロジックから conc.Limiter という専用型(limiter.go)に切り出した。WaitGroup.Spawn は Go に改名され、group.Group も自前の acquire/release ではなく conc.Limiter を使うように変更された。stream パッケージには Stream 型・Submit/SubmitErr が新規実装された。",
+    "why": "group パッケージで作った ErrorGroup/ContextGroup と同等の機能(エラー集約、context によるキャンセル)を pool 側にも持たせるための拡張。同時に、Group と Pool の両方で重複していた「チャネルでの同時実行数制御」のロジックを Limiter という一つの型にまとめ、コードの重複を減らしている。stream.Stream は各タスクの完了順ではなく投入順にコールバックを呼ぶための、free/queue 2つのチャネルを使う仕組みとして導入された。",
+    "highlights": [
+      { "file": "limiter.go", "note": "Acquire/Release を持つ chan struct{} ベースの Limiter 型。Group と Pool の両方で共通利用される。" },
+      { "file": "pool/error_pool.go", "note": "ErrorPool.Do は内部の Pool にタスクを積みつつ、返り値の error を mutex 付きで集約する。" },
+      { "file": "stream/stream.go", "note": "Stream.Do は free チャネルから空きコールバックチャネルを取り出し、実行結果を queue 経由で順序を保ったままコールバックする。" }
+    ],
+    "langNotes": [
+      { "topic": "chan struct{} によるセマフォの型抽出", "note": "struct{} は0バイトのゼロ値型で、値そのものではなく送受信の可否だけを使う Go の慣用パターン。ここでは chan struct{} を Limiter という named type にして Acquire/Release メソッドを生やし、再利用可能な部品にしている。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

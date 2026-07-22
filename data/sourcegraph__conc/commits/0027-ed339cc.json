@@ -1,0 +1,86 @@
+{
+  "seq": 27,
+  "sha": "ed339cc27f5def87a8ddc909b9dc19edccbb7867",
+  "parents": [
+    "825d77a427dd86781f2ad2016148c3821eb97286"
+  ],
+  "author": {
+    "name": "Camden Cheek",
+    "email": "camden@ccheek.com",
+    "date": "2022-12-24T19:42:11-07:00"
+  },
+  "message": "guarantee at most one goroutine is spawned per task",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 13,
+    "deletions": 7
+  },
+  "files": [
+    {
+      "path": "pool/pool.go",
+      "status": "M",
+      "additions": 13,
+      "deletions": 7,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/pool/pool.go b/pool/pool.go\nindex cdf7db4..7bf36a0 100644\n--- a/pool/pool.go\n+++ b/pool/pool.go\n@@ -25,13 +25,19 @@ type Pool struct {\n }\n \n func (p *Pool) Go(f func()) {\n-\tfor {\n-\t\tselect {\n-\t\tcase p.limiter <- struct{}{}:\n-\t\t\tp.handle.Go(p.worker)\n-\t\tcase p.tasks <- f:\n-\t\t\treturn\n-\t\t}\n+\tselect {\n+\tcase p.limiter <- struct{}{}:\n+\t\t// If we are below our limit, spawn a new worker rather\n+\t\t// than waiting for one to become available.\n+\t\tp.handle.Go(p.worker)\n+\n+\t\t// We know there is a least one worker running, so wait\n+\t\t// for it to become available. This ensures we never spawn\n+\t\t// more workers than the number of tasks.\n+\t\tp.tasks <- f\n+\tcase p.tasks <- f:\n+\t\t// A worker is available and has accepted the task\n+\t\treturn\n \t}\n }\n \n",
+  "diffTruncated": false,
+  "tree": [
+    "LICENSE",
+    "go.mod",
+    "go.sum",
+    "group/context_group.go",
+    "group/context_group_test.go",
+    "group/error_group.go",
+    "group/error_group_test.go",
+    "group/group.go",
+    "group/group_test.go",
+    "group/iter.go",
+    "group/iter_test.go",
+    "group/result_context_group.go",
+    "group/result_context_group_test.go",
+    "group/result_error_group.go",
+    "group/result_error_group_test.go",
+    "group/result_group.go",
+    "group/result_group_test.go",
+    "iter.go",
+    "limiter.go",
+    "panic.go",
+    "pool/context_pool.go",
+    "pool/context_pool_test.go",
+    "pool/error_pool.go",
+    "pool/error_pool_test.go",
+    "pool/iter.go",
+    "pool/iter_test.go",
+    "pool/pool.go",
+    "pool/pool_test.go",
+    "pool/result_context_pool.go",
+    "pool/result_context_pool_test.go",
+    "pool/result_error_pool.go",
+    "pool/result_error_pool_test.go",
+    "pool/result_pool.go",
+    "pool/result_pool_test.go",
+    "stream/stream.go",
+    "stream/stream_test.go",
+    "waitgroup.go",
+    "waitgroup_test.go"
+  ],
+  "explanation": {
+    "what": "Pool.Go(f) の実装を、無限for文中で `select { limiter <- : spawn worker; case tasks <- f: return }` を繰り返す形から、select を1回だけ実行する形に変更した。limiter への送信が成功した場合は新しいworkerをspawnした後、そのまま tasks <- f を(select ではなく)直接ブロッキング送信するようにしている。",
+    "why": "変更前の実装はfor文でselectを繰り返すため、limiterへの送信が成功してworkerをspawnした後も再度ループしてselectを評価し直しており、タイミング次第では同じタスクに対して複数回workerがspawnされる余地があった(コミット件名の「guarantee at most one goroutine is spawned per task」が示す通り)。1回のselect後は明示的にtasksへブロッキング送信することで、1タスクにつき最大1つのworker起動であることを保証している。",
+    "highlights": [
+      { "file": "pool/pool.go", "note": "forループを外しselectを1回きりの分岐にした差分。limiter送信成功後はtasks<-fを直接ブロッキングで実行" }
+    ],
+    "langNotes": [
+      { "topic": "select と channel送受信", "note": "Go の select 文は複数のchannel操作のうち準備ができたものを1つ選んで実行する。for文で囲むと条件が揃うまで何度も候補を評価し直すため、意図せず同じ処理(ここではworkerのspawn)が繰り返し実行される場合がある。ここでは1回のselect実行後は通常のブロッキング送信に切り替えることで、選択のやり直しを防いでいる。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

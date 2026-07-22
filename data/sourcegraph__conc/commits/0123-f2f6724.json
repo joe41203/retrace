@@ -1,0 +1,89 @@
+{
+  "seq": 123,
+  "sha": "f2f672440410ae20762f793e89674cc98b1b67e5",
+  "parents": [
+    "e5ed75f142be18355735a74856f80b0f79f412da",
+    "429a94b4d81834bf28209c06e9a71703d3bc2661"
+  ],
+  "author": {
+    "name": "Robert Lin",
+    "email": "robertlin1@gmail.com",
+    "date": "2023-01-23T09:50:06-08:00"
+  },
+  "message": "Merge pull request #75 from sourcegraph/panics-error\n\npanics: allow usage of RecoveredPanic as a normal error",
+  "pr": {
+    "number": 75,
+    "title": "panics: allow usage of RecoveredPanic as a normal error",
+    "body": "Returning a concrete type `*RecoveredPanic` that implements `error` introduces an interesting gotcha - it looks like an `error` and behaves like an `error`, but cannot really be used as an error, because if returned as an error even if nil it's a typed error or something and shows up as _not nil_.\r\n\r\nExample using the existing implementation:\r\n\r\n```go\r\nfunc TestCatcherRecovered(t *testing.T) {\r\n\tvar fn = func() error {\r\n\t\tvar c Catcher\r\n\t\tc.Try(func() {})\r\n\t\treturn c.Recovered() // ok, looks like an error\r\n\t}\r\n\terr := fn()\r\n\tassert.Nil(t, err)     // ok, surely no error\r\n\tassert.NoError(t, err) // fails!! err is nil but is not a nil error\r\n\t// Error: Received unexpected error:\r\n\t//   \t  <nil>\r\n}\r\n```\r\n\r\nPlayground example: https://go.dev/play/p/C1DAdBWY9EZ , example in practice: https://github.com/sourcegraph/controller/actions/runs/3972347286/jobs/6810164688#step:7:141\r\n\r\nTo remedy this, we can either:\r\n\r\n- change `(*Catcher).Recovered() *RecoveredPanic` to `(*Catcher).Recovered() error` and ask that callers cast it into `*RecoveredPanic` for details a la `os.ExitError`\r\n- remove the `error` implementation and move it to another type that can be retrieved with `(*RecoveredPanic).AsError()`\r\n\r\nThis PR currently implements the latter - I might prefer the former, but it's a bigger change, and the distinction between a panic and an error returned is nice.",
+    "url": "https://github.com/sourcegraph/conc/pull/75"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 73,
+    "deletions": 10
+  },
+  "files": [
+    {
+      "path": "panics/panics.go",
+      "status": "M",
+      "additions": 21,
+      "deletions": 4,
+      "binary": false
+    },
+    {
+      "path": "panics/panics_test.go",
+      "status": "M",
+      "additions": 52,
+      "deletions": 6,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/panics/panics.go b/panics/panics.go\nindex 1486815..5d4f12d 100644\n--- a/panics/panics.go\n+++ b/panics/panics.go\n@@ -73,12 +73,29 @@ type RecoveredPanic struct {\n \tStack []byte\n }\n \n-func (c *RecoveredPanic) Error() string {\n-\treturn fmt.Sprintf(\"panic: %v\\nstacktrace:\\n%s\\n\", c.Value, c.Stack)\n+// String renders a human-readable formatting of the panic.\n+func (p *RecoveredPanic) String() string {\n+\treturn fmt.Sprintf(\"panic: %v\\nstacktrace:\\n%s\\n\", p.Value, p.Stack)\n }\n \n-func (c *RecoveredPanic) Unwrap() error {\n-\tif err, ok := c.Value.(error); ok {\n+// AsError casts the panic into an error implementation. The implementation\n+// is unwrappable with the cause of the panic, if the panic was provided one.\n+func (p *RecoveredPanic) AsError() error {\n+\tif p == nil {\n+\t\treturn nil\n+\t}\n+\treturn &ErrRecoveredPanic{*p}\n+}\n+\n+// ErrRecoveredPanic wraps a RecoveredPanic in an error implementation.\n+type ErrRecoveredPanic struct{ RecoveredPanic }\n+\n+var _ error = (*ErrRecoveredPanic)(nil)\n+\n+func (p *ErrRecoveredPanic) Error() string { return p.String() }\n+\n+func (p *ErrRecoveredPanic) Unwrap() error {\n+\tif err, ok := p.Value.(error); ok {\n \t\treturn err\n \t}\n \treturn nil\ndiff --git a/panics/panics_test.go b/panics/panics_test.go\nindex a6a1eba..f75d444 100644\n--- a/panics/panics_test.go\n+++ b/panics/panics_test.go\n@@ -7,6 +7,7 @@ import (\n \t\"sync\"\n \t\"testing\"\n \n+\t\"github.com/stretchr/testify/assert\"\n \t\"github.com/stretchr/testify/require\"\n )\n \n@@ -60,6 +61,26 @@ func ExampleCatcher_callers() {\n \t// runtime.goexit\n }\n \n+func ExampleCatcher_error() {\n+\thelper := func() error {\n+\t\tvar pc Catcher\n+\t\tpc.Try(func() { panic(errors.New(\"error\")) })\n+\t\treturn pc.Recovered().AsError()\n+\t}\n+\n+\tif err := helper(); err != nil {\n+\t\t// In normal use cases, you can use err.Error() output directly to\n+\t\t// dump the panic's stack. This is not used in the example because\n+\t\t// its output is machine-specific - instead, we demonstrate getting\n+\t\t// the underlying error that was used for the panic.\n+\t\tif cause := errors.Unwrap(err); cause != nil {\n+\t\t\tfmt.Printf(\"helper panicked with an error: %s\", cause)\n+\t\t}\n+\t}\n+\t// Output:\n+\t// helper panicked with an error: error\n+}\n+\n func TestCatcher(t *testing.T) {\n \tt.Parallel()\n \n@@ -70,21 +91,21 @@ func TestCatcher(t *testing.T) {\n \t\tvar pc Catcher\n \t\tpc.Try(func() { panic(err1) })\n \t\trecovered := pc.Recovered()\n-\t\trequire.ErrorIs(t, recovered, err1)\n-\t\trequire.ErrorAs(t, recovered, &err1)\n+\t\trequire.ErrorIs(t, recovered.AsError(), err1)\n+\t\trequire.ErrorAs(t, recovered.AsError(), &err1)\n \t\t// The exact contents aren't tested because the stacktrace contains local file paths\n \t\t// and even the structure of the stacktrace is bound to be unstable over time. Just\n \t\t// test a couple of basics.\n-\t\trequire.Contains(t, recovered.Error(), \"SOS\", \"error should contain the panic message\")\n-\t\trequire.Contains(t, recovered.Error(), \"panics.(*Catcher).Try\", recovered.Error(), \"error should contain the stack trace\")\n+\t\trequire.Contains(t, recovered.String(), \"SOS\", \"formatted panic should contain the panic message\")\n+\t\trequire.Contains(t, recovered.String(), \"panics.(*Catcher).Try\", recovered.String(), \"formatted panic should contain the stack trace\")\n \t})\n \n \tt.Run(\"not error\", func(t *testing.T) {\n \t\tvar pc Catcher\n \t\tpc.Try(func() { panic(\"definitely not an error\") })\n \t\trecovered := pc.Recovered()\n-\t\trequire.NotErrorIs(t, recovered, err1)\n-\t\trequire.Nil(t, recovered.Unwrap())\n+\t\trequire.NotErrorIs(t, recovered.AsError(), err1)\n+\t\trequire.Nil(t, errors.Unwrap(recovered.AsError()))\n \t})\n \n \tt.Run(\"repanic panics\", func(t *testing.T) {\n@@ -121,3 +142,28 @@ func TestCatcher(t *testing.T) {\n \t\trequire.Equal(t, \"50\", pc.Recovered().Value)\n \t})\n }\n+\n+func TestRecoveredPanicAsError(t *testing.T) {\n+\tt.Parallel()\n+\tt.Run(\"as error is nil\", func(t *testing.T) {\n+\t\tt.Parallel()\n+\t\tfn := func() error {\n+\t\t\tvar c Catcher\n+\t\t\tc.Try(func() {})\n+\t\t\treturn c.Recovered().AsError()\n+\t\t}\n+\t\terr := fn()\n+\t\tassert.Nil(t, err)\n+\t})\n+\n+\tt.Run(\"as error is not nil nil\", func(t *testing.T) {\n+\t\tt.Parallel()\n+\t\tfn := func() error {\n+\t\t\tvar c Catcher\n+\t\t\tc.Try(func() { panic(\"oh dear!\") })\n+\t\t\treturn c.Recovered().AsError()\n+\t\t}\n+\t\terr := fn()\n+\t\tassert.NotNil(t, err)\n+\t})\n+}\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/go.yml",
+    ".golangci.yml",
+    "LICENSE",
+    "README.md",
+    "go.mod",
+    "go.sum",
+    "iter/iter.go",
+    "iter/iter_test.go",
+    "iter/map.go",
+    "iter/map_test.go",
+    "panics/panics.go",
+    "panics/panics_test.go",
+    "pool/context_pool.go",
+    "pool/context_pool_test.go",
+    "pool/error_pool.go",
+    "pool/error_pool_test.go",
+    "pool/pool.go",
+    "pool/pool_test.go",
+    "pool/result_context_pool.go",
+    "pool/result_context_pool_test.go",
+    "pool/result_error_pool.go",
+    "pool/result_error_pool_test.go",
+    "pool/result_pool.go",
+    "pool/result_pool_test.go",
+    "stream/stream.go",
+    "stream/stream_test.go",
+    "waitgroup.go",
+    "waitgroup_test.go"
+  ],
+  "explanation": {
+    "what": "panics.RecoveredPanic から error インタフェースの実装(Error/Unwrap)を取り除き、代わりに String() メソッドで人間可読な文字列を返すようにした。error として使いたい場合は新設の AsError() を呼んで別型 ErrRecoveredPanic でラップする形に変更し、既存のテストと panics/try.go 呼び出し側もこの API に追従させた。",
+    "why": "PR本文にある通り、*RecoveredPanic に error を実装させると典型的な Go の『non-nil interface containing nil pointer』の罠にはまる。nil の *RecoveredPanic を error 型の戻り値としてそのまま返すと、errors.Is(err, nil) 相当の比較では偽になるのに err != nil は真になってしまい、呼び出し側が誤って「エラーがある」と判定してしまう。この事故を構造的に防ぐため、error 実装を別の具象型 ErrRecoveredPanic に切り出し、AsError() が nil チェックをしたうえで意図的に変換するようにした。",
+    "highlights": [
+      { "file": "panics/panics.go", "note": "RecoveredPanic.Error()/Unwrap() を削除し、String() と AsError()/ErrRecoveredPanic に置き換えた核心部分" }
+    ],
+    "langNotes": [
+      { "topic": "typed nil と error インタフェース", "note": "Go では具象型のポインタ(*T)がnilでも、それをerrorインタフェース型の変数に代入すると型情報が乗るため err != nil が真になる。このコミットはRecoveredPanicに直接errorを実装させず、AsError()でnilチェックしてから変換することでこの罠を回避している。" }
+    ],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [{ "type": "pr", "number": 75, "url": "https://github.com/sourcegraph/conc/pull/75" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

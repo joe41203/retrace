@@ -1,0 +1,80 @@
+{
+  "seq": 104,
+  "sha": "7e601ce6403bf4383ffc9add44b365e434550d4e",
+  "parents": [
+    "10ecce883a7332a2dfab2125881d6e7769ca5b3b",
+    "0f2ebb6298dcb915ce15fdf2026ba8e5f7428e84"
+  ],
+  "author": {
+    "name": "Camden Cheek",
+    "email": "camden@ccheek.com",
+    "date": "2023-01-09T09:49:17-07:00"
+  },
+  "message": "Merge pull request #41 from sashamelentyev/streamtask\n\nRename StreamTask",
+  "pr": {
+    "number": 41,
+    "title": "Rename StreamTask",
+    "body": "Rename `stream.StreamTask` to `stream.Task`",
+    "url": "https://github.com/sourcegraph/conc/pull/41"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 3,
+    "deletions": 3
+  },
+  "files": [
+    {
+      "path": "stream/stream.go",
+      "status": "M",
+      "additions": 3,
+      "deletions": 3,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/stream/stream.go b/stream/stream.go\nindex f1b2c8c..1af04c8 100644\n--- a/stream/stream.go\n+++ b/stream/stream.go\n@@ -43,10 +43,10 @@ type Stream struct {\n \tinitOnce sync.Once\n }\n \n-// Stream task is a task that is submitted to the stream. Submitted tasks will\n+// Task is a task that is submitted to the stream. Submitted tasks will\n // be executed concurrently. It returns a callback that will be called after\n // the task has completed.\n-type StreamTask func() Callback\n+type Task func() Callback\n \n // Callback is a function that is returned by a StreamTask. Callbacks are\n // called in the same order that tasks are submitted.\n@@ -57,7 +57,7 @@ type Callback func()\n // returned by the tasks will be executed in the order that the tasks were\n // submitted. All callbacks will be executed by the same goroutine, so no\n // synchronization is necessary between callbacks.\n-func (s *Stream) Go(f StreamTask) {\n+func (s *Stream) Go(f Task) {\n \ts.init()\n \n \t// Get a channel from the cache.\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/go.yml",
+    ".golangci.yml",
+    "LICENSE",
+    "README.md",
+    "go.mod",
+    "go.sum",
+    "iter/iter.go",
+    "iter/iter_test.go",
+    "panics/panics.go",
+    "panics/panics_test.go",
+    "pool/context_pool.go",
+    "pool/context_pool_test.go",
+    "pool/error_pool.go",
+    "pool/error_pool_test.go",
+    "pool/pool.go",
+    "pool/pool_test.go",
+    "pool/result_context_pool.go",
+    "pool/result_context_pool_test.go",
+    "pool/result_error_pool.go",
+    "pool/result_error_pool_test.go",
+    "pool/result_pool.go",
+    "pool/result_pool_test.go",
+    "stream/stream.go",
+    "stream/stream_test.go",
+    "waitgroup.go",
+    "waitgroup_test.go"
+  ],
+  "explanation": {
+    "what": "stream パッケージの型 StreamTask を Task にリネームした。stream.Stream.Go メソッドの引数型もそれに追従して更新されている。",
+    "why": "PR本文にある通り、パッケージ名がすでに stream であるため、その中の型名にも Stream を重ねて StreamTask とするのは冗長という判断でリネームされた。",
+    "highlights": [
+      { "file": "stream/stream.go", "note": "型宣言 `type StreamTask func() Callback` が `type Task func() Callback` になり、Go メソッドのシグネチャも追従" }
+    ],
+    "langNotes": [
+      { "topic": "パッケージ名との重複を避ける命名規約", "note": "Go の命名規約(Effective Go)では、呼び出し側は `stream.Task` のようにパッケージ名で修飾されるため、型名にパッケージ名を重ねる(`stream.StreamTask`)のは冗長とされ避けられる。" }
+    ],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [{ "type": "pr", "number": 41, "url": "https://github.com/sourcegraph/conc/pull/41" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

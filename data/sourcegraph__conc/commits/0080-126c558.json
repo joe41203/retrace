@@ -1,0 +1,71 @@
+{
+  "seq": 80,
+  "sha": "126c558a86122b682a6606102dc472c54b23e93a",
+  "parents": [
+    "e9bd55ead1e27986dd2688d6cf4320e3de303291"
+  ],
+  "author": {
+    "name": "Camden Cheek",
+    "email": "camden@ccheek.com",
+    "date": "2023-01-04T10:32:36-07:00"
+  },
+  "message": "add test that error pool propagates panics",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 14,
+    "deletions": 0
+  },
+  "files": [
+    {
+      "path": "pool/error_pool_test.go",
+      "status": "M",
+      "additions": 14,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/pool/error_pool_test.go b/pool/error_pool_test.go\nindex 9723c55..825c00f 100644\n--- a/pool/error_pool_test.go\n+++ b/pool/error_pool_test.go\n@@ -57,6 +57,20 @@ func TestErrorPool(t *testing.T) {\n \t\trequire.ErrorIs(t, err, err2)\n \t})\n \n+\tt.Run(\"propagates panics\", func(t *testing.T) {\n+\t\tg := New().WithErrors()\n+\t\tfor i := 0; i < 10; i++ {\n+\t\t\ti := i\n+\t\t\tg.Go(func() error {\n+\t\t\t\tif i == 5 {\n+\t\t\t\t\tpanic(\"fatal\")\n+\t\t\t\t}\n+\t\t\t\treturn nil\n+\t\t\t})\n+\t\t}\n+\t\trequire.Panics(t, func() { g.Wait() })\n+\t})\n+\n \tt.Run(\"limit\", func(t *testing.T) {\n \t\tt.Parallel()\n \t\tfor _, maxGoroutines := range []int{1, 10, 100} {\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/go.yml",
+    "LICENSE",
+    "README.md",
+    "go.mod",
+    "go.sum",
+    "iter/iter.go",
+    "iter/iter_test.go",
+    "panic.go",
+    "panic_test.go",
+    "pool/context_pool.go",
+    "pool/context_pool_test.go",
+    "pool/error_pool.go",
+    "pool/error_pool_test.go",
+    "pool/pool.go",
+    "pool/pool_test.go",
+    "pool/result_context_pool.go",
+    "pool/result_context_pool_test.go",
+    "pool/result_error_pool.go",
+    "pool/result_error_pool_test.go",
+    "pool/result_pool.go",
+    "pool/result_pool_test.go",
+    "stream/stream.go",
+    "stream/stream_test.go",
+    "waitgroup.go",
+    "waitgroup_test.go"
+  ],
+  "explanation": {
+    "what": "ErrorPool のテストに「propagates panics」ケースを追加した。10個のタスクを投入し、そのうち1つ(i==5)が panic を起こした場合に `Wait()` 呼び出し側で panic が再送出されることを `require.Panics` で検証している。",
+    "why": "コミットメッセージ「add test that error pool propagates panics」の通り、ErrorPool がタスク内の panic を握りつぶさずに Wait() 側へ伝播させるという既存の panic 保護の挙動に対して、回帰を防ぐためのテストカバレッジを追加したもの。",
+    "highlights": [
+      { "file": "pool/error_pool_test.go", "note": "panic を起こすタスクを混ぜて Wait() で再送出されることを検証" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

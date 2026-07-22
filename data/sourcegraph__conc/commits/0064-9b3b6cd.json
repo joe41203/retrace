@@ -1,0 +1,74 @@
+{
+  "seq": 64,
+  "sha": "9b3b6cdb40d185073c16701646d278f470820ec7",
+  "parents": [
+    "673edc0788acea5e92c95d9258e3caafe321e2b6"
+  ],
+  "author": {
+    "name": "Camden Cheek",
+    "email": "camden@ccheek.com",
+    "date": "2023-01-02T17:19:45-07:00"
+  },
+  "message": "add WaitGroup example",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 17,
+    "deletions": 0
+  },
+  "files": [
+    {
+      "path": "waitgroup_test.go",
+      "status": "M",
+      "additions": 17,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/waitgroup_test.go b/waitgroup_test.go\nindex 0165070..aa56933 100644\n--- a/waitgroup_test.go\n+++ b/waitgroup_test.go\n@@ -1,12 +1,29 @@\n package conc\n \n import (\n+\t\"fmt\"\n \t\"sync/atomic\"\n \t\"testing\"\n \n \t\"github.com/stretchr/testify/require\"\n )\n \n+func ExampleWaitGroup() {\n+\tvar count atomic.Int64\n+\n+\tvar wg WaitGroup\n+\tfor i := 0; i < 10; i++ {\n+\t\twg.Go(func() {\n+\t\t\tcount.Add(1)\n+\t\t})\n+\t}\n+\twg.Wait()\n+\n+\tfmt.Println(count.Load())\n+\t// Output:\n+\t// 10\n+}\n+\n func TestWaitGroup(t *testing.T) {\n \tt.Parallel()\n \n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/go.yml",
+    "LICENSE",
+    "README.md",
+    "go.mod",
+    "go.sum",
+    "iter/iter.go",
+    "iter/iter_test.go",
+    "panic.go",
+    "panic_test.go",
+    "pool/context_pool.go",
+    "pool/context_pool_test.go",
+    "pool/error_pool.go",
+    "pool/error_pool_test.go",
+    "pool/pool.go",
+    "pool/pool_test.go",
+    "pool/result_context_pool.go",
+    "pool/result_context_pool_test.go",
+    "pool/result_error_pool.go",
+    "pool/result_error_pool_test.go",
+    "pool/result_pool.go",
+    "pool/result_pool_test.go",
+    "stream/stream.go",
+    "stream/stream_test.go",
+    "waitgroup.go",
+    "waitgroup_test.go"
+  ],
+  "explanation": {
+    "what": "waitgroup_test.go に ExampleWaitGroup 関数を追加した。10個の goroutine を conc.WaitGroup 経由で起動し atomic.Int64 をインクリメントした後、Wait して結果 10 を Println で出力し、`// Output:` コメントで期待出力を宣言している。",
+    "why": "コミットメッセージの通り、WaitGroup の使い方を示すサンプルを追加する目的。Go の Example 関数は pkg.go.dev のドキュメントに埋め込まれ実行可能なコードとして表示されるため、README のコードブロックとは別に、テストとして動作保証された公式サンプルを用意したと考えられる。",
+    "highlights": [
+      { "file": "waitgroup_test.go", "note": "ExampleWaitGroup: `// Output:` コメントで期待標準出力を宣言するGoのExampleテスト" }
+    ],
+    "langNotes": [
+      { "topic": "Example関数(go test)", "note": "`Example` で始まる関数はGoのテストフレームワークが特別扱いする。末尾の `// Output:` コメントに書かれた文字列と実行時の標準出力を比較し、一致しなければテスト失敗になる。`go doc`やpkg.go.devにも実行可能なドキュメントとして表示される。" },
+      { "topic": "sync/atomic (atomic.Int64)", "note": "複数goroutineから同時にインクリメントされる可能性があるカウンタは、mutexを使わずatomic.Int64のAdd/Loadで安全に読み書きできる。Go 1.19で導入された型付きatomic型で、int64を直接埋め込むより誤用しにくい。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

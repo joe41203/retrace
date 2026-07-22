@@ -1,0 +1,90 @@
+{
+  "seq": 18,
+  "sha": "87d4babe8444a6edffc0bef0d1911a59f2646680",
+  "parents": [
+    "fd0ba95fcc6fd8abae7a26edfef57230876ac70e"
+  ],
+  "author": {
+    "name": "Camden Cheek",
+    "email": "camden@ccheek.com",
+    "date": "2022-12-16T14:37:31-07:00"
+  },
+  "message": "add MapErr tests",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 89,
+    "deletions": 1
+  },
+  "files": [
+    {
+      "path": "group/iter.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "group/iter_test.go",
+      "status": "M",
+      "additions": 88,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/group/iter.go b/group/iter.go\nindex 141f0b3..aaa0408 100644\n--- a/group/iter.go\n+++ b/group/iter.go\n@@ -31,5 +31,5 @@ func MapErr[T any, R any](input []T, f func(*T) (R, error)) ([]R, error) {\n \tg := New()\n \tdefer g.Wait()\n \n-\treturn conc.MapErrIn(New(), input, f)\n+\treturn conc.MapErrIn(g, input, f)\n }\ndiff --git a/group/iter_test.go b/group/iter_test.go\nindex 9081133..4c9a89d 100644\n--- a/group/iter_test.go\n+++ b/group/iter_test.go\n@@ -4,6 +4,7 @@ import (\n \t\"strconv\"\n \t\"testing\"\n \n+\t\"github.com/sourcegraph/sourcegraph/lib/errors\"\n \t\"github.com/stretchr/testify/require\"\n \n \t\"github.com/camdencheek/conc\"\n@@ -151,6 +152,93 @@ func TestMap(t *testing.T) {\n \t})\n }\n \n+func TestMapErr(t *testing.T) {\n+\tt.Parallel()\n+\n+\tt.Run(\"empty\", func(t *testing.T) {\n+\t\tf := func() {\n+\t\t\tints := []int{}\n+\t\t\tMapErr(ints, func(val *int) (int, error) {\n+\t\t\t\tpanic(\"this should never be called\")\n+\t\t\t})\n+\t\t}\n+\t\trequire.NotPanics(t, f)\n+\t})\n+\n+\tt.Run(\"panic is propagated\", func(t *testing.T) {\n+\t\tf := func() {\n+\t\t\tints := []int{1}\n+\t\t\tMapErr(ints, func(val *int) (int, error) {\n+\t\t\t\tpanic(\"super bad thing happened\")\n+\t\t\t})\n+\t\t}\n+\t\trequire.Panics(t, f)\n+\t})\n+\n+\tt.Run(\"mutating inputs is fine, though not recommended\", func(t *testing.T) {\n+\t\tints := []int{1, 2, 3, 4, 5}\n+\t\tMapErr(ints, func(val *int) (int, error) {\n+\t\t\t*val += 1\n+\t\t\treturn 0, nil\n+\t\t})\n+\t\trequire.Equal(t, []int{2, 3, 4, 5, 6}, ints)\n+\t})\n+\n+\tt.Run(\"basic increment\", func(t *testing.T) {\n+\t\tints := []int{1, 2, 3, 4, 5}\n+\t\tres, err := MapErr(ints, func(val *int) (int, error) {\n+\t\t\treturn *val + 1, nil\n+\t\t})\n+\t\trequire.NoError(t, err)\n+\t\trequire.Equal(t, []int{2, 3, 4, 5, 6}, res)\n+\t\trequire.Equal(t, []int{1, 2, 3, 4, 5}, ints)\n+\t})\n+\n+\terr1 := errors.New(\"error1\")\n+\terr2 := errors.New(\"error1\")\n+\n+\tt.Run(\"error is propagated\", func(t *testing.T) {\n+\t\tints := []int{1, 2, 3, 4, 5}\n+\t\tres, err := MapErr(ints, func(val *int) (int, error) {\n+\t\t\tif *val == 3 {\n+\t\t\t\treturn 0, err1\n+\t\t\t}\n+\t\t\treturn *val + 1, nil\n+\t\t})\n+\t\trequire.ErrorIs(t, err, err1)\n+\t\trequire.Equal(t, []int{2, 3, 0, 5, 6}, res)\n+\t\trequire.Equal(t, []int{1, 2, 3, 4, 5}, ints)\n+\t})\n+\n+\tt.Run(\"multiple errors are propagated\", func(t *testing.T) {\n+\t\tints := []int{1, 2, 3, 4, 5}\n+\t\tres, err := MapErr(ints, func(val *int) (int, error) {\n+\t\t\tif *val == 3 {\n+\t\t\t\treturn 0, err1\n+\t\t\t}\n+\t\t\tif *val == 4 {\n+\t\t\t\treturn 0, err2\n+\t\t\t}\n+\t\t\treturn *val + 1, nil\n+\t\t})\n+\t\trequire.ErrorIs(t, err, err1)\n+\t\trequire.ErrorIs(t, err, err2)\n+\t\trequire.Equal(t, []int{2, 3, 0, 0, 6}, res)\n+\t\trequire.Equal(t, []int{1, 2, 3, 4, 5}, ints)\n+\t})\n+\n+\tt.Run(\"huge inputs\", func(t *testing.T) {\n+\t\tints := make([]int, 10000)\n+\t\tres := Map(ints, func(val *int) int {\n+\t\t\treturn 1\n+\t\t})\n+\t\texpected := make([]int, 10000)\n+\t\tfor i := 0; i < 10000; i++ {\n+\t\t\texpected[i] = 1\n+\t\t}\n+\t\trequire.Equal(t, expected, res)\n+\t})\n+}\n func BenchmarkForEachIdx(b *testing.B) {\n \tb.Run(\"simple mutation\", func(b *testing.B) {\n \t\tfor _, n := range []int{10, 1000, 1000000} {\n",
+  "diffTruncated": false,
+  "tree": [
+    "LICENSE",
+    "go.mod",
+    "go.sum",
+    "group/context_group.go",
+    "group/context_group_test.go",
+    "group/error_group.go",
+    "group/error_group_test.go",
+    "group/group.go",
+    "group/group_test.go",
+    "group/iter.go",
+    "group/iter_test.go",
+    "group/result_context_group.go",
+    "group/result_context_group_test.go",
+    "group/result_error_group.go",
+    "group/result_error_group_test.go",
+    "group/result_group.go",
+    "group/result_group_test.go",
+    "iter.go",
+    "limiter.go",
+    "pool/context_pool.go",
+    "pool/context_pool_test.go",
+    "pool/error_pool.go",
+    "pool/error_pool_test.go",
+    "pool/iter.go",
+    "pool/iter_test.go",
+    "pool/pool.go",
+    "pool/pool_test.go",
+    "pool/result_context_pool.go",
+    "pool/result_context_pool_test.go",
+    "pool/result_error_pool.go",
+    "pool/result_error_pool_test.go",
+    "pool/result_pool.go",
+    "pool/result_pool_test.go",
+    "stream/stream.go",
+    "waitgroup.go",
+    "waitgroup_test.go"
+  ],
+  "explanation": {
+    "what": "group/iter.go の MapErr 関数で、defer g.Wait() 対象にしている group `g` ではなく別の `New()` 呼び出しを conc.MapErrIn に渡していたバグを、正しく `g` を渡すよう修正した。group/iter_test.go に TestMapErr を追加し、空入力・panic 伝播・エラー伝播・複数エラーの集約・巨大入力を検証している。",
+    "why": "前々コミット(96fbbc7)で MapErr に `g := New(); defer g.Wait()` を導入した際、実際の処理に渡す goer を New() の別呼び出しのままにしてしまっていた見た目上の取り違えを、テストを書く過程で発見して修正したとみられる(おそらく)。",
+    "highlights": [
+      { "file": "group/iter.go", "note": "conc.MapErrIn(New(), ...) を conc.MapErrIn(g, ...) に修正した1行差分" },
+      { "file": "group/iter_test.go", "note": "MapErr の複数エラーが同時に返り値として伝播することを確認するテスト" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "inferred",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

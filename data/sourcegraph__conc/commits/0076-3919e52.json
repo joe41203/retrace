@@ -1,0 +1,87 @@
+{
+  "seq": 76,
+  "sha": "3919e527cd0f3862b58b3c714e4044bbb3fc134a",
+  "parents": [
+    "e92e00da1226dab638eadcdf7474033f6521e864",
+    "a5e5128a3f0bb3c17d12224d32852788b017e1ea"
+  ],
+  "author": {
+    "name": "Camden Cheek",
+    "email": "camden@ccheek.com",
+    "date": "2023-01-03T10:06:03-07:00"
+  },
+  "message": "Merge pull request #8 from sourcegraph/cc/fix-copylock-lint\n\nAvoid dereferencing to appease the copylock lint",
+  "pr": {
+    "number": 8,
+    "title": "Avoid dereferencing to appease the copylock lint",
+    "body": "In the configuration methods, we dereference pools to copy them into the parent struct. This triggers the copylock lint. Even though it shouldn't actually be a problem because you shouldn't be configuring the pool after using the pool, it's still misleading and makes developing on conc noisy.",
+    "url": "https://github.com/sourcegraph/conc/pull/8"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 22,
+    "deletions": 3
+  },
+  "files": [
+    {
+      "path": "pool/error_pool.go",
+      "status": "M",
+      "additions": 11,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "pool/pool.go",
+      "status": "M",
+      "additions": 11,
+      "deletions": 2,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/pool/error_pool.go b/pool/error_pool.go\nindex a538f1e..ed24216 100644\n--- a/pool/error_pool.go\n+++ b/pool/error_pool.go\n@@ -39,7 +39,7 @@ func (p *ErrorPool) Wait() error {\n func (p *ErrorPool) WithContext(ctx context.Context) *ContextPool {\n \tctx, cancel := context.WithCancel(ctx)\n \treturn &ContextPool{\n-\t\terrorPool: *p,\n+\t\terrorPool: p.deref(),\n \t\tctx:       ctx,\n \t\tcancel:    cancel,\n \t}\n@@ -59,6 +59,16 @@ func (p *ErrorPool) WithMaxGoroutines(n int) *ErrorPool {\n \treturn p\n }\n \n+// deref is a helper that creates a shallow copy of the pool with the same\n+// settings. We don't want to just dereference the pointer because that makes\n+// the copylock lint angry.\n+func (p *ErrorPool) deref() ErrorPool {\n+\treturn ErrorPool{\n+\t\tpool:           p.pool.deref(),\n+\t\tonlyFirstError: p.onlyFirstError,\n+\t}\n+}\n+\n func (p *ErrorPool) addErr(err error) {\n \tif err != nil {\n \t\tp.mu.Lock()\ndiff --git a/pool/pool.go b/pool/pool.go\nindex 2fec55b..3835627 100644\n--- a/pool/pool.go\n+++ b/pool/pool.go\n@@ -93,7 +93,16 @@ func (p *Pool) init() {\n // return errors.\n func (p *Pool) WithErrors() *ErrorPool {\n \treturn &ErrorPool{\n-\t\tpool: *p,\n+\t\tpool: p.deref(),\n+\t}\n+}\n+\n+// deref is a helper that creates a shallow copy of the pool with the same\n+// settings. We don't want to just dereference the pointer because that makes\n+// the copylock lint angry.\n+func (p *Pool) deref() Pool {\n+\treturn Pool{\n+\t\tlimiter: p.limiter,\n \t}\n }\n \n@@ -102,7 +111,7 @@ func (p *Pool) WithErrors() *ErrorPool {\n func (p *Pool) WithContext(ctx context.Context) *ContextPool {\n \tctx, cancel := context.WithCancel(ctx)\n \treturn &ContextPool{\n-\t\terrorPool: *p.WithErrors(),\n+\t\terrorPool: p.WithErrors().deref(),\n \t\tctx:       ctx,\n \t\tcancel:    cancel,\n \t}\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/go.yml",
+    "LICENSE",
+    "README.md",
+    "go.mod",
+    "go.sum",
+    "iter/iter.go",
+    "iter/iter_test.go",
+    "panic.go",
+    "panic_test.go",
+    "pool/context_pool.go",
+    "pool/context_pool_test.go",
+    "pool/error_pool.go",
+    "pool/error_pool_test.go",
+    "pool/pool.go",
+    "pool/pool_test.go",
+    "pool/result_context_pool.go",
+    "pool/result_context_pool_test.go",
+    "pool/result_error_pool.go",
+    "pool/result_error_pool_test.go",
+    "pool/result_pool.go",
+    "pool/result_pool_test.go",
+    "stream/stream.go",
+    "stream/stream_test.go",
+    "waitgroup.go",
+    "waitgroup_test.go"
+  ],
+  "explanation": {
+    "what": "Pool と ErrorPool に `deref()` という非公開ヘルパーメソッドを追加し、`WithErrors()` / `WithContext()` 内で `*p`(ポインタのデリファレンスによるコピー)を使っていた箇所を `p.deref()` の呼び出しに置き換えた。deref() は各フィールドを明示的にコピーした新しい値を組み立てて返す。",
+    "why": "PR body に説明されている通り、設定用メソッド内でポインタをデリファレンスして構造体をコピーする書き方が go vet の copylock lint に引っかかっていた。実際にはプールを使用開始した後に設定を変更することはない設計のため安全ではあるものの、lint が誤検知気味に警告を出し続けて開発時のノイズになっていたため、フィールドを手動でコピーするヘルパーに置き換えて lint を静める対応。",
+    "highlights": [
+      { "file": "pool/pool.go", "note": "deref() ヘルパーの新設と *p の置き換え" },
+      { "file": "pool/error_pool.go", "note": "ErrorPool 側でも同様に deref() を追加" }
+    ],
+    "langNotes": [
+      { "topic": "copylock lint", "note": "Go の sync.Mutex 等ロックを含む構造体は値コピーすると危険なため、go vet の copylock 解析はポインタのデリファレンス(*p)によるコピーを警告する。このコミットはロックを含まない設定値だけを手動で新しい構造体に詰め替えることで、意味は同じまま lint の警告対象になる書き方を避けている。" }
+    ],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [{ "type": "pr", "number": 8, "url": "https://github.com/sourcegraph/conc/pull/8" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

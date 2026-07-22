@@ -1,0 +1,81 @@
+{
+  "seq": 41,
+  "sha": "dd643b40c429dd5a8b1082e38933b2b470c97635",
+  "parents": [
+    "a24fa38009e896e8daaa32f7b4d067c9672cc0c3"
+  ],
+  "author": {
+    "name": "Camden Cheek",
+    "email": "camden@ccheek.com",
+    "date": "2023-01-02T11:25:36-07:00"
+  },
+  "message": "move limiter to pool package",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 18,
+    "deletions": 3
+  },
+  "files": [
+    {
+      "path": "pool/limiter.go",
+      "status": "A",
+      "additions": 15,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "pool/pool.go",
+      "status": "M",
+      "additions": 3,
+      "deletions": 3,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/pool/limiter.go b/pool/limiter.go\nnew file mode 100644\nindex 0000000..7ca9ce3\n--- /dev/null\n+++ b/pool/limiter.go\n@@ -0,0 +1,15 @@\n+package pool\n+\n+type limiter chan struct{}\n+\n+func (l limiter) Limit() int {\n+\treturn cap(l)\n+}\n+\n+func (l limiter) Acquire() {\n+\tl <- struct{}{}\n+}\n+\n+func (l limiter) Release() {\n+\t<-l\n+}\ndiff --git a/pool/pool.go b/pool/pool.go\nindex c5eea57..0fe39fa 100644\n--- a/pool/pool.go\n+++ b/pool/pool.go\n@@ -14,7 +14,7 @@ func New() *Pool {\n \n type Pool struct {\n \thandle   conc.WaitGroup\n-\tlimiter  conc.Limiter\n+\tlimiter  limiter\n \ttasks    chan func()\n \tinitOnce sync.Once\n }\n@@ -55,7 +55,7 @@ func (p *Pool) init() {\n \tp.initOnce.Do(func() {\n \t\t// Do not override the limiter if set by WithMaxGoroutines\n \t\tif p.limiter == nil {\n-\t\t\tp.limiter = make(conc.Limiter, runtime.GOMAXPROCS(0))\n+\t\t\tp.limiter = make(limiter, runtime.GOMAXPROCS(0))\n \t\t}\n \n \t\tp.tasks = make(chan func())\n@@ -68,7 +68,7 @@ func (p *Pool) WithMaxGoroutines(n int) *Pool {\n \tif n < 1 {\n \t\tpanic(\"max goroutines in a pool must be greater than zero\")\n \t}\n-\tp.limiter = conc.NewLimiter(n)\n+\tp.limiter = make(limiter, n)\n \treturn p\n }\n \n",
+  "diffTruncated": false,
+  "tree": [
+    "LICENSE",
+    "go.mod",
+    "go.sum",
+    "limiter.go",
+    "panic.go",
+    "panic_test.go",
+    "pariter/iter.go",
+    "pariter/iter_test.go",
+    "pool/context_pool.go",
+    "pool/context_pool_test.go",
+    "pool/error_pool.go",
+    "pool/error_pool_test.go",
+    "pool/limiter.go",
+    "pool/pool.go",
+    "pool/pool_test.go",
+    "pool/result_context_pool.go",
+    "pool/result_context_pool_test.go",
+    "pool/result_error_pool.go",
+    "pool/result_error_pool_test.go",
+    "pool/result_pool.go",
+    "pool/result_pool_test.go",
+    "stream/stream.go",
+    "stream/stream_test.go",
+    "waitgroup.go",
+    "waitgroup_test.go"
+  ],
+  "explanation": {
+    "what": "pool パッケージ専用の非公開 limiter 型(pool/limiter.go)を新設し、Pool 構造体が使っていた公開の conc.Limiter を置き換えた。pool.go 側は make(conc.Limiter, n) を make(limiter, n) に差し替えるだけで、Acquire/Release/Limit の呼び出し口は変えていない。",
+    "why": "conc.Limiter はトップレベルパッケージが公開する汎用セマフォ型だったが、実際に使っているのは pool パッケージだけだった。おそらく、公開 API として外部に晒す必要のない実装詳細を pool 内に閉じ込め、conc パッケージの公開面を絞る意図の整理と考えられる。",
+    "highlights": [
+      { "file": "pool/limiter.go", "note": "chan struct{} を型定義しただけの新設ファイル。セマフォの実装がここに閉じる" },
+      { "file": "pool/pool.go", "note": "conc.Limiter → limiter への置き換え箇所" }
+    ],
+    "langNotes": [
+      { "topic": "channel-as-semaphore", "note": "type limiter chan struct{} は Go でよく使われるイディオムで、バッファ付きチャネルの容量(cap)を最大同時実行数に見立て、送信(Acquire)と受信(Release)の可否でブロックの有無を制御する。" }
+    ],
+    "diagram": null,
+    "evidence": "inferred",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

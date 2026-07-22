@@ -1,0 +1,78 @@
+{
+  "seq": 110,
+  "sha": "dbf89733ffb22e95a6ee143c674729f2409ad511",
+  "parents": [
+    "559008f01a2f50256982296a622ea3a13989fb06",
+    "4b8311d4cad3044eba725742bf69c39a7fd5a1b0"
+  ],
+  "author": {
+    "name": "Camden Cheek",
+    "email": "camden@ccheek.com",
+    "date": "2023-01-11T15:05:08-07:00"
+  },
+  "message": "Merge pull request #54 from sourcegraph/cc/fix-error\n\nFix error in method description",
+  "pr": {
+    "number": 54,
+    "title": "Fix error in method description",
+    "body": "The message here was incorrect. Fixed to match the API docs.",
+    "url": "https://github.com/sourcegraph/conc/pull/54"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 1,
+    "deletions": 1
+  },
+  "files": [
+    {
+      "path": "README.md",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/README.md b/README.md\nindex 9e6ebf8..2a2e31f 100644\n--- a/README.md\n+++ b/README.md\n@@ -37,7 +37,7 @@ then configured with methods:\n - [`p.WithErrors()`](https://pkg.go.dev/github.com/sourcegraph/conc/pool#Pool.WithErrors) configures the pool to run tasks that return errors\n - [`p.WithContext(ctx)`](https://pkg.go.dev/github.com/sourcegraph/conc/pool#Pool.WithContext) configures the pool to run tasks that should be canceled on first error\n - [`p.WithFirstError()`](https://pkg.go.dev/github.com/sourcegraph/conc/pool#ErrorPool.WithFirstError) configures error pools to only keep the first returned error rather than an aggregated error\n-- [`p.WithCollectErrored()`](https://pkg.go.dev/github.com/sourcegraph/conc/pool#ResultContextPool.WithCollectErrored) configures result pools to only collect results that did not error\n+- [`p.WithCollectErrored()`](https://pkg.go.dev/github.com/sourcegraph/conc/pool#ResultContextPool.WithCollectErrored) configures result pools to collect results even when the task errored\n \n # Goals\n \n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/go.yml",
+    ".golangci.yml",
+    "LICENSE",
+    "README.md",
+    "go.mod",
+    "go.sum",
+    "iter/iter.go",
+    "iter/iter_test.go",
+    "panics/panics.go",
+    "panics/panics_test.go",
+    "pool/context_pool.go",
+    "pool/context_pool_test.go",
+    "pool/error_pool.go",
+    "pool/error_pool_test.go",
+    "pool/pool.go",
+    "pool/pool_test.go",
+    "pool/result_context_pool.go",
+    "pool/result_context_pool_test.go",
+    "pool/result_error_pool.go",
+    "pool/result_error_pool_test.go",
+    "pool/result_pool.go",
+    "pool/result_pool_test.go",
+    "stream/stream.go",
+    "stream/stream_test.go",
+    "waitgroup.go",
+    "waitgroup_test.go"
+  ],
+  "explanation": {
+    "what": "README.md にある WithCollectErrored() の説明文を、「エラーしなかった結果だけを集める」という記述から「タスクがエラーした場合でも結果を集める」という記述に修正した。",
+    "why": "PR本文に明記されている通り、この説明が実際の API の挙動と食い違っていたための訂正。WithCollectErrored は本来エラー時でも結果を破棄せず収集するオプションであり、README の説明がこれと逆の意味に読める誤りだった。",
+    "highlights": [
+      { "file": "README.md", "note": "`WithCollectErrored()` の説明が「エラーしなかった結果のみ収集」から「エラーした場合も結果を収集」に訂正されている" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [{ "type": "pr", "number": 54, "url": "https://github.com/sourcegraph/conc/pull/54" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

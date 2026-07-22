@@ -1,0 +1,80 @@
+{
+  "seq": 122,
+  "sha": "e5ed75f142be18355735a74856f80b0f79f412da",
+  "parents": [
+    "f9df11e3fd9527ed72e7b2c8c9f23f77ab952260",
+    "1d533b4596da248eba16fba8ee30b3407018f6b9"
+  ],
+  "author": {
+    "name": "Camden Cheek",
+    "email": "camden@ccheek.com",
+    "date": "2023-01-17T11:43:52-07:00"
+  },
+  "message": "Merge pull request #74 from sashamelentyev/require\n\nUse require insteed of assert",
+  "pr": {
+    "number": 74,
+    "title": "Use require insteed of assert",
+    "body": "",
+    "url": "https://github.com/sourcegraph/conc/pull/74"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 1,
+    "deletions": 2
+  },
+  "files": [
+    {
+      "path": "iter/iter_test.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 2,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/iter/iter_test.go b/iter/iter_test.go\nindex 6309d98..d65af2b 100644\n--- a/iter/iter_test.go\n+++ b/iter/iter_test.go\n@@ -6,7 +6,6 @@ import (\n \t\"sync/atomic\"\n \t\"testing\"\n \n-\t\"github.com/stretchr/testify/assert\"\n \t\"github.com/stretchr/testify/require\"\n )\n \n@@ -38,7 +37,7 @@ func TestIterator(t *testing.T) {\n \t\t// iter.Concurrency > numInput case that updates iter.Concurrency\n \t\titerator.ForEachIdx([]int{1, 2, 3}, func(i int, t *int) {})\n \n-\t\tassert.Equal(t, iterator.MaxGoroutines, 999)\n+\t\trequire.Equal(t, iterator.MaxGoroutines, 999)\n \t})\n \n \tt.Run(\"allows more than defaultMaxGoroutines() concurrent tasks\", func(t *testing.T) {\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/go.yml",
+    ".golangci.yml",
+    "LICENSE",
+    "README.md",
+    "go.mod",
+    "go.sum",
+    "iter/iter.go",
+    "iter/iter_test.go",
+    "iter/map.go",
+    "iter/map_test.go",
+    "panics/panics.go",
+    "panics/panics_test.go",
+    "pool/context_pool.go",
+    "pool/context_pool_test.go",
+    "pool/error_pool.go",
+    "pool/error_pool_test.go",
+    "pool/pool.go",
+    "pool/pool_test.go",
+    "pool/result_context_pool.go",
+    "pool/result_context_pool_test.go",
+    "pool/result_error_pool.go",
+    "pool/result_error_pool_test.go",
+    "pool/result_pool.go",
+    "pool/result_pool_test.go",
+    "stream/stream.go",
+    "stream/stream_test.go",
+    "waitgroup.go",
+    "waitgroup_test.go"
+  ],
+  "explanation": {
+    "what": "iter/iter_test.go から testify/assert の import を削除し、残っていた1箇所の assert.Equal を require.Equal に置き換えた。",
+    "why": "コミットメッセージ・PRタイトルの通り、assert と require の使い分けの徹底が目的。testify では assert は失敗してもテストを継続し、require は即座に t.FailNow() する。この箇所はゴルーチン数の設定値検証で、以降のアサーションが前提とする状態のため、失敗時に即座に打ち切る require の方が適切と判断されたとみられる。",
+    "highlights": [],
+    "langNotes": [
+      { "topic": "testify assert vs require", "note": "Go の testify ライブラリでは assert.X は失敗を記録しつつテスト関数の実行を継続するのに対し、require.X は失敗すると t.FailNow() でそのテストを即座に打ち切る。以降のコードが前提とする条件のチェックには require を使うのが慣例。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [{ "type": "pr", "number": 74, "url": "https://github.com/sourcegraph/conc/pull/74" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

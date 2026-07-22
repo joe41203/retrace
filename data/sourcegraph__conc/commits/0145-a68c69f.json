@@ -1,0 +1,86 @@
+{
+  "seq": 145,
+  "sha": "a68c69faf592d2da20745b1088d091ac5b635649",
+  "parents": [
+    "b7b9417b089c652d00a4e9e05c2cc12173b6161f"
+  ],
+  "author": {
+    "name": "Camden Cheek",
+    "email": "camden@ccheek.com",
+    "date": "2023-11-12T09:16:35-07:00"
+  },
+  "message": "remove obsolete build directives\n\nThe `//go:build` directive was added in go 1.18, but this module\nrequires at least go 1.19, so the old version of these build directives\nis unnecessary.",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 0,
+    "deletions": 2
+  },
+  "files": [
+    {
+      "path": "internal/multierror/multierror_go119.go",
+      "status": "M",
+      "additions": 0,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "internal/multierror/multierror_go120.go",
+      "status": "M",
+      "additions": 0,
+      "deletions": 1,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/internal/multierror/multierror_go119.go b/internal/multierror/multierror_go119.go\nindex 7087e32..b56ac9b 100644\n--- a/internal/multierror/multierror_go119.go\n+++ b/internal/multierror/multierror_go119.go\n@@ -1,5 +1,4 @@\n //go:build !go1.20\n-// +build !go1.20\n \n package multierror\n \ndiff --git a/internal/multierror/multierror_go120.go b/internal/multierror/multierror_go120.go\nindex 39cff82..c164dd9 100644\n--- a/internal/multierror/multierror_go120.go\n+++ b/internal/multierror/multierror_go120.go\n@@ -1,5 +1,4 @@\n //go:build go1.20\n-// +build go1.20\n \n package multierror\n \n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/go.yml",
+    ".golangci.yml",
+    "LICENSE",
+    "README.md",
+    "go.mod",
+    "go.sum",
+    "internal/multierror/multierror_go119.go",
+    "internal/multierror/multierror_go120.go",
+    "iter/export_test.go",
+    "iter/iter.go",
+    "iter/iter_test.go",
+    "iter/map.go",
+    "iter/map_test.go",
+    "panics/panics.go",
+    "panics/panics_test.go",
+    "panics/try.go",
+    "panics/try_test.go",
+    "pool/context_pool.go",
+    "pool/context_pool_test.go",
+    "pool/error_pool.go",
+    "pool/error_pool_test.go",
+    "pool/pool.go",
+    "pool/pool_test.go",
+    "pool/result_context_pool.go",
+    "pool/result_context_pool_test.go",
+    "pool/result_error_pool.go",
+    "pool/result_error_pool_test.go",
+    "pool/result_pool.go",
+    "pool/result_pool_test.go",
+    "stream/stream.go",
+    "stream/stream_test.go",
+    "waitgroup.go",
+    "waitgroup_test.go"
+  ],
+  "explanation": {
+    "what": "internal/multierror 配下の2ファイル(multierror_go119.go / multierror_go120.go)から、旧形式のビルドタグ行 `// +build !go1.20` / `// +build go1.20` を削除した。`//go:build` 行だけが残る。",
+    "why": "コミットメッセージに明記されている通り、`//go:build` 構文は go 1.18 で導入されたもので、conc は go.mod 上で go 1.19 以上を要求しているため、後方互換のための旧 `// +build` 行はもう不要だった。",
+    "highlights": [],
+    "langNotes": [
+      { "topic": "go:build ビルドタグ", "note": "Go のビルド制約はファイル先頭のコメントで指定する。go 1.17以前は `// +build tag` という古い構文しかなく、go 1.17で `//go:build tag` という新構文が導入され、しばらくは両方を併記するのが慣例だった(gofmt が自動で両方生成していた)。go 1.18以降を前提にできるコードベースでは旧構文を削って構わない。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

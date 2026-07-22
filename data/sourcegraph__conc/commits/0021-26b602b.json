@@ -1,0 +1,94 @@
+{
+  "seq": 21,
+  "sha": "26b602bfef649acbdab5b6a92cb24ee18d56774e",
+  "parents": [
+    "6a692eb39984f68b3bdf6d94424cffaa342525d3"
+  ],
+  "author": {
+    "name": "Camden Cheek",
+    "email": "camden@ccheek.com",
+    "date": "2022-12-16T17:35:10-07:00"
+  },
+  "message": "add panic protection to pool",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 17,
+    "deletions": 2
+  },
+  "files": [
+    {
+      "path": "pool/pool.go",
+      "status": "M",
+      "additions": 6,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "pool/pool_test.go",
+      "status": "M",
+      "additions": 11,
+      "deletions": 1,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/pool/pool.go b/pool/pool.go\nindex 0734d7b..cdf7db4 100644\n--- a/pool/pool.go\n+++ b/pool/pool.go\n@@ -12,7 +12,8 @@ func New() *Pool {\n \t\tlimiter: make(conc.Limiter, runtime.GOMAXPROCS(0)),\n \t\t// tasks is not buffered because if it were, it would be possible to\n \t\t// submit tasks but never be forced to start a worker goroutine. If\n-\t\t// goroutines were started eagerly, this wouldn't be a problem.\n+\t\t// goroutines were started eagerly, this wouldn't be a problem, but\n+\t\t// I think it's preferable to minimize the cost of creating a pool.\n \t\ttasks: make(chan func()),\n \t}\n }\n@@ -62,6 +63,10 @@ func (p *Pool) WithContext(ctx context.Context) *ContextPool {\n }\n \n func (p *Pool) worker() {\n+\t// The only time this matters is if the task panics.\n+\t// This makes it possible to spin up new workers in that case.\n+\tdefer p.limiter.Release()\n+\n \tfor f := range p.tasks {\n \t\tf()\n \t}\ndiff --git a/pool/pool_test.go b/pool/pool_test.go\nindex 6c409c6..6c2ce89 100644\n--- a/pool/pool_test.go\n+++ b/pool/pool_test.go\n@@ -63,6 +63,16 @@ func TestPool(t *testing.T) {\n \t\t\t\t}\n \t\t\t})\n \t\t}\n-\t\trequire.Panics(t, func() { g.Wait() })\n+\t\trequire.Panics(t, g.Wait)\n+\t})\n+\n+\tt.Run(\"panics do not exhaust goroutines\", func(t *testing.T) {\n+\t\tg := New().WithMaxGoroutines(2)\n+\t\tfor i := 0; i < 10; i++ {\n+\t\t\tg.Go(func() {\n+\t\t\t\tpanic(42)\n+\t\t\t})\n+\t\t}\n+\t\trequire.Panics(t, g.Wait)\n \t})\n }\n",
+  "diffTruncated": false,
+  "tree": [
+    "LICENSE",
+    "go.mod",
+    "go.sum",
+    "group/context_group.go",
+    "group/context_group_test.go",
+    "group/error_group.go",
+    "group/error_group_test.go",
+    "group/group.go",
+    "group/group_test.go",
+    "group/iter.go",
+    "group/iter_test.go",
+    "group/result_context_group.go",
+    "group/result_context_group_test.go",
+    "group/result_error_group.go",
+    "group/result_error_group_test.go",
+    "group/result_group.go",
+    "group/result_group_test.go",
+    "iter.go",
+    "limiter.go",
+    "panic.go",
+    "pool/context_pool.go",
+    "pool/context_pool_test.go",
+    "pool/error_pool.go",
+    "pool/error_pool_test.go",
+    "pool/iter.go",
+    "pool/iter_test.go",
+    "pool/pool.go",
+    "pool/pool_test.go",
+    "pool/result_context_pool.go",
+    "pool/result_context_pool_test.go",
+    "pool/result_error_pool.go",
+    "pool/result_error_pool_test.go",
+    "pool/result_pool.go",
+    "pool/result_pool_test.go",
+    "stream/stream.go",
+    "stream/stream_test.go",
+    "waitgroup.go",
+    "waitgroup_test.go"
+  ],
+  "explanation": {
+    "what": "Pool のワーカー関数 worker() に `defer p.limiter.Release()` を追加した。あわせて、タスクが panic しても goroutine 数の上限管理(limiter)が壊れないことを確認するテスト「panics do not exhaust goroutines」を追加している。",
+    "why": "それまでは worker がタスク実行中に panic すると、limiter で確保した枠(Acquire 相当)が解放されないまま goroutine が終了し、以後 Pool が新しいワーカーを起動できなくなる(実質的なデッドロック・スループット低下)という問題があった。defer で Release を保証することで、panic 発生後も別の goroutine が枠を再取得してタスク処理を継続できるようにしている。",
+    "highlights": [
+      { "file": "pool/pool.go", "note": "worker() 冒頭の defer p.limiter.Release() が今回の本質的な修正" },
+      { "file": "pool/pool_test.go", "note": "10個のpanicするタスクをMaxGoroutines(2)のPoolに投げ、Waitがpanicで終わることだけを確認するテスト" }
+    ],
+    "langNotes": [
+      { "topic": "defer と panic", "note": "Go の defer は関数が正常終了・panic のどちらで抜けても実行される。ここでは『タスクがpanicしてもリソース解放だけは必ず行う』という後始末をdeferで保証している。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

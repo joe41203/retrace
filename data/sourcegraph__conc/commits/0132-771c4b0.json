@@ -1,0 +1,102 @@
+{
+  "seq": 132,
+  "sha": "771c4b0263cc42908217b018d373d26990159d39",
+  "parents": [
+    "14c5081d40d66578e43aace6c83e569fbd85793b",
+    "e8fb0351c1e3de8c9ad124bfdb2b6362bf0b6d90"
+  ],
+  "author": {
+    "name": "Robert Lin",
+    "email": "robertlin1@gmail.com",
+    "date": "2023-02-24T10:05:27-08:00"
+  },
+  "message": "Merge pull request #92 from sourcegraph/context-pool-panic\n\npool: let WithCancelOnError also cancel on panics",
+  "pr": {
+    "number": 92,
+    "title": "pool: let WithCancelOnError also cancel on panics",
+    "body": "On `(*ContextPool).WithCancelOnError()` task errors, we cancel the context - but what if a task _panics_? I think it might be reasonable to assume that this will trigger a context cancellation since a panic is broadly an \"error\". This isn't the case in the current implementation, because a panic will abort before `ContextPool`'s error handling - if one task panics, other tasks will continue.\r\n\r\nThis change proposes that we catch panics separately for the `(*ContextPool).WithCancelOnError()` case, which allows us to cancel the pool's context before propagating the panic.",
+    "url": "https://github.com/sourcegraph/conc/pull/92"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 3,
+    "additions": 59,
+    "deletions": 1
+  },
+  "files": [
+    {
+      "path": "pool/context_pool.go",
+      "status": "M",
+      "additions": 13,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "pool/context_pool_test.go",
+      "status": "M",
+      "additions": 22,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "pool/result_context_pool_test.go",
+      "status": "M",
+      "additions": 24,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/pool/context_pool.go b/pool/context_pool.go\nindex 6c4cb32..b2d7f8a 100644\n--- a/pool/context_pool.go\n+++ b/pool/context_pool.go\n@@ -23,6 +23,18 @@ type ContextPool struct {\n // are busy, a call to Go() will block until the task can be started.\n func (p *ContextPool) Go(f func(ctx context.Context) error) {\n \tp.errorPool.Go(func() error {\n+\t\tif p.cancelOnError {\n+\t\t\t// If we are cancelling on error, then we also want to cancel if a\n+\t\t\t// panic is raised. To do this, we need to recover, cancel, and then\n+\t\t\t// re-throw the caught panic.\n+\t\t\tdefer func() {\n+\t\t\t\tif r := recover(); r != nil {\n+\t\t\t\t\tp.cancel()\n+\t\t\t\t\tpanic(r)\n+\t\t\t\t}\n+\t\t\t}()\n+\t\t}\n+\n \t\terr := f(p.ctx)\n \t\tif err != nil && p.cancelOnError {\n \t\t\t// Leaky abstraction warning: We add the error directly because\n@@ -56,7 +68,7 @@ func (p *ContextPool) WithFirstError() *ContextPool {\n }\n \n // WithCancelOnError configures the pool to cancel its context as soon as\n-// any task returns an error. By default, the pool's context is not\n+// any task returns an error or panics. By default, the pool's context is not\n // canceled until the parent context is canceled.\n //\n // In this case, all errors returned from the pool after the first will\ndiff --git a/pool/context_pool_test.go b/pool/context_pool_test.go\nindex 1ec8a4d..1e3f1f0 100644\n--- a/pool/context_pool_test.go\n+++ b/pool/context_pool_test.go\n@@ -9,6 +9,7 @@ import (\n \t\"testing\"\n \t\"time\"\n \n+\t\"github.com/stretchr/testify/assert\"\n \t\"github.com/stretchr/testify/require\"\n )\n \n@@ -187,6 +188,27 @@ func TestContextPool(t *testing.T) {\n \t\trequire.NotErrorIs(t, err, context.Canceled)\n \t})\n \n+\tt.Run(\"WithCancelOnError and panic\", func(t *testing.T) {\n+\t\tt.Parallel()\n+\t\tp := New().WithContext(bgctx).WithCancelOnError()\n+\t\tvar cancelledTasks atomic.Int64\n+\t\tp.Go(func(ctx context.Context) error {\n+\t\t\t<-ctx.Done()\n+\t\t\tcancelledTasks.Add(1)\n+\t\t\treturn ctx.Err()\n+\t\t})\n+\t\tp.Go(func(ctx context.Context) error {\n+\t\t\t<-ctx.Done()\n+\t\t\tcancelledTasks.Add(1)\n+\t\t\treturn ctx.Err()\n+\t\t})\n+\t\tp.Go(func(ctx context.Context) error {\n+\t\t\tpanic(\"abort!\")\n+\t\t})\n+\t\tassert.Panics(t, func() { _ = p.Wait() })\n+\t\tassert.EqualValues(t, 2, cancelledTasks.Load())\n+\t})\n+\n \tt.Run(\"limit\", func(t *testing.T) {\n \t\tt.Parallel()\n \t\tfor _, maxConcurrent := range []int{1, 10, 100} {\ndiff --git a/pool/result_context_pool_test.go b/pool/result_context_pool_test.go\nindex a65f6c9..a116d93 100644\n--- a/pool/result_context_pool_test.go\n+++ b/pool/result_context_pool_test.go\n@@ -10,6 +10,7 @@ import (\n \t\"testing\"\n \t\"time\"\n \n+\t\"github.com/stretchr/testify/assert\"\n \t\"github.com/stretchr/testify/require\"\n )\n \n@@ -100,6 +101,29 @@ func TestResultContextPool(t *testing.T) {\n \t\trequire.ErrorIs(t, err, err1)\n \t})\n \n+\tt.Run(\"WithCancelOnError and panic\", func(t *testing.T) {\n+\t\tt.Parallel()\n+\t\tp := NewWithResults[int]().\n+\t\t\tWithContext(context.Background()).\n+\t\t\tWithCancelOnError()\n+\t\tvar cancelledTasks atomic.Int64\n+\t\tp.Go(func(ctx context.Context) (int, error) {\n+\t\t\t<-ctx.Done()\n+\t\t\tcancelledTasks.Add(1)\n+\t\t\treturn 0, ctx.Err()\n+\t\t})\n+\t\tp.Go(func(ctx context.Context) (int, error) {\n+\t\t\t<-ctx.Done()\n+\t\t\tcancelledTasks.Add(1)\n+\t\t\treturn 0, ctx.Err()\n+\t\t})\n+\t\tp.Go(func(ctx context.Context) (int, error) {\n+\t\t\tpanic(\"abort!\")\n+\t\t})\n+\t\tassert.Panics(t, func() { _, _ = p.Wait() })\n+\t\tassert.EqualValues(t, 2, cancelledTasks.Load())\n+\t})\n+\n \tt.Run(\"no WithCancelOnError\", func(t *testing.T) {\n \t\tt.Parallel()\n \t\tg := NewWithResults[int]().WithContext(context.Background())\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/go.yml",
+    ".golangci.yml",
+    "LICENSE",
+    "README.md",
+    "go.mod",
+    "go.sum",
+    "iter/iter.go",
+    "iter/iter_test.go",
+    "iter/map.go",
+    "iter/map_test.go",
+    "multierror/multierror_go119.go",
+    "multierror/multierror_go120.go",
+    "panics/panics.go",
+    "panics/panics_test.go",
+    "panics/try.go",
+    "panics/try_test.go",
+    "pool/context_pool.go",
+    "pool/context_pool_test.go",
+    "pool/error_pool.go",
+    "pool/error_pool_test.go",
+    "pool/pool.go",
+    "pool/pool_test.go",
+    "pool/result_context_pool.go",
+    "pool/result_context_pool_test.go",
+    "pool/result_error_pool.go",
+    "pool/result_error_pool_test.go",
+    "pool/result_pool.go",
+    "pool/result_pool_test.go",
+    "stream/stream.go",
+    "stream/stream_test.go",
+    "waitgroup.go",
+    "waitgroup_test.go"
+  ],
+  "explanation": {
+    "what": "ContextPool.Go に、WithCancelOnError が有効な場合だけ働く defer/recover を追加した。タスクが panic すると recover() で捕まえ、pool の context を cancel してから同じ値で再度 panic(r) して伝播させる。ドキュメントコメントも「エラーまたは panic で cancel する」に更新し、context_pool_test.go と result_context_pool_test.go に panic 発生時に他タスクが cancel されることを検証するテストを追加した。",
+    "why": "PR本文によると、WithCancelOnError はタスクがエラーを返した場合のみ context を cancel していたが、panic は「エラー」の一種と広く解釈できるにもかかわらず、panic は ErrorPool のエラーハンドリングより先に伝播してしまうため、他のタスクが cancel されずに動き続けてしまう問題があった。この不整合を解消するため、panic 発生時も cancel が起きるよう個別に recover するようにした。",
+    "highlights": [
+      { "file": "pool/context_pool.go", "note": "recover→cancel→panic(r) で再送出する defer" }
+    ],
+    "langNotes": [
+      { "topic": "context pool の panic 伝播", "note": "Go の panic は recover() で捕まえない限り goroutine を離脱しつつ呼び出し元へ伝わっていく。この変更では defer 内で recover した panic 値をそのまま panic(r) で再送出しつつ、途中で context.cancel() を挟むことで「他タスクへの通知」と「panic の伝播」を両立させている。" }
+    ],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [
+      { "type": "pr", "number": 92, "url": "https://github.com/sourcegraph/conc/pull/92" }
+    ],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

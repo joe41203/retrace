@@ -1,0 +1,109 @@
+{
+  "seq": 133,
+  "sha": "e2914e5ae705e88c2362977152afd214d4c67b82",
+  "parents": [
+    "771c4b0263cc42908217b018d373d26990159d39",
+    "279d23cb2d43fc8be8d28e757210c2b99b6650b0"
+  ],
+  "author": {
+    "name": "Robert Lin",
+    "email": "robertlin1@gmail.com",
+    "date": "2023-02-24T17:06:16-08:00"
+  },
+  "message": "Merge pull request #96 from sourcegraph/panics-naming-simplification\n\npanics: reduce naming stutter in panics.RecoveredPanic",
+  "pr": {
+    "number": 96,
+    "title": "panics: reduce naming stutter in panics.RecoveredPanic",
+    "body": "Renames `panics.RecoveredPanic` and friends, which stutters somewhat, to just `panics.Recovered`.",
+    "url": "https://github.com/sourcegraph/conc/pull/96"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 4,
+    "additions": 25,
+    "deletions": 25
+  },
+  "files": [
+    {
+      "path": "panics/panics.go",
+      "status": "M",
+      "additions": 20,
+      "deletions": 20,
+      "binary": false
+    },
+    {
+      "path": "panics/panics_test.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "panics/try.go",
+      "status": "M",
+      "additions": 2,
+      "deletions": 2,
+      "binary": false
+    },
+    {
+      "path": "waitgroup.go",
+      "status": "M",
+      "additions": 2,
+      "deletions": 2,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/panics/panics.go b/panics/panics.go\nindex 5d4f12d..abbed7f 100644\n--- a/panics/panics.go\n+++ b/panics/panics.go\n@@ -13,7 +13,7 @@ import (\n // get the value of the first panic (if any) with Recovered(), or you can just\n // propagate the panic (re-panic) with Repanic().\n type Catcher struct {\n-\trecovered atomic.Pointer[RecoveredPanic]\n+\trecovered atomic.Pointer[Recovered]\n }\n \n // Try executes f, catching any panic it might spawn. It is safe\n@@ -25,13 +25,13 @@ func (p *Catcher) Try(f func()) {\n \n func (p *Catcher) tryRecover() {\n \tif val := recover(); val != nil {\n-\t\trp := NewRecoveredPanic(1, val)\n+\t\trp := NewRecovered(1, val)\n \t\tp.recovered.CompareAndSwap(nil, &rp)\n \t}\n }\n \n // Repanic panics if any calls to Try caught a panic. It will panic with the\n-// value of the first panic caught, wrapped in a RecoveredPanic with caller\n+// value of the first panic caught, wrapped in a panics.Recovered with caller\n // information.\n func (p *Catcher) Repanic() {\n \tif val := p.Recovered(); val != nil {\n@@ -41,27 +41,27 @@ func (p *Catcher) Repanic() {\n \n // Recovered returns the value of the first panic caught by Try, or nil if\n // no calls to Try panicked.\n-func (p *Catcher) Recovered() *RecoveredPanic {\n+func (p *Catcher) Recovered() *Recovered {\n \treturn p.recovered.Load()\n }\n \n-// NewRecoveredPanic creates a RecoveredPanic from a panic value and a\n-// collected stacktrace. The skip parameter allows the caller to skip stack\n-// frames when collecting the stacktrace. Calling with a skip of 0 means\n-// include the call to NewRecoveredPanic in the stacktrace.\n-func NewRecoveredPanic(skip int, value any) RecoveredPanic {\n+// NewRecovered creates a panics.Recovered from a panic value and a collected\n+// stacktrace. The skip parameter allows the caller to skip stack frames when\n+// collecting the stacktrace. Calling with a skip of 0 means include the call to\n+// NewRecovered in the stacktrace.\n+func NewRecovered(skip int, value any) Recovered {\n \t// 64 frames should be plenty\n \tvar callers [64]uintptr\n \tn := runtime.Callers(skip+1, callers[:])\n-\treturn RecoveredPanic{\n+\treturn Recovered{\n \t\tValue:   value,\n \t\tCallers: callers[:n],\n \t\tStack:   debug.Stack(),\n \t}\n }\n \n-// RecoveredPanic is a panic that was caught with recover().\n-type RecoveredPanic struct {\n+// Recovered is a panic that was caught with recover().\n+type Recovered struct {\n \t// The original value of the panic.\n \tValue any\n \t// The caller list as returned by runtime.Callers when the panic was\n@@ -74,27 +74,27 @@ type RecoveredPanic struct {\n }\n \n // String renders a human-readable formatting of the panic.\n-func (p *RecoveredPanic) String() string {\n+func (p *Recovered) String() string {\n \treturn fmt.Sprintf(\"panic: %v\\nstacktrace:\\n%s\\n\", p.Value, p.Stack)\n }\n \n // AsError casts the panic into an error implementation. The implementation\n // is unwrappable with the cause of the panic, if the panic was provided one.\n-func (p *RecoveredPanic) AsError() error {\n+func (p *Recovered) AsError() error {\n \tif p == nil {\n \t\treturn nil\n \t}\n-\treturn &ErrRecoveredPanic{*p}\n+\treturn &ErrRecovered{*p}\n }\n \n-// ErrRecoveredPanic wraps a RecoveredPanic in an error implementation.\n-type ErrRecoveredPanic struct{ RecoveredPanic }\n+// ErrRecovered wraps a panics.Recovered in an error implementation.\n+type ErrRecovered struct{ Recovered }\n \n-var _ error = (*ErrRecoveredPanic)(nil)\n+var _ error = (*ErrRecovered)(nil)\n \n-func (p *ErrRecoveredPanic) Error() string { return p.String() }\n+func (p *ErrRecovered) Error() string { return p.String() }\n \n-func (p *ErrRecoveredPanic) Unwrap() error {\n+func (p *ErrRecovered) Unwrap() error {\n \tif err, ok := p.Value.(error); ok {\n \t\treturn err\n \t}\ndiff --git a/panics/panics_test.go b/panics/panics_test.go\nindex f75d444..15bb32e 100644\n--- a/panics/panics_test.go\n+++ b/panics/panics_test.go\n@@ -143,7 +143,7 @@ func TestCatcher(t *testing.T) {\n \t})\n }\n \n-func TestRecoveredPanicAsError(t *testing.T) {\n+func TestRecoveredAsError(t *testing.T) {\n \tt.Parallel()\n \tt.Run(\"as error is nil\", func(t *testing.T) {\n \t\tt.Parallel()\ndiff --git a/panics/try.go b/panics/try.go\nindex d4e0961..4ded92a 100644\n--- a/panics/try.go\n+++ b/panics/try.go\n@@ -3,8 +3,8 @@ package panics\n // Try executes f, catching and returning any panic it might spawn.\n //\n // The recovered panic can be propagated with panic(), or handled as a normal error with\n-// (*RecoveredPanic).AsError().\n-func Try(f func()) *RecoveredPanic {\n+// (*panics.Recovered).AsError().\n+func Try(f func()) *Recovered {\n \tvar c Catcher\n \tc.Try(f)\n \treturn c.Recovered()\ndiff --git a/waitgroup.go b/waitgroup.go\nindex 6fc1627..47b1bc1 100644\n--- a/waitgroup.go\n+++ b/waitgroup.go\n@@ -43,8 +43,8 @@ func (h *WaitGroup) Wait() {\n }\n \n // WaitAndRecover will block until all goroutines spawned with Go exit and\n-// will return a *panics.RecoveredPanic if one of the child goroutines panics.\n-func (h *WaitGroup) WaitAndRecover() *panics.RecoveredPanic {\n+// will return a *panics.Recovered if one of the child goroutines panics.\n+func (h *WaitGroup) WaitAndRecover() *panics.Recovered {\n \th.wg.Wait()\n \n \t// Return a recovered panic if we caught one from a child goroutine.\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/go.yml",
+    ".golangci.yml",
+    "LICENSE",
+    "README.md",
+    "go.mod",
+    "go.sum",
+    "iter/iter.go",
+    "iter/iter_test.go",
+    "iter/map.go",
+    "iter/map_test.go",
+    "multierror/multierror_go119.go",
+    "multierror/multierror_go120.go",
+    "panics/panics.go",
+    "panics/panics_test.go",
+    "panics/try.go",
+    "panics/try_test.go",
+    "pool/context_pool.go",
+    "pool/context_pool_test.go",
+    "pool/error_pool.go",
+    "pool/error_pool_test.go",
+    "pool/pool.go",
+    "pool/pool_test.go",
+    "pool/result_context_pool.go",
+    "pool/result_context_pool_test.go",
+    "pool/result_error_pool.go",
+    "pool/result_error_pool_test.go",
+    "pool/result_pool.go",
+    "pool/result_pool_test.go",
+    "stream/stream.go",
+    "stream/stream_test.go",
+    "waitgroup.go",
+    "waitgroup_test.go"
+  ],
+  "explanation": {
+    "what": "panics パッケージの型・関数名から冗長な語を除いた。RecoveredPanic → Recovered、NewRecoveredPanic → NewRecovered、ErrRecoveredPanic → ErrRecovered にリネームし、panics.go・panics_test.go・try.go・waitgroup.go の該当箇所を追従修正した。",
+    "why": "PR本文の通り、外部から `panics.RecoveredPanic` として参照すると「panics」という語がパッケージ名と型名で重複(stutter)して冗長になる。Go の命名慣習では、パッケージ名を型名に繰り返さない(例えば `bytes.Buffer` であって `bytes.BytesBuffer` ではない)ため、この重複を解消して `panics.Recovered` というより自然な名前に揃えた。",
+    "highlights": [
+      { "file": "panics/panics.go", "note": "RecoveredPanic → Recovered への型・関数の一括リネーム" }
+    ],
+    "langNotes": [
+      { "topic": "panics 命名整理(stutter 回避)", "note": "Go では呼び出し側が `パッケージ名.識別子` の形でアクセスするため、型名にパッケージ名を重ねる命名(例: panics.RecoveredPanic)は「stutter(どもり)」と呼ばれ避けるべき慣習とされる。このコミットは公式の Go 命名ガイドラインに沿って panics.Recovered へ短縮した例。" }
+    ],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [
+      { "type": "pr", "number": 96, "url": "https://github.com/sourcegraph/conc/pull/96" }
+    ],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

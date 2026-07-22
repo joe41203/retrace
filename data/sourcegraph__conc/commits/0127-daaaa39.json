@@ -1,0 +1,165 @@
+{
+  "seq": 127,
+  "sha": "daaaa39c877d8e1556e5acb612f61a77320bca1f",
+  "parents": [
+    "90aae322b299f917c75515b1393d094bb225b47b",
+    "23fad806427db60d44cd8982aa637d1e7e166e0f"
+  ],
+  "author": {
+    "name": "Camden Cheek",
+    "email": "camden@ccheek.com",
+    "date": "2023-02-07T09:02:06-07:00"
+  },
+  "message": "Merge pull request #83 from sourcegraph/cc/panic-on-reconfigure\n\nPanic on reconfigure after use",
+  "pr": {
+    "number": 83,
+    "title": "Panic on reconfigure after use",
+    "body": "It is not safe to reconfigure a pool after calling `Go` for the first time, but neither the API nor the documentation makes this super obvious. To protect users from accidentally using `conc` unsafely, this adds a conservative panic to make it more obvious to users that this is not supported. \r\n\r\n",
+    "url": "https://github.com/sourcegraph/conc/pull/83"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 12,
+    "additions": 170,
+    "deletions": 0
+  },
+  "files": [
+    {
+      "path": "pool/context_pool.go",
+      "status": "M",
+      "additions": 10,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "pool/context_pool_test.go",
+      "status": "M",
+      "additions": 17,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "pool/error_pool.go",
+      "status": "M",
+      "additions": 10,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "pool/error_pool_test.go",
+      "status": "M",
+      "additions": 17,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "pool/pool.go",
+      "status": "M",
+      "additions": 17,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "pool/pool_test.go",
+      "status": "M",
+      "additions": 17,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "pool/result_context_pool.go",
+      "status": "M",
+      "additions": 11,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "pool/result_context_pool_test.go",
+      "status": "M",
+      "additions": 17,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "pool/result_error_pool.go",
+      "status": "M",
+      "additions": 11,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "pool/result_error_pool_test.go",
+      "status": "M",
+      "additions": 17,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "pool/result_pool.go",
+      "status": "M",
+      "additions": 10,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "pool/result_pool_test.go",
+      "status": "M",
+      "additions": 16,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/pool/context_pool.go b/pool/context_pool.go\nindex c119001..c1be3b7 100644\n--- a/pool/context_pool.go\n+++ b/pool/context_pool.go\n@@ -6,6 +6,9 @@ import (\n \n // ContextPool is a pool that runs tasks that take a context.\n // A new ContextPool should be created with `New().WithContext(ctx)`.\n+//\n+// The configuration methods (With*) will panic if they are used after calling\n+// Go() for the first time.\n type ContextPool struct {\n \terrorPool ErrorPool\n \n@@ -45,6 +48,7 @@ func (p *ContextPool) Wait() error {\n // This is particularly useful for (*ContextPool).WithCancelOnError(),\n // where all errors after the first are likely to be context.Canceled.\n func (p *ContextPool) WithFirstError() *ContextPool {\n+\tp.panicIfInitialized()\n \tp.errorPool.WithFirstError()\n \treturn p\n }\n@@ -58,6 +62,7 @@ func (p *ContextPool) WithFirstError() *ContextPool {\n // (*ContextPool).WithFirstError() to configure the pool to only return\n // the first error.\n func (p *ContextPool) WithCancelOnError() *ContextPool {\n+\tp.panicIfInitialized()\n \tp.cancelOnError = true\n \treturn p\n }\n@@ -65,6 +70,11 @@ func (p *ContextPool) WithCancelOnError() *ContextPool {\n // WithMaxGoroutines limits the number of goroutines in a pool.\n // Defaults to unlimited. Panics if n < 1.\n func (p *ContextPool) WithMaxGoroutines(n int) *ContextPool {\n+\tp.panicIfInitialized()\n \tp.errorPool.WithMaxGoroutines(n)\n \treturn p\n }\n+\n+func (p *ContextPool) panicIfInitialized() {\n+\tp.errorPool.panicIfInitialized()\n+}\ndiff --git a/pool/context_pool_test.go b/pool/context_pool_test.go\nindex 85c629f..dff49b4 100644\n--- a/pool/context_pool_test.go\n+++ b/pool/context_pool_test.go\n@@ -41,6 +41,23 @@ func TestContextPool(t *testing.T) {\n \terr2 := errors.New(\"err2\")\n \tbgctx := context.Background()\n \n+\tt.Run(\"panics on configuration after init\", func(t *testing.T) {\n+\t\tt.Run(\"before wait\", func(t *testing.T) {\n+\t\t\tt.Parallel()\n+\t\t\tg := New().WithContext(context.Background())\n+\t\t\tg.Go(func(context.Context) error { return nil })\n+\t\t\trequire.Panics(t, func() { g.WithMaxGoroutines(10) })\n+\t\t})\n+\n+\t\tt.Run(\"after wait\", func(t *testing.T) {\n+\t\t\tt.Parallel()\n+\t\t\tg := New().WithContext(context.Background())\n+\t\t\tg.Go(func(context.Context) error { return nil })\n+\t\t\t_ = g.Wait()\n+\t\t\trequire.Panics(t, func() { g.WithMaxGoroutines(10) })\n+\t\t})\n+\t})\n+\n \tt.Run(\"behaves the same as ErrorGroup\", func(t *testing.T) {\n \t\tt.Parallel()\n \ndiff --git a/pool/error_pool.go b/pool/error_pool.go\nindex 3473a9e..3104ee8 100644\n--- a/pool/error_pool.go\n+++ b/pool/error_pool.go\n@@ -10,6 +10,9 @@ import (\n // ErrorPool is a pool that runs tasks that may return an error.\n // Errors are collected and returned by Wait().\n //\n+// The configuration methods (With*) will panic if they are used after calling\n+// Go() for the first time.\n+//\n // A new ErrorPool should be created using `New().WithErrors()`.\n type ErrorPool struct {\n \tpool Pool\n@@ -40,6 +43,7 @@ func (p *ErrorPool) Wait() error {\n // For example, WithCancelOnError can be configured on the returned pool to\n // signal that all goroutines should be cancelled upon the first error.\n func (p *ErrorPool) WithContext(ctx context.Context) *ContextPool {\n+\tp.panicIfInitialized()\n \tctx, cancel := context.WithCancel(ctx)\n \treturn &ContextPool{\n \t\terrorPool: p.deref(),\n@@ -51,6 +55,7 @@ func (p *ErrorPool) WithContext(ctx context.Context) *ContextPool {\n // WithFirstError configures the pool to only return the first error\n // returned by a task. By default, Wait() will return a combined error.\n func (p *ErrorPool) WithFirstError() *ErrorPool {\n+\tp.panicIfInitialized()\n \tp.onlyFirstError = true\n \treturn p\n }\n@@ -58,6 +63,7 @@ func (p *ErrorPool) WithFirstError() *ErrorPool {\n // WithMaxGoroutines limits the number of goroutines in a pool.\n // Defaults to unlimited. Panics if n < 1.\n func (p *ErrorPool) WithMaxGoroutines(n int) *ErrorPool {\n+\tp.panicIfInitialized()\n \tp.pool.WithMaxGoroutines(n)\n \treturn p\n }\n@@ -72,6 +78,10 @@ func (p *ErrorPool) deref() ErrorPool {\n \t}\n }\n \n+func (p *ErrorPool) panicIfInitialized() {\n+\tp.pool.panicIfInitialized()\n+}\n+\n func (p *ErrorPool) addErr(err error) {\n \tif err != nil {\n \t\tp.mu.Lock()\ndiff --git a/pool/error_pool_test.go b/pool/error_pool_test.go\nindex f6a2ec4..44cd1a6 100644\n--- a/pool/error_pool_test.go\n+++ b/pool/error_pool_test.go\n@@ -35,6 +35,23 @@ func TestErrorPool(t *testing.T) {\n \terr1 := errors.New(\"err1\")\n \terr2 := errors.New(\"err2\")\n \n+\tt.Run(\"panics on configuration after init\", func(t *testing.T) {\n+\t\tt.Run(\"before wait\", func(t *testing.T) {\n+\t\t\tt.Parallel()\n+\t\t\tg := New().WithErrors()\n+\t\t\tg.Go(func() error { return nil })\n+\t\t\trequire.Panics(t, func() { g.WithMaxGoroutines(10) })\n+\t\t})\n+\n+\t\tt.Run(\"after wait\", func(t *testing.T) {\n+\t\t\tt.Parallel()\n+\t\t\tg := New().WithErrors()\n+\t\t\tg.Go(func() error { return nil })\n+\t\t\t_ = g.Wait()\n+\t\t\trequire.Panics(t, func() { g.WithMaxGoroutines(10) })\n+\t\t})\n+\t})\n+\n \tt.Run(\"wait returns no error if no errors\", func(t *testing.T) {\n \t\tt.Parallel()\n \t\tg := New().WithErrors()\ndiff --git a/pool/pool.go b/pool/pool.go\nindex 36c08ce..b63eb19 100644\n--- a/pool/pool.go\n+++ b/pool/pool.go\n@@ -21,6 +21,9 @@ func New() *Pool {\n // Goroutines are started lazily, so creating a new pool is cheap. There will\n // never be more goroutines spawned than there are tasks submitted.\n //\n+// The configuration methods (With*) will panic if they are used after calling\n+// Go() for the first time.\n+//\n // Pool is efficient, but not zero cost. It should not be used for very short\n // tasks. Startup and teardown come with an overhead of around 1µs, and each\n // task has an overhead of around 300ns.\n@@ -72,6 +75,7 @@ func (p *Pool) Wait() {\n \tp.init()\n \n \tclose(p.tasks)\n+\n \tp.handle.Wait()\n }\n \n@@ -83,6 +87,7 @@ func (p *Pool) MaxGoroutines() int {\n // WithMaxGoroutines limits the number of goroutines in a pool.\n // Defaults to unlimited. Panics if n < 1.\n func (p *Pool) WithMaxGoroutines(n int) *Pool {\n+\tp.panicIfInitialized()\n \tif n < 1 {\n \t\tpanic(\"max goroutines in a pool must be greater than zero\")\n \t}\n@@ -98,9 +103,19 @@ func (p *Pool) init() {\n \t})\n }\n \n+// panicIfInitialized will trigger a panic if a configuration method is called\n+// after the pool has started any goroutines for the first time. In the case that\n+// new settings are needed, a new pool should be created.\n+func (p *Pool) panicIfInitialized() {\n+\tif p.tasks != nil {\n+\t\tpanic(\"pool can not be reconfigured after calling Go() for the first time\")\n+\t}\n+}\n+\n // WithErrors converts the pool to an ErrorPool so the submitted tasks can\n // return errors.\n func (p *Pool) WithErrors() *ErrorPool {\n+\tp.panicIfInitialized()\n \treturn &ErrorPool{\n \t\tpool: p.deref(),\n \t}\n@@ -110,6 +125,7 @@ func (p *Pool) WithErrors() *ErrorPool {\n // settings. We don't want to just dereference the pointer because that makes\n // the copylock lint angry.\n func (p *Pool) deref() Pool {\n+\tp.panicIfInitialized()\n \treturn Pool{\n \t\tlimiter: p.limiter,\n \t}\n@@ -120,6 +136,7 @@ func (p *Pool) deref() Pool {\n // For example, WithCancelOnError can be configured on the returned pool to\n // signal that all goroutines should be cancelled upon the first error.\n func (p *Pool) WithContext(ctx context.Context) *ContextPool {\n+\tp.panicIfInitialized()\n \tctx, cancel := context.WithCancel(ctx)\n \treturn &ContextPool{\n \t\terrorPool: p.WithErrors().deref(),\ndiff --git a/pool/pool_test.go b/pool/pool_test.go\nindex fc74d9d..a6e93da 100644\n--- a/pool/pool_test.go\n+++ b/pool/pool_test.go\n@@ -44,6 +44,23 @@ func TestPool(t *testing.T) {\n \t\trequire.Equal(t, completed.Load(), int64(100))\n \t})\n \n+\tt.Run(\"panics on configuration after init\", func(t *testing.T) {\n+\t\tt.Run(\"before wait\", func(t *testing.T) {\n+\t\t\tt.Parallel()\n+\t\t\tg := New()\n+\t\t\tg.Go(func() {})\n+\t\t\trequire.Panics(t, func() { g.WithMaxGoroutines(10) })\n+\t\t})\n+\n+\t\tt.Run(\"after wait\", func(t *testing.T) {\n+\t\t\tt.Parallel()\n+\t\t\tg := New()\n+\t\t\tg.Go(func() {})\n+\t\t\tg.Wait()\n+\t\t\trequire.Panics(t, func() { g.WithMaxGoroutines(10) })\n+\t\t})\n+\t})\n+\n \tt.Run(\"limit\", func(t *testing.T) {\n \t\tt.Parallel()\n \t\tfor _, maxConcurrent := range []int{1, 10, 100} {\ndiff --git a/pool/result_context_pool.go b/pool/result_context_pool.go\nindex dbfa005..55dc3bc 100644\n--- a/pool/result_context_pool.go\n+++ b/pool/result_context_pool.go\n@@ -8,6 +8,9 @@ import (\n // result. The context passed to the task will be canceled if any of the tasks\n // return an error, which makes its functionality different than just capturing\n // a context with the task closure.\n+//\n+// The configuration methods (With*) will panic if they are used after calling\n+// Go() for the first time.\n type ResultContextPool[T any] struct {\n \tcontextPool    ContextPool\n \tagg            resultAggregator[T]\n@@ -37,6 +40,7 @@ func (p *ResultContextPool[T]) Wait() ([]T, error) {\n // even if the task returned an error. By default, the result of tasks that errored\n // are ignored and only the error is collected.\n func (p *ResultContextPool[T]) WithCollectErrored() *ResultContextPool[T] {\n+\tp.panicIfInitialized()\n \tp.collectErrored = true\n \treturn p\n }\n@@ -44,6 +48,7 @@ func (p *ResultContextPool[T]) WithCollectErrored() *ResultContextPool[T] {\n // WithFirstError configures the pool to only return the first error\n // returned by a task. By default, Wait() will return a combined error.\n func (p *ResultContextPool[T]) WithFirstError() *ResultContextPool[T] {\n+\tp.panicIfInitialized()\n \tp.contextPool.WithFirstError()\n \treturn p\n }\n@@ -52,6 +57,7 @@ func (p *ResultContextPool[T]) WithFirstError() *ResultContextPool[T] {\n // any task returns an error. By default, the pool's context is not\n // canceled until the parent context is canceled.\n func (p *ResultContextPool[T]) WithCancelOnError() *ResultContextPool[T] {\n+\tp.panicIfInitialized()\n \tp.contextPool.WithCancelOnError()\n \treturn p\n }\n@@ -59,6 +65,11 @@ func (p *ResultContextPool[T]) WithCancelOnError() *ResultContextPool[T] {\n // WithMaxGoroutines limits the number of goroutines in a pool.\n // Defaults to unlimited. Panics if n < 1.\n func (p *ResultContextPool[T]) WithMaxGoroutines(n int) *ResultContextPool[T] {\n+\tp.panicIfInitialized()\n \tp.contextPool.WithMaxGoroutines(n)\n \treturn p\n }\n+\n+func (p *ResultContextPool[T]) panicIfInitialized() {\n+\tp.contextPool.panicIfInitialized()\n+}\ndiff --git a/pool/result_context_pool_test.go b/pool/result_context_pool_test.go\nindex 4f2f40f..e812018 100644\n--- a/pool/result_context_pool_test.go\n+++ b/pool/result_context_pool_test.go\n@@ -19,6 +19,23 @@ func TestResultContextPool(t *testing.T) {\n \terr1 := errors.New(\"err1\")\n \terr2 := errors.New(\"err2\")\n \n+\tt.Run(\"panics on configuration after init\", func(t *testing.T) {\n+\t\tt.Run(\"before wait\", func(t *testing.T) {\n+\t\t\tt.Parallel()\n+\t\t\tg := NewWithResults[int]().WithContext(context.Background())\n+\t\t\tg.Go(func(context.Context) (int, error) { return 0, nil })\n+\t\t\trequire.Panics(t, func() { g.WithMaxGoroutines(10) })\n+\t\t})\n+\n+\t\tt.Run(\"after wait\", func(t *testing.T) {\n+\t\t\tt.Parallel()\n+\t\t\tg := NewWithResults[int]().WithContext(context.Background())\n+\t\t\tg.Go(func(context.Context) (int, error) { return 0, nil })\n+\t\t\t_, _ = g.Wait()\n+\t\t\trequire.Panics(t, func() { g.WithMaxGoroutines(10) })\n+\t\t})\n+\t})\n+\n \tt.Run(\"behaves the same as ErrorGroup\", func(t *testing.T) {\n \t\tt.Parallel()\n \t\tbgctx := context.Background()\ndiff --git a/pool/result_error_pool.go b/pool/result_error_pool.go\nindex 163b4ae..4caaadc 100644\n--- a/pool/result_error_pool.go\n+++ b/pool/result_error_pool.go\n@@ -11,6 +11,9 @@ import (\n // The order of the results is not guaranteed to be the same as the order the\n // tasks were submitted. If your use case requires consistent ordering,\n // consider using the `stream` package or `Map` from the `iter` package.\n+//\n+// The configuration methods (With*) will panic if they are used after calling\n+// Go() for the first time.\n type ResultErrorPool[T any] struct {\n \terrorPool      ErrorPool\n \tagg            resultAggregator[T]\n@@ -40,6 +43,7 @@ func (p *ResultErrorPool[T]) Wait() ([]T, error) {\n // even if the task returned an error. By default, the result of tasks that errored\n // are ignored and only the error is collected.\n func (p *ResultErrorPool[T]) WithCollectErrored() *ResultErrorPool[T] {\n+\tp.panicIfInitialized()\n \tp.collectErrored = true\n \treturn p\n }\n@@ -49,6 +53,7 @@ func (p *ResultErrorPool[T]) WithCollectErrored() *ResultErrorPool[T] {\n // For example, WithCancelOnError can be configured on the returned pool to\n // signal that all goroutines should be cancelled upon the first error.\n func (p *ResultErrorPool[T]) WithContext(ctx context.Context) *ResultContextPool[T] {\n+\tp.panicIfInitialized()\n \treturn &ResultContextPool[T]{\n \t\tcontextPool: *p.errorPool.WithContext(ctx),\n \t}\n@@ -57,6 +62,7 @@ func (p *ResultErrorPool[T]) WithContext(ctx context.Context) *ResultContextPool\n // WithFirstError configures the pool to only return the first error\n // returned by a task. By default, Wait() will return a combined error.\n func (p *ResultErrorPool[T]) WithFirstError() *ResultErrorPool[T] {\n+\tp.panicIfInitialized()\n \tp.errorPool.WithFirstError()\n \treturn p\n }\n@@ -64,6 +70,11 @@ func (p *ResultErrorPool[T]) WithFirstError() *ResultErrorPool[T] {\n // WithMaxGoroutines limits the number of goroutines in a pool.\n // Defaults to unlimited. Panics if n < 1.\n func (p *ResultErrorPool[T]) WithMaxGoroutines(n int) *ResultErrorPool[T] {\n+\tp.panicIfInitialized()\n \tp.errorPool.WithMaxGoroutines(n)\n \treturn p\n }\n+\n+func (p *ResultErrorPool[T]) panicIfInitialized() {\n+\tp.errorPool.panicIfInitialized()\n+}\ndiff --git a/pool/result_error_pool_test.go b/pool/result_error_pool_test.go\nindex 26db0da..ab27c49 100644\n--- a/pool/result_error_pool_test.go\n+++ b/pool/result_error_pool_test.go\n@@ -17,6 +17,23 @@ func TestResultErrorGroup(t *testing.T) {\n \terr1 := errors.New(\"err1\")\n \terr2 := errors.New(\"err2\")\n \n+\tt.Run(\"panics on configuration after init\", func(t *testing.T) {\n+\t\tt.Run(\"before wait\", func(t *testing.T) {\n+\t\t\tt.Parallel()\n+\t\t\tg := NewWithResults[int]().WithErrors()\n+\t\t\tg.Go(func() (int, error) { return 0, nil })\n+\t\t\trequire.Panics(t, func() { g.WithMaxGoroutines(10) })\n+\t\t})\n+\n+\t\tt.Run(\"after wait\", func(t *testing.T) {\n+\t\t\tt.Parallel()\n+\t\t\tg := NewWithResults[int]().WithErrors()\n+\t\t\tg.Go(func() (int, error) { return 0, nil })\n+\t\t\t_, _ = g.Wait()\n+\t\t\trequire.Panics(t, func() { g.WithMaxGoroutines(10) })\n+\t\t})\n+\t})\n+\n \tt.Run(\"wait returns no error if no errors\", func(t *testing.T) {\n \t\tt.Parallel()\n \t\tg := NewWithResults[int]().WithErrors()\ndiff --git a/pool/result_pool.go b/pool/result_pool.go\nindex e1b1ab5..ea304cb 100644\n--- a/pool/result_pool.go\n+++ b/pool/result_pool.go\n@@ -6,6 +6,9 @@ import (\n )\n \n // NewWithResults creates a new ResultPool for tasks with a result of type T.\n+//\n+// The configuration methods (With*) will panic if they are used after calling\n+// Go() for the first time.\n func NewWithResults[T any]() *ResultPool[T] {\n \treturn &ResultPool[T]{\n \t\tpool: *New(),\n@@ -47,6 +50,7 @@ func (p *ResultPool[T]) MaxGoroutines() int {\n // WithErrors converts the pool to an ResultErrorPool so the submitted tasks\n // can return errors.\n func (p *ResultPool[T]) WithErrors() *ResultErrorPool[T] {\n+\tp.panicIfInitialized()\n \treturn &ResultErrorPool[T]{\n \t\terrorPool: *p.pool.WithErrors(),\n \t}\n@@ -57,6 +61,7 @@ func (p *ResultPool[T]) WithErrors() *ResultErrorPool[T] {\n // For example, WithCancelOnError can be configured on the returned pool to\n // signal that all goroutines should be cancelled upon the first error.\n func (p *ResultPool[T]) WithContext(ctx context.Context) *ResultContextPool[T] {\n+\tp.panicIfInitialized()\n \treturn &ResultContextPool[T]{\n \t\tcontextPool: *p.pool.WithContext(ctx),\n \t}\n@@ -65,10 +70,15 @@ func (p *ResultPool[T]) WithContext(ctx context.Context) *ResultContextPool[T] {\n // WithMaxGoroutines limits the number of goroutines in a pool.\n // Defaults to unlimited. Panics if n < 1.\n func (p *ResultPool[T]) WithMaxGoroutines(n int) *ResultPool[T] {\n+\tp.panicIfInitialized()\n \tp.pool.WithMaxGoroutines(n)\n \treturn p\n }\n \n+func (p *ResultPool[T]) panicIfInitialized() {\n+\tp.pool.panicIfInitialized()\n+}\n+\n // resultAggregator is a utility type that lets us safely append from multiple\n // goroutines. The zero value is valid and ready to use.\n type resultAggregator[T any] struct {\ndiff --git a/pool/result_pool_test.go b/pool/result_pool_test.go\nindex c7ed5d5..1663968 100644\n--- a/pool/result_pool_test.go\n+++ b/pool/result_pool_test.go\n@@ -31,6 +31,22 @@ func ExampleResultPool() {\n func TestResultGroup(t *testing.T) {\n \tt.Parallel()\n \n+\tt.Run(\"panics on configuration after init\", func(t *testing.T) {\n+\t\tt.Run(\"before wait\", func(t *testing.T) {\n+\t\t\tt.Parallel()\n+\t\t\tg := NewWithResults[int]()\n+\t\t\tg.Go(func() int { return 0 })\n+\t\t\trequire.Panics(t, func() { g.WithMaxGoroutines(10) })\n+\t\t})\n+\n+\t\tt.Run(\"after wait\", func(t *testing.T) {\n+\t\t\tt.Parallel()\n+\t\t\tg := NewWithResults[int]()\n+\t\t\tg.Go(func() int { return 0 })\n+\t\t\trequire.Panics(t, func() { g.WithMaxGoroutines(10) })\n+\t\t})\n+\t})\n+\n \tt.Run(\"basic\", func(t *testing.T) {\n \t\tt.Parallel()\n \t\tg := NewWithResults[int]()\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/go.yml",
+    ".golangci.yml",
+    "LICENSE",
+    "README.md",
+    "go.mod",
+    "go.sum",
+    "iter/iter.go",
+    "iter/iter_test.go",
+    "iter/map.go",
+    "iter/map_test.go",
+    "panics/panics.go",
+    "panics/panics_test.go",
+    "panics/try.go",
+    "panics/try_test.go",
+    "pool/context_pool.go",
+    "pool/context_pool_test.go",
+    "pool/error_pool.go",
+    "pool/error_pool_test.go",
+    "pool/pool.go",
+    "pool/pool_test.go",
+    "pool/result_context_pool.go",
+    "pool/result_context_pool_test.go",
+    "pool/result_error_pool.go",
+    "pool/result_error_pool_test.go",
+    "pool/result_pool.go",
+    "pool/result_pool_test.go",
+    "stream/stream.go",
+    "stream/stream_test.go",
+    "waitgroup.go",
+    "waitgroup_test.go"
+  ],
+  "explanation": {
+    "what": "Pool およびそれを埋め込む ErrorPool / ContextPool / ResultPool / ResultErrorPool / ResultContextPool の全ての With* 系設定メソッドの先頭に panicIfInitialized() の呼び出しを追加した。Pool.panicIfInitialized は内部フィールド tasks が既に非nil(= Go() が一度でも呼ばれて初期化済み)であれば panic するようにし、他のプール型は自分が埋め込む下位プールの panicIfInitialized を呼ぶだけの委譲になっている。各プールのテストに「初期化後に設定変更するとpanicすること」を確認するケースが追加された。",
+    "why": "PR本文にある通り、Go() を最初に呼んだ後にプールを再設定することは安全ではないが、それがAPIやドキュメントから読み取りにくかった。誤って再設定してしまうバグを早期に・分かりやすく検出できるよう、保守的にpanicで防ぐガードを追加した。",
+    "highlights": [
+      { "file": "pool/pool.go", "note": "panicIfInitializedの実体。p.tasksがnilでなければ初期化済みとみなしpanicする" },
+      { "file": "pool/context_pool.go", "note": "自身のerrorPool.panicIfInitialized()に委譲するだけの薄い転送。埋め込み型それぞれに同じパターンが横展開されている" }
+    ],
+    "langNotes": [
+      { "topic": "panic によるAPI誤用の防止", "note": "Goにはビルダーパターンの呼び出し順序をコンパイル時に強制する仕組みが乏しいため、誤った順序での呼び出しは実行時のpanicで防ぐことが多い。このコミットは「Go()呼び出し後の再設定」という誤用をpanicで即座に顕在化させ、サイレントな未定義動作を防いでいる。" }
+    ],
+    "diagram": {
+      "mermaid": "flowchart TD\n  A[\"Pool.panicIfInitialized()\"] --> B[\"ErrorPool.panicIfInitialized()\"]\n  B --> C[\"ContextPool.panicIfInitialized()\"]\n  B --> D[\"ResultErrorPool.panicIfInitialized()\"]\n  D --> E[\"ResultContextPool.panicIfInitialized()\"]\n  A --> F[\"ResultPool.panicIfInitialized()\"]\n  F --> D",
+      "caption": "panicIfInitializedの委譲関係。各プール型は自身が埋め込む下位プールのpanicIfInitializedを呼ぶだけ"
+    },
+    "evidence": "pr",
+    "refs": [{ "type": "pr", "number": 83, "url": "https://github.com/sourcegraph/conc/pull/83" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

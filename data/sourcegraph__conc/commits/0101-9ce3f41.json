@@ -1,0 +1,133 @@
+{
+  "seq": 101,
+  "sha": "9ce3f41e47664d6ecaf05e6257fa14b2e9d49079",
+  "parents": [
+    "4e988f8ab38cf3069b9ed0579ad2ecb0490b302f",
+    "c0f5cdbe044f2b68e0672139a8ba3ae98859740e"
+  ],
+  "author": {
+    "name": "Robert Lin",
+    "email": "robertlin1@gmail.com",
+    "date": "2023-01-08T17:39:50-08:00"
+  },
+  "message": "Merge pull request #38 from sourcegraph/panic-subpackage\n\npanics: move PanicCatcher to separate package",
+  "pr": {
+    "number": 38,
+    "title": "panics: move PanicCatcher to separate package",
+    "body": "Proposal: move `conc.PanicCatcher` to a subpackage, `conc/panics.Catcher`. We cannot use `panic` as a package name without conflicting with the builtin `panic()`.\r\n\r\nIMO it is a bit strange for `PanicCatcher` to be part of the top-level `conc` package, since:\r\n\r\n1. Most users of `conc.WaitGroup`, `conc/pool`, etc will never interact directly with panic catcher\r\n2. While `PanicCatcher` can be used multiple times and concurrently, it only ever retains a single panic, so regardless of safety, in a standalone usecase I imagine one might use an instance of `PanicCatcher` for one goroutine at a time to get more granular `RecoveredPanic`s, so it doesn't really fit in with the theme of `conc` and is more of a utility.",
+    "url": "https://github.com/sourcegraph/conc/pull/38"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 8,
+    "additions": 117,
+    "deletions": 22
+  },
+  "files": [
+    {
+      "path": "README.md",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "go.mod",
+      "status": "M",
+      "additions": 5,
+      "deletions": 2,
+      "binary": false
+    },
+    {
+      "path": "go.sum",
+      "status": "M",
+      "additions": 4,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "panic.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "panics/panics.go",
+      "status": "A",
+      "additions": 85,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "panics/panics_test.go",
+      "status": "R",
+      "additions": 16,
+      "deletions": 16,
+      "binary": false,
+      "oldPath": "panic_test.go"
+    },
+    {
+      "path": "stream/stream.go",
+      "status": "M",
+      "additions": 2,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "waitgroup.go",
+      "status": "M",
+      "additions": 3,
+      "deletions": 1,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/README.md b/README.md\nindex 5df21a6..9e6ebf8 100644\n--- a/README.md\n+++ b/README.md\n@@ -25,7 +25,7 @@ go get github.com/sourcegraph/conc\n - Use [`stream.Stream`](https://pkg.go.dev/github.com/sourcegraph/conc/stream#Stream) if you want to process an ordered stream of tasks in parallel with serial callbacks\n - Use [`iter.Map`](https://pkg.go.dev/github.com/sourcegraph/conc/iter#Map) if you want to concurrently map a slice\n - Use [`iter.ForEach`](https://pkg.go.dev/github.com/sourcegraph/conc/iter#ForEach) if you want to concurrently iterate over a slice\n-- Use [`conc.PanicCatcher`](https://pkg.go.dev/github.com/sourcegraph/conc#PanicCatcher) if you want to catch panics in your own goroutines\n+- Use [`panics.Catcher`](https://pkg.go.dev/github.com/sourcegraph/conc/panics#Catcher) if you want to catch panics in your own goroutines\n \n All pools are created with\n [`pool.New()`](https://pkg.go.dev/github.com/sourcegraph/conc/pool#New)\ndiff --git a/go.mod b/go.mod\nindex bb7ae75..18c95d6 100644\n--- a/go.mod\n+++ b/go.mod\n@@ -2,6 +2,11 @@ module github.com/sourcegraph/conc\n \n go 1.19\n \n+require (\n+\tgithub.com/sourcegraph/sourcegraph/lib v0.0.0-20221216004406-749998a2ac74\n+\tgithub.com/stretchr/testify v1.8.1\n+)\n+\n require (\n \tgithub.com/cockroachdb/errors v1.9.0 // indirect\n \tgithub.com/cockroachdb/logtags v0.0.0-20211118104740-dabe8e521a4f // indirect\n@@ -14,8 +19,6 @@ require (\n \tgithub.com/pkg/errors v0.9.1 // indirect\n \tgithub.com/pmezard/go-difflib v1.0.0 // indirect\n \tgithub.com/rogpeppe/go-internal v1.9.0 // indirect\n-\tgithub.com/sourcegraph/sourcegraph/lib v0.0.0-20221216004406-749998a2ac74 // indirect\n-\tgithub.com/stretchr/testify v1.8.1 // indirect\n \tgolang.org/x/sys v0.0.0-20220829200755-d48e67d00261 // indirect\n \tgopkg.in/yaml.v3 v3.0.1 // indirect\n )\ndiff --git a/go.sum b/go.sum\nindex 02deb5b..4e35a3b 100644\n--- a/go.sum\n+++ b/go.sum\n@@ -59,6 +59,7 @@ github.com/getsentry/sentry-go v0.13.0/go.mod h1:EOsfu5ZdvKPfeHYV6pTVQnsjfp30+XA\n github.com/gin-contrib/sse v0.0.0-20190301062529-5545eab6dad3/go.mod h1:VJ0WA2NBN22VlZ2dKZQPAPnyWw5XTlK1KymzLKsr59s=\n github.com/gin-gonic/gin v1.4.0/go.mod h1:OW2EZn3DO8Ln9oIKOvM++LBO+5UPHJJDH72/q/3rZdM=\n github.com/go-check/check v0.0.0-20180628173108-788fd7840127/go.mod h1:9ES+weclKsC9YodN5RgxqK/VD9HM9JsCSh7rNhMZE98=\n+github.com/go-errors/errors v1.0.1 h1:LUHzmkK3GUKUrL/1gfBUxAHzcev3apQlezX/+O7ma6w=\n github.com/go-errors/errors v1.0.1/go.mod h1:f4zRHt4oKfwPJE5k8C9vpYG+aDHdBFUsgrm6/TyX73Q=\n github.com/go-martini/martini v0.0.0-20170121215854-22fa46961aab/go.mod h1:/P9AEU963A2AYjv4d1V5eVL1CQbEJq6aCNHDDjibzu8=\n github.com/gobwas/httphead v0.0.0-20180130184737-2c6c146eadee/go.mod h1:L0fX3K22YWvt/FAX9NnzrNzcI4wNYi9Yku4O0LKYflo=\n@@ -94,6 +95,7 @@ github.com/google/go-cmp v0.3.1/go.mod h1:8QqcDgzrUqlUb/G2PQTWiueGozuR1884gddMyw\n github.com/google/go-cmp v0.4.0/go.mod h1:v8dTdLbMG2kIc/vJvl+f65V22dbkXbowE6jgT/gNBxE=\n github.com/google/go-cmp v0.5.0/go.mod h1:v8dTdLbMG2kIc/vJvl+f65V22dbkXbowE6jgT/gNBxE=\n github.com/google/go-cmp v0.5.5/go.mod h1:v8dTdLbMG2kIc/vJvl+f65V22dbkXbowE6jgT/gNBxE=\n+github.com/google/go-cmp v0.5.8 h1:e6P7q2lk1O+qJJb4BtCQXlK8vWEO8V1ZeuEdJNOqZyg=\n github.com/google/go-querystring v1.0.0/go.mod h1:odCYkC5MyYFN7vkCjXpyrEuKhc/BUO6wN/zVPAxq5ck=\n github.com/google/gofuzz v1.0.0/go.mod h1:dBl0BpW6vV/+mYPU4Po3pmUjxk6FQPldtuIdl/M65Eg=\n github.com/google/uuid v1.1.2/go.mod h1:TIyPZe4MgqvfeYDBFedMoGGpEw/LqOeaOT+nhxU+yHo=\n@@ -181,6 +183,7 @@ github.com/onsi/ginkgo v1.13.0/go.mod h1:+REjRxOmWfHCjfv9TTWB1jD1Frx4XydAD3zm1ls\n github.com/onsi/gomega v1.7.1/go.mod h1:XdKZgCCFLUoM/7CFJVPcG8C1xQ1AJ0vpAezJrB7JYyY=\n github.com/onsi/gomega v1.10.1/go.mod h1:iN09h71vgCQne3DLsj+A5owkum+a2tYe+TOCB1ybHNo=\n github.com/pelletier/go-toml v1.2.0/go.mod h1:5z9KED0ma1S8pY6P1sdut58dfprrGBbd/94hg7ilaic=\n+github.com/pingcap/errors v0.11.4 h1:lFuQV/oaUMGcD2tqt+01ROSmJs75VG1ToEOkZIZ4nE4=\n github.com/pingcap/errors v0.11.4/go.mod h1:Oi8TUi2kEtXXLMJk9l1cGmz20kV3TaQ0usTwv5KuLY8=\n github.com/pkg/diff v0.0.0-20210226163009-20ebb0f2a09e/go.mod h1:pJLUxLENpZxwdsKMEsNbx1VGcRFpLqf3715MtcvvzbA=\n github.com/pkg/errors v0.8.1/go.mod h1:bwawxfHBFNV+L2hUp1rHADufV3IMtnDRdf1r5NINEl0=\n@@ -367,6 +370,7 @@ google.golang.org/protobuf v1.26.0-rc.1/go.mod h1:jlhhOSvTdKEhbULTjvd4ARK9grFBp0\n google.golang.org/protobuf v1.26.0/go.mod h1:9q0QmTI4eRPtz6boOQmLYwt+qCgq0jsYwAQnmE0givc=\n gopkg.in/check.v1 v0.0.0-20161208181325-20d25e280405/go.mod h1:Co6ibVJAznAaIkqp8huTwlJQCZ016jof/cbN4VW5Yz0=\n gopkg.in/check.v1 v1.0.0-20180628173108-788fd7840127/go.mod h1:Co6ibVJAznAaIkqp8huTwlJQCZ016jof/cbN4VW5Yz0=\n+gopkg.in/check.v1 v1.0.0-20190902080502-41f04d3bba15 h1:YR8cESwS4TdDjEe65xsg0ogRM/Nc3DYOhEAlW+xobZo=\n gopkg.in/check.v1 v1.0.0-20190902080502-41f04d3bba15/go.mod h1:Co6ibVJAznAaIkqp8huTwlJQCZ016jof/cbN4VW5Yz0=\n gopkg.in/errgo.v2 v2.1.0/go.mod h1:hNsd1EY+bozCKY1Ytp96fpM3vjJbqLJn88ws8XvfDNI=\n gopkg.in/fsnotify.v1 v1.4.7/go.mod h1:Tz8NjZHkW78fSQdbUxIjBTcgA1z1m8ZHf0WmKUhAMys=\ndiff --git a/panic.go b/panic.go\nindex 390e6d9..2b02986 100644\n--- a/panic.go\n+++ b/panic.go\n@@ -10,7 +10,7 @@ import (\n // PanicCatcher is used to catch panics. You can execute a function with Try,\n // which will catch any spawned panic. Try can be called any number of times,\n // from any number of goroutines. Once all calls to Try have completed, you can\n-// get the value of the first panic (if any) with Value(), or you can just\n+// get the value of the first panic (if any) with Recovered(), or you can just\n // propagate the panic (re-panic) with Repanic().\n type PanicCatcher struct {\n \trecovered atomic.Pointer[RecoveredPanic]\ndiff --git a/panics/panics.go b/panics/panics.go\nnew file mode 100644\nindex 0000000..829a218\n--- /dev/null\n+++ b/panics/panics.go\n@@ -0,0 +1,85 @@\n+package panics\n+\n+import (\n+\t\"fmt\"\n+\t\"runtime\"\n+\t\"runtime/debug\"\n+\t\"sync/atomic\"\n+)\n+\n+// Catcher is used to catch panics. You can execute a function with Try,\n+// which will catch any spawned panic. Try can be called any number of times,\n+// from any number of goroutines. Once all calls to Try have completed, you can\n+// get the value of the first panic (if any) with Value(), or you can just\n+// propagate the panic (re-panic) with Repanic().\n+type Catcher struct {\n+\trecovered atomic.Pointer[RecoveredPanic]\n+}\n+\n+// Try executes f, catching any panic it might spawn. It is safe\n+// to call from multiple goroutines simultaneously.\n+func (p *Catcher) Try(f func()) {\n+\tdefer p.tryRecover()\n+\tf()\n+}\n+\n+func (p *Catcher) tryRecover() {\n+\tif val := recover(); val != nil {\n+\t\trp := NewRecoveredPanic(1, val)\n+\t\tp.recovered.CompareAndSwap(nil, &rp)\n+\t}\n+}\n+\n+// Repanic panics if any calls to Try caught a panic. It will panic with the\n+// value of the first panic caught, wrapped in a RecoveredPanic with caller\n+// information.\n+func (p *Catcher) Repanic() {\n+\tif val := p.Recovered(); val != nil {\n+\t\tpanic(val)\n+\t}\n+}\n+\n+// Recovered returns the value of the first panic caught by Try, or nil if\n+// no calls to Try panicked.\n+func (p *Catcher) Recovered() *RecoveredPanic {\n+\treturn p.recovered.Load()\n+}\n+\n+// NewRecoveredPanic creates a RecoveredPanic from a panic value and a\n+// collected stacktrace. The skip parameter allows the caller to skip stack\n+// frames when collecting the stacktrace. Calling with a skip of 0 means\n+// include the call to NewRecoveredPanic in the stacktrace.\n+func NewRecoveredPanic(skip int, value any) RecoveredPanic {\n+\t// 64 frames should be plenty\n+\tvar callers [64]uintptr\n+\tn := runtime.Callers(skip+1, callers[:])\n+\treturn RecoveredPanic{\n+\t\tValue:   value,\n+\t\tCallers: callers[:n],\n+\t\tStack:   debug.Stack(),\n+\t}\n+}\n+\n+// RecoveredPanic is a panic that was caught with recover().\n+type RecoveredPanic struct {\n+\t// The original value of the panic.\n+\tValue any\n+\t// The caller list as returned by runtime.Callers when the panic was\n+\t// recovered. Can be used to produce a more detailed stack information with\n+\t// runtime.CallersFrames.\n+\tCallers []uintptr\n+\t// The formatted stacktrace from the goroutine where the panic was recovered.\n+\t// Easier to use than Callers.\n+\tStack []byte\n+}\n+\n+func (c *RecoveredPanic) Error() string {\n+\treturn fmt.Sprintf(\"panic: %v\\nstacktrace:\\n%s\\n\", c.Value, c.Stack)\n+}\n+\n+func (c *RecoveredPanic) Unwrap() error {\n+\tif err, ok := c.Value.(error); ok {\n+\t\treturn err\n+\t}\n+\treturn nil\n+}\ndiff --git a/panic_test.go b/panics/panics_test.go\nsimilarity index 76%\nrename from panic_test.go\nrename to panics/panics_test.go\nindex ab245b3..81b40b6 100644\n--- a/panic_test.go\n+++ b/panics/panics_test.go\n@@ -1,4 +1,4 @@\n-package conc\n+package panics\n \n import (\n \t\"errors\"\n@@ -10,8 +10,8 @@ import (\n \t\"github.com/stretchr/testify/require\"\n )\n \n-func ExamplePanicCatcher() {\n-\tvar pc PanicCatcher\n+func ExampleCatcher() {\n+\tvar pc Catcher\n \ti := 0\n \tpc.Try(func() { i += 1 })\n \tpc.Try(func() { panic(\"abort!\") })\n@@ -26,8 +26,8 @@ func ExamplePanicCatcher() {\n \t// abort!\n }\n \n-func ExamplePanicCatcher_callers() {\n-\tvar pc PanicCatcher\n+func ExampleCatcher_callers() {\n+\tvar pc Catcher\n \tpc.Try(func() { panic(\"mayday!\") })\n \n \trecovered := pc.Recovered()\n@@ -47,11 +47,11 @@ func ExamplePanicCatcher_callers() {\n \t\t}\n \t}\n \t// Output:\n-\t// github.com/sourcegraph/conc.(*PanicCatcher).tryRecover\n+\t// github.com/sourcegraph/conc/panics.(*Catcher).tryRecover\n \t// runtime.gopanic\n-\t// github.com/sourcegraph/conc.ExamplePanicCatcher_callers.func1\n-\t// github.com/sourcegraph/conc.(*PanicCatcher).Try\n-\t// github.com/sourcegraph/conc.ExamplePanicCatcher_callers\n+\t// github.com/sourcegraph/conc/panics.ExampleCatcher_callers.func1\n+\t// github.com/sourcegraph/conc/panics.(*Catcher).Try\n+\t// github.com/sourcegraph/conc/panics.ExampleCatcher_callers\n \t// testing.runExample\n \t// testing.runExamples\n \t// testing.(*M).Run\n@@ -60,11 +60,11 @@ func ExamplePanicCatcher_callers() {\n \t// runtime.goexit\n }\n \n-func TestPanicCatcher(t *testing.T) {\n+func TestCatcher(t *testing.T) {\n \terr1 := errors.New(\"SOS\")\n \n \tt.Run(\"error\", func(t *testing.T) {\n-\t\tvar pc PanicCatcher\n+\t\tvar pc Catcher\n \t\tpc.Try(func() { panic(err1) })\n \t\trecovered := pc.Recovered()\n \t\trequire.ErrorIs(t, recovered, err1)\n@@ -73,11 +73,11 @@ func TestPanicCatcher(t *testing.T) {\n \t\t// and even the structure of the stacktrace is bound to be unstable over time. Just\n \t\t// test a couple of basics.\n \t\trequire.Contains(t, recovered.Error(), \"SOS\", \"error should contain the panic message\")\n-\t\trequire.Contains(t, recovered.Error(), \"conc.(*PanicCatcher).Try\", recovered.Error(), \"error should contain the stack trace\")\n+\t\trequire.Contains(t, recovered.Error(), \"panics.(*Catcher).Try\", recovered.Error(), \"error should contain the stack trace\")\n \t})\n \n \tt.Run(\"not error\", func(t *testing.T) {\n-\t\tvar pc PanicCatcher\n+\t\tvar pc Catcher\n \t\tpc.Try(func() { panic(\"definitely not an error\") })\n \t\trecovered := pc.Recovered()\n \t\trequire.NotErrorIs(t, recovered, err1)\n@@ -85,20 +85,20 @@ func TestPanicCatcher(t *testing.T) {\n \t})\n \n \tt.Run(\"repanic panics\", func(t *testing.T) {\n-\t\tvar pc PanicCatcher\n+\t\tvar pc Catcher\n \t\tpc.Try(func() { panic(err1) })\n \t\trequire.Panics(t, pc.Repanic)\n \t})\n \n \tt.Run(\"repanic does not panic without child panic\", func(t *testing.T) {\n-\t\tvar pc PanicCatcher\n+\t\tvar pc Catcher\n \t\tpc.Try(func() { _ = 1 })\n \t\trequire.NotPanics(t, pc.Repanic)\n \t})\n \n \tt.Run(\"is goroutine safe\", func(t *testing.T) {\n \t\tvar wg sync.WaitGroup\n-\t\tvar pc PanicCatcher\n+\t\tvar pc Catcher\n \t\tfor i := 0; i < 100; i++ {\n \t\t\ti := i\n \t\t\twg.Add(1)\ndiff --git a/stream/stream.go b/stream/stream.go\nindex bddf262..64aa886 100644\n--- a/stream/stream.go\n+++ b/stream/stream.go\n@@ -5,6 +5,7 @@ import (\n \t\"sync\"\n \n \t\"github.com/sourcegraph/conc\"\n+\t\"github.com/sourcegraph/conc/panics\"\n \t\"github.com/sourcegraph/conc/pool\"\n )\n \n@@ -116,7 +117,7 @@ func (s *Stream) init() {\n // callbacker is responsible for calling the returned callbacks in the order\n // they were submitted. There is only a single instance of callbacker running.\n func (s *Stream) callbacker() {\n-\tvar panicCatcher conc.PanicCatcher\n+\tvar panicCatcher panics.Catcher\n \tdefer panicCatcher.Repanic()\n \n \t// For every scheduled task, read that tasks channel from the queue.\ndiff --git a/waitgroup.go b/waitgroup.go\nindex 0403348..214cd85 100644\n--- a/waitgroup.go\n+++ b/waitgroup.go\n@@ -2,6 +2,8 @@ package conc\n \n import (\n \t\"sync\"\n+\n+\t\"github.com/sourcegraph/conc/panics\"\n )\n \n // NewWaitGroup creates a new WaitGroup.\n@@ -19,7 +21,7 @@ func NewWaitGroup() *WaitGroup {\n // Also like sync.WaitGroup, it must not be copied after first use.\n type WaitGroup struct {\n \twg sync.WaitGroup\n-\tpc PanicCatcher\n+\tpc panics.Catcher\n }\n \n // Go spawns a new goroutine in the WaitGroup.\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/go.yml",
+    ".golangci.yml",
+    "LICENSE",
+    "README.md",
+    "go.mod",
+    "go.sum",
+    "iter/iter.go",
+    "iter/iter_test.go",
+    "panic.go",
+    "panics/panics.go",
+    "panics/panics_test.go",
+    "pool/context_pool.go",
+    "pool/context_pool_test.go",
+    "pool/error_pool.go",
+    "pool/error_pool_test.go",
+    "pool/pool.go",
+    "pool/pool_test.go",
+    "pool/result_context_pool.go",
+    "pool/result_context_pool_test.go",
+    "pool/result_error_pool.go",
+    "pool/result_error_pool_test.go",
+    "pool/result_pool.go",
+    "pool/result_pool_test.go",
+    "stream/stream.go",
+    "stream/stream_test.go",
+    "waitgroup.go",
+    "waitgroup_test.go"
+  ],
+  "explanation": {
+    "what": "conc.PanicCatcher を conc パッケージ直下から新設の panics サブパッケージ(panics.Catcher)へ移動した。あわせて RecoveredPanic・NewRecoveredPanic も panics パッケージに移り、waitgroup.go や stream/stream.go の参照箇所、README のリンクも panics.Catcher 表記に更新されている。panic_test.go は panics/panics_test.go にリネームされ、package 名も panics に変わった。",
+    "why": "PR本文で、PanicCatcher を conc 直下に置くのは奇妙だと説明されている。WaitGroup や pool を使うほとんどのユーザーは PanicCatcher を直接使わず、単体で使う場合も1ゴルーチンにつき1インスタンスという使い方が conc 全体のテーマ(構造化並行処理)とは毛色が異なるユーティリティだから、という設計判断が述べられている。なお package 名を panic にできないのは組み込み関数 panic() と衝突するためで、それも本文で明言されている。",
+    "highlights": [
+      { "file": "panics/panics.go", "note": "PanicCatcher→Catcher に改名して独立パッケージ化された本体。Try/Repanic/Recovered の3メソッド構成は移動前と同じ" },
+      { "file": "waitgroup.go", "note": "WaitGroup が内部フィールドを PanicCatcher から panics.Catcher に切り替えている箇所" }
+    ],
+    "langNotes": [
+      { "topic": "package名の予約語衝突", "note": "Go では組み込み関数 panic() があるため、パッケージ名に panic を使うと呼び出し側で panic.Xxx のような記法が組み込みの panic と紛らわしくなる(実際には使用可能だが避けられた)。本コミットでは複数形の panics を採用して回避している。" },
+      { "topic": "atomic.Pointer[T]", "note": "Catcher.recovered は sync/atomic の atomic.Pointer[RecoveredPanic] というジェネリック型で、複数ゴルーチンから安全に最初のパニックだけを CompareAndSwap で記録する実装になっている。" }
+    ],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [{ "type": "pr", "number": 38, "url": "https://github.com/sourcegraph/conc/pull/38" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

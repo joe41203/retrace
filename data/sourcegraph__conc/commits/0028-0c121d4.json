@@ -1,0 +1,94 @@
+{
+  "seq": 28,
+  "sha": "0c121d47b63052555063eba41137aa6ba785efed",
+  "parents": [
+    "ed339cc27f5def87a8ddc909b9dc19edccbb7867"
+  ],
+  "author": {
+    "name": "Camden Cheek",
+    "email": "camden@ccheek.com",
+    "date": "2022-12-24T21:28:05-07:00"
+  },
+  "message": "make pool zero value usable",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 29,
+    "deletions": 15
+  },
+  "files": [
+    {
+      "path": "limiter.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 3,
+      "binary": false
+    },
+    {
+      "path": "pool/pool.go",
+      "status": "M",
+      "additions": 28,
+      "deletions": 12,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/limiter.go b/limiter.go\nindex a6e513f..c3f87a5 100644\n--- a/limiter.go\n+++ b/limiter.go\n@@ -1,9 +1,7 @@\n package conc\n \n+// Limiter is a simple channel-based semaphore.\n func NewLimiter(n int) Limiter {\n-\tif n < 1 {\n-\t\treturn nil\n-\t}\n \treturn make(Limiter, n)\n }\n \ndiff --git a/pool/pool.go b/pool/pool.go\nindex 7bf36a0..e52a4cd 100644\n--- a/pool/pool.go\n+++ b/pool/pool.go\n@@ -3,28 +3,25 @@ package pool\n import (\n \t\"context\"\n \t\"runtime\"\n+\t\"sync\"\n \n \t\"github.com/camdencheek/conc\"\n )\n \n func New() *Pool {\n-\treturn &Pool{\n-\t\tlimiter: make(conc.Limiter, runtime.GOMAXPROCS(0)),\n-\t\t// tasks is not buffered because if it were, it would be possible to\n-\t\t// submit tasks but never be forced to start a worker goroutine. If\n-\t\t// goroutines were started eagerly, this wouldn't be a problem, but\n-\t\t// I think it's preferable to minimize the cost of creating a pool.\n-\t\ttasks: make(chan func()),\n-\t}\n+\treturn &Pool{}\n }\n \n type Pool struct {\n-\thandle  conc.WaitGroup\n-\tlimiter conc.Limiter\n-\ttasks   chan func()\n+\thandle   conc.WaitGroup\n+\tlimiter  conc.Limiter\n+\ttasks    chan func()\n+\tinitOnce sync.Once\n }\n \n func (p *Pool) Go(f func()) {\n+\tp.init()\n+\n \tselect {\n \tcase p.limiter <- struct{}{}:\n \t\t// If we are below our limit, spawn a new worker rather\n@@ -42,6 +39,7 @@ func (p *Pool) Go(f func()) {\n }\n \n func (p *Pool) Wait() {\n+\tp.init()\n \tclose(p.tasks)\n \tp.handle.Wait()\n }\n@@ -50,8 +48,26 @@ func (p *Pool) MaxGoroutines() int {\n \treturn p.limiter.Limit()\n }\n \n+// init ensures that the pool is initialized before use. This makes the\n+// zero value of the pool usable.\n+func (p *Pool) init() {\n+\tp.initOnce.Do(func() {\n+\t\t// Do not override the limiter if set by WithMaxGoroutines\n+\t\tif p.limiter == nil {\n+\t\t\tp.limiter = make(conc.Limiter, runtime.GOMAXPROCS(0))\n+\t\t}\n+\n+\t\tp.tasks = make(chan func())\n+\t})\n+}\n+\n+// WithMaxGoroutines limits the number of goroutines in a pool.\n+// Panics if n < 1.\n func (p *Pool) WithMaxGoroutines(n int) *Pool {\n-\tp.limiter = make(chan struct{}, n)\n+\tif n < 1 {\n+\t\tpanic(\"max goroutines in a pool must be greater than zero\")\n+\t}\n+\tp.limiter = conc.NewLimiter(n)\n \treturn p\n }\n \n",
+  "diffTruncated": false,
+  "tree": [
+    "LICENSE",
+    "go.mod",
+    "go.sum",
+    "group/context_group.go",
+    "group/context_group_test.go",
+    "group/error_group.go",
+    "group/error_group_test.go",
+    "group/group.go",
+    "group/group_test.go",
+    "group/iter.go",
+    "group/iter_test.go",
+    "group/result_context_group.go",
+    "group/result_context_group_test.go",
+    "group/result_error_group.go",
+    "group/result_error_group_test.go",
+    "group/result_group.go",
+    "group/result_group_test.go",
+    "iter.go",
+    "limiter.go",
+    "panic.go",
+    "pool/context_pool.go",
+    "pool/context_pool_test.go",
+    "pool/error_pool.go",
+    "pool/error_pool_test.go",
+    "pool/iter.go",
+    "pool/iter_test.go",
+    "pool/pool.go",
+    "pool/pool_test.go",
+    "pool/result_context_pool.go",
+    "pool/result_context_pool_test.go",
+    "pool/result_error_pool.go",
+    "pool/result_error_pool_test.go",
+    "pool/result_pool.go",
+    "pool/result_pool_test.go",
+    "stream/stream.go",
+    "stream/stream_test.go",
+    "waitgroup.go",
+    "waitgroup_test.go"
+  ],
+  "explanation": {
+    "what": "Pool 構造体に initOnce sync.Once フィールドを追加し、init() メソッドで limiter と tasks チャネルの初期化を遅延させることで `&Pool{}`(ゼロ値)がそのまま使えるようにした。Go()/Wait() の冒頭で p.init() を呼ぶよう変更。WithMaxGoroutines(n) は n<1 のとき panic するように変更し(以前は nil を返すだけの NewLimiter に委譲していた)、Limiter.go 側の `n < 1` の nilガードも削除している。",
+    "why": "従来は New() でしか正しく初期化されない Pool だったが、ゼロ値でも動作するようにすることで `var p pool.Pool` のような宣言でも使えるようにする意図だとおそらく考えられる。sync.Once による遅延初期化はゼロ値usableなAPI設計でよく使われるパターン。WithMaxGoroutines のpanic化は、n<1という不正な設定を黙って無視する(無制限として扱う)のではなく即座に呼び出し元のバグとして顕在化させる方針への転換だとおそらく考えられる。",
+    "highlights": [
+      { "file": "pool/pool.go", "note": "initOnce sync.Once による遅延初期化。init()内でlimiterが未設定(WithMaxGoroutines未呼び出し)の場合のみデフォルト値を設定" },
+      { "file": "limiter.go", "note": "NewLimiterからn<1のnilガードが削除され、不正値は上位のWithMaxGoroutinesでpanicする設計に変更" }
+    ],
+    "langNotes": [
+      { "topic": "sync.Once とゼロ値usableなAPI", "note": "sync.Once は Do(f) に渡した関数を一度だけ実行することを保証する型で、ゼロ値のまま使える。Go の設計慣習では「ゼロ値がそのまま有効な状態になる」ことが好まれ(zero value is useful)、コンストラクタ呼び出しを必須にしないための遅延初期化によく使われる。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

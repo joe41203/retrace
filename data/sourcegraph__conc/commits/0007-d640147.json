@@ -1,0 +1,120 @@
+{
+  "seq": 7,
+  "sha": "d640147ff86bffec0a4bed28cf909b222afa25e3",
+  "parents": [
+    "cd5f6c01401ba1d7b084e00741c5097141c181ee"
+  ],
+  "author": {
+    "name": "Camden Cheek",
+    "email": "camden@ccheek.com",
+    "date": "2022-12-15T22:08:30-07:00"
+  },
+  "message": "add result groups",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 8,
+    "additions": 305,
+    "deletions": 1
+  },
+  "files": [
+    {
+      "path": "group/result_context_group.go",
+      "status": "A",
+      "additions": 46,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "group/result_error_group.go",
+      "status": "A",
+      "additions": 47,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "group/result_group.go",
+      "status": "A",
+      "additions": 52,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "pool/iter.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "pool/pool.go",
+      "status": "M",
+      "additions": 14,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "pool/result_context_pool.go",
+      "status": "A",
+      "additions": 46,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "pool/result_error_pool.go",
+      "status": "A",
+      "additions": 47,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "pool/result_pool.go",
+      "status": "A",
+      "additions": 52,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/group/result_context_group.go b/group/result_context_group.go\nnew file mode 100644\nindex 0000000..2c4a181\n--- /dev/null\n+++ b/group/result_context_group.go\n@@ -0,0 +1,46 @@\n+package group\n+\n+import (\n+\t\"context\"\n+)\n+\n+type ResultContextGroup[T any] struct {\n+\tcontextGroup   ContextGroup\n+\tagg            resultAggregator[T]\n+\tcollectErrored bool\n+}\n+\n+func (g ResultContextGroup[T]) Go(f func(context.Context) (T, error)) {\n+\tg.contextGroup.Go(func(ctx context.Context) error {\n+\t\tres, err := f(ctx)\n+\t\tif err == nil || g.collectErrored {\n+\t\t\tg.agg.add(res)\n+\t\t}\n+\t\treturn err\n+\t})\n+}\n+\n+func (g ResultContextGroup[T]) Wait() ([]T, error) {\n+\terr := g.contextGroup.Wait()\n+\treturn g.agg.results, err\n+}\n+\n+func (g ResultContextGroup[T]) WithCollectErrored() ResultContextGroup[T] {\n+\tg.collectErrored = true\n+\treturn g\n+}\n+\n+func (g ResultContextGroup[T]) WithMaxConcurrency(limit int) ResultContextGroup[T] {\n+\tg.contextGroup = g.contextGroup.WithMaxConcurrency(limit)\n+\treturn g\n+}\n+\n+func (g ResultContextGroup[T]) WithCancelOnError() ResultContextGroup[T] {\n+\tg.contextGroup = g.contextGroup.WithCancelOnError()\n+\treturn g\n+}\n+\n+func (g ResultContextGroup[T]) WithFirstError() ResultContextGroup[T] {\n+\tg.contextGroup = g.contextGroup.WithFirstError()\n+\treturn g\n+}\ndiff --git a/group/result_error_group.go b/group/result_error_group.go\nnew file mode 100644\nindex 0000000..2f5cc35\n--- /dev/null\n+++ b/group/result_error_group.go\n@@ -0,0 +1,47 @@\n+package group\n+\n+import (\n+\t\"context\"\n+)\n+\n+type ResultErrorGroup[T any] struct {\n+\terrGroup       ErrorGroup\n+\tagg            resultAggregator[T]\n+\tcollectErrored bool\n+}\n+\n+func (g *ResultErrorGroup[T]) Do(f func() (T, error)) {\n+\tg.errGroup.Go(func() error {\n+\t\tres, err := f()\n+\t\tif err == nil || g.collectErrored {\n+\t\t\tg.agg.add(res)\n+\t\t}\n+\t\treturn err\n+\t})\n+}\n+\n+func (g *ResultErrorGroup[T]) Wait() ([]T, error) {\n+\terr := g.errGroup.Wait()\n+\treturn g.agg.results, err\n+}\n+\n+func (g ResultErrorGroup[T]) WithCollectErrored() ResultErrorGroup[T] {\n+\tg.collectErrored = true\n+\treturn g\n+}\n+\n+func (g ResultErrorGroup[T]) WithFirstError() ResultErrorGroup[T] {\n+\tg.errGroup = g.errGroup.WithFirstError()\n+\treturn g\n+}\n+\n+func (g ResultErrorGroup[T]) WithMaxConcurrency(limit int) ResultErrorGroup[T] {\n+\tg.errGroup = g.errGroup.WithMaxConcurrency(limit)\n+\treturn g\n+}\n+\n+func (g ResultErrorGroup[T]) WithContext(ctx context.Context) ResultContextGroup[T] {\n+\treturn ResultContextGroup[T]{\n+\t\tcontextGroup: g.errGroup.WithContext(ctx),\n+\t}\n+}\ndiff --git a/group/result_group.go b/group/result_group.go\nnew file mode 100644\nindex 0000000..dcdb478\n--- /dev/null\n+++ b/group/result_group.go\n@@ -0,0 +1,52 @@\n+package group\n+\n+import (\n+\t\"context\"\n+\t\"sync\"\n+)\n+\n+type ResultGroup[T any] struct {\n+\tgroup Group\n+\tagg   resultAggregator[T]\n+}\n+\n+func (g *ResultGroup[T]) Do(f func() T) {\n+\tg.group.Go(func() {\n+\t\tg.agg.add(f())\n+\t})\n+}\n+\n+func (g *ResultGroup[T]) Wait() []T {\n+\tg.group.Wait()\n+\treturn g.agg.results\n+}\n+\n+func (g ResultGroup[T]) WithErrors() ResultErrorGroup[T] {\n+\treturn ResultErrorGroup[T]{\n+\t\terrGroup: g.group.WithErrors(),\n+\t}\n+}\n+\n+func (g ResultGroup[T]) WithContext(ctx context.Context) ResultContextGroup[T] {\n+\treturn ResultContextGroup[T]{\n+\t\tcontextGroup: g.group.WithContext(ctx),\n+\t}\n+}\n+\n+func (g ResultGroup[T]) WithMaxConcurrency(limit int) ResultGroup[T] {\n+\tg.group = g.group.WithMaxConcurrency(limit)\n+\treturn g\n+}\n+\n+// resultAggregator is a utility type that lets us safely append from multiple\n+// goroutines. The zero value is valid and ready to use.\n+type resultAggregator[T any] struct {\n+\tmu      sync.Mutex\n+\tresults []T\n+}\n+\n+func (r *resultAggregator[T]) add(res T) {\n+\tr.mu.Lock()\n+\tr.results = append(r.results, res)\n+\tr.mu.Unlock()\n+}\ndiff --git a/pool/iter.go b/pool/iter.go\nindex 5e1700b..d9502b3 100644\n--- a/pool/iter.go\n+++ b/pool/iter.go\n@@ -57,7 +57,7 @@ func MapIn[T any, R any](p *Pool, input []T, f func(*T) R) []R {\n \treturn res\n }\n \n-func MapErrIn[T any, R any](input []T, f func(*T) (R, error)) ([]R, error) {\n+func MapErr[T any, R any](input []T, f func(*T) (R, error)) ([]R, error) {\n \tp := New()\n \treturn MapErrIn(&p, input, f)\n }\ndiff --git a/pool/pool.go b/pool/pool.go\nindex 22ffd5c..38cf0a1 100644\n--- a/pool/pool.go\n+++ b/pool/pool.go\n@@ -1,6 +1,7 @@\n package pool\n \n import (\n+\t\"context\"\n \t\"runtime\"\n \n \t\"github.com/camdencheek/conc\"\n@@ -40,6 +41,19 @@ func (p Pool) WithMaxGoroutines(n int) Pool {\n \treturn p\n }\n \n+func (p Pool) WithErrors() ErrorPool {\n+\treturn ErrorPool{\n+\t\tpool: p,\n+\t}\n+}\n+\n+func (p Pool) WithContext(ctx context.Context) ContextPool {\n+\treturn ContextPool{\n+\t\terrPool: p.WithErrors(),\n+\t\tctx:     ctx,\n+\t}\n+}\n+\n func (p *Pool) MaxGoroutines() int {\n \treturn cap(p.limiter)\n }\ndiff --git a/pool/result_context_pool.go b/pool/result_context_pool.go\nnew file mode 100644\nindex 0000000..c3b7818\n--- /dev/null\n+++ b/pool/result_context_pool.go\n@@ -0,0 +1,46 @@\n+package pool\n+\n+import (\n+\t\"context\"\n+)\n+\n+type ResultContextPool[T any] struct {\n+\tcontextPool    ContextPool\n+\tagg            resultAggregator[T]\n+\tcollectErrored bool\n+}\n+\n+func (p ResultContextPool[T]) Do(f func(context.Context) (T, error)) {\n+\tp.contextPool.Do(func(ctx context.Context) error {\n+\t\tres, err := f(ctx)\n+\t\tif err == nil || p.collectErrored {\n+\t\t\tp.agg.add(res)\n+\t\t}\n+\t\treturn err\n+\t})\n+}\n+\n+func (p ResultContextPool[T]) Wait() ([]T, error) {\n+\terr := p.contextPool.Wait()\n+\treturn p.agg.results, err\n+}\n+\n+func (p ResultContextPool[T]) WithCollectErrored() ResultContextPool[T] {\n+\tp.collectErrored = true\n+\treturn p\n+}\n+\n+func (p ResultContextPool[T]) WithMaxGoroutines(limit int) ResultContextPool[T] {\n+\tp.contextPool = p.contextPool.WithMaxGoroutines(limit)\n+\treturn p\n+}\n+\n+func (p ResultContextPool[T]) WithCancelOnError() ResultContextPool[T] {\n+\tp.contextPool = p.contextPool.WithCancelOnError()\n+\treturn p\n+}\n+\n+func (p ResultContextPool[T]) WithFirstError() ResultContextPool[T] {\n+\tp.contextPool = p.contextPool.WithFirstError()\n+\treturn p\n+}\ndiff --git a/pool/result_error_pool.go b/pool/result_error_pool.go\nnew file mode 100644\nindex 0000000..8084ede\n--- /dev/null\n+++ b/pool/result_error_pool.go\n@@ -0,0 +1,47 @@\n+package pool\n+\n+import (\n+\t\"context\"\n+)\n+\n+type ResultErrorPool[T any] struct {\n+\terrPool        ErrorPool\n+\tagg            resultAggregator[T]\n+\tcollectErrored bool\n+}\n+\n+func (p *ResultErrorPool[T]) Do(f func() (T, error)) {\n+\tp.errPool.Do(func() error {\n+\t\tres, err := f()\n+\t\tif err == nil || p.collectErrored {\n+\t\t\tp.agg.add(res)\n+\t\t}\n+\t\treturn err\n+\t})\n+}\n+\n+func (p *ResultErrorPool[T]) Wait() ([]T, error) {\n+\terr := p.errPool.Wait()\n+\treturn p.agg.results, err\n+}\n+\n+func (g ResultErrorPool[T]) WithCollectErrored() ResultErrorPool[T] {\n+\tg.collectErrored = true\n+\treturn g\n+}\n+\n+func (g ResultErrorPool[T]) WithFirstError() ResultErrorPool[T] {\n+\tg.errPool = g.errPool.WithFirstError()\n+\treturn g\n+}\n+\n+func (g ResultErrorPool[T]) WithMaxGoroutines(limit int) ResultErrorPool[T] {\n+\tg.errPool = g.errPool.WithMaxGoroutines(limit)\n+\treturn g\n+}\n+\n+func (g ResultErrorPool[T]) WithContext(ctx context.Context) ResultContextPool[T] {\n+\treturn ResultContextPool[T]{\n+\t\tcontextPool: g.errPool.WithContext(ctx),\n+\t}\n+}\ndiff --git a/pool/result_pool.go b/pool/result_pool.go\nnew file mode 100644\nindex 0000000..6ea1a45\n--- /dev/null\n+++ b/pool/result_pool.go\n@@ -0,0 +1,52 @@\n+package pool\n+\n+import (\n+\t\"context\"\n+\t\"sync\"\n+)\n+\n+type ResultPool[T any] struct {\n+\tpool Pool\n+\tagg  resultAggregator[T]\n+}\n+\n+func (p *ResultPool[T]) Do(f func() T) {\n+\tp.pool.Do(func() {\n+\t\tp.agg.add(f())\n+\t})\n+}\n+\n+func (p *ResultPool[T]) Wait() []T {\n+\tp.pool.Wait()\n+\treturn p.agg.results\n+}\n+\n+func (p ResultPool[T]) WithErrors() ResultErrorPool[T] {\n+\treturn ResultErrorPool[T]{\n+\t\terrPool: p.pool.WithErrors(),\n+\t}\n+}\n+\n+func (p ResultPool[T]) WithContext(ctx context.Context) ResultContextPool[T] {\n+\treturn ResultContextPool[T]{\n+\t\tcontextPool: p.pool.WithContext(ctx),\n+\t}\n+}\n+\n+func (p ResultPool[T]) WithMaxGoroutines(limit int) ResultPool[T] {\n+\tp.pool = p.pool.WithMaxGoroutines(limit)\n+\treturn p\n+}\n+\n+// resultAggregator is a utility type that lets us safely append from multiple\n+// goroutines. The zero value is valid and ready to use.\n+type resultAggregator[T any] struct {\n+\tmu      sync.Mutex\n+\tresults []T\n+}\n+\n+func (r *resultAggregator[T]) add(res T) {\n+\tr.mu.Lock()\n+\tr.results = append(r.results, res)\n+\tr.mu.Unlock()\n+}\n",
+  "diffTruncated": false,
+  "tree": [
+    "LICENSE",
+    "go.mod",
+    "go.sum",
+    "group/context_group.go",
+    "group/error_group.go",
+    "group/group.go",
+    "group/result_context_group.go",
+    "group/result_error_group.go",
+    "group/result_group.go",
+    "limiter.go",
+    "pool/context_pool.go",
+    "pool/error_pool.go",
+    "pool/iter.go",
+    "pool/pool.go",
+    "pool/result_context_pool.go",
+    "pool/result_error_pool.go",
+    "pool/result_pool.go",
+    "stream/stream.go",
+    "waitgroup.go"
+  ],
+  "explanation": {
+    "what": "group / pool の両パッケージに ResultGroup[T] / ResultErrorGroup[T] / ResultContextGroup[T](および pool 側の ResultPool[T] 等)を新規追加した。各タスクの戻り値 T を resultAggregator[T] という mutex 付きスライスに集約し、Wait() で []T (と必要ならエラー)をまとめて返す。既存の ErrorGroup / ContextGroup / Pool には WithErrors() / WithContext() というメソッドが増設され、これらの新しい Result 系型を生成する入口になっている。",
+    "why": "従来の Group / Pool は各タスクの戻り値を捨てて void 実行するだけだったが、「並行実行した結果をまとめて集める」という一般的なユースケースに対応するため、結果集約機能を持つバリアントを追加したと考えられる。resultAggregator という共通の集約ロジックを group と pool の双方に複製する形で実装しており、後続コミット(embedding の整理)で重複が解消されていく。",
+    "highlights": [
+      { "file": "group/result_group.go", "note": "resultAggregator[T] が mutex で保護された結果スライスへの追記を提供し、ResultGroup.Do がタスク実行と結果集約を1メソッドに結びつける。" },
+      { "file": "pool/result_error_pool.go", "note": "ResultErrorPool.Do は成功時のみ(collectErrored が真なら失敗時も)結果を集約し、エラーは ErrorPool 側の仕組みで集める。" }
+    ],
+    "langNotes": [
+      { "topic": "ジェネリック構造体([T any] の struct)", "note": "ResultGroup[T any] のように構造体自体を型パラメータ化すると、任意の戻り値の型 T に対して同じ集約ロジック(resultAggregator)を使い回せる。関数だけでなく型もジェネリクス化できるのが Go 1.18+ の特徴。" }
+    ],
+    "diagram": {
+      "mermaid": "flowchart LR\n  A[\"Do(f) を複数回呼ぶ\"] --> B[\"各goroutineでf()実行\"]\n  B --> C[\"resultAggregator.add(結果)\"]\n  C --> D[\"mutexで保護されたresultsスライス\"]\n  D --> E[\"Wait() で []T をまとめて取得\"]",
+      "caption": "ResultGroup/ResultPool による並行実行結果の集約フロー"
+    },
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

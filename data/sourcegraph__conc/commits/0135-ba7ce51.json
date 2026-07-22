@@ -1,0 +1,92 @@
+{
+  "seq": 135,
+  "sha": "ba7ce516f375fe6d8c9267a2dcc68a729bfec506",
+  "parents": [
+    "7b8c8f2875cb861bb61844c9bcaa1aed070adbd4"
+  ],
+  "author": {
+    "name": "Zhong Dai",
+    "email": "4401438+zhongdai@users.noreply.github.com",
+    "date": "2023-02-28T09:56:24+11:00"
+  },
+  "message": "Added successful case for context pool, returns before timeout (#94)\n\nI think we need an example of, if the tasks return before the context\r\ncancelled due to timeout, it should success\r\n\r\nCo-authored-by: Camden Cheek <camden@ccheek.com>",
+  "pr": {
+    "number": 94,
+    "title": "Added successful case for context pool, returns before timeout",
+    "body": "I think we need an example of, if the tasks return before the context cancelled due to timeout, it should success",
+    "url": "https://github.com/sourcegraph/conc/pull/94"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 15,
+    "deletions": 1
+  },
+  "files": [
+    {
+      "path": "panics/panics_test.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "pool/context_pool_test.go",
+      "status": "M",
+      "additions": 14,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/panics/panics_test.go b/panics/panics_test.go\nindex 15bb32e..ceb8706 100644\n--- a/panics/panics_test.go\n+++ b/panics/panics_test.go\n@@ -156,7 +156,7 @@ func TestRecoveredAsError(t *testing.T) {\n \t\tassert.Nil(t, err)\n \t})\n \n-\tt.Run(\"as error is not nil nil\", func(t *testing.T) {\n+\tt.Run(\"as error is not nil\", func(t *testing.T) {\n \t\tt.Parallel()\n \t\tfn := func() error {\n \t\t\tvar c Catcher\ndiff --git a/pool/context_pool_test.go b/pool/context_pool_test.go\nindex 1e3f1f0..326e481 100644\n--- a/pool/context_pool_test.go\n+++ b/pool/context_pool_test.go\n@@ -113,6 +113,20 @@ func TestContextPool(t *testing.T) {\n \t\t\t})\n \t\t\trequire.ErrorIs(t, p.Wait(), context.DeadlineExceeded)\n \t\t})\n+\n+\t\tt.Run(\"return before timed out\", func(t *testing.T) {\n+\t\t\tt.Parallel()\n+\t\t\tp := New().WithContext(context.Background())\n+\t\t\tp.Go(func(ctx context.Context) error {\n+\t\t\t\tselect {\n+\t\t\t\tcase <-ctx.Done():\n+\t\t\t\t\treturn ctx.Err()\n+\t\t\t\tcase <-time.After(1 * time.Millisecond):\n+\t\t\t\t\treturn nil\n+\t\t\t\t}\n+\t\t\t})\n+\t\t\trequire.NoError(t, p.Wait())\n+\t\t})\n \t})\n \n \tt.Run(\"WithCancelOnError\", func(t *testing.T) {\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/go.yml",
+    ".golangci.yml",
+    "LICENSE",
+    "README.md",
+    "go.mod",
+    "go.sum",
+    "internal/multierror/multierror_go119.go",
+    "internal/multierror/multierror_go120.go",
+    "iter/iter.go",
+    "iter/iter_test.go",
+    "iter/map.go",
+    "iter/map_test.go",
+    "panics/panics.go",
+    "panics/panics_test.go",
+    "panics/try.go",
+    "panics/try_test.go",
+    "pool/context_pool.go",
+    "pool/context_pool_test.go",
+    "pool/error_pool.go",
+    "pool/error_pool_test.go",
+    "pool/pool.go",
+    "pool/pool_test.go",
+    "pool/result_context_pool.go",
+    "pool/result_context_pool_test.go",
+    "pool/result_error_pool.go",
+    "pool/result_error_pool_test.go",
+    "pool/result_pool.go",
+    "pool/result_pool_test.go",
+    "stream/stream.go",
+    "stream/stream_test.go",
+    "waitgroup.go",
+    "waitgroup_test.go"
+  ],
+  "explanation": {
+    "what": "context_pool_test.go に「タイムアウトになる前にタスクが正常に完了するケース」のテストを追加し、`p.Wait()` がエラーなく終わることを検証した。あわせて panics_test.go のサブテスト名の重複タイポ(\"as error is not nil nil\")を \"as error is not nil\" に修正した。",
+    "why": "PR本文の通り、既存のテストは context がタイムアウトでキャンセルされるケードは検証していたが、タスクがタイムアウト前に正常終了する成功パスのテストが欠けていたため追加したもの。",
+    "highlights": [
+      { "file": "pool/context_pool_test.go", "note": "select で time.After より先に完了する成功ケースのテスト追加" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [
+      { "type": "pr", "number": 94, "url": "https://github.com/sourcegraph/conc/pull/94" }
+    ],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

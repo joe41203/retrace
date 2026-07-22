@@ -1,0 +1,105 @@
+{
+  "seq": 116,
+  "sha": "2f96f8668baa223dcfea4cc164112116ff116c0f",
+  "parents": [
+    "c2a0b3dde7e99479fc28839624bfffe16c14d9cd",
+    "00be160554e82765e3222985ad37bc772196b0d6"
+  ],
+  "author": {
+    "name": "Robert Lin",
+    "email": "robertlin1@gmail.com",
+    "date": "2023-01-16T11:18:18-08:00"
+  },
+  "message": "Merge pull request #67 from sourcegraph/iter-map-separate-files",
+  "pr": {
+    "number": 67,
+    "title": "iter: move Map implementation to separate files",
+    "body": "Some moving around before https://github.com/sourcegraph/conc/pull/68 - moves `Map`, `MapErr`, and related tests into `iter/map.go` and `iter/map_test.go`",
+    "url": "https://github.com/sourcegraph/conc/pull/67"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 4,
+    "additions": 204,
+    "deletions": 192
+  },
+  "files": [
+    {
+      "path": "iter/iter.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 33,
+      "binary": false
+    },
+    {
+      "path": "iter/iter_test.go",
+      "status": "M",
+      "additions": 0,
+      "deletions": 159,
+      "binary": false
+    },
+    {
+      "path": "iter/map.go",
+      "status": "A",
+      "additions": 37,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "iter/map_test.go",
+      "status": "A",
+      "additions": 166,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/iter/iter.go b/iter/iter.go\nindex a14331b..124b4f9 100644\n--- a/iter/iter.go\n+++ b/iter/iter.go\n@@ -2,11 +2,9 @@ package iter\n \n import (\n \t\"runtime\"\n-\t\"sync\"\n \t\"sync/atomic\"\n \n \t\"github.com/sourcegraph/conc\"\n-\t\"github.com/sourcegraph/sourcegraph/lib/errors\"\n )\n \n // defaultMaxGoroutines returns the default maximum number of\n@@ -17,7 +15,7 @@ func defaultMaxGoroutines() int { return runtime.GOMAXPROCS(0) }\n // and ForEachIdx. The zero value is safe to use with reasonable\n // defaults.\n //\n-// Iterator is safe for reuse and concurrent use.\n+// Iterator is also safe for reuse and concurrent use.\n type Iterator[T any] struct {\n \t// MaxGoroutines controls the maximum number of goroutines\n \t// to use on this Iterator's methods.\n@@ -85,33 +83,3 @@ func (iter Iterator[T]) ForEachIdx(input []T, f func(int, *T)) {\n \t}\n \twg.Wait()\n }\n-\n-// Map applies f to each element of input, returning the mapped result.\n-func Map[T, R any](input []T, f func(*T) R) []R {\n-\tres := make([]R, len(input))\n-\tForEachIdx(input, func(i int, t *T) {\n-\t\tres[i] = f(t)\n-\t})\n-\treturn res\n-}\n-\n-// MapErr applies f to each element of the input, returning the mapped result\n-// and a combined error of all returned errors.\n-func MapErr[T, R any](input []T, f func(*T) (R, error)) ([]R, error) {\n-\tvar (\n-\t\tres    = make([]R, len(input))\n-\t\terrMux sync.Mutex\n-\t\terrs   error\n-\t)\n-\tForEachIdx(input, func(i int, t *T) {\n-\t\tvar err error\n-\t\tres[i], err = f(t)\n-\t\tif err != nil {\n-\t\t\terrMux.Lock()\n-\t\t\t// TODO: use stdlib errors once multierrors land in go 1.20\n-\t\t\terrs = errors.Append(errs, err)\n-\t\t\terrMux.Unlock()\n-\t\t}\n-\t})\n-\treturn res, errs\n-}\ndiff --git a/iter/iter_test.go b/iter/iter_test.go\nindex acc36e3..7394810 100644\n--- a/iter/iter_test.go\n+++ b/iter/iter_test.go\n@@ -5,7 +5,6 @@ import (\n \t\"sync/atomic\"\n \t\"testing\"\n \n-\t\"github.com/sourcegraph/sourcegraph/lib/errors\"\n \t\"github.com/stretchr/testify/assert\"\n \t\"github.com/stretchr/testify/require\"\n )\n@@ -150,164 +149,6 @@ func TestForEach(t *testing.T) {\n \t})\n }\n \n-func TestMap(t *testing.T) {\n-\tt.Parallel()\n-\n-\tt.Run(\"empty\", func(t *testing.T) {\n-\t\tt.Parallel()\n-\t\tf := func() {\n-\t\t\tints := []int{}\n-\t\t\tMap(ints, func(val *int) int {\n-\t\t\t\tpanic(\"this should never be called\")\n-\t\t\t})\n-\t\t}\n-\t\trequire.NotPanics(t, f)\n-\t})\n-\n-\tt.Run(\"panic is propagated\", func(t *testing.T) {\n-\t\tt.Parallel()\n-\t\tf := func() {\n-\t\t\tints := []int{1}\n-\t\t\tMap(ints, func(val *int) int {\n-\t\t\t\tpanic(\"super bad thing happened\")\n-\t\t\t})\n-\t\t}\n-\t\trequire.Panics(t, f)\n-\t})\n-\n-\tt.Run(\"mutating inputs is fine, though not recommended\", func(t *testing.T) {\n-\t\tt.Parallel()\n-\t\tints := []int{1, 2, 3, 4, 5}\n-\t\tMap(ints, func(val *int) int {\n-\t\t\t*val += 1\n-\t\t\treturn 0\n-\t\t})\n-\t\trequire.Equal(t, []int{2, 3, 4, 5, 6}, ints)\n-\t})\n-\n-\tt.Run(\"basic increment\", func(t *testing.T) {\n-\t\tt.Parallel()\n-\t\tints := []int{1, 2, 3, 4, 5}\n-\t\tres := Map(ints, func(val *int) int {\n-\t\t\treturn *val + 1\n-\t\t})\n-\t\trequire.Equal(t, []int{2, 3, 4, 5, 6}, res)\n-\t\trequire.Equal(t, []int{1, 2, 3, 4, 5}, ints)\n-\t})\n-\n-\tt.Run(\"huge inputs\", func(t *testing.T) {\n-\t\tt.Parallel()\n-\t\tints := make([]int, 10000)\n-\t\tres := Map(ints, func(val *int) int {\n-\t\t\treturn 1\n-\t\t})\n-\t\texpected := make([]int, 10000)\n-\t\tfor i := 0; i < 10000; i++ {\n-\t\t\texpected[i] = 1\n-\t\t}\n-\t\trequire.Equal(t, expected, res)\n-\t})\n-}\n-\n-func TestMapErr(t *testing.T) {\n-\tt.Parallel()\n-\n-\tt.Run(\"empty\", func(t *testing.T) {\n-\t\tt.Parallel()\n-\t\tf := func() {\n-\t\t\tints := []int{}\n-\t\t\tres, err := MapErr(ints, func(val *int) (int, error) {\n-\t\t\t\tpanic(\"this should never be called\")\n-\t\t\t})\n-\t\t\trequire.NoError(t, err)\n-\t\t\trequire.Equal(t, ints, res)\n-\t\t}\n-\t\trequire.NotPanics(t, f)\n-\t})\n-\n-\tt.Run(\"panic is propagated\", func(t *testing.T) {\n-\t\tt.Parallel()\n-\t\tf := func() {\n-\t\t\tints := []int{1}\n-\t\t\t_, _ = MapErr(ints, func(val *int) (int, error) {\n-\t\t\t\tpanic(\"super bad thing happened\")\n-\t\t\t})\n-\t\t}\n-\t\trequire.Panics(t, f)\n-\t})\n-\n-\tt.Run(\"mutating inputs is fine, though not recommended\", func(t *testing.T) {\n-\t\tt.Parallel()\n-\t\tints := []int{1, 2, 3, 4, 5}\n-\t\tres, err := MapErr(ints, func(val *int) (int, error) {\n-\t\t\t*val += 1\n-\t\t\treturn 0, nil\n-\t\t})\n-\t\trequire.NoError(t, err)\n-\t\trequire.Equal(t, []int{2, 3, 4, 5, 6}, ints)\n-\t\trequire.Equal(t, []int{0, 0, 0, 0, 0}, res)\n-\t})\n-\n-\tt.Run(\"basic increment\", func(t *testing.T) {\n-\t\tt.Parallel()\n-\t\tints := []int{1, 2, 3, 4, 5}\n-\t\tres, err := MapErr(ints, func(val *int) (int, error) {\n-\t\t\treturn *val + 1, nil\n-\t\t})\n-\t\trequire.NoError(t, err)\n-\t\trequire.Equal(t, []int{2, 3, 4, 5, 6}, res)\n-\t\trequire.Equal(t, []int{1, 2, 3, 4, 5}, ints)\n-\t})\n-\n-\terr1 := errors.New(\"error1\")\n-\terr2 := errors.New(\"error1\")\n-\n-\tt.Run(\"error is propagated\", func(t *testing.T) {\n-\t\tt.Parallel()\n-\t\tints := []int{1, 2, 3, 4, 5}\n-\t\tres, err := MapErr(ints, func(val *int) (int, error) {\n-\t\t\tif *val == 3 {\n-\t\t\t\treturn 0, err1\n-\t\t\t}\n-\t\t\treturn *val + 1, nil\n-\t\t})\n-\t\trequire.ErrorIs(t, err, err1)\n-\t\trequire.Equal(t, []int{2, 3, 0, 5, 6}, res)\n-\t\trequire.Equal(t, []int{1, 2, 3, 4, 5}, ints)\n-\t})\n-\n-\tt.Run(\"multiple errors are propagated\", func(t *testing.T) {\n-\t\tt.Parallel()\n-\t\tints := []int{1, 2, 3, 4, 5}\n-\t\tres, err := MapErr(ints, func(val *int) (int, error) {\n-\t\t\tif *val == 3 {\n-\t\t\t\treturn 0, err1\n-\t\t\t}\n-\t\t\tif *val == 4 {\n-\t\t\t\treturn 0, err2\n-\t\t\t}\n-\t\t\treturn *val + 1, nil\n-\t\t})\n-\t\trequire.ErrorIs(t, err, err1)\n-\t\trequire.ErrorIs(t, err, err2)\n-\t\trequire.Equal(t, []int{2, 3, 0, 0, 6}, res)\n-\t\trequire.Equal(t, []int{1, 2, 3, 4, 5}, ints)\n-\t})\n-\n-\tt.Run(\"huge inputs\", func(t *testing.T) {\n-\t\tt.Parallel()\n-\t\tints := make([]int, 10000)\n-\t\tres := Map(ints, func(val *int) int {\n-\t\t\treturn 1\n-\t\t})\n-\t\texpected := make([]int, 10000)\n-\t\tfor i := 0; i < 10000; i++ {\n-\t\t\texpected[i] = 1\n-\t\t}\n-\t\trequire.Equal(t, expected, res)\n-\t})\n-}\n-\n func BenchmarkForEach(b *testing.B) {\n \tfor _, count := range []int{0, 1, 8, 100, 1000, 10000, 100000} {\n \t\tb.Run(strconv.Itoa(count), func(b *testing.B) {\ndiff --git a/iter/map.go b/iter/map.go\nnew file mode 100644\nindex 0000000..0d96223\n--- /dev/null\n+++ b/iter/map.go\n@@ -0,0 +1,37 @@\n+package iter\n+\n+import (\n+\t\"sync\"\n+\n+\t\"github.com/sourcegraph/sourcegraph/lib/errors\"\n+)\n+\n+// Map applies f to each element of input, returning the mapped result.\n+func Map[T, R any](input []T, f func(*T) R) []R {\n+\tres := make([]R, len(input))\n+\tForEachIdx(input, func(i int, t *T) {\n+\t\tres[i] = f(t)\n+\t})\n+\treturn res\n+}\n+\n+// MapErr applies f to each element of the input, returning the mapped result\n+// and a combined error of all returned errors.\n+func MapErr[T, R any](input []T, f func(*T) (R, error)) ([]R, error) {\n+\tvar (\n+\t\tres    = make([]R, len(input))\n+\t\terrMux sync.Mutex\n+\t\terrs   error\n+\t)\n+\tForEachIdx(input, func(i int, t *T) {\n+\t\tvar err error\n+\t\tres[i], err = f(t)\n+\t\tif err != nil {\n+\t\t\terrMux.Lock()\n+\t\t\t// TODO: use stdlib errors once multierrors land in go 1.20\n+\t\t\terrs = errors.Append(errs, err)\n+\t\t\terrMux.Unlock()\n+\t\t}\n+\t})\n+\treturn res, errs\n+}\ndiff --git a/iter/map_test.go b/iter/map_test.go\nnew file mode 100644\nindex 0000000..7a7c794\n--- /dev/null\n+++ b/iter/map_test.go\n@@ -0,0 +1,166 @@\n+package iter\n+\n+import (\n+\t\"errors\"\n+\t\"testing\"\n+\n+\t\"github.com/stretchr/testify/require\"\n+)\n+\n+func TestMap(t *testing.T) {\n+\tt.Parallel()\n+\n+\tt.Run(\"empty\", func(t *testing.T) {\n+\t\tt.Parallel()\n+\t\tf := func() {\n+\t\t\tints := []int{}\n+\t\t\tMap(ints, func(val *int) int {\n+\t\t\t\tpanic(\"this should never be called\")\n+\t\t\t})\n+\t\t}\n+\t\trequire.NotPanics(t, f)\n+\t})\n+\n+\tt.Run(\"panic is propagated\", func(t *testing.T) {\n+\t\tt.Parallel()\n+\t\tf := func() {\n+\t\t\tints := []int{1}\n+\t\t\tMap(ints, func(val *int) int {\n+\t\t\t\tpanic(\"super bad thing happened\")\n+\t\t\t})\n+\t\t}\n+\t\trequire.Panics(t, f)\n+\t})\n+\n+\tt.Run(\"mutating inputs is fine, though not recommended\", func(t *testing.T) {\n+\t\tt.Parallel()\n+\t\tints := []int{1, 2, 3, 4, 5}\n+\t\tMap(ints, func(val *int) int {\n+\t\t\t*val += 1\n+\t\t\treturn 0\n+\t\t})\n+\t\trequire.Equal(t, []int{2, 3, 4, 5, 6}, ints)\n+\t})\n+\n+\tt.Run(\"basic increment\", func(t *testing.T) {\n+\t\tt.Parallel()\n+\t\tints := []int{1, 2, 3, 4, 5}\n+\t\tres := Map(ints, func(val *int) int {\n+\t\t\treturn *val + 1\n+\t\t})\n+\t\trequire.Equal(t, []int{2, 3, 4, 5, 6}, res)\n+\t\trequire.Equal(t, []int{1, 2, 3, 4, 5}, ints)\n+\t})\n+\n+\tt.Run(\"huge inputs\", func(t *testing.T) {\n+\t\tt.Parallel()\n+\t\tints := make([]int, 10000)\n+\t\tres := Map(ints, func(val *int) int {\n+\t\t\treturn 1\n+\t\t})\n+\t\texpected := make([]int, 10000)\n+\t\tfor i := 0; i < 10000; i++ {\n+\t\t\texpected[i] = 1\n+\t\t}\n+\t\trequire.Equal(t, expected, res)\n+\t})\n+}\n+\n+func TestMapErr(t *testing.T) {\n+\tt.Parallel()\n+\n+\tt.Run(\"empty\", func(t *testing.T) {\n+\t\tt.Parallel()\n+\t\tf := func() {\n+\t\t\tints := []int{}\n+\t\t\tres, err := MapErr(ints, func(val *int) (int, error) {\n+\t\t\t\tpanic(\"this should never be called\")\n+\t\t\t})\n+\t\t\trequire.NoError(t, err)\n+\t\t\trequire.Equal(t, ints, res)\n+\t\t}\n+\t\trequire.NotPanics(t, f)\n+\t})\n+\n+\tt.Run(\"panic is propagated\", func(t *testing.T) {\n+\t\tt.Parallel()\n+\t\tf := func() {\n+\t\t\tints := []int{1}\n+\t\t\t_, _ = MapErr(ints, func(val *int) (int, error) {\n+\t\t\t\tpanic(\"super bad thing happened\")\n+\t\t\t})\n+\t\t}\n+\t\trequire.Panics(t, f)\n+\t})\n+\n+\tt.Run(\"mutating inputs is fine, though not recommended\", func(t *testing.T) {\n+\t\tt.Parallel()\n+\t\tints := []int{1, 2, 3, 4, 5}\n+\t\tres, err := MapErr(ints, func(val *int) (int, error) {\n+\t\t\t*val += 1\n+\t\t\treturn 0, nil\n+\t\t})\n+\t\trequire.NoError(t, err)\n+\t\trequire.Equal(t, []int{2, 3, 4, 5, 6}, ints)\n+\t\trequire.Equal(t, []int{0, 0, 0, 0, 0}, res)\n+\t})\n+\n+\tt.Run(\"basic increment\", func(t *testing.T) {\n+\t\tt.Parallel()\n+\t\tints := []int{1, 2, 3, 4, 5}\n+\t\tres, err := MapErr(ints, func(val *int) (int, error) {\n+\t\t\treturn *val + 1, nil\n+\t\t})\n+\t\trequire.NoError(t, err)\n+\t\trequire.Equal(t, []int{2, 3, 4, 5, 6}, res)\n+\t\trequire.Equal(t, []int{1, 2, 3, 4, 5}, ints)\n+\t})\n+\n+\terr1 := errors.New(\"error1\")\n+\terr2 := errors.New(\"error1\")\n+\n+\tt.Run(\"error is propagated\", func(t *testing.T) {\n+\t\tt.Parallel()\n+\t\tints := []int{1, 2, 3, 4, 5}\n+\t\tres, err := MapErr(ints, func(val *int) (int, error) {\n+\t\t\tif *val == 3 {\n+\t\t\t\treturn 0, err1\n+\t\t\t}\n+\t\t\treturn *val + 1, nil\n+\t\t})\n+\t\trequire.ErrorIs(t, err, err1)\n+\t\trequire.Equal(t, []int{2, 3, 0, 5, 6}, res)\n+\t\trequire.Equal(t, []int{1, 2, 3, 4, 5}, ints)\n+\t})\n+\n+\tt.Run(\"multiple errors are propagated\", func(t *testing.T) {\n+\t\tt.Parallel()\n+\t\tints := []int{1, 2, 3, 4, 5}\n+\t\tres, err := MapErr(ints, func(val *int) (int, error) {\n+\t\t\tif *val == 3 {\n+\t\t\t\treturn 0, err1\n+\t\t\t}\n+\t\t\tif *val == 4 {\n+\t\t\t\treturn 0, err2\n+\t\t\t}\n+\t\t\treturn *val + 1, nil\n+\t\t})\n+\t\trequire.ErrorIs(t, err, err1)\n+\t\trequire.ErrorIs(t, err, err2)\n+\t\trequire.Equal(t, []int{2, 3, 0, 0, 6}, res)\n+\t\trequire.Equal(t, []int{1, 2, 3, 4, 5}, ints)\n+\t})\n+\n+\tt.Run(\"huge inputs\", func(t *testing.T) {\n+\t\tt.Parallel()\n+\t\tints := make([]int, 10000)\n+\t\tres := Map(ints, func(val *int) int {\n+\t\t\treturn 1\n+\t\t})\n+\t\texpected := make([]int, 10000)\n+\t\tfor i := 0; i < 10000; i++ {\n+\t\t\texpected[i] = 1\n+\t\t}\n+\t\trequire.Equal(t, expected, res)\n+\t})\n+}\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/go.yml",
+    ".golangci.yml",
+    "LICENSE",
+    "README.md",
+    "go.mod",
+    "go.sum",
+    "iter/iter.go",
+    "iter/iter_test.go",
+    "iter/map.go",
+    "iter/map_test.go",
+    "panics/panics.go",
+    "panics/panics_test.go",
+    "pool/context_pool.go",
+    "pool/context_pool_test.go",
+    "pool/error_pool.go",
+    "pool/error_pool_test.go",
+    "pool/pool.go",
+    "pool/pool_test.go",
+    "pool/result_context_pool.go",
+    "pool/result_context_pool_test.go",
+    "pool/result_error_pool.go",
+    "pool/result_error_pool_test.go",
+    "pool/result_pool.go",
+    "pool/result_pool_test.go",
+    "stream/stream.go",
+    "stream/stream_test.go",
+    "waitgroup.go",
+    "waitgroup_test.go"
+  ],
+  "explanation": {
+    "what": "iter パッケージ内の Map / MapErr の実装とそのテストを iter.go / iter_test.go から新設の iter/map.go / iter/map_test.go に切り出した。コードの中身自体は変更されておらず、純粋なファイル分割(移動)。",
+    "why": "PR本文によれば、直後に予定されている PR #68(Map に設定可能な並行度を持つ Mapper 型を導入する変更)に向けた準備として、ForEach 系(Iterator)と Map 系(のちの Mapper)のコードを別ファイルに分離しておく整理コミット。",
+    "highlights": [
+      { "file": "iter/map.go", "note": "Map/MapErr の実装が iter.go から移動してきただけで中身は同一" }
+    ],
+    "langNotes": [
+      { "topic": "iter/map.go へのファイル分離", "note": "Go では同一パッケージ内のファイル分割は言語仕様上は自由(パッケージ全体が単位でコンパイルされる)。この分離は次の PR で ForEach 用の Iterator[T] と Map 用の Mapper[T,R] という別の型を導入しやすくするための整理と考えられる。" }
+    ],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [
+      { "type": "pr", "number": 67, "url": "https://github.com/sourcegraph/conc/pull/67" }
+    ],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

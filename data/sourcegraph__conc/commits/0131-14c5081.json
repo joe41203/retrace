@@ -1,0 +1,78 @@
+{
+  "seq": 131,
+  "sha": "14c5081d40d66578e43aace6c83e569fbd85793b",
+  "parents": [
+    "3d936542f162e398ef62ff76f4bfcb5ec628c1c1"
+  ],
+  "author": {
+    "name": "Camden Cheek",
+    "email": "camden@ccheek.com",
+    "date": "2023-02-21T05:10:46-07:00"
+  },
+  "message": "revert test change",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 6,
+    "deletions": 2
+  },
+  "files": [
+    {
+      "path": "pool/context_pool_test.go",
+      "status": "M",
+      "additions": 6,
+      "deletions": 2,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/pool/context_pool_test.go b/pool/context_pool_test.go\nindex 4273e5a..1ec8a4d 100644\n--- a/pool/context_pool_test.go\n+++ b/pool/context_pool_test.go\n@@ -133,8 +133,12 @@ func TestContextPool(t *testing.T) {\n \t\tt.Parallel()\n \t\tp := New().WithContext(bgctx)\n \t\tp.Go(func(ctx context.Context) error {\n-\t\t\t<-ctx.Done()\n-\t\t\treturn ctx.Err()\n+\t\t\tselect {\n+\t\t\tcase <-ctx.Done():\n+\t\t\t\treturn ctx.Err()\n+\t\t\tcase <-time.After(10 * time.Millisecond):\n+\t\t\t\treturn nil\n+\t\t\t}\n \t\t})\n \t\tp.Go(func(ctx context.Context) error {\n \t\t\treturn err1\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/go.yml",
+    ".golangci.yml",
+    "LICENSE",
+    "README.md",
+    "go.mod",
+    "go.sum",
+    "iter/iter.go",
+    "iter/iter_test.go",
+    "iter/map.go",
+    "iter/map_test.go",
+    "multierror/multierror_go119.go",
+    "multierror/multierror_go120.go",
+    "panics/panics.go",
+    "panics/panics_test.go",
+    "panics/try.go",
+    "panics/try_test.go",
+    "pool/context_pool.go",
+    "pool/context_pool_test.go",
+    "pool/error_pool.go",
+    "pool/error_pool_test.go",
+    "pool/pool.go",
+    "pool/pool_test.go",
+    "pool/result_context_pool.go",
+    "pool/result_context_pool_test.go",
+    "pool/result_error_pool.go",
+    "pool/result_error_pool_test.go",
+    "pool/result_pool.go",
+    "pool/result_pool_test.go",
+    "stream/stream.go",
+    "stream/stream_test.go",
+    "waitgroup.go",
+    "waitgroup_test.go"
+  ],
+  "explanation": {
+    "what": "pool/context_pool_test.go の1テストケースで、context の Done チャネルを単純に待つだけの実装を、select で `ctx.Done()` と `time.After(10 * time.Millisecond)` の両方を待つ形に戻した。直前のコミット「fix racy test」で加えた変更を打ち消す revert。",
+    "why": "直前コミット(seq130, fix racy test)でこのテストを単純化したが、それによりレースまたは意図しない挙動が再発したため、元の select による待ち合わせ方式に戻したと考えられる。コミットメッセージは「revert test change」とだけ述べており詳細な理由は書かれていない。",
+    "highlights": [
+      { "file": "pool/context_pool_test.go", "note": "ctx.Done() 単体待ちから select+time.After に戻す差分" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

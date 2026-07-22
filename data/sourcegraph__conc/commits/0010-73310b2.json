@@ -1,0 +1,74 @@
+{
+  "seq": 10,
+  "sha": "73310b2ce4f31e9c534632f71f973fbf7688b76a",
+  "parents": [
+    "c13cb25d3a084b249a3ce5e9a94c5e0689a44a53"
+  ],
+  "author": {
+    "name": "Camden Cheek",
+    "email": "camden@ccheek.com",
+    "date": "2022-12-16T10:11:13-07:00"
+  },
+  "message": "embed ErrorPool",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 7,
+    "deletions": 12
+  },
+  "files": [
+    {
+      "path": "pool/context_pool.go",
+      "status": "M",
+      "additions": 5,
+      "deletions": 10,
+      "binary": false
+    },
+    {
+      "path": "pool/pool.go",
+      "status": "M",
+      "additions": 2,
+      "deletions": 2,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/pool/context_pool.go b/pool/context_pool.go\nindex d1b09cc..b7a0055 100644\n--- a/pool/context_pool.go\n+++ b/pool/context_pool.go\n@@ -5,20 +5,20 @@ import (\n )\n \n type ContextPool struct {\n-\terrPool ErrorPool\n+\tErrorPool\n \n \tctx    context.Context\n \tcancel context.CancelFunc\n }\n \n func (g *ContextPool) Do(f func(ctx context.Context) error) {\n-\tg.errPool.Do(func() error {\n+\tg.ErrorPool.Go(func() error {\n \t\terr := f(g.ctx)\n \t\tif err != nil && g.cancel != nil {\n \t\t\t// Add the error directly because otherwise, canceling could cause\n \t\t\t// another goroutine to exit and return an error before this error\n \t\t\t// was added, which breaks the expectations of WithFirstError().\n-\t\t\tg.errPool.addErr(err)\n+\t\t\tg.ErrorPool.addErr(err)\n \t\t\tg.cancel()\n \t\t\treturn nil\n \t\t}\n@@ -27,7 +27,7 @@ func (g *ContextPool) Do(f func(ctx context.Context) error) {\n }\n \n func (p *ContextPool) Wait() error {\n-\treturn p.errPool.Wait()\n+\treturn p.ErrorPool.Wait()\n }\n \n func (p *ContextPool) WithCancelOnError() *ContextPool {\n@@ -36,11 +36,6 @@ func (p *ContextPool) WithCancelOnError() *ContextPool {\n }\n \n func (p *ContextPool) WithMaxGoroutines(limit int) *ContextPool {\n-\tp.errPool = *p.errPool.WithMaxGoroutines(limit)\n-\treturn p\n-}\n-\n-func (p *ContextPool) WithFirstError() *ContextPool {\n-\tp.errPool = *p.errPool.WithFirstError()\n+\tp.ErrorPool = *p.ErrorPool.WithMaxGoroutines(limit)\n \treturn p\n }\ndiff --git a/pool/pool.go b/pool/pool.go\nindex 8194373..e4ea615 100644\n--- a/pool/pool.go\n+++ b/pool/pool.go\n@@ -53,8 +53,8 @@ func (p *Pool) WithErrors() *ErrorPool {\n \n func (p Pool) WithContext(ctx context.Context) *ContextPool {\n \treturn &ContextPool{\n-\t\terrPool: *p.WithErrors(),\n-\t\tctx:     ctx,\n+\t\tErrorPool: *p.WithErrors(),\n+\t\tctx:       ctx,\n \t}\n }\n \n",
+  "diffTruncated": false,
+  "tree": [
+    "LICENSE",
+    "go.mod",
+    "go.sum",
+    "group/context_group.go",
+    "group/error_group.go",
+    "group/group.go",
+    "group/iter.go",
+    "group/result_context_group.go",
+    "group/result_error_group.go",
+    "group/result_group.go",
+    "iter.go",
+    "limiter.go",
+    "pool/context_pool.go",
+    "pool/error_pool.go",
+    "pool/iter.go",
+    "pool/pool.go",
+    "pool/result_context_pool.go",
+    "pool/result_error_pool.go",
+    "pool/result_pool.go",
+    "stream/stream.go",
+    "waitgroup.go"
+  ],
+  "explanation": {
+    "what": "ContextPool の errPool ErrorPool フィールドを無名埋め込みの ErrorPool に変更し、Do 内の呼び出しを g.errPool.Do から g.ErrorPool.Go に、Wait/addErr の参照も g.ErrorPool 経由に揃えた。ContextPool.WithFirstError の委譲メソッドは削除された。",
+    "why": "seq9 で group パッケージに適用した struct embedding によるメソッド昇格を、pool パッケージの ContextPool にも同様に適用する後追いの修正。コミットメッセージ「embed ErrorPool」が示すとおり、この commit の目的はまさにその1点に絞られている。",
+    "highlights": [
+      { "file": "pool/context_pool.go", "note": "errPool ErrorPool → 無名埋め込み ErrorPool への変更。WithFirstError の委譲コードが不要になり削除された。" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

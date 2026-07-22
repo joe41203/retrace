@@ -1,0 +1,77 @@
+{
+  "seq": 85,
+  "sha": "73ebfbf689e4494da5122bc680472c30dd0fe96e",
+  "parents": [
+    "4b2b559d335a2bf2b54dc2cea592da60eedf6959",
+    "054b03ae70f90b173ee1c575f447d379cf23a603"
+  ],
+  "author": {
+    "name": "Camden Cheek",
+    "email": "camden@ccheek.com",
+    "date": "2023-01-05T09:33:29-07:00"
+  },
+  "message": "Merge pull request #12 from shadow3x3x3/fix-readme-foreach-link\n\nfix README.md `iter.ForEach` link",
+  "pr": {
+    "number": 12,
+    "title": "fix README.md `iter.ForEach` link",
+    "body": "Fixed the link in README.md and removed white spaces of line.",
+    "url": "https://github.com/sourcegraph/conc/pull/12"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 15,
+    "deletions": 15
+  },
+  "files": [
+    {
+      "path": "README.md",
+      "status": "M",
+      "additions": 15,
+      "deletions": 15,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/README.md b/README.md\nindex ec5d61a..021db73 100644\n--- a/README.md\n+++ b/README.md\n@@ -24,7 +24,7 @@ go get github.com/sourcegraph/conc\n - Use [`pool.(Result)?ContextPool`](https://pkg.go.dev/github.com/sourcegraph/conc@v0.1.0/pool#ContextPool) if your tasks should be canceled on failure\n - Use [`stream.Stream`](https://pkg.go.dev/github.com/sourcegraph/conc@v0.1.0/stream#Stream) if you want to process an ordered stream of tasks in parallel with serial callbacks\n - Use [`iter.Map`](https://pkg.go.dev/github.com/sourcegraph/conc@v0.1.0/iter#Map) if you want to concurrently map a slice\n-- Use [`iter.ForEach`](https://pkg.go.dev/github.com/sourcegraph/conc@v0.1.0/iter#Map) if you want to concurrently iterate over a slice\n+- Use [`iter.ForEach`](https://pkg.go.dev/github.com/sourcegraph/conc@v0.1.0/iter#ForEach) if you want to concurrently iterate over a slice\n - Use [`conc.PanicCatcher`](https://pkg.go.dev/github.com/sourcegraph/conc#PanicCatcher) if you want to catch panics in your own goroutines\n \n All pools are created with\n@@ -84,7 +84,7 @@ post](https://vorpus.org/blog/notes-on-structured-concurrency-or-go-statement-co\n \n A frequent problem with goroutines in long-running applications is handling\n panics. A goroutine spawned without a panic handler will crash the whole process\n-on panic. This is usually undesirable. \n+on panic. This is usually undesirable.\n \n However, if you do add a panic handler to a goroutine, what do you do with the\n panic once you catch it? Some options:\n@@ -103,7 +103,7 @@ program is in a really bad state.\n Both (3) and (4) are reasonable options, but both require the goroutine to have\n an owner that can actually receive the message that something went wrong. This\n is generally not true with a goroutine spawned with `go`, but in the `conc`\n-package, all goroutines have an owner that must collect the spawned goroutine. \n+package, all goroutines have an owner that must collect the spawned goroutine.\n In the conc package, any call to `Wait()` will panic if any of the spawned goroutines\n panicked. Additionally, it decorates the panic value with a stacktrace from the child\n goroutine so that you don't lose information about what caused the panic.\n@@ -128,8 +128,8 @@ type caughtPanicError struct {\n \n func (e *caughtPanicError) Error() string {\n     return fmt.Sprintf(\n-        \"panic: %q\\n%s\", \n-        e.val, \n+        \"panic: %q\\n%s\",\n+        e.val,\n         string(e.stack)\n     )\n }\n@@ -162,7 +162,7 @@ func main() {\n func main() {\n     var wg conc.WaitGroup\n     wg.Go(doSomethingThatMightPanic)\n-    // panics with a nice stacktrace      \n+    // panics with a nice stacktrace\n     wg.Wait()\n }\n ```\n@@ -206,7 +206,7 @@ func main() {\n         wg.Add(1)\n         go func() {\n             defer wg.Done()\n-            // crashes on panic!          \n+            // crashes on panic!\n             doSomething()\n         }()\n     }\n@@ -219,7 +219,7 @@ func main() {\n ```go\n func main() {\n     var wg conc.WaitGroup\n-    for i := 0; i < 10; i++ {             \n+    for i := 0; i < 10; i++ {\n         wg.Go(doSomething)\n     }\n     wg.Wait()\n@@ -246,7 +246,7 @@ func process(stream chan int) {\n         wg.Add(1)\n         go func() {\n             defer wg.Done()\n-            for elem := range stream {    \n+            for elem := range stream {\n                 handle(elem)\n             }\n         }()\n@@ -259,7 +259,7 @@ func process(stream chan int) {\n \n ```go\n func process(stream chan int) {\n-    p := pool.New().WithMaxGoroutines(10) \n+    p := pool.New().WithMaxGoroutines(10)\n     for elem := range stream {\n         elem := elem\n         p.Go(func() {\n@@ -292,7 +292,7 @@ func process(values []int) {\n         wg.Add(1)\n         go func() {\n             defer wg.Done()\n-            for elem := range feeder {    \n+            for elem := range feeder {\n                 handle(elem)\n             }\n         }()\n@@ -310,7 +310,7 @@ func process(values []int) {\n \n ```go\n func process(values []int) {\n-    iter.ForEach(values, handle)          \n+    iter.ForEach(values, handle)\n }\n ```\n </td>\n@@ -342,7 +342,7 @@ func concMap(\n             defer wg.Done()\n \n             for {\n-                i := int(idx.Add(1) - 1)  \n+                i := int(idx.Add(1) - 1)\n                 if i >= len(input) {\n                     return\n                 }\n@@ -363,7 +363,7 @@ func concMap(\n     input []int,\n     f func(int) int,\n ) []int {\n-    return iter.Map(input, f)                    \n+    return iter.Map(input, f)\n }\n ```\n </td>\n@@ -421,7 +421,7 @@ func mapStream\n         }\n     }\n \n-    // We've exhausted input. \n+    // We've exhausted input.\n     // Wait for everything to finish\n     close(tasks)\n     workerWg.Wait()\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/go.yml",
+    "LICENSE",
+    "README.md",
+    "go.mod",
+    "go.sum",
+    "iter/iter.go",
+    "iter/iter_test.go",
+    "panic.go",
+    "panic_test.go",
+    "pool/context_pool.go",
+    "pool/context_pool_test.go",
+    "pool/error_pool.go",
+    "pool/error_pool_test.go",
+    "pool/pool.go",
+    "pool/pool_test.go",
+    "pool/result_context_pool.go",
+    "pool/result_context_pool_test.go",
+    "pool/result_error_pool.go",
+    "pool/result_error_pool_test.go",
+    "pool/result_pool.go",
+    "pool/result_pool_test.go",
+    "stream/stream.go",
+    "stream/stream_test.go",
+    "waitgroup.go",
+    "waitgroup_test.go"
+  ],
+  "explanation": {
+    "what": "外部PR #12をマージし、README.md 内の `iter.ForEach` へのリンクが誤って `iter.Map` のアンカーを指していたのを修正し、あわせて行末の余分な空白を各所から除去した。",
+    "why": "PR本文に \"Fixed the link in README.md and removed white spaces of line.\" とあり、pkg.go.dev へのリンク先の誤りと行末空白のクリーンアップが目的。",
+    "highlights": [
+      { "file": "README.md", "note": "`iter.ForEach` のリンクアンカーを `#Map` から `#ForEach` に修正" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [{ "type": "pr", "number": 12, "url": "https://github.com/sourcegraph/conc/pull/12" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

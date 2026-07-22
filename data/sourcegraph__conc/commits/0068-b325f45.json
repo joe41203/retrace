@@ -1,0 +1,69 @@
+{
+  "seq": 68,
+  "sha": "b325f45264566dc6d9ca585b6ee43221c935c4d9",
+  "parents": [
+    "712f3f8473f9fa01ebfee5772466083797f741d2"
+  ],
+  "author": {
+    "name": "Camden Cheek",
+    "email": "camden@ccheek.com",
+    "date": "2023-01-02T18:44:14-07:00"
+  },
+  "message": "make spacing prettier",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 147,
+    "deletions": 147
+  },
+  "files": [
+    {
+      "path": "README.md",
+      "status": "M",
+      "additions": 147,
+      "deletions": 147,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/README.md b/README.md\nindex e1aa3df..9cf64b7 100644\n--- a/README.md\n+++ b/README.md\n@@ -114,33 +114,33 @@ the code more difficult to read, so `conc` does this for you.\n \n ```go\n type caughtPanicError struct {\n-\tval   any\n-\tstack []byte\n+    val   any\n+    stack []byte\n }\n \n func (e *caughtPanicError) Error() string {\n-\treturn fmt.Sprintf(\"panic: %q\\n%s\", e.val, string(e.stack))\n+    return fmt.Sprintf(\"panic: %q\\n%s\", e.val, string(e.stack))\n }\n \n func main() {\n-\tdone := make(chan error)\n-\tgo func() {\n-\t\tdefer func() {\n-\t\t\tif val := recover(); val != nil {\n-\t\t\t\tdone <- caughtPanicError{\n-\t\t\t\t\tval: val, \n-\t\t\t\t\tstack: debug.Stack()\n-\t\t\t\t}\n-\t\t\t} else {\n-\t\t\t\tdone <- nil\n-\t\t\t}\n-\t\t}()\n-\t\tdoSomethingThatMightPanic()\n-\t}()\n-\terr := <-done\n-\tif err != nil {\n-\t\tpanic(err)\n-\t}\n+    done := make(chan error)\n+    go func() {\n+        defer func() {\n+            if val := recover(); val != nil {\n+                done <- caughtPanicError{\n+                    val: val, \n+                    stack: debug.Stack()\n+                }\n+            } else {\n+                done <- nil\n+            }\n+        }()\n+        doSomethingThatMightPanic()\n+    }()\n+    err := <-done\n+    if err != nil {\n+        panic(err)\n+    }\n }\n ```\n </td>\n@@ -188,16 +188,16 @@ Spawn a set of goroutines and waiting for them to finish:\n \n ```go\n func main() {\n-\tvar wg sync.WaitGroup\n-\tfor i := 0; i < 10; i++ {\n-\t\twg.Add(1)\n-\t\tgo func() {\n-\t\t\tdefer wg.Done()\n-\t\t\t// if doSomething panics, the process crashes!\n-\t\t\tdoSomething()\n-\t\t}()\n-\t}\n-\twg.Wait()\n+    var wg sync.WaitGroup\n+    for i := 0; i < 10; i++ {\n+        wg.Add(1)\n+        go func() {\n+            defer wg.Done()\n+            // if doSomething panics, the process crashes!\n+            doSomething()\n+        }()\n+    }\n+    wg.Wait()\n }\n ```\n </td>\n@@ -205,11 +205,11 @@ func main() {\n \n ```go\n func main() {\n-\tvar wg conc.WaitGroup\n-\tfor i := 0; i < 10; i++ {\n-\t\twg.Go(doSomething)\n-\t}\n-\twg.Wait()\n+    var wg conc.WaitGroup\n+    for i := 0; i < 10; i++ {\n+        wg.Go(doSomething)\n+    }\n+    wg.Wait()\n }\n ```\n </td>\n@@ -228,17 +228,17 @@ Process each element of a stream in a static pool of goroutines:\n \n ```go\n func process(stream chan int) {\n-\tvar wg sync.WaitGroup\n-\tfor i := 0; i < 10; i++ {\n-\t\twg.Add(1)\n-\t\tgo func() {\n-\t\t\tdefer wg.Done()\n-\t\t\tfor elem := range stream {\n-\t\t\t\thandle(elem)\n-\t\t\t}\n-\t\t}()\n-\t}\n-\twg.Wait()\n+    var wg sync.WaitGroup\n+    for i := 0; i < 10; i++ {\n+        wg.Add(1)\n+        go func() {\n+            defer wg.Done()\n+            for elem := range stream {\n+                handle(elem)\n+            }\n+        }()\n+    }\n+    wg.Wait()\n }\n ```\n </td>\n@@ -246,14 +246,14 @@ func process(stream chan int) {\n \n ```go\n func process(stream chan int) {\n-\tp := pool.New().WithMaxGoroutines(10)\n-\tfor elem := range stream {\n-\t\telem := elem\n-\t\tp.Go(func() {\n-\t\t\thandle(elem)\n-\t\t})\n-\t}\n-\tp.Wait()\n+    p := pool.New().WithMaxGoroutines(10)\n+    for elem := range stream {\n+        elem := elem\n+        p.Go(func() {\n+            handle(elem)\n+        })\n+    }\n+    p.Wait()\n }\n ```\n </td>\n@@ -272,26 +272,26 @@ Process each element of a slice in a static pool of goroutines:\n \n ```go\n func main() {\n-\tvalues := []int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10}\n-\n-\tfeeder := make(chan int, 8)\n-\n-\tvar wg sync.WaitGroup\n-\tfor i := 0; i < 10; i++ {\n-\t\twg.Add(1)\n-\t\tgo func() {\n-\t\t\tdefer wg.Done()\n-\t\t\tfor elem := range feeder {\n-\t\t\t\thandle(elem)\n-\t\t\t}\n-\t\t}()\n-\t}\n-\n-\tfor _, value := range values {\n-\t\tfeeder <- value\n-\t}\n-\n-\twg.Wait()\n+    values := []int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10}\n+\n+    feeder := make(chan int, 8)\n+\n+    var wg sync.WaitGroup\n+    for i := 0; i < 10; i++ {\n+        wg.Add(1)\n+        go func() {\n+            defer wg.Done()\n+            for elem := range feeder {\n+                handle(elem)\n+            }\n+        }()\n+    }\n+\n+    for _, value := range values {\n+        feeder <- value\n+    }\n+\n+    wg.Wait()\n }\n ```\n </td>\n@@ -299,8 +299,8 @@ func main() {\n \n ```go\n func main() {\n-\tvalues := []int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10}\n-\titer.ForEach(values, handle)\n+    values := []int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10}\n+    iter.ForEach(values, handle)\n }\n ```\n </td>\n@@ -319,27 +319,27 @@ Concurrently map a slice:\n \n ```go\n func concMap(input []int, f func(int) int) []int {\n-\tres := make([]int, len(input))\n-\tvar idx atomic.Int64\n-\n-\tvar wg sync.WaitGroup\n-\tfor i := 0; i < 10; i++ {\n-\t\twg.Add(1)\n-\t\tgo func() {\n-\t\t\tdefer wg.Done()\n-\n-\t\t\tfor {\n-\t\t\t\ti := int(idx.Add(1) - 1)\n-\t\t\t\tif i >= len(input) {\n-\t\t\t\t\treturn\n-\t\t\t\t}\n-\n-\t\t\t\tres[i] = f(input[i])\n-\t\t\t}\n-\t\t}()\n-\t}\n-\twg.Wait()\n-\treturn res\n+    res := make([]int, len(input))\n+    var idx atomic.Int64\n+\n+    var wg sync.WaitGroup\n+    for i := 0; i < 10; i++ {\n+        wg.Add(1)\n+        go func() {\n+            defer wg.Done()\n+\n+            for {\n+                i := int(idx.Add(1) - 1)\n+                if i >= len(input) {\n+                    return\n+                }\n+\n+                res[i] = f(input[i])\n+            }\n+        }()\n+    }\n+    wg.Wait()\n+    return res\n }\n ```\n </td>\n@@ -347,7 +347,7 @@ func concMap(input []int, f func(int) int) []int {\n \n ```go\n func concMap(input []int, f func(int) int) []int {\n-\titer.Map(input, f)\n+    iter.Map(input, f)\n }\n ```\n </td>\n@@ -367,45 +367,45 @@ Process an ordered stream concurrently:\n \n ```go\n func mapStream(input chan int, output chan int, f func(int) int) {\n-\ttasks := make(chan func())\n-\ttaskResults := make(chan chan int)\n-\n-\t// Spawn the worker goroutines\n-\tvar workerWg sync.WaitGroup\n-\tfor i := 0; i < 10; i++ {\n-\t\tworkerWg.Add(1)\n-\t\tgo func() {\n-\t\t\tdefer workerWg.Done()\n-\t\t\tfor task := range tasks {\n-\t\t\t\ttask()\n-\t\t\t}\n-\t\t}()\n-\t}\n-\n-\t// Spawn the goroutine that reads results in order\n-\tvar readerWg sync.WaitGroup\n-\treaderWg.Add(1)\n-\tgo func() {\n-\t\tdefer readerWg.Done()\n-\t\tfor taskResult := range taskResults {\n-\t\t\toutput <- taskResult\n-\t\t}\n-\t}\n-\n-\t// Feed the workers with tasks\n-\tfor elem := range input {\n-\t\tresultCh := make(chan int, 1)\n-\t\ttaskResults <- resultCh\n-\t\ttasks <- func() {\n-\t\t\tresultCh <- f(elem)\n-\t\t}\n-\t}\n-\n-\t// We've exhausted input. Wait for everything to finish\n-\tclose(tasks)\n-\tworkerWg.Wait()\n-\tclose(taskResults)\n-\treaderWg.Wait()\n+    tasks := make(chan func())\n+    taskResults := make(chan chan int)\n+\n+    // Spawn the worker goroutines\n+    var workerWg sync.WaitGroup\n+    for i := 0; i < 10; i++ {\n+        workerWg.Add(1)\n+        go func() {\n+            defer workerWg.Done()\n+            for task := range tasks {\n+                task()\n+            }\n+        }()\n+    }\n+\n+    // Spawn the goroutine that reads results in order\n+    var readerWg sync.WaitGroup\n+    readerWg.Add(1)\n+    go func() {\n+        defer readerWg.Done()\n+        for taskResult := range taskResults {\n+            output <- taskResult\n+        }\n+    }\n+\n+    // Feed the workers with tasks\n+    for elem := range input {\n+        resultCh := make(chan int, 1)\n+        taskResults <- resultCh\n+        tasks <- func() {\n+            resultCh <- f(elem)\n+        }\n+    }\n+\n+    // We've exhausted input. Wait for everything to finish\n+    close(tasks)\n+    workerWg.Wait()\n+    close(taskResults)\n+    readerWg.Wait()\n }\n ```\n </td>\n@@ -413,15 +413,15 @@ func mapStream(input chan int, output chan int, f func(int) int) {\n \n ```go\n func mapStream(input chan int, output chan int, f func(int) int) {\n-\ts := stream.New().WithMaxGoroutines(10)\n-\tfor elem := range input {\n-\t\telem := elem\n-\t\ts.Go(func() {\n-\t\t\tres := f(elem)\n-\t\t\treturn func() { output <- res }\n-\t\t})\n-\t}\n-\ts.Wait()\n+    s := stream.New().WithMaxGoroutines(10)\n+    for elem := range input {\n+        elem := elem\n+        s.Go(func() {\n+            res := f(elem)\n+            return func() { output <- res }\n+        })\n+    }\n+    s.Wait()\n }\n ```\n </td>\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/go.yml",
+    "LICENSE",
+    "README.md",
+    "go.mod",
+    "go.sum",
+    "iter/iter.go",
+    "iter/iter_test.go",
+    "panic.go",
+    "panic_test.go",
+    "pool/context_pool.go",
+    "pool/context_pool_test.go",
+    "pool/error_pool.go",
+    "pool/error_pool_test.go",
+    "pool/pool.go",
+    "pool/pool_test.go",
+    "pool/result_context_pool.go",
+    "pool/result_context_pool_test.go",
+    "pool/result_error_pool.go",
+    "pool/result_error_pool_test.go",
+    "pool/result_pool.go",
+    "pool/result_pool_test.go",
+    "stream/stream.go",
+    "stream/stream_test.go",
+    "waitgroup.go",
+    "waitgroup_test.go"
+  ],
+  "explanation": {
+    "what": "README 内の全コード例のインデントをタブから4スペースに統一した(147行の追加・147行の削除で内容は変わらず空白のみ変更)。",
+    "why": "コミットメッセージの通り、GitHub 上でのMarkdown表示時の見栄え(スペーシング)を整える目的の整形修正。前の commit でタブに統一したばかりだが、表示上はスペースの方が好ましいと判断し方針を変えたと考えられる。",
+    "highlights": [],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

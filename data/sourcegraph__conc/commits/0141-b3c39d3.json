@@ -1,0 +1,83 @@
+{
+  "seq": 141,
+  "sha": "b3c39d32eccbb66e8eb985d9596737d403f17911",
+  "parents": [
+    "7a31dff5fbd84f1529c53c6f59170d8c31ee0a44"
+  ],
+  "author": {
+    "name": "Camden Cheek",
+    "email": "camden@ccheek.com",
+    "date": "2023-06-02T12:56:21-06:00"
+  },
+  "message": "Remove outdated TODO (#117)\n\nWe use the new error facilities when built with go 1.20, so this TODO no\r\nlonger applies.",
+  "pr": {
+    "number": 117,
+    "title": "Remove outdated TODO",
+    "body": "We use the new error facilities when built with go 1.20, so this TODO no longer applies.",
+    "url": "https://github.com/sourcegraph/conc/pull/117"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 0,
+    "deletions": 1
+  },
+  "files": [
+    {
+      "path": "iter/map.go",
+      "status": "M",
+      "additions": 0,
+      "deletions": 1,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/iter/map.go b/iter/map.go\nindex efbe6bf..b311287 100644\n--- a/iter/map.go\n+++ b/iter/map.go\n@@ -56,7 +56,6 @@ func (m Mapper[T, R]) MapErr(input []T, f func(*T) (R, error)) ([]R, error) {\n \t\tres[i], err = f(t)\n \t\tif err != nil {\n \t\t\terrMux.Lock()\n-\t\t\t// TODO: use stdlib errors once multierrors land in go 1.20\n \t\t\terrs = multierror.Join(errs, err)\n \t\t\terrMux.Unlock()\n \t\t}\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/go.yml",
+    ".golangci.yml",
+    "LICENSE",
+    "README.md",
+    "go.mod",
+    "go.sum",
+    "internal/multierror/multierror_go119.go",
+    "internal/multierror/multierror_go120.go",
+    "iter/iter.go",
+    "iter/iter_test.go",
+    "iter/map.go",
+    "iter/map_test.go",
+    "panics/panics.go",
+    "panics/panics_test.go",
+    "panics/try.go",
+    "panics/try_test.go",
+    "pool/context_pool.go",
+    "pool/context_pool_test.go",
+    "pool/error_pool.go",
+    "pool/error_pool_test.go",
+    "pool/pool.go",
+    "pool/pool_test.go",
+    "pool/result_context_pool.go",
+    "pool/result_context_pool_test.go",
+    "pool/result_error_pool.go",
+    "pool/result_error_pool_test.go",
+    "pool/result_pool.go",
+    "pool/result_pool_test.go",
+    "stream/stream.go",
+    "stream/stream_test.go",
+    "waitgroup.go",
+    "waitgroup_test.go"
+  ],
+  "explanation": {
+    "what": "iter/map.go の MapErr 内にあった「go 1.20 で multierror が入ったら stdlib に切り替える」という TODO コメントを1行削除した。",
+    "why": "PR本文に明記されている通り、conc は既に go 1.20 でビルドした場合は新しいエラー機構(errors.Join ベースの internal/multierror)を使うようになっていたため、このTODOはもう当てはまらなくなっていた。実装の追従ではなくコメントの陳腐化を掃除する小さな整理コミット。",
+    "highlights": [
+      { "file": "iter/map.go", "note": "削除されたのはコメント1行のみ。実装(multierror.Join の呼び出し)自体は変わらない" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [{ "type": "pr", "number": 117, "url": "https://github.com/sourcegraph/conc/pull/117" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

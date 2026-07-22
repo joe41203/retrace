@@ -1,0 +1,143 @@
+{
+  "seq": 43,
+  "sha": "9ea2caa121f1e58b3ce20488bad2e1c2e632c039",
+  "parents": [
+    "73ab4d957d627e17150b755380a08ad59bbf28e7"
+  ],
+  "author": {
+    "name": "Camden Cheek",
+    "email": "camden@ccheek.com",
+    "date": "2023-01-02T12:18:43-07:00"
+  },
+  "message": "add a bunch of comments",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 11,
+    "additions": 116,
+    "deletions": 62
+  },
+  "files": [
+    {
+      "path": "limiter.go",
+      "status": "M",
+      "additions": 0,
+      "deletions": 19,
+      "binary": false
+    },
+    {
+      "path": "pool/context_pool.go",
+      "status": "M",
+      "additions": 20,
+      "deletions": 9,
+      "binary": false
+    },
+    {
+      "path": "pool/context_pool_test.go",
+      "status": "M",
+      "additions": 3,
+      "deletions": 3,
+      "binary": false
+    },
+    {
+      "path": "pool/error_pool.go",
+      "status": "M",
+      "additions": 13,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "pool/limiter.go",
+      "status": "D",
+      "additions": 0,
+      "deletions": 3,
+      "binary": false
+    },
+    {
+      "path": "pool/pool.go",
+      "status": "M",
+      "additions": 33,
+      "deletions": 10,
+      "binary": false
+    },
+    {
+      "path": "pool/pool_test.go",
+      "status": "M",
+      "additions": 19,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "pool/result_context_pool.go",
+      "status": "M",
+      "additions": 0,
+      "deletions": 5,
+      "binary": false
+    },
+    {
+      "path": "pool/result_context_pool_test.go",
+      "status": "M",
+      "additions": 3,
+      "deletions": 3,
+      "binary": false
+    },
+    {
+      "path": "stream/stream.go",
+      "status": "M",
+      "additions": 5,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "stream/stream_test.go",
+      "status": "M",
+      "additions": 20,
+      "deletions": 10,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/limiter.go b/limiter.go\nindex b9354e9..f8fd5a3 100644\n--- a/limiter.go\n+++ b/limiter.go\n@@ -1,20 +1 @@\n package conc\n-\n-// Limiter is a simple, goroutine-safe, channel-based semaphore.\n-func NewLimiter(n int) Limiter {\n-\treturn make(Limiter, n)\n-}\n-\n-type Limiter chan struct{}\n-\n-func (l Limiter) Limit() int {\n-\treturn cap(l)\n-}\n-\n-func (l Limiter) Acquire() {\n-\tl <- struct{}{}\n-}\n-\n-func (l Limiter) Release() {\n-\t<-l\n-}\ndiff --git a/pool/context_pool.go b/pool/context_pool.go\nindex fb83659..8d9fea0 100644\n--- a/pool/context_pool.go\n+++ b/pool/context_pool.go\n@@ -4,6 +4,10 @@ import (\n \t\"context\"\n )\n \n+// ContextPool is a pool that runs tasks that take a context.\n+// The context passed to the task will be canceled if any\n+// of the tasks return an error, which makes its functionality\n+// different than just capturing a context with the task closure.\n type ContextPool struct {\n \terrorPool ErrorPool\n \n@@ -11,13 +15,17 @@ type ContextPool struct {\n \tcancel context.CancelFunc\n }\n \n+// Go submits a task. If it returns an error, the error will be\n+// collected and returned by Wait() and the context passed to other\n+// tasks will be canceled.\n func (g *ContextPool) Go(f func(ctx context.Context) error) {\n \tg.errorPool.Go(func() error {\n \t\terr := f(g.ctx)\n-\t\tif err != nil && g.cancel != nil {\n-\t\t\t// Add the error directly because otherwise, canceling could cause\n-\t\t\t// another goroutine to exit and return an error before this error\n-\t\t\t// was added, which breaks the expectations of WithFirstError().\n+\t\tif err != nil {\n+\t\t\t// Leaky abstraction warning: We add the error directly because\n+\t\t\t// otherwise, canceling could cause another goroutine to exit and\n+\t\t\t// return an error before this error was added, which breaks the\n+\t\t\t// expectations of WithFirstError().\n \t\t\tg.errorPool.addErr(err)\n \t\t\tg.cancel()\n \t\t\treturn nil\n@@ -26,20 +34,23 @@ func (g *ContextPool) Go(f func(ctx context.Context) error) {\n \t})\n }\n \n+// Wait cleans up all spawned goroutines, propagates any panics, and\n+// returns an error if any of the tasks errored.\n func (p *ContextPool) Wait() error {\n \treturn p.errorPool.Wait()\n }\n \n-func (p *ContextPool) WithCancelOnError() *ContextPool {\n-\tp.ctx, p.cancel = context.WithCancel(p.ctx)\n-\treturn p\n-}\n-\n+// WithFirstError configures the pool to only return the first error\n+// returned by a task. By default, Wait() will return a combined error.\n+// This is particularly useful for ContextPool where all errors after the\n+// first are likely to be context.Canceled.\n func (p *ContextPool) WithFirstError() *ContextPool {\n \tp.errorPool.WithFirstError()\n \treturn p\n }\n \n+// WithMaxGoroutines limits the number of goroutines in a pool.\n+// Defaults to runtime.GOMAXPROCS(0). Panics if n < 1.\n func (p *ContextPool) WithMaxGoroutines(n int) *ContextPool {\n \tp.errorPool.WithMaxGoroutines(n)\n \treturn p\ndiff --git a/pool/context_pool_test.go b/pool/context_pool_test.go\nindex cafa3e7..71677ee 100644\n--- a/pool/context_pool_test.go\n+++ b/pool/context_pool_test.go\n@@ -67,8 +67,8 @@ func TestContextPool(t *testing.T) {\n \t\t})\n \t})\n \n-\tt.Run(\"CancelOnError\", func(t *testing.T) {\n-\t\tp := New().WithMaxGoroutines(2).WithContext(bgctx).WithCancelOnError()\n+\tt.Run(\"cancel on error\", func(t *testing.T) {\n+\t\tp := New().WithMaxGoroutines(2).WithContext(bgctx)\n \t\tp.Go(func(ctx context.Context) error {\n \t\t\t<-ctx.Done()\n \t\t\treturn ctx.Err()\n@@ -82,7 +82,7 @@ func TestContextPool(t *testing.T) {\n \t})\n \n \tt.Run(\"WithFirstError\", func(t *testing.T) {\n-\t\tp := New().WithContext(bgctx).WithCancelOnError().WithFirstError()\n+\t\tp := New().WithContext(bgctx).WithFirstError()\n \t\tp.Go(func(ctx context.Context) error {\n \t\t\t<-ctx.Done()\n \t\t\treturn err2\ndiff --git a/pool/error_pool.go b/pool/error_pool.go\nindex 454cd75..b8164d9 100644\n--- a/pool/error_pool.go\n+++ b/pool/error_pool.go\n@@ -7,6 +7,8 @@ import (\n \t\"github.com/sourcegraph/sourcegraph/lib/errors\"\n )\n \n+// ErrorPool is a pool that runs tasks that may return an error.\n+// Errors are collected and returned by Wait().\n type ErrorPool struct {\n \tpool Pool\n \n@@ -16,29 +18,40 @@ type ErrorPool struct {\n \terrs error\n }\n \n+// Go submits a task to the pool.\n func (p *ErrorPool) Go(f func() error) {\n \tp.pool.Go(func() {\n \t\tp.addErr(f())\n \t})\n }\n \n+// Wait cleans up any spawned goroutines, propagating any panics and\n+// returning any errors from tasks.\n func (p *ErrorPool) Wait() error {\n \tp.pool.Wait()\n \treturn p.errs\n }\n \n+// WithContext converts the pool to a ContextPool for tasks that should\n+// be canceled on first error.\n func (p *ErrorPool) WithContext(ctx context.Context) *ContextPool {\n+\tctx, cancel := context.WithCancel(ctx)\n \treturn &ContextPool{\n \t\terrorPool: *p,\n \t\tctx:       ctx,\n+\t\tcancel:    cancel,\n \t}\n }\n \n+// WithFirstError configures the pool to only return the first error\n+// returned by a task. By default, Wait() will return a combined error.\n func (p *ErrorPool) WithFirstError() *ErrorPool {\n \tp.onlyFirstError = true\n \treturn p\n }\n \n+// WithMaxGoroutines limits the number of goroutines in a pool.\n+// Defaults to runtime.GOMAXPROCS(0). Panics if n < 1.\n func (p *ErrorPool) WithMaxGoroutines(n int) *ErrorPool {\n \tp.pool.WithMaxGoroutines(n)\n \treturn p\ndiff --git a/pool/limiter.go b/pool/limiter.go\ndeleted file mode 100644\nindex 737b4dd..0000000\n--- a/pool/limiter.go\n+++ /dev/null\n@@ -1,3 +0,0 @@\n-package pool\n-\n-type limiter chan struct{}\ndiff --git a/pool/pool.go b/pool/pool.go\nindex 8c3a532..4b06545 100644\n--- a/pool/pool.go\n+++ b/pool/pool.go\n@@ -8,10 +8,23 @@ import (\n \t\"github.com/camdencheek/conc\"\n )\n \n+// New creates a new Pool.\n func New() *Pool {\n \treturn &Pool{}\n }\n \n+// Pool is a pool of goroutines used to execute tasks concurrently.\n+//\n+// Tasks are submitted with Go(). Once all your tasks have been submitted, you\n+// must call Wait() to clean up any spawned goroutines and propagate any\n+// panics.\n+//\n+// Goroutines are started lazily, so creating a new pool is cheap. There will\n+// never be more goroutines spawned than there are tasks submitted.\n+//\n+// Pool is efficient, but not zero cost. It should not be used for very short\n+// tasks. Startup and teardown come with an overhead of around 1µs, and each\n+// task has an overhead of around 300ns.\n type Pool struct {\n \thandle   conc.WaitGroup\n \tlimiter  limiter\n@@ -19,6 +32,7 @@ type Pool struct {\n \tinitOnce sync.Once\n }\n \n+// Go submits a task to be run in the pool.\n func (p *Pool) Go(f func()) {\n \tp.init()\n \n@@ -38,6 +52,8 @@ func (p *Pool) Go(f func()) {\n \t}\n }\n \n+// Wait cleans up spawned goroutines, propagating any panics that were\n+// raised by a tasks.\n func (p *Pool) Wait() {\n \tp.init()\n \n@@ -45,10 +61,21 @@ func (p *Pool) Wait() {\n \tp.handle.Wait()\n }\n \n+// MaxGoroutines returns the maximum size of the pool.\n func (p *Pool) MaxGoroutines() int {\n \treturn p.limiter.limit()\n }\n \n+// WithMaxGoroutines limits the number of goroutines in a pool.\n+// Defaults to runtime.GOMAXPROCS(0). Panics if n < 1.\n+func (p *Pool) WithMaxGoroutines(n int) *Pool {\n+\tif n < 1 {\n+\t\tpanic(\"max goroutines in a pool must be greater than zero\")\n+\t}\n+\tp.limiter = make(limiter, n)\n+\treturn p\n+}\n+\n // init ensures that the pool is initialized before use. This makes the\n // zero value of the pool usable.\n func (p *Pool) init() {\n@@ -62,26 +89,22 @@ func (p *Pool) init() {\n \t})\n }\n \n-// WithMaxGoroutines limits the number of goroutines in a pool.\n-// Panics if n < 1.\n-func (p *Pool) WithMaxGoroutines(n int) *Pool {\n-\tif n < 1 {\n-\t\tpanic(\"max goroutines in a pool must be greater than zero\")\n-\t}\n-\tp.limiter = make(limiter, n)\n-\treturn p\n-}\n-\n+// WithErrors converts the pool to an ErrorPool so the submitted tasks can\n+// return errors.\n func (p *Pool) WithErrors() *ErrorPool {\n \treturn &ErrorPool{\n \t\tpool: *p,\n \t}\n }\n \n+// WithContext converts the pool to a ContextPool for tasks that should\n+// be canceled on first error.\n func (p *Pool) WithContext(ctx context.Context) *ContextPool {\n+\tctx, cancel := context.WithCancel(ctx)\n \treturn &ContextPool{\n \t\terrorPool: *p.WithErrors(),\n \t\tctx:       ctx,\n+\t\tcancel:    cancel,\n \t}\n }\n \ndiff --git a/pool/pool_test.go b/pool/pool_test.go\nindex 6c2ce89..fda363e 100644\n--- a/pool/pool_test.go\n+++ b/pool/pool_test.go\n@@ -76,3 +76,22 @@ func TestPool(t *testing.T) {\n \t\trequire.Panics(t, g.Wait)\n \t})\n }\n+\n+func BenchmarkPool(b *testing.B) {\n+\tb.Run(\"startup and teardown\", func(b *testing.B) {\n+\t\tfor i := 0; i < b.N; i++ {\n+\t\t\tp := New()\n+\t\t\tp.Go(func() {})\n+\t\t\tp.Wait()\n+\t\t}\n+\t})\n+\n+\tb.Run(\"per task\", func(b *testing.B) {\n+\t\tp := New()\n+\t\tf := func() {}\n+\t\tfor i := 0; i < b.N; i++ {\n+\t\t\tp.Go(f)\n+\t\t}\n+\t\tp.Wait()\n+\t})\n+}\ndiff --git a/pool/result_context_pool.go b/pool/result_context_pool.go\nindex 31be030..3a5f51e 100644\n--- a/pool/result_context_pool.go\n+++ b/pool/result_context_pool.go\n@@ -30,11 +30,6 @@ func (p *ResultContextPool[T]) WithCollectErrored() *ResultContextPool[T] {\n \treturn p\n }\n \n-func (p *ResultContextPool[T]) WithCancelOnError() *ResultContextPool[T] {\n-\tp.contextPool.WithCancelOnError()\n-\treturn p\n-}\n-\n func (p *ResultContextPool[T]) WithFirstError() *ResultContextPool[T] {\n \tp.contextPool.WithFirstError()\n \treturn p\ndiff --git a/pool/result_context_pool_test.go b/pool/result_context_pool_test.go\nindex 50fa038..e682c79 100644\n--- a/pool/result_context_pool_test.go\n+++ b/pool/result_context_pool_test.go\n@@ -63,9 +63,9 @@ func TestResultContextPool(t *testing.T) {\n \t\trequire.ErrorIs(t, err, context.Canceled)\n \t})\n \n-\tt.Run(\"CancelOnError\", func(t *testing.T) {\n+\tt.Run(\"cancel on error\", func(t *testing.T) {\n \t\tt.Parallel()\n-\t\tg := NewWithResults[int]().WithContext(context.Background()).WithCancelOnError()\n+\t\tg := NewWithResults[int]().WithContext(context.Background())\n \t\tg.Go(func(ctx context.Context) (int, error) {\n \t\t\t<-ctx.Done()\n \t\t\treturn 0, ctx.Err()\n@@ -89,7 +89,7 @@ func TestResultContextPool(t *testing.T) {\n \n \tt.Run(\"WithFirstError\", func(t *testing.T) {\n \t\tt.Parallel()\n-\t\tg := NewWithResults[int]().WithContext(context.Background()).WithCancelOnError().WithFirstError()\n+\t\tg := NewWithResults[int]().WithContext(context.Background()).WithFirstError()\n \t\tg.Go(func(ctx context.Context) (int, error) {\n \t\t\t<-ctx.Done()\n \t\t\treturn 0, err2\ndiff --git a/stream/stream.go b/stream/stream.go\nindex 791215b..49c5e63 100644\n--- a/stream/stream.go\n+++ b/stream/stream.go\n@@ -29,6 +29,11 @@ func New() *Stream {\n // In the case of panic during execution of a task or a callback, all other\n // tasks and callbacks will still execute. The panic will be propagated to the\n // caller when Wait() is called.\n+//\n+// A Stream is efficient, but not zero cost. It should not be used for very\n+// short tasks. Startup and teardown adds an overhead of a couple of\n+// microseconds, and the overhead for each task is roughly 500ns. It should be\n+// good enough for any task that requires a network call.\n type Stream struct {\n \tpool             pool.Pool\n \tcallbackerHandle conc.WaitGroup\ndiff --git a/stream/stream_test.go b/stream/stream_test.go\nindex d62fe74..6c4c4db 100644\n--- a/stream/stream_test.go\n+++ b/stream/stream_test.go\n@@ -114,14 +114,24 @@ func TestStream(t *testing.T) {\n }\n \n func BenchmarkStream(b *testing.B) {\n-\tn := 0\n-\ts := New()\n-\tfor i := 0; i < b.N; i++ {\n-\t\ts.Go(func() Callback {\n-\t\t\treturn func() {\n-\t\t\t\tn += 1\n-\t\t\t}\n-\t\t})\n-\t}\n-\ts.Wait()\n+\tb.Run(\"startup and teardown\", func(b *testing.B) {\n+\t\tfor i := 0; i < b.N; i++ {\n+\t\t\ts := New()\n+\t\t\ts.Go(func() Callback { return func() {} })\n+\t\t\ts.Wait()\n+\t\t}\n+\t})\n+\n+\tb.Run(\"per task\", func(b *testing.B) {\n+\t\tn := 0\n+\t\ts := New()\n+\t\tfor i := 0; i < b.N; i++ {\n+\t\t\ts.Go(func() Callback {\n+\t\t\t\treturn func() {\n+\t\t\t\t\tn += 1\n+\t\t\t\t}\n+\t\t\t})\n+\t\t}\n+\t\ts.Wait()\n+\t})\n }\n",
+  "diffTruncated": false,
+  "tree": [
+    "LICENSE",
+    "go.mod",
+    "go.sum",
+    "limiter.go",
+    "panic.go",
+    "panic_test.go",
+    "pariter/iter.go",
+    "pariter/iter_test.go",
+    "pool/context_pool.go",
+    "pool/context_pool_test.go",
+    "pool/error_pool.go",
+    "pool/error_pool_test.go",
+    "pool/pool.go",
+    "pool/pool_test.go",
+    "pool/result_context_pool.go",
+    "pool/result_context_pool_test.go",
+    "pool/result_error_pool.go",
+    "pool/result_error_pool_test.go",
+    "pool/result_pool.go",
+    "pool/result_pool_test.go",
+    "stream/stream.go",
+    "stream/stream_test.go",
+    "waitgroup.go",
+    "waitgroup_test.go"
+  ],
+  "explanation": {
+    "what": "pool 配下の各型(Pool, ErrorPool, ContextPool, ResultPool 系)に GoDoc コメントを大量に追加した。あわせて ContextPool.WithCancelOnError() を削除し、WithContext() 呼び出し時に常に context.WithCancel でキャンセル可能な context を生成するよう変更。Pool と Stream には起動・タスクごとのオーバーヘッド(概算 µs/ns 単位)を明記したコメントを追加し、ベンチマークも整理した。ルートの limiter.go(旧公開 Limiter 型の残骸)と pool/limiter.go の重複定義も削除している。",
+    "why": "WithCancelOnError の削除は、ContextPool を作った時点でキャンセル可能にしておかないと利用者が呼び忘れるバグを避ける設計変更だとみられる。コメント整備は、複数の Pool 系型が出揃った直後にパッケージを公開ドキュメント(GoDoc)として読める状態に整える作業と考えられる。いずれも明確な根拠(PR/issue)はコミットメッセージ以外になく、おそらく設計意図の推測にとどまる。",
+    "highlights": [
+      { "file": "pool/error_pool.go", "note": "WithContext が context.WithCancel(ctx) を内包し、CancelOnError 相当の挙動をデフォルト化" },
+      { "file": "pool/pool.go", "note": "Pool 型のドキュメントコメントに『ゴルーチン起動は遅延・タスクごと約300nsのオーバーヘッド』などの性能特性が明記された" }
+    ],
+    "langNotes": [
+      { "topic": "GoDoc コメント規約", "note": "Go の公開識別子の直前に書くコメントは `// 識別子名 は...` のように識別子名で始めるのが慣習(GoDoc がこれを抽出してAPIドキュメントを生成する)。このコミットで Pool や Go・Wait などの公開メソッドに一括でこの形式のコメントが付いた。" }
+    ],
+    "diagram": null,
+    "evidence": "inferred",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

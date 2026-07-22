@@ -1,0 +1,134 @@
+{
+  "seq": 149,
+  "sha": "4c5c70ab8b0e91cb1ecfa7eb4622723b138af3cc",
+  "parents": [
+    "8427ccd11dde5f56ccacfbbd184f42ce865d2f0d"
+  ],
+  "author": {
+    "name": "Camden Cheek",
+    "email": "camden@ccheek.com",
+    "date": "2024-01-19T10:52:23-07:00"
+  },
+  "message": "Reusable pools (#129)\n\nThis updates the pool types that collect results and errors to reset on\r\n`Wait` so they are reusable once waited on. Previously, if a pool was\r\nreused, the returned values of `Wait()` would contain the aggregated set\r\nof all previous uses. This wasn't explicitly a guarantee of the library\r\nbefore, but it does make it operate more like `sync.WaitGroup` and it's\r\neasy to do, so I think it's a positive change.",
+  "pr": {
+    "number": 129,
+    "title": "Reusable pools",
+    "body": "This updates the pool types that collect results and errors to reset on `Wait` so they are reusable once waited on. Previously, if a pool was reused, the returned values of `Wait()` would contain the aggregated set of all previous uses. This wasn't explicitly a guarantee of the library before, but it does make it operate more like `sync.WaitGroup` and it's easy to do, so I think it's a positive change.\r\n\r\nFixes https://github.com/sourcegraph/conc/issues/128\r\n\r\nStacked on https://github.com/sourcegraph/conc/pull/126",
+    "url": "https://github.com/sourcegraph/conc/pull/129"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 8,
+    "additions": 76,
+    "deletions": 6
+  },
+  "files": [
+    {
+      "path": "pool/error_pool.go",
+      "status": "M",
+      "additions": 7,
+      "deletions": 3,
+      "binary": false
+    },
+    {
+      "path": "pool/error_pool_test.go",
+      "status": "M",
+      "additions": 15,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "pool/result_context_pool.go",
+      "status": "M",
+      "additions": 3,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "pool/result_context_pool_test.go",
+      "status": "M",
+      "additions": 16,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "pool/result_error_pool.go",
+      "status": "M",
+      "additions": 3,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "pool/result_error_pool_test.go",
+      "status": "M",
+      "additions": 16,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "pool/result_pool.go",
+      "status": "M",
+      "additions": 3,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "pool/result_pool_test.go",
+      "status": "M",
+      "additions": 13,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/pool/error_pool.go b/pool/error_pool.go\nindex 2e999a5..939fb29 100644\n--- a/pool/error_pool.go\n+++ b/pool/error_pool.go\n@@ -35,12 +35,16 @@ func (p *ErrorPool) Go(f func() error) {\n // returning any errors from tasks.\n func (p *ErrorPool) Wait() error {\n \tp.pool.Wait()\n-\tif len(p.errs) == 0 {\n+\n+\terrs := p.errs\n+\tp.errs = nil // reset errs\n+\n+\tif len(errs) == 0 {\n \t\treturn nil\n \t} else if p.onlyFirstError {\n-\t\treturn p.errs[0]\n+\t\treturn errs[0]\n \t} else {\n-\t\treturn multierror.Join(p.errs...)\n+\t\treturn multierror.Join(errs...)\n \t}\n }\n \ndiff --git a/pool/error_pool_test.go b/pool/error_pool_test.go\nindex 5eb8b20..814f90b 100644\n--- a/pool/error_pool_test.go\n+++ b/pool/error_pool_test.go\n@@ -117,4 +117,19 @@ func TestErrorPool(t *testing.T) {\n \t\t\t})\n \t\t}\n \t})\n+\n+\tt.Run(\"reuse\", func(t *testing.T) {\n+\t\t// Test for https://github.com/sourcegraph/conc/issues/128\n+\t\tp := pool.New().WithErrors()\n+\n+\t\tp.Go(func() error { return err1 })\n+\t\twait1 := p.Wait()\n+\t\trequire.ErrorIs(t, wait1, err1)\n+\n+\t\tp.Go(func() error { return err2 })\n+\t\twait2 := p.Wait()\n+\t\t// On reuse, only the new error should be returned\n+\t\trequire.ErrorIs(t, wait2, err2)\n+\t\trequire.NotErrorIs(t, wait1, err2)\n+\t})\n }\ndiff --git a/pool/result_context_pool.go b/pool/result_context_pool.go\nindex 8560c6a..6bc30dd 100644\n--- a/pool/result_context_pool.go\n+++ b/pool/result_context_pool.go\n@@ -32,7 +32,9 @@ func (p *ResultContextPool[T]) Go(f func(context.Context) (T, error)) {\n // returns an error if any of the tasks errored.\n func (p *ResultContextPool[T]) Wait() ([]T, error) {\n \terr := p.contextPool.Wait()\n-\treturn p.agg.collect(p.collectErrored), err\n+\tresults := p.agg.collect(p.collectErrored)\n+\tp.agg = resultAggregator[T]{}\n+\treturn results, err\n }\n \n // WithCollectErrored configures the pool to still collect the result of a task\ndiff --git a/pool/result_context_pool_test.go b/pool/result_context_pool_test.go\nindex ceae5e8..fc3b68a 100644\n--- a/pool/result_context_pool_test.go\n+++ b/pool/result_context_pool_test.go\n@@ -228,4 +228,20 @@ func TestResultContextPool(t *testing.T) {\n \t\t\t})\n \t\t}\n \t})\n+\n+\tt.Run(\"reuse\", func(t *testing.T) {\n+\t\t// Test for https://github.com/sourcegraph/conc/issues/128\n+\t\tp := pool.NewWithResults[int]().WithContext(context.Background())\n+\n+\t\tp.Go(func(context.Context) (int, error) { return 1, err1 })\n+\t\tresults1, errs1 := p.Wait()\n+\t\trequire.Empty(t, results1)\n+\t\trequire.ErrorIs(t, errs1, err1)\n+\n+\t\tp.Go(func(context.Context) (int, error) { return 2, err2 })\n+\t\tresults2, errs2 := p.Wait()\n+\t\trequire.Empty(t, results2)\n+\t\trequire.ErrorIs(t, errs2, err2)\n+\t\trequire.NotErrorIs(t, errs2, err1)\n+\t})\n }\ndiff --git a/pool/result_error_pool.go b/pool/result_error_pool.go\nindex 5a0bfb9..832cd9b 100644\n--- a/pool/result_error_pool.go\n+++ b/pool/result_error_pool.go\n@@ -34,7 +34,9 @@ func (p *ResultErrorPool[T]) Go(f func() (T, error)) {\n // returning the results and any errors from tasks.\n func (p *ResultErrorPool[T]) Wait() ([]T, error) {\n \terr := p.errorPool.Wait()\n-\treturn p.agg.collect(p.collectErrored), err\n+\tresults := p.agg.collect(p.collectErrored)\n+\tp.agg = resultAggregator[T]{} // reset for reuse\n+\treturn results, err\n }\n \n // WithCollectErrored configures the pool to still collect the result of a task\ndiff --git a/pool/result_error_pool_test.go b/pool/result_error_pool_test.go\nindex c9b1b08..7326639 100644\n--- a/pool/result_error_pool_test.go\n+++ b/pool/result_error_pool_test.go\n@@ -130,4 +130,20 @@ func TestResultErrorPool(t *testing.T) {\n \t\t\t})\n \t\t}\n \t})\n+\n+\tt.Run(\"reuse\", func(t *testing.T) {\n+\t\t// Test for https://github.com/sourcegraph/conc/issues/128\n+\t\tp := pool.NewWithResults[int]().WithErrors()\n+\n+\t\tp.Go(func() (int, error) { return 1, err1 })\n+\t\tresults1, errs1 := p.Wait()\n+\t\trequire.Empty(t, results1)\n+\t\trequire.ErrorIs(t, errs1, err1)\n+\n+\t\tp.Go(func() (int, error) { return 2, err2 })\n+\t\tresults2, errs2 := p.Wait()\n+\t\trequire.Empty(t, results2)\n+\t\trequire.ErrorIs(t, errs2, err2)\n+\t\trequire.NotErrorIs(t, errs2, err1)\n+\t})\n }\ndiff --git a/pool/result_pool.go b/pool/result_pool.go\nindex 16d8b46..f73a772 100644\n--- a/pool/result_pool.go\n+++ b/pool/result_pool.go\n@@ -40,7 +40,9 @@ func (p *ResultPool[T]) Go(f func() T) {\n // a slice of results from tasks that did not panic.\n func (p *ResultPool[T]) Wait() []T {\n \tp.pool.Wait()\n-\treturn p.agg.collect(true)\n+\tresults := p.agg.collect(true)\n+\tp.agg = resultAggregator[T]{} // reset for reuse\n+\treturn results\n }\n \n // MaxGoroutines returns the maximum size of the pool.\ndiff --git a/pool/result_pool_test.go b/pool/result_pool_test.go\nindex ccd7892..69b9de4 100644\n--- a/pool/result_pool_test.go\n+++ b/pool/result_pool_test.go\n@@ -113,4 +113,17 @@ func TestResultGroup(t *testing.T) {\n \t\t\t})\n \t\t}\n \t})\n+\n+\tt.Run(\"reuse\", func(t *testing.T) {\n+\t\t// Test for https://github.com/sourcegraph/conc/issues/128\n+\t\tp := pool.NewWithResults[int]()\n+\n+\t\tp.Go(func() int { return 1 })\n+\t\tresults1 := p.Wait()\n+\t\trequire.Equal(t, []int{1}, results1)\n+\n+\t\tp.Go(func() int { return 2 })\n+\t\tresults2 := p.Wait()\n+\t\trequire.Equal(t, []int{2}, results2)\n+\t})\n }\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/go.yml",
+    ".golangci.yml",
+    "LICENSE",
+    "README.md",
+    "go.mod",
+    "go.sum",
+    "internal/multierror/multierror_go119.go",
+    "internal/multierror/multierror_go120.go",
+    "iter/export_test.go",
+    "iter/iter.go",
+    "iter/iter_test.go",
+    "iter/map.go",
+    "iter/map_test.go",
+    "panics/panics.go",
+    "panics/panics_test.go",
+    "panics/try.go",
+    "panics/try_test.go",
+    "pool/context_pool.go",
+    "pool/context_pool_test.go",
+    "pool/error_pool.go",
+    "pool/error_pool_test.go",
+    "pool/pool.go",
+    "pool/pool_test.go",
+    "pool/result_context_pool.go",
+    "pool/result_context_pool_test.go",
+    "pool/result_error_pool.go",
+    "pool/result_error_pool_test.go",
+    "pool/result_pool.go",
+    "pool/result_pool_test.go",
+    "stream/stream.go",
+    "stream/stream_test.go",
+    "waitgroup.go",
+    "waitgroup_test.go"
+  ],
+  "explanation": {
+    "what": "ErrorPool / ResultErrorPool / ResultContextPool / ResultPool の Wait() を、呼び出し後に内部状態(errs スライスや resultAggregator)をリセットするように変更した。ErrorPool.Wait() は errs をローカル変数に退避してから p.errs = nil にし、結果集約系の3つの Pool は p.agg = resultAggregator[T]{} でゼロ値に戻す。各 Pool のテストに「reuse」サブテストが追加され、1回目の Wait() で得たエラー・結果が2回目の Wait() に混入しないことを確認している。",
+    "why": "PR本文と紐づく issue #128 に明記されている通り、以前は Pool を Wait() 後に使い回すと、2回目の Wait() の戻り値に1回目の結果・エラーまで累積されて含まれてしまっていた。これは明示的な保証ではなかったが、sync.WaitGroup のように「Wait() のたびに素の状態から再スタートできる」挙動の方が直感的で、かつ実装コストも小さいため、reusable pool として振る舞うよう修正した。",
+    "highlights": [
+      { "file": "pool/error_pool.go", "note": "Wait() 内で errs := p.errs; p.errs = nil としてから返す値を組み立てる、退避してからリセットするパターン" },
+      { "file": "pool/result_pool_test.go", "note": "\"reuse\" サブテスト。同じ Pool に対して Go→Wait を2回行い、2回目の結果に1回目の値が残っていないことを確認" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [{ "type": "pr", "number": 129, "url": "https://github.com/sourcegraph/conc/pull/129" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

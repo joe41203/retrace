@@ -1,0 +1,79 @@
+{
+  "seq": 143,
+  "sha": "b528efd34e509ef017ddedb47be85292d54ac024",
+  "parents": [
+    "abd9a8b87309f7a96ce00689e5ab0778b1f7310c"
+  ],
+  "author": {
+    "name": "Kimi.Wang",
+    "email": "kimi.wang@verystar.cn",
+    "date": "2023-08-03T10:37:53+08:00"
+  },
+  "message": "only execute stream callback when non-nil (#121)\n\nCurrently, if `nil` is returned as a stream callback, it will cause a\npanic because we try to call a `nil` func. This makes it valid to return\na `nil` callback from the stream job, which just does nothing on\ncallback.",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 3,
+    "deletions": 1
+  },
+  "files": [
+    {
+      "path": "stream/stream.go",
+      "status": "M",
+      "additions": 3,
+      "deletions": 1,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/stream/stream.go b/stream/stream.go\nindex d80a923..6b11e90 100644\n--- a/stream/stream.go\n+++ b/stream/stream.go\n@@ -128,7 +128,9 @@ func (s *Stream) callbacker() {\n \t\tcallback := <-callbackCh\n \n \t\t// Execute the callback (with panic protection).\n-\t\tpanicCatcher.Try(callback)\n+\t\tif callback != nil {\n+\t\t\tpanicCatcher.Try(callback)\n+\t\t}\n \n \t\t// Return the channel to the pool of unused channels.\n \t\tputCh(callbackCh)\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/go.yml",
+    ".golangci.yml",
+    "LICENSE",
+    "README.md",
+    "go.mod",
+    "go.sum",
+    "internal/multierror/multierror_go119.go",
+    "internal/multierror/multierror_go120.go",
+    "iter/export_test.go",
+    "iter/iter.go",
+    "iter/iter_test.go",
+    "iter/map.go",
+    "iter/map_test.go",
+    "panics/panics.go",
+    "panics/panics_test.go",
+    "panics/try.go",
+    "panics/try_test.go",
+    "pool/context_pool.go",
+    "pool/context_pool_test.go",
+    "pool/error_pool.go",
+    "pool/error_pool_test.go",
+    "pool/pool.go",
+    "pool/pool_test.go",
+    "pool/result_context_pool.go",
+    "pool/result_context_pool_test.go",
+    "pool/result_error_pool.go",
+    "pool/result_error_pool_test.go",
+    "pool/result_pool.go",
+    "pool/result_pool_test.go",
+    "stream/stream.go",
+    "stream/stream_test.go",
+    "waitgroup.go",
+    "waitgroup_test.go"
+  ],
+  "explanation": {
+    "what": "stream パッケージの callbacker() で、コールバックを実行する直前に nil チェックを追加した。これまでは stream ジョブが返す Callback が nil の場合、そのまま panicCatcher.Try(callback) に渡されて nil 関数呼び出しの panic を起こしていた。",
+    "why": "コミットメッセージに明記されている通り、ジョブ側が「何もしない」ことを意図して nil を返すケースを正当な使い方として許容するための修正。stream.Go に渡す関数のシグネチャは `func() stream.Callback` で、結果の後処理(コールバック)が不要なジョブでは nil を返したくなる場面がある。",
+    "highlights": [
+      { "file": "stream/stream.go", "note": "callbacker() 内、panicCatcher.Try(callback) を呼ぶ前に if callback != nil を追加しただけの3行差分" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

@@ -1,0 +1,78 @@
+{
+  "seq": 35,
+  "sha": "c984ba451c1651076a611349672666ea66d530d6",
+  "parents": [
+    "ba878256583a27245ee44f6a559e60489294ca0c"
+  ],
+  "author": {
+    "name": "Camden Cheek",
+    "email": "camden@ccheek.com",
+    "date": "2022-12-24T23:01:21-07:00"
+  },
+  "message": "add examples and rename Propagate to Repanic",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 58,
+    "deletions": 7
+  },
+  "files": [
+    {
+      "path": "panic.go",
+      "status": "M",
+      "additions": 5,
+      "deletions": 5,
+      "binary": false
+    },
+    {
+      "path": "panic_test.go",
+      "status": "M",
+      "additions": 53,
+      "deletions": 2,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/panic.go b/panic.go\nindex 2d525f4..fc78248 100644\n--- a/panic.go\n+++ b/panic.go\n@@ -22,7 +22,7 @@ func (p *PanicCatcher) Try(f func()) {\n \tdefer func() {\n \t\tif val := recover(); val != nil {\n \t\t\tvar callers [64]uintptr\n-\t\t\tn := runtime.Callers(1, callers[:])\n+\t\t\tn := runtime.Callers(2, callers[:])\n \t\t\tp.recovered.CompareAndSwap(nil, &RecoveredPanic{\n \t\t\t\tValue:   val,\n \t\t\t\tCallers: callers[:n],\n@@ -33,10 +33,10 @@ func (p *PanicCatcher) Try(f func()) {\n \tf()\n }\n \n-// Propagate panics if any calls to Try caught a panic. It will\n-// panic with the value of the first panic caught, wrapped with\n-// caller information.\n-func (p *PanicCatcher) Propagate() {\n+// Repanic panics if any calls to Try caught a panic. It will panic with the\n+// value of the first panic caught, wrapped in a RecoveredPanic with caller\n+// information.\n+func (p *PanicCatcher) Repanic() {\n \tif val := p.Recovered(); val != nil {\n \t\tpanic(val)\n \t}\ndiff --git a/panic_test.go b/panic_test.go\nindex 1caa27e..69ebc0b 100644\n--- a/panic_test.go\n+++ b/panic_test.go\n@@ -1,6 +1,13 @@\n package conc\n \n-import \"fmt\"\n+import (\n+\t\"errors\"\n+\t\"fmt\"\n+\t\"runtime\"\n+\t\"testing\"\n+\n+\t\"github.com/stretchr/testify/require\"\n+)\n \n func ExamplePanicCatcher() {\n \tvar pc PanicCatcher\n@@ -13,8 +20,52 @@ func ExamplePanicCatcher() {\n \n \tfmt.Println(i)\n \tfmt.Println(rc.Value.(string))\n-\n \t// Output:\n \t// 2\n \t// abort!\n }\n+\n+func ExamplePanicCatcher_callers() {\n+\tvar pc PanicCatcher\n+\tpc.Try(func() { panic(\"mayday!\") })\n+\n+\trecovered := pc.Recovered()\n+\n+\t// For debugging, the pre-formatted recovered.Stack is easier to use than\n+\t// rc.Callers. This is not used in the example because its output is\n+\t// machine-specific.\n+\n+\tframes := runtime.CallersFrames(recovered.Callers)\n+\tfor {\n+\t\tframe, more := frames.Next()\n+\n+\t\tfmt.Println(frame.Function)\n+\n+\t\tif !more {\n+\t\t\tbreak\n+\t\t}\n+\t}\n+\t// Output:\n+\t// runtime.gopanic\n+\t// github.com/camdencheek/conc.ExamplePanicCatcher_callers.func1\n+\t// github.com/camdencheek/conc.(*PanicCatcher).Try\n+\t// github.com/camdencheek/conc.ExamplePanicCatcher_callers\n+\t// testing.runExample\n+\t// testing.runExamples\n+\t// testing.(*M).Run\n+\t// main.main\n+\t// runtime.main\n+\t// runtime.goexit\n+}\n+\n+func TestPanicCatcher(t *testing.T) {\n+\terr1 := errors.New(\"SOS\")\n+\n+\tt.Run(\"error\", func(t *testing.T) {\n+\t\tvar pc PanicCatcher\n+\t\tpc.Try(func() { panic(err1) })\n+\t\trecovered := pc.Recovered()\n+\t\trequire.ErrorIs(t, recovered, err1)\n+\t\trequire.ErrorAs(t, recovered, &err1)\n+\t})\n+}\n",
+  "diffTruncated": false,
+  "tree": [
+    "LICENSE",
+    "go.mod",
+    "go.sum",
+    "iter.go",
+    "limiter.go",
+    "panic.go",
+    "panic_test.go",
+    "pool/context_pool.go",
+    "pool/context_pool_test.go",
+    "pool/error_pool.go",
+    "pool/error_pool_test.go",
+    "pool/iter.go",
+    "pool/iter_test.go",
+    "pool/pool.go",
+    "pool/pool_test.go",
+    "pool/result_context_pool.go",
+    "pool/result_context_pool_test.go",
+    "pool/result_error_pool.go",
+    "pool/result_error_pool_test.go",
+    "pool/result_pool.go",
+    "pool/result_pool_test.go",
+    "stream/stream.go",
+    "stream/stream_test.go",
+    "waitgroup.go",
+    "waitgroup_test.go"
+  ],
+  "explanation": {
+    "what": "PanicCatcher.Propagate() を Repanic() にリネームし、スタックトレース収集の runtime.Callers 呼び出しをスキップフレーム数 1 から 2 に変更した。panic_test.go に ExamplePanicCatcher_callers(呼び出し元フレーム一覧を出力する例)と TestPanicCatcher(errors.New で作った error を panic させ、require.ErrorIs / require.ErrorAs で前コミットの Unwrap 実装を検証するテスト)を追加した。",
+    "why": "コミットメッセージの通り Propagate という名前を Repanic に変更している。おそらく「伝播させる」よりも「再度 panic させる」という動作をそのまま表す名前にする意図だったとみられる。runtime.Callers のスキップ数を増やしたのは、おそらく Repanic 呼び出し自体のフレームをスタックトレースから除外し、より呼び出し元に近い情報を残すためとみられる。",
+    "highlights": [
+      { "file": "panic_test.go", "note": "require.ErrorIs / require.ErrorAs で RecoveredPanic の Unwrap 実装を検証している" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "inferred",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

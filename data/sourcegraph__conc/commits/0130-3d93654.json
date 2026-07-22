@@ -1,0 +1,78 @@
+{
+  "seq": 130,
+  "sha": "3d936542f162e398ef62ff76f4bfcb5ec628c1c1",
+  "parents": [
+    "1df97ecbf2e84d77e363cd2b52c272cd2ba35b74"
+  ],
+  "author": {
+    "name": "Camden Cheek",
+    "email": "camden@ccheek.com",
+    "date": "2023-02-21T05:09:16-07:00"
+  },
+  "message": "fix racy test",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 2,
+    "deletions": 6
+  },
+  "files": [
+    {
+      "path": "pool/context_pool_test.go",
+      "status": "M",
+      "additions": 2,
+      "deletions": 6,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/pool/context_pool_test.go b/pool/context_pool_test.go\nindex 1ec8a4d..4273e5a 100644\n--- a/pool/context_pool_test.go\n+++ b/pool/context_pool_test.go\n@@ -133,12 +133,8 @@ func TestContextPool(t *testing.T) {\n \t\tt.Parallel()\n \t\tp := New().WithContext(bgctx)\n \t\tp.Go(func(ctx context.Context) error {\n-\t\t\tselect {\n-\t\t\tcase <-ctx.Done():\n-\t\t\t\treturn ctx.Err()\n-\t\t\tcase <-time.After(10 * time.Millisecond):\n-\t\t\t\treturn nil\n-\t\t\t}\n+\t\t\t<-ctx.Done()\n+\t\t\treturn ctx.Err()\n \t\t})\n \t\tp.Go(func(ctx context.Context) error {\n \t\t\treturn err1\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/go.yml",
+    ".golangci.yml",
+    "LICENSE",
+    "README.md",
+    "go.mod",
+    "go.sum",
+    "iter/iter.go",
+    "iter/iter_test.go",
+    "iter/map.go",
+    "iter/map_test.go",
+    "multierror/multierror_go119.go",
+    "multierror/multierror_go120.go",
+    "panics/panics.go",
+    "panics/panics_test.go",
+    "panics/try.go",
+    "panics/try_test.go",
+    "pool/context_pool.go",
+    "pool/context_pool_test.go",
+    "pool/error_pool.go",
+    "pool/error_pool_test.go",
+    "pool/pool.go",
+    "pool/pool_test.go",
+    "pool/result_context_pool.go",
+    "pool/result_context_pool_test.go",
+    "pool/result_error_pool.go",
+    "pool/result_error_pool_test.go",
+    "pool/result_pool.go",
+    "pool/result_pool_test.go",
+    "stream/stream.go",
+    "stream/stream_test.go",
+    "waitgroup.go",
+    "waitgroup_test.go"
+  ],
+  "explanation": {
+    "what": "pool/context_pool_test.go の1つのテストケースで、select { case <-ctx.Done(): ...; case <-time.After(10ms): ... } という2択の待機処理を、単純な <-ctx.Done(); return ctx.Err() に置き換えた。",
+    "why": "コミットメッセージは「fix racy test」とだけ述べている。おそらく、time.After(10ms) 側が先に発火してctx.Errではないnilを返してしまうことがあり、CI環境などタイミングが揺れる状況でテストの成否が不安定になっていたためと考えられる。ctx.Done()だけを待つ形にすることで、このタスクの結果がキャンセルされたことに確実に依存するようにし、レースを解消したとみられる。",
+    "highlights": [
+      { "file": "pool/context_pool_test.go", "note": "selectによる2択待機を<-ctx.Done()単独の待機に単純化。タイミング依存の分岐を無くしている" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "inferred",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

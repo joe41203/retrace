@@ -1,0 +1,79 @@
+{
+  "seq": 32,
+  "sha": "6ab95c49ac14abaea16e4fccee630b1dbfbf9280",
+  "parents": [
+    "d325a6c56acf593775c4ef1a05fb5aeb2c584e1a"
+  ],
+  "author": {
+    "name": "Camden Cheek",
+    "email": "camden@ccheek.com",
+    "date": "2022-12-24T22:01:52-07:00"
+  },
+  "message": "impl Unwrap for CaughtPanic",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 24,
+    "deletions": 1
+  },
+  "files": [
+    {
+      "path": "panic.go",
+      "status": "M",
+      "additions": 8,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "waitgroup_test.go",
+      "status": "M",
+      "additions": 16,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/panic.go b/panic.go\nindex 4167329..f827322 100644\n--- a/panic.go\n+++ b/panic.go\n@@ -62,5 +62,12 @@ type CaughtPanic struct {\n }\n \n func (c *CaughtPanic) Error() string {\n-\treturn fmt.Sprintf(\"original value: %q\\nstacktrace: %s\", c.Value, c.Stack)\n+\treturn fmt.Sprintf(\"panic: %q\\nstacktrace:\\n%s\\n\", c.Value, c.Stack)\n+}\n+\n+func (c *CaughtPanic) Unwrap() error {\n+\tif err, ok := c.Value.(error); ok {\n+\t\treturn err\n+\t}\n+\treturn nil\n }\ndiff --git a/waitgroup_test.go b/waitgroup_test.go\nindex 4874885..0165070 100644\n--- a/waitgroup_test.go\n+++ b/waitgroup_test.go\n@@ -52,5 +52,21 @@ func TestWaitGroup(t *testing.T) {\n \t\t\t}\n \t\t\trequire.Panics(t, wg.Wait)\n \t\t})\n+\n+\t\tt.Run(\"nonpanics run successfully\", func(t *testing.T) {\n+\t\t\tvar wg WaitGroup\n+\t\t\tvar i atomic.Int64\n+\t\t\twg.Go(func() {\n+\t\t\t\ti.Add(1)\n+\t\t\t})\n+\t\t\twg.Go(func() {\n+\t\t\t\tpanic(\"super bad thing\")\n+\t\t\t})\n+\t\t\twg.Go(func() {\n+\t\t\t\ti.Add(1)\n+\t\t\t})\n+\t\t\trequire.Panics(t, wg.Wait)\n+\t\t\trequire.Equal(t, int64(2), i.Load())\n+\t\t})\n \t})\n }\n",
+  "diffTruncated": false,
+  "tree": [
+    "LICENSE",
+    "go.mod",
+    "go.sum",
+    "iter.go",
+    "limiter.go",
+    "panic.go",
+    "pool/context_pool.go",
+    "pool/context_pool_test.go",
+    "pool/error_pool.go",
+    "pool/error_pool_test.go",
+    "pool/iter.go",
+    "pool/iter_test.go",
+    "pool/pool.go",
+    "pool/pool_test.go",
+    "pool/result_context_pool.go",
+    "pool/result_context_pool_test.go",
+    "pool/result_error_pool.go",
+    "pool/result_error_pool_test.go",
+    "pool/result_pool.go",
+    "pool/result_pool_test.go",
+    "stream/stream.go",
+    "stream/stream_test.go",
+    "waitgroup.go",
+    "waitgroup_test.go"
+  ],
+  "explanation": {
+    "what": "CaughtPanic に Unwrap() error メソッドを追加し、panic の Value が error 型であればそのエラーを返すようにした。あわせて Error() のフォーマット文字列を \"original value: %q\" から \"panic: %q\" に変更した。waitgroup_test.go には panic した goroutine の前後の goroutine が正常終了することを確認するテストを追加した。",
+    "why": "おそらく、panic の値が元々 error だった場合に、errors.Is / errors.As などの標準的なエラーチェーンの仕組みで元のエラーを扱えるようにする意図だったとみられる。Unwrap() を実装することで CaughtPanic 自体を error ラッパーとして扱える。",
+    "highlights": [
+      { "file": "panic.go", "note": "Unwrap() で Value が error のときだけ中身を返す実装" }
+    ],
+    "langNotes": [
+      { "topic": "Unwrap() によるエラーチェーン", "note": "Go 1.13 以降、error 型が Unwrap() error メソッドを持つと errors.Is / errors.As がそのチェーンを辿れるようになる。ここでは panic の recover 値がたまたま error だった場合に、CaughtPanic 越しに元のエラーへアクセスできるようにしている。" }
+    ],
+    "diagram": null,
+    "evidence": "inferred",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

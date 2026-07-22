@@ -1,0 +1,93 @@
+{
+  "seq": 114,
+  "sha": "4023cd5c619c2398804b69238b09cd2361abbee4",
+  "parents": [
+    "f6e77d4bcec80a1316616a4cc8e34f41596f26ff",
+    "ff4bd5b78cd8644a5e0d5b72dc339f13ba547bf3"
+  ],
+  "author": {
+    "name": "Robert Lin",
+    "email": "robertlin1@gmail.com",
+    "date": "2023-01-15T20:58:29-08:00"
+  },
+  "message": "Merge pull request #63 from sourcegraph/for-each-iterator\n\niter: introduce Iterator with configurable concurrency",
+  "pr": {
+    "number": 63,
+    "title": "iter: introduce Iterator with configurable concurrency",
+    "body": "Adds configurable concurrency to `iter` via a new type `Iterator` with ~no overhead and no API changes:\r\n\r\n```go\r\ncustomIterator := iter.Iterator{MaxGoroutines: 42}\r\ncustomIterator.ForEach(...)\r\n\r\n// zero value is safe, defaults to runtime.GOMAXPROCS(0)\r\niter.Iterator{}.ForEach(...)\r\n\r\n// package-level functions behave the same as before\r\niter.ForEach(...)\r\n```\r\n\r\nIf the API is agreeable, I can make a follow-up PR to introduce something similar for `Map` and friends. Note that `Map` cannot simply be a method on `Iterator` because methods cannot accept type parameters, and we do not want the return type `R` on `Iterator` where `ForEach` does not use `R`.\r\n\r\nRelevant to https://github.com/sourcegraph/conc/issues/36, closes https://github.com/sourcegraph/conc/issues/55\r\n\r\n---\r\n\r\nBefore:\r\n\r\n```\r\ngo test -run=XXX -bench=. -benchmem ./iter\r\ngoos: darwin\r\ngoarch: arm64\r\npkg: github.com/sourcegraph/conc/iter\r\nBenchmarkForEach/0-10   13291378                77.89 ns/op          120 B/op          4 allocs/op\r\nBenchmarkForEach/1-10    2048739               607.5 ns/op           144 B/op          5 allocs/op\r\nBenchmarkForEach/8-10     441230              2843 ns/op             312 B/op         12 allocs/op\r\nBenchmarkForEach/100-10                   278910              4847 ns/op             360 B/op         14 allocs/op\r\nBenchmarkForEach/1000-10                   42801             31772 ns/op             360 B/op         14 allocs/op\r\nBenchmarkForEach/10000-10                   2192            521428 ns/op             397 B/op         14 allocs/op\r\nBenchmarkForEach/100000-10                   187           6115313 ns/op            4653 B/op         14 allocs/op\r\nPASS\r\nok      github.com/sourcegraph/conc/iter        10.492s\r\n```\r\n\r\nAfter:\r\n\r\n```\r\ngo test -run=XXX -bench=. -benchmem ./iter\r\ngoos: darwin\r\ngoarch: arm64\r\npkg: github.com/sourcegraph/conc/iter\r\nBenchmarkForEach/0-10   13504274                77.28 ns/op          120 B/op          4 allocs/op\r\nBenchmarkForEach/1-10    2133229               560.1 ns/op           144 B/op          5 allocs/op\r\nBenchmarkForEach/8-10     488190              2274 ns/op             312 B/op         12 allocs/op\r\nBenchmarkForEach/100-10                   295342              3770 ns/op             360 B/op         14 allocs/op\r\nBenchmarkForEach/1000-10                   33836             35229 ns/op             360 B/op         14 allocs/op\r\nBenchmarkForEach/10000-10                   2001            618155 ns/op             402 B/op         14 allocs/op\r\nBenchmarkForEach/100000-10                   175           6827000 ns/op            4948 B/op         14 allocs/op\r\nPASS\r\nok      github.com/sourcegraph/conc/iter        10.241s\r\n```",
+    "url": "https://github.com/sourcegraph/conc/pull/63"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 91,
+    "deletions": 8
+  },
+  "files": [
+    {
+      "path": "iter/iter.go",
+      "status": "M",
+      "additions": 45,
+      "deletions": 8,
+      "binary": false
+    },
+    {
+      "path": "iter/iter_test.go",
+      "status": "M",
+      "additions": 46,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/iter/iter.go b/iter/iter.go\nindex 38870e9..a14331b 100644\n--- a/iter/iter.go\n+++ b/iter/iter.go\n@@ -9,6 +9,23 @@ import (\n \t\"github.com/sourcegraph/sourcegraph/lib/errors\"\n )\n \n+// defaultMaxGoroutines returns the default maximum number of\n+// goroutines to use within this package.\n+func defaultMaxGoroutines() int { return runtime.GOMAXPROCS(0) }\n+\n+// Iterator can be used to configure the behaviour of ForEach\n+// and ForEachIdx. The zero value is safe to use with reasonable\n+// defaults.\n+//\n+// Iterator is safe for reuse and concurrent use.\n+type Iterator[T any] struct {\n+\t// MaxGoroutines controls the maximum number of goroutines\n+\t// to use on this Iterator's methods.\n+\t//\n+\t// If unset, MaxGoroutines defaults to runtime.GOMAXPROCS(0).\n+\tMaxGoroutines int\n+}\n+\n // ForEach executes f in parallel over each element in input.\n //\n // It is safe to mutate the input parameter, which makes it\n@@ -16,21 +33,41 @@ import (\n //\n // ForEach always uses at most runtime.GOMAXPROCS goroutines.\n // It takes roughly 2µs to start up the goroutines and adds\n+// an overhead of roughly 50ns per element of input. For\n+// a configurable goroutine limit, use a custom Iterator.\n+func ForEach[T any](input []T, f func(*T)) { Iterator[T]{}.ForEach(input, f) }\n+\n+// ForEach executes f in parallel over each element in input,\n+// using up to the Iterator's configured maximum number of\n+// goroutines.\n+//\n+// It is safe to mutate the input parameter, which makes it\n+// possible to map in place.\n+//\n+// It takes roughly 2µs to start up the goroutines and adds\n // an overhead of roughly 50ns per element of input.\n-func ForEach[T any](input []T, f func(*T)) {\n-\tForEachIdx(input, func(_ int, t *T) {\n+func (iter Iterator[T]) ForEach(input []T, f func(*T)) {\n+\titer.ForEachIdx(input, func(_ int, t *T) {\n \t\tf(t)\n \t})\n }\n \n // ForEachIdx is the same as ForEach except it also provides the\n // index of the element to the callback.\n-func ForEachIdx[T any](input []T, f func(int, *T)) {\n-\tnumTasks := runtime.GOMAXPROCS(0)\n+func ForEachIdx[T any](input []T, f func(int, *T)) { Iterator[T]{}.ForEachIdx(input, f) }\n+\n+// ForEachIdx is the same as ForEach except it also provides the\n+// index of the element to the callback.\n+func (iter Iterator[T]) ForEachIdx(input []T, f func(int, *T)) {\n+\tif iter.MaxGoroutines == 0 {\n+\t\t// iter is a value receiver and is hence safe to mutate\n+\t\titer.MaxGoroutines = defaultMaxGoroutines()\n+\t}\n+\n \tnumInput := len(input)\n-\tif numTasks > numInput {\n-\t\t// No more tasks than the number of input items.\n-\t\tnumTasks = numInput\n+\tif iter.MaxGoroutines > numInput {\n+\t\t// No more concurrent tasks than the number of input items.\n+\t\titer.MaxGoroutines = numInput\n \t}\n \n \tvar idx atomic.Int64\n@@ -43,7 +80,7 @@ func ForEachIdx[T any](input []T, f func(int, *T)) {\n \t}\n \n \tvar wg conc.WaitGroup\n-\tfor i := 0; i < numTasks; i++ {\n+\tfor i := 0; i < iter.MaxGoroutines; i++ {\n \t\twg.Go(task)\n \t}\n \twg.Wait()\ndiff --git a/iter/iter_test.go b/iter/iter_test.go\nindex b171352..acc36e3 100644\n--- a/iter/iter_test.go\n+++ b/iter/iter_test.go\n@@ -2,12 +2,58 @@ package iter\n \n import (\n \t\"strconv\"\n+\t\"sync/atomic\"\n \t\"testing\"\n \n \t\"github.com/sourcegraph/sourcegraph/lib/errors\"\n+\t\"github.com/stretchr/testify/assert\"\n \t\"github.com/stretchr/testify/require\"\n )\n \n+func TestIterator(t *testing.T) {\n+\tt.Parallel()\n+\n+\tt.Run(\"safe for reuse\", func(t *testing.T) {\n+\t\tt.Parallel()\n+\n+\t\titerator := Iterator[int]{MaxGoroutines: 999}\n+\n+\t\t// iter.Concurrency > numInput case that updates iter.Concurrency\n+\t\titerator.ForEachIdx([]int{1, 2, 3}, func(i int, t *int) {})\n+\n+\t\tassert.Equal(t, iterator.MaxGoroutines, 999)\n+\t})\n+\n+\tt.Run(\"allows more than defaultMaxGoroutines() concurrent tasks\", func(t *testing.T) {\n+\t\tt.Parallel()\n+\n+\t\twantConcurrency := 2 * defaultMaxGoroutines()\n+\n+\t\tmaxConcurrencyHit := make(chan struct{})\n+\n+\t\ttasks := make([]int, wantConcurrency)\n+\t\titerator := Iterator[int]{MaxGoroutines: wantConcurrency}\n+\n+\t\tvar concurrentTasks atomic.Int64\n+\t\titerator.ForEach(tasks, func(t *int) {\n+\t\t\tn := concurrentTasks.Add(1)\n+\t\t\tdefer concurrentTasks.Add(-1)\n+\n+\t\t\tif int(n) == wantConcurrency {\n+\t\t\t\t// All our tasks are running concurrently.\n+\t\t\t\t// Signal to the rest of the tasks to stop.\n+\t\t\t\tclose(maxConcurrencyHit)\n+\t\t\t} else {\n+\t\t\t\t// Wait until we hit max concurrency before exiting.\n+\t\t\t\t// This ensures that all tasks have been started\n+\t\t\t\t// in parallel, despite being a larger input set than\n+\t\t\t\t// defaultMaxGoroutines().\n+\t\t\t\t<-maxConcurrencyHit\n+\t\t\t}\n+\t\t})\n+\t})\n+}\n+\n func TestForEachIdx(t *testing.T) {\n \tt.Parallel()\n \n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/go.yml",
+    ".golangci.yml",
+    "LICENSE",
+    "README.md",
+    "go.mod",
+    "go.sum",
+    "iter/iter.go",
+    "iter/iter_test.go",
+    "panics/panics.go",
+    "panics/panics_test.go",
+    "pool/context_pool.go",
+    "pool/context_pool_test.go",
+    "pool/error_pool.go",
+    "pool/error_pool_test.go",
+    "pool/pool.go",
+    "pool/pool_test.go",
+    "pool/result_context_pool.go",
+    "pool/result_context_pool_test.go",
+    "pool/result_error_pool.go",
+    "pool/result_error_pool_test.go",
+    "pool/result_pool.go",
+    "pool/result_pool_test.go",
+    "stream/stream.go",
+    "stream/stream_test.go",
+    "waitgroup.go",
+    "waitgroup_test.go"
+  ],
+  "explanation": {
+    "what": "iter パッケージに Iterator[T] という値型を新設し、MaxGoroutines フィールドで並行度を設定可能にした。既存の ForEach / ForEachIdx はそれぞれ Iterator[T]{}.ForEach(...) / Iterator[T]{}.ForEachIdx(...) を呼ぶだけの薄いラッパーに書き換えられ、後方互換のAPIは維持したまま、Iterator{MaxGoroutines: N}.ForEach(...) のように呼び出し元が並行度を制御できるようになった。MaxGoroutines が未設定(ゼロ値)の場合は defaultMaxGoroutines()(runtime.GOMAXPROCS(0))にフォールバックする。テストも「ゼロ値の再利用」「defaultMaxGoroutines を超える並行数の指定」を検証するケースが追加された。",
+    "why": "PR本文によれば、既存の ForEach は常に runtime.GOMAXPROCS(0) 個の goroutine を使う設計だったが、呼び出し元が並行度を制御したいニーズ(issue #36 関連、issue #55 をクローズ)に応えるため。Map にメソッドとして持たせず Iterator という別型にしたのは、Go のメソッドは型パラメータを追加で持てない制約があり、ForEach が使わない結果型 R を Iterator に持たせたくなかったため、と PR 本文で説明されている。ベンチマーク結果も添付されており、オーバーヘッドがほぼ無いことを確認した上での変更。",
+    "highlights": [
+      { "file": "iter/iter.go", "note": "Iterator[T]{}.ForEachIdx が本体で、ForEach/ForEachIdx のパッケージ関数はゼロ値 Iterator を作って委譲するだけに変わった" }
+    ],
+    "langNotes": [
+      { "topic": "Iterator[T] (値レシーバでの安全な変更)", "note": "ForEachIdx 内で iter.MaxGoroutines = defaultMaxGoroutines() のように値レシーバ iter 自身を書き換えているが、Go では値レシーバはメソッド呼び出し時にコピーされるため、呼び出し元の Iterator には影響しない。コメントでも「iter is a value receiver and is hence safe to mutate」と明記されている。" },
+      { "topic": "ジェネリクスとメソッドの型パラメータ制約", "note": "PR本文で触れられている通り、Go のメソッドはレシーバの型パラメータ以外に独自の型パラメータを持てない。これが Map を Iterator のメソッドにせず別設計にした理由の一つ。" }
+    ],
+    "diagram": {
+      "mermaid": "flowchart LR\n  A[\"ForEach(input, f)\"] --> B[\"Iterator[T]{}.ForEach\"]\n  B --> C[\"Iterator[T]{}.ForEachIdx\"]\n  C --> D{\"MaxGoroutines == 0?\"}\n  D -->|\"yes\"| E[\"defaultMaxGoroutines() = GOMAXPROCS(0)\"]\n  D -->|\"no\"| F[\"指定された MaxGoroutines\"]\n  E --> G[\"conc.WaitGroup で goroutine を起動\"]\n  F --> G",
+      "caption": "ForEach から Iterator 経由で並行度が決まるまでの流れ"
+    },
+    "evidence": "pr",
+    "refs": [
+      { "type": "pr", "number": 63, "url": "https://github.com/sourcegraph/conc/pull/63" }
+    ],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

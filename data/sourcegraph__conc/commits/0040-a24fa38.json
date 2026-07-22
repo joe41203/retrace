@@ -1,0 +1,68 @@
+{
+  "seq": 40,
+  "sha": "a24fa38009e896e8daaa32f7b4d067c9672cc0c3",
+  "parents": [
+    "d1654930aa03f3a158fe62d1210c64a5db1b4e9e"
+  ],
+  "author": {
+    "name": "Camden Cheek",
+    "email": "camden@ccheek.com",
+    "date": "2023-01-02T11:19:05-07:00"
+  },
+  "message": "reorganize",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 14,
+    "deletions": 14
+  },
+  "files": [
+    {
+      "path": "stream/stream.go",
+      "status": "M",
+      "additions": 14,
+      "deletions": 14,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/stream/stream.go b/stream/stream.go\nindex 090d0bf..791215b 100644\n--- a/stream/stream.go\n+++ b/stream/stream.go\n@@ -37,20 +37,6 @@ type Stream struct {\n \tinitOnce sync.Once\n }\n \n-var callbackChPool = sync.Pool{\n-\tNew: func() any {\n-\t\treturn make(callbackCh, 1)\n-\t},\n-}\n-\n-func getCh() callbackCh {\n-\treturn callbackChPool.Get().(callbackCh)\n-}\n-\n-func putCh(ch callbackCh) {\n-\tcallbackChPool.Put(ch)\n-}\n-\n // Stream task is a task that is submitted to the stream. Submitted tasks will\n // be executed concurrently. It returns a callback that will be called after\n // the task has completed.\n@@ -142,3 +128,17 @@ func (s *Stream) callbacker() {\n }\n \n type callbackCh chan func()\n+\n+var callbackChPool = sync.Pool{\n+\tNew: func() any {\n+\t\treturn make(callbackCh, 1)\n+\t},\n+}\n+\n+func getCh() callbackCh {\n+\treturn callbackChPool.Get().(callbackCh)\n+}\n+\n+func putCh(ch callbackCh) {\n+\tcallbackChPool.Put(ch)\n+}\n",
+  "diffTruncated": false,
+  "tree": [
+    "LICENSE",
+    "go.mod",
+    "go.sum",
+    "limiter.go",
+    "panic.go",
+    "panic_test.go",
+    "pariter/iter.go",
+    "pariter/iter_test.go",
+    "pool/context_pool.go",
+    "pool/context_pool_test.go",
+    "pool/error_pool.go",
+    "pool/error_pool_test.go",
+    "pool/pool.go",
+    "pool/pool_test.go",
+    "pool/result_context_pool.go",
+    "pool/result_context_pool_test.go",
+    "pool/result_error_pool.go",
+    "pool/result_error_pool_test.go",
+    "pool/result_pool.go",
+    "pool/result_pool_test.go",
+    "stream/stream.go",
+    "stream/stream_test.go",
+    "waitgroup.go",
+    "waitgroup_test.go"
+  ],
+  "explanation": {
+    "what": "stream/stream.go 内で callbackChPool の宣言と getCh()/putCh() 関数を、Stream 構造体の直後からファイル末尾(callbackCh 型定義の後)へ移動した。コードの中身は一切変更されておらず、宣言順序の並べ替えのみ。",
+    "why": "コミットメッセージの通り単純な再配置。おそらく callbackCh 型定義とそれを使う callbackChPool の宣言を近接させ、読む順序を「型→使う場所」に揃える意図だったとみられる。",
+    "highlights": [],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "inferred",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

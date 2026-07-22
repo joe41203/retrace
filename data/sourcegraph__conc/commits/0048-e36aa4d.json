@@ -1,0 +1,70 @@
+{
+  "seq": 48,
+  "sha": "e36aa4d2bf19618ea87e3cad5e606fbd22b41139",
+  "parents": [
+    "dc0d34a34c0edb5bbefef3edae3d2860abf7ad94"
+  ],
+  "author": {
+    "name": "Camden Cheek",
+    "email": "camden@ccheek.com",
+    "date": "2023-01-02T13:45:29-07:00"
+  },
+  "message": "don't defer wait",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 1,
+    "deletions": 3
+  },
+  "files": [
+    {
+      "path": "iter/iter.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 3,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/iter/iter.go b/iter/iter.go\nindex a6c942a..0b91f71 100644\n--- a/iter/iter.go\n+++ b/iter/iter.go\n@@ -26,9 +26,6 @@ func ForEach[T any](input []T, f func(*T)) {\n // ForEachIdx is the same as ForEach except it also provides the\n // index of the element to the callback.\n func ForEachIdx[T any](input []T, f func(int, *T)) {\n-\tvar wg conc.WaitGroup\n-\tdefer wg.Wait()\n-\n \tnumTasks := runtime.GOMAXPROCS(0)\n \tif numTasks > len(input) {\n \t\t// No more tasks than the number of input items\n@@ -44,6 +41,7 @@ func ForEachIdx[T any](input []T, f func(int, *T)) {\n \t\t}\n \t}\n \n+\tvar wg conc.WaitGroup\n \tfor i := 0; i < numTasks; i++ {\n \t\twg.Go(task)\n \t}\n",
+  "diffTruncated": false,
+  "tree": [
+    "LICENSE",
+    "go.mod",
+    "go.sum",
+    "iter/iter.go",
+    "iter/iter_test.go",
+    "limiter.go",
+    "panic.go",
+    "panic_test.go",
+    "pool/context_pool.go",
+    "pool/context_pool_test.go",
+    "pool/error_pool.go",
+    "pool/error_pool_test.go",
+    "pool/pool.go",
+    "pool/pool_test.go",
+    "pool/result_context_pool.go",
+    "pool/result_context_pool_test.go",
+    "pool/result_error_pool.go",
+    "pool/result_error_pool_test.go",
+    "pool/result_pool.go",
+    "pool/result_pool_test.go",
+    "stream/stream.go",
+    "stream/stream_test.go",
+    "waitgroup.go",
+    "waitgroup_test.go"
+  ],
+  "explanation": {
+    "what": "ForEachIdx 内の var wg conc.WaitGroup と defer wg.Wait() を関数冒頭から、numTasks や task クロージャの準備が終わった後の位置に移動した。defer ではなく wg.Wait() をそのままループの直後で呼ぶ形に変えている。",
+    "why": "コミットメッセージ「don't defer wait」の通り、defer を使うと関数の終わり(return)まで Wait 呼び出しが遅延されるが、ここでは早期リターンなどの分岐がなく、単純にコードの実行順を宣言順に揃えて読みやすくする意図とみられる。",
+    "highlights": [
+      { "file": "iter/iter.go", "note": "var wg conc.WaitGroup の宣言位置を task 定義の後ろへ移動し、defer をやめて直接 wg.Wait() を末尾で呼ぶ形に" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

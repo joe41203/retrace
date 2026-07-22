@@ -1,0 +1,105 @@
+{
+  "seq": 20,
+  "sha": "6a692eb39984f68b3bdf6d94424cffaa342525d3",
+  "parents": [
+    "b2ac8980e9b68c755670a4e00c2cadcf7c4bc2a4"
+  ],
+  "author": {
+    "name": "Camden Cheek",
+    "email": "camden@ccheek.com",
+    "date": "2022-12-16T17:27:58-07:00"
+  },
+  "message": "add some panic stability",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 3,
+    "additions": 144,
+    "deletions": 25
+  },
+  "files": [
+    {
+      "path": "panic.go",
+      "status": "A",
+      "additions": 20,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "stream/stream.go",
+      "status": "M",
+      "additions": 43,
+      "deletions": 13,
+      "binary": false
+    },
+    {
+      "path": "stream/stream_test.go",
+      "status": "M",
+      "additions": 81,
+      "deletions": 12,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/panic.go b/panic.go\nnew file mode 100644\nindex 0000000..07e4a7a\n--- /dev/null\n+++ b/panic.go\n@@ -0,0 +1,20 @@\n+package conc\n+\n+type PanicCatcher struct {\n+\tpanicVal any\n+}\n+\n+func (p *PanicCatcher) Try(f func()) {\n+\tdefer func() {\n+\t\tif r := recover(); r != nil && p.panicVal == nil {\n+\t\t\tp.panicVal = r\n+\t\t}\n+\t}()\n+\tf()\n+}\n+\n+func (p *PanicCatcher) MaybePanic() {\n+\tif p.panicVal != nil {\n+\t\tpanic(p.panicVal)\n+\t}\n+}\ndiff --git a/stream/stream.go b/stream/stream.go\nindex 85d0022..9d52aa3 100644\n--- a/stream/stream.go\n+++ b/stream/stream.go\n@@ -8,19 +8,27 @@ import (\n \t\"github.com/camdencheek/conc/pool\"\n )\n \n+// Create a new Stream with default settings\n func New() *Stream {\n \treturn &Stream{\n \t\tpool: *pool.New(),\n \t}\n }\n \n-// Stream is used to exectue a stream of tasks concurrently while maintaining\n+// Stream is used to execute a stream of tasks concurrently while maintaining\n // the order of the results.\n //\n-// To use a stream, you submit any number of `StreamTask`s, each of which\n+// To use a stream, you submit some number of `StreamTask`s, each of which\n // return a callback. Each task will be executed concurrently in the stream's\n-// associated Pool, but the callbacks will be executed sequentially, in the\n+// associated Pool, and the callbacks will be executed sequentially in the\n // order the tasks were submitted.\n+//\n+// Once all your tasks have been submitted, Wait() must be called to clean up\n+// running goroutines and propagate any panics.\n+//\n+// In the case of panic during execution of a task or a callback, all other\n+// tasks and callbacks will still execute. The panic will be propagated to the\n+// caller when Wait() is called.\n type Stream struct {\n \tpool             pool.Pool\n \tcallbackerHandle conc.WaitGroup\n@@ -55,25 +63,42 @@ func (s *Stream) Go(f StreamTask) {\n \n \t// Submit the task for execution\n \ts.pool.Go(func() {\n+\t\tdefer func() {\n+\t\t\t// In the case of a panic from f, we don't want the callbacker to\n+\t\t\t// starve waiting for a callback from this channel, so give it an\n+\t\t\t// empty callback.\n+\t\t\tif r := recover(); r != nil {\n+\t\t\t\tch <- func() {}\n+\t\t\t\tpanic(r)\n+\t\t\t}\n+\t\t}()\n+\n \t\t// Run the task, sending its callback down this task's channel\n-\t\tch <- f()\n+\t\tcallback := f()\n+\t\tch <- callback\n \t})\n }\n \n // Wait signals to the stream that all tasks have been submitted. Wait will\n // not return until all tasks and callbacks have been run.\n func (s *Stream) Wait() {\n-\ts.initOnce.Do(s.init)\n+\t// Defer the callbacker cleanup so that it occurs even in the case\n+\t// that one of the tasks panics and is propagated up by s.pool.Wait()\n+\tdefer func() {\n+\t\t// queue may be nil if Go was never called and init never ran\n+\t\tif s.queue != nil {\n+\t\t\tclose(s.queue)\n+\t\t}\n+\t\ts.callbackerHandle.Wait()\n+\t}()\n \n \t// Wait for all the workers to exit\n \ts.pool.Wait()\n+}\n \n-\t// Now that all the workers have finished, close the\n-\t// callback queue, signalling the callbacker to exit.\n-\tclose(s.queue)\n-\n-\t// Wait for the callbacker to finish.\n-\ts.callbackerHandle.Wait()\n+func (s *Stream) WithMaxGoroutines(n int) *Stream {\n+\ts.pool.WithMaxGoroutines(n)\n+\treturn s\n }\n \n func (s *Stream) init() {\n@@ -89,14 +114,19 @@ func (s *Stream) init() {\n \ts.callbackerHandle.Go(s.callbacker)\n }\n \n+// callbacker is responsible for calling the returned callbacks in the order\n+// they were submitted. There is only a single instance of callbacker running.\n func (s *Stream) callbacker() {\n+\tvar panicCatcher conc.PanicCatcher\n+\tdefer panicCatcher.MaybePanic()\n+\n \t// For every scheduled task, read that tasks channel from the queue.\n \tfor callbackCh := range s.queue {\n \t\t// Wait for the task to complete and get its callback from the channel\n \t\tcallback := <-callbackCh\n \n-\t\t// Execute the callback\n-\t\tcallback()\n+\t\t// Execute the callback (with panic protection)\n+\t\tpanicCatcher.Try(callback)\n \n \t\t// Return the channel to the pool of unused channels\n \t\ts.free.put(callbackCh)\ndiff --git a/stream/stream_test.go b/stream/stream_test.go\nindex 51de643..7df49ef 100644\n--- a/stream/stream_test.go\n+++ b/stream/stream_test.go\n@@ -2,30 +2,38 @@ package stream\n \n import (\n \t\"fmt\"\n+\t\"sync/atomic\"\n \t\"testing\"\n+\t\"time\"\n \n \t\"github.com/stretchr/testify/require\"\n )\n \n func ExampleStream() {\n-\ts := New()\n-\tfor i := 0; i < 5; i++ {\n-\t\ti := i\n-\t\ts.Go(func() Callback {\n-\t\t\ti *= 2\n-\t\t\treturn func() { fmt.Println(i) }\n+\ttimes := []int{20, 52, 16, 45, 4, 80}\n+\n+\tstream := New()\n+\tfor _, millis := range times {\n+\t\tdur := time.Duration(millis) * time.Millisecond\n+\t\tstream.Go(func() Callback {\n+\t\t\ttime.Sleep(dur)\n+\t\t\treturn func() { fmt.Println(dur) }\n \t\t})\n \t}\n-\ts.Wait()\n+\tstream.Wait()\n+\n \t// Output:\n-\t// 0\n-\t// 2\n-\t// 4\n-\t// 6\n-\t// 8\n+\t// 20ms\n+\t// 52ms\n+\t// 16ms\n+\t// 45ms\n+\t// 4ms\n+\t// 80ms\n }\n \n func TestStream(t *testing.T) {\n+\tt.Parallel()\n+\n \tt.Run(\"simple\", func(t *testing.T) {\n \t\ts := New()\n \t\tvar res []int\n@@ -42,4 +50,65 @@ func TestStream(t *testing.T) {\n \t\trequire.Equal(t, []int{0, 2, 4, 6, 8}, res)\n \t})\n \n+\tt.Run(\"max goroutines\", func(t *testing.T) {\n+\t\ts := New().WithMaxGoroutines(5)\n+\t\tvar currentTaskCount atomic.Int64\n+\t\tvar currentCallbackCount atomic.Int64\n+\t\tfor i := 0; i < 50; i++ {\n+\t\t\ts.Go(func() Callback {\n+\t\t\t\tcurr := currentTaskCount.Add(1)\n+\t\t\t\tif curr > 5 {\n+\t\t\t\t\tt.Fatal(\"too many concurrent tasks being executed\")\n+\t\t\t\t}\n+\t\t\t\tdefer currentTaskCount.Add(-1)\n+\n+\t\t\t\ttime.Sleep(time.Millisecond)\n+\n+\t\t\t\treturn func() {\n+\t\t\t\t\tcurr := currentCallbackCount.Add(1)\n+\t\t\t\t\tif curr > 1 {\n+\t\t\t\t\t\tt.Fatal(\"too many concurrent callbacks being executed\")\n+\t\t\t\t\t}\n+\n+\t\t\t\t\ttime.Sleep(time.Millisecond)\n+\n+\t\t\t\t\tdefer currentCallbackCount.Add(-1)\n+\t\t\t\t}\n+\t\t\t})\n+\t\t}\n+\t\ts.Wait()\n+\t})\n+\n+\tt.Run(\"panic in task is propagated\", func(t *testing.T) {\n+\t\ts := New().WithMaxGoroutines(5)\n+\t\ts.Go(func() Callback {\n+\t\t\tpanic(\"something really bad happened in the task\")\n+\t\t})\n+\t\trequire.Panics(t, s.Wait)\n+\t})\n+\n+\tt.Run(\"panic in callback is propagated\", func(t *testing.T) {\n+\t\ts := New().WithMaxGoroutines(5)\n+\t\ts.Go(func() Callback {\n+\t\t\treturn func() {\n+\t\t\t\tpanic(\"something really bad happened in the callback\")\n+\t\t\t}\n+\t\t})\n+\t\trequire.Panics(t, s.Wait)\n+\t})\n+\n+\tt.Run(\"panic in callback does not block producers\", func(t *testing.T) {\n+\t\ts := New().WithMaxGoroutines(5)\n+\t\ts.Go(func() Callback {\n+\t\t\treturn func() {\n+\t\t\t\tpanic(\"something really bad happened in the callback\")\n+\t\t\t}\n+\t\t})\n+\t\tfor i := 0; i < 100; i++ {\n+\t\t\ts.Go(func() Callback {\n+\t\t\t\treturn func() {}\n+\t\t\t})\n+\t\t}\n+\t\trequire.Panics(t, s.Wait)\n+\t})\n }\n",
+  "diffTruncated": false,
+  "tree": [
+    "LICENSE",
+    "go.mod",
+    "go.sum",
+    "group/context_group.go",
+    "group/context_group_test.go",
+    "group/error_group.go",
+    "group/error_group_test.go",
+    "group/group.go",
+    "group/group_test.go",
+    "group/iter.go",
+    "group/iter_test.go",
+    "group/result_context_group.go",
+    "group/result_context_group_test.go",
+    "group/result_error_group.go",
+    "group/result_error_group_test.go",
+    "group/result_group.go",
+    "group/result_group_test.go",
+    "iter.go",
+    "limiter.go",
+    "panic.go",
+    "pool/context_pool.go",
+    "pool/context_pool_test.go",
+    "pool/error_pool.go",
+    "pool/error_pool_test.go",
+    "pool/iter.go",
+    "pool/iter_test.go",
+    "pool/pool.go",
+    "pool/pool_test.go",
+    "pool/result_context_pool.go",
+    "pool/result_context_pool_test.go",
+    "pool/result_error_pool.go",
+    "pool/result_error_pool_test.go",
+    "pool/result_pool.go",
+    "pool/result_pool_test.go",
+    "stream/stream.go",
+    "stream/stream_test.go",
+    "waitgroup.go",
+    "waitgroup_test.go"
+  ],
+  "explanation": {
+    "what": "新規ファイル panic.go に PanicCatcher 型(Try(f func()) で panic を recover して保持し、MaybePanic() で再度 panic させる)を追加した。stream/stream.go の Go() では、タスク f() が panic した場合でも callbacker が待ち続けないよう空のコールバックをチャネルに送ってから panic を再送出するようにし、callbacker() 側は PanicCatcher 経由でコールバック実行を保護して Wait() まで panic を持ち越すようにした。stream/stream_test.go にタスク側・コールバック側それぞれの panic 伝播と、コールバック側の panic が後続タスクの生産をブロックしないことを検証するテストを追加した。",
+    "why": "Stream はタスク実行用 goroutine とコールバック実行用 goroutine が分かれているため、どちらか一方が無防備に panic すると、もう一方が呼吸不全(チャネル送受信で永久に止まる)を起こしうる。このコミットは両方の経路に recover を仕込み、panic を Wait() の呼び出し元まで安全に伝播させることでその問題を解消している。",
+    "highlights": [
+      { "file": "panic.go", "note": "PanicCatcher: Try で recover して保持、MaybePanic で再 panic するシンプルな型" },
+      { "file": "stream/stream.go", "note": "タスク側 panic 時に空コールバックを送ってから re-panic する箇所と、callbacker 側で PanicCatcher.Try(callback) を使う箇所" },
+      { "file": "stream/stream_test.go", "note": "コールバックの panic が後続タスクの投入をブロックしないことを確認するテスト" }
+    ],
+    "langNotes": [
+      { "topic": "recover と panic の再送出", "note": "Go の recover() は defer 内でのみ有効で、panic を捕まえて値を取り出せる。PanicCatcher はこの値を一旦保持しておき、後で改めて panic(val) することで「今は握りつぶすが、あとで呼び出し元に伝える」という遅延伝播を実現している。" }
+    ],
+    "diagram": {
+      "mermaid": "flowchart LR\n  T[\"task goroutine\"] -->|\"panic時は空callbackを送りre-panic\"| CH[\"channel\"]\n  CH --> CB[\"callbacker goroutine\"]\n  CB -->|\"PanicCatcher.Try\"| RUN[\"callback実行\"]\n  RUN -->|\"panic保持\"| WAIT[\"Wait() 呼び出し元\"]\n  T -->|\"panic保持\"| WAIT",
+      "caption": "task と callback それぞれの goroutine で panic が発生した場合の伝播経路"
+    },
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

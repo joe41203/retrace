@@ -1,0 +1,97 @@
+{
+  "seq": 111,
+  "sha": "ec1413e244f2d1c6eef8162bb7b19ef4227e9687",
+  "parents": [
+    "dbf89733ffb22e95a6ee143c674729f2409ad511",
+    "83a01d630c4629ce1fc404fdd245f32c3e988229"
+  ],
+  "author": {
+    "name": "Camden Cheek",
+    "email": "camden@ccheek.com",
+    "date": "2023-01-12T18:34:37-07:00"
+  },
+  "message": "Merge pull request #53 from craigpastro/add-wait-safe-method\n\nAdd WaitAndRecover method to WaitGroup",
+  "pr": {
+    "number": 53,
+    "title": "Add WaitAndRecover method to WaitGroup",
+    "body": "Resolves #29.\r\n\r\n👋 My attempt at resolving #29. I wasn't sure if was better to reimplement `Wait` in terms of `WaitSafe`. I think leaving the code as it looks a bit cleaner, so I just left it.\r\n\r\nI also wondered if it is better to say in the docs that `WaitSafe` will return the first panic it encounters and add a test for that. That is true, right?\r\n\r\nThank you!",
+    "url": "https://github.com/sourcegraph/conc/pull/53"
+  },
+  "linkedIssues": [
+    {
+      "number": 29,
+      "title": "Add a `Wait()`-like method that returns a caught panic",
+      "body": "Re-panicking is not ideal for every situation. Sometimes, in the case of a panic, a user will want to handle the panic manually. It's possible to `recover()` the propagated panic, but that's extra work for the user and you lose the type information that the panic value is a `RecoveredPanic`.  \r\n\r\nWe should add a method like `WaitSafe()` that returns a `*RecoveredPanic` if a panic was caught. \r\n\r\nOpen questions:\r\n- What to call it? `WaitSafe`, `SafeWait`, `WaitAndRecover` all come to mind\r\n- Do we add this just to `WaitGroup`, or also add it to each of the `.*Pool` types?",
+      "url": "https://github.com/sourcegraph/conc/issues/29"
+    }
+  ],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 50,
+    "deletions": 0
+  },
+  "files": [
+    {
+      "path": "waitgroup.go",
+      "status": "M",
+      "additions": 9,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "waitgroup_test.go",
+      "status": "M",
+      "additions": 41,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/waitgroup.go b/waitgroup.go\nindex 214cd85..6fc1627 100644\n--- a/waitgroup.go\n+++ b/waitgroup.go\n@@ -41,3 +41,12 @@ func (h *WaitGroup) Wait() {\n \t// Propagate a panic if we caught one from a child goroutine.\n \th.pc.Repanic()\n }\n+\n+// WaitAndRecover will block until all goroutines spawned with Go exit and\n+// will return a *panics.RecoveredPanic if one of the child goroutines panics.\n+func (h *WaitGroup) WaitAndRecover() *panics.RecoveredPanic {\n+\th.wg.Wait()\n+\n+\t// Return a recovered panic if we caught one from a child goroutine.\n+\treturn h.pc.Recovered()\n+}\ndiff --git a/waitgroup_test.go b/waitgroup_test.go\nindex 74e1dfd..331cff5 100644\n--- a/waitgroup_test.go\n+++ b/waitgroup_test.go\n@@ -98,5 +98,46 @@ func TestWaitGroup(t *testing.T) {\n \t\t\trequire.Panics(t, wg.Wait)\n \t\t\trequire.Equal(t, int64(2), i.Load())\n \t\t})\n+\n+\t\tt.Run(\"is caught by waitandrecover\", func(t *testing.T) {\n+\t\t\tt.Parallel()\n+\t\t\tvar wg WaitGroup\n+\t\t\twg.Go(func() {\n+\t\t\t\tpanic(\"super bad thing\")\n+\t\t\t})\n+\t\t\tp := wg.WaitAndRecover()\n+\t\t\trequire.Equal(t, p.Value, \"super bad thing\")\n+\t\t})\n+\n+\t\tt.Run(\"one is caught by waitandrecover\", func(t *testing.T) {\n+\t\t\tt.Parallel()\n+\t\t\tvar wg WaitGroup\n+\t\t\twg.Go(func() {\n+\t\t\t\tpanic(\"super bad thing\")\n+\t\t\t})\n+\t\t\twg.Go(func() {\n+\t\t\t\tpanic(\"super badder thing\")\n+\t\t\t})\n+\t\t\tp := wg.WaitAndRecover()\n+\t\t\trequire.NotNil(t, p)\n+\t\t})\n+\n+\t\tt.Run(\"nonpanics run successfully with waitandrecover\", func(t *testing.T) {\n+\t\t\tt.Parallel()\n+\t\t\tvar wg WaitGroup\n+\t\t\tvar i atomic.Int64\n+\t\t\twg.Go(func() {\n+\t\t\t\ti.Add(1)\n+\t\t\t})\n+\t\t\twg.Go(func() {\n+\t\t\t\tpanic(\"super bad thing\")\n+\t\t\t})\n+\t\t\twg.Go(func() {\n+\t\t\t\ti.Add(1)\n+\t\t\t})\n+\t\t\tp := wg.WaitAndRecover()\n+\t\t\trequire.Equal(t, p.Value, \"super bad thing\")\n+\t\t\trequire.Equal(t, int64(2), i.Load())\n+\t\t})\n \t})\n }\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/go.yml",
+    ".golangci.yml",
+    "LICENSE",
+    "README.md",
+    "go.mod",
+    "go.sum",
+    "iter/iter.go",
+    "iter/iter_test.go",
+    "panics/panics.go",
+    "panics/panics_test.go",
+    "pool/context_pool.go",
+    "pool/context_pool_test.go",
+    "pool/error_pool.go",
+    "pool/error_pool_test.go",
+    "pool/pool.go",
+    "pool/pool_test.go",
+    "pool/result_context_pool.go",
+    "pool/result_context_pool_test.go",
+    "pool/result_error_pool.go",
+    "pool/result_error_pool_test.go",
+    "pool/result_pool.go",
+    "pool/result_pool_test.go",
+    "stream/stream.go",
+    "stream/stream_test.go",
+    "waitgroup.go",
+    "waitgroup_test.go"
+  ],
+  "explanation": {
+    "what": "WaitGroup に WaitAndRecover() メソッドを追加した。既存の Wait() は子 goroutine の panic を再 panic(Repanic)して伝播させるのに対し、WaitAndRecover() はブロックして全 goroutine の完了を待ったのち、panic を再送せずに *panics.RecoveredPanic として返す。waitgroup_test.go にも panic 捕捉・複数 panic・panic と正常終了の混在を確認するテストが追加された。",
+    "why": "issue #29 で「Wait() は panic を再 panic するしかなく、呼び出し側が手動で recover() すると RecoveredPanic の型情報が失われる。panic を捕まえて呼び出し側に返す WaitSafe 相当のメソッドが欲しい」という要望があり、それに応える形でこの PR が作られた。PR 本文でも issue #29 の解決を明記している。",
+    "highlights": [
+      { "file": "waitgroup.go", "note": "WaitAndRecover は Wait と違い h.pc.Repanic() ではなく h.pc.Recovered() を呼び、panic を再送せず値として返す" }
+    ],
+    "langNotes": [
+      { "topic": "WaitAndRecover", "note": "Go には例外機構がなく、panic/recover で異常系を扱う。conc の panics.Catcher はこの recover をカプセル化し、WaitAndRecover() のように「panic を再送せず戻り値として受け取る」API を提供することで、呼び出し側が型情報(RecoveredPanic)を保ったままハンドリングできるようにしている。" }
+    ],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [
+      { "type": "pr", "number": 53, "url": "https://github.com/sourcegraph/conc/pull/53" },
+      { "type": "issue", "number": 29, "url": "https://github.com/sourcegraph/conc/issues/29" }
+    ],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

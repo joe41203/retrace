@@ -1,0 +1,141 @@
+{
+  "seq": 150,
+  "sha": "e454401b0a476b708561a7c10d4b3f268b33e604",
+  "parents": [
+    "4c5c70ab8b0e91cb1ecfa7eb4622723b138af3cc"
+  ],
+  "author": {
+    "name": "Camden Cheek",
+    "email": "camden@ccheek.com",
+    "date": "2024-01-19T11:08:15-07:00"
+  },
+  "message": "Exclusively use go1.20 multierrors (#127)\n\nThis removes the dependency on `go.uber.org/multierror` in favor of\r\nthe multierror functionality included in go 1.20.",
+  "pr": {
+    "number": 127,
+    "title": "Exclusively use go1.20 multierrors",
+    "body": "This PR removes the dependency on `go.uber.org/multierror` in favor of the multierror functionality included in go 1.20. \r\n\r\nAs a consequence, this removes support for go versions earlier than go 1.20. In order to maintain the standard \"two minor versions\" support policy, this change will not be released (likely in a 1.0 version) until go 1.22 is released.",
+    "url": "https://github.com/sourcegraph/conc/pull/127"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 9,
+    "additions": 8,
+    "deletions": 47
+  },
+  "files": [
+    {
+      "path": ".github/workflows/go.yml",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "README.md",
+      "status": "M",
+      "additions": 0,
+      "deletions": 11,
+      "binary": false
+    },
+    {
+      "path": "go.mod",
+      "status": "M",
+      "additions": 2,
+      "deletions": 6,
+      "binary": false
+    },
+    {
+      "path": "go.sum",
+      "status": "M",
+      "additions": 0,
+      "deletions": 5,
+      "binary": false
+    },
+    {
+      "path": "internal/multierror/multierror_go119.go",
+      "status": "D",
+      "additions": 0,
+      "deletions": 9,
+      "binary": false
+    },
+    {
+      "path": "internal/multierror/multierror_go120.go",
+      "status": "D",
+      "additions": 0,
+      "deletions": 9,
+      "binary": false
+    },
+    {
+      "path": "iter/map.go",
+      "status": "M",
+      "additions": 2,
+      "deletions": 3,
+      "binary": false
+    },
+    {
+      "path": "iter/map_test.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "pool/error_pool.go",
+      "status": "M",
+      "additions": 2,
+      "deletions": 3,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/.github/workflows/go.yml b/.github/workflows/go.yml\nindex 0b1cc1f..f190c54 100644\n--- a/.github/workflows/go.yml\n+++ b/.github/workflows/go.yml\n@@ -14,7 +14,7 @@ jobs:\n   build:\n     strategy:\n       matrix:\n-        go-version: ['1.19', 'stable']\n+        go-version: ['1.20', 'stable']\n     runs-on: ubuntu-latest\n     steps:\n     - uses: actions/checkout@v3\ndiff --git a/README.md b/README.md\nindex c0c3014..1c87c3c 100644\n--- a/README.md\n+++ b/README.md\n@@ -455,17 +455,6 @@ func mapStream(\n </tr>\n </table>\n \n-# Errors\n-\n-In general, `conc` handles multiple errors from tasks by joining them into\n-a single \"multierror\". In go 1.19, we use Uber's multierror package, but\n-in version 1.20, go added native support for joining errors so we use that\n-instead. Note that, if you are relying on converting an error back into its\n-component errors, the behavior changes between go 1.19 and go 1.20 and\n-you should use the `Unwrap() []error` method instead of casting the error\n-as a `*multierror.Error`. `errors.As` and `errors.Is` should continue\n-to work as expected.\n-\n # Status\n \n This package is currently pre-1.0. There are likely to be minor breaking\ndiff --git a/go.mod b/go.mod\nindex e06798f..aa49e92 100644\n--- a/go.mod\n+++ b/go.mod\n@@ -1,18 +1,14 @@\n module github.com/sourcegraph/conc\n \n-go 1.19\n+go 1.20\n \n-require (\n-\tgithub.com/stretchr/testify v1.8.1\n-\tgo.uber.org/multierr v1.9.0\n-)\n+require github.com/stretchr/testify v1.8.1\n \n require (\n \tgithub.com/davecgh/go-spew v1.1.1 // indirect\n \tgithub.com/kr/pretty v0.3.0 // indirect\n \tgithub.com/pmezard/go-difflib v1.0.0 // indirect\n \tgithub.com/rogpeppe/go-internal v1.9.0 // indirect\n-\tgo.uber.org/atomic v1.7.0 // indirect\n \tgopkg.in/check.v1 v1.0.0-20190902080502-41f04d3bba15 // indirect\n \tgopkg.in/yaml.v3 v3.0.1 // indirect\n )\ndiff --git a/go.sum b/go.sum\nindex 2eaf607..8254f47 100644\n--- a/go.sum\n+++ b/go.sum\n@@ -17,15 +17,10 @@ github.com/rogpeppe/go-internal v1.9.0/go.mod h1:WtVeX8xhTBvf0smdhujwtBcq4Qrzq/f\n github.com/stretchr/objx v0.1.0/go.mod h1:HFkY916IF+rwdDfMAkV7OtwuqBVzrE8GR6GFx+wExME=\n github.com/stretchr/objx v0.4.0/go.mod h1:YvHI0jy2hoMjB+UWwv71VJQ9isScKT/TqJzVSSt89Yw=\n github.com/stretchr/objx v0.5.0/go.mod h1:Yh+to48EsGEfYuaHDzXPcE3xhTkx73EhmCGUpEOglKo=\n-github.com/stretchr/testify v1.3.0/go.mod h1:M5WIy9Dh21IEIfnGCwXGc5bZfKNJtfHm1UVUgZn+9EI=\n github.com/stretchr/testify v1.7.1/go.mod h1:6Fq8oRcR53rry900zMqJjRRixrwX3KX962/h/Wwjteg=\n github.com/stretchr/testify v1.8.0/go.mod h1:yNjHg4UonilssWZ8iaSj1OCr/vHnekPRkoO+kdMU+MU=\n github.com/stretchr/testify v1.8.1 h1:w7B6lhMri9wdJUVmEZPGGhZzrYTPvgJArz7wNPgYKsk=\n github.com/stretchr/testify v1.8.1/go.mod h1:w2LPCIKwWwSfY2zedu0+kehJoqGctiVI29o6fzry7u4=\n-go.uber.org/atomic v1.7.0 h1:ADUqmZGgLDDfbSL9ZmPxKTybcoEYHgpYfELNoN+7hsw=\n-go.uber.org/atomic v1.7.0/go.mod h1:fEN4uk6kAWBTFdckzkM89CLk9XfWZrxpCo0nPH17wJc=\n-go.uber.org/multierr v1.9.0 h1:7fIwc/ZtS0q++VgcfqFDxSBZVv/Xo49/SYnDFupUwlI=\n-go.uber.org/multierr v1.9.0/go.mod h1:X2jQV1h+kxSjClGpnseKVIxpmcjrj7MNnI0bnlfKTVQ=\n gopkg.in/check.v1 v0.0.0-20161208181325-20d25e280405/go.mod h1:Co6ibVJAznAaIkqp8huTwlJQCZ016jof/cbN4VW5Yz0=\n gopkg.in/check.v1 v1.0.0-20180628173108-788fd7840127/go.mod h1:Co6ibVJAznAaIkqp8huTwlJQCZ016jof/cbN4VW5Yz0=\n gopkg.in/check.v1 v1.0.0-20190902080502-41f04d3bba15 h1:YR8cESwS4TdDjEe65xsg0ogRM/Nc3DYOhEAlW+xobZo=\ndiff --git a/internal/multierror/multierror_go119.go b/internal/multierror/multierror_go119.go\ndeleted file mode 100644\nindex b56ac9b..0000000\n--- a/internal/multierror/multierror_go119.go\n+++ /dev/null\n@@ -1,9 +0,0 @@\n-//go:build !go1.20\n-\n-package multierror\n-\n-import \"go.uber.org/multierr\"\n-\n-var (\n-\tJoin = multierr.Combine\n-)\ndiff --git a/internal/multierror/multierror_go120.go b/internal/multierror/multierror_go120.go\ndeleted file mode 100644\nindex c164dd9..0000000\n--- a/internal/multierror/multierror_go120.go\n+++ /dev/null\n@@ -1,9 +0,0 @@\n-//go:build go1.20\n-\n-package multierror\n-\n-import \"errors\"\n-\n-var (\n-\tJoin = errors.Join\n-)\ndiff --git a/iter/map.go b/iter/map.go\nindex c5462c0..af8c3b2 100644\n--- a/iter/map.go\n+++ b/iter/map.go\n@@ -1,9 +1,8 @@\n package iter\n \n import (\n+\t\"errors\"\n \t\"sync\"\n-\n-\t\"github.com/sourcegraph/conc/internal/multierror\"\n )\n \n // Mapper is an Iterator with a result type R. It can be used to configure\n@@ -60,5 +59,5 @@ func (m Mapper[T, R]) MapErr(input []T, f func(*T) (R, error)) ([]R, error) {\n \t\t\terrMux.Unlock()\n \t\t}\n \t})\n-\treturn res, multierror.Join(errs...)\n+\treturn res, errors.Join(errs...)\n }\ndiff --git a/iter/map_test.go b/iter/map_test.go\nindex 7901da7..5749e9a 100644\n--- a/iter/map_test.go\n+++ b/iter/map_test.go\n@@ -162,6 +162,7 @@ func TestMapErr(t *testing.T) {\n \t\t})\n \t\trequire.ErrorIs(t, err, err1)\n \t\trequire.ErrorIs(t, err, err2)\n+\t\trequire.ElementsMatch(t, err.(interface{ Unwrap() []error }).Unwrap(), []error{err1, err2})\n \t\trequire.Equal(t, []int{2, 3, 0, 0, 6}, res)\n \t\trequire.Equal(t, []int{1, 2, 3, 4, 5}, ints)\n \t})\ndiff --git a/pool/error_pool.go b/pool/error_pool.go\nindex 939fb29..e1789e6 100644\n--- a/pool/error_pool.go\n+++ b/pool/error_pool.go\n@@ -2,9 +2,8 @@ package pool\n \n import (\n \t\"context\"\n+\t\"errors\"\n \t\"sync\"\n-\n-\t\"github.com/sourcegraph/conc/internal/multierror\"\n )\n \n // ErrorPool is a pool that runs tasks that may return an error.\n@@ -44,7 +43,7 @@ func (p *ErrorPool) Wait() error {\n \t} else if p.onlyFirstError {\n \t\treturn errs[0]\n \t} else {\n-\t\treturn multierror.Join(errs...)\n+\t\treturn errors.Join(errs...)\n \t}\n }\n \n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/go.yml",
+    ".golangci.yml",
+    "LICENSE",
+    "README.md",
+    "go.mod",
+    "go.sum",
+    "iter/export_test.go",
+    "iter/iter.go",
+    "iter/iter_test.go",
+    "iter/map.go",
+    "iter/map_test.go",
+    "panics/panics.go",
+    "panics/panics_test.go",
+    "panics/try.go",
+    "panics/try_test.go",
+    "pool/context_pool.go",
+    "pool/context_pool_test.go",
+    "pool/error_pool.go",
+    "pool/error_pool_test.go",
+    "pool/pool.go",
+    "pool/pool_test.go",
+    "pool/result_context_pool.go",
+    "pool/result_context_pool_test.go",
+    "pool/result_error_pool.go",
+    "pool/result_error_pool_test.go",
+    "pool/result_pool.go",
+    "pool/result_pool_test.go",
+    "stream/stream.go",
+    "stream/stream_test.go",
+    "waitgroup.go",
+    "waitgroup_test.go"
+  ],
+  "explanation": {
+    "what": "go.uber.org/multierror への依存と、go 1.19/1.20 でビルドタグ切り替えていた internal/multierror パッケージ(2ファイル)を丸ごと削除し、iter/map.go と pool/error_pool.go で標準ライブラリの errors.Join を直接呼ぶように変更した。go.mod の go ディレクティブを 1.19 から 1.20 に、CI の go-version マトリクスも '1.19' から '1.20' に更新し、README のエラー処理に関する節も削除した。",
+    "why": "PR本文に明記されている通り、go 1.20 で errors.Join が標準ライブラリに入ったことで、go 1.19 以前をサポートするための go.uber.org/multierror への依存とビルドタグ分岐がもう不要になったため、外部依存を減らして stdlib のみに寄せた。この変更に伴い go 1.19 のサポートを打ち切っており、PR本文では「2マイナーバージョンをサポートする」方針を守るため go 1.22 のリリースまでこの変更はリリースしない、とも述べられている。",
+    "highlights": [
+      { "file": "go.mod", "note": "go 1.19 → 1.20 への引き上げと go.uber.org/multierr 依存の削除" },
+      { "file": "iter/map.go", "note": "internal/multierror.Join(...) から標準ライブラリの errors.Join(...) への置き換え" }
+    ],
+    "langNotes": [
+      { "topic": "errors.Join (go 1.20)", "note": "go 1.20 で標準ライブラリに追加された関数で、複数のエラーを1つにまとめる。それ以前は go.uber.org/multierr のような外部ライブラリに頼るのが一般的だった。conc はこれまでビルドタグ(//go:build go1.20 / !go1.20)で2つの実装を切り替えて両バージョンに対応していたが、このコミットで go 1.20 未満のサポートを打ち切り、内部の抽象化ごと削除して errors.Join に一本化した。" }
+    ],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [{ "type": "pr", "number": 127, "url": "https://github.com/sourcegraph/conc/pull/127" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

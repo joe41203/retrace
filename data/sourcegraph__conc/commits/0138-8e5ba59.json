@@ -1,0 +1,85 @@
+{
+  "seq": 138,
+  "sha": "8e5ba59e78214e2d8d3ea2c78ef6cf2693bedaa8",
+  "parents": [
+    "06d3061eb7cc571d833a2c0e75220ca1add74a19"
+  ],
+  "author": {
+    "name": "Link512",
+    "email": "horatiu.ion@gmail.com",
+    "date": "2023-05-03T06:23:57+02:00"
+  },
+  "message": "always spawn a worker with the task it was supposed to complete (#112)\n\nFor \"unlimited\" pools, in the original code:\r\n\r\n```go\r\np.handle.Go(p.worker)\r\np.tasks <- f\r\n```\r\n\r\nIf in between the call to `handle.Go` and sending the task to the\r\nworker, another goroutine would call `pool.Go`, that task would \"hijack\"\r\nthe newly created worker, causing the original send to block. This is\r\nundesirable behavior if the pool is unlimited.\r\n\r\nThe solution was to add an `initialFunc` to the worker, which will be\r\nexecuted before the worker starts waiting for new tasks. This ensures\r\nthat a worker will first complete the task it was supposed to, then\r\ncomplete others.",
+  "pr": {
+    "number": 112,
+    "title": "always spawn a worker with the task it was supposed to complete",
+    "body": "For \"unlimited\" pools, in the [original code](https://github.com/sourcegraph/conc/blob/main/pool/pool.go#L45):\r\n\r\n```go\r\np.handle.Go(p.worker)\r\np.tasks <- f\r\n```\r\n\r\nIf in between the call to `handle.Go` and sending the task to the worker, another goroutine would call `pool.Go`, that task would \"hijack\" the newly created worker, causing the original send to block. This is undesirable behavior if the pool is unlimited.\r\n\r\nThe solution was to add an `initialFunc` to the worker, which will be executed before the worker starts waiting for new tasks. This ensures that a worker will first complete the task it was supposed to, then complete others.",
+    "url": "https://github.com/sourcegraph/conc/pull/112"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 11,
+    "deletions": 9
+  },
+  "files": [
+    {
+      "path": "pool/pool.go",
+      "status": "M",
+      "additions": 11,
+      "deletions": 9,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/pool/pool.go b/pool/pool.go\nindex 4b13469..8f4494e 100644\n--- a/pool/pool.go\n+++ b/pool/pool.go\n@@ -47,20 +47,18 @@ func (p *Pool) Go(f func()) {\n \t\tdefault:\n \t\t\t// No goroutine was available to handle the task.\n \t\t\t// Spawn a new one and send it the task.\n-\t\t\tp.handle.Go(p.worker)\n-\t\t\tp.tasks <- f\n+\t\t\tp.handle.Go(func() {\n+\t\t\t\tp.worker(f)\n+\t\t\t})\n \t\t}\n \t} else {\n \t\tselect {\n \t\tcase p.limiter <- struct{}{}:\n \t\t\t// If we are below our limit, spawn a new worker rather\n \t\t\t// than waiting for one to become available.\n-\t\t\tp.handle.Go(p.worker)\n-\n-\t\t\t// We know there is at least one worker running, so wait\n-\t\t\t// for it to become available. This ensures we never spawn\n-\t\t\t// more workers than the number of tasks.\n-\t\t\tp.tasks <- f\n+\t\t\tp.handle.Go(func() {\n+\t\t\t\tp.worker(f)\n+\t\t\t})\n \t\tcase p.tasks <- f:\n \t\t\t// A worker is available and has accepted the task.\n \t\t\treturn\n@@ -149,11 +147,15 @@ func (p *Pool) WithContext(ctx context.Context) *ContextPool {\n \t}\n }\n \n-func (p *Pool) worker() {\n+func (p *Pool) worker(initialFunc func()) {\n \t// The only time this matters is if the task panics.\n \t// This makes it possible to spin up new workers in that case.\n \tdefer p.limiter.release()\n \n+\tif initialFunc != nil {\n+\t\tinitialFunc()\n+\t}\n+\n \tfor f := range p.tasks {\n \t\tf()\n \t}\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/go.yml",
+    ".golangci.yml",
+    "LICENSE",
+    "README.md",
+    "go.mod",
+    "go.sum",
+    "internal/multierror/multierror_go119.go",
+    "internal/multierror/multierror_go120.go",
+    "iter/iter.go",
+    "iter/iter_test.go",
+    "iter/map.go",
+    "iter/map_test.go",
+    "panics/panics.go",
+    "panics/panics_test.go",
+    "panics/try.go",
+    "panics/try_test.go",
+    "pool/context_pool.go",
+    "pool/context_pool_test.go",
+    "pool/error_pool.go",
+    "pool/error_pool_test.go",
+    "pool/pool.go",
+    "pool/pool_test.go",
+    "pool/result_context_pool.go",
+    "pool/result_context_pool_test.go",
+    "pool/result_error_pool.go",
+    "pool/result_error_pool_test.go",
+    "pool/result_pool.go",
+    "pool/result_pool_test.go",
+    "stream/stream.go",
+    "stream/stream_test.go",
+    "waitgroup.go",
+    "waitgroup_test.go"
+  ],
+  "explanation": {
+    "what": "Pool.worker のシグネチャを `worker()` から `worker(initialFunc func())` に変更し、新しいワーカーを起動する箇所を `p.handle.Go(p.worker)` に続けて `p.tasks <- f` するのではなく、`p.handle.Go(func() { p.worker(f) })` として、生成直後のワーカーに実行すべきタスク f をクロージャで直接渡すようにした。worker 内では for range p.tasks でループする前に、まず initialFunc(渡された f)を実行する。",
+    "why": "PR本文によると、旧実装では `p.handle.Go(p.worker)` でワーカーgoroutineを起動した直後に `p.tasks <- f` でタスクを送信していたが、その間に別の goroutine が Go() を呼ぶと、その別タスクが先にチャネルからタスクを受け取ってしまい(横取り)、本来そのワーカーに渡すはずだった f の送信がブロックしてしまう可能性があった。unlimited なプールではこれは無制限にワーカーを増やしてしまう望ましくない挙動になる。ワーカー生成時に実行すべきタスクをクロージャで直接束縛することで、新しく作ったワーカーが必ず「そのために生成されたタスク」を最初に実行することを保証した。",
+    "highlights": [
+      { "file": "pool/pool.go", "note": "p.handle.Go(p.worker) + p.tasks<-f から p.handle.Go(func(){ p.worker(f) }) への変更" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [
+      { "type": "pr", "number": 112, "url": "https://github.com/sourcegraph/conc/pull/112" }
+    ],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

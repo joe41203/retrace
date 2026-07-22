@@ -1,0 +1,98 @@
+{
+  "seq": 118,
+  "sha": "77718332d4a01f20f26052e0e1c15e70b00dd4f8",
+  "parents": [
+    "d94160cc60e537a5a4c73411d7c449053131dadb",
+    "8f03217d76a810b821a36351688f49e15622f5ae"
+  ],
+  "author": {
+    "name": "Robert Lin",
+    "email": "robertlin1@gmail.com",
+    "date": "2023-01-17T07:58:22-08:00"
+  },
+  "message": "Merge pull request #68 from sourcegraph/iter-map-configureable-concurrency\n\niter: introduce Mapper type with configurable Iterator",
+  "pr": {
+    "number": 68,
+    "title": "iter: introduce Mapper type with configurable Iterator",
+    "body": "This follows up https://github.com/sourcegraph/conc/pull/63 by introducing a `Mapper` type that can be used to configure mapping behaviour, while keeping the top-level `Map` and `MapErr` functions.\r\n\r\nRelevant to https://github.com/sourcegraph/conc/issues/55\r\nStacked on https://github.com/sourcegraph/conc/pull/67\r\n\r\n<details>\r\n  <summary>Previous discussion points</summary>\r\n\r\nAll superseded by https://github.com/sourcegraph/conc/pull/68#issuecomment-1384393956\r\n\r\n## `type Mapper struct` vs `type Mapper = Iterator`\r\n\r\nthe `Mapper` type must be a struct - IMO this type only really needs to be an `Iterator` with a result type `R`, defined as a type alias:\r\n\r\n```go\r\ntype Mapper[T, R any] = Iterator[T]\r\n```\r\n\r\nThis would reinforce that `Mapper` is simply an `Iterator` that also works with result types, and shouldn't have additional behaviours/state that might be better suited to a `Pool` type.\r\n\r\nSadly, this isn't possible in Go 1.19 - type aliases currently cannot have type parameters of their own. However, **a proposal to change this is accepted** (https://github.com/golang/go/issues/46477), so we may want to wait for it since it's [tagged as part of Go 1.20](https://github.com/golang/go/issues/46477#issuecomment-1134888278), but there hasn't been much activity on it and with the Go 1.20 coming up soon it might not have made it into the release.\r\n\r\n## `Mapper.ForEach`\r\n\r\nAnother consideration: with both the above approaches, `Mapper` instances have `ForEach`, etc from `Iterator` accessible as well, which makes for a larger visible API surface. I think it's harmless, but if we want to hide it, we may want to use `type Mapper struct` and either:\r\n\r\n- Make `(Mapper).Iterator` a named rather than embedded field\r\n- Make `Mapper` a copy-pasta of `Iterator`, and create new `Iterator` instances that use `(Mapper).MaxGoroutines` - this is a bit tedious and IMO potentially confusing\r\n\r\n\r\n</details>\r\n",
+    "url": "https://github.com/sourcegraph/conc/pull/68"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 3,
+    "additions": 60,
+    "deletions": 2
+  },
+  "files": [
+    {
+      "path": "iter/iter_test.go",
+      "status": "M",
+      "additions": 17,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "iter/map.go",
+      "status": "M",
+      "additions": 30,
+      "deletions": 2,
+      "binary": false
+    },
+    {
+      "path": "iter/map_test.go",
+      "status": "M",
+      "additions": 13,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/iter/iter_test.go b/iter/iter_test.go\nindex 7394810..eb06ad9 100644\n--- a/iter/iter_test.go\n+++ b/iter/iter_test.go\n@@ -1,6 +1,7 @@\n package iter\n \n import (\n+\t\"fmt\"\n \t\"strconv\"\n \t\"sync/atomic\"\n \t\"testing\"\n@@ -9,6 +10,22 @@ import (\n \t\"github.com/stretchr/testify/require\"\n )\n \n+func ExampleIterator() {\n+\tinput := []int{1, 2, 3, 4}\n+\titerator := Iterator[int]{\n+\t\tMaxGoroutines: len(input) / 2,\n+\t}\n+\n+\titerator.ForEach(input, func(v *int) {\n+\t\tif *v%2 == 0 {\n+\t\t\tfmt.Println(*v)\n+\t\t}\n+\t})\n+\t// Output:\n+\t// 2\n+\t// 4\n+}\n+\n func TestIterator(t *testing.T) {\n \tt.Parallel()\n \ndiff --git a/iter/map.go b/iter/map.go\nindex 0d96223..02fbb1a 100644\n--- a/iter/map.go\n+++ b/iter/map.go\n@@ -6,10 +6,27 @@ import (\n \t\"github.com/sourcegraph/sourcegraph/lib/errors\"\n )\n \n+// Mapper is an Iterator with a result type R. It can be used to configure\n+// the behaviour of Map and MapErr. The zero value is safe to use with\n+// reasonable defaults.\n+//\n+// Mapper is also safe for reuse and concurrent use.\n+type Mapper[T, R any] Iterator[T]\n+\n // Map applies f to each element of input, returning the mapped result.\n+//\n+// Map always uses at most runtime.GOMAXPROCS goroutines. For a configurable\n+// goroutine limit, use a custom Mapper.\n func Map[T, R any](input []T, f func(*T) R) []R {\n+\treturn Mapper[T, R]{}.Map(input, f)\n+}\n+\n+// Map applies f to each element of input, returning the mapped result.\n+//\n+// Map uses up to the configured Mapper's maximum number of goroutines.\n+func (m Mapper[T, R]) Map(input []T, f func(*T) R) []R {\n \tres := make([]R, len(input))\n-\tForEachIdx(input, func(i int, t *T) {\n+\tIterator[T](m).ForEachIdx(input, func(i int, t *T) {\n \t\tres[i] = f(t)\n \t})\n \treturn res\n@@ -17,13 +34,24 @@ func Map[T, R any](input []T, f func(*T) R) []R {\n \n // MapErr applies f to each element of the input, returning the mapped result\n // and a combined error of all returned errors.\n+//\n+// Map always uses at most runtime.GOMAXPROCS goroutines. For a configurable\n+// goroutine limit, use a custom Mapper.\n func MapErr[T, R any](input []T, f func(*T) (R, error)) ([]R, error) {\n+\treturn Mapper[T, R]{}.MapErr(input, f)\n+}\n+\n+// MapErr applies f to each element of the input, returning the mapped result\n+// and a combined error of all returned errors.\n+//\n+// Map uses up to the configured Mapper's maximum number of goroutines.\n+func (m Mapper[T, R]) MapErr(input []T, f func(*T) (R, error)) ([]R, error) {\n \tvar (\n \t\tres    = make([]R, len(input))\n \t\terrMux sync.Mutex\n \t\terrs   error\n \t)\n-\tForEachIdx(input, func(i int, t *T) {\n+\tIterator[T](m).ForEachIdx(input, func(i int, t *T) {\n \t\tvar err error\n \t\tres[i], err = f(t)\n \t\tif err != nil {\ndiff --git a/iter/map_test.go b/iter/map_test.go\nindex 7a7c794..28be912 100644\n--- a/iter/map_test.go\n+++ b/iter/map_test.go\n@@ -2,11 +2,24 @@ package iter\n \n import (\n \t\"errors\"\n+\t\"fmt\"\n \t\"testing\"\n \n \t\"github.com/stretchr/testify/require\"\n )\n \n+func ExampleMapper() {\n+\tinput := []int{1, 2, 3, 4}\n+\tmapper := Mapper[int, bool]{\n+\t\tMaxGoroutines: len(input) / 2,\n+\t}\n+\n+\tresults := mapper.Map(input, func(v *int) bool { return *v%2 == 0 })\n+\tfmt.Println(results)\n+\t// Output:\n+\t// [false true false true]\n+}\n+\n func TestMap(t *testing.T) {\n \tt.Parallel()\n \n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/go.yml",
+    ".golangci.yml",
+    "LICENSE",
+    "README.md",
+    "go.mod",
+    "go.sum",
+    "iter/iter.go",
+    "iter/iter_test.go",
+    "iter/map.go",
+    "iter/map_test.go",
+    "panics/panics.go",
+    "panics/panics_test.go",
+    "pool/context_pool.go",
+    "pool/context_pool_test.go",
+    "pool/error_pool.go",
+    "pool/error_pool_test.go",
+    "pool/pool.go",
+    "pool/pool_test.go",
+    "pool/result_context_pool.go",
+    "pool/result_context_pool_test.go",
+    "pool/result_error_pool.go",
+    "pool/result_error_pool_test.go",
+    "pool/result_pool.go",
+    "pool/result_pool_test.go",
+    "stream/stream.go",
+    "stream/stream_test.go",
+    "waitgroup.go",
+    "waitgroup_test.go"
+  ],
+  "explanation": {
+    "what": "iter パッケージに Mapper[T, R] 型を新設した。Mapper は Iterator[T] と同じ MaxGoroutines フィールドを持つ型で、Map / MapErr をメソッドとして持つ。パッケージ関数 Map / MapErr は Mapper[T, R]{}.Map(...) / Mapper[T, R]{}.MapErr(...) へ委譲するよう書き換えられ、内部では Iterator[T](m) という型変換で Iterator の ForEachIdx に処理を委ねている。ExampleIterator / ExampleMapper という Example テストも追加された。",
+    "why": "PR本文によれば、直前の PR #63 で ForEach 系に導入した「設定可能な並行度」を Map / MapErr にも展開するための変更(issue #55 に関連)。PR本文には Mapper[T, R] = Iterator[T] という型エイリアスにしたい案も検討されたが、Go 1.19 時点では型パラメータ付きの型エイリアスが言語仕様上サポートされていない(提案 golang/go#46477 は当時未確定)ため、Mapper を Iterator[T] の再定義型として実装したと記されている。",
+    "highlights": [
+      { "file": "iter/map.go", "note": "Mapper[T, R] は Iterator[T] の再定義型として定義され、Map/MapErr 内で Iterator[T](m) にキャストして ForEachIdx を再利用している" }
+    ],
+    "langNotes": [
+      { "topic": "Mapper[T, R] Iterator[T] (再定義型と型変換)", "note": "type Mapper[T, R any] Iterator[T] は Iterator[T] のフィールド構造を流用した別の名前付き型(エイリアスではなく再定義)を作る書き方。Go 1.19時点ではジェネリックな型エイリアス(type Mapper[T,R] = Iterator[T])が使えなかったため、この方法で Iterator の構造を再利用しつつ Map 用のメソッドだけを Mapper に持たせている。Iterator[T](m) はこの再定義型を元の Iterator[T] に戻すための型変換。" }
+    ],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [
+      { "type": "pr", "number": 68, "url": "https://github.com/sourcegraph/conc/pull/68" }
+    ],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

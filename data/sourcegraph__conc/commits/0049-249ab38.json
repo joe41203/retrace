@@ -1,0 +1,70 @@
+{
+  "seq": 49,
+  "sha": "249ab38d60d718ae2a6185d102c423e04b4b837a",
+  "parents": [
+    "e36aa4d2bf19618ea87e3cad5e606fbd22b41139"
+  ],
+  "author": {
+    "name": "Camden Cheek",
+    "email": "camden@ccheek.com",
+    "date": "2023-01-02T13:54:52-07:00"
+  },
+  "message": "add a couple of clarifying comments",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 2,
+    "deletions": 1
+  },
+  "files": [
+    {
+      "path": "iter/iter.go",
+      "status": "M",
+      "additions": 2,
+      "deletions": 1,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/iter/iter.go b/iter/iter.go\nindex 0b91f71..9d26521 100644\n--- a/iter/iter.go\n+++ b/iter/iter.go\n@@ -33,7 +33,7 @@ func ForEachIdx[T any](input []T, f func(int, *T)) {\n \t}\n \n \tvar idx atomic.Int64\n-\t// create the task outside the loop to avoid extra allocations\n+\t// create the task outside the loop to avoid extra closure allocations\n \ttask := func() {\n \t\ti := int(idx.Add(1) - 1)\n \t\tfor ; i < len(input); i = int(idx.Add(1) - 1) {\n@@ -70,6 +70,7 @@ func MapErr[T any, R any](input []T, f func(*T) (R, error)) ([]R, error) {\n \t\tres[i], err = f(t)\n \t\tif err != nil {\n \t\t\terrMux.Lock()\n+\t\t\t// TODO: use stdlib errors once multierrors land in go 1.20\n \t\t\terrs = errors.Append(errs, err)\n \t\t\terrMux.Unlock()\n \t\t}\n",
+  "diffTruncated": false,
+  "tree": [
+    "LICENSE",
+    "go.mod",
+    "go.sum",
+    "iter/iter.go",
+    "iter/iter_test.go",
+    "limiter.go",
+    "panic.go",
+    "panic_test.go",
+    "pool/context_pool.go",
+    "pool/context_pool_test.go",
+    "pool/error_pool.go",
+    "pool/error_pool_test.go",
+    "pool/pool.go",
+    "pool/pool_test.go",
+    "pool/result_context_pool.go",
+    "pool/result_context_pool_test.go",
+    "pool/result_error_pool.go",
+    "pool/result_error_pool_test.go",
+    "pool/result_pool.go",
+    "pool/result_pool_test.go",
+    "stream/stream.go",
+    "stream/stream_test.go",
+    "waitgroup.go",
+    "waitgroup_test.go"
+  ],
+  "explanation": {
+    "what": "iter/iter.go に2箇所コメントを追記した。task クロージャ作成のコメントを『余分なアロケーションを避けるため』から『余分なクロージャのアロケーションを避けるため』へ具体化し、MapErr のエラー集約部分に『Go 1.20 でマルチエラーが標準入りしたら stdlib errors を使う』という TODO を追加した。",
+    "why": "コミットメッセージ通り、既存コードの意図を読み手に伝えるための補足コメント追加。TODO は当時 github.com/sourcegraph/sourcegraph/lib/errors という社内errorsパッケージで多重エラーを合成していたことに対し、将来 Go 標準ライブラリ側の対応(errors.Join 相当)に置き換える計画を残したものとみられる。",
+    "highlights": [
+      { "file": "iter/iter.go", "note": "MapErr 内、errors.Append 呼び出し直前の TODO コメント" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

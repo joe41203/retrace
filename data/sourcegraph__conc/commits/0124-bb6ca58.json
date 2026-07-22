@@ -1,0 +1,89 @@
+{
+  "seq": 124,
+  "sha": "bb6ca58e7fda2b8759c41a3b64d14e8b967a4146",
+  "parents": [
+    "f2f672440410ae20762f793e89674cc98b1b67e5",
+    "cf1f0797d5ee74957ff9f8f6cf43c5d9c2eee8e7"
+  ],
+  "author": {
+    "name": "Robert Lin",
+    "email": "robertlin1@gmail.com",
+    "date": "2023-01-25T19:04:20-08:00"
+  },
+  "message": "Merge pull request #77 from sourcegraph/panics-try",
+  "pr": {
+    "number": 77,
+    "title": "panics: add single-fn Try at package level",
+    "body": "`panics` is pretty useful for cases where you're dealing with a third-party library that panics instead of handling errors, which is sadly a non-zero number of libraries. For one-off usages, however, using `Catcher` is clunky because it's designed to be reused - this adds a convenience function `Try` that attempts a single function and recovers from panics it raises.",
+    "url": "https://github.com/sourcegraph/conc/pull/77"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 44,
+    "deletions": 0
+  },
+  "files": [
+    {
+      "path": "panics/try.go",
+      "status": "A",
+      "additions": 11,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "panics/try_test.go",
+      "status": "A",
+      "additions": 33,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/panics/try.go b/panics/try.go\nnew file mode 100644\nindex 0000000..d4e0961\n--- /dev/null\n+++ b/panics/try.go\n@@ -0,0 +1,11 @@\n+package panics\n+\n+// Try executes f, catching and returning any panic it might spawn.\n+//\n+// The recovered panic can be propagated with panic(), or handled as a normal error with\n+// (*RecoveredPanic).AsError().\n+func Try(f func()) *RecoveredPanic {\n+\tvar c Catcher\n+\tc.Try(f)\n+\treturn c.Recovered()\n+}\ndiff --git a/panics/try_test.go b/panics/try_test.go\nnew file mode 100644\nindex 0000000..02a41e9\n--- /dev/null\n+++ b/panics/try_test.go\n@@ -0,0 +1,33 @@\n+package panics\n+\n+import (\n+\t\"errors\"\n+\t\"testing\"\n+\n+\t\"github.com/stretchr/testify/require\"\n+)\n+\n+func TestTry(t *testing.T) {\n+\tt.Parallel()\n+\n+\tt.Run(\"panics\", func(t *testing.T) {\n+\t\tt.Parallel()\n+\n+\t\terr := errors.New(\"SOS\")\n+\t\trecovered := Try(func() { panic(err) })\n+\t\trequire.ErrorIs(t, recovered.AsError(), err)\n+\t\trequire.ErrorAs(t, recovered.AsError(), &err)\n+\t\t// The exact contents aren't tested because the stacktrace contains local file paths\n+\t\t// and even the structure of the stacktrace is bound to be unstable over time. Just\n+\t\t// test a couple of basics.\n+\t\trequire.Contains(t, recovered.String(), \"SOS\", \"formatted panic should contain the panic message\")\n+\t\trequire.Contains(t, recovered.String(), \"panics.(*Catcher).Try\", recovered.String(), \"formatted panic should contain the stack trace\")\n+\t})\n+\n+\tt.Run(\"no panic\", func(t *testing.T) {\n+\t\tt.Parallel()\n+\n+\t\trecovered := Try(func() {})\n+\t\trequire.Nil(t, recovered)\n+\t})\n+}\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/go.yml",
+    ".golangci.yml",
+    "LICENSE",
+    "README.md",
+    "go.mod",
+    "go.sum",
+    "iter/iter.go",
+    "iter/iter_test.go",
+    "iter/map.go",
+    "iter/map_test.go",
+    "panics/panics.go",
+    "panics/panics_test.go",
+    "panics/try.go",
+    "panics/try_test.go",
+    "pool/context_pool.go",
+    "pool/context_pool_test.go",
+    "pool/error_pool.go",
+    "pool/error_pool_test.go",
+    "pool/pool.go",
+    "pool/pool_test.go",
+    "pool/result_context_pool.go",
+    "pool/result_context_pool_test.go",
+    "pool/result_error_pool.go",
+    "pool/result_error_pool_test.go",
+    "pool/result_pool.go",
+    "pool/result_pool_test.go",
+    "stream/stream.go",
+    "stream/stream_test.go",
+    "waitgroup.go",
+    "waitgroup_test.go"
+  ],
+  "explanation": {
+    "what": "panics パッケージにパッケージレベル関数 Try(f func()) *RecoveredPanic を追加した。内部で Catcher を1つ作って f を Try に渡すだけの薄いラッパーで、対応するテスト try_test.go も同時に追加している。",
+    "why": "PR本文にある通り、Catcher 型は繰り返し使う前提で設計されているため、パニックする可能性のあるサードパーティ関数を1回だけ安全に呼びたいだけのケースでは Catcher を宣言してから Try を呼ぶという手順が冗長だった。Try() 単体関数を用意することで、そのような使い捨てのユースケースを一行で書けるようにした。",
+    "highlights": [
+      { "file": "panics/try.go", "note": "Catcherを都度newせずに済む、1回限りのpanic捕捉のための薄いショートカット関数" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [{ "type": "pr", "number": 77, "url": "https://github.com/sourcegraph/conc/pull/77" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

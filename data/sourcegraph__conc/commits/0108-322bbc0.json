@@ -1,0 +1,78 @@
+{
+  "seq": 108,
+  "sha": "322bbc07212b7c07b2902471bad8f3685cf6a70b",
+  "parents": [
+    "da1a381ab40b97b4736f02d22d1f45a25c95cd6a",
+    "e74ebb25b9c4bb74fba64c16726e2a58bbc81201"
+  ],
+  "author": {
+    "name": "Camden Cheek",
+    "email": "camden@ccheek.com",
+    "date": "2023-01-10T10:25:50-07:00"
+  },
+  "message": "Merge pull request #48 from sashamelentyev/numinput\n\nAdd number of input as var",
+  "pr": {
+    "number": 48,
+    "title": "Add number of input as var",
+    "body": "",
+    "url": "https://github.com/sourcegraph/conc/pull/48"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 4,
+    "deletions": 3
+  },
+  "files": [
+    {
+      "path": "iter/iter.go",
+      "status": "M",
+      "additions": 4,
+      "deletions": 3,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/iter/iter.go b/iter/iter.go\nindex 9900f04..38870e9 100644\n--- a/iter/iter.go\n+++ b/iter/iter.go\n@@ -27,16 +27,17 @@ func ForEach[T any](input []T, f func(*T)) {\n // index of the element to the callback.\n func ForEachIdx[T any](input []T, f func(int, *T)) {\n \tnumTasks := runtime.GOMAXPROCS(0)\n-\tif numTasks > len(input) {\n+\tnumInput := len(input)\n+\tif numTasks > numInput {\n \t\t// No more tasks than the number of input items.\n-\t\tnumTasks = len(input)\n+\t\tnumTasks = numInput\n \t}\n \n \tvar idx atomic.Int64\n \t// Create the task outside the loop to avoid extra closure allocations.\n \ttask := func() {\n \t\ti := int(idx.Add(1) - 1)\n-\t\tfor ; i < len(input); i = int(idx.Add(1) - 1) {\n+\t\tfor ; i < numInput; i = int(idx.Add(1) - 1) {\n \t\t\tf(i, &input[i])\n \t\t}\n \t}\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/go.yml",
+    ".golangci.yml",
+    "LICENSE",
+    "README.md",
+    "go.mod",
+    "go.sum",
+    "iter/iter.go",
+    "iter/iter_test.go",
+    "panics/panics.go",
+    "panics/panics_test.go",
+    "pool/context_pool.go",
+    "pool/context_pool_test.go",
+    "pool/error_pool.go",
+    "pool/error_pool_test.go",
+    "pool/pool.go",
+    "pool/pool_test.go",
+    "pool/result_context_pool.go",
+    "pool/result_context_pool_test.go",
+    "pool/result_error_pool.go",
+    "pool/result_error_pool_test.go",
+    "pool/result_pool.go",
+    "pool/result_pool_test.go",
+    "stream/stream.go",
+    "stream/stream_test.go",
+    "waitgroup.go",
+    "waitgroup_test.go"
+  ],
+  "explanation": {
+    "what": "iter.ForEachIdx 内で len(input) を毎回呼び出していた箇所を numInput という変数に一度だけ抽出し、以降の比較・ループ条件でその変数を使うように書き換えた。",
+    "why": "コミット件名「Add number of input as var」の通り、同じ値を返す len(input) の重複呼び出しを1つの変数にまとめる可読性・軽微な効率のための整理。PR本文は空だが、diff は変数抽出のみで挙動に変化はない。",
+    "highlights": [
+      { "file": "iter/iter.go", "note": "`len(input)` の3箇所の呼び出しを `numInput := len(input)` に集約している" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [{ "type": "pr", "number": 48, "url": "https://github.com/sourcegraph/conc/pull/48" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

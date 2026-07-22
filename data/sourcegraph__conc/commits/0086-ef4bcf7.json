@@ -1,0 +1,93 @@
+{
+  "seq": 86,
+  "sha": "ef4bcf771755c0b569d2ef5ca58a33a02c9e925f",
+  "parents": [
+    "73ebfbf689e4494da5122bc680472c30dd0fe96e",
+    "77ca0f933c6fa80bfae52696eb377ae6d68c15b0"
+  ],
+  "author": {
+    "name": "Camden Cheek",
+    "email": "camden@ccheek.com",
+    "date": "2023-01-05T10:09:43-07:00"
+  },
+  "message": "Merge pull request #14 from sourcegraph/pool/fix-benchmark-loop-vars\n\npool: fix loop variables in tests",
+  "pr": {
+    "number": 14,
+    "title": "pool: fix loop variables in tests",
+    "body": "This has been a long-standing discussion (https://github.com/golang/go/issues/20733, https://github.com/golang/go/discussions/56010) but today, variables in iterations are per-loop, not per-iteration, so you need to copy these values for them to be used inside `p.Go`.\r\n\r\nAdd a `t.Log` inside `p.Go` in the corresponding tests to see that previously, we're always comparing against the last value in the iteration, i.e. 100, and after the change the correct value is used:\r\n\r\n<table>\r\n<tr>\r\n<th>before - always the last value</th>\r\n<th>after - uses the correct value</th>\r\n</tr>\r\n<tr>\r\n<td>\r\n\r\n```\r\n=== CONT  TestContextPool/limit/100\r\n    context_pool_test.go:128: 100\r\n=== CONT  TestContextPool/limit/10\r\n    context_pool_test.go:128: 100\r\n=== CONT  TestContextPool/limit/100\r\n    context_pool_test.go:128: 100\r\n    context_pool_test.go:128: 100\r\n    context_pool_test.go:128: 100\r\n    context_pool_test.go:128: 100\r\n=== CONT  TestContextPool/limit/10\r\n    context_pool_test.go:128: 100\r\n=== CONT  TestContextPool/limit/1\r\n    context_pool_test.go:128: 100\r\n=== CONT  TestContextPool/limit/100\r\n    context_pool_test.go:128: 100\r\n=== CONT  TestContextPool/limit/10\r\n    context_pool_test.go:128: 100\r\n    context_pool_test.go:128: 100\r\n    context_pool_test.go:128: 100\r\n=== CONT  TestContextPool/limit/1\r\n    context_pool_test.go:128: 100\r\n=== CONT  TestContextPool/limit/10\r\n    context_pool_test.go:128: 100\r\n=== CONT  TestContextPool/limit/1\r\n    context_pool_test.go:128: 100\r\n=== CONT  TestContextPool/limit/10\r\n    context_pool_test.go:128: 100\r\n    context_pool_test.go:128: 100\r\n    context_pool_test.go:128: 100\r\n=== CONT  TestContextPool/limit/1\r\n    context_pool_test.go:128: 100\r\n=== CONT  TestContextPool/limit/10\r\n    context_pool_test.go:128: 100\r\n    context_pool_test.go:128: 100\r\n```\r\n</td>\r\n<td>\r\n\r\n```\r\n=== CONT  TestContextPool/limit/1\r\n    context_pool_test.go:130: 1\r\n=== CONT  TestContextPool/limit/100\r\n    context_pool_test.go:130: 100\r\n    context_pool_test.go:130: 100\r\n    context_pool_test.go:130: 100\r\n    context_pool_test.go:130: 100\r\n    context_pool_test.go:130: 100\r\n    context_pool_test.go:130: 100\r\n    context_pool_test.go:130: 100\r\n    context_pool_test.go:130: 100\r\n    context_pool_test.go:130: 100\r\n    context_pool_test.go:130: 100\r\n    context_pool_test.go:130: 100\r\n    context_pool_test.go:130: 100\r\n    context_pool_test.go:130: 100\r\n    context_pool_test.go:130: 100\r\n    context_pool_test.go:130: 100\r\n    context_pool_test.go:130: 100\r\n    context_pool_test.go:130: 100\r\n    context_pool_test.go:130: 100\r\n=== CONT  TestContextPool/limit/10\r\n    context_pool_test.go:130: 10\r\n=== CONT  TestContextPool/limit/100\r\n    context_pool_test.go:130: 100\r\n    context_pool_test.go:130: 100\r\n    context_pool_test.go:130: 100\r\n    context_pool_test.go:130: 100\r\n    context_pool_test.go:130: 100\r\n    context_pool_test.go:130: 100\r\n    context_pool_test.go:130: 100\r\n```\r\n</td>\r\n</tr>\r\n</table>",
+    "url": "https://github.com/sourcegraph/conc/pull/14"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 3,
+    "additions": 6,
+    "deletions": 0
+  },
+  "files": [
+    {
+      "path": "pool/context_pool_test.go",
+      "status": "M",
+      "additions": 2,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "pool/result_context_pool_test.go",
+      "status": "M",
+      "additions": 2,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "pool/result_error_pool_test.go",
+      "status": "M",
+      "additions": 2,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/pool/context_pool_test.go b/pool/context_pool_test.go\nindex 15addc2..b78156d 100644\n--- a/pool/context_pool_test.go\n+++ b/pool/context_pool_test.go\n@@ -118,6 +118,8 @@ func TestContextPool(t *testing.T) {\n \t\tt.Parallel()\n \t\tfor _, maxConcurrent := range []int{1, 10, 100} {\n \t\t\tt.Run(strconv.Itoa(maxConcurrent), func(t *testing.T) {\n+\t\t\t\tmaxConcurrent := maxConcurrent // copy\n+\n \t\t\t\tt.Parallel()\n \t\t\t\tp := New().WithContext(bgctx).WithMaxGoroutines(maxConcurrent)\n \ndiff --git a/pool/result_context_pool_test.go b/pool/result_context_pool_test.go\nindex e682c79..5312c0c 100644\n--- a/pool/result_context_pool_test.go\n+++ b/pool/result_context_pool_test.go\n@@ -107,6 +107,8 @@ func TestResultContextPool(t *testing.T) {\n \t\tt.Parallel()\n \t\tfor _, maxConcurrency := range []int{1, 10, 100} {\n \t\t\tt.Run(strconv.Itoa(maxConcurrency), func(t *testing.T) {\n+\t\t\t\tmaxConcurrency := maxConcurrency // copy\n+\n \t\t\t\tt.Parallel()\n \t\t\t\tctx := context.Background()\n \t\t\t\tg := NewWithResults[int]().WithContext(ctx).WithMaxGoroutines(maxConcurrency)\ndiff --git a/pool/result_error_pool_test.go b/pool/result_error_pool_test.go\nindex 456d4c7..4474ce5 100644\n--- a/pool/result_error_pool_test.go\n+++ b/pool/result_error_pool_test.go\n@@ -81,6 +81,8 @@ func TestResultErrorGroup(t *testing.T) {\n \tt.Run(\"limit\", func(t *testing.T) {\n \t\tfor _, maxConcurrency := range []int{1, 10, 100} {\n \t\t\tt.Run(strconv.Itoa(maxConcurrency), func(t *testing.T) {\n+\t\t\t\tmaxConcurrency := maxConcurrency // copy\n+\n \t\t\t\tt.Parallel()\n \t\t\t\tg := NewWithResults[int]().WithErrors().WithMaxGoroutines(maxConcurrency)\n \n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/go.yml",
+    "LICENSE",
+    "README.md",
+    "go.mod",
+    "go.sum",
+    "iter/iter.go",
+    "iter/iter_test.go",
+    "panic.go",
+    "panic_test.go",
+    "pool/context_pool.go",
+    "pool/context_pool_test.go",
+    "pool/error_pool.go",
+    "pool/error_pool_test.go",
+    "pool/pool.go",
+    "pool/pool_test.go",
+    "pool/result_context_pool.go",
+    "pool/result_context_pool_test.go",
+    "pool/result_error_pool.go",
+    "pool/result_error_pool_test.go",
+    "pool/result_pool.go",
+    "pool/result_pool_test.go",
+    "stream/stream.go",
+    "stream/stream_test.go",
+    "waitgroup.go",
+    "waitgroup_test.go"
+  ],
+  "explanation": {
+    "what": "外部PR #14をマージし、pool/context_pool_test.go・result_context_pool_test.go・result_error_pool_test.go の3つのテストで、`t.Run` の無名関数内で使うループ変数 `maxConcurrent`/`maxConcurrency` をループ内でシャドーイングしてコピーする1行を追加した。",
+    "why": "PR本文によれば、当時のGoのfor文はループ変数がイテレーションごとではなくループ全体で1つ共有される仕様であり、`t.Parallel()` を使う並列サブテストの中で goroutine が実行される時点では変数が既に最後の値(例では常に100)に書き換わっていたバグを修正するもの。PR本文には実際の修正前後のテストログ比較が添付されている。",
+    "highlights": [
+      { "file": "pool/context_pool_test.go", "note": "`maxConcurrent := maxConcurrent // copy` でループ変数をシャドーイングし、goroutine 起動前に値を固定" }
+    ],
+    "langNotes": [
+      { "topic": "loop variable capture", "note": "このコミット当時のGo(1.22より前)では for 文のループ変数はイテレーションごとに再生成されず、ループを通して1つの変数を使い回す。goroutine やクロージャの中で参照すると、実行タイミングによっては意図した値ではなく最後のイテレーションの値を見てしまう「ループ変数キャプチャ」の罠として知られ、`v := v` のようなシャドーイングで各イテレーションにコピーを作るのが定番の回避策だった。" }
+    ],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [{ "type": "pr", "number": 14, "url": "https://github.com/sourcegraph/conc/pull/14" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}

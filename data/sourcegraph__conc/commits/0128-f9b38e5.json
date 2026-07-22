@@ -1,0 +1,84 @@
+{
+  "seq": 128,
+  "sha": "f9b38e58d16d45f2bdf1685de1f439ba14f9e0a9",
+  "parents": [
+    "daaaa39c877d8e1556e5acb612f61a77320bca1f",
+    "3e983047010a94a196896394e3389ac40cd47947"
+  ],
+  "author": {
+    "name": "Robert Lin",
+    "email": "robertlin1@gmail.com",
+    "date": "2023-02-16T12:48:37-08:00"
+  },
+  "message": "Merge pull request #91 from sourcegraph/context-pool-cancel\n\npool: ensure ContextPool.cancel() is called",
+  "pr": {
+    "number": 91,
+    "title": "pool: ensure ContextPool.cancel() is called",
+    "body": "Now that we [no longer cancel-on-error by default](#23), it's possible that a `ContextPool` can be consumed without ever cancelling its context, which causes a goroutine leakage - this change ensures that we call `p.cancel()` (which can safely be called multiple times) on `p.Wait()`.\r\n\r\nAlternatively, we could also only configure a cancellable context when the user calls `p.WithCancelOnError()`, but the discussion over at https://github.com/sourcegraph/conc/issues/86#issuecomment-1422595564 indicates that there is a strong desire for the ability to cancel a `ContextPool` without providing an additional context, so I decided not to go this route for now.\r\n\r\nNo additional tests because there should be no behaviour changes/additions.",
+    "url": "https://github.com/sourcegraph/conc/pull/91"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 2,
+    "deletions": 0
+  },
+  "files": [
+    {
+      "path": "pool/context_pool.go",
+      "status": "M",
+      "additions": 2,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/pool/context_pool.go b/pool/context_pool.go\nindex c1be3b7..6c4cb32 100644\n--- a/pool/context_pool.go\n+++ b/pool/context_pool.go\n@@ -40,6 +40,8 @@ func (p *ContextPool) Go(f func(ctx context.Context) error) {\n // Wait cleans up all spawned goroutines, propagates any panics, and\n // returns an error if any of the tasks errored.\n func (p *ContextPool) Wait() error {\n+\t// Make sure we call cancel after pool is done to avoid memory leakage.\n+\tdefer p.cancel()\n \treturn p.errorPool.Wait()\n }\n \n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/go.yml",
+    ".golangci.yml",
+    "LICENSE",
+    "README.md",
+    "go.mod",
+    "go.sum",
+    "iter/iter.go",
+    "iter/iter_test.go",
+    "iter/map.go",
+    "iter/map_test.go",
+    "panics/panics.go",
+    "panics/panics_test.go",
+    "panics/try.go",
+    "panics/try_test.go",
+    "pool/context_pool.go",
+    "pool/context_pool_test.go",
+    "pool/error_pool.go",
+    "pool/error_pool_test.go",
+    "pool/pool.go",
+    "pool/pool_test.go",
+    "pool/result_context_pool.go",
+    "pool/result_context_pool_test.go",
+    "pool/result_error_pool.go",
+    "pool/result_error_pool_test.go",
+    "pool/result_pool.go",
+    "pool/result_pool_test.go",
+    "stream/stream.go",
+    "stream/stream_test.go",
+    "waitgroup.go",
+    "waitgroup_test.go"
+  ],
+  "explanation": {
+    "what": "ContextPool.Wait() の先頭で defer p.cancel() を呼ぶようにした。既存の p.cancel は複数回呼んでも安全な実装になっている。",
+    "why": "PR本文にある通り、以前のコミット(#23)でエラー発生時のデフォルトのcancel-on-error動作をやめたため、ユーザーがWithCancelOnErrorを設定しない限りcontextが一度もキャンセルされないままpoolが消費されるケースが生まれ、goroutineリーク(内部で保持しているcontextのcancel関数由来のリソースが解放されない)につながる可能性があった。Wait()完了時に必ずcancelを呼ぶことでこれを防いだ。issue #86でのユーザーからの要望も踏まえ、WithCancelOnErrorを必須にする案ではなくWait側で保証する方式を選んでいる。",
+    "highlights": [
+      { "file": "pool/context_pool.go", "note": "defer p.cancel() の1行追加がこのコミットの全て。cancelは複数回呼んでも安全という前提に依存している" }
+    ],
+    "langNotes": [
+      { "topic": "context.CancelFunc の後始末", "note": "Goのcontext.WithCancelが返すcancel関数は、そのcontextに関連するリソースを解放するために使い終わったら必ず呼ぶ約束になっている。呼び忘れるとcontextツリーがガベージコレクトされるまで残り続ける(vetの `lostcancel` が典型的にこれを検出する)。deferで呼ぶのが定石。" }
+    ],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [{ "type": "pr", "number": 91, "url": "https://github.com/sourcegraph/conc/pull/91" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T00:00:00Z"
+  }
+}
