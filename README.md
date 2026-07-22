@@ -5,18 +5,14 @@ OSS のコミット履歴を最初から順に、**差分 + LLM による意図�
 ## クイックスタート
 
 ```bash
-# 0. 前提: Node 20+ / git / gh(認証済み)
-gh auth status
+# 前提: Node 20+ / git / gh(認証済み)。コマンド一覧は `make` で表示
+make dev                            # 閲覧開始(初回は自動で npm install)
 
-# 1. 題材 OSS を機械抽出(diff・tree・PR/issue 紐付け → data/ に JSON)
-node generator/extract.mjs --repo nakabonne/ali
-node generator/validate.mjs --repo nakabonne/ali
-
-# 2. 章立てと解説の生成(Claude Code 内で)
-#    → skill「retrace-generate」を実行。新規追加は「retrace-add-repo」で 1〜3 を一括実行
-
-# 3. 閲覧
-cd viewer && npm install && npm run dev
+# 新しい題材 OSS を足すとき
+make extract REPO=<owner>/<repo>    # 1. 機械抽出(diff・tree・PR/issue 紐付け)
+make validate REPO=<owner>/<repo>   # 2. スキーマ検証
+#                                     3. 章立て・解説生成は Claude Code 内で
+#                                        skill「retrace-add-repo」が 1〜3 を一括実行
 ```
 
 ## 構成

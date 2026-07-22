@@ -17,13 +17,14 @@
 ## セットアップ・実行
 
 ```bash
-node generator/extract.mjs --repo <owner>/<repo>   # 機械抽出(再開可能・冪等)
-node generator/validate.mjs --repo <owner>/<repo>  # スキーマ検証+統計
-node --test generator/lib.test.mjs                 # generator のテスト
-cd viewer && npm install && npm run dev            # ビューア(dev で data/ を配信)
-npm run build                                      # tsc -b + vite build(viewer/ 内で)
-node viewer/scripts/make-fixture.mjs               # 開発用 fixture 生成
+make dev                            # ビューア起動(初回は自動 npm install。data/ も配信)
+make extract REPO=<owner>/<repo>    # 機械抽出(再開可能・冪等)
+make validate REPO=<owner>/<repo>   # スキーマ検証+統計
+make test                           # generator のユニットテスト
+make build / make fixture           # ビューアビルド / fixture 生成
 ```
+
+(実体は Makefile 参照。生スクリプトは generator/*.mjs と viewer/ の npm scripts)
 
 前提: `gh auth status` が通っていること(PR/issue 取得に使用)。
 
