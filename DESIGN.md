@@ -34,7 +34,7 @@ flowchart LR
 - **generator/** … 決定的な機械抽出。git と `gh` CLI だけで動く Node(ESM)スクリプト群。LLM は使わない
 - **.claude/skills/retrace-generate/** … Claude Code スキル。抽出済み JSON に章立てと解説を追記する(ここだけ LLM)
 - **viewer/** … 純粋な静的 SPA。`data/` の JSON を読むだけ。サーバーロジックなし
-- **data/** … リポジトリごとの生成データ(gitignore 対象。再生成可能なため)
+- **data/** … リポジトリごとの生成データ(**git 管理**。機械抽出は再生成可能だが、解説は生成にコストがかかるため保全する。2026-07-22 変更)
 
 ## データスキーマ
 

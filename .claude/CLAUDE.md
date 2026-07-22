@@ -9,7 +9,7 @@
 - スタック: generator = Node 20+ 標準モジュールのみ(npm 依存なし)/ viewer = Vite + React + TypeScript(npm)
 - 構成:
   - `generator/` — 機械抽出(clone→mainline→diff/tree/PR 紐付け→JSON)。**LLM は使わない**
-  - `data/<owner>__<repo>/` — 生成データ(git 管理外・再生成可能)
+  - `data/<owner>__<repo>/` — 生成データ(**git 管理**。解説の生成コスト保全のため。2026-07-22〜)
   - `.claude/skills/` — LLM を使うのはここだけ(章立て・解説生成)
   - `viewer/` — 静的 SPA。`data/` を fetch するだけ。進捗は localStorage
 - **設計・データスキーマの正は `DESIGN.md`**。迷ったら DESIGN.md に従い、矛盾を見つけたら DESIGN.md 側を直してから実装を追従させる
@@ -53,7 +53,7 @@ node viewer/scripts/make-fixture.mjs               # 開発用 fixture 生成
 ## 注意・ハマりどころ
 
 - viewer の本番ビルド(`dist/`)は `data/` を含まない。閲覧は dev/preview サーバ前提(vite.config.ts の serveData ミドルウェアが repo ルート `data/` を配信)
-- `data/` と `.cache/` は git 管理外。「コミットに現れない状態」がある前提で作業する(例: 抽出済みか否かは `data/` を直接確認)
+- `.cache/` は git 管理外。`data/` は git 管理(解説生成後は忘れずコミットする)
 - mainline は first-parent。コミット総数(GitHub API)と mainline 件数は一致しない(ali: 280 vs 202)
 - 新規 agent / skill は原則次回セッションから有効(skill は同一セッション内で認識される場合もある)
 - `.claude/commands/` に README や説明用 .md を置かない — **全 `*.md` がスラッシュコマンドとして登録される**(/README 事故の実績あり)。説明は skills/README.md か本ファイルに書く

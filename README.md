@@ -24,6 +24,6 @@ cd viewer && npm install && npm run dev
 | パス | 役割 |
 |---|---|
 | `generator/` | 機械抽出(Node 標準のみ・LLM 不使用・再開可能) |
-| `data/<owner>__<repo>/` | 生成データ(git 管理外・再生成可能) |
+| `data/<owner>__<repo>/` | 生成データ(git 管理。解説はトークンコストがかかるため保全) |
 | `.claude/` | ハーネス(skills / agents / rules / hooks)。LLM を使う工程はここ経由 |
 | `viewer/` | Vite + React の静的 SPA。既読・再開位置は localStorage |
