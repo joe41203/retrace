@@ -1,0 +1,51 @@
+{
+  "seq": 7,
+  "sha": "57b25daeaffb4f533d9edbf5527d159da66ffc85",
+  "parents": [
+    "5ab1a759c946522fd6934e1b45351efeae23f100"
+  ],
+  "author": {
+    "name": "nakabonne",
+    "email": "ryo@nakao.dev",
+    "date": "2020-09-12T20:49:33+09:00"
+  },
+  "message": "Make it possible to stop attacking",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 8,
+    "deletions": 8
+  },
+  "files": [
+    {
+      "path": "attacker/attacker.go",
+      "status": "M",
+      "additions": 7,
+      "deletions": 7,
+      "binary": false
+    },
+    {
+      "path": "gui/widgets.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/attacker/attacker.go b/attacker/attacker.go\nindex 561d512..e5512e7 100644\n--- a/attacker/attacker.go\n+++ b/attacker/attacker.go\n@@ -36,7 +36,6 @@ type Result struct {\n // Results are sent to the given channel as soon as they arrive.\n // When the attack is over, it gives back final statistics.\n func Attack(ctx context.Context, target string, resCh chan *Result, opts Options) *Metrics {\n-\tpp.Println(\"start attacking\")\n \tif opts.Rate == 0 {\n \t\topts.Rate = defaultRate\n \t}\n@@ -59,12 +58,13 @@ func Attack(ctx context.Context, target string, resCh chan *Result, opts Options\n \tvar metrics vegeta.Metrics\n \n \tfor res := range attacker.Attack(targeter, rate, opts.Duration, \"main\") {\n-\t\t// TODO: Stop if ctx is expired.\n-\t\t/*if <-ctx.Done() {\n-\t\t\treturn newMetrics(&metrics)\n-\t\t}*/\n-\t\tresCh <- &Result{Latency: res.Latency}\n-\t\tmetrics.Add(res)\n+\t\tselect {\n+\t\tcase <-ctx.Done():\n+\t\t\tattacker.Stop()\n+\t\tdefault:\n+\t\t\tresCh <- &Result{Latency: res.Latency}\n+\t\t\tmetrics.Add(res)\n+\t\t}\n \t}\n \tmetrics.Close()\n \tpp.Println(\"vegeta metrics\", metrics)\ndiff --git a/gui/widgets.go b/gui/widgets.go\nindex 6112d36..534acbf 100644\n--- a/gui/widgets.go\n+++ b/gui/widgets.go\n@@ -72,7 +72,7 @@ func redrawChart(ctx context.Context, lineChart *linechart.LineChart, resultCh c\n \t\t\tlineChart.Series(\"plot\", values,\n \t\t\t\tlinechart.SeriesCellOpts(cell.FgColor(cell.ColorNumber(87))),\n \t\t\t\tlinechart.SeriesXLabels(map[int]string{\n-\t\t\t\t\t0: \"zero\",\n+\t\t\t\t\t0: \"num\",\n \t\t\t\t}),\n \t\t\t)\n \t\t}\n",
+  "diffTruncated": false,
+  "tree": [
+    ".gitignore",
+    ".golangci.yml",
+    "LICENSE",
+    "README.md",
+    "attacker/attacker.go",
+    "go.mod",
+    "go.sum",
+    "gui/gui.go",
+    "gui/widgets.go",
+    "main.go"
+  ],
+  "explanation": null
+}

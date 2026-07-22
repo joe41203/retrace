@@ -1,0 +1,55 @@
+{
+  "seq": 20,
+  "sha": "28b8a34c40e52a2e6285efbb631a4f5d53f3287a",
+  "parents": [
+    "4a23fdd1a706d101a944f7a281d4de53e3465307"
+  ],
+  "author": {
+    "name": "nakabonne",
+    "email": "ryo@nakao.dev",
+    "date": "2020-09-14T22:02:43+09:00"
+  },
+  "message": "Add duration widgets",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 42,
+    "deletions": 16
+  },
+  "files": [
+    {
+      "path": "gui/gui.go",
+      "status": "M",
+      "additions": 30,
+      "deletions": 6,
+      "binary": false
+    },
+    {
+      "path": "gui/widgets.go",
+      "status": "M",
+      "additions": 12,
+      "deletions": 10,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/gui/gui.go b/gui/gui.go\nindex 62b1262..dccdb79 100644\n--- a/gui/gui.go\n+++ b/gui/gui.go\n@@ -4,6 +4,7 @@ import (\n \t\"context\"\n \t\"fmt\"\n \t\"net/url\"\n+\t\"strconv\"\n \t\"time\"\n \n \t\"github.com/mum4k/termdash\"\n@@ -68,15 +69,31 @@ func keybinds(ctx context.Context, cancel context.CancelFunc, dr *drawer) func(*\n \t\t\t\treturn\n \t\t\t}\n \t\t\tvar (\n-\t\t\t\trate        = 10\n-\t\t\t\tduration, _ = time.ParseDuration(\"2s\")\n-\t\t\t\trequestNum  = rate * int(duration/time.Second)\n-\t\t\t\ttarget      = dr.widgets.urlInput.Read()\n+\t\t\t\ttarget   string\n+\t\t\t\trate     int\n+\t\t\t\tduration time.Duration\n+\t\t\t\terr      error\n \t\t\t)\n+\t\t\ttarget = dr.widgets.urlInput.Read()\n \t\t\tif _, err := url.ParseRequestURI(target); err != nil {\n-\t\t\t\tdr.reportCh <- fmt.Sprintf(\"bad URL: %v\", err)\n+\t\t\t\tdr.reportCh <- fmt.Sprintf(\"Bad URL: %v\", err)\n \t\t\t\treturn\n \t\t\t}\n+\t\t\tif s := dr.widgets.rateLimitInput.Read(); s != \"\" {\n+\t\t\t\trate, err = strconv.Atoi(s)\n+\t\t\t\tif err != nil {\n+\t\t\t\t\tdr.reportCh <- fmt.Sprintf(\"Given rate limit %q isn't integer: %v\", s, err)\n+\t\t\t\t\treturn\n+\t\t\t\t}\n+\t\t\t}\n+\t\t\tif s := dr.widgets.durationInput.Read(); s != \"\" {\n+\t\t\t\tduration, err = time.ParseDuration(s)\n+\t\t\t\tif err != nil {\n+\t\t\t\t\tdr.reportCh <- fmt.Sprintf(\"Unparseable duration %q: %v\", s, err)\n+\t\t\t\t\treturn\n+\t\t\t\t}\n+\t\t\t}\n+\t\t\trequestNum := rate * int(duration/time.Second)\n \t\t\t// To pre-allocate, run redrawChart on a per-attack basis.\n \t\t\tgo dr.redrawChart(ctx, requestNum)\n \t\t\tgo func(ctx context.Context, d *drawer, t string, r int, du time.Duration) {\n@@ -93,7 +110,14 @@ func gridLayout(w *widgets) ([]container.Option, error) {\n \t\tgrid.ColWidthPerc(99, grid.Widget(w.latencyChart, container.Border(linestyle.Light), container.BorderTitle(\"Latency (ms)\"))),\n \t)\n \traw2 := grid.RowHeightPerc(36,\n-\t\tgrid.ColWidthPerc(50, grid.Widget(w.urlInput, container.Border(linestyle.Light), container.BorderTitle(\"Input\"))),\n+\t\t//grid.ColWidthPerc(50, grid.Widget(w.urlInput, container.Border(linestyle.Light), container.BorderTitle(\"Input\"))),\n+\t\tgrid.ColWidthPerc(50,\n+\t\t\tgrid.RowHeightPerc(20, grid.Widget(w.urlInput, container.Border(linestyle.None))),\n+\t\t\tgrid.RowHeightPerc(20,\n+\t\t\t\tgrid.ColWidthPerc(50, grid.Widget(w.rateLimitInput, container.Border(linestyle.None))),\n+\t\t\t\tgrid.ColWidthPerc(49, grid.Widget(w.durationInput, container.Border(linestyle.None))),\n+\t\t\t),\n+\t\t),\n \t\tgrid.ColWidthPerc(49, grid.Widget(w.reportText, container.Border(linestyle.Light), container.BorderTitle(\"Report\"))),\n \t)\n \traw3 := grid.RowHeightFixed(1,\ndiff --git a/gui/widgets.go b/gui/widgets.go\nindex 36dc4c4..28b45fa 100644\n--- a/gui/widgets.go\n+++ b/gui/widgets.go\n@@ -3,7 +3,6 @@ package gui\n import (\n \t\"time\"\n \n-\t\"github.com/k0kubun/pp\"\n \t\"github.com/mum4k/termdash/cell\"\n \t\"github.com/mum4k/termdash/keyboard\"\n \t\"github.com/mum4k/termdash/widgets/button\"\n@@ -18,7 +17,6 @@ const (\n )\n \n type widgets struct {\n-\tattackButton   *button.Button\n \turlInput       *textinput.TextInput\n \trateLimitInput *textinput.TextInput\n \tdurationInput  *textinput.TextInput\n@@ -40,24 +38,28 @@ func newWidgets() (*widgets, error) {\n \tif err != nil {\n \t\treturn nil, err\n \t}\n-\turlInput, err := newTextInput(\"Target URL: \", \"target URL\")\n+\turlInput, err := newTextInput(\"Target URL: \", \"\", 100)\n \tif err != nil {\n \t\treturn nil, err\n \t}\n-\trateLimitInput, err := newTextInput(\"Rate limit: \", \"number of requests per second (default 50)\")\n+\trateLimitInput, err := newTextInput(\"Rate limit: \", \"50\", 50)\n \tif err != nil {\n \t\treturn nil, err\n \t}\n-\tattackButton, err := newButton(\"Attack\", func() error {\n+\tdurationInput, err := newTextInput(\"Duration: \", \"30s\", 50)\n+\tif err != nil {\n+\t\treturn nil, err\n+\t}\n+\t/*attackButton, err := newButton(\"Attack\", func() error {\n \t\ttarget := urlInput.Read()\n \t\tpp.Println(target)\n \t\t// TODO: Call Attack.\n \t\treturn nil\n-\t})\n+\t})*/\n \treturn &widgets{\n-\t\tattackButton:   attackButton,\n \t\turlInput:       urlInput,\n \t\trateLimitInput: rateLimitInput,\n+\t\tdurationInput:  durationInput,\n \t\tlatencyChart:   latencyChart,\n \t\treportText:     reportText,\n \t\tnavi:           navi,\n@@ -90,10 +92,10 @@ func newButton(text string, onSubmit func() error) (*button.Button, error) {\n \t)\n }\n \n-func newTextInput(label, placeHolder string) (*textinput.TextInput, error) {\n+func newTextInput(label, placeHolder string, cells int) (*textinput.TextInput, error) {\n \treturn textinput.New(\n-\t\ttextinput.Label(label, cell.FgColor(cell.ColorBlue)),\n-\t\ttextinput.MaxWidthCells(99),\n+\t\ttextinput.Label(label, cell.FgColor(cell.ColorWhite)),\n+\t\ttextinput.MaxWidthCells(cells),\n \t\ttextinput.PlaceHolder(placeHolder),\n \t)\n }\n",
+  "diffTruncated": false,
+  "tree": [
+    ".gitignore",
+    ".golangci.yml",
+    "LICENSE",
+    "README.md",
+    "attacker/attacker.go",
+    "attacker/attacker_test.go",
+    "attacker/fake_attacker.go",
+    "attacker/metrics.go",
+    "go.mod",
+    "go.sum",
+    "gui/drawer.go",
+    "gui/gui.go",
+    "gui/widgets.go",
+    "main.go"
+  ],
+  "explanation": null
+}

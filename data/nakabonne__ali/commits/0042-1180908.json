@@ -1,0 +1,72 @@
+{
+  "seq": 42,
+  "sha": "1180908abd9c2fbc50a33ea1d4392c709a6606ae",
+  "parents": [
+    "a1b616d518e178d120f7554faea921d1465a735c"
+  ],
+  "author": {
+    "name": "nakabonne",
+    "email": "ryo@nakao.dev",
+    "date": "2020-09-16T22:58:48+09:00"
+  },
+  "message": "Enable to install with docker",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 3,
+    "additions": 33,
+    "deletions": 0
+  },
+  "files": [
+    {
+      "path": ".goreleaser.yml",
+      "status": "M",
+      "additions": 9,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "Dockerfile",
+      "status": "A",
+      "additions": 4,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "README.md",
+      "status": "M",
+      "additions": 20,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/.goreleaser.yml b/.goreleaser.yml\nindex 507a8f6..e8cd4f3 100644\n--- a/.goreleaser.yml\n+++ b/.goreleaser.yml\n@@ -46,3 +46,12 @@ brews:\n       name: homebrew-ali\n     homepage: 'https://github.com/nakabonne/ali'\n     description: 'Generate HTTP load and plot the results in real-time'\n+\n+dockers:\n+  - dockerfile: Dockerfile\n+    binaries:\n+      - ali\n+    image_templates:\n+      - \"nakabonne/ali:latest\"\n+      - \"nakabonne/ali:{{ .Tag }}\"\n+      - \"nakabonne/ali:v{{ .Major }}.{{ .Minor }}\"\ndiff --git a/Dockerfile b/Dockerfile\nnew file mode 100644\nindex 0000000..9da820f\n--- /dev/null\n+++ b/Dockerfile\n@@ -0,0 +1,4 @@\n+FROM alpine\n+\n+COPY ali /usr/bin/\n+CMD [\"ali\"]\ndiff --git a/README.md b/README.md\nindex af13efe..4db758d 100644\n--- a/README.md\n+++ b/README.md\n@@ -1,5 +1,7 @@\n # ali\n \n+[![Go Doc](https://img.shields.io/badge/godoc-reference-blue.svg?style=flat-square)](https://godoc.org/github.com/nakabonne/ali)\n+\n <div align=\"center\">\n \n Another load testing tool, inspired by [vegeta](https://github.com/tsenart/vegeta) and [jplot](https://github.com/rs/jplot).\n@@ -15,6 +17,24 @@ With it, real-time analysis can be performed on the terminal.\n \n Executables are available through the [releases page](https://github.com/nakabonne/ali/releases).\n \n+**With Homebrew**\n+\n+```bash\n+brew install nakabonne/ali/ali\n+```\n+\n+**With Go**\n+\n+```bash\n+go get github.com/nakabonne/ali\n+```\n+\n+**With Docker**\n+\n+```bash\n+docker run --rm -it nakabonne/ali ali\n+```\n+\n ## Usage\n ### Quickstart\n Give the target URL and press Enter, then the attack will be launched with default options.\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/release.yml",
+    ".github/workflows/test.yml",
+    ".gitignore",
+    ".golangci.yml",
+    ".goreleaser.yml",
+    "Dockerfile",
+    "LICENSE",
+    "README.md",
+    "attacker/attacker.go",
+    "attacker/attacker_test.go",
+    "attacker/fake_attacker.go",
+    "attacker/metrics.go",
+    "go.mod",
+    "go.sum",
+    "gui/drawer.go",
+    "gui/gui.go",
+    "gui/keybinds.go",
+    "gui/keybinds_test.go",
+    "gui/widgets.go",
+    "images/demo.gif",
+    "images/mouse-support.gif",
+    "images/progress.gif",
+    "images/real-time.gif",
+    "main.go"
+  ],
+  "explanation": null
+}

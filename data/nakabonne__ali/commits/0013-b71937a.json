@@ -1,0 +1,68 @@
+{
+  "seq": 13,
+  "sha": "b71937a74ded2ce8fcb87126886037e01e56ae03",
+  "parents": [
+    "b5f5c777a489fb95a8b3916cf43a5fb4403851be"
+  ],
+  "author": {
+    "name": "nakabonne",
+    "email": "ryo@nakao.dev",
+    "date": "2020-09-13T12:01:23+09:00"
+  },
+  "message": "Add drawer",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 4,
+    "additions": 80,
+    "deletions": 35
+  },
+  "files": [
+    {
+      "path": "attacker/attacker.go",
+      "status": "M",
+      "additions": 4,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "gui/drawer.go",
+      "status": "A",
+      "additions": 49,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "gui/gui.go",
+      "status": "M",
+      "additions": 16,
+      "deletions": 10,
+      "binary": false
+    },
+    {
+      "path": "gui/widgets.go",
+      "status": "M",
+      "additions": 11,
+      "deletions": 25,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/attacker/attacker.go b/attacker/attacker.go\nindex 0adcd50..9908968 100644\n--- a/attacker/attacker.go\n+++ b/attacker/attacker.go\n@@ -112,3 +112,7 @@ func newMetrics(m *vegeta.Metrics) *Metrics {\n \t\t},\n \t}\n }\n+\n+func (m *Metrics) String() string {\n+\treturn \"foo\"\n+}\ndiff --git a/gui/drawer.go b/gui/drawer.go\nnew file mode 100644\nindex 0000000..970b3b7\n--- /dev/null\n+++ b/gui/drawer.go\n@@ -0,0 +1,49 @@\n+package gui\n+\n+import (\n+\t\"context\"\n+\t\"time\"\n+\n+\t\"github.com/mum4k/termdash/widgets/text\"\n+\n+\t\"github.com/mum4k/termdash/cell\"\n+\t\"github.com/mum4k/termdash/widgets/linechart\"\n+\n+\t\"github.com/nakabonne/ali/attacker\"\n+)\n+\n+type drawer struct {\n+\twidgets  *widgets\n+\tchartsCh chan *attacker.Result\n+\treportCh chan string\n+}\n+\n+// TODO: In the future, multiple charts including bytes-in/out etc will be re-drawn.\n+func (d *drawer) redrawChart(ctx context.Context, maxSize int) {\n+\tvalues := make([]float64, 0, maxSize)\n+\tfor {\n+\t\tselect {\n+\t\tcase <-ctx.Done():\n+\t\t\treturn\n+\t\tcase res := <-d.chartsCh:\n+\t\t\tvalues = append(values, float64(res.Latency/time.Millisecond))\n+\t\t\td.widgets.latencyChart.Series(\"latency\", values,\n+\t\t\t\tlinechart.SeriesCellOpts(cell.FgColor(cell.ColorNumber(87))),\n+\t\t\t\tlinechart.SeriesXLabels(map[int]string{\n+\t\t\t\t\t0: \"req\",\n+\t\t\t\t}),\n+\t\t\t)\n+\t\t}\n+\t}\n+}\n+\n+func (d *drawer) redrawReport(ctx context.Context) {\n+\tfor {\n+\t\tselect {\n+\t\tcase <-ctx.Done():\n+\t\t\treturn\n+\t\tcase report := <-d.reportCh:\n+\t\t\td.widgets.reportText.Write(report, text.WriteReplace())\n+\t\t}\n+\t}\n+}\ndiff --git a/gui/gui.go b/gui/gui.go\nindex dc99679..3445ca0 100644\n--- a/gui/gui.go\n+++ b/gui/gui.go\n@@ -5,7 +5,6 @@ import (\n \t\"fmt\"\n \t\"time\"\n \n-\t\"github.com/k0kubun/pp\"\n \t\"github.com/mum4k/termdash\"\n \t\"github.com/mum4k/termdash/container\"\n \t\"github.com/mum4k/termdash/container/grid\"\n@@ -46,21 +45,28 @@ func Run() error {\n \t\treturn fmt.Errorf(\"failed to update container: %w\", err)\n \t}\n \n+\td := &drawer{\n+\t\twidgets:  w,\n+\t\tchartsCh: make(chan *attacker.Result),\n+\t\treportCh: make(chan string),\n+\t}\n+\tgo d.redrawReport(ctx)\n+\n \tkeybinds := func(k *terminalapi.Keyboard) {\n \t\tswitch k.Key {\n \t\tcase keyboard.KeyEsc, keyboard.KeyCtrlC:\n \t\t\tcancel()\n \t\tcase keyboard.KeySpace:\n-\t\t\tresultCh := make(chan *attacker.Result)\n \t\t\t// TODO: Enalble to poplulate from input\n \t\t\trate := 50\n-\t\t\tduration, _ := time.ParseDuration(\"10s\")\n+\t\t\tduration, _ := time.ParseDuration(\"2s\")\n \t\t\trequestNum := rate * int(duration/time.Second)\n-\t\t\tgo func() {\n-\t\t\t\tmetrics := attacker.Attack(ctx, \"http://34.84.111.163:9898\", resultCh, attacker.Options{Rate: rate, Duration: duration})\n-\t\t\t\tpp.Println(metrics)\n-\t\t\t}()\n-\t\t\tgo redrawChart(ctx, w.latencyChart, resultCh, requestNum)\n+\t\t\tgo d.redrawChart(ctx, requestNum)\n+\t\t\tgo func(ctx context.Context, d *drawer, r int, du time.Duration) {\n+\t\t\t\tmetrics := attacker.Attack(ctx, \"http://34.84.111.163:9898\", d.chartsCh, attacker.Options{Rate: r, Duration: du})\n+\t\t\t\t//close(ch) TODO: Gracefully stop redrawChart goroutine.\n+\t\t\t\td.reportCh <- metrics.String()\n+\t\t\t}(ctx, d, rate, duration)\n \t\t}\n \t}\n \n@@ -71,11 +77,11 @@ func gridLayout(w *widgets) ([]container.Option, error) {\n \traw1 := grid.RowHeightPerc(50,\n \t\tgrid.ColWidthPerc(99, grid.Widget(w.latencyChart, container.Border(linestyle.Light), container.BorderTitle(\"Latency\"))),\n \t)\n-\traw2 := grid.RowHeightPerc(47,\n+\traw2 := grid.RowHeightPerc(45,\n \t\tgrid.ColWidthPerc(50, grid.Widget(w.urlInput, container.Border(linestyle.Light), container.BorderTitle(\"Input\"))),\n \t\tgrid.ColWidthPerc(49, grid.Widget(w.reportText, container.Border(linestyle.Light), container.BorderTitle(\"Report\"))),\n \t)\n-\traw3 := grid.RowHeightPerc(2,\n+\traw3 := grid.RowHeightPerc(4,\n \t\tgrid.ColWidthPerc(99, grid.Widget(w.navi, container.Border(linestyle.Light))),\n \t)\n \ndiff --git a/gui/widgets.go b/gui/widgets.go\nindex ed61d99..1037fe3 100644\n--- a/gui/widgets.go\n+++ b/gui/widgets.go\n@@ -1,7 +1,6 @@\n package gui\n \n import (\n-\t\"context\"\n \t\"time\"\n \n \t\"github.com/k0kubun/pp\"\n@@ -9,8 +8,6 @@ import (\n \t\"github.com/mum4k/termdash/widgets/linechart\"\n \t\"github.com/mum4k/termdash/widgets/text\"\n \t\"github.com/mum4k/termdash/widgets/textinput\"\n-\n-\t\"github.com/nakabonne/ali/attacker\"\n )\n \n // redrawInterval is how often termdash redraws the screen.\n@@ -30,11 +27,11 @@ func newWidgets() (*widgets, error) {\n \tif err != nil {\n \t\treturn nil, err\n \t}\n-\trt, err := newRollText()\n+\trt, err := newRollText(\"Give the target URL and press Space, then the attack will be launched.\")\n \tif err != nil {\n \t\treturn nil, err\n \t}\n-\twt, err := newWrapText(\"Ctrl-c: quit, Space: attack\")\n+\twt, err := newRollText(\"Ctrl-c: quit, Space: attack\")\n \tif err != nil {\n \t\treturn nil, err\n \t}\n@@ -59,8 +56,15 @@ func newLineChart() (*linechart.LineChart, error) {\n \t)\n }\n \n-func newRollText() (*text.Text, error) {\n-\treturn text.New(text.RollContent())\n+func newRollText(s string) (*text.Text, error) {\n+\tt, err := text.New(text.RollContent())\n+\tif err != nil {\n+\t\treturn nil, err\n+\t}\n+\tif err := t.Write(s); err != nil {\n+\t\treturn nil, err\n+\t}\n+\treturn t, nil\n }\n \n func newWrapText(s string) (*text.Text, error) {\n@@ -90,21 +94,3 @@ func newTextInput() (*textinput.TextInput, error) {\n \t}\n \treturn input, err\n }\n-\n-func redrawChart(ctx context.Context, latency *linechart.LineChart, resultCh chan *attacker.Result, maxSize int) {\n-\tvalues := make([]float64, 0, maxSize)\n-\tfor {\n-\t\tselect {\n-\t\tcase <-ctx.Done():\n-\t\t\treturn\n-\t\tcase res := <-resultCh:\n-\t\t\tvalues = append(values, float64(res.Latency/time.Millisecond))\n-\t\t\tlatency.Series(\"latency\", values,\n-\t\t\t\tlinechart.SeriesCellOpts(cell.FgColor(cell.ColorNumber(87))),\n-\t\t\t\tlinechart.SeriesXLabels(map[int]string{\n-\t\t\t\t\t0: \"req\",\n-\t\t\t\t}),\n-\t\t\t)\n-\t\t}\n-\t}\n-}\n",
+  "diffTruncated": false,
+  "tree": [
+    ".gitignore",
+    ".golangci.yml",
+    "LICENSE",
+    "README.md",
+    "attacker/attacker.go",
+    "attacker/attacker_test.go",
+    "attacker/fake_attacker.go",
+    "go.mod",
+    "go.sum",
+    "gui/drawer.go",
+    "gui/gui.go",
+    "gui/widgets.go",
+    "main.go"
+  ],
+  "explanation": null
+}

@@ -1,0 +1,64 @@
+{
+  "seq": 61,
+  "sha": "3f4b3cbdd4f5b1450818c914e46b488286e908a3",
+  "parents": [
+    "5d69ade1f3210d05a6f0667e82477cf81b37c94c"
+  ],
+  "author": {
+    "name": "Ryo Nakao",
+    "email": "ryo@nakao.dev",
+    "date": "2020-09-22T11:09:52+09:00"
+  },
+  "message": "Add check if metrics nil (#8)",
+  "pr": {
+    "number": 8,
+    "title": "Add check if metrics nil",
+    "body": "Fixes: https://github.com/nakabonne/ali/issues/5",
+    "url": "https://github.com/nakabonne/ali/pull/8"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 6,
+    "deletions": 0
+  },
+  "files": [
+    {
+      "path": "gui/drawer.go",
+      "status": "M",
+      "additions": 6,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/gui/drawer.go b/gui/drawer.go\nindex 2f4a6ab..018040b 100644\n--- a/gui/drawer.go\n+++ b/gui/drawer.go\n@@ -35,6 +35,9 @@ L:\n \t\tcase <-ctx.Done():\n \t\t\tbreak L\n \t\tcase res := <-d.chartCh:\n+\t\t\tif res == nil {\n+\t\t\t\tbreak L\n+\t\t\t}\n \t\t\tif res.End {\n \t\t\t\td.gaugeCh <- true\n \t\t\t\tbreak L\n@@ -105,6 +108,9 @@ func (d *drawer) redrawReport(ctx context.Context) {\n \t\tcase <-ctx.Done():\n \t\t\treturn\n \t\tcase metrics := <-d.metricsCh:\n+\t\t\tif metrics == nil {\n+\t\t\t\tcontinue\n+\t\t\t}\n \t\t\td.widgets.latenciesText.Write(\n \t\t\t\tfmt.Sprintf(latenciesTextFormat,\n \t\t\t\t\tmetrics.Latencies.Total,\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/lint.yml",
+    ".github/workflows/release.yml",
+    ".github/workflows/test.yml",
+    ".gitignore",
+    ".golangci.yml",
+    ".goreleaser.yml",
+    "Dockerfile",
+    "LICENSE",
+    "README.md",
+    "attacker/attacker.go",
+    "attacker/attacker_test.go",
+    "attacker/fake_attacker.go",
+    "attacker/metrics.go",
+    "go.mod",
+    "go.sum",
+    "gui/drawer.go",
+    "gui/gui.go",
+    "gui/keybinds.go",
+    "gui/keybinds_test.go",
+    "gui/widgets.go",
+    "images/demo.gif",
+    "images/mouse-support.gif",
+    "images/progress.gif",
+    "images/real-time.gif",
+    "main.go"
+  ],
+  "explanation": null
+}

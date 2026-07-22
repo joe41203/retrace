@@ -1,0 +1,71 @@
+{
+  "seq": 77,
+  "sha": "a86bd811893509d5084c4474a1960cef1a070925",
+  "parents": [
+    "c660e408f7e04fb2c8a82715e9c4134538e73922"
+  ],
+  "author": {
+    "name": "nakabonne",
+    "email": "ryo@nakao.dev",
+    "date": "2020-09-24T22:14:31+09:00"
+  },
+  "message": "Add test cases for redrawing metrics",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 118,
+    "deletions": 2
+  },
+  "files": [
+    {
+      "path": "gui/drawer.go",
+      "status": "M",
+      "additions": 9,
+      "deletions": 2,
+      "binary": false
+    },
+    {
+      "path": "gui/drawer_test.go",
+      "status": "M",
+      "additions": 109,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/gui/drawer.go b/gui/drawer.go\nindex 417882c..a03210c 100644\n--- a/gui/drawer.go\n+++ b/gui/drawer.go\n@@ -99,8 +99,7 @@ Wait: %v\n Requests: %d\n Rate: %f\n Throughput: %f\n-Success: %f\n-StatusCodes:`\n+Success: %f`\n \t)\n \n \tfor {\n@@ -144,9 +143,17 @@ StatusCodes:`\n \t\t\t\t\tmetrics.Success,\n \t\t\t\t), text.WriteReplace())\n \n+\t\t\tif len(metrics.StatusCodes) > 0 {\n+\t\t\t\td.widgets.othersText.Write(`\n+StatusCodes:`)\n+\t\t\t}\n \t\t\tfor code, n := range metrics.StatusCodes {\n \t\t\t\td.widgets.othersText.Write(fmt.Sprintf(`\n   %s: %d`, code, n))\n+\t\t\t}\n+\t\t\tif len(metrics.Errors) > 0 {\n+\t\t\t\td.widgets.othersText.Write(`\n+Errors:`)\n \t\t\t}\n \t\t\tfor i, e := range metrics.Errors {\n \t\t\t\td.widgets.othersText.Write(fmt.Sprintf(`\ndiff --git a/gui/drawer_test.go b/gui/drawer_test.go\nindex cd4f55f..af2ea86 100644\n--- a/gui/drawer_test.go\n+++ b/gui/drawer_test.go\n@@ -136,6 +136,115 @@ func TestRedrawGauge(t *testing.T) {\n \t}\n }\n \n+func TestRedrawMetrics(t *testing.T) {\n+\tctrl := gomock.NewController(t)\n+\tdefer ctrl.Finish()\n+\n+\tctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)\n+\tdefer cancel()\n+\n+\ttests := []struct {\n+\t\tname          string\n+\t\tmetrics       *attacker.Metrics\n+\t\tlatenciesText Text\n+\t\tbytesText     Text\n+\t\tothersText    Text\n+\t}{\n+\t\t{\n+\t\t\tname: \"with errors\",\n+\t\t\tmetrics: &attacker.Metrics{\n+\t\t\t\tLatencies: attacker.LatencyMetrics{\n+\t\t\t\t\tTotal: 1,\n+\t\t\t\t\tMean:  1,\n+\t\t\t\t\tP50:   1,\n+\t\t\t\t\tP90:   1,\n+\t\t\t\t\tP95:   1,\n+\t\t\t\t\tP99:   1,\n+\t\t\t\t\tMax:   1,\n+\t\t\t\t\tMin:   1,\n+\t\t\t\t},\n+\t\t\t\tBytesIn: attacker.ByteMetrics{\n+\t\t\t\t\tTotal: 1,\n+\t\t\t\t\tMean:  1,\n+\t\t\t\t},\n+\t\t\t\tBytesOut: attacker.ByteMetrics{\n+\t\t\t\t\tTotal: 1,\n+\t\t\t\t\tMean:  1,\n+\t\t\t\t},\n+\t\t\t\tEarliest:    time.Date(2009, time.November, 10, 23, 0, 0, 0, time.UTC),\n+\t\t\t\tLatest:      time.Date(2009, time.November, 10, 23, 0, 0, 0, time.UTC),\n+\t\t\t\tEnd:         time.Date(2009, time.November, 10, 23, 0, 0, 0, time.UTC),\n+\t\t\t\tDuration:    1,\n+\t\t\t\tWait:        1,\n+\t\t\t\tRequests:    1,\n+\t\t\t\tRate:        1,\n+\t\t\t\tThroughput:  1,\n+\t\t\t\tSuccess:     1,\n+\t\t\t\tStatusCodes: map[string]int{\"200\": 2},\n+\t\t\t\tErrors:      []string{\"error1\"},\n+\t\t\t},\n+\t\t\tlatenciesText: func() Text {\n+\t\t\t\tt := NewMockText(ctrl)\n+\t\t\t\tt.EXPECT().Write(`Total: 1ns\n+Mean: 1ns\n+P50: 1ns\n+P90: 1ns\n+P95: 1ns\n+P99: 1ns\n+Max: 1ns\n+Min: 1ns`, gomock.Any())\n+\t\t\t\treturn t\n+\t\t\t}(),\n+\t\t\tbytesText: func() Text {\n+\t\t\t\tt := NewMockText(ctrl)\n+\t\t\t\tt.EXPECT().Write(`In:\n+  Total: 1\n+  Mean: 1\n+Out:\n+  Total: 1\n+  Mean: 1`, gomock.Any())\n+\t\t\t\treturn t\n+\t\t\t}(),\n+\t\t\tothersText: func() Text {\n+\t\t\t\tt := NewMockText(ctrl)\n+\t\t\t\tt.EXPECT().Write(`Earliest: 2009-11-10 23:00:00 +0000 UTC\n+Latest: 2009-11-10 23:00:00 +0000 UTC\n+End: 2009-11-10 23:00:00 +0000 UTC\n+Duration: 1ns\n+Wait: 1ns\n+Requests: 1\n+Rate: 1.000000\n+Throughput: 1.000000\n+Success: 1.000000`, gomock.Any())\n+\t\t\t\tt.EXPECT().Write(`\n+StatusCodes:`)\n+\t\t\t\tt.EXPECT().Write(`\n+  200: 2`)\n+\t\t\t\tt.EXPECT().Write(`\n+Errors:`)\n+\t\t\t\tt.EXPECT().Write(`\n+  0: error1`)\n+\t\t\t\treturn t\n+\t\t\t}(),\n+\t\t},\n+\t}\n+\n+\tfor _, tt := range tests {\n+\t\tt.Run(tt.name, func(t *testing.T) {\n+\t\t\td := &drawer{\n+\t\t\t\twidgets: &widgets{\n+\t\t\t\t\tlatenciesText: tt.latenciesText,\n+\t\t\t\t\tbytesText:     tt.bytesText,\n+\t\t\t\t\tothersText:    tt.othersText,\n+\t\t\t\t},\n+\t\t\t\tmetricsCh: make(chan *attacker.Metrics),\n+\t\t\t}\n+\t\t\tgo d.redrawMetrics(ctx)\n+\t\t\td.metricsCh <- tt.metrics\n+\t\t})\n+\t}\n+}\n+\n func TestRedrawMessage(t *testing.T) {\n \tctrl := gomock.NewController(t)\n \tdefer ctrl.Finish()\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/lint.yml",
+    ".github/workflows/release.yml",
+    ".github/workflows/test.yml",
+    ".gitignore",
+    ".golangci.yml",
+    ".goreleaser.yml",
+    "Dockerfile",
+    "LICENSE",
+    "Makefile",
+    "README.md",
+    "attacker/attacker.go",
+    "attacker/attacker_test.go",
+    "attacker/fake_attacker.go",
+    "attacker/metrics.go",
+    "codecov.yml",
+    "go.mod",
+    "go.sum",
+    "gui/drawer.go",
+    "gui/drawer_test.go",
+    "gui/gui.go",
+    "gui/gui_test.go",
+    "gui/keybinds.go",
+    "gui/keybinds_test.go",
+    "gui/widgets.go",
+    "gui/widgets.mock.go",
+    "images/demo.gif",
+    "images/mouse-support.gif",
+    "images/progress.gif",
+    "images/real-time.gif",
+    "main.go"
+  ],
+  "explanation": null
+}

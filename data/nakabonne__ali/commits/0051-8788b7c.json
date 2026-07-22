@@ -1,0 +1,85 @@
+{
+  "seq": 51,
+  "sha": "8788b7c832a3c25c1f345f26c8b8e53609db29f1",
+  "parents": [
+    "90c64bf75ab34a3f3cf5c0f23d596d86ba88020d"
+  ],
+  "author": {
+    "name": "Ryo Nakao",
+    "email": "ryo@nakao.dev",
+    "date": "2020-09-20T18:26:35+09:00"
+  },
+  "message": "Use multi-widgets to show metrics (#4)",
+  "pr": {
+    "number": 4,
+    "title": "Use multi-widgets to show metrics",
+    "body": "",
+    "url": "https://github.com/nakabonne/ali/pull/4"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 4,
+    "additions": 124,
+    "deletions": 23
+  },
+  "files": [
+    {
+      "path": "gui/drawer.go",
+      "status": "M",
+      "additions": 77,
+      "deletions": 6,
+      "binary": false
+    },
+    {
+      "path": "gui/gui.go",
+      "status": "M",
+      "additions": 13,
+      "deletions": 6,
+      "binary": false
+    },
+    {
+      "path": "gui/keybinds.go",
+      "status": "M",
+      "additions": 3,
+      "deletions": 3,
+      "binary": false
+    },
+    {
+      "path": "gui/widgets.go",
+      "status": "M",
+      "additions": 31,
+      "deletions": 8,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/gui/drawer.go b/gui/drawer.go\nindex ac51963..7c0c0d4 100644\n--- a/gui/drawer.go\n+++ b/gui/drawer.go\n@@ -2,6 +2,7 @@ package gui\n \n import (\n \t\"context\"\n+\t\"fmt\"\n \t\"time\"\n \n \t\"github.com/mum4k/termdash/cell\"\n@@ -12,10 +13,11 @@ import (\n )\n \n type drawer struct {\n-\twidgets  *widgets\n-\tchartCh  chan *attacker.Result\n-\tgaugeCh  chan bool\n-\treportCh chan string\n+\twidgets   *widgets\n+\tchartCh   chan *attacker.Result\n+\tgaugeCh   chan bool\n+\tmetricsCh chan *attacker.Metrics\n+\tmessageCh chan string\n \n \t// aims to avoid to perform multiple `redrawChart`.\n \tchartDrawing bool\n@@ -68,13 +70,82 @@ func (d *drawer) redrawGauge(ctx context.Context, maxSize int) {\n \t}\n }\n \n+const (\n+\tlatenciesTextFormat = `Total: %v\n+Mean: %v\n+P50: %v\n+P90: %v\n+P95: %v\n+P99: %v\n+Max: %v\n+Min: %v`\n+\n+\tbytesTextFormat = `In:\n+  Total: %v\n+  Mean: %v\n+Out:\n+  Total: %v\n+  Mean: %v`\n+\n+\tothersTextFormat = `Earliest: %v\n+Latest: %v\n+End: %v\n+Duration: %v\n+Wait: %v\n+Requests: %d\n+Rate: %f\n+Throughput: %f\n+Success: %f\n+StatusCodes:`\n+)\n+\n func (d *drawer) redrawReport(ctx context.Context) {\n \tfor {\n \t\tselect {\n \t\tcase <-ctx.Done():\n \t\t\treturn\n-\t\tcase report := <-d.reportCh:\n-\t\t\td.widgets.reportText.Write(report, text.WriteReplace())\n+\t\tcase metrics := <-d.metricsCh:\n+\t\t\td.widgets.latenciesText.Write(\n+\t\t\t\tfmt.Sprintf(latenciesTextFormat,\n+\t\t\t\t\tmetrics.Latencies.Total,\n+\t\t\t\t\tmetrics.Latencies.Mean,\n+\t\t\t\t\tmetrics.Latencies.P50,\n+\t\t\t\t\tmetrics.Latencies.P90,\n+\t\t\t\t\tmetrics.Latencies.P95,\n+\t\t\t\t\tmetrics.Latencies.P99,\n+\t\t\t\t\tmetrics.Latencies.Max,\n+\t\t\t\t\tmetrics.Latencies.Min,\n+\t\t\t\t), text.WriteReplace())\n+\n+\t\t\td.widgets.bytesText.Write(\n+\t\t\t\tfmt.Sprintf(bytesTextFormat,\n+\t\t\t\t\tmetrics.BytesIn.Total,\n+\t\t\t\t\tmetrics.BytesIn.Mean,\n+\t\t\t\t\tmetrics.BytesOut.Total,\n+\t\t\t\t\tmetrics.BytesOut.Mean,\n+\t\t\t\t), text.WriteReplace())\n+\n+\t\t\td.widgets.othersText.Write(\n+\t\t\t\tfmt.Sprintf(othersTextFormat,\n+\t\t\t\t\tmetrics.Earliest,\n+\t\t\t\t\tmetrics.Latest,\n+\t\t\t\t\tmetrics.End,\n+\t\t\t\t\tmetrics.Duration,\n+\t\t\t\t\tmetrics.Wait,\n+\t\t\t\t\tmetrics.Requests,\n+\t\t\t\t\tmetrics.Rate,\n+\t\t\t\t\tmetrics.Throughput,\n+\t\t\t\t\tmetrics.Success,\n+\t\t\t\t), text.WriteReplace())\n+\n+\t\t\tfor code, n := range metrics.StatusCodes {\n+\t\t\t\td.widgets.othersText.Write(fmt.Sprintf(`\n+  %s: %d`, code, n))\n+\t\t\t}\n+\t\t\tfor i, e := range metrics.Errors {\n+\t\t\t\td.widgets.othersText.Write(fmt.Sprintf(`\n+  %d: %s`, i, e))\n+\t\t\t}\n \t\t}\n \t}\n }\ndiff --git a/gui/gui.go b/gui/gui.go\nindex 6a5a5da..7dc28d9 100644\n--- a/gui/gui.go\n+++ b/gui/gui.go\n@@ -44,10 +44,10 @@ func Run() error {\n \t}\n \n \td := &drawer{\n-\t\twidgets:  w,\n-\t\tchartCh:  make(chan *attacker.Result),\n-\t\tgaugeCh:  make(chan bool),\n-\t\treportCh: make(chan string),\n+\t\twidgets:   w,\n+\t\tchartCh:   make(chan *attacker.Result),\n+\t\tgaugeCh:   make(chan bool),\n+\t\tmetricsCh: make(chan *attacker.Metrics),\n \t}\n \tgo d.redrawReport(ctx)\n \n@@ -59,7 +59,7 @@ func Run() error {\n func gridLayout(w *widgets) ([]container.Option, error) {\n \traw1 := grid.RowHeightPerc(65, grid.Widget(w.latencyChart, container.Border(linestyle.Light), container.BorderTitle(\"Latency (ms)\")))\n \traw2 := grid.RowHeightPerc(30,\n-\t\tgrid.ColWidthPerc(64,\n+\t\tgrid.ColWidthPerc(50,\n \t\t\tgrid.RowHeightPerc(34, grid.Widget(w.urlInput, container.Border(linestyle.Light), container.BorderTitle(\"Target URL\"))),\n \t\t\tgrid.RowHeightPerc(33,\n \t\t\t\tgrid.ColWidthPerc(20, grid.Widget(w.rateLimitInput, container.Border(linestyle.Light), container.BorderTitle(\"Rate Limit\"))),\n@@ -70,7 +70,14 @@ func gridLayout(w *widgets) ([]container.Option, error) {\n \t\t\t),\n \t\t\tgrid.RowHeightPerc(33, grid.Widget(w.bodyInput, container.Border(linestyle.Light), container.BorderTitle(\"Body\"))),\n \t\t),\n-\t\tgrid.ColWidthPerc(35, grid.Widget(w.reportText, container.Border(linestyle.Light), container.BorderTitle(\"Report\"))),\n+\t\tgrid.ColWidthPerc(50,\n+\t\t\tgrid.RowHeightPerc(85,\n+\t\t\t\tgrid.ColWidthPerc(25, grid.Widget(w.latenciesText, container.Border(linestyle.Light), container.BorderTitle(\"Latencies\"))),\n+\t\t\t\tgrid.ColWidthPerc(25, grid.Widget(w.bytesText, container.Border(linestyle.Light), container.BorderTitle(\"Bytes\"))),\n+\t\t\t\tgrid.ColWidthPerc(50, grid.Widget(w.othersText, container.Border(linestyle.Light), container.BorderTitle(\"Others\"))),\n+\t\t\t),\n+\t\t\tgrid.RowHeightPerc(15, grid.Widget(w.messageText, container.Border(linestyle.Light), container.BorderTitle(\"Message\"))),\n+\t\t),\n \t)\n \traw3 := grid.RowHeightPerc(4,\n \t\tgrid.ColWidthPerc(64, grid.Widget(w.progressGauge, container.Border(linestyle.None))),\ndiff --git a/gui/keybinds.go b/gui/keybinds.go\nindex 5e0505a..48ece66 100644\n--- a/gui/keybinds.go\n+++ b/gui/keybinds.go\n@@ -32,12 +32,12 @@ func attack(ctx context.Context, d *drawer) {\n \t}\n \ttarget := d.widgets.urlInput.Read()\n \tif _, err := url.ParseRequestURI(target); err != nil {\n-\t\td.reportCh <- fmt.Sprintf(\"Bad URL: %v\", err)\n+\t\td.messageCh <- fmt.Sprintf(\"Bad URL: %v\", err)\n \t\treturn\n \t}\n \topts, err := makeOptions(d.widgets)\n \tif err != nil {\n-\t\td.reportCh <- err.Error()\n+\t\td.messageCh <- err.Error()\n \t\treturn\n \t}\n \trequestNum := opts.Rate * int(opts.Duration/time.Second)\n@@ -47,7 +47,7 @@ func attack(ctx context.Context, d *drawer) {\n \tgo d.redrawGauge(ctx, requestNum)\n \tgo func(ctx context.Context, d *drawer, t string, o attacker.Options) {\n \t\tmetrics := attacker.Attack(ctx, t, d.chartCh, o)\n-\t\td.reportCh <- metrics.String()\n+\t\td.metricsCh <- metrics\n \t\td.chartCh <- &attacker.Result{End: true}\n \t}(ctx, d, target, opts)\n }\ndiff --git a/gui/widgets.go b/gui/widgets.go\nindex 133928a..8692e3a 100644\n--- a/gui/widgets.go\n+++ b/gui/widgets.go\n@@ -27,10 +27,16 @@ type widgets struct {\n \tbodyInput      *textinput.TextInput\n \theaderInput    *textinput.TextInput\n \ttimeoutInput   *textinput.TextInput\n-\tlatencyChart   *linechart.LineChart\n-\treportText     *text.Text\n-\tprogressGauge  *gauge.Gauge\n-\tnavi           *text.Text\n+\n+\tlatencyChart *linechart.LineChart\n+\n+\tmessageText   *text.Text\n+\tlatenciesText *text.Text\n+\tbytesText     *text.Text\n+\tothersText    *text.Text\n+\n+\tprogressGauge *gauge.Gauge\n+\tnavi          *text.Text\n }\n \n func newWidgets() (*widgets, error) {\n@@ -38,7 +44,19 @@ func newWidgets() (*widgets, error) {\n \tif err != nil {\n \t\treturn nil, err\n \t}\n-\treportText, err := newText(\"Give the target URL and press Enter, then the attack will be launched.\")\n+\tmessageText, err := newText(\"Give the target URL and press Enter.\")\n+\tif err != nil {\n+\t\treturn nil, err\n+\t}\n+\tlatenciesText, err := newText(\"\")\n+\tif err != nil {\n+\t\treturn nil, err\n+\t}\n+\tbytesText, err := newText(\"\")\n+\tif err != nil {\n+\t\treturn nil, err\n+\t}\n+\tothersText, err := newText(\"\")\n \tif err != nil {\n \t\treturn nil, err\n \t}\n@@ -87,7 +105,10 @@ func newWidgets() (*widgets, error) {\n \t\theaderInput:    headerInput,\n \t\ttimeoutInput:   timeoutInput,\n \t\tlatencyChart:   latencyChart,\n-\t\treportText:     reportText,\n+\t\tmessageText:    messageText,\n+\t\tlatenciesText:  latenciesText,\n+\t\tbytesText:      bytesText,\n+\t\tothersText:     othersText,\n \t\tprogressGauge:  progressGauge,\n \t\tnavi:           navi,\n \t}, nil\n@@ -106,8 +127,10 @@ func newText(s string) (*text.Text, error) {\n \tif err != nil {\n \t\treturn nil, err\n \t}\n-\tif err := t.Write(s); err != nil {\n-\t\treturn nil, err\n+\tif s != \"\" {\n+\t\tif err := t.Write(s); err != nil {\n+\t\t\treturn nil, err\n+\t\t}\n \t}\n \treturn t, nil\n }\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/lint.yml",
+    ".github/workflows/release.yml",
+    ".github/workflows/test.yml",
+    ".gitignore",
+    ".golangci.yml",
+    ".goreleaser.yml",
+    "Dockerfile",
+    "LICENSE",
+    "README.md",
+    "attacker/attacker.go",
+    "attacker/attacker_test.go",
+    "attacker/fake_attacker.go",
+    "attacker/metrics.go",
+    "go.mod",
+    "go.sum",
+    "gui/drawer.go",
+    "gui/gui.go",
+    "gui/keybinds.go",
+    "gui/keybinds_test.go",
+    "gui/widgets.go",
+    "images/demo.gif",
+    "images/mouse-support.gif",
+    "images/progress.gif",
+    "images/real-time.gif",
+    "main.go"
+  ],
+  "explanation": null
+}

@@ -1,0 +1,84 @@
+{
+  "seq": 88,
+  "sha": "82b2334ca52594cfb75d9dd5f0941bacf5acc769",
+  "parents": [
+    "74ddb3f75b12c6f80d7ba0c766de653fa3368c5f"
+  ],
+  "author": {
+    "name": "Ryo Nakao",
+    "email": "ryo@nakao.dev",
+    "date": "2020-09-26T12:33:53+09:00"
+  },
+  "message": "Use buffered channels for goroutine testing (#14)\n\n* Use buffered channels for goroutine testing\r\n\r\n* Remove",
+  "pr": {
+    "number": 14,
+    "title": "Use buffered channels for goroutine testing",
+    "body": "",
+    "url": "https://github.com/nakabonne/ali/pull/14"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 3,
+    "additions": 8,
+    "deletions": 68
+  },
+  "files": [
+    {
+      "path": "attacker/attacker_test.go",
+      "status": "M",
+      "additions": 3,
+      "deletions": 31,
+      "binary": false
+    },
+    {
+      "path": "gui/drawer_test.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 15,
+      "binary": false
+    },
+    {
+      "path": "gui/keybinds_test.go",
+      "status": "M",
+      "additions": 4,
+      "deletions": 22,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/attacker/attacker_test.go b/attacker/attacker_test.go\nindex a8a421f..52223d9 100644\n--- a/attacker/attacker_test.go\n+++ b/attacker/attacker_test.go\n@@ -2,32 +2,13 @@ package attacker\n \n import (\n \t\"context\"\n-\t\"sync\"\n \t\"testing\"\n-\t\"time\"\n \n \t\"github.com/stretchr/testify/assert\"\n \tvegeta \"github.com/tsenart/vegeta/v12/lib\"\n \t\"go.uber.org/goleak\"\n )\n \n-type watcher struct {\n-\tresCh chan *Result\n-\tcount int\n-}\n-\n-func (w *watcher) countRes(ctx context.Context, wg *sync.WaitGroup) {\n-\tfor {\n-\t\tselect {\n-\t\tcase <-ctx.Done():\n-\t\t\twg.Done()\n-\t\t\treturn\n-\t\tcase <-w.resCh:\n-\t\t\tw.count++\n-\t\t}\n-\t}\n-}\n-\n func TestMain(m *testing.M) {\n \tgoleak.VerifyTestMain(m)\n }\n@@ -90,20 +71,11 @@ func TestAttack(t *testing.T) {\n \t}\n \n \tfor _, tt := range tests {\n-\t\tctx, cancel := context.WithTimeout(ctx, 30*time.Second)\n-\t\tw := &watcher{\n-\t\t\tresCh: make(chan *Result),\n-\t\t}\n-\n-\t\tvar wg sync.WaitGroup\n-\t\twg.Add(1)\n-\t\tgo w.countRes(ctx, &wg)\n \t\tt.Run(tt.name, func(t *testing.T) {\n-\t\t\tgot := Attack(ctx, tt.target, w.resCh, tt.opts)\n-\t\t\tcancel()\n-\t\t\twg.Wait()\n+\t\t\tresCh := make(chan *Result, 100)\n+\t\t\tgot := Attack(ctx, tt.target, resCh, tt.opts)\n \t\t\tassert.Equal(t, tt.want, got)\n-\t\t\tassert.Equal(t, tt.wantResCount, w.count)\n+\t\t\tassert.Equal(t, tt.wantResCount, len(resCh))\n \t\t})\n \t}\n }\ndiff --git a/gui/drawer_test.go b/gui/drawer_test.go\nindex 0f0ed57..2ebb136 100644\n--- a/gui/drawer_test.go\n+++ b/gui/drawer_test.go\n@@ -60,27 +60,13 @@ func TestRedrawChart(t *testing.T) {\n \t\t\td := &drawer{\n \t\t\t\twidgets: &widgets{latencyChart: tt.latencyChart},\n \t\t\t\tchartCh: make(chan *attacker.Result),\n-\t\t\t\tgaugeCh: make(chan bool),\n+\t\t\t\tgaugeCh: make(chan bool, 100),\n \t\t\t}\n-\t\t\tvar wg sync.WaitGroup\n-\t\t\twg.Add(1)\n-\t\t\tgo func(w *sync.WaitGroup) {\n-\t\t\t\tfor {\n-\t\t\t\t\tselect {\n-\t\t\t\t\tcase end := <-d.gaugeCh:\n-\t\t\t\t\t\tif end {\n-\t\t\t\t\t\t\tw.Done()\n-\t\t\t\t\t\t\treturn\n-\t\t\t\t\t\t}\n-\t\t\t\t\t}\n-\t\t\t\t}\n-\t\t\t}(&wg)\n \t\t\tgo d.redrawChart(ctx, len(tt.results))\n \t\t\tfor _, res := range tt.results {\n \t\t\t\td.chartCh <- res\n \t\t\t}\n \t\t\td.chartCh <- &attacker.Result{End: true}\n-\t\t\twg.Wait()\n \t\t})\n \t}\n }\ndiff --git a/gui/keybinds_test.go b/gui/keybinds_test.go\nindex 67b9f2c..955c8d0 100644\n--- a/gui/keybinds_test.go\n+++ b/gui/keybinds_test.go\n@@ -3,7 +3,6 @@ package gui\n import (\n \t\"context\"\n \t\"net/http\"\n-\t\"sync\"\n \t\"testing\"\n \t\"time\"\n \n@@ -17,17 +16,18 @@ func TestAttack(t *testing.T) {\n \tctrl := gomock.NewController(t)\n \tdefer ctrl.Finish()\n \n+\tctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)\n+\tdefer cancel()\n+\n \ttests := []struct {\n \t\tname           string\n \t\turlInput       TextInput\n \t\trateLimitInput TextInput\n-\t\tmessageCh      chan string\n \t\tchartDrawing   bool\n \t}{\n \t\t{\n \t\t\tname:         \"chart is drawing\",\n \t\t\tchartDrawing: true,\n-\t\t\tmessageCh:    make(chan string),\n \t\t},\n \t\t{\n \t\t\tname: \"bad url given\",\n@@ -36,12 +36,10 @@ func TestAttack(t *testing.T) {\n \t\t\t\tm.EXPECT().Read().Return(\"bad-url\")\n \t\t\t\treturn m\n \t\t\t}(),\n-\t\t\tmessageCh: make(chan string),\n \t\t},\n \t}\n \tfor _, tt := range tests {\n \t\tt.Run(tt.name, func(t *testing.T) {\n-\t\t\tctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)\n \t\t\td := &drawer{\n \t\t\t\twidgets: &widgets{\n \t\t\t\t\turlInput:       tt.urlInput,\n@@ -59,26 +57,10 @@ func TestAttack(t *testing.T) {\n \t\t\t\t\tprogressGauge:  nil,\n \t\t\t\t\tnavi:           nil,\n \t\t\t\t},\n-\t\t\t\tmessageCh:    tt.messageCh,\n+\t\t\t\tmessageCh:    make(chan string, 100),\n \t\t\t\tchartDrawing: tt.chartDrawing,\n \t\t\t}\n-\n-\t\t\tvar wg sync.WaitGroup\n-\t\t\twg.Add(1)\n-\t\t\tgo func() {\n-\t\t\t\tfor {\n-\t\t\t\t\tselect {\n-\t\t\t\t\tcase <-ctx.Done():\n-\t\t\t\t\t\twg.Done()\n-\t\t\t\t\t\treturn\n-\t\t\t\t\tcase <-tt.messageCh:\n-\t\t\t\t\t}\n-\t\t\t\t}\n-\t\t\t}()\n-\n \t\t\tattack(ctx, d)\n-\t\t\tcancel()\n-\t\t\twg.Wait()\n \t\t})\n \t}\n }\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/lint.yml",
+    ".github/workflows/release.yml",
+    ".github/workflows/test.yml",
+    ".gitignore",
+    ".golangci.yml",
+    ".goreleaser.yml",
+    "Dockerfile",
+    "LICENSE",
+    "Makefile",
+    "README.md",
+    "attacker/attacker.go",
+    "attacker/attacker_test.go",
+    "attacker/fake_attacker.go",
+    "attacker/metrics.go",
+    "codecov.yml",
+    "go.mod",
+    "go.sum",
+    "gui/drawer.go",
+    "gui/drawer_test.go",
+    "gui/gui.go",
+    "gui/gui_test.go",
+    "gui/keybinds.go",
+    "gui/keybinds_test.go",
+    "gui/testdata/body-1.json",
+    "gui/widgets.go",
+    "gui/widgets.mock.go",
+    "images/demo.gif",
+    "images/mouse-support.gif",
+    "images/progress.gif",
+    "images/real-time.gif",
+    "main.go"
+  ],
+  "explanation": null
+}

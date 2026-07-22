@@ -1,0 +1,77 @@
+{
+  "seq": 83,
+  "sha": "119ef0fff78607d31ecb45a8a83965c8575be226",
+  "parents": [
+    "fdc49c57fe445b6f79b3b474ad88b9c3a100b175"
+  ],
+  "author": {
+    "name": "Ryo Nakao",
+    "email": "ryo@nakao.dev",
+    "date": "2020-09-25T14:31:21+09:00"
+  },
+  "message": "Ensure that the options passed correctly (#13)",
+  "pr": {
+    "number": 13,
+    "title": "Ensure that the options passed correctly",
+    "body": "",
+    "url": "https://github.com/nakabonne/ali/pull/13"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 330,
+    "deletions": 0
+  },
+  "files": [
+    {
+      "path": "gui/keybinds_test.go",
+      "status": "M",
+      "additions": 329,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "gui/testdata/body-1.json",
+      "status": "A",
+      "additions": 1,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/gui/keybinds_test.go b/gui/keybinds_test.go\nindex cb9e900..67b9f2c 100644\n--- a/gui/keybinds_test.go\n+++ b/gui/keybinds_test.go\n@@ -1,11 +1,340 @@\n package gui\n \n import (\n+\t\"context\"\n+\t\"net/http\"\n+\t\"sync\"\n \t\"testing\"\n+\t\"time\"\n \n+\t\"github.com/golang/mock/gomock\"\n \t\"github.com/stretchr/testify/assert\"\n+\n+\t\"github.com/nakabonne/ali/attacker\"\n )\n \n+func TestAttack(t *testing.T) {\n+\tctrl := gomock.NewController(t)\n+\tdefer ctrl.Finish()\n+\n+\ttests := []struct {\n+\t\tname           string\n+\t\turlInput       TextInput\n+\t\trateLimitInput TextInput\n+\t\tmessageCh      chan string\n+\t\tchartDrawing   bool\n+\t}{\n+\t\t{\n+\t\t\tname:         \"chart is drawing\",\n+\t\t\tchartDrawing: true,\n+\t\t\tmessageCh:    make(chan string),\n+\t\t},\n+\t\t{\n+\t\t\tname: \"bad url given\",\n+\t\t\turlInput: func() TextInput {\n+\t\t\t\tm := NewMockTextInput(ctrl)\n+\t\t\t\tm.EXPECT().Read().Return(\"bad-url\")\n+\t\t\t\treturn m\n+\t\t\t}(),\n+\t\t\tmessageCh: make(chan string),\n+\t\t},\n+\t}\n+\tfor _, tt := range tests {\n+\t\tt.Run(tt.name, func(t *testing.T) {\n+\t\t\tctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)\n+\t\t\td := &drawer{\n+\t\t\t\twidgets: &widgets{\n+\t\t\t\t\turlInput:       tt.urlInput,\n+\t\t\t\t\trateLimitInput: tt.rateLimitInput,\n+\t\t\t\t\tdurationInput:  nil,\n+\t\t\t\t\tmethodInput:    nil,\n+\t\t\t\t\tbodyInput:      nil,\n+\t\t\t\t\theaderInput:    nil,\n+\t\t\t\t\ttimeoutInput:   nil,\n+\t\t\t\t\tlatencyChart:   nil,\n+\t\t\t\t\tmessageText:    nil,\n+\t\t\t\t\tlatenciesText:  nil,\n+\t\t\t\t\tbytesText:      nil,\n+\t\t\t\t\tothersText:     nil,\n+\t\t\t\t\tprogressGauge:  nil,\n+\t\t\t\t\tnavi:           nil,\n+\t\t\t\t},\n+\t\t\t\tmessageCh:    tt.messageCh,\n+\t\t\t\tchartDrawing: tt.chartDrawing,\n+\t\t\t}\n+\n+\t\t\tvar wg sync.WaitGroup\n+\t\t\twg.Add(1)\n+\t\t\tgo func() {\n+\t\t\t\tfor {\n+\t\t\t\t\tselect {\n+\t\t\t\t\tcase <-ctx.Done():\n+\t\t\t\t\t\twg.Done()\n+\t\t\t\t\t\treturn\n+\t\t\t\t\tcase <-tt.messageCh:\n+\t\t\t\t\t}\n+\t\t\t\t}\n+\t\t\t}()\n+\n+\t\t\tattack(ctx, d)\n+\t\t\tcancel()\n+\t\t\twg.Wait()\n+\t\t})\n+\t}\n+}\n+\n+func TestMakeOptions(t *testing.T) {\n+\tctrl := gomock.NewController(t)\n+\tdefer ctrl.Finish()\n+\n+\ttests := []struct {\n+\t\tname    string\n+\t\twidgets widgets\n+\t\twant    attacker.Options\n+\t\twantErr bool\n+\t}{\n+\t\t{\n+\t\t\tname: \"wrong rate limit given\",\n+\t\t\twidgets: widgets{\n+\t\t\t\trateLimitInput: func() TextInput {\n+\t\t\t\t\tm := NewMockTextInput(ctrl)\n+\t\t\t\t\tm.EXPECT().Read().Return(\"a\")\n+\t\t\t\t\treturn m\n+\t\t\t\t}(),\n+\t\t\t},\n+\t\t\twantErr: true,\n+\t\t},\n+\t\t{\n+\t\t\tname: \"wrong duration given\",\n+\t\t\twidgets: widgets{\n+\t\t\t\trateLimitInput: func() TextInput {\n+\t\t\t\t\tm := NewMockTextInput(ctrl)\n+\t\t\t\t\tm.EXPECT().Read().Return(\"\")\n+\t\t\t\t\treturn m\n+\t\t\t\t}(),\n+\t\t\t\tdurationInput: func() TextInput {\n+\t\t\t\t\tm := NewMockTextInput(ctrl)\n+\t\t\t\t\tm.EXPECT().Read().Return(\"a\")\n+\t\t\t\t\treturn m\n+\t\t\t\t}(),\n+\t\t\t},\n+\t\t\twantErr: true,\n+\t\t},\n+\t\t{\n+\t\t\tname: \"wrong timeout given\",\n+\t\t\twidgets: widgets{\n+\t\t\t\trateLimitInput: func() TextInput {\n+\t\t\t\t\tm := NewMockTextInput(ctrl)\n+\t\t\t\t\tm.EXPECT().Read().Return(\"\")\n+\t\t\t\t\treturn m\n+\t\t\t\t}(),\n+\t\t\t\tdurationInput: func() TextInput {\n+\t\t\t\t\tm := NewMockTextInput(ctrl)\n+\t\t\t\t\tm.EXPECT().Read().Return(\"\")\n+\t\t\t\t\treturn m\n+\t\t\t\t}(),\n+\t\t\t\ttimeoutInput: func() TextInput {\n+\t\t\t\t\tm := NewMockTextInput(ctrl)\n+\t\t\t\t\tm.EXPECT().Read().Return(\"a\")\n+\t\t\t\t\treturn m\n+\t\t\t\t}(),\n+\t\t\t},\n+\t\t\twantErr: true,\n+\t\t},\n+\t\t{\n+\t\t\tname: \"wrong method given\",\n+\t\t\twidgets: widgets{\n+\t\t\t\trateLimitInput: func() TextInput {\n+\t\t\t\t\tm := NewMockTextInput(ctrl)\n+\t\t\t\t\tm.EXPECT().Read().Return(\"\")\n+\t\t\t\t\treturn m\n+\t\t\t\t}(),\n+\t\t\t\tdurationInput: func() TextInput {\n+\t\t\t\t\tm := NewMockTextInput(ctrl)\n+\t\t\t\t\tm.EXPECT().Read().Return(\"\")\n+\t\t\t\t\treturn m\n+\t\t\t\t}(),\n+\t\t\t\ttimeoutInput: func() TextInput {\n+\t\t\t\t\tm := NewMockTextInput(ctrl)\n+\t\t\t\t\tm.EXPECT().Read().Return(\"\")\n+\t\t\t\t\treturn m\n+\t\t\t\t}(),\n+\t\t\t\tmethodInput: func() TextInput {\n+\t\t\t\t\tm := NewMockTextInput(ctrl)\n+\t\t\t\t\tm.EXPECT().Read().Return(\"a\")\n+\t\t\t\t\treturn m\n+\t\t\t\t}(),\n+\t\t\t},\n+\t\t\twantErr: true,\n+\t\t},\n+\t\t{\n+\t\t\tname: \"wrong header given\",\n+\t\t\twidgets: widgets{\n+\t\t\t\trateLimitInput: func() TextInput {\n+\t\t\t\t\tm := NewMockTextInput(ctrl)\n+\t\t\t\t\tm.EXPECT().Read().Return(\"\")\n+\t\t\t\t\treturn m\n+\t\t\t\t}(),\n+\t\t\t\tdurationInput: func() TextInput {\n+\t\t\t\t\tm := NewMockTextInput(ctrl)\n+\t\t\t\t\tm.EXPECT().Read().Return(\"\")\n+\t\t\t\t\treturn m\n+\t\t\t\t}(),\n+\t\t\t\ttimeoutInput: func() TextInput {\n+\t\t\t\t\tm := NewMockTextInput(ctrl)\n+\t\t\t\t\tm.EXPECT().Read().Return(\"\")\n+\t\t\t\t\treturn m\n+\t\t\t\t}(),\n+\t\t\t\tmethodInput: func() TextInput {\n+\t\t\t\t\tm := NewMockTextInput(ctrl)\n+\t\t\t\t\tm.EXPECT().Read().Return(\"\")\n+\t\t\t\t\treturn m\n+\t\t\t\t}(),\n+\t\t\t\theaderInput: func() TextInput {\n+\t\t\t\t\tm := NewMockTextInput(ctrl)\n+\t\t\t\t\tm.EXPECT().Read().Return(\"a\")\n+\t\t\t\t\treturn m\n+\t\t\t\t}(),\n+\t\t\t},\n+\t\t\twantErr: true,\n+\t\t},\n+\t\t{\n+\t\t\tname: \"wrong body file path given\",\n+\t\t\twidgets: widgets{\n+\t\t\t\trateLimitInput: func() TextInput {\n+\t\t\t\t\tm := NewMockTextInput(ctrl)\n+\t\t\t\t\tm.EXPECT().Read().Return(\"\")\n+\t\t\t\t\treturn m\n+\t\t\t\t}(),\n+\t\t\t\tdurationInput: func() TextInput {\n+\t\t\t\t\tm := NewMockTextInput(ctrl)\n+\t\t\t\t\tm.EXPECT().Read().Return(\"\")\n+\t\t\t\t\treturn m\n+\t\t\t\t}(),\n+\t\t\t\ttimeoutInput: func() TextInput {\n+\t\t\t\t\tm := NewMockTextInput(ctrl)\n+\t\t\t\t\tm.EXPECT().Read().Return(\"\")\n+\t\t\t\t\treturn m\n+\t\t\t\t}(),\n+\t\t\t\tmethodInput: func() TextInput {\n+\t\t\t\t\tm := NewMockTextInput(ctrl)\n+\t\t\t\t\tm.EXPECT().Read().Return(\"\")\n+\t\t\t\t\treturn m\n+\t\t\t\t}(),\n+\t\t\t\theaderInput: func() TextInput {\n+\t\t\t\t\tm := NewMockTextInput(ctrl)\n+\t\t\t\t\tm.EXPECT().Read().Return(\"\")\n+\t\t\t\t\treturn m\n+\t\t\t\t}(),\n+\t\t\t\tbodyInput: func() TextInput {\n+\t\t\t\t\tm := NewMockTextInput(ctrl)\n+\t\t\t\t\tm.EXPECT().Read().Return(\"a\")\n+\t\t\t\t\treturn m\n+\t\t\t\t}(),\n+\t\t\t},\n+\t\t\twantErr: true,\n+\t\t},\n+\t\t{\n+\t\t\tname: \"default values applied\",\n+\t\t\twidgets: widgets{\n+\t\t\t\trateLimitInput: func() TextInput {\n+\t\t\t\t\tm := NewMockTextInput(ctrl)\n+\t\t\t\t\tm.EXPECT().Read().Return(\"\")\n+\t\t\t\t\treturn m\n+\t\t\t\t}(),\n+\t\t\t\tdurationInput: func() TextInput {\n+\t\t\t\t\tm := NewMockTextInput(ctrl)\n+\t\t\t\t\tm.EXPECT().Read().Return(\"\")\n+\t\t\t\t\treturn m\n+\t\t\t\t}(),\n+\t\t\t\ttimeoutInput: func() TextInput {\n+\t\t\t\t\tm := NewMockTextInput(ctrl)\n+\t\t\t\t\tm.EXPECT().Read().Return(\"\")\n+\t\t\t\t\treturn m\n+\t\t\t\t}(),\n+\t\t\t\tmethodInput: func() TextInput {\n+\t\t\t\t\tm := NewMockTextInput(ctrl)\n+\t\t\t\t\tm.EXPECT().Read().Return(\"\")\n+\t\t\t\t\treturn m\n+\t\t\t\t}(),\n+\t\t\t\theaderInput: func() TextInput {\n+\t\t\t\t\tm := NewMockTextInput(ctrl)\n+\t\t\t\t\tm.EXPECT().Read().Return(\"\")\n+\t\t\t\t\treturn m\n+\t\t\t\t}(),\n+\t\t\t\tbodyInput: func() TextInput {\n+\t\t\t\t\tm := NewMockTextInput(ctrl)\n+\t\t\t\t\tm.EXPECT().Read().Return(\"\")\n+\t\t\t\t\treturn m\n+\t\t\t\t}(),\n+\t\t\t},\n+\t\t\twant: attacker.Options{\n+\t\t\t\tRate:     50,\n+\t\t\t\tDuration: 10 * time.Second,\n+\t\t\t\tTimeout:  30 * time.Second,\n+\t\t\t\tMethod:   \"\",\n+\t\t\t\tHeader:   http.Header{},\n+\t\t\t},\n+\t\t\twantErr: false,\n+\t\t},\n+\t\t{\n+\t\t\tname: \"given values applied\",\n+\t\t\twidgets: widgets{\n+\t\t\t\trateLimitInput: func() TextInput {\n+\t\t\t\t\tm := NewMockTextInput(ctrl)\n+\t\t\t\t\tm.EXPECT().Read().Return(\"1\")\n+\t\t\t\t\treturn m\n+\t\t\t\t}(),\n+\t\t\t\tdurationInput: func() TextInput {\n+\t\t\t\t\tm := NewMockTextInput(ctrl)\n+\t\t\t\t\tm.EXPECT().Read().Return(\"1s\")\n+\t\t\t\t\treturn m\n+\t\t\t\t}(),\n+\t\t\t\ttimeoutInput: func() TextInput {\n+\t\t\t\t\tm := NewMockTextInput(ctrl)\n+\t\t\t\t\tm.EXPECT().Read().Return(\"1s\")\n+\t\t\t\t\treturn m\n+\t\t\t\t}(),\n+\t\t\t\tmethodInput: func() TextInput {\n+\t\t\t\t\tm := NewMockTextInput(ctrl)\n+\t\t\t\t\tm.EXPECT().Read().Return(\"POST\")\n+\t\t\t\t\treturn m\n+\t\t\t\t}(),\n+\t\t\t\theaderInput: func() TextInput {\n+\t\t\t\t\tm := NewMockTextInput(ctrl)\n+\t\t\t\t\tm.EXPECT().Read().Return(\"Foo: Bar\")\n+\t\t\t\t\treturn m\n+\t\t\t\t}(),\n+\t\t\t\tbodyInput: func() TextInput {\n+\t\t\t\t\tm := NewMockTextInput(ctrl)\n+\t\t\t\t\tm.EXPECT().Read().Return(\"./testdata/body-1.json\")\n+\t\t\t\t\treturn m\n+\t\t\t\t}(),\n+\t\t\t},\n+\t\t\twant: attacker.Options{\n+\t\t\t\tRate:     1,\n+\t\t\t\tDuration: time.Second,\n+\t\t\t\tTimeout:  time.Second,\n+\t\t\t\tMethod:   \"POST\",\n+\t\t\t\tHeader: http.Header{\n+\t\t\t\t\t\"Foo\": []string{\n+\t\t\t\t\t\t\"Bar\",\n+\t\t\t\t\t},\n+\t\t\t\t},\n+\t\t\t\tBody: []byte(`{\"foo\": 1}`),\n+\t\t\t},\n+\t\t\twantErr: false,\n+\t\t},\n+\t}\n+\tfor _, tt := range tests {\n+\t\tt.Run(tt.name, func(t *testing.T) {\n+\t\t\tgot, err := makeOptions(&tt.widgets)\n+\t\t\tassert.Equal(t, tt.wantErr, err != nil)\n+\t\t\tassert.Equal(t, tt.want, got)\n+\t\t})\n+\t}\n+}\n+\n func TestValidateMethod(t *testing.T) {\n \ttests := []struct {\n \t\tname   string\ndiff --git a/gui/testdata/body-1.json b/gui/testdata/body-1.json\nnew file mode 100644\nindex 0000000..77bbe1e\n--- /dev/null\n+++ b/gui/testdata/body-1.json\n@@ -0,0 +1 @@\n+{\"foo\": 1}\n\\ No newline at end of file\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/lint.yml",
+    ".github/workflows/release.yml",
+    ".github/workflows/test.yml",
+    ".gitignore",
+    ".golangci.yml",
+    ".goreleaser.yml",
+    "Dockerfile",
+    "LICENSE",
+    "Makefile",
+    "README.md",
+    "attacker/attacker.go",
+    "attacker/attacker_test.go",
+    "attacker/fake_attacker.go",
+    "attacker/metrics.go",
+    "codecov.yml",
+    "go.mod",
+    "go.sum",
+    "gui/drawer.go",
+    "gui/drawer_test.go",
+    "gui/gui.go",
+    "gui/gui_test.go",
+    "gui/keybinds.go",
+    "gui/keybinds_test.go",
+    "gui/testdata/body-1.json",
+    "gui/widgets.go",
+    "gui/widgets.mock.go",
+    "images/demo.gif",
+    "images/mouse-support.gif",
+    "images/progress.gif",
+    "images/real-time.gif",
+    "main.go"
+  ],
+  "explanation": null
+}

@@ -1,0 +1,79 @@
+{
+  "seq": 32,
+  "sha": "daabc84815ea309516f59e9ed375f0e6caff6500",
+  "parents": [
+    "56bf577e1a147663620ae95d3698ccead4763394"
+  ],
+  "author": {
+    "name": "nakabonne",
+    "email": "ryo@nakao.dev",
+    "date": "2020-09-16T08:22:37+09:00"
+  },
+  "message": "Add tests for attacker",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 5,
+    "additions": 91,
+    "deletions": 46
+  },
+  "files": [
+    {
+      "path": "attacker/attacker_test.go",
+      "status": "M",
+      "additions": 11,
+      "deletions": 5,
+      "binary": false
+    },
+    {
+      "path": "attacker/fake_attacker.go",
+      "status": "M",
+      "additions": 6,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "gui/gui.go",
+      "status": "M",
+      "additions": 0,
+      "deletions": 40,
+      "binary": false
+    },
+    {
+      "path": "gui/keybinds.go",
+      "status": "R",
+      "additions": 42,
+      "deletions": 0,
+      "binary": false,
+      "oldPath": "gui/input_handler.go"
+    },
+    {
+      "path": "gui/keybinds_test.go",
+      "status": "A",
+      "additions": 32,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/attacker/attacker_test.go b/attacker/attacker_test.go\nindex 94183d4..151ce0b 100644\n--- a/attacker/attacker_test.go\n+++ b/attacker/attacker_test.go\n@@ -3,26 +3,32 @@ package attacker\n import (\n \t\"context\"\n \t\"testing\"\n+\t\"time\"\n \n \t\"github.com/stretchr/testify/assert\"\n )\n \n func TestAttack(t *testing.T) {\n+\tctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)\n+\tdefer cancel()\n \ttests := []struct {\n \t\tname   string\n \t\ttarget string\n-\t\tresCh  chan *Result\n \t\topts   Options\n \t\twant   *Metrics\n \t}{\n-\t\t// TODO: Add test cases.\n+\t\t{\n+\t\t\tname:   \"no target given\",\n+\t\t\ttarget: \"\",\n+\t\t\twant:   nil,\n+\t\t},\n \t}\n-\tctx := context.Background()\n+\n \tfor _, tt := range tests {\n \t\ttt.opts.Attacker = &fakeAttacker{}\n \t\tt.Run(tt.name, func(t *testing.T) {\n-\t\t\tgot := Attack(ctx, tt.target, tt.resCh, tt.opts)\n-\t\t\tassert.Equal(t, got, tt.want)\n+\t\t\tgot := Attack(ctx, tt.target, make(chan *Result), tt.opts)\n+\t\t\tassert.Equal(t, tt.want, got)\n \t\t})\n \t}\n }\ndiff --git a/attacker/fake_attacker.go b/attacker/fake_attacker.go\nindex 3e67e8b..4ff5752 100644\n--- a/attacker/fake_attacker.go\n+++ b/attacker/fake_attacker.go\n@@ -7,10 +7,15 @@ import (\n )\n \n type fakeAttacker struct {\n+\tresults []*vegeta.Result\n }\n \n func (f *fakeAttacker) Attack(vegeta.Targeter, vegeta.Pacer, time.Duration, string) <-chan *vegeta.Result {\n-\treturn nil\n+\tresultCh := make(chan *vegeta.Result)\n+\tfor _, r := range f.results {\n+\t\tresultCh <- r\n+\t}\n+\treturn resultCh\n }\n \n func (f *fakeAttacker) Stop() {\ndiff --git a/gui/gui.go b/gui/gui.go\nindex d1abb27..6a5a5da 100644\n--- a/gui/gui.go\n+++ b/gui/gui.go\n@@ -3,13 +3,10 @@ package gui\n import (\n \t\"context\"\n \t\"fmt\"\n-\t\"net/url\"\n-\t\"time\"\n \n \t\"github.com/mum4k/termdash\"\n \t\"github.com/mum4k/termdash/container\"\n \t\"github.com/mum4k/termdash/container/grid\"\n-\t\"github.com/mum4k/termdash/keyboard\"\n \t\"github.com/mum4k/termdash/linestyle\"\n \t\"github.com/mum4k/termdash/terminal/termbox\"\n \t\"github.com/mum4k/termdash/terminal/terminalapi\"\n@@ -89,40 +86,3 @@ func gridLayout(w *widgets) ([]container.Option, error) {\n \n \treturn builder.Build()\n }\n-\n-func keybinds(ctx context.Context, cancel context.CancelFunc, dr *drawer) func(*terminalapi.Keyboard) {\n-\treturn func(k *terminalapi.Keyboard) {\n-\t\tswitch k.Key {\n-\t\tcase keyboard.KeyCtrlC: // Quit\n-\t\t\tcancel()\n-\t\tcase keyboard.KeyEnter: // Attack\n-\t\t\tattack(ctx, dr)\n-\t\t}\n-\t}\n-}\n-\n-func attack(ctx context.Context, d *drawer) {\n-\tif d.chartDrawing {\n-\t\treturn\n-\t}\n-\ttarget := d.widgets.urlInput.Read()\n-\tif _, err := url.ParseRequestURI(target); err != nil {\n-\t\td.reportCh <- fmt.Sprintf(\"Bad URL: %v\", err)\n-\t\treturn\n-\t}\n-\topts, err := makeOptions(d.widgets)\n-\tif err != nil {\n-\t\td.reportCh <- err.Error()\n-\t\treturn\n-\t}\n-\trequestNum := opts.Rate * int(opts.Duration/time.Second)\n-\n-\t// To pre-allocate, run redrawChart on a per-attack basis.\n-\tgo d.redrawChart(ctx, requestNum)\n-\tgo d.redrawGauge(ctx, requestNum)\n-\tgo func(ctx context.Context, d *drawer, t string, o attacker.Options) {\n-\t\tmetrics := attacker.Attack(ctx, t, d.chartCh, o)\n-\t\td.reportCh <- metrics.String()\n-\t\td.chartCh <- &attacker.Result{End: true}\n-\t}(ctx, d, target, opts)\n-}\ndiff --git a/gui/input_handler.go b/gui/keybinds.go\nsimilarity index 67%\nrename from gui/input_handler.go\nrename to gui/keybinds.go\nindex f048ffa..b8f79bb 100644\n--- a/gui/input_handler.go\n+++ b/gui/keybinds.go\n@@ -1,15 +1,57 @@\n package gui\n \n import (\n+\t\"context\"\n \t\"fmt\"\n \t\"net/http\"\n+\t\"net/url\"\n \t\"strconv\"\n \t\"strings\"\n \t\"time\"\n \n+\t\"github.com/mum4k/termdash/keyboard\"\n+\t\"github.com/mum4k/termdash/terminal/terminalapi\"\n+\n \t\"github.com/nakabonne/ali/attacker\"\n )\n \n+func keybinds(ctx context.Context, cancel context.CancelFunc, dr *drawer) func(*terminalapi.Keyboard) {\n+\treturn func(k *terminalapi.Keyboard) {\n+\t\tswitch k.Key {\n+\t\tcase keyboard.KeyCtrlC: // Quit\n+\t\t\tcancel()\n+\t\tcase keyboard.KeyEnter: // Attack\n+\t\t\tattack(ctx, dr)\n+\t\t}\n+\t}\n+}\n+\n+func attack(ctx context.Context, d *drawer) {\n+\tif d.chartDrawing {\n+\t\treturn\n+\t}\n+\ttarget := d.widgets.urlInput.Read()\n+\tif _, err := url.ParseRequestURI(target); err != nil {\n+\t\td.reportCh <- fmt.Sprintf(\"Bad URL: %v\", err)\n+\t\treturn\n+\t}\n+\topts, err := makeOptions(d.widgets)\n+\tif err != nil {\n+\t\td.reportCh <- err.Error()\n+\t\treturn\n+\t}\n+\trequestNum := opts.Rate * int(opts.Duration/time.Second)\n+\n+\t// To pre-allocate, run redrawChart on a per-attack basis.\n+\tgo d.redrawChart(ctx, requestNum)\n+\tgo d.redrawGauge(ctx, requestNum)\n+\tgo func(ctx context.Context, d *drawer, t string, o attacker.Options) {\n+\t\tmetrics := attacker.Attack(ctx, t, d.chartCh, o)\n+\t\td.reportCh <- metrics.String()\n+\t\td.chartCh <- &attacker.Result{End: true}\n+\t}(ctx, d, target, opts)\n+}\n+\n // makeOptions gives back an options for attacker, with the input from UI.\n func makeOptions(w *widgets) (attacker.Options, error) {\n \tvar (\ndiff --git a/gui/keybinds_test.go b/gui/keybinds_test.go\nnew file mode 100644\nindex 0000000..cb9e900\n--- /dev/null\n+++ b/gui/keybinds_test.go\n@@ -0,0 +1,32 @@\n+package gui\n+\n+import (\n+\t\"testing\"\n+\n+\t\"github.com/stretchr/testify/assert\"\n+)\n+\n+func TestValidateMethod(t *testing.T) {\n+\ttests := []struct {\n+\t\tname   string\n+\t\tmethod string\n+\t\twant   bool\n+\t}{\n+\t\t{\n+\t\t\tname:   \"wrong method\",\n+\t\t\tmethod: \"WRONG\",\n+\t\t\twant:   false,\n+\t\t},\n+\t\t{\n+\t\t\tname:   \"right method\",\n+\t\t\tmethod: \"GET\",\n+\t\t\twant:   true,\n+\t\t},\n+\t}\n+\tfor _, tt := range tests {\n+\t\tt.Run(tt.name, func(t *testing.T) {\n+\t\t\tgot := validateMethod(tt.method)\n+\t\t\tassert.Equal(t, tt.want, got)\n+\t\t})\n+\t}\n+}\n",
+  "diffTruncated": false,
+  "tree": [
+    ".gitignore",
+    ".golangci.yml",
+    "LICENSE",
+    "README.md",
+    "attacker/attacker.go",
+    "attacker/attacker_test.go",
+    "attacker/fake_attacker.go",
+    "attacker/metrics.go",
+    "go.mod",
+    "go.sum",
+    "gui/drawer.go",
+    "gui/gui.go",
+    "gui/keybinds.go",
+    "gui/keybinds_test.go",
+    "gui/widgets.go",
+    "main.go"
+  ],
+  "explanation": null
+}

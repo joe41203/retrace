@@ -1,0 +1,63 @@
+{
+  "seq": 75,
+  "sha": "6f6f89c6fa9031d4821b06e171eed13b61dbc11e",
+  "parents": [
+    "75a8e8485bb46b09beb81ea00d48b2813618bc71"
+  ],
+  "author": {
+    "name": "nakabonne",
+    "email": "ryo@nakao.dev",
+    "date": "2020-09-24T09:27:12+09:00"
+  },
+  "message": "Ensure to wait for goroutine to end",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 7,
+    "deletions": 4
+  },
+  "files": [
+    {
+      "path": "gui/drawer_test.go",
+      "status": "M",
+      "additions": 7,
+      "deletions": 4,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/gui/drawer_test.go b/gui/drawer_test.go\nindex d91617d..cd4f55f 100644\n--- a/gui/drawer_test.go\n+++ b/gui/drawer_test.go\n@@ -2,6 +2,7 @@ package gui\n \n import (\n \t\"context\"\n+\t\"sync\"\n \t\"testing\"\n \t\"time\"\n \n@@ -61,23 +62,25 @@ func TestRedrawChart(t *testing.T) {\n \t\t\t\tchartCh: make(chan *attacker.Result),\n \t\t\t\tgaugeCh: make(chan bool),\n \t\t\t}\n-\t\t\tgo func() {\n+\t\t\tvar wg sync.WaitGroup\n+\t\t\twg.Add(1)\n+\t\t\tgo func(w *sync.WaitGroup) {\n \t\t\t\tfor {\n \t\t\t\t\tselect {\n-\t\t\t\t\tcase <-ctx.Done():\n-\t\t\t\t\t\treturn\n \t\t\t\t\tcase end := <-d.gaugeCh:\n \t\t\t\t\t\tif end {\n+\t\t\t\t\t\t\tw.Done()\n \t\t\t\t\t\t\treturn\n \t\t\t\t\t\t}\n \t\t\t\t\t}\n \t\t\t\t}\n-\t\t\t}()\n+\t\t\t}(&wg)\n \t\t\tgo d.redrawChart(ctx, len(tt.results))\n \t\t\tfor _, res := range tt.results {\n \t\t\t\td.chartCh <- res\n \t\t\t}\n \t\t\td.chartCh <- &attacker.Result{End: true}\n+\t\t\twg.Wait()\n \t\t})\n \t}\n }\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/lint.yml",
+    ".github/workflows/release.yml",
+    ".github/workflows/test.yml",
+    ".gitignore",
+    ".golangci.yml",
+    ".goreleaser.yml",
+    "Dockerfile",
+    "LICENSE",
+    "Makefile",
+    "README.md",
+    "attacker/attacker.go",
+    "attacker/attacker_test.go",
+    "attacker/fake_attacker.go",
+    "attacker/metrics.go",
+    "go.mod",
+    "go.sum",
+    "gui/drawer.go",
+    "gui/drawer_test.go",
+    "gui/gui.go",
+    "gui/gui_test.go",
+    "gui/keybinds.go",
+    "gui/keybinds_test.go",
+    "gui/widgets.go",
+    "gui/widgets.mock.go",
+    "images/demo.gif",
+    "images/mouse-support.gif",
+    "images/progress.gif",
+    "images/real-time.gif",
+    "main.go"
+  ],
+  "explanation": null
+}

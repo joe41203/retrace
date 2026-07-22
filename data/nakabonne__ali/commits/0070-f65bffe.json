@@ -1,0 +1,66 @@
+{
+  "seq": 70,
+  "sha": "f65bffe6dc638569d824c464625bfd8f3f6a5e67",
+  "parents": [
+    "beeb21b91d996af71d57414baceb3c9eca6da8cd"
+  ],
+  "author": {
+    "name": "nakabonne",
+    "email": "ryo@nakao.dev",
+    "date": "2020-09-23T09:29:24+09:00"
+  },
+  "message": "Make it possible to report coverage",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 7,
+    "deletions": 1
+  },
+  "files": [
+    {
+      "path": ".github/workflows/test.yml",
+      "status": "M",
+      "additions": 6,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": ".gitignore",
+      "status": "M",
+      "additions": 1,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/.github/workflows/test.yml b/.github/workflows/test.yml\nindex 1b1b8a9..6b9568e 100644\n--- a/.github/workflows/test.yml\n+++ b/.github/workflows/test.yml\n@@ -31,4 +31,9 @@ jobs:\n     - name: Build\n       run: go build\n     - name: Test\n-      run: go test -v ./...\n+      run: go test -v -coverpkg=./... -covermode=atomic -coverprofile=coverage.txt ./...\n+    - name: Upload coverage to Codecov\n+      uses: codecov/codecov-action@v1\n+      with:\n+        token: ${{ secrets.CODECOV_TOKEN }}\n+        file: ./coverage.txt\ndiff --git a/.gitignore b/.gitignore\nindex c02c781..d55dc48 100644\n--- a/.gitignore\n+++ b/.gitignore\n@@ -11,6 +11,7 @@ ali\n \n # Output of the go coverage tool, specifically when used with LiteIDE\n *.out\n+coverage.txt\n ali-debug.log\n \n # IDE\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/lint.yml",
+    ".github/workflows/release.yml",
+    ".github/workflows/test.yml",
+    ".gitignore",
+    ".golangci.yml",
+    ".goreleaser.yml",
+    "Dockerfile",
+    "LICENSE",
+    "README.md",
+    "attacker/attacker.go",
+    "attacker/attacker_test.go",
+    "attacker/fake_attacker.go",
+    "attacker/metrics.go",
+    "go.mod",
+    "go.sum",
+    "gui/drawer.go",
+    "gui/gui.go",
+    "gui/keybinds.go",
+    "gui/keybinds_test.go",
+    "gui/widgets.go",
+    "images/demo.gif",
+    "images/mouse-support.gif",
+    "images/progress.gif",
+    "images/real-time.gif",
+    "main.go"
+  ],
+  "explanation": null
+}

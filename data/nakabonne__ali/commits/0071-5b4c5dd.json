@@ -1,0 +1,67 @@
+{
+  "seq": 71,
+  "sha": "5b4c5ddcac8f348e334a7148ae4ab4988f9a56e0",
+  "parents": [
+    "f65bffe6dc638569d824c464625bfd8f3f6a5e67"
+  ],
+  "author": {
+    "name": "nakabonne",
+    "email": "ryo@nakao.dev",
+    "date": "2020-09-23T09:30:34+09:00"
+  },
+  "message": "Add tests for GUI",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 53,
+    "deletions": 1
+  },
+  "files": [
+    {
+      "path": "gui/gui.go",
+      "status": "M",
+      "additions": 7,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "gui/gui_test.go",
+      "status": "A",
+      "additions": 46,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/gui/gui.go b/gui/gui.go\nindex c6c80ef..f5fae64 100644\n--- a/gui/gui.go\n+++ b/gui/gui.go\n@@ -16,7 +16,13 @@ import (\n \n const rootID = \"root\"\n \n+type runner func(ctx context.Context, t terminalapi.Terminal, c *container.Container, opts ...termdash.Option) error\n+\n func Run() error {\n+\treturn run(termdash.Run)\n+}\n+\n+func run(r runner) error {\n \tctx, cancel := context.WithCancel(context.Background())\n \tdefer cancel()\n \n@@ -55,7 +61,7 @@ func Run() error {\n \n \tk := keybinds(ctx, cancel, d)\n \n-\treturn termdash.Run(ctx, t, c, termdash.KeyboardSubscriber(k), termdash.RedrawInterval(redrawInterval))\n+\treturn r(ctx, t, c, termdash.KeyboardSubscriber(k), termdash.RedrawInterval(redrawInterval))\n }\n \n func gridLayout(w *widgets) ([]container.Option, error) {\ndiff --git a/gui/gui_test.go b/gui/gui_test.go\nnew file mode 100644\nindex 0000000..a723fd0\n--- /dev/null\n+++ b/gui/gui_test.go\n@@ -0,0 +1,46 @@\n+package gui\n+\n+import (\n+\t\"context\"\n+\t\"fmt\"\n+\t\"testing\"\n+\n+\t\"github.com/mum4k/termdash\"\n+\t\"github.com/mum4k/termdash/container\"\n+\t\"github.com/mum4k/termdash/terminal/terminalapi\"\n+\t\"github.com/stretchr/testify/assert\"\n+)\n+\n+// TODO: Ensure to kill all goroutine when running unit tests.\n+/*func TestMain(m *testing.M) {\n+\tgoleak.VerifyTestMain(m)\n+}*/\n+\n+func TestRun(t *testing.T) {\n+\ttests := []struct {\n+\t\tname    string\n+\t\tr       runner\n+\t\twantErr bool\n+\t}{\n+\t\t{\n+\t\t\tname: \"successful running\",\n+\t\t\tr: func(context.Context, terminalapi.Terminal, *container.Container, ...termdash.Option) error {\n+\t\t\t\treturn nil\n+\t\t\t},\n+\t\t\twantErr: false,\n+\t\t},\n+\t\t{\n+\t\t\tname: \"failed running\",\n+\t\t\tr: func(context.Context, terminalapi.Terminal, *container.Container, ...termdash.Option) error {\n+\t\t\t\treturn fmt.Errorf(\"error\")\n+\t\t\t},\n+\t\t\twantErr: true,\n+\t\t},\n+\t}\n+\tfor _, tt := range tests {\n+\t\tt.Run(tt.name, func(t *testing.T) {\n+\t\t\terr := run(tt.r)\n+\t\t\tassert.Equal(t, tt.wantErr, err != nil)\n+\t\t})\n+\t}\n+}\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/lint.yml",
+    ".github/workflows/release.yml",
+    ".github/workflows/test.yml",
+    ".gitignore",
+    ".golangci.yml",
+    ".goreleaser.yml",
+    "Dockerfile",
+    "LICENSE",
+    "README.md",
+    "attacker/attacker.go",
+    "attacker/attacker_test.go",
+    "attacker/fake_attacker.go",
+    "attacker/metrics.go",
+    "go.mod",
+    "go.sum",
+    "gui/drawer.go",
+    "gui/gui.go",
+    "gui/gui_test.go",
+    "gui/keybinds.go",
+    "gui/keybinds_test.go",
+    "gui/widgets.go",
+    "images/demo.gif",
+    "images/mouse-support.gif",
+    "images/progress.gif",
+    "images/real-time.gif",
+    "main.go"
+  ],
+  "explanation": null
+}

@@ -1,0 +1,66 @@
+{
+  "seq": 49,
+  "sha": "fc4fde801a1b660744287643a91b476df9390b9f",
+  "parents": [
+    "cc43887df576d644b6e9e18717114f816b12cdc0"
+  ],
+  "author": {
+    "name": "nakabonne",
+    "email": "ryo@nakao.dev",
+    "date": "2020-09-20T10:40:37+09:00"
+  },
+  "message": "Enable to test response count",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 71,
+    "deletions": 7
+  },
+  "files": [
+    {
+      "path": "attacker/attacker_test.go",
+      "status": "M",
+      "additions": 70,
+      "deletions": 7,
+      "binary": false
+    },
+    {
+      "path": "attacker/fake_attacker.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/attacker/attacker_test.go b/attacker/attacker_test.go\nindex 151ce0b..bb2934e 100644\n--- a/attacker/attacker_test.go\n+++ b/attacker/attacker_test.go\n@@ -2,6 +2,7 @@ package attacker\n \n import (\n \t\"context\"\n+\t\"sync\"\n \t\"testing\"\n \t\"time\"\n \n@@ -9,26 +10,88 @@ import (\n )\n \n func TestAttack(t *testing.T) {\n-\tctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)\n+\tctx, cancel := context.WithCancel(context.Background())\n \tdefer cancel()\n+\n \ttests := []struct {\n-\t\tname   string\n-\t\ttarget string\n-\t\topts   Options\n-\t\twant   *Metrics\n+\t\tname         string\n+\t\ttarget       string\n+\t\topts         Options\n+\t\twant         *Metrics\n+\t\twantResCount int\n \t}{\n \t\t{\n \t\t\tname:   \"no target given\",\n \t\t\ttarget: \"\",\n \t\t\twant:   nil,\n \t\t},\n+\t\t{\n+\t\t\tname:   \"no result given back\",\n+\t\t\ttarget: \"http://host.xz\",\n+\t\t\topts: Options{\n+\t\t\t\tAttacker: &fakeAttacker{},\n+\t\t\t},\n+\t\t\twant: &Metrics{\n+\t\t\t\tStatusCodes: make(map[string]int),\n+\t\t\t\tErrors:      []string{},\n+\t\t\t},\n+\t\t\twantResCount: 0,\n+\t\t},\n+\t\t/*{\n+\t\t\tname:   \"two result given back\",\n+\t\t\ttarget: \"http://host.xz\",\n+\t\t\topts: Options{\n+\t\t\t\tAttacker: &fakeAttacker{\n+\t\t\t\t\tresults: []*vegeta.Result{\n+\t\t\t\t\t\t{\n+\t\t\t\t\t\t\tAttack: \"1\",\n+\t\t\t\t\t\t},\n+\t\t\t\t\t\t{\n+\t\t\t\t\t\t\tAttack: \"2\",\n+\t\t\t\t\t\t},\n+\t\t\t\t\t},\n+\t\t\t\t},\n+\t\t\t},\n+\t\t\twant: &Metrics{\n+\t\t\t\tStatusCodes: make(map[string]int),\n+\t\t\t\tErrors:      []string{},\n+\t\t\t},\n+\t\t\twantResCount: 2,\n+\t\t},*/\n \t}\n \n \tfor _, tt := range tests {\n-\t\ttt.opts.Attacker = &fakeAttacker{}\n+\t\tctx, cancel := context.WithTimeout(ctx, 30*time.Second)\n+\t\tw := &watcher{\n+\t\t\tresCh: make(chan *Result),\n+\t\t}\n+\n+\t\tvar wg sync.WaitGroup\n+\t\twg.Add(1)\n+\t\tgo w.countRes(ctx, &wg)\n \t\tt.Run(tt.name, func(t *testing.T) {\n-\t\t\tgot := Attack(ctx, tt.target, make(chan *Result), tt.opts)\n+\t\t\tgot := Attack(ctx, tt.target, w.resCh, tt.opts)\n+\t\t\tcancel()\n+\t\t\twg.Wait()\n \t\t\tassert.Equal(t, tt.want, got)\n+\t\t\tassert.Equal(t, tt.wantResCount, w.count)\n \t\t})\n \t}\n }\n+\n+type watcher struct {\n+\tresCh chan *Result\n+\tcount int\n+}\n+\n+func (w *watcher) countRes(ctx context.Context, wg *sync.WaitGroup) {\n+\tfor {\n+\t\tselect {\n+\t\tcase <-ctx.Done():\n+\t\t\twg.Done()\n+\t\t\treturn\n+\t\tcase <-w.resCh:\n+\t\t\tw.count++\n+\t\t}\n+\t}\n+}\ndiff --git a/attacker/fake_attacker.go b/attacker/fake_attacker.go\nindex 4ff5752..7a876aa 100644\n--- a/attacker/fake_attacker.go\n+++ b/attacker/fake_attacker.go\n@@ -12,6 +12,7 @@ type fakeAttacker struct {\n \n func (f *fakeAttacker) Attack(vegeta.Targeter, vegeta.Pacer, time.Duration, string) <-chan *vegeta.Result {\n \tresultCh := make(chan *vegeta.Result)\n+\tdefer close(resultCh)\n \tfor _, r := range f.results {\n \t\tresultCh <- r\n \t}\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/lint.yml",
+    ".github/workflows/release.yml",
+    ".github/workflows/test.yml",
+    ".gitignore",
+    ".golangci.yml",
+    ".goreleaser.yml",
+    "Dockerfile",
+    "LICENSE",
+    "README.md",
+    "attacker/attacker.go",
+    "attacker/attacker_test.go",
+    "attacker/fake_attacker.go",
+    "attacker/metrics.go",
+    "go.mod",
+    "go.sum",
+    "gui/drawer.go",
+    "gui/gui.go",
+    "gui/keybinds.go",
+    "gui/keybinds_test.go",
+    "gui/widgets.go",
+    "images/demo.gif",
+    "images/mouse-support.gif",
+    "images/progress.gif",
+    "images/real-time.gif",
+    "main.go"
+  ],
+  "explanation": null
+}

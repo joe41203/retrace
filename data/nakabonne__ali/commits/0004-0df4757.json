@@ -1,0 +1,72 @@
+{
+  "seq": 4,
+  "sha": "0df47574b8e0562ba764a1f3e8d8d9d3f9e0db0f",
+  "parents": [
+    "fab357efb28cb49f335243d32a22c533cab9b6f3"
+  ],
+  "author": {
+    "name": "nakabonne",
+    "email": "ryo@nakao.dev",
+    "date": "2020-09-12T12:44:01+09:00"
+  },
+  "message": "Add golangci.yml",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 3,
+    "additions": 81,
+    "deletions": 0
+  },
+  "files": [
+    {
+      "path": ".golangci.yml",
+      "status": "A",
+      "additions": 79,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "gui/gui.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "main.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/.golangci.yml b/.golangci.yml\nnew file mode 100644\nindex 0000000..88fd321\n--- /dev/null\n+++ b/.golangci.yml\n@@ -0,0 +1,79 @@\n+run:\n+  issues-exit-code: 0\n+\n+linters:\n+  disable-all: true\n+  enable:\n+    - staticcheck\n+    - gosimple\n+    - ineffassign\n+    - errcheck\n+    - misspell\n+    - unparam\n+    - gofmt\n+    - goimports\n+    - deadcode\n+    - nestif\n+    - govet\n+    - golint\n+    - prealloc\n+    - depguard\n+    - dogsled\n+    - dupl\n+    - goconst\n+    - gocritic\n+    - gocyclo\n+    - goprintffuncname\n+    - gosec\n+    - nakedret\n+    - rowserrcheck\n+    - scopelint\n+    - structcheck\n+    - stylecheck\n+    - typecheck\n+    - unconvert\n+    - varcheck\n+    - exhaustive\n+    - exportloopref\n+    - goerr113\n+    - gofumpt\n+    - unused\n+\n+run:\n+  tests: false\n+  skip-dirs:\n+    - testdata\n+\n+issues:\n+  exclude-rules:\n+    - linters:\n+      - gosec\n+      text: \"G204: Subprocess launched\"\n+    - linters:\n+      - goerr113\n+      text: \"err113: do not define dynamic errors\"\n+    - linters:\n+      - stylecheck\n+      text: \"ST1003: struct field Https\"\n+    - linters:\n+      - stylecheck\n+      text: \"ST1003: struct field Id\"\n+\n+linters-settings:\n+  dupl:\n+    threshold: 100\n+  funlen:\n+    lines: 100\n+    statements: 50\n+  goconst:\n+    min-len: 2\n+    min-occurrences: 2\n+  goimports:\n+    local-prefixes: github.com/nakabonne/ali\n+  golint:\n+    min-confidence: 0.3\n+  maligned:\n+    suggest-new: true\n+  misspell:\n+    locale: US\n+\ndiff --git a/gui/gui.go b/gui/gui.go\nindex 5f6668f..e54aaec 100644\n--- a/gui/gui.go\n+++ b/gui/gui.go\n@@ -17,6 +17,7 @@ const rootID = \"root\"\n \n func Run() error {\n \tctx, cancel := context.WithCancel(context.Background())\n+\tdefer cancel()\n \n \tt, err := termbox.New(termbox.ColorMode(terminalapi.ColorMode256))\n \tif err != nil {\ndiff --git a/main.go b/main.go\nindex cef9a9f..1e469bb 100644\n--- a/main.go\n+++ b/main.go\n@@ -49,6 +49,7 @@ func main() {\n \n \tos.Exit(c.run())\n }\n+\n func (c *cli) run() int {\n \tif c.version {\n \t\tfmt.Fprintf(c.stderr, \"version=%s, commit=%s, buildDate=%s, os=%s, arch=%s\\n\", version, commit, date, runtime.GOOS, runtime.GOARCH)\n",
+  "diffTruncated": false,
+  "tree": [
+    ".gitignore",
+    ".golangci.yml",
+    "LICENSE",
+    "README.md",
+    "go.mod",
+    "go.sum",
+    "gui/gui.go",
+    "gui/widgets.go",
+    "main.go"
+  ],
+  "explanation": {
+    "what": "golangci-lint(複数のGo用リンターをまとめて実行するツール)の設定ファイル `.golangci.yml` を追加した。staticcheck・errcheck・gofmt・gocycloなど30種近いリンターを有効化し、テスト対象からは除外する設定にしている。あわせて gui/gui.go に `defer cancel()` を1行追加している。",
+    "why": "コミットメッセージ通り、静的解析を開発の早い段階から導入する目的。`defer cancel()` の追加は、context.WithCancel で作ったcancel関数を必ず呼ぶようにする修正で、golangci-lintの中の govet や staticcheck が「contextのcancelを呼び忘れている(リークの可能性)」と指摘したことに対応したとみられる。",
+    "highlights": [
+      { "file": "gui/gui.go", "note": "`defer cancel()` の追加。context.WithCancel で得たcancelは呼ばないとcontextの内部リソースが解放されないため、直後にdeferで予約するのが定石" },
+      { "file": ".golangci.yml", "note": "この時点で.golangci.ymlはgoの標準的な静的解析ツール群をまとめて定義するファイルで、以降のコミットでもCI連携(GitHub Actions)の対象になっていく" }
+    ],
+    "langNotes": [
+      { "topic": "golangci-lint", "note": "Goコミュニティで広く使われる、複数のリンター(gofmt/govet/staticcheckなど)を1つの設定ファイルでまとめて実行するメタリンター。.golangci.ymlで有効にするリンターや除外ルールを指定する" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-07-22T06:12:04Z"
+  }
+}

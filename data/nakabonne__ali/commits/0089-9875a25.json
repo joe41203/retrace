@@ -1,0 +1,70 @@
+{
+  "seq": 89,
+  "sha": "9875a25bc1ebae1d07124e45cbea4c906154d473",
+  "parents": [
+    "82b2334ca52594cfb75d9dd5f0941bacf5acc769"
+  ],
+  "author": {
+    "name": "Ryo Nakao",
+    "email": "ryo@nakao.dev",
+    "date": "2020-09-26T12:46:48+09:00"
+  },
+  "message": "Add test for quitting with Ctrl-C (#15)",
+  "pr": {
+    "number": 15,
+    "title": "Add test for quitting with Ctrl-C",
+    "body": "",
+    "url": "https://github.com/nakabonne/ali/pull/15"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 30,
+    "deletions": 0
+  },
+  "files": [
+    {
+      "path": "gui/keybinds_test.go",
+      "status": "M",
+      "additions": 30,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/gui/keybinds_test.go b/gui/keybinds_test.go\nindex 955c8d0..90e6c07 100644\n--- a/gui/keybinds_test.go\n+++ b/gui/keybinds_test.go\n@@ -7,11 +7,41 @@ import (\n \t\"time\"\n \n \t\"github.com/golang/mock/gomock\"\n+\t\"github.com/mum4k/termdash/keyboard\"\n+\t\"github.com/mum4k/termdash/terminal/terminalapi\"\n \t\"github.com/stretchr/testify/assert\"\n \n \t\"github.com/nakabonne/ali/attacker\"\n )\n \n+func TestKeybinds(t *testing.T) {\n+\ttests := []struct {\n+\t\tname string\n+\t\tkey  keyboard.Key\n+\t}{\n+\t\t{\n+\t\t\tname: \"quit\",\n+\t\t\tkey:  keyboard.KeyCtrlC,\n+\t\t},\n+\t}\n+\tfor _, tt := range tests {\n+\t\tt.Run(tt.name, func(t *testing.T) {\n+\t\t\tctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)\n+\t\t\tgo func(ctx context.Context) {\n+\t\t\t\tfor {\n+\t\t\t\t\tselect {\n+\t\t\t\t\tcase <-ctx.Done():\n+\t\t\t\t\t\treturn\n+\t\t\t\t\t}\n+\t\t\t\t}\n+\t\t\t}(ctx)\n+\t\t\tf := keybinds(ctx, cancel, nil)\n+\t\t\tf(&terminalapi.Keyboard{Key: tt.key})\n+\t\t\t// If ctx wasn't expired, goleak will find it.\n+\t\t})\n+\t}\n+}\n+\n func TestAttack(t *testing.T) {\n \tctrl := gomock.NewController(t)\n \tdefer ctrl.Finish()\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/lint.yml",
+    ".github/workflows/release.yml",
+    ".github/workflows/test.yml",
+    ".gitignore",
+    ".golangci.yml",
+    ".goreleaser.yml",
+    "Dockerfile",
+    "LICENSE",
+    "Makefile",
+    "README.md",
+    "attacker/attacker.go",
+    "attacker/attacker_test.go",
+    "attacker/fake_attacker.go",
+    "attacker/metrics.go",
+    "codecov.yml",
+    "go.mod",
+    "go.sum",
+    "gui/drawer.go",
+    "gui/drawer_test.go",
+    "gui/gui.go",
+    "gui/gui_test.go",
+    "gui/keybinds.go",
+    "gui/keybinds_test.go",
+    "gui/testdata/body-1.json",
+    "gui/widgets.go",
+    "gui/widgets.mock.go",
+    "images/demo.gif",
+    "images/mouse-support.gif",
+    "images/progress.gif",
+    "images/real-time.gif",
+    "main.go"
+  ],
+  "explanation": null
+}

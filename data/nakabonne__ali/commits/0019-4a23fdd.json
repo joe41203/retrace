@@ -1,0 +1,62 @@
+{
+  "seq": 19,
+  "sha": "4a23fdd1a706d101a944f7a281d4de53e3465307",
+  "parents": [
+    "808c3e8fbc22d9c7c930b40b87c4ef39ba60fdbe"
+  ],
+  "author": {
+    "name": "nakabonne",
+    "email": "ryo@nakao.dev",
+    "date": "2020-09-14T21:18:52+09:00"
+  },
+  "message": "Ensure to attack with input text",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 3,
+    "additions": 11,
+    "deletions": 12
+  },
+  "files": [
+    {
+      "path": "gui/drawer.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "gui/gui.go",
+      "status": "M",
+      "additions": 8,
+      "deletions": 4,
+      "binary": false
+    },
+    {
+      "path": "gui/widgets.go",
+      "status": "M",
+      "additions": 2,
+      "deletions": 7,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/gui/drawer.go b/gui/drawer.go\nindex e752776..216d2cf 100644\n--- a/gui/drawer.go\n+++ b/gui/drawer.go\n@@ -16,7 +16,7 @@ type drawer struct {\n \tchartsCh chan *attacker.Result\n \treportCh chan string\n \n-\t// Indicates if charts are drawing.\n+\t// aims to avoid to perform multiple `redrawChart`.\n \tchartDrawing bool\n }\n \ndiff --git a/gui/gui.go b/gui/gui.go\nindex fa65a15..62b1262 100644\n--- a/gui/gui.go\n+++ b/gui/gui.go\n@@ -3,6 +3,7 @@ package gui\n import (\n \t\"context\"\n \t\"fmt\"\n+\t\"net/url\"\n \t\"time\"\n \n \t\"github.com/mum4k/termdash\"\n@@ -60,19 +61,22 @@ func Run() error {\n func keybinds(ctx context.Context, cancel context.CancelFunc, dr *drawer) func(*terminalapi.Keyboard) {\n \treturn func(k *terminalapi.Keyboard) {\n \t\tswitch k.Key {\n-\t\tcase keyboard.KeyEsc, keyboard.KeyCtrlC:\n+\t\tcase keyboard.KeyCtrlC: // Quit\n \t\t\tcancel()\n-\t\tcase keyboard.KeySpace:\n+\t\tcase keyboard.KeyEnter: // Attack\n \t\t\tif dr.chartDrawing {\n \t\t\t\treturn\n \t\t\t}\n-\t\t\t// TODO: Enalble to poplulate from input\n \t\t\tvar (\n \t\t\t\trate        = 10\n \t\t\t\tduration, _ = time.ParseDuration(\"2s\")\n \t\t\t\trequestNum  = rate * int(duration/time.Second)\n-\t\t\t\ttarget      = \"http://34.84.111.163:9898\"\n+\t\t\t\ttarget      = dr.widgets.urlInput.Read()\n \t\t\t)\n+\t\t\tif _, err := url.ParseRequestURI(target); err != nil {\n+\t\t\t\tdr.reportCh <- fmt.Sprintf(\"bad URL: %v\", err)\n+\t\t\t\treturn\n+\t\t\t}\n \t\t\t// To pre-allocate, run redrawChart on a per-attack basis.\n \t\t\tgo dr.redrawChart(ctx, requestNum)\n \t\t\tgo func(ctx context.Context, d *drawer, t string, r int, du time.Duration) {\ndiff --git a/gui/widgets.go b/gui/widgets.go\nindex b31762e..36dc4c4 100644\n--- a/gui/widgets.go\n+++ b/gui/widgets.go\n@@ -32,11 +32,11 @@ func newWidgets() (*widgets, error) {\n \tif err != nil {\n \t\treturn nil, err\n \t}\n-\treportText, err := newRollText(\"Give the target URL and press Space, then the attack will be launched.\")\n+\treportText, err := newRollText(\"Give the target URL and press Enter, then the attack will be launched.\")\n \tif err != nil {\n \t\treturn nil, err\n \t}\n-\tnavi, err := newRollText(\"Ctrl-c: quit, Space: attack\")\n+\tnavi, err := newRollText(\"Ctrl-c: quit, Enter: attack\")\n \tif err != nil {\n \t\treturn nil, err\n \t}\n@@ -95,10 +95,5 @@ func newTextInput(label, placeHolder string) (*textinput.TextInput, error) {\n \t\ttextinput.Label(label, cell.FgColor(cell.ColorBlue)),\n \t\ttextinput.MaxWidthCells(99),\n \t\ttextinput.PlaceHolder(placeHolder),\n-\t\ttextinput.OnSubmit(func(text string) error {\n-\t\t\t// TODO: Handle on submit action, for example, using channel.\n-\t\t\tpp.Println(\"input text\", text)\n-\t\t\treturn nil\n-\t\t}),\n \t)\n }\n",
+  "diffTruncated": false,
+  "tree": [
+    ".gitignore",
+    ".golangci.yml",
+    "LICENSE",
+    "README.md",
+    "attacker/attacker.go",
+    "attacker/attacker_test.go",
+    "attacker/fake_attacker.go",
+    "attacker/metrics.go",
+    "go.mod",
+    "go.sum",
+    "gui/drawer.go",
+    "gui/gui.go",
+    "gui/widgets.go",
+    "main.go"
+  ],
+  "explanation": null
+}

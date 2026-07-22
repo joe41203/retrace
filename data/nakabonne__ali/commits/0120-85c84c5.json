@@ -1,0 +1,86 @@
+{
+  "seq": 120,
+  "sha": "85c84c5105e63ae1680d5572b303f94511f10b6d",
+  "parents": [
+    "da09bf247637f545b12315339acf622e0ffd2b04",
+    "51d1af36eb67856dca91b5eff49a27ef159eeda1"
+  ],
+  "author": {
+    "name": "Ryo Nakao",
+    "email": "ryo@nakao.dev",
+    "date": "2020-10-06T21:14:56+09:00"
+  },
+  "message": "Merge pull request #47 from brenol/change-timestamp-formats-in-others-text\n\nchange timestamp format to not have millis/nanos at all",
+  "pr": {
+    "number": 47,
+    "title": "change timestamp format to not have millis/nanos at all",
+    "body": "Sorry I took so long for this one :)\r\n\r\nThis closes #33 \r\n\r\nedit: It looks like this, though (it has the T):\r\n![image](https://user-images.githubusercontent.com/7342697/95153481-edf0ba80-0765-11eb-842d-6c8e1d7a3038.png)\r\n\r\n",
+    "url": "https://github.com/nakabonne/ali/pull/47"
+  },
+  "linkedIssues": [
+    {
+      "number": 33,
+      "title": "modify others text for better reading ",
+      "body": "This is actually a question.\r\n\r\nPerhaps Earliest/Latest/End shouldn't use String() for a time.Time. It gets noisy when you have a timezone (because of Monotonic): \r\n![image](https://user-images.githubusercontent.com/7342697/94883416-00ef4c00-0441-11eb-832d-204c0f9be904.png)\r\n\r\nPerhaps we can use time.RFC3339Nano?\r\n\r\n![image](https://user-images.githubusercontent.com/7342697/94884076-d2727080-0442-11eb-9fb1-22bc8515d47b.png)\r\n\r\nOr some middleground, without the T:\r\n![image](https://user-images.githubusercontent.com/7342697/94884146-0352a580-0443-11eb-9f36-783caf9d3333.png)\r\n\r\nOr without millis/nanos:\r\n![image](https://user-images.githubusercontent.com/7342697/94884363-9ee41600-0443-11eb-89f5-84fb0d64ee56.png)\r\n\r\nOr without millis/nanos and aligned:\r\n![image](https://user-images.githubusercontent.com/7342697/94884392-ba4f2100-0443-11eb-98e5-5af3d08d4bb0.png)\r\n\r\nOr with millis/nanos, aligned, without monotonic:\r\n![image](https://user-images.githubusercontent.com/7342697/94884518-13b75000-0444-11eb-87f7-4d0c1ad0f507.png)\r\n\r\nAnd (I know I'm talking mostly about date but...) with everything aligned:\r\n![image](https://user-images.githubusercontent.com/7342697/94884632-655fda80-0444-11eb-94e7-37ad2fc455f1.png)\r\n\r\n\r\n\r\n",
+      "url": "https://github.com/nakabonne/ali/issues/33"
+    }
+  ],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 6,
+    "deletions": 6
+  },
+  "files": [
+    {
+      "path": "gui/drawer.go",
+      "status": "M",
+      "additions": 3,
+      "deletions": 3,
+      "binary": false
+    },
+    {
+      "path": "gui/drawer_test.go",
+      "status": "M",
+      "additions": 3,
+      "deletions": 3,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/gui/drawer.go b/gui/drawer.go\nindex d820e0b..fa2c8ac 100644\n--- a/gui/drawer.go\n+++ b/gui/drawer.go\n@@ -137,9 +137,9 @@ func (d *drawer) redrawMetrics(ctx context.Context) {\n \t\t\t\tmetrics.Rate,\n \t\t\t\tmetrics.Throughput,\n \t\t\t\tmetrics.Success,\n-\t\t\t\tmetrics.Earliest,\n-\t\t\t\tmetrics.Latest,\n-\t\t\t\tmetrics.End,\n+\t\t\t\tmetrics.Earliest.Format(time.RFC3339),\n+\t\t\t\tmetrics.Latest.Format(time.RFC3339),\n+\t\t\t\tmetrics.End.Format(time.RFC3339),\n \t\t\t), text.WriteReplace())\n \n \t\t\tcodesText := \"\"\ndiff --git a/gui/drawer_test.go b/gui/drawer_test.go\nindex f0dc2b4..2a02731 100644\n--- a/gui/drawer_test.go\n+++ b/gui/drawer_test.go\n@@ -236,9 +236,9 @@ Requests: 1\n Rate: 1.000000\n Throughput: 1.000000\n Success: 1.000000\n-Earliest: 2009-11-10 23:00:00 +0000 UTC\n-Latest: 2009-11-10 23:00:00 +0000 UTC\n-End: 2009-11-10 23:00:00 +0000 UTC`, gomock.Any())\n+Earliest: 2009-11-10T23:00:00Z\n+Latest: 2009-11-10T23:00:00Z\n+End: 2009-11-10T23:00:00Z`, gomock.Any())\n \n \t\t\t\treturn t\n \t\t\t}(),\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/lint.yml",
+    ".github/workflows/release.yml",
+    ".github/workflows/test.yml",
+    ".gitignore",
+    ".golangci.yml",
+    ".goreleaser.yml",
+    "Dockerfile",
+    "LICENSE",
+    "Makefile",
+    "README.md",
+    "attacker/attacker.go",
+    "attacker/attacker_test.go",
+    "attacker/fake_attacker.go",
+    "attacker/metrics.go",
+    "codecov.yml",
+    "go.mod",
+    "go.sum",
+    "gui/drawer.go",
+    "gui/drawer_test.go",
+    "gui/gui.go",
+    "gui/gui_test.go",
+    "gui/keybinds.go",
+    "gui/keybinds_test.go",
+    "gui/widgets.go",
+    "gui/widgets.mock.go",
+    "images/demo.gif",
+    "images/mouse-support.gif",
+    "images/progress.gif",
+    "images/real-time.gif",
+    "main.go",
+    "main_test.go",
+    "testdata/body-1.json"
+  ],
+  "explanation": null
+}

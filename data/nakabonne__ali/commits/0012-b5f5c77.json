@@ -1,0 +1,53 @@
+{
+  "seq": 12,
+  "sha": "b5f5c777a489fb95a8b3916cf43a5fb4403851be",
+  "parents": [
+    "14e9f4a3afcc4bcc6e73713678d486b7e2e2e3b3"
+  ],
+  "author": {
+    "name": "nakabonne",
+    "email": "ryo@nakao.dev",
+    "date": "2020-09-13T11:10:01+09:00"
+  },
+  "message": "Rename widgets name",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 13,
+    "deletions": 13
+  },
+  "files": [
+    {
+      "path": "gui/gui.go",
+      "status": "M",
+      "additions": 3,
+      "deletions": 3,
+      "binary": false
+    },
+    {
+      "path": "gui/widgets.go",
+      "status": "M",
+      "additions": 10,
+      "deletions": 10,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/gui/gui.go b/gui/gui.go\nindex 17df6df..dc99679 100644\n--- a/gui/gui.go\n+++ b/gui/gui.go\n@@ -60,7 +60,7 @@ func Run() error {\n \t\t\t\tmetrics := attacker.Attack(ctx, \"http://34.84.111.163:9898\", resultCh, attacker.Options{Rate: rate, Duration: duration})\n \t\t\t\tpp.Println(metrics)\n \t\t\t}()\n-\t\t\tgo redrawChart(ctx, w.plotChart, resultCh, requestNum)\n+\t\t\tgo redrawChart(ctx, w.latencyChart, resultCh, requestNum)\n \t\t}\n \t}\n \n@@ -69,11 +69,11 @@ func Run() error {\n \n func gridLayout(w *widgets) ([]container.Option, error) {\n \traw1 := grid.RowHeightPerc(50,\n-\t\tgrid.ColWidthPerc(99, grid.Widget(w.plotChart, container.Border(linestyle.Light), container.BorderTitle(\"Plot\"))),\n+\t\tgrid.ColWidthPerc(99, grid.Widget(w.latencyChart, container.Border(linestyle.Light), container.BorderTitle(\"Latency\"))),\n \t)\n \traw2 := grid.RowHeightPerc(47,\n \t\tgrid.ColWidthPerc(50, grid.Widget(w.urlInput, container.Border(linestyle.Light), container.BorderTitle(\"Input\"))),\n-\t\tgrid.ColWidthPerc(49, grid.Widget(w.metrics, container.Border(linestyle.Light), container.BorderTitle(\"Metrics\"))),\n+\t\tgrid.ColWidthPerc(49, grid.Widget(w.reportText, container.Border(linestyle.Light), container.BorderTitle(\"Report\"))),\n \t)\n \traw3 := grid.RowHeightPerc(2,\n \t\tgrid.ColWidthPerc(99, grid.Widget(w.navi, container.Border(linestyle.Light))),\ndiff --git a/gui/widgets.go b/gui/widgets.go\nindex 536c02f..ed61d99 100644\n--- a/gui/widgets.go\n+++ b/gui/widgets.go\n@@ -19,10 +19,10 @@ const (\n )\n \n type widgets struct {\n-\turlInput  *textinput.TextInput\n-\tplotChart *linechart.LineChart\n-\tmetrics   *text.Text\n-\tnavi      *text.Text\n+\turlInput     *textinput.TextInput\n+\tlatencyChart *linechart.LineChart\n+\treportText   *text.Text\n+\tnavi         *text.Text\n }\n \n func newWidgets() (*widgets, error) {\n@@ -44,10 +44,10 @@ func newWidgets() (*widgets, error) {\n \t}\n \n \treturn &widgets{\n-\t\turlInput:  ti,\n-\t\tplotChart: lc,\n-\t\tmetrics:   rt,\n-\t\tnavi:      wt,\n+\t\turlInput:     ti,\n+\t\tlatencyChart: lc,\n+\t\treportText:   rt,\n+\t\tnavi:         wt,\n \t}, nil\n }\n \n@@ -78,9 +78,9 @@ func newTextInput() (*textinput.TextInput, error) {\n \tinput, err := textinput.New(\n \t\ttextinput.Label(\"Target URL: \", cell.FgColor(cell.ColorBlue)),\n \t\ttextinput.MaxWidthCells(20),\n-\t\ttextinput.PlaceHolder(\"enter any text\"),\n+\t\ttextinput.PlaceHolder(\"enter target URL\"),\n \t\ttextinput.OnSubmit(func(text string) error {\n-\t\t\t// TODO: Handle on submit action, for instance using channel.\n+\t\t\t// TODO: Handle on submit action, for example, using channel.\n \t\t\tpp.Println(\"input text\", text)\n \t\t\treturn nil\n \t\t}),\n",
+  "diffTruncated": false,
+  "tree": [
+    ".gitignore",
+    ".golangci.yml",
+    "LICENSE",
+    "README.md",
+    "attacker/attacker.go",
+    "attacker/attacker_test.go",
+    "attacker/fake_attacker.go",
+    "go.mod",
+    "go.sum",
+    "gui/gui.go",
+    "gui/widgets.go",
+    "main.go"
+  ],
+  "explanation": null
+}

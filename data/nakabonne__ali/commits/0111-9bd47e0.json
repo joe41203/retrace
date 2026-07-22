@@ -1,0 +1,113 @@
+{
+  "seq": 111,
+  "sha": "9bd47e021561648e6054b0ccfd2f55c6fab85f17",
+  "parents": [
+    "c2d447f008cef96c620c42efd3a0c997e6385b20"
+  ],
+  "author": {
+    "name": "Ryo Nakao",
+    "email": "ryo@nakao.dev",
+    "date": "2020-10-03T10:50:11+09:00"
+  },
+  "message": "Remove unneeded message widgets (#40)\n\n* Remove unneeded message widgets\r\n\r\n* Remove unused stuff",
+  "pr": {
+    "number": 40,
+    "title": "Remove unneeded message widgets",
+    "body": "",
+    "url": "https://github.com/nakabonne/ali/pull/40"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 7,
+    "additions": 0,
+    "deletions": 64
+  },
+  "files": [
+    {
+      "path": "gui/drawer.go",
+      "status": "M",
+      "additions": 0,
+      "deletions": 14,
+      "binary": false
+    },
+    {
+      "path": "gui/drawer_test.go",
+      "status": "M",
+      "additions": 0,
+      "deletions": 35,
+      "binary": false
+    },
+    {
+      "path": "gui/gui.go",
+      "status": "M",
+      "additions": 0,
+      "deletions": 2,
+      "binary": false
+    },
+    {
+      "path": "gui/keybinds.go",
+      "status": "M",
+      "additions": 0,
+      "deletions": 2,
+      "binary": false
+    },
+    {
+      "path": "gui/keybinds_test.go",
+      "status": "M",
+      "additions": 0,
+      "deletions": 2,
+      "binary": false
+    },
+    {
+      "path": "gui/widgets.go",
+      "status": "M",
+      "additions": 0,
+      "deletions": 8,
+      "binary": false
+    },
+    {
+      "path": "main.go",
+      "status": "M",
+      "additions": 0,
+      "deletions": 1,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/gui/drawer.go b/gui/drawer.go\nindex 5f00df9..d820e0b 100644\n--- a/gui/drawer.go\n+++ b/gui/drawer.go\n@@ -17,8 +17,6 @@ type drawer struct {\n \tchartCh   chan *attacker.Result\n \tgaugeCh   chan bool\n \tmetricsCh chan *attacker.Metrics\n-\t// TODO: Remove\n-\tmessageCh chan string\n \n \t// aims to avoid to perform multiple `redrawChart`.\n \tchartDrawing bool\n@@ -160,15 +158,3 @@ func (d *drawer) redrawMetrics(ctx context.Context) {\n \t\t}\n \t}\n }\n-\n-func (d *drawer) redrawMessage(ctx context.Context) {\n-\tdefer close(d.messageCh)\n-\tfor {\n-\t\tselect {\n-\t\tcase <-ctx.Done():\n-\t\t\treturn\n-\t\tcase m := <-d.messageCh:\n-\t\t\td.widgets.messageText.Write(m, text.WriteReplace())\n-\t\t}\n-\t}\n-}\ndiff --git a/gui/drawer_test.go b/gui/drawer_test.go\nindex d5f797d..f0dc2b4 100644\n--- a/gui/drawer_test.go\n+++ b/gui/drawer_test.go\n@@ -265,38 +265,3 @@ End: 2009-11-10 23:00:00 +0000 UTC`, gomock.Any())\n \t\t})\n \t}\n }\n-\n-func TestRedrawMessage(t *testing.T) {\n-\tctrl := gomock.NewController(t)\n-\tdefer ctrl.Finish()\n-\n-\ttests := []struct {\n-\t\tname    string\n-\t\tmessage string\n-\t\ttext    Text\n-\t}{\n-\t\t{\n-\t\t\tname:    \"write foo\",\n-\t\t\tmessage: \"foo\",\n-\t\t\ttext: func() Text {\n-\t\t\t\tg := NewMockText(ctrl)\n-\t\t\t\tg.EXPECT().Write(\"foo\", gomock.Any())\n-\t\t\t\treturn g\n-\t\t\t}(),\n-\t\t},\n-\t}\n-\n-\tfor _, tt := range tests {\n-\t\tt.Run(tt.name, func(t *testing.T) {\n-\t\t\tctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)\n-\t\t\td := &drawer{\n-\t\t\t\twidgets:   &widgets{messageText: tt.text},\n-\t\t\t\tmessageCh: make(chan string),\n-\t\t\t}\n-\t\t\tgo d.redrawMessage(ctx)\n-\t\t\td.messageCh <- tt.message\n-\t\t\tcancel()\n-\t\t\t<-d.messageCh\n-\t\t})\n-\t}\n-}\ndiff --git a/gui/gui.go b/gui/gui.go\nindex 814858d..3cbb7b8 100644\n--- a/gui/gui.go\n+++ b/gui/gui.go\n@@ -58,10 +58,8 @@ func run(t *termbox.Terminal, r runner, targetURL string, opts *attacker.Options\n \t\tchartCh:   make(chan *attacker.Result),\n \t\tgaugeCh:   make(chan bool),\n \t\tmetricsCh: make(chan *attacker.Metrics),\n-\t\tmessageCh: make(chan string),\n \t}\n \tgo d.redrawMetrics(ctx)\n-\tgo d.redrawMessage(ctx)\n \n \tk := keybinds(ctx, cancel, d, targetURL, *opts)\n \ndiff --git a/gui/keybinds.go b/gui/keybinds.go\nindex a2a5dc0..16db35a 100644\n--- a/gui/keybinds.go\n+++ b/gui/keybinds.go\n@@ -23,7 +23,6 @@ func keybinds(ctx context.Context, cancel context.CancelFunc, dr *drawer, target\n \n func attack(ctx context.Context, d *drawer, target string, opts attacker.Options) {\n \tif d.chartDrawing {\n-\t\td.messageCh <- \"Wait until the attack is over\"\n \t\treturn\n \t}\n \trequestNum := opts.Rate * int(opts.Duration/time.Second)\n@@ -34,6 +33,5 @@ func attack(ctx context.Context, d *drawer, target string, opts attacker.Options\n \tgo func(ctx context.Context, d *drawer, t string, o attacker.Options) {\n \t\tattacker.Attack(ctx, t, d.chartCh, d.metricsCh, o) // this blocks until attack finishes\n \t\td.chartCh <- &attacker.Result{End: true}\n-\t\td.messageCh <- \"Attack completed\"\n \t}(ctx, d, target, opts)\n }\ndiff --git a/gui/keybinds_test.go b/gui/keybinds_test.go\nindex a47728c..3e658f1 100644\n--- a/gui/keybinds_test.go\n+++ b/gui/keybinds_test.go\n@@ -61,14 +61,12 @@ func TestAttack(t *testing.T) {\n \t\t\td := &drawer{\n \t\t\t\twidgets: &widgets{\n \t\t\t\t\tlatencyChart:  nil,\n-\t\t\t\t\tmessageText:   nil,\n \t\t\t\t\tlatenciesText: nil,\n \t\t\t\t\tbytesText:     nil,\n \t\t\t\t\tothersText:    nil,\n \t\t\t\t\tprogressGauge: nil,\n \t\t\t\t\tnavi:          nil,\n \t\t\t\t},\n-\t\t\t\tmessageCh:    make(chan string, 100),\n \t\t\t\tchartDrawing: tt.chartDrawing,\n \t\t\t}\n \t\t\tattack(ctx, d, \"\", attacker.Options{})\ndiff --git a/gui/widgets.go b/gui/widgets.go\nindex ceb6068..3dcfb7a 100644\n--- a/gui/widgets.go\n+++ b/gui/widgets.go\n@@ -32,7 +32,6 @@ type widgets struct {\n \tlatencyChart LineChart\n \n \tparamsText      Text\n-\tmessageText     Text\n \tlatenciesText   Text\n \tbytesText       Text\n \tstatusCodesText Text\n@@ -49,10 +48,6 @@ func newWidgets(targetURL string, opts *attacker.Options) (*widgets, error) {\n \t\treturn nil, err\n \t}\n \n-\tmessageText, err := newText(\"Give the target URL and press Enter\")\n-\tif err != nil {\n-\t\treturn nil, err\n-\t}\n \tlatenciesText, err := newText(\"\")\n \tif err != nil {\n \t\treturn nil, err\n@@ -90,7 +85,6 @@ func newWidgets(targetURL string, opts *attacker.Options) (*widgets, error) {\n \treturn &widgets{\n \t\tlatencyChart:    latencyChart,\n \t\tparamsText:      paramsText,\n-\t\tmessageText:     messageText,\n \t\tlatenciesText:   latenciesText,\n \t\tbytesText:       bytesText,\n \t\tstatusCodesText: statusCodesText,\n@@ -124,9 +118,7 @@ func newText(s string) (Text, error) {\n \n func newGauge() (Gauge, error) {\n \treturn gauge.New(\n-\t\t//gauge.Height(1),\n \t\tgauge.Border(linestyle.None),\n-\t\t//gauge.BorderTitle(\"Progress\"),\n \t)\n }\n \ndiff --git a/main.go b/main.go\nindex 5df6ba5..23d5ba5 100644\n--- a/main.go\n+++ b/main.go\n@@ -43,7 +43,6 @@ Author:\n )\n \n type cli struct {\n-\ttarget   string\n \trate     int\n \tduration time.Duration\n \ttimeout  time.Duration\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/lint.yml",
+    ".github/workflows/release.yml",
+    ".github/workflows/test.yml",
+    ".gitignore",
+    ".golangci.yml",
+    ".goreleaser.yml",
+    "Dockerfile",
+    "LICENSE",
+    "Makefile",
+    "README.md",
+    "attacker/attacker.go",
+    "attacker/attacker_test.go",
+    "attacker/fake_attacker.go",
+    "attacker/metrics.go",
+    "codecov.yml",
+    "go.mod",
+    "go.sum",
+    "gui/drawer.go",
+    "gui/drawer_test.go",
+    "gui/gui.go",
+    "gui/gui_test.go",
+    "gui/keybinds.go",
+    "gui/keybinds_test.go",
+    "gui/testdata/body-1.json",
+    "gui/widgets.go",
+    "gui/widgets.mock.go",
+    "images/demo.gif",
+    "images/mouse-support.gif",
+    "images/progress.gif",
+    "images/real-time.gif",
+    "main.go",
+    "main_test.go"
+  ],
+  "explanation": null
+}

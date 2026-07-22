@@ -1,0 +1,48 @@
+{
+  "seq": 18,
+  "sha": "808c3e8fbc22d9c7c930b40b87c4ef39ba60fdbe",
+  "parents": [
+    "56b79660de1548a49f2dd3b0ada1e4d352705db3"
+  ],
+  "author": {
+    "name": "nakabonne",
+    "email": "ryo@nakao.dev",
+    "date": "2020-09-14T14:01:13+09:00"
+  },
+  "message": "Add attack button",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 38,
+    "deletions": 30
+  },
+  "files": [
+    {
+      "path": "gui/widgets.go",
+      "status": "M",
+      "additions": 38,
+      "deletions": 30,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/gui/widgets.go b/gui/widgets.go\nindex 47b23c5..b31762e 100644\n--- a/gui/widgets.go\n+++ b/gui/widgets.go\n@@ -5,6 +5,8 @@ import (\n \n \t\"github.com/k0kubun/pp\"\n \t\"github.com/mum4k/termdash/cell\"\n+\t\"github.com/mum4k/termdash/keyboard\"\n+\t\"github.com/mum4k/termdash/widgets/button\"\n \t\"github.com/mum4k/termdash/widgets/linechart\"\n \t\"github.com/mum4k/termdash/widgets/text\"\n \t\"github.com/mum4k/termdash/widgets/textinput\"\n@@ -16,35 +18,49 @@ const (\n )\n \n type widgets struct {\n-\turlInput     *textinput.TextInput\n-\tlatencyChart *linechart.LineChart\n-\treportText   *text.Text\n-\tnavi         *text.Text\n+\tattackButton   *button.Button\n+\turlInput       *textinput.TextInput\n+\trateLimitInput *textinput.TextInput\n+\tdurationInput  *textinput.TextInput\n+\tlatencyChart   *linechart.LineChart\n+\treportText     *text.Text\n+\tnavi           *text.Text\n }\n \n func newWidgets() (*widgets, error) {\n-\tlc, err := newLineChart()\n+\tlatencyChart, err := newLineChart()\n \tif err != nil {\n \t\treturn nil, err\n \t}\n-\trt, err := newRollText(\"Give the target URL and press Space, then the attack will be launched.\")\n+\treportText, err := newRollText(\"Give the target URL and press Space, then the attack will be launched.\")\n \tif err != nil {\n \t\treturn nil, err\n \t}\n-\twt, err := newRollText(\"Ctrl-c: quit, Space: attack\")\n+\tnavi, err := newRollText(\"Ctrl-c: quit, Space: attack\")\n \tif err != nil {\n \t\treturn nil, err\n \t}\n-\tti, err := newTextInput()\n+\turlInput, err := newTextInput(\"Target URL: \", \"target URL\")\n \tif err != nil {\n \t\treturn nil, err\n \t}\n-\n+\trateLimitInput, err := newTextInput(\"Rate limit: \", \"number of requests per second (default 50)\")\n+\tif err != nil {\n+\t\treturn nil, err\n+\t}\n+\tattackButton, err := newButton(\"Attack\", func() error {\n+\t\ttarget := urlInput.Read()\n+\t\tpp.Println(target)\n+\t\t// TODO: Call Attack.\n+\t\treturn nil\n+\t})\n \treturn &widgets{\n-\t\turlInput:     ti,\n-\t\tlatencyChart: lc,\n-\t\treportText:   rt,\n-\t\tnavi:         wt,\n+\t\tattackButton:   attackButton,\n+\t\turlInput:       urlInput,\n+\t\trateLimitInput: rateLimitInput,\n+\t\tlatencyChart:   latencyChart,\n+\t\treportText:     reportText,\n+\t\tnavi:           navi,\n \t}, nil\n }\n \n@@ -67,30 +83,22 @@ func newRollText(s string) (*text.Text, error) {\n \treturn t, nil\n }\n \n-func newWrapText(s string) (*text.Text, error) {\n-\tt, err := text.New(text.WrapAtWords())\n-\tif err != nil {\n-\t\treturn nil, err\n-\t}\n-\tif err := t.Write(s); err != nil {\n-\t\treturn nil, err\n-\t}\n-\treturn t, nil\n+func newButton(text string, onSubmit func() error) (*button.Button, error) {\n+\treturn button.New(text, onSubmit,\n+\t\tbutton.GlobalKey(keyboard.KeyEnter),\n+\t\tbutton.FillColor(cell.ColorNumber(196)),\n+\t)\n }\n \n-func newTextInput() (*textinput.TextInput, error) {\n-\tinput, err := textinput.New(\n-\t\ttextinput.Label(\"Target URL: \", cell.FgColor(cell.ColorBlue)),\n+func newTextInput(label, placeHolder string) (*textinput.TextInput, error) {\n+\treturn textinput.New(\n+\t\ttextinput.Label(label, cell.FgColor(cell.ColorBlue)),\n \t\ttextinput.MaxWidthCells(99),\n-\t\ttextinput.PlaceHolder(\"enter target URL\"),\n+\t\ttextinput.PlaceHolder(placeHolder),\n \t\ttextinput.OnSubmit(func(text string) error {\n \t\t\t// TODO: Handle on submit action, for example, using channel.\n \t\t\tpp.Println(\"input text\", text)\n \t\t\treturn nil\n \t\t}),\n \t)\n-\tif err != nil {\n-\t\treturn nil, err\n-\t}\n-\treturn input, err\n }\n",
+  "diffTruncated": false,
+  "tree": [
+    ".gitignore",
+    ".golangci.yml",
+    "LICENSE",
+    "README.md",
+    "attacker/attacker.go",
+    "attacker/attacker_test.go",
+    "attacker/fake_attacker.go",
+    "attacker/metrics.go",
+    "go.mod",
+    "go.sum",
+    "gui/drawer.go",
+    "gui/gui.go",
+    "gui/widgets.go",
+    "main.go"
+  ],
+  "explanation": null
+}

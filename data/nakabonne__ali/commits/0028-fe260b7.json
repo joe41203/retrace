@@ -1,0 +1,63 @@
+{
+  "seq": 28,
+  "sha": "fe260b734338316f496de448e779f6126d7b5e45",
+  "parents": [
+    "8965080dc4d9e6048b3accd4fedbe4805e22c089"
+  ],
+  "author": {
+    "name": "nakabonne",
+    "email": "ryo@nakao.dev",
+    "date": "2020-09-15T20:59:59+09:00"
+  },
+  "message": "Enable to specify timeout",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 3,
+    "additions": 20,
+    "deletions": 3
+  },
+  "files": [
+    {
+      "path": "attacker/attacker.go",
+      "status": "M",
+      "additions": 6,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "gui/gui.go",
+      "status": "M",
+      "additions": 3,
+      "deletions": 2,
+      "binary": false
+    },
+    {
+      "path": "gui/input_handler.go",
+      "status": "M",
+      "additions": 11,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/attacker/attacker.go b/attacker/attacker.go\nindex 8dcaff9..28c7b7b 100644\n--- a/attacker/attacker.go\n+++ b/attacker/attacker.go\n@@ -11,6 +11,7 @@ import (\n const (\n \tDefaultRate     = 50\n \tDefaultDuration = 10 * time.Second\n+\tDefaultTimeout  = 30 * time.Second\n \tDefaultMethod   = http.MethodGet\n )\n \n@@ -23,6 +24,7 @@ type Attacker interface {\n type Options struct {\n \tRate     int\n \tDuration time.Duration\n+\tTimeout  time.Duration\n \tMethod   string\n \tBody     []byte\n \tHeader   http.Header\n@@ -50,11 +52,14 @@ func Attack(ctx context.Context, target string, resCh chan *Result, opts Options\n \tif opts.Duration == 0 {\n \t\topts.Duration = DefaultDuration\n \t}\n+\tif opts.Timeout == 0 {\n+\t\topts.Timeout = DefaultTimeout\n+\t}\n \tif opts.Method == \"\" {\n \t\topts.Method = DefaultMethod\n \t}\n \tif opts.Attacker == nil {\n-\t\topts.Attacker = vegeta.NewAttacker()\n+\t\topts.Attacker = vegeta.NewAttacker(vegeta.Timeout(opts.Timeout))\n \t}\n \n \trate := vegeta.Rate{Freq: opts.Rate, Per: time.Second}\ndiff --git a/gui/gui.go b/gui/gui.go\nindex 3d31751..5292fc9 100644\n--- a/gui/gui.go\n+++ b/gui/gui.go\n@@ -67,8 +67,9 @@ func gridLayout(w *widgets) ([]container.Option, error) {\n \t\tgrid.ColWidthPerc(64,\n \t\t\tgrid.RowHeightPerc(29, grid.Widget(w.urlInput, container.Border(linestyle.None))),\n \t\t\tgrid.RowHeightPerc(29,\n-\t\t\t\tgrid.ColWidthPerc(50, grid.Widget(w.rateLimitInput, container.Border(linestyle.None))),\n-\t\t\t\tgrid.ColWidthPerc(49, grid.Widget(w.durationInput, container.Border(linestyle.None))),\n+\t\t\t\tgrid.ColWidthPerc(33, grid.Widget(w.rateLimitInput, container.Border(linestyle.None))),\n+\t\t\t\tgrid.ColWidthPerc(33, grid.Widget(w.durationInput, container.Border(linestyle.None))),\n+\t\t\t\tgrid.ColWidthPerc(33, grid.Widget(w.timeoutInput, container.Border(linestyle.None))),\n \t\t\t),\n \t\t\tgrid.RowHeightPerc(29,\n \t\t\t\tgrid.ColWidthPerc(33, grid.Widget(w.methodInput, container.Border(linestyle.None))),\ndiff --git a/gui/input_handler.go b/gui/input_handler.go\nindex 54d70e1..f048ffa 100644\n--- a/gui/input_handler.go\n+++ b/gui/input_handler.go\n@@ -15,6 +15,7 @@ func makeOptions(w *widgets) (attacker.Options, error) {\n \tvar (\n \t\trate     int\n \t\tduration time.Duration\n+\t\ttimeout  time.Duration\n \t\tmethod   string\n \t\tbody     string\n \t\theader   = make(http.Header)\n@@ -39,6 +40,15 @@ func makeOptions(w *widgets) (attacker.Options, error) {\n \t\t}\n \t}\n \n+\tif s := w.timeoutInput.Read(); s == \"\" {\n+\t\ttimeout = attacker.DefaultTimeout\n+\t} else {\n+\t\ttimeout, err = time.ParseDuration(s)\n+\t\tif err != nil {\n+\t\t\treturn attacker.Options{}, fmt.Errorf(\"Unparseable timeout %q: %w\", s, err)\n+\t\t}\n+\t}\n+\n \tif method = w.methodInput.Read(); method != \"\" {\n \t\tif !validateMethod(method) {\n \t\t\treturn attacker.Options{}, fmt.Errorf(\"Given method %q isn't an HTTP request method\", method)\n@@ -65,6 +75,7 @@ func makeOptions(w *widgets) (attacker.Options, error) {\n \treturn attacker.Options{\n \t\tRate:     rate,\n \t\tDuration: duration,\n+\t\tTimeout:  timeout,\n \t\tMethod:   method,\n \t\tBody:     []byte(body),\n \t\tHeader:   header,\n",
+  "diffTruncated": false,
+  "tree": [
+    ".gitignore",
+    ".golangci.yml",
+    "LICENSE",
+    "README.md",
+    "attacker/attacker.go",
+    "attacker/attacker_test.go",
+    "attacker/fake_attacker.go",
+    "attacker/metrics.go",
+    "go.mod",
+    "go.sum",
+    "gui/drawer.go",
+    "gui/gui.go",
+    "gui/input_handler.go",
+    "gui/widgets.go",
+    "main.go"
+  ],
+  "explanation": null
+}

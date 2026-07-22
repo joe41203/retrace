@@ -1,0 +1,53 @@
+{
+  "seq": 11,
+  "sha": "14e9f4a3afcc4bcc6e73713678d486b7e2e2e3b3",
+  "parents": [
+    "b8f8d80bcd93016e20e2b33661d65ed7fcbebb1c"
+  ],
+  "author": {
+    "name": "nakabonne",
+    "email": "ryo@nakao.dev",
+    "date": "2020-09-13T11:05:46+09:00"
+  },
+  "message": "Compute request number to pre-allocate",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 10,
+    "deletions": 8
+  },
+  "files": [
+    {
+      "path": "gui/gui.go",
+      "status": "M",
+      "additions": 6,
+      "deletions": 3,
+      "binary": false
+    },
+    {
+      "path": "gui/widgets.go",
+      "status": "M",
+      "additions": 4,
+      "deletions": 5,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/gui/gui.go b/gui/gui.go\nindex 67f4361..17df6df 100644\n--- a/gui/gui.go\n+++ b/gui/gui.go\n@@ -52,12 +52,15 @@ func Run() error {\n \t\t\tcancel()\n \t\tcase keyboard.KeySpace:\n \t\t\tresultCh := make(chan *attacker.Result)\n+\t\t\t// TODO: Enalble to poplulate from input\n+\t\t\trate := 50\n+\t\t\tduration, _ := time.ParseDuration(\"10s\")\n+\t\t\trequestNum := rate * int(duration/time.Second)\n \t\t\tgo func() {\n-\t\t\t\t// TODO: Enalble to poplulate from input\n-\t\t\t\tmetrics := attacker.Attack(ctx, \"http://34.84.111.163:9898\", resultCh, attacker.Options{Rate: 50, Duration: 10 * time.Second})\n+\t\t\t\tmetrics := attacker.Attack(ctx, \"http://34.84.111.163:9898\", resultCh, attacker.Options{Rate: rate, Duration: duration})\n \t\t\t\tpp.Println(metrics)\n \t\t\t}()\n-\t\t\tgo redrawChart(ctx, w.plotChart, resultCh)\n+\t\t\tgo redrawChart(ctx, w.plotChart, resultCh, requestNum)\n \t\t}\n \t}\n \ndiff --git a/gui/widgets.go b/gui/widgets.go\nindex 1674585..536c02f 100644\n--- a/gui/widgets.go\n+++ b/gui/widgets.go\n@@ -91,19 +91,18 @@ func newTextInput() (*textinput.TextInput, error) {\n \treturn input, err\n }\n \n-func redrawChart(ctx context.Context, lineChart *linechart.LineChart, resultCh chan *attacker.Result) {\n-\tvalues := []float64{}\n+func redrawChart(ctx context.Context, latency *linechart.LineChart, resultCh chan *attacker.Result, maxSize int) {\n+\tvalues := make([]float64, 0, maxSize)\n \tfor {\n \t\tselect {\n \t\tcase <-ctx.Done():\n \t\t\treturn\n \t\tcase res := <-resultCh:\n-\t\t\tpp.Println(\"latency\", res.Latency/time.Millisecond)\n \t\t\tvalues = append(values, float64(res.Latency/time.Millisecond))\n-\t\t\tlineChart.Series(\"plot\", values,\n+\t\t\tlatency.Series(\"latency\", values,\n \t\t\t\tlinechart.SeriesCellOpts(cell.FgColor(cell.ColorNumber(87))),\n \t\t\t\tlinechart.SeriesXLabels(map[int]string{\n-\t\t\t\t\t0: \"num\",\n+\t\t\t\t\t0: \"req\",\n \t\t\t\t}),\n \t\t\t)\n \t\t}\n",
+  "diffTruncated": false,
+  "tree": [
+    ".gitignore",
+    ".golangci.yml",
+    "LICENSE",
+    "README.md",
+    "attacker/attacker.go",
+    "attacker/attacker_test.go",
+    "attacker/fake_attacker.go",
+    "go.mod",
+    "go.sum",
+    "gui/gui.go",
+    "gui/widgets.go",
+    "main.go"
+  ],
+  "explanation": null
+}

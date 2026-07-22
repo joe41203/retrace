@@ -1,0 +1,100 @@
+{
+  "seq": 140,
+  "sha": "dc848df36ceb762de13496f8060aacfb17cb4bf0",
+  "parents": [
+    "f4ad79dc1e6846b0e27395027131145a0d5fe8e8",
+    "d2e2724d0afd13822d61860ae591088379511035"
+  ],
+  "author": {
+    "name": "Ryo Nakao",
+    "email": "ryo@nakao.dev",
+    "date": "2020-10-17T18:23:44+09:00"
+  },
+  "message": "Merge pull request #68 from rzkmak/feat/histogram-buckets\n\nAdd bucket histogram option",
+  "pr": {
+    "number": 68,
+    "title": "Add bucket histogram option",
+    "body": "I'm trying to add an option for bucket histogram as in the #63 issue\r\n\r\n```\r\nali --buckets \"1ms, 10ms, 100ms, 500ms\" http://host.xz\r\n```\r\n\r\nBut I'm not sure where I can put this part\r\n```\r\n0~1ms: 1 25%\r\n1ms~10ms: 1 25%\r\n10ms~100ms: 1 25%\r\n100ms~500ms: 1 25%\r\n```\r\n\r\nAny feedback or suggestion would help me so much.\r\nThank you",
+    "url": "https://github.com/nakabonne/ali/pull/68"
+  },
+  "linkedIssues": [
+    {
+      "number": 63,
+      "title": "Histogram bar chart",
+      "body": "\r\nGive buckets as:\r\n```\r\nali --buckets \"1ms, 10ms, 100ms, 500ms\" http://host.xz\r\n```\r\n\r\nThen drawn as a bar chart:\r\n\r\n![image](https://user-images.githubusercontent.com/19730728/96325158-8fc6b000-1060-11eb-94c2-5324af5c2f21.png)\r\n\r\nhttps://github.com/mum4k/termdash/blob/master/doc/images/barchartdemo.gif\r\n\r\n### More... (TBD)\r\n\r\nit may be helpful to appear on the others widget:\r\n```\r\n0~1ms: 1 25%\r\n1ms~10ms: 1 25%\r\n10ms~100ms: 1 25%\r\n100ms~500ms: 1 25%\r\n```\r\n\r\nSuppose there's an SLA that says 95% of requests must be returned within 500ms. It would be helpful.\r\n\r\n\r\n### TODO:\r\n- [ ] Make it capable of giving histogram buckets from comma-separated args. (https://github.com/nakabonne/ali/pull/68)\r\n- [ ] Add bar chart which draw histogram buckets",
+      "url": "https://github.com/nakabonne/ali/issues/63"
+    }
+  ],
+  "stats": {
+    "filesChanged": 4,
+    "additions": 42,
+    "deletions": 1
+  },
+  "files": [
+    {
+      "path": "README.md",
+      "status": "M",
+      "additions": 1,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "attacker/attacker.go",
+      "status": "M",
+      "additions": 8,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "main.go",
+      "status": "M",
+      "additions": 29,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "main_test.go",
+      "status": "M",
+      "additions": 4,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/README.md b/README.md\nindex b30e939..ee87093 100644\n--- a/README.md\n+++ b/README.md\n@@ -72,6 +72,7 @@ Usage:\n Flags:\n   -b, --body string         A request body to be sent.\n   -B, --body-file string    The path to file whose content will be set as the http request body.\n+      --buckets             Histogram buckets in comma-separated value (example: \"10ms, 100ms, 500ms\".\n   -c, --connections int     Amount of maximum open idle connections per target host (default 10000)\n       --debug               Run in debug mode.\n   -d, --duration duration   The amount of time to issue requests to the targets. Give 0s for an infinite attack. (default 10s)\ndiff --git a/attacker/attacker.go b/attacker/attacker.go\nindex 9d8dea0..33c39ed 100644\n--- a/attacker/attacker.go\n+++ b/attacker/attacker.go\n@@ -43,6 +43,7 @@ type Options struct {\n \tConnections int\n \tHTTP2       bool\n \tLocalAddr   net.IPAddr\n+\tBuckets     []time.Duration\n \n \tAttacker Attacker\n }\n@@ -100,7 +101,13 @@ func Attack(ctx context.Context, target string, resCh chan *Result, metricsCh ch\n \t\tHeader: opts.Header,\n \t})\n \n-\tmetrics := &vegeta.Metrics{}\n+\tvar metrics *vegeta.Metrics\n+\tif len(opts.Buckets) > 0 {\n+\t\thistogram := &vegeta.Histogram{Buckets: opts.Buckets}\n+\t\tmetrics = &vegeta.Metrics{Histogram: histogram}\n+\t} else {\n+\t\tmetrics = &vegeta.Metrics{}\n+\t}\n \n \tchild, cancelChild := context.WithCancel(ctx)\n \tdefer cancelChild()\ndiff --git a/main.go b/main.go\nindex 89fe9b8..117c4a4 100644\n--- a/main.go\n+++ b/main.go\n@@ -45,6 +45,7 @@ type cli struct {\n \tnoHTTP2      bool\n \tlocalAddress string\n \tnoKeepAlive  bool\n+\tbuckets      string\n \n \tdebug   bool\n \tversion bool\n@@ -81,6 +82,7 @@ func parseFlags(stdout, stderr io.Writer) (*cli, error) {\n \tflagSet.IntVarP(&c.connections, \"connections\", \"c\", attacker.DefaultConnections, \"Amount of maximum open idle connections per target host\")\n \tflagSet.BoolVar(&c.noHTTP2, \"no-http2\", false, \"Don't issue HTTP/2 requests to servers which support it.\")\n \tflagSet.StringVar(&c.localAddress, \"local-addr\", \"0.0.0.0\", \"Local IP address.\")\n+\tflagSet.StringVar(&c.buckets, \"buckets\", \"\", \"Histogram buckets; comma-separated list.\")\n \tflagSet.Usage = c.usage\n \tif err := flagSet.Parse(os.Args[1:]); err != nil {\n \t\tif !errors.Is(err, flag.ErrHelp) {\n@@ -177,6 +179,12 @@ func (c *cli) makeOptions() (*attacker.Options, error) {\n \n \tlocalAddr := net.IPAddr{IP: net.ParseIP(c.localAddress)}\n \n+\tparsedBuckets, err := parseBucketOptions(c.buckets)\n+\n+\tif err != nil {\n+\t\treturn nil, fmt.Errorf(\"wrong buckets format %w\", err)\n+\t}\n+\n \treturn &attacker.Options{\n \t\tRate:        c.rate,\n \t\tDuration:    c.duration,\n@@ -191,6 +199,7 @@ func (c *cli) makeOptions() (*attacker.Options, error) {\n \t\tConnections: c.connections,\n \t\tHTTP2:       !c.noHTTP2,\n \t\tLocalAddr:   localAddr,\n+\t\tBuckets:     parsedBuckets,\n \t}, nil\n }\n \n@@ -202,6 +211,26 @@ func validateMethod(method string) bool {\n \treturn false\n }\n \n+func parseBucketOptions(rawBuckets string) ([]time.Duration, error) {\n+\tif rawBuckets == \"\" {\n+\t\treturn []time.Duration{}, nil\n+\t}\n+\n+\tstringBuckets := strings.Split(rawBuckets, \",\")\n+\tresult := make([]time.Duration, len(stringBuckets))\n+\n+\tfor _, bucket := range stringBuckets {\n+\t\ttrimmedBucket := strings.TrimSpace(bucket)\n+\t\td, err := time.ParseDuration(trimmedBucket)\n+\t\tif err != nil {\n+\t\t\treturn nil, err\n+\t\t}\n+\t\tresult = append(result, d)\n+\t}\n+\n+\treturn result, nil\n+}\n+\n // Makes a new file under the working directory only when debug use.\n func setDebug(w io.Writer, debug bool) {\n \tif !debug {\ndiff --git a/main_test.go b/main_test.go\nindex 820ded7..61c1ba7 100644\n--- a/main_test.go\n+++ b/main_test.go\n@@ -203,6 +203,7 @@ func TestMakeOptions(t *testing.T) {\n \t\t\t\tMaxBody:    0,\n \t\t\t\tHTTP2:      true,\n \t\t\t\tKeepAlive:  true,\n+\t\t\t\tBuckets:    []time.Duration{},\n \t\t\t},\n \t\t\twantErr: false,\n \t\t},\n@@ -229,6 +230,7 @@ func TestMakeOptions(t *testing.T) {\n \t\t\t\tMaxBody:    0,\n \t\t\t\tHTTP2:      true,\n \t\t\t\tKeepAlive:  true,\n+\t\t\t\tBuckets:    []time.Duration{},\n \t\t\t},\n \t\t\twantErr: false,\n \t\t},\n@@ -267,6 +269,7 @@ func TestMakeOptions(t *testing.T) {\n \t\t\t\tMaxBody:    0,\n \t\t\t\tHTTP2:      false,\n \t\t\t\tKeepAlive:  true,\n+\t\t\t\tBuckets:    []time.Duration{},\n \t\t\t},\n \t\t\twantErr: false,\n \t\t},\n@@ -294,6 +297,7 @@ func TestMakeOptions(t *testing.T) {\n \t\t\t\tMaxBody:    0,\n \t\t\t\tHTTP2:      true,\n \t\t\t\tKeepAlive:  false,\n+\t\t\t\tBuckets:    []time.Duration{},\n \t\t\t},\n \t\t\twantErr: false,\n \t\t},\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/lint.yml",
+    ".github/workflows/release.yml",
+    ".github/workflows/test.yml",
+    ".gitignore",
+    ".golangci.yml",
+    ".goreleaser.yml",
+    "Dockerfile",
+    "LICENSE",
+    "Makefile",
+    "README.md",
+    "attacker/attacker.go",
+    "attacker/attacker_test.go",
+    "attacker/fake_attacker.go",
+    "attacker/metrics.go",
+    "codecov.yml",
+    "go.mod",
+    "go.sum",
+    "gui/drawer.go",
+    "gui/drawer_test.go",
+    "gui/gui.go",
+    "gui/gui_test.go",
+    "gui/keybinds.go",
+    "gui/keybinds_test.go",
+    "gui/widgets.go",
+    "gui/widgets.mock.go",
+    "images/demo.gif",
+    "images/mouse-support.gif",
+    "images/progress.gif",
+    "images/real-time.gif",
+    "main.go",
+    "main_test.go",
+    "testdata/body-1.json"
+  ],
+  "explanation": null
+}

@@ -1,0 +1,76 @@
+{
+  "seq": 22,
+  "sha": "7fa23dd5c3fd0797c36f18c4428975d3dfbbf228",
+  "parents": [
+    "e2b1d39d8325c86ffd25c2a9eb321930d25684cc"
+  ],
+  "author": {
+    "name": "nakabonne",
+    "email": "ryo@nakao.dev",
+    "date": "2020-09-15T08:52:49+09:00"
+  },
+  "message": "Add progress donut",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 5,
+    "additions": 75,
+    "deletions": 15
+  },
+  "files": [
+    {
+      "path": "README.md",
+      "status": "M",
+      "additions": 17,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "attacker/attacker.go",
+      "status": "M",
+      "additions": 6,
+      "deletions": 6,
+      "binary": false
+    },
+    {
+      "path": "gui/drawer.go",
+      "status": "M",
+      "additions": 23,
+      "deletions": 2,
+      "binary": false
+    },
+    {
+      "path": "gui/gui.go",
+      "status": "M",
+      "additions": 16,
+      "deletions": 6,
+      "binary": false
+    },
+    {
+      "path": "gui/widgets.go",
+      "status": "M",
+      "additions": 13,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/README.md b/README.md\nindex 7beadd0..83e1afd 100644\n--- a/README.md\n+++ b/README.md\n@@ -14,9 +14,25 @@ Another load testing tool, inspired by [vegeta](https://github.com/tsenart/veget\n \n Executables are available through the [releases page](https://github.com/nakabonne/ali/releases).\n \n+## Usage\n+\n ## Features\n #### Mouse support\n \n+#### Visualizes the attack progress\n+\n [gif animations]\n \n-## Alternatives\n\\ No newline at end of file\n+## Built with\n+- [mum4k/termdash](https://github.com/mum4k/termdash/wiki/Termbox-API)\n+  - [nsf/termbox-go](https://github.com/nsf/termbox-go)\n+- [vegeta](https://github.com/tsenart/vegeta)\n+\n+\n+## LoadMap\n+- Plot Bytes In and Bytes Out (Press `Ctrl-w` to switch between charts)\n+- Plot status codes\n+- Better UI\n+\n+## Alternatives\n+\ndiff --git a/attacker/attacker.go b/attacker/attacker.go\nindex 5fe26a0..0fccfb7 100644\n--- a/attacker/attacker.go\n+++ b/attacker/attacker.go\n@@ -9,9 +9,9 @@ import (\n )\n \n const (\n-\tdefaultRate     = 50\n-\tdefaultDuration = 10 * time.Second\n-\tdefaultMethod   = http.MethodGet\n+\tDefaultRate     = 50\n+\tDefaultDuration = 10 * time.Second\n+\tDefaultMethod   = http.MethodGet\n )\n \n type Attacker interface {\n@@ -44,13 +44,13 @@ func Attack(ctx context.Context, target string, resCh chan *Result, opts Options\n \t\treturn nil\n \t}\n \tif opts.Rate == 0 {\n-\t\topts.Rate = defaultRate\n+\t\topts.Rate = DefaultRate\n \t}\n \tif opts.Duration == 0 {\n-\t\topts.Duration = defaultDuration\n+\t\topts.Duration = DefaultDuration\n \t}\n \tif opts.Method == \"\" {\n-\t\topts.Method = defaultMethod\n+\t\topts.Method = DefaultMethod\n \t}\n \tif opts.Attacker == nil {\n \t\topts.Attacker = vegeta.NewAttacker()\ndiff --git a/gui/drawer.go b/gui/drawer.go\nindex 216d2cf..388bfb7 100644\n--- a/gui/drawer.go\n+++ b/gui/drawer.go\n@@ -13,7 +13,8 @@ import (\n \n type drawer struct {\n \twidgets  *widgets\n-\tchartsCh chan *attacker.Result\n+\tchartCh  chan *attacker.Result\n+\tdonutCh  chan bool\n \treportCh chan string\n \n \t// aims to avoid to perform multiple `redrawChart`.\n@@ -31,10 +32,12 @@ L:\n \t\tselect {\n \t\tcase <-ctx.Done():\n \t\t\tbreak L\n-\t\tcase res := <-d.chartsCh:\n+\t\tcase res := <-d.chartCh:\n \t\t\tif res.End {\n+\t\t\t\td.donutCh <- true\n \t\t\t\tbreak L\n \t\t\t}\n+\t\t\td.donutCh <- false\n \t\t\tvalues = append(values, float64(res.Latency/time.Millisecond))\n \t\t\td.widgets.latencyChart.Series(\"latency\", values,\n \t\t\t\tlinechart.SeriesCellOpts(cell.FgColor(cell.ColorNumber(87))),\n@@ -47,6 +50,24 @@ L:\n \td.chartDrawing = false\n }\n \n+func (d *drawer) redrawDonut(ctx context.Context, maxSize int) {\n+\tvar count float64\n+\tsize := float64(maxSize)\n+\td.widgets.progressDonut.Percent(0)\n+\tfor {\n+\t\tselect {\n+\t\tcase <-ctx.Done():\n+\t\t\treturn\n+\t\tcase end := <-d.donutCh:\n+\t\t\tif end {\n+\t\t\t\treturn\n+\t\t\t}\n+\t\t\tcount++\n+\t\t\td.widgets.progressDonut.Percent(int(count / size * 100))\n+\t\t}\n+\t}\n+}\n+\n func (d *drawer) redrawReport(ctx context.Context) {\n \tfor {\n \t\tselect {\ndiff --git a/gui/gui.go b/gui/gui.go\nindex d72f737..97cc9a8 100644\n--- a/gui/gui.go\n+++ b/gui/gui.go\n@@ -50,7 +50,8 @@ func Run() error {\n \n \td := &drawer{\n \t\twidgets:  w,\n-\t\tchartsCh: make(chan *attacker.Result),\n+\t\tchartCh:  make(chan *attacker.Result),\n+\t\tdonutCh:  make(chan bool),\n \t\treportCh: make(chan string),\n \t}\n \tgo d.redrawReport(ctx)\n@@ -76,7 +77,8 @@ func gridLayout(w *widgets) ([]container.Option, error) {\n \t\t\t\tgrid.ColWidthPerc(49, grid.Widget(w.bodyInput, container.Border(linestyle.None))),\n \t\t\t),\n \t\t),\n-\t\tgrid.ColWidthPerc(69, grid.Widget(w.reportText, container.Border(linestyle.Light), container.BorderTitle(\"Report\"))),\n+\t\tgrid.ColWidthPerc(35, grid.Widget(w.reportText, container.Border(linestyle.Light), container.BorderTitle(\"Report\"))),\n+\t\tgrid.ColWidthPerc(34, grid.Widget(w.progressDonut, container.Border(linestyle.Light), container.BorderTitle(\"Progress\"))),\n \t)\n \traw3 := grid.RowHeightFixed(1,\n \t\tgrid.ColWidthFixed(100, grid.Widget(w.navi, container.Border(linestyle.Light))),\n@@ -112,6 +114,7 @@ func attack(ctx context.Context, dr *drawer) {\n \t\trate     int\n \t\tduration time.Duration\n \t\tmethod   string\n+\t\tbody     string\n \t\terr      error\n \t)\n \ttarget = dr.widgets.urlInput.Read()\n@@ -119,14 +122,18 @@ func attack(ctx context.Context, dr *drawer) {\n \t\tdr.reportCh <- fmt.Sprintf(\"Bad URL: %v\", err)\n \t\treturn\n \t}\n-\tif s := dr.widgets.rateLimitInput.Read(); s != \"\" {\n+\tif s := dr.widgets.rateLimitInput.Read(); s == \"\" {\n+\t\trate = attacker.DefaultRate\n+\t} else {\n \t\trate, err = strconv.Atoi(s)\n \t\tif err != nil {\n \t\t\tdr.reportCh <- fmt.Sprintf(\"Given rate limit %q isn't integer: %v\", s, err)\n \t\t\treturn\n \t\t}\n \t}\n-\tif s := dr.widgets.durationInput.Read(); s != \"\" {\n+\tif s := dr.widgets.durationInput.Read(); s == \"\" {\n+\t\tduration = attacker.DefaultDuration\n+\t} else {\n \t\tduration, err = time.ParseDuration(s)\n \t\tif err != nil {\n \t\t\tdr.reportCh <- fmt.Sprintf(\"Unparseable duration %q: %v\", s, err)\n@@ -139,13 +146,16 @@ func attack(ctx context.Context, dr *drawer) {\n \t\t\treturn\n \t\t}\n \t}\n+\tbody = dr.widgets.bodyInput.Read()\n \trequestNum := rate * int(duration/time.Second)\n+\n \t// To pre-allocate, run redrawChart on a per-attack basis.\n \tgo dr.redrawChart(ctx, requestNum)\n+\tgo dr.redrawDonut(ctx, requestNum)\n \tgo func(ctx context.Context, d *drawer, t string, r int, du time.Duration) {\n-\t\tmetrics := attacker.Attack(ctx, t, d.chartsCh, attacker.Options{Rate: r, Duration: du, Method: method})\n+\t\tmetrics := attacker.Attack(ctx, t, d.chartCh, attacker.Options{Rate: r, Duration: du, Method: method, Body: []byte(body)})\n \t\td.reportCh <- metrics.String()\n-\t\td.chartsCh <- &attacker.Result{End: true}\n+\t\td.chartCh <- &attacker.Result{End: true}\n \t}(ctx, dr, target, rate, duration)\n }\n \ndiff --git a/gui/widgets.go b/gui/widgets.go\nindex 674a743..30d7f19 100644\n--- a/gui/widgets.go\n+++ b/gui/widgets.go\n@@ -4,6 +4,7 @@ import (\n \t\"time\"\n \n \t\"github.com/mum4k/termdash/cell\"\n+\t\"github.com/mum4k/termdash/widgets/donut\"\n \t\"github.com/mum4k/termdash/widgets/linechart\"\n \t\"github.com/mum4k/termdash/widgets/text\"\n \t\"github.com/mum4k/termdash/widgets/textinput\"\n@@ -22,6 +23,7 @@ type widgets struct {\n \tbodyInput      *textinput.TextInput\n \tlatencyChart   *linechart.LineChart\n \treportText     *text.Text\n+\tprogressDonut  *donut.Donut\n \tnavi           *text.Text\n }\n \n@@ -58,6 +60,10 @@ func newWidgets() (*widgets, error) {\n \tif err != nil {\n \t\treturn nil, err\n \t}\n+\tprogressDonut, err := newDonut()\n+\tif err != nil {\n+\t\treturn nil, err\n+\t}\n \treturn &widgets{\n \t\turlInput:       urlInput,\n \t\trateLimitInput: rateLimitInput,\n@@ -66,6 +72,7 @@ func newWidgets() (*widgets, error) {\n \t\tbodyInput:      bodyInput,\n \t\tlatencyChart:   latencyChart,\n \t\treportText:     reportText,\n+\t\tprogressDonut:  progressDonut,\n \t\tnavi:           navi,\n \t}, nil\n }\n@@ -96,3 +103,9 @@ func newTextInput(label, placeHolder string, cells int) (*textinput.TextInput, e\n \t\ttextinput.PlaceHolder(placeHolder),\n \t)\n }\n+\n+func newDonut() (*donut.Donut, error) {\n+\treturn donut.New(\n+\t\tdonut.CellOpts(cell.FgColor(cell.ColorGreen)),\n+\t)\n+}\n",
+  "diffTruncated": false,
+  "tree": [
+    ".gitignore",
+    ".golangci.yml",
+    "LICENSE",
+    "README.md",
+    "attacker/attacker.go",
+    "attacker/attacker_test.go",
+    "attacker/fake_attacker.go",
+    "attacker/metrics.go",
+    "go.mod",
+    "go.sum",
+    "gui/drawer.go",
+    "gui/gui.go",
+    "gui/widgets.go",
+    "main.go"
+  ],
+  "explanation": null
+}

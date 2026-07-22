@@ -1,0 +1,63 @@
+{
+  "seq": 27,
+  "sha": "8965080dc4d9e6048b3accd4fedbe4805e22c089",
+  "parents": [
+    "bde0524e9a06de19ca3d89af5b6da366780bc81c"
+  ],
+  "author": {
+    "name": "nakabonne",
+    "email": "ryo@nakao.dev",
+    "date": "2020-09-15T20:50:17+09:00"
+  },
+  "message": "Use widgets instead of drawer",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 3,
+    "additions": 8,
+    "deletions": 7
+  },
+  "files": [
+    {
+      "path": "README.md",
+      "status": "M",
+      "additions": 1,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "gui/gui.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "gui/input_handler.go",
+      "status": "M",
+      "additions": 6,
+      "deletions": 6,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/README.md b/README.md\nindex 83e1afd..5e8b09e 100644\n--- a/README.md\n+++ b/README.md\n@@ -30,6 +30,7 @@ Executables are available through the [releases page](https://github.com/nakabon\n \n \n ## LoadMap\n+- Support more options for HTTP requests\n - Plot Bytes In and Bytes Out (Press `Ctrl-w` to switch between charts)\n - Plot status codes\n - Better UI\ndiff --git a/gui/gui.go b/gui/gui.go\nindex de45d72..3d31751 100644\n--- a/gui/gui.go\n+++ b/gui/gui.go\n@@ -113,7 +113,7 @@ func attack(ctx context.Context, d *drawer) {\n \t\td.reportCh <- fmt.Sprintf(\"Bad URL: %v\", err)\n \t\treturn\n \t}\n-\topts, err := makeOptions(d)\n+\topts, err := makeOptions(d.widgets)\n \tif err != nil {\n \t\td.reportCh <- err.Error()\n \t\treturn\ndiff --git a/gui/input_handler.go b/gui/input_handler.go\nindex c88f4e1..54d70e1 100644\n--- a/gui/input_handler.go\n+++ b/gui/input_handler.go\n@@ -11,7 +11,7 @@ import (\n )\n \n // makeOptions gives back an options for attacker, with the input from UI.\n-func makeOptions(d *drawer) (attacker.Options, error) {\n+func makeOptions(w *widgets) (attacker.Options, error) {\n \tvar (\n \t\trate     int\n \t\tduration time.Duration\n@@ -21,7 +21,7 @@ func makeOptions(d *drawer) (attacker.Options, error) {\n \t\terr      error\n \t)\n \n-\tif s := d.widgets.rateLimitInput.Read(); s == \"\" {\n+\tif s := w.rateLimitInput.Read(); s == \"\" {\n \t\trate = attacker.DefaultRate\n \t} else {\n \t\trate, err = strconv.Atoi(s)\n@@ -30,7 +30,7 @@ func makeOptions(d *drawer) (attacker.Options, error) {\n \t\t}\n \t}\n \n-\tif s := d.widgets.durationInput.Read(); s == \"\" {\n+\tif s := w.durationInput.Read(); s == \"\" {\n \t\tduration = attacker.DefaultDuration\n \t} else {\n \t\tduration, err = time.ParseDuration(s)\n@@ -39,15 +39,15 @@ func makeOptions(d *drawer) (attacker.Options, error) {\n \t\t}\n \t}\n \n-\tif method = d.widgets.methodInput.Read(); method != \"\" {\n+\tif method = w.methodInput.Read(); method != \"\" {\n \t\tif !validateMethod(method) {\n \t\t\treturn attacker.Options{}, fmt.Errorf(\"Given method %q isn't an HTTP request method\", method)\n \t\t}\n \t}\n \n-\tbody = d.widgets.bodyInput.Read()\n+\tbody = w.bodyInput.Read()\n \n-\tif s := d.widgets.headerInput.Read(); s != \"\" {\n+\tif s := w.headerInput.Read(); s != \"\" {\n \t\tparts := strings.SplitN(s, \":\", 2)\n \t\tif len(parts) != 2 {\n \t\t\treturn attacker.Options{}, fmt.Errorf(\"Given header %q has a wrong format\", s)\n",
+  "diffTruncated": false,
+  "tree": [
+    ".gitignore",
+    ".golangci.yml",
+    "LICENSE",
+    "README.md",
+    "attacker/attacker.go",
+    "attacker/attacker_test.go",
+    "attacker/fake_attacker.go",
+    "attacker/metrics.go",
+    "go.mod",
+    "go.sum",
+    "gui/drawer.go",
+    "gui/gui.go",
+    "gui/input_handler.go",
+    "gui/widgets.go",
+    "main.go"
+  ],
+  "explanation": null
+}

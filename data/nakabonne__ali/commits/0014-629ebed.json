@@ -1,0 +1,76 @@
+{
+  "seq": 14,
+  "sha": "629ebed82b0352c02f055f468708cb0d00af3f65",
+  "parents": [
+    "b71937a74ded2ce8fcb87126886037e01e56ae03"
+  ],
+  "author": {
+    "name": "nakabonne",
+    "email": "ryo@nakao.dev",
+    "date": "2020-09-13T12:22:26+09:00"
+  },
+  "message": "Enable to draw metrics",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 5,
+    "additions": 55,
+    "deletions": 37
+  },
+  "files": [
+    {
+      "path": "README.md",
+      "status": "M",
+      "additions": 7,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "attacker/attacker.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 37,
+      "binary": false
+    },
+    {
+      "path": "attacker/metrics.go",
+      "status": "A",
+      "additions": 44,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "go.mod",
+      "status": "M",
+      "additions": 1,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "go.sum",
+      "status": "M",
+      "additions": 2,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/README.md b/README.md\nindex 1674d4f..7beadd0 100644\n--- a/README.md\n+++ b/README.md\n@@ -13,3 +13,10 @@ Another load testing tool, inspired by [vegeta](https://github.com/tsenart/veget\n ## Installation\n \n Executables are available through the [releases page](https://github.com/nakabonne/ali/releases).\n+\n+## Features\n+#### Mouse support\n+\n+[gif animations]\n+\n+## Alternatives\n\\ No newline at end of file\ndiff --git a/attacker/attacker.go b/attacker/attacker.go\nindex 9908968..57903f6 100644\n--- a/attacker/attacker.go\n+++ b/attacker/attacker.go\n@@ -31,7 +31,7 @@ type Options struct {\n \tAttacker Attacker\n }\n \n-// Result contains the results of a single Target hit.\n+// Result contains the results of a single HTTP request.\n type Result struct {\n \tLatency time.Duration\n }\n@@ -80,39 +80,3 @@ func Attack(ctx context.Context, target string, resCh chan *Result, opts Options\n \n \treturn newMetrics(&metrics)\n }\n-\n-type (\n-\t// Metrics wraps vegeta.Metrics to avoid dependency on it.\n-\tMetrics struct {\n-\t\tLatencies LatencyMetrics\n-\t}\n-\tLatencyMetrics struct {\n-\t\tTotal time.Duration\n-\t\tMean  time.Duration\n-\t\tP50   time.Duration\n-\t\tP90   time.Duration\n-\t\tP95   time.Duration\n-\t\tP99   time.Duration\n-\t\tMax   time.Duration\n-\t\tMin   time.Duration\n-\t}\n-)\n-\n-func newMetrics(m *vegeta.Metrics) *Metrics {\n-\treturn &Metrics{\n-\t\tLatencies: LatencyMetrics{\n-\t\t\tTotal: m.Latencies.Total,\n-\t\t\tMean:  m.Latencies.Mean,\n-\t\t\tP50:   m.Latencies.P50,\n-\t\t\tP90:   m.Latencies.P90,\n-\t\t\tP95:   m.Latencies.P95,\n-\t\t\tP99:   m.Latencies.P99,\n-\t\t\tMax:   m.Latencies.Max,\n-\t\t\tMin:   m.Latencies.Min,\n-\t\t},\n-\t}\n-}\n-\n-func (m *Metrics) String() string {\n-\treturn \"foo\"\n-}\ndiff --git a/attacker/metrics.go b/attacker/metrics.go\nnew file mode 100644\nindex 0000000..4fd0670\n--- /dev/null\n+++ b/attacker/metrics.go\n@@ -0,0 +1,44 @@\n+package attacker\n+\n+import (\n+\t\"time\"\n+\n+\tvegeta \"github.com/tsenart/vegeta/v12/lib\"\n+\t\"gopkg.in/yaml.v2\"\n+)\n+\n+// Metrics wraps \"vegeta.Metrics\" to avoid dependency on it.\n+type Metrics struct {\n+\tLatencies LatencyMetrics `json:\"latencies\"`\n+}\n+\n+type LatencyMetrics struct {\n+\tTotal time.Duration `json:\"total\"`\n+\tMean  time.Duration `json:\"mean\"`\n+\tP50   time.Duration `json:\"50th\"`\n+\tP90   time.Duration `json:\"90th\"`\n+\tP95   time.Duration `json:\"95th\"`\n+\tP99   time.Duration `json:\"99th\"`\n+\tMax   time.Duration `json:\"max\"`\n+\tMin   time.Duration `json:\"min\"`\n+}\n+\n+func newMetrics(m *vegeta.Metrics) *Metrics {\n+\treturn &Metrics{\n+\t\tLatencies: LatencyMetrics{\n+\t\t\tTotal: m.Latencies.Total,\n+\t\t\tMean:  m.Latencies.Mean,\n+\t\t\tP50:   m.Latencies.P50,\n+\t\t\tP90:   m.Latencies.P90,\n+\t\t\tP95:   m.Latencies.P95,\n+\t\t\tP99:   m.Latencies.P99,\n+\t\t\tMax:   m.Latencies.Max,\n+\t\t\tMin:   m.Latencies.Min,\n+\t\t},\n+\t}\n+}\n+\n+func (m *Metrics) String() string {\n+\tb, _ := yaml.Marshal(m)\n+\treturn string(b)\n+}\ndiff --git a/go.mod b/go.mod\nindex 25e6ca0..910fdb4 100644\n--- a/go.mod\n+++ b/go.mod\n@@ -10,4 +10,5 @@ require (\n \tgithub.com/spf13/pflag v1.0.5\n \tgithub.com/stretchr/testify v1.6.1\n \tgithub.com/tsenart/vegeta/v12 v12.8.3\n+\tgopkg.in/yaml.v2 v2.3.0\n )\ndiff --git a/go.sum b/go.sum\nindex 69fcb03..95e3cc7 100644\n--- a/go.sum\n+++ b/go.sum\n@@ -88,6 +88,8 @@ golang.org/x/tools v0.0.0-20190907020128-2ca718005c18/go.mod h1:b+2E5dAYhXwXZwtn\n golang.org/x/xerrors v0.0.0-20190717185122-a985d3407aa7/go.mod h1:I/5z698sn9Ka8TeJc9MKroUUfqBBauWjQqLJ2OPfmY0=\n gopkg.in/check.v1 v0.0.0-20161208181325-20d25e280405 h1:yhCVgyC4o1eVCa2tZl7eS0r+SDo693bJlVdllGtEeKM=\n gopkg.in/check.v1 v0.0.0-20161208181325-20d25e280405/go.mod h1:Co6ibVJAznAaIkqp8huTwlJQCZ016jof/cbN4VW5Yz0=\n+gopkg.in/yaml.v2 v2.3.0 h1:clyUAQHOM3G0M3f5vQj7LuJrETvjVot3Z5el9nffUtU=\n+gopkg.in/yaml.v2 v2.3.0/go.mod h1:hI93XBmqTisBFMUTm0b8Fm+jr3Dg1NNxqwp+5A1VGuI=\n gopkg.in/yaml.v3 v3.0.0-20200313102051-9f266ea9e77c h1:dUUwHk2QECo/6vqA44rthZ8ie2QXMNeKRTHCNY2nXvo=\n gopkg.in/yaml.v3 v3.0.0-20200313102051-9f266ea9e77c/go.mod h1:K4uyk7z7BCEPqu6E+C64Yfv1cQ7kz7rIZviUmN+EgEM=\n pgregory.net/rapid v0.3.3 h1:jCjBsY4ln4Atz78QoBWxUEvAHaFyNDQg9+WU62aCn1U=\n",
+  "diffTruncated": false,
+  "tree": [
+    ".gitignore",
+    ".golangci.yml",
+    "LICENSE",
+    "README.md",
+    "attacker/attacker.go",
+    "attacker/attacker_test.go",
+    "attacker/fake_attacker.go",
+    "attacker/metrics.go",
+    "go.mod",
+    "go.sum",
+    "gui/drawer.go",
+    "gui/gui.go",
+    "gui/widgets.go",
+    "main.go"
+  ],
+  "explanation": null
+}

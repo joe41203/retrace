@@ -1,0 +1,64 @@
+{
+  "seq": 41,
+  "sha": "a1b616d518e178d120f7554faea921d1465a735c",
+  "parents": [
+    "2fb876cd84ed97b709ab3bc26cfea41fe152f1ef"
+  ],
+  "author": {
+    "name": "nakabonne",
+    "email": "ryo@nakao.dev",
+    "date": "2020-09-16T22:42:36+09:00"
+  },
+  "message": "Add goreleaser",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 74,
+    "deletions": 0
+  },
+  "files": [
+    {
+      "path": ".github/workflows/release.yml",
+      "status": "A",
+      "additions": 26,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": ".goreleaser.yml",
+      "status": "A",
+      "additions": 48,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/.github/workflows/release.yml b/.github/workflows/release.yml\nnew file mode 100644\nindex 0000000..78d70f6\n--- /dev/null\n+++ b/.github/workflows/release.yml\n@@ -0,0 +1,26 @@\n+name: release\n+on:\n+  push:\n+    tags:\n+    - \"v[0-9]+.[0-9]+.[0-9]+\"\n+jobs:\n+  goreleaser:\n+    runs-on: ubuntu-latest\n+    steps:\n+      - name: Checkout\n+        uses: actions/checkout@v2\n+      - name: Unshallow\n+        run: git fetch --prune --unshallow\n+      - name: Setup Go\n+        uses: actions/setup-go@v2\n+        with:\n+          go-version: 1.15\n+      - name: Login docker.io\n+        run: docker login -u nakabonne -p ${{ secrets.DOCKER_PASSWORD }}\n+      - name: Run GoReleaser\n+        uses: goreleaser/goreleaser-action@v2\n+        with:\n+          version: latest\n+          args: release --rm-dist\n+        env:\n+          GITHUB_TOKEN: ${{ secrets.ACCESS_TOKEN_WITH_REPO_PERM }}\ndiff --git a/.goreleaser.yml b/.goreleaser.yml\nnew file mode 100644\nindex 0000000..507a8f6\n--- /dev/null\n+++ b/.goreleaser.yml\n@@ -0,0 +1,48 @@\n+before:\n+  hooks:\n+    - go mod tidy\n+builds:\n+- main: .\n+  binary: ali\n+  goos:\n+    - freebsd\n+    - darwin\n+    - linux\n+    - windows\n+  goarch:\n+    - amd64\n+    - arm\n+    - arm64\n+    - 386\n+    - ppc64le\n+    - s390x\n+    - mips64\n+    - mips64le\n+  goarm:\n+    - 6\n+    - 7\n+  env:\n+    - CGO_ENABLED=0\n+  ldflags: -s -w -X main.version={{.Version}} -X main.commit={{.ShortCommit}} -X main.date={{.Date}}\n+\n+archives:\n+- replacements:\n+    386: 32-bit\n+\n+checksum:\n+  name_template: 'checksums.txt'\n+\n+snapshot:\n+  name_template: \"{{ .Tag }}-next\"\n+\n+changelog:\n+  filters:\n+    exclude:\n+    - '^test:'\n+\n+brews:\n+  - github:\n+      owner: nakabonne\n+      name: homebrew-ali\n+    homepage: 'https://github.com/nakabonne/ali'\n+    description: 'Generate HTTP load and plot the results in real-time'\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/release.yml",
+    ".github/workflows/test.yml",
+    ".gitignore",
+    ".golangci.yml",
+    ".goreleaser.yml",
+    "LICENSE",
+    "README.md",
+    "attacker/attacker.go",
+    "attacker/attacker_test.go",
+    "attacker/fake_attacker.go",
+    "attacker/metrics.go",
+    "go.mod",
+    "go.sum",
+    "gui/drawer.go",
+    "gui/gui.go",
+    "gui/keybinds.go",
+    "gui/keybinds_test.go",
+    "gui/widgets.go",
+    "images/demo.gif",
+    "images/mouse-support.gif",
+    "images/progress.gif",
+    "images/real-time.gif",
+    "main.go"
+  ],
+  "explanation": null
+}

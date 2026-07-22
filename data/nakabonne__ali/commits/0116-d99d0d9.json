@@ -1,0 +1,73 @@
+{
+  "seq": 116,
+  "sha": "d99d0d976c53ec1ae3bac3f16428b0ca8a7afb19",
+  "parents": [
+    "e963eff21459131d522fc96dffed06030fe5ffe0"
+  ],
+  "author": {
+    "name": "nakabonne",
+    "email": "ryo@nakao.dev",
+    "date": "2020-10-04T13:59:25+09:00"
+  },
+  "message": "Update flag descriptions",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 8,
+    "deletions": 6
+  },
+  "files": [
+    {
+      "path": "README.md",
+      "status": "M",
+      "additions": 6,
+      "deletions": 4,
+      "binary": false
+    },
+    {
+      "path": "main.go",
+      "status": "M",
+      "additions": 2,
+      "deletions": 2,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/README.md b/README.md\nindex 72ef706..f247cce 100644\n--- a/README.md\n+++ b/README.md\n@@ -22,15 +22,15 @@ brew install nakabonne/ali/ali\n **Via APT**\n \n ```bash\n-wget https://github.com/nakabonne/ali/releases/download/v0.3.1/ali_0.3.1_linux_amd64.deb\n-apt install ./ali_0.3.1_linux_amd64.deb\n+wget https://github.com/nakabonne/ali/releases/download/v0.3.2/ali_0.3.2_linux_amd64.deb\n+apt install ./ali_0.3.2_linux_amd64.deb\n ```\n \n **Via RPM**\n \n ```bash\n-curl -OL https://github.com/nakabonne/ali/releases/download/v0.3.1/ali_0.3.1_linux_amd64.rpm\n-rpm -i ./ali_0.3.1_linux_amd64.rpm\n+curl -OL https://github.com/nakabonne/ali/releases/download/v0.3.2/ali_0.3.2_linux_amd64.rpm\n+rpm -i ./ali_0.3.2_linux_amd64.rpm\n ```\n \n **Via AUR**\n@@ -74,6 +74,8 @@ Flags:\n       --debug               Run in debug mode.\n   -d, --duration duration   The amount of time to issue requests to the targets. Give 0s for an infinite attack. (default 10s)\n   -H, --header strings      A request header to be sent. Can be used multiple times to send multiple headers.\n+  -k, --keepalive           Use persistent connections. (default true)\n+  -M, --max-body int        Max bytes to capture from response bodies. Give -1 for no limit. (default -1)\n   -m, --method string       An HTTP request method for each request. (default \"GET\")\n   -r, --rate int            The request rate per second to issue against the targets. Give 0 then it will send requests as fast as possible. (default 50)\n   -t, --timeout duration    The timeout for each request. 0s means to disable timeouts. (default 30s)\ndiff --git a/main.go b/main.go\nindex c4b553e..93f4f7b 100644\n--- a/main.go\n+++ b/main.go\n@@ -58,10 +58,10 @@ func main() {\n \tflagSet.StringSliceVarP(&c.headers, \"header\", \"H\", []string{}, \"A request header to be sent. Can be used multiple times to send multiple headers.\")\n \tflagSet.StringVarP(&c.body, \"body\", \"b\", \"\", \"A request body to be sent.\")\n \tflagSet.StringVarP(&c.bodyFile, \"body-file\", \"B\", \"\", \"The path to file whose content will be set as the http request body.\")\n-\tflagSet.Int64VarP(&c.maxBody, \"max-body\", \"M\", 0, \"Maximum number of bytes to capture from response bodies\")\n+\tflagSet.Int64VarP(&c.maxBody, \"max-body\", \"M\", -1, \"Max bytes to capture from response bodies. Give -1 for no limit.\")\n \tflagSet.BoolVarP(&c.version, \"version\", \"v\", false, \"Print the current version.\")\n \tflagSet.BoolVar(&c.debug, \"debug\", false, \"Run in debug mode.\")\n-\tflagSet.BoolVarP(&c.keepAlive, \"keepalive\", \"K\", false, \"Use persistent connections if keepalive is set to true. (default false)\")\n+\tflagSet.BoolVarP(&c.keepAlive, \"keepalive\", \"k\", true, \"Use persistent connections.\")\n \tflagSet.Usage = c.usage\n \tif err := flagSet.Parse(os.Args[1:]); err != nil {\n \t\tif !errors.Is(err, flag.ErrHelp) {\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/lint.yml",
+    ".github/workflows/release.yml",
+    ".github/workflows/test.yml",
+    ".gitignore",
+    ".golangci.yml",
+    ".goreleaser.yml",
+    "Dockerfile",
+    "LICENSE",
+    "Makefile",
+    "README.md",
+    "attacker/attacker.go",
+    "attacker/attacker_test.go",
+    "attacker/fake_attacker.go",
+    "attacker/metrics.go",
+    "codecov.yml",
+    "go.mod",
+    "go.sum",
+    "gui/drawer.go",
+    "gui/drawer_test.go",
+    "gui/gui.go",
+    "gui/gui_test.go",
+    "gui/keybinds.go",
+    "gui/keybinds_test.go",
+    "gui/widgets.go",
+    "gui/widgets.mock.go",
+    "images/demo.gif",
+    "images/mouse-support.gif",
+    "images/progress.gif",
+    "images/real-time.gif",
+    "main.go",
+    "main_test.go",
+    "testdata/body-1.json"
+  ],
+  "explanation": null
+}

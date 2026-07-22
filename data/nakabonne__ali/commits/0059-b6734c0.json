@@ -1,0 +1,66 @@
+{
+  "seq": 59,
+  "sha": "b6734c07c22c28032ebddcd9978f49222fd28179",
+  "parents": [
+    "d6b6e85af7d678bcfe88cc7e306c07790a68b6c2"
+  ],
+  "author": {
+    "name": "nakabonne",
+    "email": "ryo@nakao.dev",
+    "date": "2020-09-22T10:34:57+09:00"
+  },
+  "message": "Enable to redraw message text",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 13,
+    "deletions": 0
+  },
+  "files": [
+    {
+      "path": "gui/drawer.go",
+      "status": "M",
+      "additions": 11,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "gui/gui.go",
+      "status": "M",
+      "additions": 2,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/gui/drawer.go b/gui/drawer.go\nindex 7c0c0d4..2f4a6ab 100644\n--- a/gui/drawer.go\n+++ b/gui/drawer.go\n@@ -149,3 +149,14 @@ func (d *drawer) redrawReport(ctx context.Context) {\n \t\t}\n \t}\n }\n+\n+func (d *drawer) redrawMessage(ctx context.Context) {\n+\tfor {\n+\t\tselect {\n+\t\tcase <-ctx.Done():\n+\t\t\treturn\n+\t\tcase m := <-d.messageCh:\n+\t\t\td.widgets.messageText.Write(m, text.WriteReplace())\n+\t\t}\n+\t}\n+}\ndiff --git a/gui/gui.go b/gui/gui.go\nindex 4f734e6..0097372 100644\n--- a/gui/gui.go\n+++ b/gui/gui.go\n@@ -48,8 +48,10 @@ func Run() error {\n \t\tchartCh:   make(chan *attacker.Result),\n \t\tgaugeCh:   make(chan bool),\n \t\tmetricsCh: make(chan *attacker.Metrics),\n+\t\tmessageCh: make(chan string),\n \t}\n \tgo d.redrawReport(ctx)\n+\tgo d.redrawMessage(ctx)\n \n \tk := keybinds(ctx, cancel, d)\n \n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/lint.yml",
+    ".github/workflows/release.yml",
+    ".github/workflows/test.yml",
+    ".gitignore",
+    ".golangci.yml",
+    ".goreleaser.yml",
+    "Dockerfile",
+    "LICENSE",
+    "README.md",
+    "attacker/attacker.go",
+    "attacker/attacker_test.go",
+    "attacker/fake_attacker.go",
+    "attacker/metrics.go",
+    "go.mod",
+    "go.sum",
+    "gui/drawer.go",
+    "gui/gui.go",
+    "gui/keybinds.go",
+    "gui/keybinds_test.go",
+    "gui/widgets.go",
+    "images/demo.gif",
+    "images/mouse-support.gif",
+    "images/progress.gif",
+    "images/real-time.gif",
+    "main.go"
+  ],
+  "explanation": null
+}

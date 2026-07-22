@@ -1,0 +1,56 @@
+{
+  "seq": 30,
+  "sha": "c1b84b563479c3e03c8184d230e771e26421a6c6",
+  "parents": [
+    "665531a8ed625f385902cf0e15547abaafc4e1a2"
+  ],
+  "author": {
+    "name": "nakabonne",
+    "email": "ryo@nakao.dev",
+    "date": "2020-09-15T23:15:12+09:00"
+  },
+  "message": "Enclose text boxes with border",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 13,
+    "deletions": 9
+  },
+  "files": [
+    {
+      "path": "gui/gui.go",
+      "status": "M",
+      "additions": 7,
+      "deletions": 7,
+      "binary": false
+    },
+    {
+      "path": "gui/widgets.go",
+      "status": "M",
+      "additions": 6,
+      "deletions": 2,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/gui/gui.go b/gui/gui.go\nindex 2445c4c..64b2ce9 100644\n--- a/gui/gui.go\n+++ b/gui/gui.go\n@@ -65,16 +65,16 @@ func gridLayout(w *widgets) ([]container.Option, error) {\n \t)\n \traw2 := grid.RowHeightPerc(35,\n \t\tgrid.ColWidthPerc(64,\n-\t\t\tgrid.RowHeightPerc(33, grid.Widget(w.urlInput, container.Border(linestyle.None))),\n+\t\t\tgrid.RowHeightPerc(33, grid.Widget(w.urlInput, container.Border(linestyle.Light), container.BorderTitle(\"Target URL\"))),\n \t\t\tgrid.RowHeightPerc(33,\n-\t\t\t\tgrid.ColWidthPerc(33, grid.Widget(w.rateLimitInput, container.Border(linestyle.None))),\n-\t\t\t\tgrid.ColWidthPerc(33, grid.Widget(w.durationInput, container.Border(linestyle.None))),\n-\t\t\t\tgrid.ColWidthPerc(33, grid.Widget(w.timeoutInput, container.Border(linestyle.None))),\n+\t\t\t\tgrid.ColWidthPerc(33, grid.Widget(w.rateLimitInput, container.Border(linestyle.Light), container.BorderTitle(\"Rate Limit\"))),\n+\t\t\t\tgrid.ColWidthPerc(33, grid.Widget(w.durationInput, container.Border(linestyle.Light), container.BorderTitle(\"Duration\"))),\n+\t\t\t\tgrid.ColWidthPerc(33, grid.Widget(w.timeoutInput, container.Border(linestyle.Light), container.BorderTitle(\"Timeout\"))),\n \t\t\t),\n \t\t\tgrid.RowHeightPerc(33,\n-\t\t\t\tgrid.ColWidthPerc(33, grid.Widget(w.methodInput, container.Border(linestyle.None))),\n-\t\t\t\tgrid.ColWidthPerc(33, grid.Widget(w.headerInput, container.Border(linestyle.None))),\n-\t\t\t\tgrid.ColWidthPerc(33, grid.Widget(w.bodyInput, container.Border(linestyle.None))),\n+\t\t\t\tgrid.ColWidthPerc(33, grid.Widget(w.methodInput, container.Border(linestyle.Light), container.BorderTitle(\"Method\"))),\n+\t\t\t\tgrid.ColWidthPerc(33, grid.Widget(w.headerInput, container.Border(linestyle.Light), container.BorderTitle(\"Header\"))),\n+\t\t\t\tgrid.ColWidthPerc(33, grid.Widget(w.bodyInput, container.Border(linestyle.Light), container.BorderTitle(\"Body\"))),\n \t\t\t),\n \t\t),\n \t\tgrid.ColWidthPerc(35, grid.Widget(w.reportText, container.Border(linestyle.Light), container.BorderTitle(\"Report\"))),\ndiff --git a/gui/widgets.go b/gui/widgets.go\nindex 275de3d..333763b 100644\n--- a/gui/widgets.go\n+++ b/gui/widgets.go\n@@ -43,7 +43,7 @@ func newWidgets() (*widgets, error) {\n \tif err != nil {\n \t\treturn nil, err\n \t}\n-\turlInput, err := newTextInput(\"Target URL: \", \"\", 60)\n+\turlInput, err := newTextInput(\"Target URL: \", \"http://\", 80)\n \tif err != nil {\n \t\treturn nil, err\n \t}\n@@ -111,9 +111,13 @@ func newText(s string) (*text.Text, error) {\n \n func newTextInput(label, placeHolder string, cells int) (*textinput.TextInput, error) {\n \treturn textinput.New(\n-\t\ttextinput.Label(label, cell.FgColor(cell.ColorWhite)),\n+\t\t//textinput.Label(label, cell.FgColor(cell.ColorWhite)),\n+\t\ttextinput.Border(linestyle.Double),\n+\t\ttextinput.BorderColor(cell.ColorGreen),\n+\t\ttextinput.FillColor(cell.ColorDefault),\n \t\ttextinput.MaxWidthCells(cells),\n \t\ttextinput.PlaceHolder(placeHolder),\n+\t\ttextinput.PlaceHolderColor(cell.ColorDefault),\n \t)\n }\n \n",
+  "diffTruncated": false,
+  "tree": [
+    ".gitignore",
+    ".golangci.yml",
+    "LICENSE",
+    "README.md",
+    "attacker/attacker.go",
+    "attacker/attacker_test.go",
+    "attacker/fake_attacker.go",
+    "attacker/metrics.go",
+    "go.mod",
+    "go.sum",
+    "gui/drawer.go",
+    "gui/gui.go",
+    "gui/input_handler.go",
+    "gui/widgets.go",
+    "main.go"
+  ],
+  "explanation": null
+}

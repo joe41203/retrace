@@ -1,0 +1,55 @@
+{
+  "seq": 16,
+  "sha": "a75ca2627e9bcf315aaf680fa54fb1d7c400dfd8",
+  "parents": [
+    "ce623995a802ad971e3b3ba0b693a5c9fa63ae22"
+  ],
+  "author": {
+    "name": "nakabonne",
+    "email": "ryo@nakao.dev",
+    "date": "2020-09-14T09:35:12+09:00"
+  },
+  "message": "Modularize keybinds",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 19,
+    "deletions": 11
+  },
+  "files": [
+    {
+      "path": "attacker/metrics.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "gui/gui.go",
+      "status": "M",
+      "additions": 18,
+      "deletions": 11,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/attacker/metrics.go b/attacker/metrics.go\nindex 4fd0670..0ab6c9f 100644\n--- a/attacker/metrics.go\n+++ b/attacker/metrics.go\n@@ -8,6 +8,7 @@ import (\n )\n \n // Metrics wraps \"vegeta.Metrics\" to avoid dependency on it.\n+// TODO: Add more fields\n type Metrics struct {\n \tLatencies LatencyMetrics `json:\"latencies\"`\n }\ndiff --git a/gui/gui.go b/gui/gui.go\nindex d7a5fc7..9008346 100644\n--- a/gui/gui.go\n+++ b/gui/gui.go\n@@ -52,29 +52,36 @@ func Run() error {\n \t}\n \tgo d.redrawReport(ctx)\n \n-\tkeybinds := func(k *terminalapi.Keyboard) {\n+\tk := keybinds(ctx, cancel, d)\n+\n+\treturn termdash.Run(ctx, t, c, termdash.KeyboardSubscriber(k), termdash.RedrawInterval(redrawInterval))\n+}\n+\n+func keybinds(ctx context.Context, cancel context.CancelFunc, dr *drawer) func(*terminalapi.Keyboard) {\n+\treturn func(k *terminalapi.Keyboard) {\n \t\tswitch k.Key {\n \t\tcase keyboard.KeyEsc, keyboard.KeyCtrlC:\n \t\t\tcancel()\n \t\tcase keyboard.KeySpace:\n-\t\t\tif d.chartDrawing {\n+\t\t\tif dr.chartDrawing {\n \t\t\t\treturn\n \t\t\t}\n \t\t\t// TODO: Enalble to poplulate from input\n-\t\t\trate := 10\n-\t\t\tduration, _ := time.ParseDuration(\"2s\")\n-\t\t\trequestNum := rate * int(duration/time.Second)\n+\t\t\tvar (\n+\t\t\t\trate        = 10\n+\t\t\t\tduration, _ = time.ParseDuration(\"2s\")\n+\t\t\t\trequestNum  = rate * int(duration/time.Second)\n+\t\t\t\ttarget      = \"http://34.84.111.163:9898\"\n+\t\t\t)\n \t\t\t// To pre-allocate, run redrawChart on a per-attack basis.\n-\t\t\tgo d.redrawChart(ctx, requestNum)\n-\t\t\tgo func(ctx context.Context, d *drawer, r int, du time.Duration) {\n-\t\t\t\tmetrics := attacker.Attack(ctx, \"http://34.84.111.163:9898\", d.chartsCh, attacker.Options{Rate: r, Duration: du})\n+\t\t\tgo dr.redrawChart(ctx, requestNum)\n+\t\t\tgo func(ctx context.Context, d *drawer, t string, r int, du time.Duration) {\n+\t\t\t\tmetrics := attacker.Attack(ctx, t, d.chartsCh, attacker.Options{Rate: r, Duration: du})\n \t\t\t\td.reportCh <- metrics.String()\n \t\t\t\td.chartsCh <- &attacker.Result{End: true}\n-\t\t\t}(ctx, d, rate, duration)\n+\t\t\t}(ctx, dr, target, rate, duration)\n \t\t}\n \t}\n-\n-\treturn termdash.Run(ctx, t, c, termdash.KeyboardSubscriber(keybinds), termdash.RedrawInterval(redrawInterval))\n }\n \n func gridLayout(w *widgets) ([]container.Option, error) {\n",
+  "diffTruncated": false,
+  "tree": [
+    ".gitignore",
+    ".golangci.yml",
+    "LICENSE",
+    "README.md",
+    "attacker/attacker.go",
+    "attacker/attacker_test.go",
+    "attacker/fake_attacker.go",
+    "attacker/metrics.go",
+    "go.mod",
+    "go.sum",
+    "gui/drawer.go",
+    "gui/gui.go",
+    "gui/widgets.go",
+    "main.go"
+  ],
+  "explanation": null
+}

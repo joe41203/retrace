@@ -1,0 +1,56 @@
+{
+  "seq": 31,
+  "sha": "56bf577e1a147663620ae95d3698ccead4763394",
+  "parents": [
+    "c1b84b563479c3e03c8184d230e771e26421a6c6"
+  ],
+  "author": {
+    "name": "nakabonne",
+    "email": "ryo@nakao.dev",
+    "date": "2020-09-16T07:48:21+09:00"
+  },
+  "message": "Move inputs to second row",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 14,
+    "deletions": 18
+  },
+  "files": [
+    {
+      "path": "gui/gui.go",
+      "status": "M",
+      "additions": 9,
+      "deletions": 13,
+      "binary": false
+    },
+    {
+      "path": "gui/widgets.go",
+      "status": "M",
+      "additions": 5,
+      "deletions": 5,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/gui/gui.go b/gui/gui.go\nindex 64b2ce9..d1abb27 100644\n--- a/gui/gui.go\n+++ b/gui/gui.go\n@@ -60,22 +60,18 @@ func Run() error {\n }\n \n func gridLayout(w *widgets) ([]container.Option, error) {\n-\traw1 := grid.RowHeightPerc(60,\n-\t\tgrid.ColWidthPerc(99, grid.Widget(w.latencyChart, container.Border(linestyle.Light), container.BorderTitle(\"Latency (ms)\"))),\n-\t)\n-\traw2 := grid.RowHeightPerc(35,\n+\traw1 := grid.RowHeightPerc(65, grid.Widget(w.latencyChart, container.Border(linestyle.Light), container.BorderTitle(\"Latency (ms)\")))\n+\traw2 := grid.RowHeightPerc(30,\n \t\tgrid.ColWidthPerc(64,\n-\t\t\tgrid.RowHeightPerc(33, grid.Widget(w.urlInput, container.Border(linestyle.Light), container.BorderTitle(\"Target URL\"))),\n-\t\t\tgrid.RowHeightPerc(33,\n-\t\t\t\tgrid.ColWidthPerc(33, grid.Widget(w.rateLimitInput, container.Border(linestyle.Light), container.BorderTitle(\"Rate Limit\"))),\n-\t\t\t\tgrid.ColWidthPerc(33, grid.Widget(w.durationInput, container.Border(linestyle.Light), container.BorderTitle(\"Duration\"))),\n-\t\t\t\tgrid.ColWidthPerc(33, grid.Widget(w.timeoutInput, container.Border(linestyle.Light), container.BorderTitle(\"Timeout\"))),\n-\t\t\t),\n+\t\t\tgrid.RowHeightPerc(34, grid.Widget(w.urlInput, container.Border(linestyle.Light), container.BorderTitle(\"Target URL\"))),\n \t\t\tgrid.RowHeightPerc(33,\n-\t\t\t\tgrid.ColWidthPerc(33, grid.Widget(w.methodInput, container.Border(linestyle.Light), container.BorderTitle(\"Method\"))),\n-\t\t\t\tgrid.ColWidthPerc(33, grid.Widget(w.headerInput, container.Border(linestyle.Light), container.BorderTitle(\"Header\"))),\n-\t\t\t\tgrid.ColWidthPerc(33, grid.Widget(w.bodyInput, container.Border(linestyle.Light), container.BorderTitle(\"Body\"))),\n+\t\t\t\tgrid.ColWidthPerc(20, grid.Widget(w.rateLimitInput, container.Border(linestyle.Light), container.BorderTitle(\"Rate Limit\"))),\n+\t\t\t\tgrid.ColWidthPerc(20, grid.Widget(w.durationInput, container.Border(linestyle.Light), container.BorderTitle(\"Duration\"))),\n+\t\t\t\tgrid.ColWidthPerc(20, grid.Widget(w.timeoutInput, container.Border(linestyle.Light), container.BorderTitle(\"Timeout\"))),\n+\t\t\t\tgrid.ColWidthPerc(20, grid.Widget(w.methodInput, container.Border(linestyle.Light), container.BorderTitle(\"Method\"))),\n+\t\t\t\tgrid.ColWidthPerc(19, grid.Widget(w.headerInput, container.Border(linestyle.Light), container.BorderTitle(\"Header\"))),\n \t\t\t),\n+\t\t\tgrid.RowHeightPerc(33, grid.Widget(w.bodyInput, container.Border(linestyle.Light), container.BorderTitle(\"Body\"))),\n \t\t),\n \t\tgrid.ColWidthPerc(35, grid.Widget(w.reportText, container.Border(linestyle.Light), container.BorderTitle(\"Report\"))),\n \t)\ndiff --git a/gui/widgets.go b/gui/widgets.go\nindex 333763b..5be6373 100644\n--- a/gui/widgets.go\n+++ b/gui/widgets.go\n@@ -43,23 +43,23 @@ func newWidgets() (*widgets, error) {\n \tif err != nil {\n \t\treturn nil, err\n \t}\n-\turlInput, err := newTextInput(\"Target URL: \", \"http://\", 80)\n+\turlInput, err := newTextInput(\"Target URL: \", \"http://\", 200)\n \tif err != nil {\n \t\treturn nil, err\n \t}\n-\trateLimitInput, err := newTextInput(\"Rate limit: \", \"50\", 30)\n+\trateLimitInput, err := newTextInput(\"Rate limit: \", \"50\", 50)\n \tif err != nil {\n \t\treturn nil, err\n \t}\n-\tdurationInput, err := newTextInput(\"Duration: \", \"10s\", 30)\n+\tdurationInput, err := newTextInput(\"Duration: \", \"10s\", 50)\n \tif err != nil {\n \t\treturn nil, err\n \t}\n-\tmethodInput, err := newTextInput(\"Method: \", \"GET\", 30)\n+\tmethodInput, err := newTextInput(\"Method: \", \"GET\", 50)\n \tif err != nil {\n \t\treturn nil, err\n \t}\n-\tbodyInput, err := newTextInput(\"Body: \", \"\", 30)\n+\tbodyInput, err := newTextInput(\"Body: \", \"\", 200)\n \tif err != nil {\n \t\treturn nil, err\n \t}\n",
+  "diffTruncated": false,
+  "tree": [
+    ".gitignore",
+    ".golangci.yml",
+    "LICENSE",
+    "README.md",
+    "attacker/attacker.go",
+    "attacker/attacker_test.go",
+    "attacker/fake_attacker.go",
+    "attacker/metrics.go",
+    "go.mod",
+    "go.sum",
+    "gui/drawer.go",
+    "gui/gui.go",
+    "gui/input_handler.go",
+    "gui/widgets.go",
+    "main.go"
+  ],
+  "explanation": null
+}

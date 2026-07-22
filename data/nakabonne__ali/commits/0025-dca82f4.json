@@ -1,0 +1,70 @@
+{
+  "seq": 25,
+  "sha": "dca82f4a6846a8745776d06c4ec09c87c3e9a3fd",
+  "parents": [
+    "6d7aae41c702e891eef8220f81d6e0b1e731b613"
+  ],
+  "author": {
+    "name": "nakabonne",
+    "email": "ryo@nakao.dev",
+    "date": "2020-09-15T15:13:11+09:00"
+  },
+  "message": "Modularize input handler",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 4,
+    "additions": 115,
+    "deletions": 59
+  },
+  "files": [
+    {
+      "path": "attacker/attacker.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "gui/gui.go",
+      "status": "M",
+      "additions": 22,
+      "deletions": 59,
+      "binary": false
+    },
+    {
+      "path": "gui/input_handler.go",
+      "status": "A",
+      "additions": 80,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "gui/widgets.go",
+      "status": "M",
+      "additions": 12,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/attacker/attacker.go b/attacker/attacker.go\nindex 0fccfb7..8dcaff9 100644\n--- a/attacker/attacker.go\n+++ b/attacker/attacker.go\n@@ -26,6 +26,7 @@ type Options struct {\n \tMethod   string\n \tBody     []byte\n \tHeader   http.Header\n+\n \tAttacker Attacker\n }\n \ndiff --git a/gui/gui.go b/gui/gui.go\nindex bf0f3e8..de45d72 100644\n--- a/gui/gui.go\n+++ b/gui/gui.go\n@@ -3,9 +3,7 @@ package gui\n import (\n \t\"context\"\n \t\"fmt\"\n-\t\"net/http\"\n \t\"net/url\"\n-\t\"strconv\"\n \t\"time\"\n \n \t\"github.com/mum4k/termdash\"\n@@ -65,18 +63,19 @@ func gridLayout(w *widgets) ([]container.Option, error) {\n \traw1 := grid.RowHeightPerc(60,\n \t\tgrid.ColWidthPerc(99, grid.Widget(w.latencyChart, container.Border(linestyle.Light), container.BorderTitle(\"Latency (ms)\"))),\n \t)\n-\traw2 := grid.RowHeightPerc(36,\n+\traw2 := grid.RowHeightPerc(34,\n \t\tgrid.ColWidthPerc(64,\n-\t\t\tgrid.RowHeightPerc(31, grid.Widget(w.urlInput, container.Border(linestyle.None))),\n-\t\t\tgrid.RowHeightPerc(31,\n+\t\t\tgrid.RowHeightPerc(29, grid.Widget(w.urlInput, container.Border(linestyle.None))),\n+\t\t\tgrid.RowHeightPerc(29,\n \t\t\t\tgrid.ColWidthPerc(50, grid.Widget(w.rateLimitInput, container.Border(linestyle.None))),\n \t\t\t\tgrid.ColWidthPerc(49, grid.Widget(w.durationInput, container.Border(linestyle.None))),\n \t\t\t),\n-\t\t\tgrid.RowHeightPerc(31,\n-\t\t\t\tgrid.ColWidthPerc(50, grid.Widget(w.methodInput, container.Border(linestyle.None))),\n-\t\t\t\tgrid.ColWidthPerc(49, grid.Widget(w.bodyInput, container.Border(linestyle.None))),\n+\t\t\tgrid.RowHeightPerc(29,\n+\t\t\t\tgrid.ColWidthPerc(33, grid.Widget(w.methodInput, container.Border(linestyle.None))),\n+\t\t\t\tgrid.ColWidthPerc(33, grid.Widget(w.headerInput, container.Border(linestyle.None))),\n+\t\t\t\tgrid.ColWidthPerc(33, grid.Widget(w.bodyInput, container.Border(linestyle.None))),\n \t\t\t),\n-\t\t\tgrid.RowHeightPerc(6, grid.Widget(w.progressGauge, container.Border(linestyle.None))),\n+\t\t\tgrid.RowHeightPerc(12, grid.Widget(w.progressGauge, container.Border(linestyle.None))),\n \t\t),\n \t\tgrid.ColWidthPerc(35, grid.Widget(w.reportText, container.Border(linestyle.Light), container.BorderTitle(\"Report\"))),\n \t)\n@@ -105,64 +104,28 @@ func keybinds(ctx context.Context, cancel context.CancelFunc, dr *drawer) func(*\n \t}\n }\n \n-func attack(ctx context.Context, dr *drawer) {\n-\tif dr.chartDrawing {\n+func attack(ctx context.Context, d *drawer) {\n+\tif d.chartDrawing {\n \t\treturn\n \t}\n-\tvar (\n-\t\ttarget   string\n-\t\trate     int\n-\t\tduration time.Duration\n-\t\tmethod   string\n-\t\tbody     string\n-\t\terr      error\n-\t)\n-\ttarget = dr.widgets.urlInput.Read()\n+\ttarget := d.widgets.urlInput.Read()\n \tif _, err := url.ParseRequestURI(target); err != nil {\n-\t\tdr.reportCh <- fmt.Sprintf(\"Bad URL: %v\", err)\n+\t\td.reportCh <- fmt.Sprintf(\"Bad URL: %v\", err)\n \t\treturn\n \t}\n-\tif s := dr.widgets.rateLimitInput.Read(); s == \"\" {\n-\t\trate = attacker.DefaultRate\n-\t} else {\n-\t\trate, err = strconv.Atoi(s)\n-\t\tif err != nil {\n-\t\t\tdr.reportCh <- fmt.Sprintf(\"Given rate limit %q isn't integer: %v\", s, err)\n-\t\t\treturn\n-\t\t}\n-\t}\n-\tif s := dr.widgets.durationInput.Read(); s == \"\" {\n-\t\tduration = attacker.DefaultDuration\n-\t} else {\n-\t\tduration, err = time.ParseDuration(s)\n-\t\tif err != nil {\n-\t\t\tdr.reportCh <- fmt.Sprintf(\"Unparseable duration %q: %v\", s, err)\n-\t\t\treturn\n-\t\t}\n-\t}\n-\tif method = dr.widgets.methodInput.Read(); method != \"\" {\n-\t\tif !validateMethod(method) {\n-\t\t\tdr.reportCh <- fmt.Sprintf(\"Given method %q isn't an HTTP request method\", method)\n-\t\t\treturn\n-\t\t}\n+\topts, err := makeOptions(d)\n+\tif err != nil {\n+\t\td.reportCh <- err.Error()\n+\t\treturn\n \t}\n-\tbody = dr.widgets.bodyInput.Read()\n-\trequestNum := rate * int(duration/time.Second)\n+\trequestNum := opts.Rate * int(opts.Duration/time.Second)\n \n \t// To pre-allocate, run redrawChart on a per-attack basis.\n-\tgo dr.redrawChart(ctx, requestNum)\n-\tgo dr.redrawGauge(ctx, requestNum)\n-\tgo func(ctx context.Context, d *drawer, t string, r int, du time.Duration) {\n-\t\tmetrics := attacker.Attack(ctx, t, d.chartCh, attacker.Options{Rate: r, Duration: du, Method: method, Body: []byte(body)})\n+\tgo d.redrawChart(ctx, requestNum)\n+\tgo d.redrawGauge(ctx, requestNum)\n+\tgo func(ctx context.Context, d *drawer, t string, o attacker.Options) {\n+\t\tmetrics := attacker.Attack(ctx, t, d.chartCh, o)\n \t\td.reportCh <- metrics.String()\n \t\td.chartCh <- &attacker.Result{End: true}\n-\t}(ctx, dr, target, rate, duration)\n-}\n-\n-func validateMethod(method string) bool {\n-\tswitch method {\n-\tcase http.MethodGet, http.MethodHead, http.MethodPost, http.MethodPut, http.MethodPatch, http.MethodDelete, http.MethodConnect, http.MethodOptions, http.MethodTrace:\n-\t\treturn true\n-\t}\n-\treturn false\n+\t}(ctx, d, target, opts)\n }\ndiff --git a/gui/input_handler.go b/gui/input_handler.go\nnew file mode 100644\nindex 0000000..c88f4e1\n--- /dev/null\n+++ b/gui/input_handler.go\n@@ -0,0 +1,80 @@\n+package gui\n+\n+import (\n+\t\"fmt\"\n+\t\"net/http\"\n+\t\"strconv\"\n+\t\"strings\"\n+\t\"time\"\n+\n+\t\"github.com/nakabonne/ali/attacker\"\n+)\n+\n+// makeOptions gives back an options for attacker, with the input from UI.\n+func makeOptions(d *drawer) (attacker.Options, error) {\n+\tvar (\n+\t\trate     int\n+\t\tduration time.Duration\n+\t\tmethod   string\n+\t\tbody     string\n+\t\theader   = make(http.Header)\n+\t\terr      error\n+\t)\n+\n+\tif s := d.widgets.rateLimitInput.Read(); s == \"\" {\n+\t\trate = attacker.DefaultRate\n+\t} else {\n+\t\trate, err = strconv.Atoi(s)\n+\t\tif err != nil {\n+\t\t\treturn attacker.Options{}, fmt.Errorf(\"Given rate limit %q isn't integer: %w\", s, err)\n+\t\t}\n+\t}\n+\n+\tif s := d.widgets.durationInput.Read(); s == \"\" {\n+\t\tduration = attacker.DefaultDuration\n+\t} else {\n+\t\tduration, err = time.ParseDuration(s)\n+\t\tif err != nil {\n+\t\t\treturn attacker.Options{}, fmt.Errorf(\"Unparseable duration %q: %w\", s, err)\n+\t\t}\n+\t}\n+\n+\tif method = d.widgets.methodInput.Read(); method != \"\" {\n+\t\tif !validateMethod(method) {\n+\t\t\treturn attacker.Options{}, fmt.Errorf(\"Given method %q isn't an HTTP request method\", method)\n+\t\t}\n+\t}\n+\n+\tbody = d.widgets.bodyInput.Read()\n+\n+\tif s := d.widgets.headerInput.Read(); s != \"\" {\n+\t\tparts := strings.SplitN(s, \":\", 2)\n+\t\tif len(parts) != 2 {\n+\t\t\treturn attacker.Options{}, fmt.Errorf(\"Given header %q has a wrong format\", s)\n+\t\t}\n+\t\tkey, val := strings.TrimSpace(parts[0]), strings.TrimSpace(parts[1])\n+\t\tif key == \"\" || val == \"\" {\n+\t\t\treturn attacker.Options{}, fmt.Errorf(\"Given header %q has a wrong format\", s)\n+\t\t}\n+\t\t// Add key/value directly to the http.Header (map[string][]string).\n+\t\t// http.Header.Add() canonicalizes keys but the vegeta API is used\n+\t\t// to test systems that require case-sensitive headers.\n+\t\theader[key] = append(header[key], val)\n+\t}\n+\n+\treturn attacker.Options{\n+\t\tRate:     rate,\n+\t\tDuration: duration,\n+\t\tMethod:   method,\n+\t\tBody:     []byte(body),\n+\t\tHeader:   header,\n+\t}, nil\n+}\n+\n+func validateMethod(method string) bool {\n+\tswitch method {\n+\tcase http.MethodGet, http.MethodHead, http.MethodPost, http.MethodPut, http.MethodPatch, http.MethodDelete, http.MethodConnect, http.MethodOptions, http.MethodTrace:\n+\t\treturn true\n+\t}\n+\treturn false\n+}\ndiff --git a/gui/widgets.go b/gui/widgets.go\nindex 8c7b5f8..322d422 100644\n--- a/gui/widgets.go\n+++ b/gui/widgets.go\n@@ -22,6 +22,8 @@ type widgets struct {\n \tdurationInput  *textinput.TextInput\n \tmethodInput    *textinput.TextInput\n \tbodyInput      *textinput.TextInput\n+\theaderInput    *textinput.TextInput\n+\ttimeoutInput   *textinput.TextInput\n \tlatencyChart   *linechart.LineChart\n \treportText     *text.Text\n \tprogressGauge  *gauge.Gauge\n@@ -61,6 +63,14 @@ func newWidgets() (*widgets, error) {\n \tif err != nil {\n \t\treturn nil, err\n \t}\n+\theaderInput, err := newTextInput(\"Header: \", \"\", 30)\n+\tif err != nil {\n+\t\treturn nil, err\n+\t}\n+\ttimeoutInput, err := newTextInput(\"Timeout: \", \"30s\", 30)\n+\tif err != nil {\n+\t\treturn nil, err\n+\t}\n \tprogressDonut, err := newGauge()\n \tif err != nil {\n \t\treturn nil, err\n@@ -71,6 +81,8 @@ func newWidgets() (*widgets, error) {\n \t\tdurationInput:  durationInput,\n \t\tmethodInput:    methodInput,\n \t\tbodyInput:      bodyInput,\n+\t\theaderInput:    headerInput,\n+\t\ttimeoutInput:   timeoutInput,\n \t\tlatencyChart:   latencyChart,\n \t\treportText:     reportText,\n \t\tprogressGauge:  progressDonut,\n",
+  "diffTruncated": false,
+  "tree": [
+    ".gitignore",
+    ".golangci.yml",
+    "LICENSE",
+    "README.md",
+    "attacker/attacker.go",
+    "attacker/attacker_test.go",
+    "attacker/fake_attacker.go",
+    "attacker/metrics.go",
+    "go.mod",
+    "go.sum",
+    "gui/drawer.go",
+    "gui/gui.go",
+    "gui/input_handler.go",
+    "gui/widgets.go",
+    "main.go"
+  ],
+  "explanation": null
+}

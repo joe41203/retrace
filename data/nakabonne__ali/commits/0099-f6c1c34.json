@@ -1,0 +1,77 @@
+{
+  "seq": 99,
+  "sha": "f6c1c345c694468e1441947be3ef59817936f1ad",
+  "parents": [
+    "f3b308985761f2e09fa2f0cad9c217ea2b6165e6"
+  ],
+  "author": {
+    "name": "Ryo Nakao",
+    "email": "ryo@nakao.dev",
+    "date": "2020-09-29T08:42:48+09:00"
+  },
+  "message": "Ensure to give max body (#19)",
+  "pr": {
+    "number": 19,
+    "title": "Ensure to give max body",
+    "body": "",
+    "url": "https://github.com/nakabonne/ali/pull/19"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 6,
+    "deletions": 1
+  },
+  "files": [
+    {
+      "path": "attacker/attacker.go",
+      "status": "M",
+      "additions": 6,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "attacker/fake_attacker.go",
+      "status": "M",
+      "additions": 0,
+      "deletions": 1,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/attacker/attacker.go b/attacker/attacker.go\nindex c00b984..313f443 100644\n--- a/attacker/attacker.go\n+++ b/attacker/attacker.go\n@@ -16,6 +16,7 @@ const (\n \tDefaultMethod     = http.MethodGet\n \tDefaultWorkers    = 10\n \tDefaultMaxWorkers = math.MaxUint64\n+\tDefaultMaxBody    = int64(-1)\n )\n \n type Attacker interface {\n@@ -33,6 +34,7 @@ type Options struct {\n \tHeader     http.Header\n \tWorkers    uint64\n \tMaxWorkers uint64\n+\tMaxBody    int64\n \n \tAttacker Attacker\n }\n@@ -60,11 +62,15 @@ func Attack(ctx context.Context, target string, resCh chan *Result, opts Options\n \tif opts.MaxWorkers == 0 {\n \t\topts.MaxWorkers = DefaultMaxWorkers\n \t}\n+\tif opts.MaxBody == 0 {\n+\t\topts.MaxBody = DefaultMaxBody\n+\t}\n \tif opts.Attacker == nil {\n \t\topts.Attacker = vegeta.NewAttacker(\n \t\t\tvegeta.Timeout(opts.Timeout),\n \t\t\tvegeta.Workers(opts.Workers),\n \t\t\tvegeta.MaxWorkers(opts.MaxWorkers),\n+\t\t\tvegeta.MaxBody(opts.MaxBody),\n \t\t)\n \t}\n \ndiff --git a/attacker/fake_attacker.go b/attacker/fake_attacker.go\nindex 3891082..c6892ce 100644\n--- a/attacker/fake_attacker.go\n+++ b/attacker/fake_attacker.go\n@@ -22,5 +22,4 @@ func (f *fakeAttacker) Attack(vegeta.Targeter, vegeta.Pacer, time.Duration, stri\n }\n \n func (f *fakeAttacker) Stop() {\n-\treturn\n }\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/lint.yml",
+    ".github/workflows/release.yml",
+    ".github/workflows/test.yml",
+    ".gitignore",
+    ".golangci.yml",
+    ".goreleaser.yml",
+    "Dockerfile",
+    "LICENSE",
+    "Makefile",
+    "README.md",
+    "attacker/attacker.go",
+    "attacker/attacker_test.go",
+    "attacker/fake_attacker.go",
+    "attacker/metrics.go",
+    "codecov.yml",
+    "go.mod",
+    "go.sum",
+    "gui/drawer.go",
+    "gui/drawer_test.go",
+    "gui/gui.go",
+    "gui/gui_test.go",
+    "gui/keybinds.go",
+    "gui/keybinds_test.go",
+    "gui/testdata/body-1.json",
+    "gui/widgets.go",
+    "gui/widgets.mock.go",
+    "images/demo.gif",
+    "images/mouse-support.gif",
+    "images/progress.gif",
+    "images/real-time.gif",
+    "main.go"
+  ],
+  "explanation": null
+}

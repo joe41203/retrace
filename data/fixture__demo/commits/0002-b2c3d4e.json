@@ -1,0 +1,77 @@
+{
+  "seq": 2,
+  "sha": "b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1",
+  "parents": [
+    "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0"
+  ],
+  "author": {
+    "name": "demo-author",
+    "email": "demo@example.com",
+    "date": "2021-01-07T09:00:00.000Z"
+  },
+  "message": "Add attacker package",
+  "pr": {
+    "number": 12,
+    "title": "Introduce attacker package",
+    "body": "This PR introduces the `attacker` package which drives load against a target URL. Closes #3.",
+    "url": "https://github.com/demo/retrace/pull/12"
+  },
+  "linkedIssues": [
+    {
+      "number": 3,
+      "title": "Need a load generation core",
+      "body": "We need a reusable component to generate load so the TUI can visualize it.",
+      "url": "https://github.com/demo/retrace/issues/3"
+    }
+  ],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 11,
+    "deletions": 0
+  },
+  "files": [
+    {
+      "path": "attacker/attacker.go",
+      "status": "A",
+      "additions": 11,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/attacker/attacker.go b/attacker/attacker.go\nnew file mode 100644\nindex 0000000..1111111\n--- /dev/null\n+++ b/attacker/attacker.go\n@@ -0,0 +1,11 @@\n+package attacker\n+\n+// Attacker は対象 URL に負荷をかける。\n+type Attacker struct {\n+\tTarget string\n+\tRate   int\n+}\n+\n+func New(target string, rate int) *Attacker {\n+\treturn &Attacker{Target: target, Rate: rate}\n+}\n",
+  "diffTruncated": false,
+  "tree": [
+    "main.go",
+    "go.mod",
+    "attacker/attacker.go"
+  ],
+  "explanation": {
+    "what": "attacker パッケージを新設し、対象 URL に負荷をかける Attacker 型を定義した。",
+    "why": "PR「Introduce attacker package」に、TUI から負荷を可視化するための再利用可能なコアが必要と書かれている。",
+    "highlights": [
+      {
+        "file": "attacker/attacker.go",
+        "note": "Target と Rate を持つ最小の負荷生成コア。"
+      }
+    ],
+    "diagram": {
+      "mermaid": "flowchart LR\n  A[\"CLI (main.go)\"] --> B[\"attacker.New\"]\n  B --> C[\"Attacker{Target, Rate}\"]\n  C --> D[\"対象 URL へ負荷\"]",
+      "caption": "CLI が attacker パッケージ経由で対象 URL に負荷をかける流れ。"
+    },
+    "evidence": "pr",
+    "refs": [
+      {
+        "type": "pr",
+        "number": 12,
+        "url": "https://github.com/demo/retrace/pull/12"
+      },
+      {
+        "type": "issue",
+        "number": 3,
+        "url": "https://github.com/demo/retrace/issues/3"
+      }
+    ],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2021-02-04T09:00:00.000Z"
+  }
+}

@@ -1,0 +1,79 @@
+{
+  "seq": 6,
+  "sha": "5ab1a759c946522fd6934e1b45351efeae23f100",
+  "parents": [
+    "8b9e6ad5eccefb346feab6d82eaceae95671a8c3"
+  ],
+  "author": {
+    "name": "nakabonne",
+    "email": "ryo@nakao.dev",
+    "date": "2020-09-12T17:52:42+09:00"
+  },
+  "message": "Enable to attack",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 6,
+    "additions": 84,
+    "deletions": 36
+  },
+  "files": [
+    {
+      "path": ".gitignore",
+      "status": "M",
+      "additions": 1,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "attacker/attacker.go",
+      "status": "M",
+      "additions": 12,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "go.mod",
+      "status": "M",
+      "additions": 3,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "go.sum",
+      "status": "M",
+      "additions": 26,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "gui/widgets.go",
+      "status": "M",
+      "additions": 23,
+      "deletions": 35,
+      "binary": false
+    },
+    {
+      "path": "main.go",
+      "status": "M",
+      "additions": 19,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/.gitignore b/.gitignore\nindex a6fdc84..00b42c0 100644\n--- a/.gitignore\n+++ b/.gitignore\n@@ -10,6 +10,7 @@\n \n # Output of the go coverage tool, specifically when used with LiteIDE\n *.out\n+ali-debug.log\n \n # IDE\n .idea\ndiff --git a/attacker/attacker.go b/attacker/attacker.go\nindex 046cefb..561d512 100644\n--- a/attacker/attacker.go\n+++ b/attacker/attacker.go\n@@ -1,9 +1,12 @@\n package attacker\n \n import (\n+\t\"context\"\n \t\"net/http\"\n \t\"time\"\n \n+\t\"github.com/k0kubun/pp\"\n+\n \tvegeta \"github.com/tsenart/vegeta/v12/lib\"\n )\n \n@@ -32,7 +35,8 @@ type Result struct {\n // Attack keeps the request running for the specified period of time.\n // Results are sent to the given channel as soon as they arrive.\n // When the attack is over, it gives back final statistics.\n-func Attack(target string, resCh chan *Result, opts Options) *Metrics {\n+func Attack(ctx context.Context, target string, resCh chan *Result, opts Options) *Metrics {\n+\tpp.Println(\"start attacking\")\n \tif opts.Rate == 0 {\n \t\topts.Rate = defaultRate\n \t}\n@@ -53,16 +57,23 @@ func Attack(target string, resCh chan *Result, opts Options) *Metrics {\n \tattacker := vegeta.NewAttacker()\n \n \tvar metrics vegeta.Metrics\n+\n \tfor res := range attacker.Attack(targeter, rate, opts.Duration, \"main\") {\n+\t\t// TODO: Stop if ctx is expired.\n+\t\t/*if <-ctx.Done() {\n+\t\t\treturn newMetrics(&metrics)\n+\t\t}*/\n \t\tresCh <- &Result{Latency: res.Latency}\n \t\tmetrics.Add(res)\n \t}\n \tmetrics.Close()\n+\tpp.Println(\"vegeta metrics\", metrics)\n \n \treturn newMetrics(&metrics)\n }\n \n type (\n+\t// Metrics wraps vegeta.Metrics to avoid dependency on it.\n \tMetrics struct {\n \t\tLatencies LatencyMetrics\n \t}\ndiff --git a/go.mod b/go.mod\nindex d5ba24b..7f7e481 100644\n--- a/go.mod\n+++ b/go.mod\n@@ -3,6 +3,9 @@ module github.com/nakabonne/ali\n go 1.15\n \n require (\n+\tgithub.com/k0kubun/colorstring v0.0.0-20150214042306-9440f1994b88 // indirect\n+\tgithub.com/k0kubun/pp v3.0.1+incompatible\n+\tgithub.com/mattn/go-colorable v0.1.7 // indirect\n \tgithub.com/mum4k/termdash v0.12.2\n \tgithub.com/spf13/pflag v1.0.5\n \tgithub.com/tsenart/vegeta/v12 v12.8.3\ndiff --git a/go.sum b/go.sum\nindex 39d054e..288f42d 100644\n--- a/go.sum\n+++ b/go.sum\n@@ -3,6 +3,8 @@ github.com/alecthomas/jsonschema v0.0.0-20180308105923-f2c93856175a/go.mod h1:qp\n github.com/bmizerany/perks v0.0.0-20141205001514-d9a9656a3a4b h1:AP/Y7sqYicnjGDfD5VcY4CIfh1hRXBUavxrvELjTiOE=\n github.com/bmizerany/perks v0.0.0-20141205001514-d9a9656a3a4b/go.mod h1:ac9efd0D1fsDb3EJvhqgXRbFx7bs2wqZ10HQPeU8U/Q=\n github.com/c2h5oh/datasize v0.0.0-20171227191756-4eba002a5eae/go.mod h1:S/7n9copUssQ56c7aAgHqftWO4LTf4xY6CGWt8Bc+3M=\n+github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=\n+github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=\n github.com/dgryski/go-gk v0.0.0-20140819190930-201884a44051 h1:ByJUvQYyTtNNCVfYNM48q6uYUT4fAlN0wNmd3th4BSo=\n github.com/dgryski/go-gk v0.0.0-20140819190930-201884a44051/go.mod h1:qm+vckxRlDt0aOla0RYJJVeqHZlWfOm2UIxHaqPB46E=\n github.com/dgryski/go-lttb v0.0.0-20180810165845-318fcdf10a77/go.mod h1:Va5MyIzkU0rAM92tn3hb3Anb7oz7KcnixF49+2wOMe4=\n@@ -30,11 +32,21 @@ github.com/google/go-cmp v0.2.0 h1:+dTQ8DZQJz0Mb/HjFlkptS1FeQ4cWSnN941F8aEG4SQ=\n github.com/google/go-cmp v0.2.0/go.mod h1:oXzfMopK8JAjlY9xF4vHSVASa0yLyX7SntLO5aqRK0M=\n github.com/influxdata/tdigest v0.0.0-20180711151920-a7d76c6f093a h1:vMqgISSVkIqWxCIZs8m1L4096temR7IbYyNdMiBxSPA=\n github.com/influxdata/tdigest v0.0.0-20180711151920-a7d76c6f093a/go.mod h1:9GkyshztGufsdPQWjH+ifgnIr3xNUL5syI70g2dzU1o=\n+github.com/k0kubun/colorstring v0.0.0-20150214042306-9440f1994b88 h1:uC1QfSlInpQF+M0ao65imhwqKnz3Q2z/d8PWZRMQvDM=\n+github.com/k0kubun/colorstring v0.0.0-20150214042306-9440f1994b88/go.mod h1:3w7q1U84EfirKl04SVQ/s7nPm1ZPhiXd34z40TNz36k=\n+github.com/k0kubun/pp v3.0.1+incompatible h1:3tqvf7QgUnZ5tXO6pNAZlrvHgl6DvifjDrd9g2S9Z40=\n+github.com/k0kubun/pp v3.0.1+incompatible/go.mod h1:GWse8YhT0p8pT4ir3ZgBbfZild3tgzSScAn6HmfYukg=\n+github.com/konsorten/go-windows-terminal-sequences v1.0.3 h1:CE8S1cTafDpPvMhIxNJKvHsGVBgn1xWYf1NbHQhywc8=\n+github.com/konsorten/go-windows-terminal-sequences v1.0.3/go.mod h1:T0+1ngSBFLxvqU3pZ+m/2kptfBszLMUkC4ZK/EgS/cQ=\n github.com/kylelemons/godebug v1.1.0 h1:RPNrshWIDI6G2gRW9EHilWtl7Z6Sb1BR0xunSBf0SNc=\n github.com/kylelemons/godebug v1.1.0/go.mod h1:9/0rRGxNHcop5bhtWyNeEfOS8JIWk580+fNqagV/RAw=\n github.com/lucasb-eyer/go-colorful v1.0.2/go.mod h1:0MS4r+7BZKSJ5mw4/S5MPN+qHFF1fYclkSPilDOKW0s=\n github.com/mailru/easyjson v0.7.0 h1:aizVhC/NAAcKWb+5QsU1iNOZb4Yws5UO2I+aIprQITM=\n github.com/mailru/easyjson v0.7.0/go.mod h1:KAzv3t3aY1NaHWoQz1+4F1ccyAH66Jk7yos7ldAVICs=\n+github.com/mattn/go-colorable v0.1.7 h1:bQGKb3vps/j0E9GfJQ03JyhRuxsvdAanXlT9BTw3mdw=\n+github.com/mattn/go-colorable v0.1.7/go.mod h1:u6P/XSegPjTcexA+o6vUJrdnUu04hMope9wVRipJSqc=\n+github.com/mattn/go-isatty v0.0.12 h1:wuysRhFDzyxgEmMf5xjvJ2M9dZoWAXNNr5LSBS7uHXY=\n+github.com/mattn/go-isatty v0.0.12/go.mod h1:cbi8OIDigv2wuxKPP5vlRcQ1OAZbq2CE4Kysco4FUpU=\n github.com/mattn/go-runewidth v0.0.4/go.mod h1:LwmH8dsx7+W8Uxz3IHJYH5QSwggIsqBzpuz5H//U1FU=\n github.com/mattn/go-runewidth v0.0.9 h1:Lm995f3rfxdpd6TSmuVCHVb/QhupuXlYr8sCI/QdE+0=\n github.com/mattn/go-runewidth v0.0.9/go.mod h1:H031xJmbD/WCDINGzjvQ9THkh0rPKHF+m2gUSrubnMI=\n@@ -43,13 +55,22 @@ github.com/mum4k/termdash v0.12.2 h1:S2frz71OrXUKIVVZ3snYBEzyYlUNRTu0ElV6d5Pf6gI\n github.com/mum4k/termdash v0.12.2/go.mod h1:haerPCSO0U8pehROAecmuOHDF+2UXw2KaCTxdWooDFE=\n github.com/nsf/termbox-go v0.0.0-20200204031403-4d2b513ad8be h1:yzmWtPyxEUIKdZg4RcPq64MfS8NA6A5fNOJgYhpR9EQ=\n github.com/nsf/termbox-go v0.0.0-20200204031403-4d2b513ad8be/go.mod h1:IuKpRQcYE1Tfu+oAQqaLisqDeXgjyyltCfsaoYN18NQ=\n+github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZbAQM=\n+github.com/pmezard/go-difflib v1.0.0/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=\n+github.com/sirupsen/logrus v1.6.0 h1:UBcNElsrwanuuMsnGSlYmtmgbb23qDR5dG+6X6Oo89I=\n+github.com/sirupsen/logrus v1.6.0/go.mod h1:7uNnSEd1DgxDLC74fIahvMZmmYsHGZGEOFrfsX/uA88=\n github.com/spf13/pflag v1.0.5 h1:iy+VFUOCP1a+8yFto/drg2CJ5u0yRoB7fZw3DKv/JXA=\n github.com/spf13/pflag v1.0.5/go.mod h1:McXfInJRrz4CZXVZOBLb0bTZqETkiAhM9Iw0y3An2Bg=\n github.com/streadway/quantile v0.0.0-20150917103942-b0c588724d25 h1:7z3LSn867ex6VSaahyKadf4WtSsJIgne6A1WLOAGM8A=\n github.com/streadway/quantile v0.0.0-20150917103942-b0c588724d25/go.mod h1:lbP8tGiBjZ5YWIc2fzuRpTaz0b/53vT6PEs3QuAWzuU=\n+github.com/stretchr/testify v1.2.2 h1:bSDNvY7ZPG5RlJ8otE/7V6gMiyenm9RtJ7IUVIAoJ1w=\n+github.com/stretchr/testify v1.2.2/go.mod h1:a8OnRcib4nhh0OaRAV+Yts87kKdq0PP7pXfy6kDkUVs=\n github.com/tsenart/go-tsz v0.0.0-20180814232043-cdeb9e1e981e/go.mod h1:SWZznP1z5Ki7hDT2ioqiFKEse8K9tU2OUvaRI0NeGQo=\n github.com/tsenart/vegeta/v12 v12.8.3 h1:UEsDkSrEJojMKW/xr7KUv4H/bYykX+V48KCsPZPqEfk=\n github.com/tsenart/vegeta/v12 v12.8.3/go.mod h1:ZiJtwLn/9M4fTPdMY7bdbIeyNeFVE8/AHbWFqCsUuho=\n+github.com/yudai/pp v1.3.0 h1:8qxHWJnYPF9HC9nq1U4N/8toJNBWO4DxaMpDlzrcE6I=\n+github.com/yudai/pp v2.0.1+incompatible h1:Q4//iY4pNF6yPLZIigmvcl7k/bPgrcTPIFIcmawg5bI=\n+github.com/yudai/pp v2.0.1+incompatible/go.mod h1:PuxR/8QJ7cyCkFp/aUDS+JY727OFEZkTdatxwunjIkc=\n golang.org/x/crypto v0.0.0-20190308221718-c2843e01d9a2/go.mod h1:djNgcEr1/C05ACkg1iLfiJU5Ep61QUkGW8qpdssI0+w=\n golang.org/x/crypto v0.0.0-20190829043050-9756ffdc2472/go.mod h1:yigFU9vqHzYiE8UmvKecakEJjdnWj3jj499lnFckfCI=\n golang.org/x/net v0.0.0-20190404232315-eb5bcb51f2a3/go.mod h1:t9HGtf8HONx5eT2rtn7q6eTqICYqUVnKs3thJo3Qplg=\n@@ -59,8 +80,13 @@ golang.org/x/net v0.0.0-20190827160401-ba9fcec4b297/go.mod h1:z5CRVTTTmAJ677TzLL\n golang.org/x/sync v0.0.0-20190423024810-112230192c58/go.mod h1:RxMgew5VJxzue5/jJTE5uejpjVlOe/izrB70Jof72aM=\n golang.org/x/sys v0.0.0-20190215142949-d0b11bdaac8a/go.mod h1:STP8DvDyc/dI5b8T5hshtkjS+E42TnysNCUPdjciGhY=\n golang.org/x/sys v0.0.0-20190412213103-97732733099d/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=\n+golang.org/x/sys v0.0.0-20190422165155-953cdadca894/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=\n golang.org/x/sys v0.0.0-20190626150813-e07cf5db2756/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=\n+golang.org/x/sys v0.0.0-20190904154756-749cb33beabd h1:DBH9mDw0zluJT/R+nGuV3jWFWLFaHyYZWD4tOT+cjn0=\n golang.org/x/sys v0.0.0-20190904154756-749cb33beabd/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=\n+golang.org/x/sys v0.0.0-20200116001909-b77594299b42/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=\n+golang.org/x/sys v0.0.0-20200223170610-d5e6a3e2c0ae h1:/WDfKMnPU+m5M4xB+6x4kaepxRw6jWvR5iDRdvjHgy8=\n+golang.org/x/sys v0.0.0-20200223170610-d5e6a3e2c0ae/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=\n golang.org/x/text v0.3.0/go.mod h1:NqM8EUOU14njkJ3fqMW+pc6Ldnwhi/IjpwHt7yyuwOQ=\n golang.org/x/text v0.3.2 h1:tW2bmiBqwgJj/UpqtC8EpXEZVYOwU0yG4iWbprSVAcs=\n golang.org/x/text v0.3.2/go.mod h1:bEr9sfX3Q8Zfm5fL9x+3itogRgK3+ptLWKqgva+5dAk=\ndiff --git a/gui/widgets.go b/gui/widgets.go\nindex 378bf4f..6112d36 100644\n--- a/gui/widgets.go\n+++ b/gui/widgets.go\n@@ -2,14 +2,16 @@ package gui\n \n import (\n \t\"context\"\n-\t\"math\"\n \t\"time\"\n \n+\t\"github.com/k0kubun/pp\"\n \t\"github.com/mum4k/termdash/cell\"\n \t\"github.com/mum4k/termdash/container\"\n \t\"github.com/mum4k/termdash/widgets/button\"\n \t\"github.com/mum4k/termdash/widgets/linechart\"\n \t\"github.com/mum4k/termdash/widgets/textinput\"\n+\n+\t\"github.com/nakabonne/ali/attacker\"\n )\n \n // redrawInterval is how often termdash redraws the screen.\n@@ -38,12 +40,6 @@ func newWidgets(ctx context.Context, c *container.Container) (*widgets, error) {\n \n // newLineChart returns a line plotChart that displays a heartbeat-like progression.\n func newLineChart(ctx context.Context) (*linechart.LineChart, error) {\n-\tvar inputs []float64\n-\tfor i := 0; i < 100; i++ {\n-\t\tv := math.Pow(math.Sin(float64(i)), 63) * math.Sin(float64(i)+1.5) * 8\n-\t\tinputs = append(inputs, v)\n-\t}\n-\n \tlc, err := linechart.New(\n \t\tlinechart.AxesCellOpts(cell.FgColor(cell.ColorRed)),\n \t\tlinechart.YLabelCellOpts(cell.FgColor(cell.ColorGreen)),\n@@ -52,41 +48,33 @@ func newLineChart(ctx context.Context) (*linechart.LineChart, error) {\n \tif err != nil {\n \t\treturn nil, err\n \t}\n-\tstep := 0\n-\tgo periodic(ctx, redrawInterval/3, func() error {\n-\t\tstep = (step + 1) % len(inputs)\n-\t\treturn lc.Series(\"heartbeat\", rotateFloats(inputs, step),\n-\t\t\tlinechart.SeriesCellOpts(cell.FgColor(cell.ColorNumber(87))),\n-\t\t\tlinechart.SeriesXLabels(map[int]string{\n-\t\t\t\t0: \"zero\",\n-\t\t\t}),\n-\t\t)\n-\t})\n+\n+\tresultCh := make(chan *attacker.Result)\n+\tgo func() {\n+\t\t// TODO: Enalble to poplulate from input\n+\t\tmetrics := attacker.Attack(ctx, \"http://34.84.111.163:9898\", resultCh, attacker.Options{Rate: 50, Duration: 10 * time.Second})\n+\t\tpp.Println(metrics)\n+\t}()\n+\tgo redrawChart(ctx, lc, resultCh)\n+\n \treturn lc, nil\n }\n \n-// periodic executes the provided closure periodically every interval.\n-// Exits when the context expires.\n-func periodic(ctx context.Context, interval time.Duration, fn func() error) {\n-\tticker := time.NewTicker(interval)\n-\tdefer ticker.Stop()\n+func redrawChart(ctx context.Context, lineChart *linechart.LineChart, resultCh chan *attacker.Result) {\n+\tvalues := []float64{}\n \tfor {\n \t\tselect {\n-\t\tcase <-ticker.C:\n-\t\t\tif err := fn(); err != nil {\n-\t\t\t\tpanic(err)\n-\t\t\t}\n \t\tcase <-ctx.Done():\n \t\t\treturn\n+\t\tcase res := <-resultCh:\n+\t\t\tpp.Println(\"latency\", res.Latency/time.Millisecond)\n+\t\t\tvalues = append(values, float64(res.Latency/time.Millisecond))\n+\t\t\tlineChart.Series(\"plot\", values,\n+\t\t\t\tlinechart.SeriesCellOpts(cell.FgColor(cell.ColorNumber(87))),\n+\t\t\t\tlinechart.SeriesXLabels(map[int]string{\n+\t\t\t\t\t0: \"zero\",\n+\t\t\t\t}),\n+\t\t\t)\n \t\t}\n \t}\n }\n-\n-// rotateFloats returns a new slice with inputs rotated by step.\n-// I.e. for a step of one:\n-//   inputs[0] -> inputs[len(inputs)-1]\n-//   inputs[1] -> inputs[0]\n-// And so on.\n-func rotateFloats(inputs []float64, step int) []float64 {\n-\treturn append(inputs[step:], inputs[:step]...)\n-}\ndiff --git a/main.go b/main.go\nindex 1e469bb..3c555f2 100644\n--- a/main.go\n+++ b/main.go\n@@ -4,9 +4,12 @@ import (\n \t\"errors\"\n \t\"fmt\"\n \t\"io\"\n+\t\"io/ioutil\"\n \t\"os\"\n+\t\"path/filepath\"\n \t\"runtime\"\n \n+\t\"github.com/k0kubun/pp\"\n \tflag \"github.com/spf13/pflag\"\n \n \t\"github.com/nakabonne/ali/gui\"\n@@ -55,6 +58,7 @@ func (c *cli) run() int {\n \t\tfmt.Fprintf(c.stderr, \"version=%s, commit=%s, buildDate=%s, os=%s, arch=%s\\n\", version, commit, date, runtime.GOOS, runtime.GOARCH)\n \t\treturn 0\n \t}\n+\tsetDebug(nil, c.debug)\n \n \tif err := gui.Run(); err != nil {\n \t\tfmt.Fprintf(c.stderr, \"failed to start application: %s\", err.Error())\n@@ -63,3 +67,18 @@ func (c *cli) run() int {\n \n \treturn 0\n }\n+\n+// Makes a new file under the working directory only when debug use.\n+func setDebug(w io.Writer, debug bool) {\n+\tif !debug {\n+\t\tpp.SetDefaultOutput(ioutil.Discard)\n+\t}\n+\tif w == nil {\n+\t\tvar err error\n+\t\tw, err = os.OpenFile(filepath.Join(\".\", \"ali-debug.log\"), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)\n+\t\tif err != nil {\n+\t\t\tpanic(err)\n+\t\t}\n+\t}\n+\tpp.SetDefaultOutput(w)\n+}\n",
+  "diffTruncated": false,
+  "tree": [
+    ".gitignore",
+    ".golangci.yml",
+    "LICENSE",
+    "README.md",
+    "attacker/attacker.go",
+    "go.mod",
+    "go.sum",
+    "gui/gui.go",
+    "gui/widgets.go",
+    "main.go"
+  ],
+  "explanation": null
+}

@@ -1,0 +1,53 @@
+{
+  "seq": 9,
+  "sha": "f77443480ba0eadeaaa2695dda330dca76e76ac3",
+  "parents": [
+    "9f478d96fad42b3bca9cd8b1e15ea6e7ca5a824f"
+  ],
+  "author": {
+    "name": "nakabonne",
+    "email": "ryo@nakao.dev",
+    "date": "2020-09-12T21:41:24+09:00"
+  },
+  "message": "Ensure to attack with pushing key",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 20,
+    "deletions": 20
+  },
+  "files": [
+    {
+      "path": "gui/gui.go",
+      "status": "M",
+      "additions": 17,
+      "deletions": 3,
+      "binary": false
+    },
+    {
+      "path": "gui/widgets.go",
+      "status": "M",
+      "additions": 3,
+      "deletions": 17,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/gui/gui.go b/gui/gui.go\nindex e54aaec..ec10bd1 100644\n--- a/gui/gui.go\n+++ b/gui/gui.go\n@@ -3,7 +3,9 @@ package gui\n import (\n \t\"context\"\n \t\"fmt\"\n+\t\"time\"\n \n+\t\"github.com/k0kubun/pp\"\n \t\"github.com/mum4k/termdash\"\n \t\"github.com/mum4k/termdash/container\"\n \t\"github.com/mum4k/termdash/container/grid\"\n@@ -11,6 +13,8 @@ import (\n \t\"github.com/mum4k/termdash/linestyle\"\n \t\"github.com/mum4k/termdash/terminal/termbox\"\n \t\"github.com/mum4k/termdash/terminal/terminalapi\"\n+\n+\t\"github.com/nakabonne/ali/attacker\"\n )\n \n const rootID = \"root\"\n@@ -42,12 +46,22 @@ func Run() error {\n \t\treturn fmt.Errorf(\"failed to update container: %w\", err)\n \t}\n \n-\tquitter := func(k *terminalapi.Keyboard) {\n-\t\tif k.Key == keyboard.KeyEsc || k.Key == keyboard.KeyCtrlC {\n+\tkeybinds := func(k *terminalapi.Keyboard) {\n+\t\tswitch k.Key {\n+\t\tcase keyboard.KeyEsc, keyboard.KeyCtrlC:\n \t\t\tcancel()\n+\t\tcase keyboard.KeyEnter:\n+\t\t\tresultCh := make(chan *attacker.Result)\n+\t\t\tgo func() {\n+\t\t\t\t// TODO: Enalble to poplulate from input\n+\t\t\t\tmetrics := attacker.Attack(ctx, \"http://34.84.111.163:9898\", resultCh, attacker.Options{Rate: 50, Duration: 10 * time.Second})\n+\t\t\t\tpp.Println(metrics)\n+\t\t\t}()\n+\t\t\tgo redrawChart(ctx, w.plotChart, resultCh)\n \t\t}\n \t}\n-\treturn termdash.Run(ctx, t, c, termdash.KeyboardSubscriber(quitter), termdash.RedrawInterval(redrawInterval))\n+\n+\treturn termdash.Run(ctx, t, c, termdash.KeyboardSubscriber(keybinds), termdash.RedrawInterval(redrawInterval))\n }\n \n func gridLayout(w *widgets) ([]container.Option, error) {\ndiff --git a/gui/widgets.go b/gui/widgets.go\nindex 534acbf..81ca8b0 100644\n--- a/gui/widgets.go\n+++ b/gui/widgets.go\n@@ -26,7 +26,7 @@ type widgets struct {\n }\n \n func newWidgets(ctx context.Context, c *container.Container) (*widgets, error) {\n-\tl, err := newLineChart(ctx)\n+\tl, err := newLineChart()\n \tif err != nil {\n \t\treturn nil, err\n \t}\n@@ -38,26 +38,12 @@ func newWidgets(ctx context.Context, c *container.Container) (*widgets, error) {\n \t}, nil\n }\n \n-// newLineChart returns a line plotChart that displays a heartbeat-like progression.\n-func newLineChart(ctx context.Context) (*linechart.LineChart, error) {\n-\tlc, err := linechart.New(\n+func newLineChart() (*linechart.LineChart, error) {\n+\treturn linechart.New(\n \t\tlinechart.AxesCellOpts(cell.FgColor(cell.ColorRed)),\n \t\tlinechart.YLabelCellOpts(cell.FgColor(cell.ColorGreen)),\n \t\tlinechart.XLabelCellOpts(cell.FgColor(cell.ColorGreen)),\n \t)\n-\tif err != nil {\n-\t\treturn nil, err\n-\t}\n-\n-\tresultCh := make(chan *attacker.Result)\n-\tgo func() {\n-\t\t// TODO: Enalble to poplulate from input\n-\t\tmetrics := attacker.Attack(ctx, \"http://34.84.111.163:9898\", resultCh, attacker.Options{Rate: 50, Duration: 10 * time.Second})\n-\t\tpp.Println(metrics)\n-\t}()\n-\tgo redrawChart(ctx, lc, resultCh)\n-\n-\treturn lc, nil\n }\n \n func redrawChart(ctx context.Context, lineChart *linechart.LineChart, resultCh chan *attacker.Result) {\n",
+  "diffTruncated": false,
+  "tree": [
+    ".gitignore",
+    ".golangci.yml",
+    "LICENSE",
+    "README.md",
+    "attacker/attacker.go",
+    "attacker/attacker_test.go",
+    "attacker/fake_attacker.go",
+    "go.mod",
+    "go.sum",
+    "gui/gui.go",
+    "gui/widgets.go",
+    "main.go"
+  ],
+  "explanation": null
+}

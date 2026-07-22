@@ -1,0 +1,85 @@
+{
+  "seq": 126,
+  "sha": "06cefb699e321da7a7acc8d850b1bcf265e5f7f7",
+  "parents": [
+    "2a36d9a17d76d7703715df1b6b573e54c6f680f3"
+  ],
+  "author": {
+    "name": "Ryo Nakao",
+    "email": "ryo@nakao.dev",
+    "date": "2020-10-08T21:54:07+09:00"
+  },
+  "message": "Don't close when finishing drawing (#55)",
+  "pr": {
+    "number": 55,
+    "title": "Don't close when finishing drawing",
+    "body": "Fixes https://github.com/nakabonne/ali/issues/52",
+    "url": "https://github.com/nakabonne/ali/pull/55"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 3,
+    "additions": 4,
+    "deletions": 3
+  },
+  "files": [
+    {
+      "path": "attacker/attacker.go",
+      "status": "M",
+      "additions": 0,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "gui/drawer.go",
+      "status": "M",
+      "additions": 0,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "gui/drawer_test.go",
+      "status": "M",
+      "additions": 4,
+      "deletions": 1,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/attacker/attacker.go b/attacker/attacker.go\nindex 8921de4..c11e1d0 100644\n--- a/attacker/attacker.go\n+++ b/attacker/attacker.go\n@@ -104,7 +104,6 @@ func Attack(ctx context.Context, target string, resCh chan *Result, metricsCh ch\n \t\tselect {\n \t\tcase <-ctx.Done():\n \t\t\topts.Attacker.Stop()\n-\t\t\t// metricsCh is already closed (as context is done) so we shouldn't send any metric\n \t\t\treturn\n \t\tdefault:\n \t\t\tresCh <- &Result{Latency: res.Latency}\ndiff --git a/gui/drawer.go b/gui/drawer.go\nindex fa2c8ac..d853eae 100644\n--- a/gui/drawer.go\n+++ b/gui/drawer.go\n@@ -101,7 +101,6 @@ End: %v`\n )\n \n func (d *drawer) redrawMetrics(ctx context.Context) {\n-\tdefer close(d.metricsCh)\n \tfor {\n \t\tselect {\n \t\tcase <-ctx.Done():\ndiff --git a/gui/drawer_test.go b/gui/drawer_test.go\nindex 2a02731..d20557f 100644\n--- a/gui/drawer_test.go\n+++ b/gui/drawer_test.go\n@@ -261,7 +261,10 @@ End: 2009-11-10T23:00:00Z`, gomock.Any())\n \t\t\tgo d.redrawMetrics(ctx)\n \t\t\td.metricsCh <- tt.metrics\n \t\t\tcancel()\n-\t\t\t<-d.metricsCh\n+\t\t\t// TODO: Stop waiting inappropriately.\n+\t\t\t// Currently waiting in a rough manner to ensure that the mock function\n+\t\t\t// is called in the `redrawMetrics`, but it is unstable and inefficient.\n+\t\t\ttime.Sleep(2 * time.Second)\n \t\t})\n \t}\n }\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/lint.yml",
+    ".github/workflows/release.yml",
+    ".github/workflows/test.yml",
+    ".gitignore",
+    ".golangci.yml",
+    ".goreleaser.yml",
+    "Dockerfile",
+    "LICENSE",
+    "Makefile",
+    "README.md",
+    "attacker/attacker.go",
+    "attacker/attacker_test.go",
+    "attacker/fake_attacker.go",
+    "attacker/metrics.go",
+    "codecov.yml",
+    "go.mod",
+    "go.sum",
+    "gui/drawer.go",
+    "gui/drawer_test.go",
+    "gui/gui.go",
+    "gui/gui_test.go",
+    "gui/keybinds.go",
+    "gui/keybinds_test.go",
+    "gui/widgets.go",
+    "gui/widgets.mock.go",
+    "images/demo.gif",
+    "images/mouse-support.gif",
+    "images/progress.gif",
+    "images/real-time.gif",
+    "main.go",
+    "main_test.go",
+    "testdata/body-1.json"
+  ],
+  "explanation": null
+}

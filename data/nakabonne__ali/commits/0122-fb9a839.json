@@ -1,0 +1,93 @@
+{
+  "seq": 122,
+  "sha": "fb9a8397e53c8647a3ab6d95d5f8e5c7be3c115f",
+  "parents": [
+    "ba927efc119e0a0a8668438e4a27d69db9b89411",
+    "b14b51984133093de1ba752373027c4fe00c06b3"
+  ],
+  "author": {
+    "name": "Ryo Nakao",
+    "email": "ryo@nakao.dev",
+    "date": "2020-10-06T21:58:34+09:00"
+  },
+  "message": "Merge pull request #48 from fsmiamoto/master\n\nAdd flag for max number of idle connections",
+  "pr": {
+    "number": 48,
+    "title": "Add flag for max number of idle connections",
+    "body": "This additional flag allows for specifying the maximum number of idle\r\nconnections per target host, with a default of 10,000.\r\n\r\nIf I missed anything, just give me a heads up :D\r\n\r\nCloses #28 ",
+    "url": "https://github.com/nakabonne/ali/pull/48"
+  },
+  "linkedIssues": [
+    {
+      "number": 28,
+      "title": "Support connections options",
+      "body": "- [ ] Enable to specify maximum open idle connections per target host by giving `-c`or `--connections`\r\n\r\nOnly tiny changes are required because all we have to do is just pass to the Vegeta API.",
+      "url": "https://github.com/nakabonne/ali/issues/28"
+    }
+  ],
+  "stats": {
+    "filesChanged": 3,
+    "additions": 47,
+    "deletions": 38
+  },
+  "files": [
+    {
+      "path": "attacker/attacker.go",
+      "status": "M",
+      "additions": 23,
+      "deletions": 17,
+      "binary": false
+    },
+    {
+      "path": "main.go",
+      "status": "M",
+      "additions": 12,
+      "deletions": 10,
+      "binary": false
+    },
+    {
+      "path": "main_test.go",
+      "status": "M",
+      "additions": 12,
+      "deletions": 11,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/attacker/attacker.go b/attacker/attacker.go\nindex fea51a4..06beb81 100644\n--- a/attacker/attacker.go\n+++ b/attacker/attacker.go\n@@ -10,13 +10,14 @@ import (\n )\n \n const (\n-\tDefaultRate       = 50\n-\tDefaultDuration   = 10 * time.Second\n-\tDefaultTimeout    = 30 * time.Second\n-\tDefaultMethod     = http.MethodGet\n-\tDefaultWorkers    = 10\n-\tDefaultMaxWorkers = math.MaxUint64\n-\tDefaultMaxBody    = int64(-1)\n+\tDefaultRate        = 50\n+\tDefaultDuration    = 10 * time.Second\n+\tDefaultTimeout     = 30 * time.Second\n+\tDefaultMethod      = http.MethodGet\n+\tDefaultWorkers     = 10\n+\tDefaultMaxWorkers  = math.MaxUint64\n+\tDefaultMaxBody     = int64(-1)\n+\tDefaultConnections = 10000\n )\n \n type Attacker interface {\n@@ -26,16 +27,17 @@ type Attacker interface {\n \n // Options provides optional settings to attack.\n type Options struct {\n-\tRate       int\n-\tDuration   time.Duration\n-\tTimeout    time.Duration\n-\tMethod     string\n-\tBody       []byte\n-\tHeader     http.Header\n-\tWorkers    uint64\n-\tMaxWorkers uint64\n-\tMaxBody    int64\n-\tKeepAlive  bool\n+\tRate        int\n+\tDuration    time.Duration\n+\tTimeout     time.Duration\n+\tMethod      string\n+\tBody        []byte\n+\tMaxBody     int64\n+\tHeader      http.Header\n+\tWorkers     uint64\n+\tMaxWorkers  uint64\n+\tKeepAlive   bool\n+\tConnections int\n \n \tAttacker Attacker\n }\n@@ -66,12 +68,16 @@ func Attack(ctx context.Context, target string, resCh chan *Result, metricsCh ch\n \tif opts.MaxBody == 0 {\n \t\topts.MaxBody = DefaultMaxBody\n \t}\n+\tif opts.Connections == 0 {\n+\t\topts.Connections = DefaultConnections\n+\t}\n \tif opts.Attacker == nil {\n \t\topts.Attacker = vegeta.NewAttacker(\n \t\t\tvegeta.Timeout(opts.Timeout),\n \t\t\tvegeta.Workers(opts.Workers),\n \t\t\tvegeta.MaxWorkers(opts.MaxWorkers),\n \t\t\tvegeta.MaxBody(opts.MaxBody),\n+\t\t\tvegeta.Connections(opts.Connections),\n \t\t\tvegeta.KeepAlive(opts.KeepAlive),\n \t\t)\n \t}\ndiff --git a/main.go b/main.go\nindex 30d41ce..fbd670b 100644\n--- a/main.go\n+++ b/main.go\n@@ -30,16 +30,17 @@ var (\n )\n \n type cli struct {\n-\trate       int\n-\tduration   time.Duration\n-\ttimeout    time.Duration\n-\tmethod     string\n-\theaders    []string\n-\tbody       string\n-\tbodyFile   string\n-\tmaxBody    int64\n-\tworkers    uint64\n-\tmaxWorkers uint64\n+\trate        int\n+\tduration    time.Duration\n+\ttimeout     time.Duration\n+\tmethod      string\n+\theaders     []string\n+\tbody        string\n+\tbodyFile    string\n+\tmaxBody     int64\n+\tworkers     uint64\n+\tmaxWorkers  uint64\n+\tconnections int\n \n \tdebug     bool\n \tversion   bool\n@@ -74,6 +75,7 @@ func parseFlags(stdout, stderr io.Writer) (*cli, error) {\n \tflagSet.BoolVarP(&c.keepAlive, \"keepalive\", \"k\", true, \"Use HTTP persistent connection.\")\n \tflagSet.Uint64VarP(&c.workers, \"workers\", \"w\", attacker.DefaultWorkers, \"Amount of initial workers to spawn.\")\n \tflagSet.Uint64VarP(&c.maxWorkers, \"max-workers\", \"W\", attacker.DefaultMaxWorkers, \"Amount of maximum workers to spawn.\")\n+\tflagSet.IntVarP(&c.connections, \"connections\", \"c\", attacker.DefaultConnections, \"Amount of maximum open idle connections per target host\")\n \tflagSet.Usage = c.usage\n \tif err := flagSet.Parse(os.Args[1:]); err != nil {\n \t\tif !errors.Is(err, flag.ErrHelp) {\ndiff --git a/main_test.go b/main_test.go\nindex 010c349..5306d93 100644\n--- a/main_test.go\n+++ b/main_test.go\n@@ -46,17 +46,18 @@ func TestParseFlags(t *testing.T) {\n \t\t{\n \t\t\tname: \"with default options\",\n \t\t\twant: &cli{\n-\t\t\t\trate:       50,\n-\t\t\t\tduration:   time.Second * 10,\n-\t\t\t\ttimeout:    time.Second * 30,\n-\t\t\t\tmethod:     \"GET\",\n-\t\t\t\theaders:    []string{},\n-\t\t\t\tmaxBody:    -1,\n-\t\t\t\tkeepAlive:  true,\n-\t\t\t\tworkers:    10,\n-\t\t\t\tmaxWorkers: math.MaxUint64,\n-\t\t\t\tstdout:     new(bytes.Buffer),\n-\t\t\t\tstderr:     new(bytes.Buffer),\n+\t\t\t\trate:        50,\n+\t\t\t\tduration:    time.Second * 10,\n+\t\t\t\ttimeout:     time.Second * 30,\n+\t\t\t\tmethod:      \"GET\",\n+\t\t\t\theaders:     []string{},\n+\t\t\t\tmaxBody:     -1,\n+\t\t\t\tkeepAlive:   true,\n+\t\t\t\tworkers:     10,\n+\t\t\t\tmaxWorkers:  math.MaxUint64,\n+\t\t\t\tconnections: 10000,\n+\t\t\t\tstdout:      new(bytes.Buffer),\n+\t\t\t\tstderr:      new(bytes.Buffer),\n \t\t\t},\n \t\t\twantErr: false,\n \t\t},\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/lint.yml",
+    ".github/workflows/release.yml",
+    ".github/workflows/test.yml",
+    ".gitignore",
+    ".golangci.yml",
+    ".goreleaser.yml",
+    "Dockerfile",
+    "LICENSE",
+    "Makefile",
+    "README.md",
+    "attacker/attacker.go",
+    "attacker/attacker_test.go",
+    "attacker/fake_attacker.go",
+    "attacker/metrics.go",
+    "codecov.yml",
+    "go.mod",
+    "go.sum",
+    "gui/drawer.go",
+    "gui/drawer_test.go",
+    "gui/gui.go",
+    "gui/gui_test.go",
+    "gui/keybinds.go",
+    "gui/keybinds_test.go",
+    "gui/widgets.go",
+    "gui/widgets.mock.go",
+    "images/demo.gif",
+    "images/mouse-support.gif",
+    "images/progress.gif",
+    "images/real-time.gif",
+    "main.go",
+    "main_test.go",
+    "testdata/body-1.json"
+  ],
+  "explanation": null
+}

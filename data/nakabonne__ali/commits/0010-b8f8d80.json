@@ -1,0 +1,53 @@
+{
+  "seq": 10,
+  "sha": "b8f8d80bcd93016e20e2b33661d65ed7fcbebb1c",
+  "parents": [
+    "f77443480ba0eadeaaa2695dda330dca76e76ac3"
+  ],
+  "author": {
+    "name": "nakabonne",
+    "email": "ryo@nakao.dev",
+    "date": "2020-09-12T22:45:05+09:00"
+  },
+  "message": "Add text widgets",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 70,
+    "deletions": 22
+  },
+  "files": [
+    {
+      "path": "gui/gui.go",
+      "status": "M",
+      "additions": 15,
+      "deletions": 12,
+      "binary": false
+    },
+    {
+      "path": "gui/widgets.go",
+      "status": "M",
+      "additions": 55,
+      "deletions": 10,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/gui/gui.go b/gui/gui.go\nindex ec10bd1..67f4361 100644\n--- a/gui/gui.go\n+++ b/gui/gui.go\n@@ -34,7 +34,7 @@ func Run() error {\n \t\treturn fmt.Errorf(\"failed to generate container: %w\", err)\n \t}\n \n-\tw, err := newWidgets(ctx, c)\n+\tw, err := newWidgets()\n \tif err != nil {\n \t\treturn fmt.Errorf(\"failed to generate widgets: %w\", err)\n \t}\n@@ -50,7 +50,7 @@ func Run() error {\n \t\tswitch k.Key {\n \t\tcase keyboard.KeyEsc, keyboard.KeyCtrlC:\n \t\t\tcancel()\n-\t\tcase keyboard.KeyEnter:\n+\t\tcase keyboard.KeySpace:\n \t\t\tresultCh := make(chan *attacker.Result)\n \t\t\tgo func() {\n \t\t\t\t// TODO: Enalble to poplulate from input\n@@ -65,19 +65,22 @@ func Run() error {\n }\n \n func gridLayout(w *widgets) ([]container.Option, error) {\n-\trows := []grid.Element{\n-\t\tgrid.RowHeightPerc(99,\n-\t\t\tgrid.Widget(w.plotChart,\n-\t\t\t\tcontainer.Border(linestyle.Light),\n-\t\t\t\tcontainer.BorderTitle(\"Plot\"),\n-\t\t\t),\n-\t\t),\n-\t}\n-\tcol := grid.ColWidthPerc(99, rows...)\n+\traw1 := grid.RowHeightPerc(50,\n+\t\tgrid.ColWidthPerc(99, grid.Widget(w.plotChart, container.Border(linestyle.Light), container.BorderTitle(\"Plot\"))),\n+\t)\n+\traw2 := grid.RowHeightPerc(47,\n+\t\tgrid.ColWidthPerc(50, grid.Widget(w.urlInput, container.Border(linestyle.Light), container.BorderTitle(\"Input\"))),\n+\t\tgrid.ColWidthPerc(49, grid.Widget(w.metrics, container.Border(linestyle.Light), container.BorderTitle(\"Metrics\"))),\n+\t)\n+\traw3 := grid.RowHeightPerc(2,\n+\t\tgrid.ColWidthPerc(99, grid.Widget(w.navi, container.Border(linestyle.Light))),\n+\t)\n \n \tbuilder := grid.New()\n \tbuilder.Add(\n-\t\tcol,\n+\t\traw1,\n+\t\traw2,\n+\t\traw3,\n \t)\n \n \treturn builder.Build()\ndiff --git a/gui/widgets.go b/gui/widgets.go\nindex 81ca8b0..1674585 100644\n--- a/gui/widgets.go\n+++ b/gui/widgets.go\n@@ -6,9 +6,8 @@ import (\n \n \t\"github.com/k0kubun/pp\"\n \t\"github.com/mum4k/termdash/cell\"\n-\t\"github.com/mum4k/termdash/container\"\n-\t\"github.com/mum4k/termdash/widgets/button\"\n \t\"github.com/mum4k/termdash/widgets/linechart\"\n+\t\"github.com/mum4k/termdash/widgets/text\"\n \t\"github.com/mum4k/termdash/widgets/textinput\"\n \n \t\"github.com/nakabonne/ali/attacker\"\n@@ -20,21 +19,35 @@ const (\n )\n \n type widgets struct {\n-\tURLInput     *textinput.TextInput\n-\tattackButton *button.Button\n-\tplotChart    *linechart.LineChart\n+\turlInput  *textinput.TextInput\n+\tplotChart *linechart.LineChart\n+\tmetrics   *text.Text\n+\tnavi      *text.Text\n }\n \n-func newWidgets(ctx context.Context, c *container.Container) (*widgets, error) {\n-\tl, err := newLineChart()\n+func newWidgets() (*widgets, error) {\n+\tlc, err := newLineChart()\n+\tif err != nil {\n+\t\treturn nil, err\n+\t}\n+\trt, err := newRollText()\n+\tif err != nil {\n+\t\treturn nil, err\n+\t}\n+\twt, err := newWrapText(\"Ctrl-c: quit, Space: attack\")\n+\tif err != nil {\n+\t\treturn nil, err\n+\t}\n+\tti, err := newTextInput()\n \tif err != nil {\n \t\treturn nil, err\n \t}\n \n \treturn &widgets{\n-\t\tURLInput:     nil,\n-\t\tattackButton: nil,\n-\t\tplotChart:    l,\n+\t\turlInput:  ti,\n+\t\tplotChart: lc,\n+\t\tmetrics:   rt,\n+\t\tnavi:      wt,\n \t}, nil\n }\n \n@@ -46,6 +59,38 @@ func newLineChart() (*linechart.LineChart, error) {\n \t)\n }\n \n+func newRollText() (*text.Text, error) {\n+\treturn text.New(text.RollContent())\n+}\n+\n+func newWrapText(s string) (*text.Text, error) {\n+\tt, err := text.New(text.WrapAtWords())\n+\tif err != nil {\n+\t\treturn nil, err\n+\t}\n+\tif err := t.Write(s); err != nil {\n+\t\treturn nil, err\n+\t}\n+\treturn t, nil\n+}\n+\n+func newTextInput() (*textinput.TextInput, error) {\n+\tinput, err := textinput.New(\n+\t\ttextinput.Label(\"Target URL: \", cell.FgColor(cell.ColorBlue)),\n+\t\ttextinput.MaxWidthCells(20),\n+\t\ttextinput.PlaceHolder(\"enter any text\"),\n+\t\ttextinput.OnSubmit(func(text string) error {\n+\t\t\t// TODO: Handle on submit action, for instance using channel.\n+\t\t\tpp.Println(\"input text\", text)\n+\t\t\treturn nil\n+\t\t}),\n+\t)\n+\tif err != nil {\n+\t\treturn nil, err\n+\t}\n+\treturn input, err\n+}\n+\n func redrawChart(ctx context.Context, lineChart *linechart.LineChart, resultCh chan *attacker.Result) {\n \tvalues := []float64{}\n \tfor {\n",
+  "diffTruncated": false,
+  "tree": [
+    ".gitignore",
+    ".golangci.yml",
+    "LICENSE",
+    "README.md",
+    "attacker/attacker.go",
+    "attacker/attacker_test.go",
+    "attacker/fake_attacker.go",
+    "go.mod",
+    "go.sum",
+    "gui/gui.go",
+    "gui/widgets.go",
+    "main.go"
+  ],
+  "explanation": null
+}

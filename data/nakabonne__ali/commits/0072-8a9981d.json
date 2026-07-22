@@ -1,0 +1,72 @@
+{
+  "seq": 72,
+  "sha": "8a9981d9513e8fd9064ff17c4402471fd34373a4",
+  "parents": [
+    "5b4c5ddcac8f348e334a7148ae4ab4988f9a56e0"
+  ],
+  "author": {
+    "name": "Ryo Nakao",
+    "email": "ryo@nakao.dev",
+    "date": "2020-09-23T09:48:54+09:00"
+  },
+  "message": "Make terminal interface pluggable (#10)\n\n* CI debug\r\n\r\n* Make terminal interface pluggable",
+  "pr": {
+    "number": 10,
+    "title": "Make terminal interface pluggable",
+    "body": "",
+    "url": "https://github.com/nakabonne/ali/pull/10"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 11,
+    "deletions": 11
+  },
+  "files": [
+    {
+      "path": "gui/gui.go",
+      "status": "M",
+      "additions": 6,
+      "deletions": 7,
+      "binary": false
+    },
+    {
+      "path": "gui/gui_test.go",
+      "status": "M",
+      "additions": 5,
+      "deletions": 4,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/gui/gui.go b/gui/gui.go\nindex f5fae64..201e793 100644\n--- a/gui/gui.go\n+++ b/gui/gui.go\n@@ -19,18 +19,17 @@ const rootID = \"root\"\n type runner func(ctx context.Context, t terminalapi.Terminal, c *container.Container, opts ...termdash.Option) error\n \n func Run() error {\n-\treturn run(termdash.Run)\n-}\n-\n-func run(r runner) error {\n-\tctx, cancel := context.WithCancel(context.Background())\n-\tdefer cancel()\n-\n \tt, err := termbox.New(termbox.ColorMode(terminalapi.ColorMode256))\n \tif err != nil {\n \t\treturn fmt.Errorf(\"failed to generate terminal interface: %w\", err)\n \t}\n \tdefer t.Close()\n+\treturn run(t, termdash.Run)\n+}\n+\n+func run(t *termbox.Terminal, r runner) error {\n+\tctx, cancel := context.WithCancel(context.Background())\n+\tdefer cancel()\n \n \tc, err := container.New(t, container.ID(rootID))\n \tif err != nil {\ndiff --git a/gui/gui_test.go b/gui/gui_test.go\nindex a723fd0..484825b 100644\n--- a/gui/gui_test.go\n+++ b/gui/gui_test.go\n@@ -7,14 +7,15 @@ import (\n \n \t\"github.com/mum4k/termdash\"\n \t\"github.com/mum4k/termdash/container\"\n+\t\"github.com/mum4k/termdash/terminal/termbox\"\n \t\"github.com/mum4k/termdash/terminal/terminalapi\"\n \t\"github.com/stretchr/testify/assert\"\n+\t\"go.uber.org/goleak\"\n )\n \n-// TODO: Ensure to kill all goroutine when running unit tests.\n-/*func TestMain(m *testing.M) {\n+func TestMain(m *testing.M) {\n \tgoleak.VerifyTestMain(m)\n-}*/\n+}\n \n func TestRun(t *testing.T) {\n \ttests := []struct {\n@@ -39,7 +40,7 @@ func TestRun(t *testing.T) {\n \t}\n \tfor _, tt := range tests {\n \t\tt.Run(tt.name, func(t *testing.T) {\n-\t\t\terr := run(tt.r)\n+\t\t\terr := run(&termbox.Terminal{}, tt.r)\n \t\t\tassert.Equal(t, tt.wantErr, err != nil)\n \t\t})\n \t}\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/lint.yml",
+    ".github/workflows/release.yml",
+    ".github/workflows/test.yml",
+    ".gitignore",
+    ".golangci.yml",
+    ".goreleaser.yml",
+    "Dockerfile",
+    "LICENSE",
+    "README.md",
+    "attacker/attacker.go",
+    "attacker/attacker_test.go",
+    "attacker/fake_attacker.go",
+    "attacker/metrics.go",
+    "go.mod",
+    "go.sum",
+    "gui/drawer.go",
+    "gui/gui.go",
+    "gui/gui_test.go",
+    "gui/keybinds.go",
+    "gui/keybinds_test.go",
+    "gui/widgets.go",
+    "images/demo.gif",
+    "images/mouse-support.gif",
+    "images/progress.gif",
+    "images/real-time.gif",
+    "main.go"
+  ],
+  "explanation": null
+}

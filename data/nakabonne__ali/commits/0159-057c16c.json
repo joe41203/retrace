@@ -1,0 +1,125 @@
+{
+  "seq": 159,
+  "sha": "057c16ceaf58eca4ab498d6060aec63ad5408aff",
+  "parents": [
+    "04b67c90b326751554fd51ea86bd801cfef43eaa",
+    "8b2ea13c57c3eb4cea8868c6fa1d759236b6a6ee"
+  ],
+  "author": {
+    "name": "Ryo Nakao",
+    "email": "ryo@nakao.dev",
+    "date": "2020-12-05T16:31:00+09:00"
+  },
+  "message": "Merge pull request #87 from matsuyoshi30/feature/add-dns-resolver\n\nAdd support for resolvers option",
+  "pr": {
+    "number": 87,
+    "title": "Add support for resolvers option",
+    "body": "Closes #85 ",
+    "url": "https://github.com/nakabonne/ali/pull/87"
+  },
+  "linkedIssues": [
+    {
+      "number": 85,
+      "title": "Support resolvers option",
+      "body": "It would be nice to have the option which specifies the list of custom DNS resolver addresses (comma-separated list). Maybe It works only on non Windows systems.\r\n\r\nExample:\r\n```\r\nali --resolvers=\"1.2.3.4,192.168.11.1:53\" http:host.xz\r\n```\r\n\r\n\r\nWe can borrow around [here](https://github.com/tsenart/vegeta/blob/d73edf2bc2663d83848da2a97a8401a7ed1440bc/attack.go#L111-L117).",
+      "url": "https://github.com/nakabonne/ali/issues/85"
+    }
+  ],
+  "stats": {
+    "filesChanged": 7,
+    "additions": 228,
+    "deletions": 0
+  },
+  "files": [
+    {
+      "path": "attacker/attacker.go",
+      "status": "M",
+      "additions": 4,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "attacker/resolver.go",
+      "status": "A",
+      "additions": 31,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "attacker/resolver_test.go",
+      "status": "A",
+      "additions": 92,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "go.mod",
+      "status": "M",
+      "additions": 1,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "go.sum",
+      "status": "M",
+      "additions": 2,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "main.go",
+      "status": "M",
+      "additions": 47,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "main_test.go",
+      "status": "M",
+      "additions": 51,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/attacker/attacker.go b/attacker/attacker.go\nindex 2904f8e..d43a120 100644\n--- a/attacker/attacker.go\n+++ b/attacker/attacker.go\n@@ -44,6 +44,7 @@ type Options struct {\n \tHTTP2       bool\n \tLocalAddr   net.IPAddr\n \tBuckets     []time.Duration\n+\tResolvers   []string\n \n \tAttacker Attacker\n }\n@@ -83,6 +84,9 @@ func Attack(ctx context.Context, target string, resCh chan<- *Result, metricsCh\n \tif opts.LocalAddr.IP == nil {\n \t\topts.LocalAddr = DefaultLocalAddr\n \t}\n+\tif len(opts.Resolvers) > 0 {\n+\t\tnet.DefaultResolver = NewResolver(opts.Resolvers)\n+\t}\n \tif opts.Attacker == nil {\n \t\topts.Attacker = vegeta.NewAttacker(\n \t\t\tvegeta.Timeout(opts.Timeout),\ndiff --git a/attacker/resolver.go b/attacker/resolver.go\nnew file mode 100644\nindex 0000000..8281492\n--- /dev/null\n+++ b/attacker/resolver.go\n@@ -0,0 +1,31 @@\n+package attacker\n+\n+import (\n+\t\"context\"\n+\t\"net\"\n+\t\"sync/atomic\"\n+\t\"time\"\n+)\n+\n+type resolver struct {\n+\taddrs []string\n+\tidx   uint64\n+}\n+\n+func NewResolver(addrs []string) *net.Resolver {\n+\tr := &resolver{addrs: addrs}\n+\n+\treturn &net.Resolver{\n+\t\tPreferGo: true,\n+\t\tDial: func(ctx context.Context, network, address string) (net.Conn, error) {\n+\t\t\td := net.Dialer{\n+\t\t\t\tTimeout: time.Millisecond * time.Duration(2000),\n+\t\t\t}\n+\t\t\treturn d.DialContext(ctx, network, r.address())\n+\t\t},\n+\t}\n+}\n+\n+func (r *resolver) address() string {\n+\treturn r.addrs[atomic.AddUint64(&r.idx, 1)%uint64(len(r.addrs))]\n+}\ndiff --git a/attacker/resolver_test.go b/attacker/resolver_test.go\nnew file mode 100644\nindex 0000000..34a1099\n--- /dev/null\n+++ b/attacker/resolver_test.go\n@@ -0,0 +1,92 @@\n+package attacker\n+\n+import (\n+\t\"fmt\"\n+\t\"io/ioutil\"\n+\t\"net\"\n+\t\"net/http\"\n+\t\"net/http/httptest\"\n+\t\"net/url\"\n+\t\"strings\"\n+\t\"testing\"\n+\t\"time\"\n+\n+\t\"github.com/miekg/dns\"\n+)\n+\n+const (\n+\ttestDomain       = \"test.notadomain\"\n+\tDNSServerAddress = \"127.0.0.1\"\n+\tmessage          = \"Test Server\"\n+)\n+\n+func TestNewResolver(t *testing.T) {\n+\tdone := make(chan struct{}) // for ensuring ds.PacketConn is not nil\n+\n+\t// prepare custom DNS server\n+\tdns.HandleFunc(\".\", handleRequest)\n+\tds := dns.Server{\n+\t\tAddr:              DNSServerAddress + \":0\",\n+\t\tNet:               \"udp\",\n+\t\tReadTimeout:       time.Millisecond * time.Duration(2000),\n+\t\tWriteTimeout:      time.Millisecond * time.Duration(2000),\n+\t\tNotifyStartedFunc: func() { close(done) },\n+\t}\n+\n+\tgo func() {\n+\t\tif err := ds.ListenAndServe(); err != nil {\n+\t\t\tt.Logf(\"got error during dns ListenAndServe: %s\", err)\n+\t\t}\n+\t}()\n+\tdefer func() {\n+\t\t_ = ds.Shutdown()\n+\t}()\n+\n+\t<-done\n+\n+\tnet.DefaultResolver = NewResolver([]string{ds.PacketConn.LocalAddr().String()})\n+\n+\t// test server for name resolution\n+\tts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {\n+\t\tfmt.Fprintln(w, message)\n+\t}))\n+\tdefer ts.Close()\n+\n+\ttsURL, _ := url.Parse(ts.URL)\n+\t_, port, _ := net.SplitHostPort(tsURL.Host)\n+\ttsURL.Host = net.JoinHostPort(testDomain, port)\n+\n+\tresp, err := http.Get(tsURL.String())\n+\tif err != nil {\n+\t\tt.Fatalf(\"failed resolver round trip: %v\", err)\n+\t}\n+\tdefer resp.Body.Close()\n+\n+\tbody, err := ioutil.ReadAll(resp.Body)\n+\tif err != nil {\n+\t\tt.Fatalf(\"failed to read respose body: %v\", err)\n+\t}\n+\n+\tif strings.TrimSpace(string(body)) != message {\n+\t\tt.Errorf(\"reponse body mismatch, expected: '%s', but got '%s'\", message, body)\n+\t}\n+}\n+\n+func handleRequest(w dns.ResponseWriter, r *dns.Msg) {\n+\tm := new(dns.Msg)\n+\tm.SetReply(r)\n+\n+\tm.Answer = []dns.RR{\n+\t\t&dns.A{\n+\t\t\tHdr: dns.RR_Header{\n+\t\t\t\tName:   r.Question[0].Name,\n+\t\t\t\tRrtype: dns.TypeA,\n+\t\t\t\tClass:  dns.ClassINET,\n+\t\t\t\tTtl:    1,\n+\t\t\t},\n+\t\t\tA: net.ParseIP(DNSServerAddress),\n+\t\t},\n+\t}\n+\n+\tw.WriteMsg(m)\n+}\ndiff --git a/go.mod b/go.mod\nindex df55a86..68c68bc 100644\n--- a/go.mod\n+++ b/go.mod\n@@ -7,6 +7,7 @@ require (\n \tgithub.com/k0kubun/colorstring v0.0.0-20150214042306-9440f1994b88 // indirect\n \tgithub.com/k0kubun/pp v3.0.1+incompatible\n \tgithub.com/mattn/go-colorable v0.1.7 // indirect\n+\tgithub.com/miekg/dns v1.1.17\n \tgithub.com/mum4k/termdash v0.12.2\n \tgithub.com/spf13/pflag v1.0.5\n \tgithub.com/stretchr/testify v1.6.1\ndiff --git a/go.sum b/go.sum\nindex 069f46c..d7e8e57 100644\n--- a/go.sum\n+++ b/go.sum\n@@ -60,6 +60,7 @@ github.com/mattn/go-isatty v0.0.12/go.mod h1:cbi8OIDigv2wuxKPP5vlRcQ1OAZbq2CE4Ky\n github.com/mattn/go-runewidth v0.0.4/go.mod h1:LwmH8dsx7+W8Uxz3IHJYH5QSwggIsqBzpuz5H//U1FU=\n github.com/mattn/go-runewidth v0.0.9 h1:Lm995f3rfxdpd6TSmuVCHVb/QhupuXlYr8sCI/QdE+0=\n github.com/mattn/go-runewidth v0.0.9/go.mod h1:H031xJmbD/WCDINGzjvQ9THkh0rPKHF+m2gUSrubnMI=\n+github.com/miekg/dns v1.1.17 h1:BhJxdA7bH51vKFZSY8Sn9pR7++LREvg0eYFzHA452ew=\n github.com/miekg/dns v1.1.17/go.mod h1:WgzbA6oji13JREwiNsRDNfl7jYdPnmz+VEuLrA+/48M=\n github.com/mum4k/termdash v0.12.2 h1:S2frz71OrXUKIVVZ3snYBEzyYlUNRTu0ElV6d5Pf6gI=\n github.com/mum4k/termdash v0.12.2/go.mod h1:haerPCSO0U8pehROAecmuOHDF+2UXw2KaCTxdWooDFE=\n@@ -84,6 +85,7 @@ go.uber.org/atomic v1.7.0/go.mod h1:fEN4uk6kAWBTFdckzkM89CLk9XfWZrxpCo0nPH17wJc=\n go.uber.org/goleak v1.1.10 h1:z+mqJhf6ss6BSfSM671tgKyZBFPTTJM+HLxnhPC3wu0=\n go.uber.org/goleak v1.1.10/go.mod h1:8a7PlsEVH3e/a/GLqe5IIrQx6GzcnRmZEufDUTk4A7A=\n golang.org/x/crypto v0.0.0-20190308221718-c2843e01d9a2/go.mod h1:djNgcEr1/C05ACkg1iLfiJU5Ep61QUkGW8qpdssI0+w=\n+golang.org/x/crypto v0.0.0-20190829043050-9756ffdc2472 h1:Gv7RPwsi3eZ2Fgewe3CBsuOebPwO27PoXzRpJPsvSSM=\n golang.org/x/crypto v0.0.0-20190829043050-9756ffdc2472/go.mod h1:yigFU9vqHzYiE8UmvKecakEJjdnWj3jj499lnFckfCI=\n golang.org/x/lint v0.0.0-20190930215403-16217165b5de h1:5hukYrvBGR8/eNkX5mdUezrA6JiaEZDtJb9Ei+1LlBs=\n golang.org/x/lint v0.0.0-20190930215403-16217165b5de/go.mod h1:6SW0HCj/g11FgYtHlgUYUwCkIfeOF89ocIRzGO/8vkc=\ndiff --git a/main.go b/main.go\nindex 5b2139d..c403c5b 100644\n--- a/main.go\n+++ b/main.go\n@@ -11,6 +11,7 @@ import (\n \t\"os\"\n \t\"path/filepath\"\n \t\"runtime\"\n+\t\"strconv\"\n \t\"strings\"\n \t\"time\"\n \n@@ -46,6 +47,7 @@ type cli struct {\n \tlocalAddress string\n \tnoKeepAlive  bool\n \tbuckets      string\n+\tresolvers    string\n \n \tdebug   bool\n \tversion bool\n@@ -84,6 +86,7 @@ func parseFlags(stdout, stderr io.Writer) (*cli, error) {\n \tflagSet.StringVar(&c.localAddress, \"local-addr\", \"0.0.0.0\", \"Local IP address.\")\n \t// TODO: Re-enable when making it capable of drawing histogram bar chart.\n \t//flagSet.StringVar(&c.buckets, \"buckets\", \"\", \"Histogram buckets; comma-separated list.\")\n+\tflagSet.StringVar(&c.resolvers, \"resolvers\", \"\", \"Custom DNS resolver addresses; comma-separated list.\")\n \tflagSet.Usage = c.usage\n \tif err := flagSet.Parse(os.Args[1:]); err != nil {\n \t\tif !errors.Is(err, flag.ErrHelp) {\n@@ -186,6 +189,11 @@ func (c *cli) makeOptions() (*attacker.Options, error) {\n \t\treturn nil, fmt.Errorf(\"wrong buckets format %w\", err)\n \t}\n \n+\tparsedResolvers, err := parseResolvers(c.resolvers)\n+\tif err != nil {\n+\t\treturn nil, err\n+\t}\n+\n \treturn &attacker.Options{\n \t\tRate:        c.rate,\n \t\tDuration:    c.duration,\n@@ -201,6 +209,7 @@ func (c *cli) makeOptions() (*attacker.Options, error) {\n \t\tHTTP2:       !c.noHTTP2,\n \t\tLocalAddr:   localAddr,\n \t\tBuckets:     parsedBuckets,\n+\t\tResolvers:   parsedResolvers,\n \t}, nil\n }\n \n@@ -232,6 +241,44 @@ func parseBucketOptions(rawBuckets string) ([]time.Duration, error) {\n \treturn result, nil\n }\n \n+func parseResolvers(addrs string) ([]string, error) {\n+\tif addrs == \"\" {\n+\t\treturn nil, nil\n+\t}\n+\n+\tstringAddrs := strings.Split(addrs, \",\")\n+\tresult := make([]string, 0, len(stringAddrs))\n+\n+\tfor _, addr := range stringAddrs {\n+\t\ttrimmedAddr := strings.TrimSpace(addr)\n+\n+\t\t// if given address has no port, append \"53\"\n+\t\tif !strings.Contains(trimmedAddr, \":\") {\n+\t\t\ttrimmedAddr += \":53\"\n+\t\t}\n+\n+\t\thost, port, err := net.SplitHostPort(trimmedAddr)\n+\t\tif err != nil {\n+\t\t\treturn nil, err\n+\t\t}\n+\n+\t\t// validate port\n+\t\t_, err = strconv.ParseUint(port, 10, 16)\n+\t\tif err != nil {\n+\t\t\treturn nil, fmt.Errorf(\"port of given address %q has a wrong format\", addr)\n+\t\t}\n+\n+\t\t// validate IP\n+\t\tif ip := net.ParseIP(host); ip == nil {\n+\t\t\treturn nil, fmt.Errorf(\"given address %q has a wrong format\", addr)\n+\t\t}\n+\n+\t\tresult = append(result, trimmedAddr)\n+\t}\n+\n+\treturn result, nil\n+}\n+\n // Makes a new file under the working directory only when debug use.\n func setDebug(w io.Writer, debug bool) {\n \tif !debug {\ndiff --git a/main_test.go b/main_test.go\nindex 61c1ba7..a8f703c 100644\n--- a/main_test.go\n+++ b/main_test.go\n@@ -60,6 +60,7 @@ func TestParseFlags(t *testing.T) {\n \t\t\t\tstderr:       new(bytes.Buffer),\n \t\t\t\tnoHTTP2:      false,\n \t\t\t\tlocalAddress: \"0.0.0.0\",\n+\t\t\t\tresolvers:    \"\",\n \t\t\t},\n \t\t\twantErr: false,\n \t\t},\n@@ -301,6 +302,56 @@ func TestMakeOptions(t *testing.T) {\n \t\t\t},\n \t\t\twantErr: false,\n \t\t},\n+\t\t{\n+\t\t\tname: \"use custom DNS resolvers\",\n+\t\t\tcli: &cli{\n+\t\t\t\tmethod:    \"GET\",\n+\t\t\t\tresolvers: \"1.2.3.4,192.168.11.1:53\",\n+\t\t\t},\n+\t\t\twant: &attacker.Options{\n+\t\t\t\tRate:       0,\n+\t\t\t\tDuration:   0,\n+\t\t\t\tTimeout:    0,\n+\t\t\t\tMethod:     \"GET\",\n+\t\t\t\tBody:       []byte{},\n+\t\t\t\tHeader:     http.Header{},\n+\t\t\t\tWorkers:    0,\n+\t\t\t\tMaxWorkers: 0,\n+\t\t\t\tMaxBody:    0,\n+\t\t\t\tHTTP2:      true,\n+\t\t\t\tKeepAlive:  true,\n+\t\t\t\tBuckets:    []time.Duration{},\n+\t\t\t\tResolvers:  []string{\"1.2.3.4:53\", \"192.168.11.1:53\"},\n+\t\t\t},\n+\t\t\twantErr: false,\n+\t\t},\n+\t\t{\n+\t\t\tname: \"wrong format\",\n+\t\t\tcli: &cli{\n+\t\t\t\tmethod:    \"GET\",\n+\t\t\t\tresolvers: \"1.2.3.4:1:1\",\n+\t\t\t},\n+\t\t\twant:    nil,\n+\t\t\twantErr: true,\n+\t\t},\n+\t\t{\n+\t\t\tname: \"wrong IP address\",\n+\t\t\tcli: &cli{\n+\t\t\t\tmethod:    \"GET\",\n+\t\t\t\tresolvers: \"1111.2.3.4\",\n+\t\t\t},\n+\t\t\twant:    nil,\n+\t\t\twantErr: true,\n+\t\t},\n+\t\t{\n+\t\t\tname: \"wrong port number\",\n+\t\t\tcli: &cli{\n+\t\t\t\tmethod:    \"GET\",\n+\t\t\t\tresolvers: \"192.168.11.1:65536\",\n+\t\t\t},\n+\t\t\twant:    nil,\n+\t\t\twantErr: true,\n+\t\t},\n \t}\n \tfor _, tt := range tests {\n \t\tt.Run(tt.name, func(t *testing.T) {\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/lint.yml",
+    ".github/workflows/release.yml",
+    ".github/workflows/test.yml",
+    ".gitignore",
+    ".golangci.yml",
+    ".goreleaser.yml",
+    "Dockerfile",
+    "LICENSE",
+    "Makefile",
+    "README.md",
+    "attacker/attacker.go",
+    "attacker/attacker_test.go",
+    "attacker/fake_attacker.go",
+    "attacker/metrics.go",
+    "attacker/resolver.go",
+    "attacker/resolver_test.go",
+    "codecov.yml",
+    "go.mod",
+    "go.sum",
+    "gui/drawer.go",
+    "gui/drawer_test.go",
+    "gui/gui.go",
+    "gui/gui_test.go",
+    "gui/keybinds.go",
+    "gui/keybinds_test.go",
+    "gui/widgets.go",
+    "gui/widgets.mock.go",
+    "images/demo.gif",
+    "images/latency-chart.png",
+    "images/mouse-support.gif",
+    "images/percentiles-chart.png",
+    "images/progress.gif",
+    "images/real-time.gif",
+    "main.go",
+    "main_test.go",
+    "testdata/body-1.json"
+  ],
+  "explanation": null
+}

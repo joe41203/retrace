@@ -1,0 +1,72 @@
+{
+  "seq": 138,
+  "sha": "4ebe364494f8aa2ecdf1857250882757a72e0257",
+  "parents": [
+    "86bc7fbfdd80341378473d36a1f58d98a614471a",
+    "d55656e39ac1cbf692a3bd410ed7774dccb7c3a2"
+  ],
+  "author": {
+    "name": "Ryo Nakao",
+    "email": "ryo@nakao.dev",
+    "date": "2020-10-14T07:59:49+09:00"
+  },
+  "message": "Merge pull request #56 from markruler/support-windows\n\nAdd tcell to support Windows",
+  "pr": {
+    "number": 56,
+    "title": "Add tcell to support Windows",
+    "body": "![image](https://user-images.githubusercontent.com/38225900/95481879-7bcbe000-09c8-11eb-81a5-8e8d080382c9.png)\r\n\r\n![image](https://user-images.githubusercontent.com/38225900/95481895-7ff7fd80-09c8-11eb-8b4b-a3ac4ec3b319.png)\r\n\r\nBut it doesn't work properly. I need help with this PR.",
+    "url": "https://github.com/nakabonne/ali/pull/56"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 12,
+    "deletions": 2
+  },
+  "files": [
+    {
+      "path": "gui/gui.go",
+      "status": "M",
+      "additions": 12,
+      "deletions": 2,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/gui/gui.go b/gui/gui.go\nindex 1a71552..70543c0 100644\n--- a/gui/gui.go\n+++ b/gui/gui.go\n@@ -3,12 +3,14 @@ package gui\n import (\n \t\"context\"\n \t\"fmt\"\n+\t\"runtime\"\n \t\"time\"\n \n \t\"github.com/mum4k/termdash\"\n \t\"github.com/mum4k/termdash/container\"\n \t\"github.com/mum4k/termdash/container/grid\"\n \t\"github.com/mum4k/termdash/linestyle\"\n+\t\"github.com/mum4k/termdash/terminal/tcell\"\n \t\"github.com/mum4k/termdash/terminal/termbox\"\n \t\"github.com/mum4k/termdash/terminal/terminalapi\"\n \n@@ -24,7 +26,15 @@ const (\n type runner func(ctx context.Context, t terminalapi.Terminal, c *container.Container, opts ...termdash.Option) error\n \n func Run(targetURL string, opts *attacker.Options) error {\n-\tt, err := termbox.New(termbox.ColorMode(terminalapi.ColorMode256))\n+\tvar (\n+\t\tt   terminalapi.Terminal\n+\t\terr error\n+\t)\n+\tif runtime.GOOS == \"windows\" {\n+\t\tt, err = tcell.New()\n+\t} else {\n+\t\tt, err = termbox.New(termbox.ColorMode(terminalapi.ColorMode256))\n+\t}\n \tif err != nil {\n \t\treturn fmt.Errorf(\"failed to generate terminal interface: %w\", err)\n \t}\n@@ -32,7 +42,7 @@ func Run(targetURL string, opts *attacker.Options) error {\n \treturn run(t, termdash.Run, targetURL, opts)\n }\n \n-func run(t *termbox.Terminal, r runner, targetURL string, opts *attacker.Options) error {\n+func run(t terminalapi.Terminal, r runner, targetURL string, opts *attacker.Options) error {\n \tctx, cancel := context.WithCancel(context.Background())\n \tdefer cancel()\n \n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/lint.yml",
+    ".github/workflows/release.yml",
+    ".github/workflows/test.yml",
+    ".gitignore",
+    ".golangci.yml",
+    ".goreleaser.yml",
+    "Dockerfile",
+    "LICENSE",
+    "Makefile",
+    "README.md",
+    "attacker/attacker.go",
+    "attacker/attacker_test.go",
+    "attacker/fake_attacker.go",
+    "attacker/metrics.go",
+    "codecov.yml",
+    "go.mod",
+    "go.sum",
+    "gui/drawer.go",
+    "gui/drawer_test.go",
+    "gui/gui.go",
+    "gui/gui_test.go",
+    "gui/keybinds.go",
+    "gui/keybinds_test.go",
+    "gui/widgets.go",
+    "gui/widgets.mock.go",
+    "images/demo.gif",
+    "images/mouse-support.gif",
+    "images/progress.gif",
+    "images/real-time.gif",
+    "main.go",
+    "main_test.go",
+    "testdata/body-1.json"
+  ],
+  "explanation": null
+}

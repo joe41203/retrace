@@ -1,0 +1,80 @@
+{
+  "seq": 152,
+  "sha": "7660e9de645be6f4506cc29bd961ea131fc626e7",
+  "parents": [
+    "a30c166d9743e51ddbc2abe44d8bc06c66c5fec5"
+  ],
+  "author": {
+    "name": "Ryo Nakao",
+    "email": "ryo@nakao.dev",
+    "date": "2020-10-25T10:07:30+09:00"
+  },
+  "message": "Use buffered channel for appending chart values (#79)",
+  "pr": {
+    "number": 79,
+    "title": "Use buffered channel for appending chart values",
+    "body": "",
+    "url": "https://github.com/nakabonne/ali/pull/79"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 4,
+    "deletions": 5
+  },
+  "files": [
+    {
+      "path": "gui/drawer.go",
+      "status": "M",
+      "additions": 3,
+      "deletions": 4,
+      "binary": false
+    },
+    {
+      "path": "gui/gui.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/gui/drawer.go b/gui/drawer.go\nindex b8ebd86..a4934e9 100644\n--- a/gui/drawer.go\n+++ b/gui/drawer.go\n@@ -26,13 +26,12 @@ type drawer struct {\n \tmetricsCh chan *attacker.Metrics\n \tdoneCh    chan struct{}\n \n-\tchartValues values\n-\tmetrics     *attacker.Metrics\n-\n \t// aims to avoid to perform multiple `appendChartValues`.\n \tchartDrawing *atomic.Bool\n \n-\tmu sync.RWMutex\n+\tmu          sync.RWMutex\n+\tchartValues values\n+\tmetrics     *attacker.Metrics\n }\n \n type values struct {\ndiff --git a/gui/gui.go b/gui/gui.go\nindex ce5e02b..660f3fd 100644\n--- a/gui/gui.go\n+++ b/gui/gui.go\n@@ -68,7 +68,7 @@ func run(t terminalapi.Terminal, r runner, targetURL string, opts *attacker.Opti\n \td := &drawer{\n \t\twidgets:      w,\n \t\tgridOpts:     gridOpts,\n-\t\tchartCh:      make(chan *attacker.Result),\n+\t\tchartCh:      make(chan *attacker.Result, 10000),\n \t\tgaugeCh:      make(chan struct{}),\n \t\tmetricsCh:    make(chan *attacker.Metrics),\n \t\tchartDrawing: atomic.NewBool(false),\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/lint.yml",
+    ".github/workflows/release.yml",
+    ".github/workflows/test.yml",
+    ".gitignore",
+    ".golangci.yml",
+    ".goreleaser.yml",
+    "Dockerfile",
+    "LICENSE",
+    "Makefile",
+    "README.md",
+    "attacker/attacker.go",
+    "attacker/attacker_test.go",
+    "attacker/fake_attacker.go",
+    "attacker/metrics.go",
+    "codecov.yml",
+    "go.mod",
+    "go.sum",
+    "gui/drawer.go",
+    "gui/drawer_test.go",
+    "gui/gui.go",
+    "gui/gui_test.go",
+    "gui/keybinds.go",
+    "gui/keybinds_test.go",
+    "gui/widgets.go",
+    "gui/widgets.mock.go",
+    "images/demo.gif",
+    "images/latency-chart.png",
+    "images/mouse-support.gif",
+    "images/percentiles-chart.png",
+    "images/progress.gif",
+    "images/real-time.gif",
+    "main.go",
+    "main_test.go",
+    "testdata/body-1.json"
+  ],
+  "explanation": null
+}

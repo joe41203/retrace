@@ -1,0 +1,85 @@
+{
+  "seq": 134,
+  "sha": "62220a6b62e4aa2a8f8b29a2c211ab99faa883d1",
+  "parents": [
+    "27ace12dcca5d18f8727e7ce7e10fe0a75dbbf0f"
+  ],
+  "author": {
+    "name": "Ryo Nakao",
+    "email": "ryo@nakao.dev",
+    "date": "2020-10-10T12:52:24+09:00"
+  },
+  "message": "Use no flags instead of using true as default (#61)",
+  "pr": {
+    "number": 61,
+    "title": "Use no flags instead of using true as default",
+    "body": "",
+    "url": "https://github.com/nakabonne/ali/pull/61"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 3,
+    "additions": 50,
+    "deletions": 18
+  },
+  "files": [
+    {
+      "path": "README.md",
+      "status": "M",
+      "additions": 3,
+      "deletions": 3,
+      "binary": false
+    },
+    {
+      "path": "main.go",
+      "status": "M",
+      "additions": 11,
+      "deletions": 11,
+      "binary": false
+    },
+    {
+      "path": "main_test.go",
+      "status": "M",
+      "additions": 36,
+      "deletions": 4,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/README.md b/README.md\nindex 1f57b9a..8da8181 100644\n--- a/README.md\n+++ b/README.md\n@@ -75,12 +75,12 @@ Flags:\n       --debug               Run in debug mode.\n   -d, --duration duration   The amount of time to issue requests to the targets. Give 0s for an infinite attack. (default 10s)\n   -H, --header strings      A request header to be sent. Can be used multiple times to send multiple headers.\n-      --http2               Issue HTTP/2 requests to servers which support it. (default true)\n-  -k, --keepalive           Use HTTP persistent connection. (default true)\n       --local-addr string   Local IP address. (default \"0.0.0.0\")\n   -M, --max-body int        Max bytes to capture from response bodies. Give -1 for no limit. (default -1)\n   -W, --max-workers uint    Amount of maximum workers to spawn. (default 18446744073709551615)\n   -m, --method string       An HTTP request method for each request. (default \"GET\")\n+      --no-http2            Don't issue HTTP/2 requests to servers which support it.\n+  -K, --no-keepalive        Don't use HTTP persistent connection.\n   -r, --rate int            The request rate per second to issue against the targets. Give 0 then it will send requests as fast as possible. (default 50)\n   -t, --timeout duration    The timeout for each request. 0s means to disable timeouts. (default 30s)\n   -v, --version             Print the current version.\n@@ -102,7 +102,7 @@ This will help you during long tests.\n ![Screenshot](images/progress.gif)\n \n ### Mouse support\n-With the help of [mum4k/termdash](https://github.com/mum4k/termdash), it's intuitive to operate.\n+With the help of [mum4k/termdash](https://github.com/mum4k/termdash) can be used intuitively.\n \n ![Screenshot](images/mouse-support.gif)\n \ndiff --git a/main.go b/main.go\nindex 1a222e5..89fe9b8 100644\n--- a/main.go\n+++ b/main.go\n@@ -42,14 +42,14 @@ type cli struct {\n \tworkers      uint64\n \tmaxWorkers   uint64\n \tconnections  int\n-\thttp2        bool\n+\tnoHTTP2      bool\n \tlocalAddress string\n+\tnoKeepAlive  bool\n \n-\tdebug     bool\n-\tversion   bool\n-\tkeepAlive bool\n-\tstdout    io.Writer\n-\tstderr    io.Writer\n+\tdebug   bool\n+\tversion bool\n+\tstdout  io.Writer\n+\tstderr  io.Writer\n }\n \n func main() {\n@@ -75,11 +75,11 @@ func parseFlags(stdout, stderr io.Writer) (*cli, error) {\n \tflagSet.Int64VarP(&c.maxBody, \"max-body\", \"M\", attacker.DefaultMaxBody, \"Max bytes to capture from response bodies. Give -1 for no limit.\")\n \tflagSet.BoolVarP(&c.version, \"version\", \"v\", false, \"Print the current version.\")\n \tflagSet.BoolVar(&c.debug, \"debug\", false, \"Run in debug mode.\")\n-\tflagSet.BoolVarP(&c.keepAlive, \"keepalive\", \"k\", true, \"Use HTTP persistent connection.\")\n+\tflagSet.BoolVarP(&c.noKeepAlive, \"no-keepalive\", \"K\", false, \"Don't use HTTP persistent connection.\")\n \tflagSet.Uint64VarP(&c.workers, \"workers\", \"w\", attacker.DefaultWorkers, \"Amount of initial workers to spawn.\")\n \tflagSet.Uint64VarP(&c.maxWorkers, \"max-workers\", \"W\", attacker.DefaultMaxWorkers, \"Amount of maximum workers to spawn.\")\n \tflagSet.IntVarP(&c.connections, \"connections\", \"c\", attacker.DefaultConnections, \"Amount of maximum open idle connections per target host\")\n-\tflagSet.BoolVar(&c.http2, \"http2\", true, \"Issue HTTP/2 requests to servers which support it.\")\n+\tflagSet.BoolVar(&c.noHTTP2, \"no-http2\", false, \"Don't issue HTTP/2 requests to servers which support it.\")\n \tflagSet.StringVar(&c.localAddress, \"local-addr\", \"0.0.0.0\", \"Local IP address.\")\n \tflagSet.Usage = c.usage\n \tif err := flagSet.Parse(os.Args[1:]); err != nil {\n@@ -163,7 +163,7 @@ func (c *cli) makeOptions() (*attacker.Options, error) {\n \t}\n \n \tif c.body != \"\" && c.bodyFile != \"\" {\n-\t\treturn nil, fmt.Errorf(\"only one of --body and --body-file can be specified\")\n+\t\treturn nil, fmt.Errorf(`only one of \"--body\" and \"--body-file\" can be specified`)\n \t}\n \n \tbody := []byte(c.body)\n@@ -185,11 +185,11 @@ func (c *cli) makeOptions() (*attacker.Options, error) {\n \t\tBody:        body,\n \t\tMaxBody:     c.maxBody,\n \t\tHeader:      header,\n-\t\tKeepAlive:   c.keepAlive,\n+\t\tKeepAlive:   !c.noKeepAlive,\n \t\tWorkers:     c.workers,\n \t\tMaxWorkers:  c.maxWorkers,\n \t\tConnections: c.connections,\n-\t\tHTTP2:       c.http2,\n+\t\tHTTP2:       !c.noHTTP2,\n \t\tLocalAddr:   localAddr,\n \t}, nil\n }\ndiff --git a/main_test.go b/main_test.go\nindex 8866e92..820ded7 100644\n--- a/main_test.go\n+++ b/main_test.go\n@@ -52,13 +52,13 @@ func TestParseFlags(t *testing.T) {\n \t\t\t\tmethod:       \"GET\",\n \t\t\t\theaders:      []string{},\n \t\t\t\tmaxBody:      -1,\n-\t\t\t\tkeepAlive:    true,\n+\t\t\t\tnoKeepAlive:  false,\n \t\t\t\tworkers:      10,\n \t\t\t\tmaxWorkers:   math.MaxUint64,\n \t\t\t\tconnections:  10000,\n \t\t\t\tstdout:       new(bytes.Buffer),\n \t\t\t\tstderr:       new(bytes.Buffer),\n-\t\t\t\thttp2:        true,\n+\t\t\t\tnoHTTP2:      false,\n \t\t\t\tlocalAddress: \"0.0.0.0\",\n \t\t\t},\n \t\t\twantErr: false,\n@@ -201,6 +201,8 @@ func TestMakeOptions(t *testing.T) {\n \t\t\t\tWorkers:    0,\n \t\t\t\tMaxWorkers: 0,\n \t\t\t\tMaxBody:    0,\n+\t\t\t\tHTTP2:      true,\n+\t\t\t\tKeepAlive:  true,\n \t\t\t},\n \t\t\twantErr: false,\n \t\t},\n@@ -225,6 +227,8 @@ func TestMakeOptions(t *testing.T) {\n \t\t\t\tWorkers:    0,\n \t\t\t\tMaxWorkers: 0,\n \t\t\t\tMaxBody:    0,\n+\t\t\t\tHTTP2:      true,\n+\t\t\t\tKeepAlive:  true,\n \t\t\t},\n \t\t\twantErr: false,\n \t\t},\n@@ -240,14 +244,14 @@ func TestMakeOptions(t *testing.T) {\n \t\t\twantErr: true,\n \t\t},\n \t\t{\n-\t\t\tname: \"http2 given as false\",\n+\t\t\tname: \"disable http2\",\n \t\t\tcli: &cli{\n \t\t\t\tmethod:   \"GET\",\n \t\t\t\tduration: 1,\n \t\t\t\theaders:  []string{\"key:value\"},\n \t\t\t\tbody:     \"\",\n \t\t\t\tbodyFile: \"testdata/body-1.json\",\n-\t\t\t\thttp2:    false,\n+\t\t\t\tnoHTTP2:  true,\n \t\t\t},\n \t\t\twant: &attacker.Options{\n \t\t\t\tRate:     0,\n@@ -262,6 +266,34 @@ func TestMakeOptions(t *testing.T) {\n \t\t\t\tMaxWorkers: 0,\n \t\t\t\tMaxBody:    0,\n \t\t\t\tHTTP2:      false,\n+\t\t\t\tKeepAlive:  true,\n+\t\t\t},\n+\t\t\twantErr: false,\n+\t\t},\n+\t\t{\n+\t\t\tname: \"disable keepalive\",\n+\t\t\tcli: &cli{\n+\t\t\t\tmethod:      \"GET\",\n+\t\t\t\tduration:    1,\n+\t\t\t\theaders:     []string{\"key:value\"},\n+\t\t\t\tbody:        \"\",\n+\t\t\t\tbodyFile:    \"testdata/body-1.json\",\n+\t\t\t\tnoKeepAlive: true,\n+\t\t\t},\n+\t\t\twant: &attacker.Options{\n+\t\t\t\tRate:     0,\n+\t\t\t\tDuration: 1,\n+\t\t\t\tTimeout:  0,\n+\t\t\t\tMethod:   \"GET\",\n+\t\t\t\tBody:     []byte(`{\"foo\": 1}`),\n+\t\t\t\tHeader: http.Header{\n+\t\t\t\t\t\"key\": []string{\"value\"},\n+\t\t\t\t},\n+\t\t\t\tWorkers:    0,\n+\t\t\t\tMaxWorkers: 0,\n+\t\t\t\tMaxBody:    0,\n+\t\t\t\tHTTP2:      true,\n+\t\t\t\tKeepAlive:  false,\n \t\t\t},\n \t\t\twantErr: false,\n \t\t},\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/lint.yml",
+    ".github/workflows/release.yml",
+    ".github/workflows/test.yml",
+    ".gitignore",
+    ".golangci.yml",
+    ".goreleaser.yml",
+    "Dockerfile",
+    "LICENSE",
+    "Makefile",
+    "README.md",
+    "attacker/attacker.go",
+    "attacker/attacker_test.go",
+    "attacker/fake_attacker.go",
+    "attacker/metrics.go",
+    "codecov.yml",
+    "go.mod",
+    "go.sum",
+    "gui/drawer.go",
+    "gui/drawer_test.go",
+    "gui/gui.go",
+    "gui/gui_test.go",
+    "gui/keybinds.go",
+    "gui/keybinds_test.go",
+    "gui/widgets.go",
+    "gui/widgets.mock.go",
+    "images/demo.gif",
+    "images/mouse-support.gif",
+    "images/progress.gif",
+    "images/real-time.gif",
+    "main.go",
+    "main_test.go",
+    "testdata/body-1.json"
+  ],
+  "explanation": null
+}

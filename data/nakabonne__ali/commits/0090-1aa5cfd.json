@@ -1,0 +1,84 @@
+{
+  "seq": 90,
+  "sha": "1aa5cfdc51388f883bcc6a47b2610cde97c75df2",
+  "parents": [
+    "9875a25bc1ebae1d07124e45cbea4c906154d473"
+  ],
+  "author": {
+    "name": "Ryo Nakao",
+    "email": "ryo@nakao.dev",
+    "date": "2020-09-26T16:59:01+09:00"
+  },
+  "message": "Avoid to block quitting (#16)",
+  "pr": {
+    "number": 16,
+    "title": "Avoid to block quitting",
+    "body": "",
+    "url": "https://github.com/nakabonne/ali/pull/16"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 3,
+    "additions": 10,
+    "deletions": 22
+  },
+  "files": [
+    {
+      "path": "gui/drawer.go",
+      "status": "M",
+      "additions": 4,
+      "deletions": 5,
+      "binary": false
+    },
+    {
+      "path": "gui/drawer_test.go",
+      "status": "M",
+      "additions": 4,
+      "deletions": 9,
+      "binary": false
+    },
+    {
+      "path": "gui/gui.go",
+      "status": "M",
+      "additions": 2,
+      "deletions": 8,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/gui/drawer.go b/gui/drawer.go\nindex ce5fa39..7bf3cf1 100644\n--- a/gui/drawer.go\n+++ b/gui/drawer.go\n@@ -3,7 +3,6 @@ package gui\n import (\n \t\"context\"\n \t\"fmt\"\n-\t\"sync\"\n \t\"time\"\n \n \t\"github.com/mum4k/termdash/cell\"\n@@ -102,11 +101,11 @@ Throughput: %f\n Success: %f`\n )\n \n-func (d *drawer) redrawMetrics(ctx context.Context, wg *sync.WaitGroup) {\n+func (d *drawer) redrawMetrics(ctx context.Context) {\n+\tdefer close(d.metricsCh)\n \tfor {\n \t\tselect {\n \t\tcase <-ctx.Done():\n-\t\t\twg.Done()\n \t\t\treturn\n \t\tcase metrics := <-d.metricsCh:\n \t\t\tif metrics == nil {\n@@ -165,11 +164,11 @@ Errors:`\n \t}\n }\n \n-func (d *drawer) redrawMessage(ctx context.Context, wg *sync.WaitGroup) {\n+func (d *drawer) redrawMessage(ctx context.Context) {\n+\tdefer close(d.messageCh)\n \tfor {\n \t\tselect {\n \t\tcase <-ctx.Done():\n-\t\t\twg.Done()\n \t\t\treturn\n \t\tcase m := <-d.messageCh:\n \t\t\td.widgets.messageText.Write(m, text.WriteReplace())\ndiff --git a/gui/drawer_test.go b/gui/drawer_test.go\nindex 2ebb136..1a95535 100644\n--- a/gui/drawer_test.go\n+++ b/gui/drawer_test.go\n@@ -2,7 +2,6 @@ package gui\n \n import (\n \t\"context\"\n-\t\"sync\"\n \t\"testing\"\n \t\"time\"\n \n@@ -235,12 +234,10 @@ Errors:\n \t\t\t\t},\n \t\t\t\tmetricsCh: make(chan *attacker.Metrics),\n \t\t\t}\n-\t\t\tvar wg sync.WaitGroup\n-\t\t\twg.Add(1)\n-\t\t\tgo d.redrawMetrics(ctx, &wg)\n+\t\t\tgo d.redrawMetrics(ctx)\n \t\t\td.metricsCh <- tt.metrics\n \t\t\tcancel()\n-\t\t\twg.Wait()\n+\t\t\t<-d.metricsCh\n \t\t})\n \t}\n }\n@@ -272,12 +269,10 @@ func TestRedrawMessage(t *testing.T) {\n \t\t\t\twidgets:   &widgets{messageText: tt.text},\n \t\t\t\tmessageCh: make(chan string),\n \t\t\t}\n-\t\t\tvar wg sync.WaitGroup\n-\t\t\twg.Add(1)\n-\t\t\tgo d.redrawMessage(ctx, &wg)\n+\t\t\tgo d.redrawMessage(ctx)\n \t\t\td.messageCh <- tt.message\n \t\t\tcancel()\n-\t\t\twg.Wait()\n+\t\t\t<-d.messageCh\n \t\t})\n \t}\n }\ndiff --git a/gui/gui.go b/gui/gui.go\nindex c04d125..ab3b2da 100644\n--- a/gui/gui.go\n+++ b/gui/gui.go\n@@ -3,7 +3,6 @@ package gui\n import (\n \t\"context\"\n \t\"fmt\"\n-\t\"sync\"\n \t\"time\"\n \n \t\"github.com/mum4k/termdash\"\n@@ -34,9 +33,6 @@ func Run() error {\n }\n \n func run(t *termbox.Terminal, r runner) error {\n-\tvar wg sync.WaitGroup\n-\tdefer wg.Wait()\n-\n \tctx, cancel := context.WithCancel(context.Background())\n \tdefer cancel()\n \n@@ -64,10 +60,8 @@ func run(t *termbox.Terminal, r runner) error {\n \t\tmetricsCh: make(chan *attacker.Metrics),\n \t\tmessageCh: make(chan string),\n \t}\n-\twg.Add(1)\n-\tgo d.redrawMetrics(ctx, &wg)\n-\twg.Add(1)\n-\tgo d.redrawMessage(ctx, &wg)\n+\tgo d.redrawMetrics(ctx)\n+\tgo d.redrawMessage(ctx)\n \n \tk := keybinds(ctx, cancel, d)\n \n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/lint.yml",
+    ".github/workflows/release.yml",
+    ".github/workflows/test.yml",
+    ".gitignore",
+    ".golangci.yml",
+    ".goreleaser.yml",
+    "Dockerfile",
+    "LICENSE",
+    "Makefile",
+    "README.md",
+    "attacker/attacker.go",
+    "attacker/attacker_test.go",
+    "attacker/fake_attacker.go",
+    "attacker/metrics.go",
+    "codecov.yml",
+    "go.mod",
+    "go.sum",
+    "gui/drawer.go",
+    "gui/drawer_test.go",
+    "gui/gui.go",
+    "gui/gui_test.go",
+    "gui/keybinds.go",
+    "gui/keybinds_test.go",
+    "gui/testdata/body-1.json",
+    "gui/widgets.go",
+    "gui/widgets.mock.go",
+    "images/demo.gif",
+    "images/mouse-support.gif",
+    "images/progress.gif",
+    "images/real-time.gif",
+    "main.go"
+  ],
+  "explanation": null
+}

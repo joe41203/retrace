@@ -1,0 +1,97 @@
+{
+  "seq": 201,
+  "sha": "34e235d33c536a46c8e67b9a69260ad1fbe85924",
+  "parents": [
+    "a8463407e485b249864922a728b6e83360ba9a9c"
+  ],
+  "author": {
+    "name": "Ryo Nakao",
+    "email": "ryo@nakao.dev",
+    "date": "2026-01-19T15:12:48+09:00"
+  },
+  "message": "Fix GoReleaser config (#142)",
+  "pr": {
+    "number": 142,
+    "title": "Fix GoReleaser config",
+    "body": "",
+    "url": "https://github.com/nakabonne/ali/pull/142"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 10,
+    "deletions": 3
+  },
+  "files": [
+    {
+      "path": ".goreleaser.yml",
+      "status": "M",
+      "additions": 6,
+      "deletions": 3,
+      "binary": false
+    },
+    {
+      "path": "Makefile",
+      "status": "M",
+      "additions": 4,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/.goreleaser.yml b/.goreleaser.yml\nindex 456fec2..8512262 100644\n--- a/.goreleaser.yml\n+++ b/.goreleaser.yml\n@@ -1,3 +1,5 @@\n+version: 2\n+\n before:\n   hooks:\n     - go mod tidy\n@@ -27,10 +29,11 @@ builds:\n   ignore:\n       - goos: windows\n         goarch: arm64\n+      - goos: windows\n+        goarch: arm\n \n archives:\n-- replacements:\n-    386: 32-bit\n+  - name_template: \"{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ if eq .Arch \\\"386\\\" }}32-bit{{ else }}{{ .Arch }}{{ end }}\"\n \n checksum:\n   name_template: 'checksums.txt'\n@@ -44,7 +47,7 @@ changelog:\n     - '^test:'\n \n brews:\n-  - tap:\n+  - repository:\n       owner: nakabonne\n       name: homebrew-ali\n     homepage: 'https://github.com/nakabonne/ali'\ndiff --git a/Makefile b/Makefile\nindex ba6fa3b..6c1dc06 100644\n--- a/Makefile\n+++ b/Makefile\n@@ -6,3 +6,7 @@ test:\n .PHONY: mockgen\n mockgen:\n \tmockgen -source=./gui/widgets.go -destination=./gui/widgets.mock.go -package=gui\n+\n+.PHONY: release-dry-run\n+release-dry-run:\n+\tgoreleaser release --snapshot --clean\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/lint.yml",
+    ".github/workflows/release.yml",
+    ".github/workflows/test.yml",
+    ".gitignore",
+    ".golangci.yml",
+    ".goreleaser.yml",
+    "CONTRIBUTING.md",
+    "Dockerfile",
+    "LICENSE",
+    "Makefile",
+    "README.md",
+    "attacker/attacker.go",
+    "attacker/attacker_test.go",
+    "attacker/fake_attacker.go",
+    "attacker/metrics.go",
+    "attacker/resolver.go",
+    "attacker/resolver_test.go",
+    "attacker/summary.go",
+    "codecov.yml",
+    "docs/export.md",
+    "docs/rfc/001-export.md",
+    "export/export.go",
+    "export/export_test.go",
+    "export_golden_test.go",
+    "export_pending_test.go",
+    "go.mod",
+    "go.sum",
+    "gui/drawer.go",
+    "gui/drawer_test.go",
+    "gui/gui.go",
+    "gui/gui_test.go",
+    "gui/keybinds.go",
+    "gui/keybinds_test.go",
+    "gui/widgets.go",
+    "gui/widgets.mock.go",
+    "images/demo.gif",
+    "images/latency-chart.png",
+    "images/mouse-support.gif",
+    "images/percentiles-chart.png",
+    "images/progress.gif",
+    "images/real-time.gif",
+    "main.go",
+    "main_test.go",
+    "storage/fake_storage.go",
+    "storage/storage.go",
+    "testdata/body-1.json",
+    "testdata/export/basic/results.csv",
+    "testdata/export/basic/summary-00000000-0000-0000-0000-000000000000.json",
+    "testdata/export/empty/results.csv",
+    "testdata/export/naninf/results.csv",
+    "testdata/export/quotes/results.csv"
+  ],
+  "explanation": null
+}

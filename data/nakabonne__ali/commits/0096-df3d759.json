@@ -1,0 +1,70 @@
+{
+  "seq": 96,
+  "sha": "df3d75976c35374ed528499a45bf189831f3a980",
+  "parents": [
+    "584f2050cc064645ab7f0468b396a76c45f23e62"
+  ],
+  "author": {
+    "name": "Ryo Nakao",
+    "email": "ryo@nakao.dev",
+    "date": "2020-09-28T08:56:50+09:00"
+  },
+  "message": "Ensure to give workers (#17)",
+  "pr": {
+    "number": 17,
+    "title": "Ensure to give workers",
+    "body": "",
+    "url": "https://github.com/nakabonne/ali/pull/17"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 26,
+    "deletions": 11
+  },
+  "files": [
+    {
+      "path": "attacker/attacker.go",
+      "status": "M",
+      "additions": 26,
+      "deletions": 11,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/attacker/attacker.go b/attacker/attacker.go\nindex ee4c36c..c00b984 100644\n--- a/attacker/attacker.go\n+++ b/attacker/attacker.go\n@@ -2,6 +2,7 @@ package attacker\n \n import (\n \t\"context\"\n+\t\"math\"\n \t\"net/http\"\n \t\"time\"\n \n@@ -9,10 +10,12 @@ import (\n )\n \n const (\n-\tDefaultRate     = 50\n-\tDefaultDuration = 10 * time.Second\n-\tDefaultTimeout  = 30 * time.Second\n-\tDefaultMethod   = http.MethodGet\n+\tDefaultRate       = 50\n+\tDefaultDuration   = 10 * time.Second\n+\tDefaultTimeout    = 30 * time.Second\n+\tDefaultMethod     = http.MethodGet\n+\tDefaultWorkers    = 10\n+\tDefaultMaxWorkers = math.MaxUint64\n )\n \n type Attacker interface {\n@@ -22,12 +25,14 @@ type Attacker interface {\n \n // Options provides optional settings to attack.\n type Options struct {\n-\tRate     int\n-\tDuration time.Duration\n-\tTimeout  time.Duration\n-\tMethod   string\n-\tBody     []byte\n-\tHeader   http.Header\n+\tRate       int\n+\tDuration   time.Duration\n+\tTimeout    time.Duration\n+\tMethod     string\n+\tBody       []byte\n+\tHeader     http.Header\n+\tWorkers    uint64\n+\tMaxWorkers uint64\n \n \tAttacker Attacker\n }\n@@ -49,8 +54,18 @@ func Attack(ctx context.Context, target string, resCh chan *Result, opts Options\n \tif opts.Method == \"\" {\n \t\topts.Method = DefaultMethod\n \t}\n+\tif opts.Workers == 0 {\n+\t\topts.Workers = DefaultWorkers\n+\t}\n+\tif opts.MaxWorkers == 0 {\n+\t\topts.MaxWorkers = DefaultMaxWorkers\n+\t}\n \tif opts.Attacker == nil {\n-\t\topts.Attacker = vegeta.NewAttacker(vegeta.Timeout(opts.Timeout))\n+\t\topts.Attacker = vegeta.NewAttacker(\n+\t\t\tvegeta.Timeout(opts.Timeout),\n+\t\t\tvegeta.Workers(opts.Workers),\n+\t\t\tvegeta.MaxWorkers(opts.MaxWorkers),\n+\t\t)\n \t}\n \n \trate := vegeta.Rate{Freq: opts.Rate, Per: time.Second}\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/lint.yml",
+    ".github/workflows/release.yml",
+    ".github/workflows/test.yml",
+    ".gitignore",
+    ".golangci.yml",
+    ".goreleaser.yml",
+    "Dockerfile",
+    "LICENSE",
+    "Makefile",
+    "README.md",
+    "attacker/attacker.go",
+    "attacker/attacker_test.go",
+    "attacker/fake_attacker.go",
+    "attacker/metrics.go",
+    "codecov.yml",
+    "go.mod",
+    "go.sum",
+    "gui/drawer.go",
+    "gui/drawer_test.go",
+    "gui/gui.go",
+    "gui/gui_test.go",
+    "gui/keybinds.go",
+    "gui/keybinds_test.go",
+    "gui/testdata/body-1.json",
+    "gui/widgets.go",
+    "gui/widgets.mock.go",
+    "images/demo.gif",
+    "images/mouse-support.gif",
+    "images/progress.gif",
+    "images/real-time.gif",
+    "main.go"
+  ],
+  "explanation": null
+}

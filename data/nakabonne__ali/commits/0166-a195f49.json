@@ -1,0 +1,84 @@
+{
+  "seq": 166,
+  "sha": "a195f49b84dfe35ff33121ab21272672907eecc4",
+  "parents": [
+    "41ab2600b69ee6cef93e3b812e5503d732b6c6ae",
+    "2196a39217317488cc4b62552c16e56518f5e6e5"
+  ],
+  "author": {
+    "name": "Ryo Nakao",
+    "email": "ryo@nakao.dev",
+    "date": "2021-05-29T15:35:58+09:00"
+  },
+  "message": "Merge pull request #104 from tworabbits/feature/tls_options\n\nAdd tls config options",
+  "pr": {
+    "number": 104,
+    "title": "Add tls config options",
+    "body": "Allow mutual tls client configuration, adding root CAs and tls\r\nverification\r\n\r\nFIxes: https://github.com/nakabonne/ali/issues/103",
+    "url": "https://github.com/nakabonne/ali/pull/104"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 64,
+    "deletions": 15
+  },
+  "files": [
+    {
+      "path": "attacker/attacker.go",
+      "status": "M",
+      "additions": 15,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "main.go",
+      "status": "M",
+      "additions": 49,
+      "deletions": 15,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/attacker/attacker.go b/attacker/attacker.go\nindex d43a120..ccf4015 100644\n--- a/attacker/attacker.go\n+++ b/attacker/attacker.go\n@@ -2,6 +2,8 @@ package attacker\n \n import (\n \t\"context\"\n+\t\"crypto/tls\"\n+\t\"crypto/x509\"\n \t\"math\"\n \t\"net\"\n \t\"net/http\"\n@@ -46,6 +48,10 @@ type Options struct {\n \tBuckets     []time.Duration\n \tResolvers   []string\n \n+\tInsecureSkipVerify bool\n+\tCACertificatePool  *x509.CertPool\n+\tTLSCertificates    []tls.Certificate\n+\n \tAttacker Attacker\n }\n \n@@ -87,6 +93,14 @@ func Attack(ctx context.Context, target string, resCh chan<- *Result, metricsCh\n \tif len(opts.Resolvers) > 0 {\n \t\tnet.DefaultResolver = NewResolver(opts.Resolvers)\n \t}\n+\n+\ttlsConfig := &tls.Config{\n+\t\tInsecureSkipVerify: opts.InsecureSkipVerify,\n+\t\tCertificates:       opts.TLSCertificates,\n+\t\tRootCAs:            opts.CACertificatePool,\n+\t}\n+\ttlsConfig.BuildNameToCertificate()\n+\n \tif opts.Attacker == nil {\n \t\topts.Attacker = vegeta.NewAttacker(\n \t\t\tvegeta.Timeout(opts.Timeout),\n@@ -97,6 +111,7 @@ func Attack(ctx context.Context, target string, resCh chan<- *Result, metricsCh\n \t\t\tvegeta.KeepAlive(opts.KeepAlive),\n \t\t\tvegeta.HTTP2(opts.HTTP2),\n \t\t\tvegeta.LocalAddr(opts.LocalAddr),\n+\t\t\tvegeta.TLSConfig(tlsConfig),\n \t\t)\n \t}\n \ndiff --git a/main.go b/main.go\nindex 9ff1845..5b1ad87 100644\n--- a/main.go\n+++ b/main.go\n@@ -1,6 +1,8 @@\n package main\n \n import (\n+\t\"crypto/tls\"\n+\t\"crypto/x509\"\n \t\"errors\"\n \t\"fmt\"\n \t\"io\"\n@@ -50,6 +52,11 @@ type cli struct {\n \tbuckets      string\n \tresolvers    string\n \n+\tinsecureSkipVerify bool\n+\ttlsCertFile        string\n+\ttlsKeyFile         string\n+\tcaCert             string\n+\n \tdebug   bool\n \tversion bool\n \tstdout  io.Writer\n@@ -85,6 +92,10 @@ func parseFlags(stdout, stderr io.Writer) (*cli, error) {\n \tflagSet.IntVarP(&c.connections, \"connections\", \"c\", attacker.DefaultConnections, \"Amount of maximum open idle connections per target host\")\n \tflagSet.BoolVar(&c.noHTTP2, \"no-http2\", false, \"Don't issue HTTP/2 requests to servers which support it.\")\n \tflagSet.StringVar(&c.localAddress, \"local-addr\", \"0.0.0.0\", \"Local IP address.\")\n+\tflagSet.BoolVar(&c.insecureSkipVerify, \"insecure\", false, \"Skip TLS verification\")\n+\tflagSet.StringVar(&c.caCert, \"cacert\", \"\", \"PEM ca certificate file\")\n+\tflagSet.StringVar(&c.tlsCertFile, \"cert\", \"\", \"PEM encoded tls certificate file to use\")\n+\tflagSet.StringVar(&c.tlsKeyFile, \"key\", \"\", \"PEM encoded tls private key file to use\")\n \t// TODO: Re-enable when making it capable of drawing histogram bar chart.\n \t//flagSet.StringVar(&c.buckets, \"buckets\", \"\", \"Histogram buckets; comma-separated list.\")\n \tflagSet.StringVar(&c.resolvers, \"resolvers\", \"\", \"Custom DNS resolver addresses; comma-separated list.\")\n@@ -195,22 +206,45 @@ func (c *cli) makeOptions() (*attacker.Options, error) {\n \t\treturn nil, err\n \t}\n \n+\tvar certs []tls.Certificate\n+\tif c.tlsCertFile != \"\" && c.tlsKeyFile != \"\" {\n+\t\tcert, err := tls.LoadX509KeyPair(c.tlsCertFile, c.tlsKeyFile)\n+\t\tif err != nil {\n+\t\t\treturn nil, fmt.Errorf(\"error loading PEM key pair %w\", err)\n+\t\t}\n+\n+\t\tcerts = append(certs, cert)\n+\t}\n+\n+\tvar caCertPool *x509.CertPool\n+\tif c.caCert != \"\" {\n+\t\tcaCertPool = x509.NewCertPool()\n+\t\tcaCert, err := ioutil.ReadFile(c.caCert)\n+\t\tif err != nil {\n+\t\t\tlog.Fatal(err)\n+\t\t}\n+\t\tcaCertPool.AppendCertsFromPEM(caCert)\n+\t}\n+\n \treturn &attacker.Options{\n-\t\tRate:        c.rate,\n-\t\tDuration:    c.duration,\n-\t\tTimeout:     c.timeout,\n-\t\tMethod:      c.method,\n-\t\tBody:        body,\n-\t\tMaxBody:     c.maxBody,\n-\t\tHeader:      header,\n-\t\tKeepAlive:   !c.noKeepAlive,\n-\t\tWorkers:     c.workers,\n-\t\tMaxWorkers:  c.maxWorkers,\n-\t\tConnections: c.connections,\n-\t\tHTTP2:       !c.noHTTP2,\n-\t\tLocalAddr:   localAddr,\n-\t\tBuckets:     parsedBuckets,\n-\t\tResolvers:   parsedResolvers,\n+\t\tRate:               c.rate,\n+\t\tDuration:           c.duration,\n+\t\tTimeout:            c.timeout,\n+\t\tMethod:             c.method,\n+\t\tBody:               body,\n+\t\tMaxBody:            c.maxBody,\n+\t\tHeader:             header,\n+\t\tKeepAlive:          !c.noKeepAlive,\n+\t\tWorkers:            c.workers,\n+\t\tMaxWorkers:         c.maxWorkers,\n+\t\tConnections:        c.connections,\n+\t\tHTTP2:              !c.noHTTP2,\n+\t\tLocalAddr:          localAddr,\n+\t\tBuckets:            parsedBuckets,\n+\t\tResolvers:          parsedResolvers,\n+\t\tInsecureSkipVerify: c.insecureSkipVerify,\n+\t\tTLSCertificates:    certs,\n+\t\tCACertificatePool:  caCertPool,\n \t}, nil\n }\n \n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/lint.yml",
+    ".github/workflows/release.yml",
+    ".github/workflows/test.yml",
+    ".gitignore",
+    ".golangci.yml",
+    ".goreleaser.yml",
+    "CONTRIBUTING.md",
+    "Dockerfile",
+    "LICENSE",
+    "Makefile",
+    "README.md",
+    "attacker/attacker.go",
+    "attacker/attacker_test.go",
+    "attacker/fake_attacker.go",
+    "attacker/metrics.go",
+    "attacker/resolver.go",
+    "attacker/resolver_test.go",
+    "codecov.yml",
+    "go.mod",
+    "go.sum",
+    "gui/drawer.go",
+    "gui/drawer_test.go",
+    "gui/gui.go",
+    "gui/gui_test.go",
+    "gui/keybinds.go",
+    "gui/keybinds_test.go",
+    "gui/widgets.go",
+    "gui/widgets.mock.go",
+    "images/demo.gif",
+    "images/latency-chart.png",
+    "images/mouse-support.gif",
+    "images/percentiles-chart.png",
+    "images/progress.gif",
+    "images/real-time.gif",
+    "main.go",
+    "main_test.go",
+    "testdata/body-1.json"
+  ],
+  "explanation": null
+}

@@ -1,0 +1,73 @@
+{
+  "seq": 66,
+  "sha": "ec2b6b4894b11507536cf56cf8ee3bf985482203",
+  "parents": [
+    "a51576fba89572783e0086edb2e2e9c91ba3765c"
+  ],
+  "author": {
+    "name": "nakabonne",
+    "email": "ryo@nakao.dev",
+    "date": "2020-09-22T16:27:03+09:00"
+  },
+  "message": "Add tests to check response count",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 3,
+    "additions": 86,
+    "deletions": 34
+  },
+  "files": [
+    {
+      "path": "attacker/attacker_test.go",
+      "status": "M",
+      "additions": 30,
+      "deletions": 23,
+      "binary": false
+    },
+    {
+      "path": "attacker/fake_attacker.go",
+      "status": "M",
+      "additions": 6,
+      "deletions": 4,
+      "binary": false
+    },
+    {
+      "path": "attacker/metrics.go",
+      "status": "M",
+      "additions": 50,
+      "deletions": 7,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/attacker/attacker_test.go b/attacker/attacker_test.go\nindex bb2934e..9194c76 100644\n--- a/attacker/attacker_test.go\n+++ b/attacker/attacker_test.go\n@@ -7,8 +7,26 @@ import (\n \t\"time\"\n \n \t\"github.com/stretchr/testify/assert\"\n+\tvegeta \"github.com/tsenart/vegeta/v12/lib\"\n )\n \n+type watcher struct {\n+\tresCh chan *Result\n+\tcount int\n+}\n+\n+func (w *watcher) countRes(ctx context.Context, wg *sync.WaitGroup) {\n+\tfor {\n+\t\tselect {\n+\t\tcase <-ctx.Done():\n+\t\t\twg.Done()\n+\t\t\treturn\n+\t\tcase <-w.resCh:\n+\t\t\tw.count++\n+\t\t}\n+\t}\n+}\n+\n func TestAttack(t *testing.T) {\n \tctx, cancel := context.WithCancel(context.Background())\n \tdefer cancel()\n@@ -37,27 +55,33 @@ func TestAttack(t *testing.T) {\n \t\t\t},\n \t\t\twantResCount: 0,\n \t\t},\n-\t\t/*{\n+\t\t{\n \t\t\tname:   \"two result given back\",\n \t\t\ttarget: \"http://host.xz\",\n \t\t\topts: Options{\n \t\t\t\tAttacker: &fakeAttacker{\n \t\t\t\t\tresults: []*vegeta.Result{\n \t\t\t\t\t\t{\n-\t\t\t\t\t\t\tAttack: \"1\",\n+\t\t\t\t\t\t\tCode: 200,\n \t\t\t\t\t\t},\n \t\t\t\t\t\t{\n-\t\t\t\t\t\t\tAttack: \"2\",\n+\t\t\t\t\t\t\tCode: 200,\n \t\t\t\t\t\t},\n \t\t\t\t\t},\n \t\t\t\t},\n \t\t\t},\n \t\t\twant: &Metrics{\n-\t\t\t\tStatusCodes: make(map[string]int),\n-\t\t\t\tErrors:      []string{},\n+\t\t\t\tRequests:   2,\n+\t\t\t\tRate:       2,\n+\t\t\t\tThroughput: 2,\n+\t\t\t\tSuccess:    1,\n+\t\t\t\tStatusCodes: map[string]int{\n+\t\t\t\t\t\"200\": 2,\n+\t\t\t\t},\n+\t\t\t\tErrors: []string{},\n \t\t\t},\n \t\t\twantResCount: 2,\n-\t\t},*/\n+\t\t},\n \t}\n \n \tfor _, tt := range tests {\n@@ -78,20 +102,3 @@ func TestAttack(t *testing.T) {\n \t\t})\n \t}\n }\n-\n-type watcher struct {\n-\tresCh chan *Result\n-\tcount int\n-}\n-\n-func (w *watcher) countRes(ctx context.Context, wg *sync.WaitGroup) {\n-\tfor {\n-\t\tselect {\n-\t\tcase <-ctx.Done():\n-\t\t\twg.Done()\n-\t\t\treturn\n-\t\tcase <-w.resCh:\n-\t\t\tw.count++\n-\t\t}\n-\t}\n-}\ndiff --git a/attacker/fake_attacker.go b/attacker/fake_attacker.go\nindex 7a876aa..3891082 100644\n--- a/attacker/fake_attacker.go\n+++ b/attacker/fake_attacker.go\n@@ -12,10 +12,12 @@ type fakeAttacker struct {\n \n func (f *fakeAttacker) Attack(vegeta.Targeter, vegeta.Pacer, time.Duration, string) <-chan *vegeta.Result {\n \tresultCh := make(chan *vegeta.Result)\n-\tdefer close(resultCh)\n-\tfor _, r := range f.results {\n-\t\tresultCh <- r\n-\t}\n+\tgo func() {\n+\t\tdefer close(resultCh)\n+\t\tfor _, r := range f.results {\n+\t\t\tresultCh <- r\n+\t\t}\n+\t}()\n \treturn resultCh\n }\n \ndiff --git a/attacker/metrics.go b/attacker/metrics.go\nindex 7e7371c..06fa8a7 100644\n--- a/attacker/metrics.go\n+++ b/attacker/metrics.go\n@@ -9,13 +9,13 @@ import (\n // Metrics wraps \"vegeta.Metrics\" to avoid dependency on it.\n type Metrics struct {\n \t// Latencies holds computed request latency metrics.\n-\tLatencies vegeta.LatencyMetrics `json:\"latencies\"`\n+\tLatencies LatencyMetrics `json:\"latencies\"`\n \t// Histogram, only if requested\n-\t//Histogram *vegeta.Histogram `json:\"buckets,omitempty\"`\n+\t// Histogram *vegeta.Histogram `json:\"buckets,omitempty\"`\n \t// BytesIn holds computed incoming byte metrics.\n-\tBytesIn vegeta.ByteMetrics `json:\"bytes_in\"`\n+\tBytesIn ByteMetrics `json:\"bytes_in\"`\n \t// BytesOut holds computed outgoing byte metrics.\n-\tBytesOut vegeta.ByteMetrics `json:\"bytes_out\"`\n+\tBytesOut ByteMetrics `json:\"bytes_out\"`\n \t// Earliest is the earliest timestamp in a Result set.\n \tEarliest time.Time `json:\"earliest\"`\n \t// Latest is the latest timestamp in a Result set.\n@@ -40,12 +40,55 @@ type Metrics struct {\n \tErrors []string `json:\"errors\"`\n }\n \n+// LatencyMetrics holds computed request latency metrics.\n+type LatencyMetrics struct {\n+\t// Total is the total latency sum of all requests in an attack.\n+\tTotal time.Duration `json:\"total\"`\n+\t// Mean is the mean request latency.\n+\tMean time.Duration `json:\"mean\"`\n+\t// P50 is the 50th percentile request latency.\n+\tP50 time.Duration `json:\"50th\"`\n+\t// P90 is the 90th percentile request latency.\n+\tP90 time.Duration `json:\"90th\"`\n+\t// P95 is the 95th percentile request latency.\n+\tP95 time.Duration `json:\"95th\"`\n+\t// P99 is the 99th percentile request latency.\n+\tP99 time.Duration `json:\"99th\"`\n+\t// Max is the maximum observed request latency.\n+\tMax time.Duration `json:\"max\"`\n+\t// Min is the minimum observed request latency.\n+\tMin time.Duration `json:\"min\"`\n+}\n+\n+// ByteMetrics holds computed byte flow metrics.\n+type ByteMetrics struct {\n+\t// Total is the total number of flowing bytes in an attack.\n+\tTotal uint64 `json:\"total\"`\n+\t// Mean is the mean number of flowing bytes per hit.\n+\tMean float64 `json:\"mean\"`\n+}\n+\n func newMetrics(m *vegeta.Metrics) *Metrics {\n \treturn &Metrics{\n-\t\tLatencies: m.Latencies,\n+\t\tLatencies: LatencyMetrics{\n+\t\t\tTotal: m.Latencies.Total,\n+\t\t\tMean:  m.Latencies.Mean,\n+\t\t\tP50:   m.Latencies.P50,\n+\t\t\tP90:   m.Latencies.P90,\n+\t\t\tP95:   m.Latencies.P95,\n+\t\t\tP99:   m.Latencies.P99,\n+\t\t\tMax:   m.Latencies.Max,\n+\t\t\tMin:   m.Latencies.Min,\n+\t\t},\n \t\t//Histogram:   m.Histogram,\n-\t\tBytesIn:     m.BytesIn,\n-\t\tBytesOut:    m.BytesOut,\n+\t\tBytesIn: ByteMetrics{\n+\t\t\tTotal: m.BytesIn.Total,\n+\t\t\tMean:  m.BytesIn.Mean,\n+\t\t},\n+\t\tBytesOut: ByteMetrics{\n+\t\t\tTotal: m.BytesOut.Total,\n+\t\t\tMean:  m.BytesOut.Mean,\n+\t\t},\n \t\tEarliest:    m.Earliest,\n \t\tLatest:      m.Latest,\n \t\tEnd:         m.End,\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/lint.yml",
+    ".github/workflows/release.yml",
+    ".github/workflows/test.yml",
+    ".gitignore",
+    ".golangci.yml",
+    ".goreleaser.yml",
+    "Dockerfile",
+    "LICENSE",
+    "README.md",
+    "attacker/attacker.go",
+    "attacker/attacker_test.go",
+    "attacker/fake_attacker.go",
+    "attacker/metrics.go",
+    "go.mod",
+    "go.sum",
+    "gui/drawer.go",
+    "gui/gui.go",
+    "gui/keybinds.go",
+    "gui/keybinds_test.go",
+    "gui/widgets.go",
+    "images/demo.gif",
+    "images/mouse-support.gif",
+    "images/progress.gif",
+    "images/real-time.gif",
+    "main.go"
+  ],
+  "explanation": null
+}

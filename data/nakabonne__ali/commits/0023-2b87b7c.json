@@ -1,0 +1,55 @@
+{
+  "seq": 23,
+  "sha": "2b87b7c4edb35b0d7b8b358b975b70751247132a",
+  "parents": [
+    "7fa23dd5c3fd0797c36f18c4428975d3dfbbf228"
+  ],
+  "author": {
+    "name": "nakabonne",
+    "email": "ryo@nakao.dev",
+    "date": "2020-09-15T09:17:09+09:00"
+  },
+  "message": "Ensure to show all metrics",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 46,
+    "deletions": 23
+  },
+  "files": [
+    {
+      "path": "attacker/metrics.go",
+      "status": "M",
+      "additions": 45,
+      "deletions": 22,
+      "binary": false
+    },
+    {
+      "path": "gui/gui.go",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/attacker/metrics.go b/attacker/metrics.go\nindex 0ab6c9f..a040786 100644\n--- a/attacker/metrics.go\n+++ b/attacker/metrics.go\n@@ -10,32 +10,55 @@ import (\n // Metrics wraps \"vegeta.Metrics\" to avoid dependency on it.\n // TODO: Add more fields\n type Metrics struct {\n-\tLatencies LatencyMetrics `json:\"latencies\"`\n-}\n-\n-type LatencyMetrics struct {\n-\tTotal time.Duration `json:\"total\"`\n-\tMean  time.Duration `json:\"mean\"`\n-\tP50   time.Duration `json:\"50th\"`\n-\tP90   time.Duration `json:\"90th\"`\n-\tP95   time.Duration `json:\"95th\"`\n-\tP99   time.Duration `json:\"99th\"`\n-\tMax   time.Duration `json:\"max\"`\n-\tMin   time.Duration `json:\"min\"`\n+\t// Latencies holds computed request latency metrics.\n+\tLatencies vegeta.LatencyMetrics `json:\"latencies\"`\n+\t// Histogram, only if requested\n+\t//Histogram *vegeta.Histogram `json:\"buckets,omitempty\"`\n+\t// BytesIn holds computed incoming byte metrics.\n+\tBytesIn vegeta.ByteMetrics `json:\"bytes_in\"`\n+\t// BytesOut holds computed outgoing byte metrics.\n+\tBytesOut vegeta.ByteMetrics `json:\"bytes_out\"`\n+\t// Earliest is the earliest timestamp in a Result set.\n+\tEarliest time.Time `json:\"earliest\"`\n+\t// Latest is the latest timestamp in a Result set.\n+\tLatest time.Time `json:\"latest\"`\n+\t// End is the latest timestamp in a Result set plus its latency.\n+\tEnd time.Time `json:\"end\"`\n+\t// Duration is the duration of the attack.\n+\tDuration time.Duration `json:\"duration\"`\n+\t// Wait is the extra time waiting for responses from targets.\n+\tWait time.Duration `json:\"wait\"`\n+\t// Requests is the total number of requests executed.\n+\tRequests uint64 `json:\"requests\"`\n+\t// Rate is the rate of sent requests per second.\n+\tRate float64 `json:\"rate\"`\n+\t// Throughput is the rate of successful requests per second.\n+\tThroughput float64 `json:\"throughput\"`\n+\t// Success is the percentage of non-error responses.\n+\tSuccess float64 `json:\"success\"`\n+\t// StatusCodes is a histogram of the responses' status codes.\n+\tStatusCodes map[string]int `json:\"status_codes\"`\n+\t// Errors is a set of unique errors returned by the targets during the attack.\n+\tErrors []string `json:\"errors\"`\n }\n \n func newMetrics(m *vegeta.Metrics) *Metrics {\n \treturn &Metrics{\n-\t\tLatencies: LatencyMetrics{\n-\t\t\tTotal: m.Latencies.Total,\n-\t\t\tMean:  m.Latencies.Mean,\n-\t\t\tP50:   m.Latencies.P50,\n-\t\t\tP90:   m.Latencies.P90,\n-\t\t\tP95:   m.Latencies.P95,\n-\t\t\tP99:   m.Latencies.P99,\n-\t\t\tMax:   m.Latencies.Max,\n-\t\t\tMin:   m.Latencies.Min,\n-\t\t},\n+\t\tLatencies: m.Latencies,\n+\t\t//Histogram:   m.Histogram,\n+\t\tBytesIn:     m.BytesIn,\n+\t\tBytesOut:    m.BytesOut,\n+\t\tEarliest:    m.Earliest,\n+\t\tLatest:      m.Latest,\n+\t\tEnd:         m.End,\n+\t\tDuration:    m.Duration,\n+\t\tWait:        m.Wait,\n+\t\tRequests:    m.Requests,\n+\t\tRate:        m.Rate,\n+\t\tThroughput:  m.Throughput,\n+\t\tSuccess:     m.Success,\n+\t\tStatusCodes: m.StatusCodes,\n+\t\tErrors:      m.Errors,\n \t}\n }\n \ndiff --git a/gui/gui.go b/gui/gui.go\nindex 97cc9a8..7b5d510 100644\n--- a/gui/gui.go\n+++ b/gui/gui.go\n@@ -77,8 +77,8 @@ func gridLayout(w *widgets) ([]container.Option, error) {\n \t\t\t\tgrid.ColWidthPerc(49, grid.Widget(w.bodyInput, container.Border(linestyle.None))),\n \t\t\t),\n \t\t),\n-\t\tgrid.ColWidthPerc(35, grid.Widget(w.reportText, container.Border(linestyle.Light), container.BorderTitle(\"Report\"))),\n \t\tgrid.ColWidthPerc(34, grid.Widget(w.progressDonut, container.Border(linestyle.Light), container.BorderTitle(\"Progress\"))),\n+\t\tgrid.ColWidthPerc(35, grid.Widget(w.reportText, container.Border(linestyle.Light), container.BorderTitle(\"Report\"))),\n \t)\n \traw3 := grid.RowHeightFixed(1,\n \t\tgrid.ColWidthFixed(100, grid.Widget(w.navi, container.Border(linestyle.Light))),\n",
+  "diffTruncated": false,
+  "tree": [
+    ".gitignore",
+    ".golangci.yml",
+    "LICENSE",
+    "README.md",
+    "attacker/attacker.go",
+    "attacker/attacker_test.go",
+    "attacker/fake_attacker.go",
+    "attacker/metrics.go",
+    "go.mod",
+    "go.sum",
+    "gui/drawer.go",
+    "gui/gui.go",
+    "gui/widgets.go",
+    "main.go"
+  ],
+  "explanation": null
+}

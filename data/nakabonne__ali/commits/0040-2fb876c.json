@@ -1,0 +1,55 @@
+{
+  "seq": 40,
+  "sha": "2fb876cd84ed97b709ab3bc26cfea41fe152f1ef",
+  "parents": [
+    "13fc5f53a75f681c72b00a505fe1e2124f7105b7"
+  ],
+  "author": {
+    "name": "Ryo Nakao",
+    "email": "ryo@nakao.dev",
+    "date": "2020-09-16T22:30:25+09:00"
+  },
+  "message": "Add workflows",
+  "pr": null,
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 34,
+    "deletions": 0
+  },
+  "files": [
+    {
+      "path": ".github/workflows/test.yml",
+      "status": "A",
+      "additions": 34,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/.github/workflows/test.yml b/.github/workflows/test.yml\nnew file mode 100644\nindex 0000000..1b1b8a9\n--- /dev/null\n+++ b/.github/workflows/test.yml\n@@ -0,0 +1,34 @@\n+name: test\n+on:\n+  push:\n+    branches:\n+    - master\n+    paths-ignore:\n+    - 'README.md'\n+    - '.github/'\n+    - 'images/'\n+  pull_request:\n+    branches:\n+    - master\n+    paths-ignore:\n+    - 'README.md'\n+    - '.github/'\n+    - 'images/'\n+jobs:\n+  test:\n+    strategy:\n+      matrix:\n+        go-version: [1.14.x, 1.15.x]\n+        platform: [ubuntu-latest, macos-latest]\n+    runs-on: ${{ matrix.platform }}\n+    steps:\n+    - name: Install Go\n+      uses: actions/setup-go@v2\n+      with:\n+        go-version: ${{ matrix.go-version }}\n+    - name: Checkout code\n+      uses: actions/checkout@v2\n+    - name: Build\n+      run: go build\n+    - name: Test\n+      run: go test -v ./...\n",
+  "diffTruncated": false,
+  "tree": [
+    ".github/workflows/test.yml",
+    ".gitignore",
+    ".golangci.yml",
+    "LICENSE",
+    "README.md",
+    "attacker/attacker.go",
+    "attacker/attacker_test.go",
+    "attacker/fake_attacker.go",
+    "attacker/metrics.go",
+    "go.mod",
+    "go.sum",
+    "gui/drawer.go",
+    "gui/gui.go",
+    "gui/keybinds.go",
+    "gui/keybinds_test.go",
+    "gui/widgets.go",
+    "images/demo.gif",
+    "images/mouse-support.gif",
+    "images/progress.gif",
+    "images/real-time.gif",
+    "main.go"
+  ],
+  "explanation": null
+}
