@@ -5,6 +5,15 @@ import { langColor } from "./langColor";
 import type { DatasetProgress } from "./useAllProgress";
 import type { DatasetEntry } from "./types";
 
+// 紹介 LP のバリエーション(public/lp/<id>/)。フッター導線で使う。
+const LP_VARIANTS: readonly { id: string; label: string }[] = [
+	{ id: "a", label: "Terminal" },
+	{ id: "b", label: "Editorial" },
+	{ id: "c", label: "Swiss" },
+	{ id: "d", label: "Brutalist" },
+	{ id: "e", label: "Poster" },
+];
+
 interface Props {
 	datasets: DatasetEntry[];
 	progress: Record<string, DatasetProgress>;
@@ -127,9 +136,14 @@ export default function RepoPicker({
 				<div className="picker-footer">
 					<span className="picker-footer-label">紹介ページ:</span>
 					{/* LP は静的 HTML(public/lp/*)。SPA ルート外なので通常リンクで遷移。 */}
-					<a href="/lp/a/">Terminal 版</a>
-					<span className="picker-footer-sep">·</span>
-					<a href="/lp/b/">Editorial 版</a>
+					{LP_VARIANTS.map((lp, i) => (
+						<span key={lp.id} className="picker-footer-link">
+							{i > 0 && <span className="picker-footer-sep">·</span>}
+							<a href={`/lp/${lp.id}/`}>
+								{lp.id.toUpperCase()} {lp.label}
+							</a>
+						</span>
+					))}
 				</div>
 			</div>
 		</div>
