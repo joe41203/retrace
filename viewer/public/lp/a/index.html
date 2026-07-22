@@ -1,0 +1,654 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Retrace — OSS のコミット履歴を、最初から追体験する</title>
+    <meta
+      name="description"
+      content="実在の OSS を Initial commit から順に、LLM 解説付きで追体験する学習ツール。diff・意図・読みどころを1コミットずつ読み解く。"
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,400;0,500;0,700;1,400&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --bg: #0a0e14;
+        --bg-elev: #0f151f;
+        --bg-inset: #070a0f;
+        --border: #1c2530;
+        --border-bright: #2a3a4a;
+        --fg: #d6deeb;
+        --fg-muted: #7d8ba0;
+        --fg-dim: #4a5568;
+        --green: #3fb950;
+        --green-bright: #56d364;
+        --cyan: #39c5cf;
+        --amber: #d29922;
+        --red: #f85149;
+        --mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+        --maxw: 1080px;
+      }
+
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      html {
+        scroll-behavior: smooth;
+      }
+
+      body {
+        font-family: var(--mono);
+        background: var(--bg);
+        color: var(--fg);
+        font-size: 16px;
+        line-height: 1.6;
+        -webkit-font-smoothing: antialiased;
+        overflow-x: hidden;
+      }
+
+      /* うっすらグリッド背景 */
+      body::before {
+        content: "";
+        position: fixed;
+        inset: 0;
+        background-image:
+          linear-gradient(rgba(63, 185, 80, 0.03) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(63, 185, 80, 0.03) 1px, transparent 1px);
+        background-size: 40px 40px;
+        pointer-events: none;
+        z-index: 0;
+      }
+
+      a {
+        color: inherit;
+        text-decoration: none;
+      }
+
+      .wrap {
+        max-width: var(--maxw);
+        margin: 0 auto;
+        padding: 0 24px;
+        position: relative;
+        z-index: 1;
+      }
+
+      /* ---------- ヘッダー ---------- */
+      header {
+        position: sticky;
+        top: 0;
+        z-index: 50;
+        background: rgba(10, 14, 20, 0.85);
+        backdrop-filter: blur(12px);
+        border-bottom: 1px solid var(--border);
+      }
+      .nav {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        height: 60px;
+      }
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-weight: 700;
+        font-size: 17px;
+        letter-spacing: -0.02em;
+      }
+      .brand .prompt {
+        color: var(--green);
+      }
+      .brand .cursor {
+        display: inline-block;
+        width: 9px;
+        height: 18px;
+        background: var(--green);
+        animation: blink 1.1s steps(1) infinite;
+        vertical-align: middle;
+      }
+      @keyframes blink {
+        50% {
+          opacity: 0;
+        }
+      }
+      .nav-cta {
+        font-size: 14px;
+        font-weight: 500;
+        color: var(--green);
+        border: 1px solid var(--border-bright);
+        padding: 8px 16px;
+        border-radius: 6px;
+        transition: all 0.18s ease;
+      }
+      .nav-cta:hover {
+        border-color: var(--green);
+        background: rgba(63, 185, 80, 0.08);
+      }
+
+      /* ---------- Hero ---------- */
+      .hero {
+        padding: 96px 0 72px;
+        text-align: left;
+      }
+      .badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 13px;
+        color: var(--fg-muted);
+        border: 1px solid var(--border);
+        background: var(--bg-elev);
+        padding: 6px 14px;
+        border-radius: 999px;
+        margin-bottom: 28px;
+      }
+      .badge .dot {
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background: var(--green);
+        box-shadow: 0 0 8px var(--green);
+      }
+      h1 {
+        font-size: clamp(30px, 6vw, 56px);
+        font-weight: 700;
+        line-height: 1.15;
+        letter-spacing: -0.03em;
+        margin-bottom: 24px;
+      }
+      h1 .accent {
+        color: var(--green-bright);
+        text-shadow: 0 0 24px rgba(63, 185, 80, 0.35);
+      }
+      .hero p.lead {
+        font-size: clamp(15px, 2.2vw, 19px);
+        color: var(--fg-muted);
+        max-width: 620px;
+        margin-bottom: 40px;
+      }
+      .cta-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 14px;
+        align-items: center;
+      }
+      .btn-primary {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        font-size: 15px;
+        font-weight: 700;
+        color: #06210c;
+        background: var(--green);
+        padding: 14px 26px;
+        border-radius: 8px;
+        transition: all 0.18s ease;
+        box-shadow: 0 0 0 rgba(63, 185, 80, 0);
+      }
+      .btn-primary:hover {
+        background: var(--green-bright);
+        box-shadow: 0 6px 28px rgba(63, 185, 80, 0.35);
+        transform: translateY(-1px);
+      }
+      .btn-ghost {
+        font-size: 14px;
+        color: var(--fg-muted);
+        padding: 14px 8px;
+        transition: color 0.18s ease;
+      }
+      .btn-ghost:hover {
+        color: var(--fg);
+      }
+
+      /* ---------- ターミナル風カード ---------- */
+      .terminal {
+        margin-top: 56px;
+        border: 1px solid var(--border-bright);
+        border-radius: 12px;
+        background: var(--bg-inset);
+        overflow: hidden;
+        box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5);
+      }
+      .terminal-bar {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 12px 16px;
+        background: var(--bg-elev);
+        border-bottom: 1px solid var(--border);
+      }
+      .terminal-bar .tdot {
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+      }
+      .tdot.r { background: #ff5f57; }
+      .tdot.y { background: #febc2e; }
+      .tdot.g { background: #28c840; }
+      .terminal-bar .tpath {
+        margin-left: 12px;
+        font-size: 12px;
+        color: var(--fg-dim);
+      }
+      .terminal-body {
+        padding: 22px 20px;
+        font-size: 13.5px;
+        line-height: 1.7;
+        overflow-x: auto;
+      }
+      .terminal-body .line {
+        white-space: pre;
+      }
+      .t-prompt { color: var(--green); }
+      .t-cmd { color: var(--fg); }
+      .t-comment { color: var(--fg-dim); }
+      .t-add { color: var(--green-bright); }
+      .t-del { color: var(--red); }
+      .t-meta { color: var(--cyan); }
+      .t-hl { color: var(--amber); }
+
+      /* ---------- セクション見出し ---------- */
+      section {
+        padding: 72px 0;
+      }
+      .kicker {
+        font-size: 13px;
+        font-weight: 500;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--green);
+        margin-bottom: 14px;
+      }
+      h2 {
+        font-size: clamp(24px, 4vw, 36px);
+        font-weight: 700;
+        letter-spacing: -0.02em;
+        line-height: 1.2;
+        margin-bottom: 16px;
+      }
+      .section-lead {
+        color: var(--fg-muted);
+        max-width: 640px;
+        margin-bottom: 48px;
+      }
+
+      /* ---------- 課題 ---------- */
+      .problem {
+        border-top: 1px solid var(--border);
+        border-bottom: 1px solid var(--border);
+        background: var(--bg-elev);
+      }
+      .problem-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+        gap: 20px;
+      }
+      .problem-card {
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 24px;
+        background: var(--bg);
+      }
+      .problem-card .q {
+        color: var(--red);
+        font-weight: 700;
+        margin-bottom: 10px;
+        font-size: 15px;
+      }
+      .problem-card p {
+        color: var(--fg-muted);
+        font-size: 14px;
+      }
+
+      /* ---------- 3ベネフィット ---------- */
+      .features {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        gap: 22px;
+      }
+      .feature {
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 28px 24px;
+        background: var(--bg-elev);
+        transition: border-color 0.2s ease, transform 0.2s ease;
+      }
+      .feature:hover {
+        border-color: var(--border-bright);
+        transform: translateY(-2px);
+      }
+      .feature .icon {
+        width: 44px;
+        height: 44px;
+        border-radius: 10px;
+        background: rgba(63, 185, 80, 0.1);
+        border: 1px solid rgba(63, 185, 80, 0.25);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-bottom: 18px;
+        color: var(--green);
+      }
+      .feature h3 {
+        font-size: 17px;
+        font-weight: 700;
+        margin-bottom: 10px;
+      }
+      .feature p {
+        color: var(--fg-muted);
+        font-size: 14px;
+      }
+
+      /* ---------- 収録リポジトリ ---------- */
+      .repos-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+        gap: 14px;
+      }
+      .repo {
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 18px;
+        background: var(--bg-elev);
+        transition: border-color 0.18s ease;
+      }
+      .repo:hover {
+        border-color: var(--green);
+      }
+      .repo .owner {
+        font-size: 12px;
+        color: var(--fg-dim);
+      }
+      .repo .name {
+        font-size: 16px;
+        font-weight: 700;
+        margin: 2px 0 10px;
+      }
+      .repo .meta {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 12px;
+        color: var(--fg-muted);
+      }
+      .repo .lang-dot {
+        width: 9px;
+        height: 9px;
+        border-radius: 50%;
+        background: #00add8;
+      }
+
+      /* ---------- 最終CTA ---------- */
+      .final {
+        text-align: center;
+        border-top: 1px solid var(--border);
+        background:
+          radial-gradient(
+            ellipse 60% 80% at 50% 0%,
+            rgba(63, 185, 80, 0.08),
+            transparent
+          );
+      }
+      .final h2 {
+        margin-bottom: 20px;
+      }
+      .final p {
+        color: var(--fg-muted);
+        max-width: 520px;
+        margin: 0 auto 36px;
+      }
+
+      /* ---------- フッター ---------- */
+      footer {
+        border-top: 1px solid var(--border);
+        padding: 32px 0;
+        color: var(--fg-dim);
+        font-size: 13px;
+      }
+      .footer-inner {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: space-between;
+        gap: 12px;
+      }
+      .lp-switch {
+        color: var(--fg-muted);
+      }
+      .lp-switch a {
+        color: var(--cyan);
+      }
+      .lp-switch a:hover {
+        text-decoration: underline;
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        * {
+          animation: none !important;
+          transition: none !important;
+          scroll-behavior: auto !important;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div class="wrap nav">
+        <div class="brand">
+          <span class="prompt">&gt;_</span>
+          Retrace<span class="cursor"></span>
+        </div>
+        <a class="nav-cta" href="/">追体験を始める</a>
+      </div>
+    </header>
+
+    <main>
+      <!-- Hero -->
+      <section class="hero">
+        <div class="wrap">
+          <span class="badge"
+            ><span class="dot"></span>7 リポジトリ・1,500+ コミットを収録</span
+          >
+          <h1>
+            OSS を <span class="accent">最初のコミット</span>から<br />
+            読み解く、追体験ツール。
+          </h1>
+          <p class="lead">
+            実在の OSS を Initial commit から順に、diff と LLM 解説付きで1コミットずつ。
+            「何を・なぜ・読みどころ」を辿りながら、設計が育つ過程をそのまま体験する。
+          </p>
+          <div class="cta-row">
+            <a class="btn-primary" href="/">
+              <span>リポジトリを選んで始める</span>
+              <span>→</span>
+            </a>
+            <a class="btn-ghost" href="#how">仕組みを見る ↓</a>
+          </div>
+
+          <!-- ターミナル風デモ -->
+          <div class="terminal">
+            <div class="terminal-bar">
+              <span class="tdot r"></span>
+              <span class="tdot y"></span>
+              <span class="tdot g"></span>
+              <span class="tpath">retrace — nakabonne/ali · commit #6</span>
+            </div>
+            <div class="terminal-body">
+<div class="line"><span class="t-prompt">$</span> <span class="t-cmd">retrace open nakabonne/ali --seq 6</span></div>
+<div class="line"><span class="t-comment"># Enable to attack &nbsp;<span class="t-meta">5ab1a75</span> · 6 files <span class="t-add">+84</span> <span class="t-del">-36</span></span></div>
+<div class="line">&nbsp;</div>
+<div class="line"><span class="t-hl">何を:</span> ダミー波形を描く periodic 関数を削除し、実際に</div>
+<div class="line">&nbsp; attacker.Attack を呼ぶ goroutine とその結果を折れ線に</div>
+<div class="line">&nbsp; 反映する redrawChart へ置き換えた。</div>
+<div class="line">&nbsp;</div>
+<div class="line"><span class="t-hl">なぜ:</span> コミットメッセージ通り、実際に負荷生成できる状態に</div>
+<div class="line">&nbsp; するのが目的。TODO から中断処理が未実装と分かる。</div>
+<div class="line">&nbsp;</div>
+<div class="line"><span class="t-del">- func Attack(target string, resCh chan *Result) *Metrics {</span></div>
+<div class="line"><span class="t-add">+ func Attack(ctx context.Context, target string, ...) {</span></div>
+<div class="line">&nbsp;</div>
+<div class="line"><span class="t-prompt">$</span> <span class="t-cmd">_</span><span class="cursor"></span></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 課題 -->
+      <section class="problem">
+        <div class="wrap">
+          <div class="kicker">The Problem</div>
+          <h2>完成したコードは読める。でも「どう育ったか」は見えない。</h2>
+          <p class="section-lead">
+            GitHub で最新のコードは読める。けれど、なぜその設計になったのか——
+            最初の一歩から積み上がる意思決定の連なりは、履歴に埋もれてしまう。
+          </p>
+          <div class="problem-grid">
+            <div class="problem-card">
+              <div class="q">git log を追っても</div>
+              <p>
+                コミットメッセージだけでは「なぜ」が分からない。diff を1つずつ開いて文脈を再構成するのは骨が折れる。
+              </p>
+            </div>
+            <div class="problem-card">
+              <div class="q">完成品から逆算しても</div>
+              <p>
+                巨大化したコードベースを前に、どこが起点でどう分岐したのか、辿る取っ掛かりが掴めない。
+              </p>
+            </div>
+            <div class="problem-card">
+              <div class="q">写経しても</div>
+              <p>
+                手を動かすだけでは「その順番で作った理由」が抜け落ちる。設計判断の連続こそ学びたいのに。
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 3ベネフィット -->
+      <section id="how">
+        <div class="wrap">
+          <div class="kicker">How it works</div>
+          <h2>1コミットずつ、意図ごと読み解く。</h2>
+          <p class="section-lead">
+            機械抽出した diff・ファイルツリー・PR に、LLM が書いた解説を重ねる。
+            決定的な抽出と、意図の言語化を分離した設計。
+          </p>
+          <div class="features">
+            <div class="feature">
+              <div class="icon" aria-hidden="true">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                  <line x1="6" y1="3" x2="6" y2="15" />
+                  <circle cx="18" cy="6" r="3" />
+                  <circle cx="6" cy="18" r="3" />
+                  <path d="M18 9a9 9 0 0 1-9 9" />
+                </svg>
+              </div>
+              <h3>mainline を古い順に</h3>
+              <p>
+                first-parent で辿る一本道を Initial commit から。分岐に迷わず、プロジェクトの背骨だけを順番に追える。
+              </p>
+            </div>
+            <div class="feature">
+              <div class="icon" aria-hidden="true">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M12 20h9" />
+                  <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
+                </svg>
+              </div>
+              <h3>何を・なぜ・読みどころ</h3>
+              <p>
+                各コミットに意図の解説。PR や issue を根拠に、変更の狙いと見るべきファイルを言語化。言語固有の概念メモ付き。
+              </p>
+            </div>
+            <div class="feature">
+              <div class="icon" aria-hidden="true">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                  <polyline points="16 18 22 12 16 6" />
+                  <polyline points="8 6 2 12 8 18" />
+                </svg>
+              </div>
+              <h3>diff とツリーを並べて</h3>
+              <p>
+                unified / split の diff、変更ファイルツリー、その時点の checkout コマンドまで。読みながら手元で再現できる。
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 収録リポジトリ -->
+      <section class="problem">
+        <div class="wrap">
+          <div class="kicker">Library</div>
+          <h2>収録されている OSS</h2>
+          <p class="section-lead">
+            CLI・ルーター・設定ライブラリ・並行処理——設計の型が学べる Go の実プロジェクトを厳選。
+          </p>
+          <div class="repos-grid">
+            <div class="repo">
+              <div class="owner">nakabonne</div>
+              <div class="name">ali</div>
+              <div class="meta"><span class="lang-dot"></span>Go · 202 コミット</div>
+            </div>
+            <div class="repo">
+              <div class="owner">alecthomas</div>
+              <div class="name">kong</div>
+              <div class="meta"><span class="lang-dot"></span>Go · 491 コミット</div>
+            </div>
+            <div class="repo">
+              <div class="owner">julienschmidt</div>
+              <div class="name">httprouter</div>
+              <div class="meta"><span class="lang-dot"></span>Go · 269 コミット</div>
+            </div>
+            <div class="repo">
+              <div class="owner">cristalhq</div>
+              <div class="name">aconfig</div>
+              <div class="meta"><span class="lang-dot"></span>Go · 168 コミット</div>
+            </div>
+            <div class="repo">
+              <div class="owner">sourcegraph</div>
+              <div class="name">conc</div>
+              <div class="meta"><span class="lang-dot"></span>Go · 153 コミット</div>
+            </div>
+            <div class="repo">
+              <div class="owner">joho</div>
+              <div class="name">godotenv</div>
+              <div class="meta"><span class="lang-dot"></span>Go · 129 コミット</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 最終CTA -->
+      <section class="final">
+        <div class="wrap">
+          <h2>さあ、最初のコミットから。</h2>
+          <p>
+            読みたい OSS を選んで、Initial commit から追体験を始めよう。進捗はブラウザに自動保存される。
+          </p>
+          <a class="btn-primary" href="/">
+            <span>リポジトリを選ぶ</span>
+            <span>→</span>
+          </a>
+        </div>
+      </section>
+    </main>
+
+    <footer>
+      <div class="wrap footer-inner">
+        <div>Retrace — ローカル学習ツール · LLM は解説生成にのみ使用</div>
+        <div class="lp-switch">
+          LP バリエーション: <strong>A (Terminal)</strong> ·
+          <a href="/lp/b/">B (Editorial) →</a>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>
