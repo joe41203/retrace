@@ -58,3 +58,5 @@ make build / make fixture           # ビューアビルド / fixture 生成
 - mainline は first-parent。コミット総数(GitHub API)と mainline 件数は一致しない(ali: 280 vs 202)
 - 新規 agent / skill は原則次回セッションから有効(skill は同一セッション内で認識される場合もある)
 - `.claude/commands/` に README や説明用 .md を置かない — **全 `*.md` がスラッシュコマンドとして登録される**(/README 事故の実績あり)。説明は skills/README.md か本ファイルに書く
+- 紹介 LP は `viewer/public/lp/<name>/index.html` の静的 HTML(React・ルーター非依存)。`/lp/a` `/lp/b` として dev/build 両方で配信される。現在は A(Terminal)/B(Editorial)の2案。Top(`/` = リポジトリ選択 SPA)からは `RepoPicker` フッターの通常リンクで遷移、LP からは CTA で `/` へ戻る。CTA の遷移先は `/`(ハッシュ無し)にすること
+- **Vite dev サーバ起動後に `public/` へ追加したファイルは即時反映されない**(SPA fallback が優先され `/lp/a` が index.html を返す)。LP を追加・変更したら `make dev` を再起動する。preview/本番ビルドでは正しく配信される

@@ -1,4 +1,4 @@
-import { createReadStream, existsSync, statSync } from "node:fs";
+import { cpSync, createReadStream, existsSync, statSync } from "node:fs";
 import { extname, join, normalize, resolve, sep } from "node:path";
 import react from "@vitejs/plugin-react";
 import {
@@ -73,8 +73,26 @@ function serveData(): Plugin {
 	};
 }
 
+// 本番ビルド時に repo ルートの data/ を dist/data/ へコピーする。
+// 静的ホスティング(Cloudflare Pages 等)で /data/* を直接配信できるようにするため。
+// dev/preview は serveData ミドルウェアが配信するので、このコピーはビルド時のみ効く。
+function copyDataToDist(): Plugin {
+	return {
+		name: "retrace-copy-data",
+		apply: "build",
+		closeBundle() {
+			if (!existsSync(DATA_ROOT)) {
+				this.warn(`data/ が見つからないためコピーをスキップ: ${DATA_ROOT}`);
+				return;
+			}
+			const dest = resolve(__dirname, "dist", "data");
+			cpSync(DATA_ROOT, dest, { recursive: true });
+		},
+	};
+}
+
 export default defineConfig({
-	plugins: [react(), serveData()],
+	plugins: [react(), serveData(), copyDataToDist()],
 	server: {
 		fs: {
 			// repo ルートの data/ を dev サーバの許可対象に含める
