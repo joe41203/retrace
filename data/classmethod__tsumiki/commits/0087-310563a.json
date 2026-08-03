@@ -1,0 +1,229 @@
+{
+  "seq": 87,
+  "sha": "310563a6ee967bf26055f7d042855beb331b977b",
+  "parents": [
+    "830c42e30ece7598041c52df1622200fc89202d2"
+  ],
+  "author": {
+    "name": "makotan",
+    "email": "makotan@gmail.com",
+    "date": "2025-08-22T05:26:00+09:00"
+  },
+  "message": "追加ルールの読込を追加。README/MANUAL更新",
+  "pr": {
+    "number": 30,
+    "title": "多環境への対応力向上",
+    "body": "色んなライブラリへの対応力を向上させた\r\n複数人での並行開発への対応\r\nディレクトリの構成などの変更\r\n緑のマークと黄色のマークが識別しにくい方への配慮",
+    "url": "https://github.com/classmethod/tsumiki/pull/30"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 16,
+    "additions": 202,
+    "deletions": 79
+  },
+  "files": [
+    {
+      "path": "MANUAL.md",
+      "status": "M",
+      "additions": 35,
+      "deletions": 4,
+      "binary": false
+    },
+    {
+      "path": "README.md",
+      "status": "M",
+      "additions": 9,
+      "deletions": 4,
+      "binary": false
+    },
+    {
+      "path": "commands/direct-setup.md",
+      "status": "M",
+      "additions": 8,
+      "deletions": 2,
+      "binary": false
+    },
+    {
+      "path": "commands/direct-verify.md",
+      "status": "M",
+      "additions": 8,
+      "deletions": 2,
+      "binary": false
+    },
+    {
+      "path": "commands/kairo-design.md",
+      "status": "M",
+      "additions": 16,
+      "deletions": 8,
+      "binary": false
+    },
+    {
+      "path": "commands/kairo-implement.md",
+      "status": "M",
+      "additions": 13,
+      "deletions": 7,
+      "binary": false
+    },
+    {
+      "path": "commands/kairo-requirements.md",
+      "status": "M",
+      "additions": 19,
+      "deletions": 13,
+      "binary": false
+    },
+    {
+      "path": "commands/kairo-task-verify.md",
+      "status": "M",
+      "additions": 11,
+      "deletions": 5,
+      "binary": false
+    },
+    {
+      "path": "commands/kairo-tasks.md",
+      "status": "M",
+      "additions": 22,
+      "deletions": 15,
+      "binary": false
+    },
+    {
+      "path": "commands/tdd-green.md",
+      "status": "M",
+      "additions": 8,
+      "deletions": 2,
+      "binary": false
+    },
+    {
+      "path": "commands/tdd-red.md",
+      "status": "M",
+      "additions": 9,
+      "deletions": 3,
+      "binary": false
+    },
+    {
+      "path": "commands/tdd-refactor.md",
+      "status": "M",
+      "additions": 8,
+      "deletions": 2,
+      "binary": false
+    },
+    {
+      "path": "commands/tdd-requirements.md",
+      "status": "M",
+      "additions": 9,
+      "deletions": 3,
+      "binary": false
+    },
+    {
+      "path": "commands/tdd-testcases.md",
+      "status": "M",
+      "additions": 8,
+      "deletions": 2,
+      "binary": false
+    },
+    {
+      "path": "commands/tdd-todo.md",
+      "status": "M",
+      "additions": 11,
+      "deletions": 5,
+      "binary": false
+    },
+    {
+      "path": "commands/tdd-verify-complete.md",
+      "status": "M",
+      "additions": 8,
+      "deletions": 2,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/MANUAL.md b/MANUAL.md\nindex d009b8c..666cbd7 100644\n--- a/MANUAL.md\n+++ b/MANUAL.md\n@@ -15,6 +15,25 @@ mkdir -p .claude\n cp -r commands .claude/\n ```\n \n+#### オプション：プロジェクト固有のルール設定\n+\n+セットアップ後、プロジェクト固有のルールや設定を追加できます。\n+`docs/rule/{種類1}/{種類2}` ディレクトリ構造でファイルを配置すると、対応するコマンド実行時に自動で読み込まれます。\n+\n+**読み込まれるディレクトリ階層**:\n+- `docs/rule/` （共通ルール）\n+- `docs/rule/{種類1}/` （種類レベルのルール）\n+- `docs/rule/{種類1}/{種類2}/` （詳細レベルのルール）\n+\n+**例**: `kairo-requirements` 実行時\n+```\n+docs/rule/                    # 全コマンド共通ルール\n+docs/rule/kairo/              # kairoコマンド共通ルール  \n+docs/rule/kairo/requirements/ # kairo-requirements専用ルール\n+```\n+\n+これらのディレクトリ内の `.md` ファイルは、コマンド実行時にコンテキストとして自動読み込みされます。\n+\n ### TDDコマンド\n \n TASK作成時に `TDD` と判定している場合で個別にTDDプロセスを実行したい場合は、以下のコマンドを順次実行できます：\n@@ -56,7 +75,19 @@ TASK作成時に `DIRECT` と判定している場合は、以下のコマンド\n \n ### Kairoコマンド（包括的フロー）\n \n-#### 1. 要件定義\n+#### 1. 技術スタック初期化\n+\n+プロジェクトの技術スタック（フレームワーク、ライブラリ）を初期化します：\n+\n+```\n+/init-tech-stack\n+\n+```\n+init-tech-stack は以下を生成します：\n+\n+生成されたファイル: `/docs/tech-stack.md` 配下\n+\n+#### 2. 要件定義\n \n 最初に、プロジェクトの要件概要をKairoに伝えます：\n \n@@ -77,7 +108,7 @@ Kairoは以下を生成します：\n \n 生成されたファイル: `/docs/spec/{要件名}-requirements.md`\n \n-#### 2. 設計\n+#### 3. 設計\n \n 要件を確認・修正した後、設計を依頼します：\n \n@@ -96,7 +127,7 @@ Kairoは以下を生成します：\n \n 生成されたファイル: `/docs/design/{要件名}/` 配下\n \n-#### 3. タスク分割\n+#### 4. タスク分割\n \n 設計を確認した後（承認は省略可）、タスク分割を実行します：\n \n@@ -115,7 +146,7 @@ Kairoは以下を生成します：\n \n 生成されたファイル: `/docs/tasks/{要件名}-tasks.md`\n \n-#### 4. 実装\n+#### 5. 実装\n \n タスクを確認した後、実装を開始します：\n （TDDサイクルまたはDIRECTを手動実行をお勧めします\ndiff --git a/README.md b/README.md\nindex b02dd2a..ed45758 100644\n--- a/README.md\n+++ b/README.md\n@@ -30,6 +30,8 @@ Kairoは要件定義から実装までの開発プロセスを自動化・支援\n \n ## 利用可能なコマンド\n \n+- `init-tech-stack` - 技術スタックの特定\n+\n ### Kairoコマンド（包括的開発フロー）\n - `kairo-requirements` - 要件定義\n - `kairo-design` - 設計文書生成\n@@ -55,16 +57,19 @@ Kairoは要件定義から実装までの開発プロセスを自動化・支援\n ### 包括的な開発フロー\n \n ```bash\n-# 1. 要件定義\n+# 1. 技術スタック初期化\n+/init-tech-stack\n+\n+# 2. 要件定義\n /kairo-requirements\n \n-# 2. 設計\n+# 3. 設計\n /kairo-design\n \n-# 3. タスク分割\n+# 4. タスク分割\n /kairo-tasks\n \n-# 4. 実装\n+# 5. 実装\n /kairo-implement\n ```\n \ndiff --git a/commands/direct-setup.md b/commands/direct-setup.md\nindex 7fbbbba..11fef44 100644\n--- a/commands/direct-setup.md\n+++ b/commands/direct-setup.md\n@@ -16,12 +16,18 @@ DIRECTタスクの設定作業を実行します。設計文書に基づいて\n \n ## 実行内容\n \n-1. **技術スタック定義の読み込み**\n+1. **追加ルールの読み込み**\n+   - `docs/rule` ディレクトリが存在する場合は読み込み\n+   - `docs/rule/direct` ディレクトリが存在する場合は読み込み  \n+   - `docs/rule/direct/setup` ディレクトリが存在する場合は読み込み\n+   - 各ディレクトリ内のすべてのファイルを読み込み、追加ルールとして適用\n+\n+2. **技術スタック定義の読み込み**\n    - `docs/tech-stack.md` が存在する場合は読み込み\n    - 存在しない場合は `CLAUDE.md` から技術スタックセクションを読み込み  \n    - どちらも存在しない場合は `.claude/commands/tech-stack.md` のデフォルト定義を使用\n \n-2. **設計文書の確認**\n+3. **設計文書の確認**\n    - 読み込んだ技術スタック定義に基づいて関連ファイルを特定\n    - @agent-symbol-searcher で関連設計文書や設定パターンを検索し、見つかったファイルをReadツールで読み込み\n    - `docs/design/{要件名}/architecture.md` をReadツールで読み込み\ndiff --git a/commands/direct-verify.md b/commands/direct-verify.md\nindex b12d0a0..fc3f873 100644\n--- a/commands/direct-verify.md\n+++ b/commands/direct-verify.md\n@@ -18,12 +18,18 @@ DIRECTタスクで実行した設定作業の動作確認とテストを行い\n \n **【重要】**: direct-setupで作成されたファイルについて、コンパイルエラーや構文エラーが見つかった場合は自動的に解決を試行します。\n \n-1. **技術スタック定義の読み込み**\n+1. **追加ルールの読み込み**\n+   - `docs/rule` ディレクトリが存在する場合は読み込み\n+   - `docs/rule/direct` ディレクトリが存在する場合は読み込み  \n+   - `docs/rule/direct/verify` ディレクトリが存在する場合は読み込み\n+   - 各ディレクトリ内のすべてのファイルを読み込み、追加ルールとして適用\n+\n+2. **技術スタック定義の読み込み**\n    - `docs/tech-stack.md` が存在する場合は読み込み\n    - 存在しない場合は `CLAUDE.md` から技術スタックセクションを読み込み  \n    - どちらも存在しない場合は `.claude/commands/tech-stack.md` のデフォルト定義を使用\n \n-2. **設定の確認**\n+3. **設定の確認**\n    - 読み込んだ技術スタック定義に基づいて検証項目を特定\n    - @agent-symbol-searcher で関連設定や検証パターンを検索し、見つかったファイルをReadツールで読み込み\n    - `docs/implements/{TASK-ID}/setup-report.md` をReadツールで読み込み、設定作業の結果を確認\ndiff --git a/commands/kairo-design.md b/commands/kairo-design.md\nindex 9424195..94cabee 100644\n--- a/commands/kairo-design.md\n+++ b/commands/kairo-design.md\n@@ -13,6 +13,14 @@ description: 承認された要件定義書に基づいて、技術設計文書\n - `docs/spec/` に要件定義書が存在する\n - 要件がユーザによって承認されている\n \n+## 事前準備\n+\n+1. **追加ルールの読み込み**\n+   - `docs/rule` ディレクトリが存在する場合は読み込み\n+   - `docs/rule/kairo` ディレクトリが存在する場合は読み込み  \n+   - `docs/rule/kairo/design` ディレクトリが存在する場合は読み込み\n+   - 各ディレクトリ内のすべてのファイルを読み込み、追加ルールとして適用\n+\n ## 実行内容\n \n **【信頼性レベル指示】**:\n@@ -22,46 +30,46 @@ description: 承認された要件定義書に基づいて、技術設計文書\n - 🟡 **黄信号**: EARS要件定義書・設計文書から妥当な推測の場合\n - 🔴 **赤信号**: EARS要件定義書・設計文書にない推測の場合\n \n-1. **技術スタック定義の読み込み**\n+2. **技術スタック定義の読み込み**\n    - `docs/tech-stack.md` が存在する場合は読み込み\n    - 存在しない場合は `CLAUDE.md` から技術スタックセクションを読み込み  \n    - どちらも存在しない場合は `.claude/commands/tech-stack.md` のデフォルト定義を使用\n \n-2. **要件の分析**\n+3. **要件の分析**\n    - @agent-symbol-searcher で要件定義書を検索し、見つかったファイルをReadツールで読み込み\n    - @agent-symbol-searcher で関連する既存設計文書を確認し、見つかったファイルをReadツールで読み込み\n    - 読み込んだ技術スタック定義に基づいて技術選択を決定\n    - 機能要件と非機能要件を整理する\n    - システムの境界を明確にする\n \n-3. **アーキテクチャ設計**\n+4. **アーキテクチャ設計**\n    - システム全体のアーキテクチャを決定\n    - フロントエンド/バックエンドの分離\n    - マイクロサービスの必要性を検討\n \n-4. **データフロー図の作成**\n+5. **データフロー図の作成**\n    - Mermaid記法でデータフローを可視化\n    - ユーザーインタラクションの流れ\n    - システム間のデータの流れ\n \n-5. **TypeScriptインターフェースの定義**\n+6. **TypeScriptインターフェースの定義**\n    - エンティティの型定義\n    - APIリクエスト/レスポンスの型定義\n    - 共通型の定義\n \n-6. **データベーススキーマの設計**\n+7. **データベーススキーマの設計**\n    - テーブル定義\n    - リレーションシップ\n    - インデックス戦略\n    - 正規化レベルの決定\n \n-7. **APIエンドポイントの設計**\n+8. **APIエンドポイントの設計**\n    - RESTful API設計\n    - エンドポイントの命名規則\n    - HTTPメソッドの適切な使用\n    - リクエスト/レスポンスの構造\n \n-8. **ファイルの作成**\n+9. **ファイルの作成**\n    - `docs/design/{要件名}/` ディレクトリに以下を作成：\n      - `architecture.md` - アーキテクチャ概要\n      - `dataflow.md` - データフロー図\ndiff --git a/commands/kairo-implement.md b/commands/kairo-implement.md\nindex d3f282f..93d2d6c 100644\n--- a/commands/kairo-implement.md\n+++ b/commands/kairo-implement.md\n@@ -24,32 +24,38 @@ description: 分割されたタスクを順番に、またはユーザが指定\n - 🟡 **黄信号**: EARS要件定義書・設計文書から妥当な推測の場合\n - 🔴 **赤信号**: EARS要件定義書・設計文書にない推測の場合\n \n-1. **技術スタック定義の読み込み**\n+1. **追加ルールの読み込み**\n+   - `docs/rule` ディレクトリが存在する場合は読み込み\n+   - `docs/rule/kairo` ディレクトリが存在する場合は読み込み  \n+   - `docs/rule/kairo/implement` ディレクトリが存在する場合は読み込み\n+   - 各ディレクトリ内のすべてのファイルを読み込み、追加ルールとして適用\n+\n+2. **技術スタック定義の読み込み**\n    - `docs/tech-stack.md` が存在する場合は読み込み\n    - 存在しない場合は `CLAUDE.md` から技術スタックセクションを読み込み  \n    - どちらも存在しない場合は `.claude/commands/tech-stack.md` のデフォルト定義を使用\n \n-2. **タスクの選択**\n+3. **タスクの選択**\n    - @agent-symbol-searcher で指定されたタスクIDを検索し、見つかったタスクファイルをReadツールで読み込み\n    - ユーザが指定したタスクIDを確認\n    - 指定がない場合は、依存関係に基づいて次のタスクを自動選択\n    - 選択したタスクの詳細を表示\n    - 読み込んだ技術スタック定義に基づいて実装方針を決定\n \n-3. **依存関係の確認**\n+4. **依存関係の確認**\n    - @agent-symbol-searcher で依存タスクの状態を検索し、見つかったタスクファイルをReadツールで読み込み\n    - 依存タスクが完了しているか確認\n    - 未完了の依存タスクがある場合は警告\n \n-4. **実装ディレクトリの準備**\n+5. **実装ディレクトリの準備**\n    - 現在のワークスペースで作業を行う\n    - 必要に応じてディレクトリ構造を確認\n \n-5. **実装タイプの判定**\n+6. **実装タイプの判定**\n    - タスクの性質を分析（コード実装 vs 準備作業）\n    - 実装方式を決定（TDD vs 直接作業）\n \n-6. **実装プロセスの実行**\n+7. **実装プロセスの実行**\n \n    ### A. **TDDプロセス**（コード実装タスク用）\n \n@@ -126,7 +132,7 @@ description: 分割されたタスクを順番に、またはユーザが指定\n    実行方式: 個別Task実行\n    ```\n \n-7. **タスクの完了処理**\n+8. **タスクの完了処理**\n    - タスクのステータスを更新（タスクファイルのチェックボックスにチェックを入れる）\n    - 実装結果をドキュメント化\n    - 次のタスクを提案\ndiff --git a/commands/kairo-requirements.md b/commands/kairo-requirements.md\nindex a2a005f..3a08717 100644\n--- a/commands/kairo-requirements.md\n+++ b/commands/kairo-requirements.md\n@@ -25,24 +25,30 @@ description: ユーザから提供された要件の概要を分析し、EARS（\n - 🟡 **黄信号**: EARS要件定義書・設計文書・ユーザヒアリングから妥当な推測の場合\n - 🔴 **赤信号**: EARS要件定義書・設計文書・ユーザヒアリングにない推測の場合\n \n-1. **プロジェクト基本情報収集**\n+1. **追加ルールの読み込み**\n+   - `docs/rule` ディレクトリが存在する場合は読み込み\n+   - `docs/rule/kairo` ディレクトリが存在する場合は読み込み  \n+   - `docs/rule/kairo/requirements` ディレクトリが存在する場合は読み込み\n+   - 各ディレクトリ内のすべてのファイルを読み込み、追加ルールとして適用\n+\n+2. **プロジェクト基本情報収集**\n    - `CLAUDE.md` の内容を読み込み（プロジェクト概要・技術スタック・制約）\n    - `README.md` が存在する場合は読み込み\n    - プロジェクト構造（ディレクトリ構成）を把握\n \n-2. **既存設計文書・仕様書の調査**\n+3. **既存設計文書・仕様書の調査**\n    - `docs/` ディレクトリ配下の全設計文書を確認\n    - 既存の要件定義書・設計書を読み込み\n    - タスク管理ファイル（phase*.md）の内容確認\n    - API仕様書・DB設計書があれば確認\n \n-3. **既存コードベース・開発状況の分析**\n+4. **既存コードベース・開発状況の分析**\n    - @agent-symbol-searcher で既存仕様・実装の網羅的調査\n    - git status/log で現在の開発状況・進捗確認\n    - 実装済み機能 vs 設計書の差分分析\n    - 残タスク・未実装部分の特定\n \n-4. **収集情報のサマリー作成**\n+5. **収集情報のサマリー作成**\n    - 既存プロジェクトの全体像整理\n    - 定義済み要件・未定義部分の特定\n    - 技術制約・非機能要件の整理\n@@ -50,43 +56,43 @@ description: ユーザから提供された要件の概要を分析し、EARS（\n \n ### Phase 1: 既存情報ベースの差分ヒアリング\n \n-5. **既存設計の妥当性・過不足確認**\n+6. **既存設計の妥当性・過不足確認**\n    - 既存の機能要件・非機能要件の確認質問\n    - 現在の制約事項（性能・データ制限等）の妥当性確認\n    - 技術スタック選択の再確認\n    - 既存設計で実現困難・不適切な部分の特定\n \n-6. **未定義・曖昧部分の詳細化ヒアリング**\n+7. **未定義・曖昧部分の詳細化ヒアリング**\n    - 設計文書で詳細が不明な機能の具体化\n    - ユーザーの実際の業務フロー・ユースケースの確認\n    - 入出力データの詳細仕様確認\n    - UI/UX の具体的な期待値確認\n \n-7. **追加・変更要件の特定**\n+8. **追加・変更要件の特定**\n    - 既存設計にない新規機能要件の聞き出し\n    - 外部システム連携の追加需要確認\n    - レポート・分析機能等の追加需要確認\n    - 運用・メンテナンス要件の追加確認\n \n-8. **既存機能への影響範囲確認**\n+9. **既存機能への影響範囲確認**\n    - 新規要件による既存機能への影響許容度確認\n    - パフォーマンス要件への影響確認\n    - セキュリティ・アクセシビリティ要件への影響確認\n    - データ移行・互換性要件の確認\n \n-9. **優先順位・スコープ調整**\n+10. **優先順位・スコープ調整**\n    - Must Have / Should Have / Could Have / Won't Have の分類\n    - リリーススコープ・段階的リリース計画の確認\n    - 予算・スケジュール制約に基づく優先順位調整\n \n ### Phase 2: 統合要件定義書作成\n \n-10. **ユーザストーリーの作成・更新**\n+11. **ユーザストーリーの作成・更新**\n     - WHO（誰が）、WHAT（何を）、WHY（なぜ）の形式で記述\n     - 既存ユーザストーリーの更新・新規ストーリーの追加\n     - 各機能の価値・優先順位を明確化\n \n-11. **EARS記法による統合要件定義**\n+12. **EARS記法による統合要件定義**\n     - **通常要件（SHALL）**: システムが通常実行すべき動作\n     - **条件付き要件（WHEN/IF-THEN）**: 特定の条件下での動作\n     - **不要要件（WHERE）**: 特定の状態での動作\n@@ -94,13 +100,13 @@ description: ユーザから提供された要件の概要を分析し、EARS（\n     - **制約要件（MUST）**: システムの制約事項\n     - 既存要件との統合・重複排除・矛盾解決\n \n-12. **Edgeケース・非機能要件の定義**\n+13. **Edgeケース・非機能要件の定義**\n     - 異常系の処理・エラーハンドリング\n     - 境界値の処理・データ制限\n     - パフォーマンス・セキュリティ・ユーザビリティ要件\n     - 運用・保守・移行要件\n \n-13. **統合要件定義書ファイルの作成**\n+14. **統合要件定義書ファイルの作成**\n     - `docs/spec/{要件名}-requirements.md`: 統合機能要件と関連文書へのリンク\n     - `docs/spec/{要件名}-user-stories.md`: 詳細なユーザストーリー\n     - `docs/spec/{要件名}-acceptance-criteria.md`: 受け入れ基準とテスト項目\ndiff --git a/commands/kairo-task-verify.md b/commands/kairo-task-verify.md\nindex 9c7ff04..b13db42 100644\n--- a/commands/kairo-task-verify.md\n+++ b/commands/kairo-task-verify.md\n@@ -22,21 +22,27 @@ description: 作成されたタスクファイルの内容を確認し、出力\n - 🟡 **黄信号**: EARS要件定義書・設計文書から妥当な推測の場合\n - 🔴 **赤信号**: EARS要件定義書・設計文書にない推測の場合\n \n-1. **技術スタック定義の読み込み**\n+1. **追加ルールの読み込み**\n+   - `docs/rule` ディレクトリが存在する場合は読み込み\n+   - `docs/rule/kairo` ディレクトリが存在する場合は読み込み  \n+   - `docs/rule/kairo/task-verify` ディレクトリが存在する場合は読み込み\n+   - 各ディレクトリ内のすべてのファイルを読み込み、追加ルールとして適用\n+\n+2. **技術スタック定義の読み込み**\n    - `docs/tech-stack.md` が存在する場合は読み込み\n    - 存在しない場合は `CLAUDE.md` から技術スタックセクションを読み込み  \n    - どちらも存在しない場合は `.claude/commands/tech-stack.md` のデフォルト定義を使用\n \n-2. **タスクファイルの確認**\n+3. **タスクファイルの確認**\n    - @agent-symbol-searcher でタスクファイルを検索し、見つかったファイルをReadツールで読み込み\n    - `docs/tasks/{要件名}-tasks.md` をReadツールで読み込み\n \n-3. **出力フォーマット例との比較**\n+4. **出力フォーマット例との比較**\n    - @agent-symbol-searcher で関連するタスクフォーマットを検索し、見つかったファイルをReadツールで読み込み\n    - kairo-tasksコマンドファイルをReadツールで読み込み、出力フォーマット例を確認\n    - 作成されたタスクファイルに不足している情報を特定\n \n-4. **不足情報の追加**\n+5. **不足情報の追加**\n    以下の項目が含まれているか確認し、不足していれば追加：\n    - 概要セクション（全タスク数、推定作業時間、クリティカルパス）\n    - 各タスクのチェックボックス\n@@ -51,7 +57,7 @@ description: 作成されたタスクファイルの内容を確認し、出力\n    - 実行順序（Mermaidガントチャート）\n    - サブタスクテンプレート情報\n \n-5. **ファイルの更新**\n+6. **ファイルの更新**\n    - 不足している情報を追加してファイルを更新\n \n ## 実行後の確認\ndiff --git a/commands/kairo-tasks.md b/commands/kairo-tasks.md\nindex 0e4abfe..29668ac 100644\n--- a/commands/kairo-tasks.md\n+++ b/commands/kairo-tasks.md\n@@ -24,12 +24,18 @@ description: 設計文書に基づいて実装タスクを1日単位の粒度で\n - 🟡 **黄信号**: EARS要件定義書・設計文書から妥当な推測の場合\n - 🔴 **赤信号**: EARS要件定義書・設計文書にない推測の場合\n \n-1. **技術スタック定義の読み込み**\n+1. **追加ルールの読み込み**\n+   - `docs/rule` ディレクトリが存在する場合は読み込み\n+   - `docs/rule/kairo` ディレクトリが存在する場合は読み込み  \n+   - `docs/rule/kairo/tasks` ディレクトリが存在する場合は読み込み\n+   - 各ディレクトリ内のすべてのファイルを読み込み、追加ルールとして適用\n+\n+2. **技術スタック定義の読み込み**\n    - `docs/tech-stack.md` が存在する場合は読み込み\n    - 存在しない場合は `CLAUDE.md` から技術スタックセクションを読み込み  \n    - どちらも存在しない場合は `.claude/commands/tech-stack.md` のデフォルト定義を使用\n \n-2. **設計文書の分析**\n+3. **設計文書の分析**\n    - @agent-symbol-searcher で設計文書を検索し、見つかったファイルをReadツールで読み込み\n    - `docs/design/{要件名}/architecture.md` をReadツールで読み込み\n    - `docs/design/{要件名}/database-schema.sql` をReadツールで読み込み\n@@ -38,25 +44,25 @@ description: 設計文書に基づいて実装タスクを1日単位の粒度で\n    - `docs/design/{要件名}/dataflow.md` をReadツールで読み込み\n    - 読み込んだ技術スタック定義に基づいて実装技術を特定\n \n-3. **既存タスクファイルの確認**\n+4. **既存タスクファイルの確認**\n    - @agent-symbol-searcher で既存タスクIDを検索し、見つかったタスクファイルをReadツールで読み込み\n    - 既存の`docs/tasks/{要件名}-*.md`ファイルをReadツールで読み込み\n    - 使用済みタスク番号（TASK-0001形式）を抽出\n    - 新規タスクで重複しない番号を割り当て\n \n-4. **タスクの洗い出し**\n+5. **タスクの洗い出し**\n    - 基盤タスク（DB設定、環境構築など）\n    - バックエンドタスク（API実装）\n    - フロントエンドタスク（UI実装）\n      - 画面のグループ毎に細かく分割する\n    - 統合タスク（E2Eテストなど）\n \n-5. **依存関係の分析**\n+6. **依存関係の分析**\n    - タスク間の依存関係を明確化\n    - 並行実行可能なタスクを識別\n    - クリティカルパスを特定\n \n-6. **タスクの詳細化**\n+7. **タスクの詳細化**\n    各タスクに以下を含める：\n    - タスクID（TASK-0001形式の4桁番号）\n    - タスク名\n@@ -74,12 +80,12 @@ description: 設計文書に基づいて実装タスクを1日単位の粒度で\n      - モバイル対応\n      - アクセシビリティ要件\n \n-7. **タスクの順序付け**\n+8. **タスクの順序付け**\n    - 依存関係に基づいて実行順序を決定\n    - マイルストーンを設定\n    - 並行実行可能なタスクをグループ化\n \n-8. **フェーズ分割**\n+9. **フェーズ分割**\n    - 各タスクを1日単位の粒度で設計\n    - タスクを1ヶ月以内の期間でフェーズに分割\n      - NEVER タスクの情報の省略\n@@ -89,7 +95,7 @@ description: 設計文書に基づいて実装タスクを1日単位の粒度で\n      - YOU MUST フェーズの分割はアーキテクチャのレイヤーを基準にする\n      - NEVER 事前検討した分割基準を前提としない\n \n-9. **ファイル作成**\n+10. **ファイル作成**\n    - ファイル作成は ファイル毎に @task で実行する \n    - 各フェーズ毎に個別のタスクファイルを作成\n    - NEVER タスクの情報の省略\n@@ -144,12 +150,13 @@ description: 設計文書に基づいて実装タスクを1日単位の粒度で\n \n ## 実行フロー\n \n-1. **技術スタック読み込み**: `docs/tech-stack.md` → `CLAUDE.md` → `.claude/commands/tech-stack.md`\n-2. **設計文書分析**: @agent-symbol-searcher で検索後、Readツールで各ファイル読み込み\n-3. **既存タスク確認**: @agent-symbol-searcher + Readで使用済み番号抽出\n-4. **タスク洗い出し**: 基盤→バックエンド→フロントエンド→統合の順\n-5. **フェーズ分割**: 180時間・500行を超えない単位で分割\n-6. **ファイル作成**: overview.md + phase*.md作成\n+1. **追加ルール読み込み**: `docs/rule` → `docs/rule/kairo` → `docs/rule/kairo/tasks`\n+2. **技術スタック読み込み**: `docs/tech-stack.md` → `CLAUDE.md` → `.claude/commands/tech-stack.md`\n+3. **設計文書分析**: @agent-symbol-searcher で検索後、Readツールで各ファイル読み込み\n+4. **既存タスク確認**: @agent-symbol-searcher + Readで使用済み番号抽出\n+5. **タスク洗い出し**: 基盤→バックエンド→フロントエンド→統合の順\n+6. **フェーズ分割**: 180時間・500行を超えない単位で分割\n+7. **ファイル作成**: overview.md + phase*.md作成\n \n ## 品質基準\n \ndiff --git a/commands/tdd-green.md b/commands/tdd-green.md\nindex df5ca21..6000f05 100644\n--- a/commands/tdd-green.md\n+++ b/commands/tdd-green.md\n@@ -10,12 +10,18 @@ TDDのGreenフェーズを実行します。\n \n 開発コンテキストの準備を行います：\n \n-1. **@agent-symbol-searcher で実装関連情報を検索し、見つかったファイルを読み込み**\n+1. **追加ルールの読み込み**\n+   - `docs/rule` ディレクトリが存在する場合は読み込み\n+   - `docs/rule/tdd` ディレクトリが存在する場合は読み込み  \n+   - `docs/rule/tdd/green` ディレクトリが存在する場合は読み込み\n+   - 各ディレクトリ内のすべてのファイルを読み込み、追加ルールとして適用\n+\n+2. **@agent-symbol-searcher で実装関連情報を検索し、見つかったファイルを読み込み**\n    - 既存の類似機能やユーティリティ関数を検索し、該当ファイルをReadツールで読み込み\n    - 実装パターンやアーキテクチャガイドラインを特定し、設計文書をReadツールで読み込み\n    - 依存関係やインポートパスを確認し、関連ファイルをReadツールで読み込み\n \n-2. **関連ファイルを直接読み込み**\n+3. **関連ファイルを直接読み込み**\n    - `docs/implements/{{task_id}}/{feature_name}-memo.md` - 既存の開発履歴を確認\n    - `docs/implements/{{task_id}}/{feature_name}-requirements.md` - 要件定義を確認\n    - `docs/implements/{{task_id}}/{feature_name}-testcases.md` - テストケース定義を確認\ndiff --git a/commands/tdd-red.md b/commands/tdd-red.md\nindex c7857cd..5667bb7 100644\n--- a/commands/tdd-red.md\n+++ b/commands/tdd-red.md\n@@ -10,19 +10,25 @@ TDDのRedフェーズを実行します。\n \n 開発コンテキストの準備を行います：\n \n-1. **技術スタック定義の読み込み**\n+1. **追加ルールの読み込み**\n+   - `docs/rule` ディレクトリが存在する場合は読み込み\n+   - `docs/rule/tdd` ディレクトリが存在する場合は読み込み  \n+   - `docs/rule/tdd/red` ディレクトリが存在する場合は読み込み\n+   - 各ディレクトリ内のすべてのファイルを読み込み、追加ルールとして適用\n+\n+2. **技術スタック定義の読み込み**\n    - `docs/tech-stack.md` が存在する場合は読み込み\n    - 存在しない場合は `CLAUDE.md` から技術スタックセクションを読み込み  \n    - どちらも存在しない場合は `.claude/commands/tech-stack.md` のデフォルト定義を使用\n \n-2. **@agent-symbol-searcher でテスト実装関連情報を検索し、見つかったファイルを読み込み**\n+3. **@agent-symbol-searcher でテスト実装関連情報を検索し、見つかったファイルを読み込み**\n    - 読み込んだ技術スタック定義に基づいてテストフレームワークを特定\n    - **UIタスクの場合**: E2Eテストフレームワーク（Playwright等）の設定とサンプルを優先的に確認\n    - 既存のテストファイルやテスト関数を検索し、該当ファイルをReadツールで読み込み\n    - テストセットアップやモックの使用パターンを特定し、関連ファイルをReadツールで読み込み\n    - **E2Eテスト設定確認**: playwright.config.js、cypress.config.js等の設定ファイルをReadツールで読み込み\n \n-3. **関連ファイルを直接読み込み**\n+4. **関連ファイルを直接読み込み**\n    - `docs/implements/{{task_id}}/{feature_name}-memo.md` - 既存の開発履歴を確認\n    - `docs/implements/{{task_id}}/{feature_name}-requirements.md` - 要件定義を確認\n    - `docs/implements/{{task_id}}/{feature_name}-testcases.md` - テストケース定義を確認\ndiff --git a/commands/tdd-refactor.md b/commands/tdd-refactor.md\nindex 4968070..1c3c828 100644\n--- a/commands/tdd-refactor.md\n+++ b/commands/tdd-refactor.md\n@@ -10,12 +10,18 @@ TDDのRefactorフェーズを実行します。\n \n 開発コンテキストの準備を行います：\n \n-1. **@agent-symbol-searcher でリファクタリング関連情報を検索し、見つかったファイルを読み込み**\n+1. **追加ルールの読み込み**\n+   - `docs/rule` ディレクトリが存在する場合は読み込み\n+   - `docs/rule/tdd` ディレクトリが存在する場合は読み込み  \n+   - `docs/rule/tdd/refactor` ディレクトリが存在する場合は読み込み\n+   - 各ディレクトリ内のすべてのファイルを読み込み、追加ルールとして適用\n+\n+2. **@agent-symbol-searcher でリファクタリング関連情報を検索し、見つかったファイルを読み込み**\n    - 既存のコードスタイルやベストプラクティスを検索し、スタイルガイドをReadツールで読み込み\n    - プロジェクト全体のアーキテクチャパターンを特定し、設計文書をReadツールで読み込み\n    - 再利用可能なユーティリティ関数やコンポーネントを確認し、関連ファイルをReadツールで読み込み\n \n-2. **関連ファイルを直接読み込み**\n+3. **関連ファイルを直接読み込み**\n    - `docs/implements/{{task_id}}/{feature_name}-memo.md` - 既存の開発履歴を確認\n    - `docs/implements/{{task_id}}/{feature_name}-requirements.md` - 要件定義を確認\n    - `docs/implements/{{task_id}}/{feature_name}-testcases.md` - テストケース定義を確認\ndiff --git a/commands/tdd-requirements.md b/commands/tdd-requirements.md\nindex 21da8c9..200cf79 100644\n--- a/commands/tdd-requirements.md\n+++ b/commands/tdd-requirements.md\n@@ -12,18 +12,24 @@ TDD開発を始めます。以下の機能について要件を整理してく\n \n 開発コンテキストの準備を行います：\n \n-1. **技術スタック定義の読み込み**\n+1. **追加ルールの読み込み**\n+   - `docs/rule` ディレクトリが存在する場合は読み込み\n+   - `docs/rule/tdd` ディレクトリが存在する場合は読み込み  \n+   - `docs/rule/tdd/requirements` ディレクトリが存在する場合は読み込み\n+   - 各ディレクトリ内のすべてのファイルを読み込み、追加ルールとして適用\n+\n+2. **技術スタック定義の読み込み**\n    - `docs/tech-stack.md` が存在する場合は読み込み\n    - 存在しない場合は `CLAUDE.md` から技術スタックセクションを読み込み  \n    - どちらも存在しない場合は `.claude/commands/tech-stack.md` のデフォルト定義を使用\n \n-2. **@agent-symbol-searcher で機能関連情報を検索し、見つかったファイルを読み込み**\n+3. **@agent-symbol-searcher で機能関連情報を検索し、見つかったファイルを読み込み**\n    - 読み込んだ技術スタック定義に基づいて関連ファイルを検索\n    - 関連する既存機能・コンポーネントを検索し、該当ファイルをReadツールで読み込み\n    - 類似した実装パターンやアーキテクチャを特定し、設計文書をReadツールで読み込み\n    - 既存のインターフェースやAPI仕様を確認し、関連ファイルをReadツールで読み込み\n \n-3. **関連ファイルを直接読み込み**\n+4. **関連ファイルを直接読み込み**\n    - `docs/implements/{{task_id}}/{feature_name}-memo.md` - 既存の開発履歴を確認\n    - `docs/implements/{{task_id}}/{feature_name}-requirements.md` - 既存の要件定義を確認\n    - `docs/implements/{{task_id}}/{feature_name}-testcases.md` - 既存のテストケースを確認\ndiff --git a/commands/tdd-testcases.md b/commands/tdd-testcases.md\nindex 7b4a0e2..5103fb2 100644\n--- a/commands/tdd-testcases.md\n+++ b/commands/tdd-testcases.md\n@@ -10,12 +10,18 @@ description: TDD開発のためのテストケース洗い出しを行います\n \n 開発コンテキストの準備を行います：\n \n-1. **@agent-symbol-searcher でテスト関連情報を検索し、見つかったファイルを読み込み**\n+1. **追加ルールの読み込み**\n+   - `docs/rule` ディレクトリが存在する場合は読み込み\n+   - `docs/rule/tdd` ディレクトリが存在する場合は読み込み  \n+   - `docs/rule/tdd/testcases` ディレクトリが存在する場合は読み込み\n+   - 各ディレクトリ内のすべてのファイルを読み込み、追加ルールとして適用\n+\n+2. **@agent-symbol-searcher でテスト関連情報を検索し、見つかったファイルを読み込み**\n    - 既存のテストパターンやテストケースを検索し、該当テストファイルをReadツールで読み込み\n    - 類似機能のテスト方法やモック戦略を特定し、関連ファイルをReadツールで読み込み\n    - テストフレームワークの使用方法を確認し、設定ファイルをReadツールで読み込み\n \n-2. **関連ファイルを直接読み込み**\n+3. **関連ファイルを直接読み込み**\n    - `docs/implements/{{task_id}}/{feature_name}-memo.md` - 既存の開発履歴を確認\n    - `docs/implements/{{task_id}}/{feature_name}-requirements.md` - 要件定義を確認\n    - `docs/implements/{{task_id}}/{feature_name}-testcases.md` - 既存のテストケースを確認\ndiff --git a/commands/tdd-todo.md b/commands/tdd-todo.md\nindex c57bba7..9b6dae8 100644\n--- a/commands/tdd-todo.md\n+++ b/commands/tdd-todo.md\n@@ -19,14 +19,20 @@ description: タスクファイルから実装可能なTODOリストを作成し\n \n ## 作成手順\n \n-1. **要件定義文書の分析**\n+1. **追加ルールの読み込み**\n+   - `docs/rule` ディレクトリが存在する場合は読み込み\n+   - `docs/rule/tdd` ディレクトリが存在する場合は読み込み  \n+   - `docs/rule/tdd/todo` ディレクトリが存在する場合は読み込み\n+   - 各ディレクトリ内のすべてのファイルを読み込み、追加ルールとして適用\n+\n+2. **要件定義文書の分析**\n    - @agent-symbol-searcher で関連要件・設計文書を検索\n    - EARS記法による要件の理解\n    - ユーザストーリーと価値の把握\n    - 機能要件と非機能要件の確認\n    - Edgeケースと受け入れ基準の理解\n \n-2. **設計文書の分析**\n+3. **設計文書の分析**\n    - @agent-symbol-searcher で既存アーキテクチャパターンを検索\n    - アーキテクチャ設計の全体像を把握\n    - データベーススキーマの構造を理解\n@@ -34,14 +40,14 @@ description: タスクファイルから実装可能なTODOリストを作成し\n    - インターフェース定義を分析\n    - データフローの設計を理解\n \n-3. **タスクファイルの分析**\n+4. **タスクファイルの分析**\n    - @agent-symbol-searcher で関連タスクIDや完了状態を検索\n    - 全体のフェーズ構造を把握\n    - タスクID別の実装内容を確認\n    - 依存関係と実行順序を理解\n    - 要件定義と設計文書との整合性を確認\n \n-4. **TODO作成時の注意点**\n+5. **TODO作成時の注意点**\n    - タスクIDを保持してトレーサビリティを確保\n    - 依存関係を考慮した順序付け\n    - 各タスクの完了条件を明確化\n@@ -56,7 +62,7 @@ description: タスクファイルから実装可能なTODOリストを作成し\n      - **DIRECT**: 設定作業のみ（環境構築、設定ファイル、依存関係など）\n      - **TDD**: 仕様に合わせた実装を伴う作業（ビジネスロジック、API実装、UI実装など）\n \n-5. **出力形式**\n+6. **出力形式**\n \n ```markdown\n # {要件名} 実装TODO\ndiff --git a/commands/tdd-verify-complete.md b/commands/tdd-verify-complete.md\nindex 7d90f2b..24b044f 100644\n--- a/commands/tdd-verify-complete.md\n+++ b/commands/tdd-verify-complete.md\n@@ -34,12 +34,18 @@ TDD開発でテストケースの実装が完全に完了しているかを検\n \n 検証コンテキストの準備を行います：\n \n-1. **@agent-symbol-searcher で検証関連情報を検索し、見つかったファイルを読み込み**\n+1. **追加ルールの読み込み**\n+   - `docs/rule` ディレクトリが存在する場合は読み込み\n+   - `docs/rule/tdd` ディレクトリが存在する場合は読み込み  \n+   - `docs/rule/tdd/verify-complete` ディレクトリが存在する場合は読み込み\n+   - 各ディレクトリ内のすべてのファイルを読み込み、追加ルールとして適用\n+\n+2. **@agent-symbol-searcher で検証関連情報を検索し、見つかったファイルを読み込み**\n    - 完了予定のテストケースや機能を検索し、該当ファイルをReadツールで読み込み\n    - 既存のテストカバレッジや品質基準を確認し、関連ファイルをReadツールで読み込み\n    - 実装完了タスクのマーキングパターンを特定し、タスクファイルをReadツールで読み込み\n \n-2. **関連ファイルを直接読み込み**\n+3. **関連ファイルを直接読み込み**\n    - `docs/implements/{{task_id}}/{feature_name}-memo.md` - 既存の開発履歴を確認\n    - `docs/implements/{{task_id}}/{feature_name}-requirements.md` - 要件定義を確認\n    - `docs/implements/{{task_id}}/{feature_name}-testcases.md` - テストケース定義を確認\n",
+  "diffTruncated": false,
+  "tree": [
+    ".claude/commands/release.yml",
+    ".devcontainer/Dockerfile",
+    ".devcontainer/devcontainer.json",
+    ".github/ISSUE_TEMPLATE/bug_report.md",
+    ".github/workflows/ci.yml",
+    ".github/workflows/release.yml",
+    ".gitignore",
+    ".npmrc",
+    ".secretlintrc.json",
+    "CLAUDE.md",
+    "CONTRIBUTING.md",
+    "LICENSE",
+    "MANUAL.md",
+    "README.md",
+    "agents/symbol-searcher.md",
+    "biome.json",
+    "book/01-fundamentals/01-aitdd-definition.md",
+    "book/02-environment/01-tools-setup.md",
+    "book/02-environment/02-claude-usage.md",
+    "book/02-environment/03-workflow-setup.md",
+    "book/03-process/01-extended-tdd-flow.md",
+    "book/03-process/02-todo-and-specification.md",
+    "book/03-process/03-test-case-creation.md",
+    "book/03-process/04-rgr-validation-cycle.md",
+    "book/03-process/05-validation-details.md",
+    "book/04-hands-on/01-first-project.md",
+    "book/04-hands-on/02-crud-example.md",
+    "book/04-hands-on/03-api-development.md",
+    "book/04-hands-on/04-error-handling.md",
+    "book/05-optimization/01-prompt-design.md",
+    "book/05-optimization/02-ai-inference-visualization.md",
+    "book/05-optimization/03-continuous-improvement.md",
+    "book/06-collaboration/01-balance-strategy.md",
+    "book/06-collaboration/02-creativity-points.md",
+    "book/06-collaboration/03-review-quality.md",
+    "book/07-case-studies/01-experimental-results.md",
+    "book/07-case-studies/02-evolution-case.md",
+    "book/07-case-studies/03-failure-cases.md",
+    "book/08-best-practices/01-tech-selection.md",
+    "book/08-best-practices/02-documentation.md",
+    "book/08-best-practices/03-future-vision.md",
+    "book/aitdd-getting-started.md",
+    "book/toc.md",
+    "commands/auto-debug.md",
+    "commands/direct-setup.md",
+    "commands/direct-verify.md",
+    "commands/init-tech-stack.md",
+    "commands/kairo-design.md",
+    "commands/kairo-implement.md",
+    "commands/kairo-requirements.md",
+    "commands/kairo-task-verify.md",
+    "commands/kairo-tasks.md",
+    "commands/rev-design.md",
+    "commands/rev-requirements.md",
+    "commands/rev-specs.md",
+    "commands/rev-tasks.md",
+    "commands/start-server.md",
+    "commands/tdd-cycle-full.sh",
+    "commands/tdd-green.md",
+    "commands/tdd-load-context.md",
+    "commands/tdd-red.md",
+    "commands/tdd-refactor.md",
+    "commands/tdd-requirements.md",
+    "commands/tdd-testcases.md",
+    "commands/tdd-todo.md",
+    "commands/tdd-verify-complete.md",
+    "commands/tech-stack.md",
+    "mise.toml",
+    "package.json",
+    "src/cli.ts",
+    "src/commands/gitignore.tsx",
+    "src/commands/install.tsx",
+    "src/commands/uninstall.tsx",
+    "tsconfig.json",
+    "tsup.config.ts"
+  ],
+  "explanation": {
+    "what": "MANUAL.md と README.md を更新し、direct-setup.md / direct-verify.md / kairo-design.md / kairo-implement.md / kairo-requirements.md / kairo-task-verify.md / kairo-tasks.md / tdd-green.md / tdd-red.md / tdd-refactor.md / tdd-requirements.md / tdd-testcases.md / tdd-todo.md / tdd-verify-complete.md の計16ファイルを修正した。コミットメッセージの通り、各コマンドに追加ルールの読込処理を組み込み、それに合わせてドキュメントを更新している。",
+    "why": "PR #30(多環境への対応力向上)の一部。前コミットで導入した init-tech-stack.md によるデフォルト技術スタック定義を、各TDD/kairoコマンドが実行時に読み込むよう追加ルールとして組み込む作業と見られる。",
+    "highlights": [],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [{ "type": "pr", "number": 30, "url": "https://github.com/classmethod/tsumiki/pull/30" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-08-04T00:00:00Z"
+  }
+}

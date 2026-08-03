@@ -1,0 +1,115 @@
+{
+  "seq": 52,
+  "sha": "2143f48f03ad0a5ff5ca34eb9b883aa07496ea9e",
+  "parents": [
+    "13cb1d03e31dab46f5565c7e9ad9602e844d89fa"
+  ],
+  "author": {
+    "name": "dyoshikawa",
+    "email": "dyoshikawa1993@gmail.com",
+    "date": "2025-07-30T17:44:39+09:00"
+  },
+  "message": "Add CLAUDE.md for project documentation and guidance",
+  "pr": {
+    "number": 15,
+    "title": "Node.js製のTsumikiインストールコマンドを追加",
+    "body": "提案&実装です。\r\n\r\n現状、導入やアップデートは手動のコピーしか手段がない（と思う）ため、インストール用のCLIを提案します。\r\n\r\nCLIの使い心地を確認してもらえるように、暫定的にnpmレジストリに `@dyoshikawa/tsumiki` として登録しています。\r\n\r\n```bash\r\n# 使い方\r\n\r\n# インストール\r\nnpx @dyoshikawa/tsumiki install\r\n\r\n# アンインストール\r\nnpx @dyoshikawa/tsumiki uninstall\r\n\r\n# .gitignoreにtsumikiコマンドを登録\r\nnpx @dyoshikawa/tsumiki gitignore\r\n```\r\n\r\nNode.jsを選定したのは以下の理由です。\r\n\r\n- Claude CodeもNode.js製なので、ランタイムを統一することで一緒に導入しやすくなる\r\n  - 例: `npm i -g @anthropic-ai/claude-code @classmethod/tsumiki`\r\n- 社内にNode.js開発者が多いので、コミットしやすそう",
+    "url": "https://github.com/classmethod/tsumiki/pull/15"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 67,
+    "deletions": 0
+  },
+  "files": [
+    {
+      "path": "CLAUDE.md",
+      "status": "A",
+      "additions": 67,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/CLAUDE.md b/CLAUDE.md\nnew file mode 100644\nindex 0000000..3d823a8\n--- /dev/null\n+++ b/CLAUDE.md\n@@ -0,0 +1,67 @@\n+# CLAUDE.md\n+\n+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.\n+\n+## 概要\n+\n+TsumikiはAI駆動開発フレームワークのコマンドテンプレートを提供するCLIツールです。このプロジェクトはTypeScript + ReactをInkで構成されたCLIアプリケーションで、Claude Code用のコマンドテンプレートをユーザーの`.claude/commands/`ディレクトリにインストールします。\n+\n+## 開発コマンド\n+\n+```bash\n+# 開発環境\n+pnpm install                # 依存関係のインストール\n+\n+# ビルド\n+pnpm build                  # プロジェクトをビルドし、commandsディレクトリをdist/にコピー\n+pnpm build:run              # ビルド後、CLI実行（テスト用）\n+\n+# コード品質\n+pnpm check                  # Biomeでコードチェック\n+pnpm fix                    # Biomeで自動修正\n+pnpm typecheck              # TypeScriptの型チェック（tsgoを使用）\n+pnpm secretlint             # シークレット情報の検査\n+\n+# pre-commitフック\n+pnpm prepare                # simple-git-hooksのセットアップ\n+```\n+\n+## プロジェクト構造\n+\n+- **`src/cli.ts`**: CLIエントリーポイント、commanderを使用してコマンド定義\n+- **`src/commands/install.tsx`**: React + Inkを使用したインストールコマンドのUI実装\n+- **`commands/`**: TsumikiのAI開発フレームワーク用Claude Codeコマンドテンプレート（`.md`と`.sh`ファイル）\n+- **`dist/`**: ビルド出力、`dist/commands/`にテンプレートがコピーされる\n+\n+## 技術スタック\n+\n+- **CLI Framework**: Commander.js\n+- **UI Framework**: React + Ink（CLIでのReactレンダリング）\n+- **Build Tool**: tsup（TypeScript + ESBuildベース）\n+- **Code Quality**: Biome（リンタ・フォーマッタ）\n+- **TypeScript**: tsgo（高速型チェック）\n+- **Package Manager**: pnpm\n+\n+## ビルドプロセス\n+\n+ビルド時（`pnpm build`）は以下の処理が実行されます：\n+1. `dist`ディレクトリをクリーンアップ\n+2. `dist/commands`ディレクトリを作成\n+3. `commands/`内の`.md`と`.sh`ファイルを`dist/commands/`にコピー\n+4. tsupでTypeScriptコードをESMとCJSの両形式でビルド\n+\n+## インストール動作\n+\n+`tsumiki install`コマンドは以下を実行します：\n+1. 現在のディレクトリに`.claude/commands/`ディレクトリを作成\n+2. ビルド済みの`dist/commands/`から全ての`.md`と`.sh`ファイルをコピー\n+3. React + Inkでプログレス表示とファイル一覧を表示\n+\n+## 品質管理\n+\n+Pre-commitフックで以下が自動実行されます：\n+- `pnpm secretlint`: 機密情報のチェック\n+- `pnpm typecheck`: 型チェック\n+- `pnpm fix`: コードの自動修正\n+\n+コード修正時は必ず`pnpm check`と`pnpm typecheck`を実行してからコミットしてください。\n\\ No newline at end of file\n",
+  "diffTruncated": false,
+  "tree": [
+    ".gitignore",
+    ".npmrc",
+    ".secretlintrc.json",
+    "CLAUDE.md",
+    "LICENSE",
+    "MANUAL.md",
+    "README.md",
+    "biome.json",
+    "book/01-fundamentals/01-aitdd-definition.md",
+    "book/02-environment/01-tools-setup.md",
+    "book/02-environment/02-claude-usage.md",
+    "book/02-environment/03-workflow-setup.md",
+    "book/03-process/01-extended-tdd-flow.md",
+    "book/03-process/02-todo-and-specification.md",
+    "book/03-process/03-test-case-creation.md",
+    "book/03-process/04-rgr-validation-cycle.md",
+    "book/03-process/05-validation-details.md",
+    "book/04-hands-on/01-first-project.md",
+    "book/04-hands-on/02-crud-example.md",
+    "book/04-hands-on/03-api-development.md",
+    "book/04-hands-on/04-error-handling.md",
+    "book/05-optimization/01-prompt-design.md",
+    "book/05-optimization/02-ai-inference-visualization.md",
+    "book/05-optimization/03-continuous-improvement.md",
+    "book/06-collaboration/01-balance-strategy.md",
+    "book/06-collaboration/02-creativity-points.md",
+    "book/06-collaboration/03-review-quality.md",
+    "book/07-case-studies/01-experimental-results.md",
+    "book/07-case-studies/02-evolution-case.md",
+    "book/07-case-studies/03-failure-cases.md",
+    "book/08-best-practices/01-tech-selection.md",
+    "book/08-best-practices/02-documentation.md",
+    "book/08-best-practices/03-future-vision.md",
+    "book/aitdd-getting-started.md",
+    "book/toc.md",
+    "commands/direct-setup.md",
+    "commands/direct-verify.md",
+    "commands/kairo-design.md",
+    "commands/kairo-implement.md",
+    "commands/kairo-requirements.md",
+    "commands/kairo-task-verify.md",
+    "commands/kairo-tasks.md",
+    "commands/rev-design.md",
+    "commands/rev-requirements.md",
+    "commands/rev-specs.md",
+    "commands/rev-tasks.md",
+    "commands/start-server.md",
+    "commands/tdd-cycle-full.sh",
+    "commands/tdd-green.md",
+    "commands/tdd-load-context.md",
+    "commands/tdd-red.md",
+    "commands/tdd-refactor.md",
+    "commands/tdd-requirements.md",
+    "commands/tdd-testcases.md",
+    "commands/tdd-todo.md",
+    "commands/tdd-verify-complete.md",
+    "mise.toml",
+    "package.json",
+    "src/cli.ts",
+    "src/commands/install.tsx",
+    "tsconfig.json",
+    "tsup.config.ts"
+  ],
+  "explanation": {
+    "what": "リポジトリルートに CLAUDE.md（67行）を新規追加した。内容は、このプロジェクト（CLI ツール Tsumiki）の概要、pnpm ベースの開発コマンド一覧（install/build/build:run/check/fix/typecheck/secretlint/prepare）、プロジェクト構造（src/cli.ts・src/commands/install.tsx・commands/・dist/）、技術スタック（Commander.js・React+Ink・tsup・Biome・tsgo・pnpm）、ビルドプロセスとインストール動作の説明、pre-commit フックでの品質管理手順をまとめている。",
+    "why": "PR body には言及がなく、おそらく Claude Code（claude.ai/code）向けにこのリポジトリの開発コマンドや構造をあらかじめ説明しておき、以降 Claude Code でこのプロジェクトを扱う際の文脈把握を助ける狙いだったと推測される。",
+    "highlights": [
+      { "file": "CLAUDE.md", "note": "Tsumiki 自身は Claude Code 用コマンドを配布するツールだが、Tsumiki のリポジトリ自体にも Claude Code 向けの CLAUDE.md が置かれている" }
+    ],
+    "langNotes": [
+      { "topic": "CLAUDE.md", "note": "Claude Code がリポジトリを開いた際に自動で読み込むガイド用ファイル。ビルド・テストコマンドやディレクトリ構成、開発時の注意点を書いておくと、以降のセッションで毎回説明し直す必要がなくなる。" }
+    ],
+    "diagram": null,
+    "evidence": "inferred",
+    "refs": [{ "type": "pr", "number": 15, "url": "https://github.com/classmethod/tsumiki/pull/15" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-08-04T00:00:00Z"
+  }
+}

@@ -1,0 +1,135 @@
+{
+  "seq": 56,
+  "sha": "c89329d32c81af4b828fc7d8dea677a0f393087a",
+  "parents": [
+    "272dc34eac06afb26234a4add2bcba10e8e5a97d"
+  ],
+  "author": {
+    "name": "dyoshikawa",
+    "email": "dyoshikawa1993@gmail.com",
+    "date": "2025-07-30T17:56:27+09:00"
+  },
+  "message": "feat: add Dockerfile and devcontainer.json for development environment setup",
+  "pr": {
+    "number": 15,
+    "title": "Node.js製のTsumikiインストールコマンドを追加",
+    "body": "提案&実装です。\r\n\r\n現状、導入やアップデートは手動のコピーしか手段がない（と思う）ため、インストール用のCLIを提案します。\r\n\r\nCLIの使い心地を確認してもらえるように、暫定的にnpmレジストリに `@dyoshikawa/tsumiki` として登録しています。\r\n\r\n```bash\r\n# 使い方\r\n\r\n# インストール\r\nnpx @dyoshikawa/tsumiki install\r\n\r\n# アンインストール\r\nnpx @dyoshikawa/tsumiki uninstall\r\n\r\n# .gitignoreにtsumikiコマンドを登録\r\nnpx @dyoshikawa/tsumiki gitignore\r\n```\r\n\r\nNode.jsを選定したのは以下の理由です。\r\n\r\n- Claude CodeもNode.js製なので、ランタイムを統一することで一緒に導入しやすくなる\r\n  - 例: `npm i -g @anthropic-ai/claude-code @classmethod/tsumiki`\r\n- 社内にNode.js開発者が多いので、コミットしやすそう",
+    "url": "https://github.com/classmethod/tsumiki/pull/15"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 3,
+    "additions": 324,
+    "deletions": 0
+  },
+  "files": [
+    {
+      "path": ".devcontainer/Dockerfile",
+      "status": "A",
+      "additions": 81,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": ".devcontainer/devcontainer.json",
+      "status": "A",
+      "additions": 48,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "CONTRIBUTING.md",
+      "status": "A",
+      "additions": 195,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/.devcontainer/Dockerfile b/.devcontainer/Dockerfile\nnew file mode 100644\nindex 0000000..af6c7d4\n--- /dev/null\n+++ b/.devcontainer/Dockerfile\n@@ -0,0 +1,81 @@\n+FROM node:20\n+\n+ARG TZ\n+ENV TZ=\"$TZ\"\n+\n+# Install basic development tools and iptables/ipset\n+RUN apt update && apt install -y less \\\n+    git \\\n+    procps \\\n+    sudo \\\n+    fzf \\\n+    zsh \\\n+    man-db \\\n+    unzip \\\n+    gnupg2 \\\n+    gh \\\n+    iptables \\\n+    ipset \\\n+    iproute2 \\\n+    dnsutils \\\n+    aggregate \\\n+    jq \\\n+    vim\n+\n+# Ensure default node user has access to /usr/local/share\n+RUN mkdir -p /usr/local/share/npm-global && \\\n+    chown -R node:node /usr/local/share\n+\n+ARG USERNAME=node\n+\n+RUN echo \"node ALL=(ALL) NOPASSWD:ALL\" >> /etc/sudoers\n+\n+# Persist bash history.\n+RUN SNIPPET=\"export PROMPT_COMMAND='history -a' && export HISTFILE=/commandhistory/.bash_history\" \\\n+    && mkdir /commandhistory \\\n+    && touch /commandhistory/.bash_history \\\n+    && chown -R $USERNAME /commandhistory\n+\n+# Set `DEVCONTAINER` environment variable to help with orientation\n+ENV DEVCONTAINER=true\n+\n+# Create workspace and config directories and set permissions\n+RUN mkdir -p /workspace /home/node/.claude && \\\n+    chown -R node:node /workspace /home/node/.claude\n+\n+WORKDIR /workspace\n+\n+RUN ARCH=$(dpkg --print-architecture) && \\\n+    wget \"https://github.com/dandavison/delta/releases/download/0.18.2/git-delta_0.18.2_${ARCH}.deb\" && \\\n+    sudo dpkg -i \"git-delta_0.18.2_${ARCH}.deb\" && \\\n+    rm \"git-delta_0.18.2_${ARCH}.deb\"\n+\n+# Set up non-root user\n+USER node\n+\n+# Rust and similarity-ts install\n+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y\n+RUN ~/.cargo/bin/cargo install similarity-ts\n+\n+# Install global packages\n+ENV NPM_CONFIG_PREFIX=/usr/local/share/npm-global\n+ENV PATH=$PATH:/usr/local/share/npm-global/bin\n+\n+# Set the default shell to zsh rather than sh\n+ENV SHELL=/bin/zsh\n+\n+# Default powerline10k theme\n+RUN sh -c \"$(wget -O- https://github.com/deluan/zsh-in-docker/releases/download/v1.2.0/zsh-in-docker.sh)\" -- \\\n+    -p git \\\n+    -p fzf \\\n+    -a \"source /usr/share/doc/fzf/examples/key-bindings.zsh\" \\\n+    -a \"source /usr/share/doc/fzf/examples/completion.zsh\" \\\n+    -a \"export PROMPT_COMMAND='history -a' && export HISTFILE=/commandhistory/.bash_history\" \\\n+    -x\n+\n+### Customize ###\n+\n+# Install mise\n+RUN curl https://mise.run | sh\n+RUN echo \"eval \\\"\\$(/home/node/.local/bin/mise activate zsh)\\\"\" >> \"/home/node/.zshrc\"\n+RUN echo \"alias ccinstall=\\\"npm install -g @anthropic-ai/claude-code\\\"\" >> \"/home/node/.zshrc\"\ndiff --git a/.devcontainer/devcontainer.json b/.devcontainer/devcontainer.json\nnew file mode 100644\nindex 0000000..8043394\n--- /dev/null\n+++ b/.devcontainer/devcontainer.json\n@@ -0,0 +1,48 @@\n+{\n+  \"name\": \"Claude Code Sandbox\",\n+  \"build\": {\n+    \"dockerfile\": \"Dockerfile\",\n+    \"args\": {\n+      \"TZ\": \"${localEnv:TZ:America/Los_Angeles}\"\n+    }\n+  },\n+  \"runArgs\": [\"--cap-add=NET_ADMIN\", \"--cap-add=NET_RAW\"],\n+  \"customizations\": {\n+    \"vscode\": {\n+      \"extensions\": [\n+        \"eamodio.gitlens\",\n+        \"biomejs.biome\"\n+      ],\n+      \"settings\": {\n+        \"editor.formatOnSave\": true,\n+        \"editor.defaultFormatter\": \"biomejs.biome\",\n+        \"editor.codeActionsOnSave\": {\n+          \"source.fixAll.eslint\": \"explicit\"\n+        },\n+        \"terminal.integrated.defaultProfile.linux\": \"zsh\",\n+        \"terminal.integrated.profiles.linux\": {\n+          \"bash\": {\n+            \"path\": \"bash\",\n+            \"icon\": \"terminal-bash\"\n+          },\n+          \"zsh\": {\n+            \"path\": \"zsh\"\n+          }\n+        }\n+      }\n+    }\n+  },\n+  \"remoteUser\": \"node\",\n+  \"mounts\": [\n+    \"source=claude-code-bashhistory-${devcontainerId},target=/commandhistory,type=volume\",\n+    \"source=claude-code-config-${devcontainerId},target=/home/node/.claude,type=volume\"\n+  ],\n+  \"remoteEnv\": {\n+    \"NODE_OPTIONS\": \"--max-old-space-size=4096\",\n+    \"CLAUDE_CONFIG_DIR\": \"/home/node/.claude\",\n+    \"POWERLEVEL9K_DISABLE_GITSTATUS\": \"true\",\n+    \"GITHUB_TOKEN\": \"${localEnv:DEVCONTAINER_GITHUB_TOKEN}\"\n+  },\n+  \"workspaceMount\": \"source=${localWorkspaceFolder},target=/workspace,type=bind,consistency=delegated\",\n+  \"workspaceFolder\": \"/workspace\"\n+}\ndiff --git a/CONTRIBUTING.md b/CONTRIBUTING.md\nnew file mode 100644\nindex 0000000..1a925f1\n--- /dev/null\n+++ b/CONTRIBUTING.md\n@@ -0,0 +1,195 @@\n+# コントリビューションガイド\n+\n+Tsumikiプロジェクトへのコントリビューションをありがとうございます！このガイドでは、プロジェクトに貢献する方法について説明します。\n+\n+## 開発環境のセットアップ\n+\n+### 必要な環境\n+\n+- Node.js 18.0.0以上\n+- pnpm 10.13.1以上\n+\n+### セットアップ手順\n+\n+1. リポジトリをフォークしてクローンします：\n+\n+```bash\n+git clone https://github.com/YOUR_USERNAME/tsumiki.git\n+cd tsumiki\n+```\n+\n+2. 依存関係をインストールします：\n+\n+```bash\n+pnpm install\n+```\n+\n+3. pre-commitフックをセットアップします：\n+\n+```bash\n+pnpm prepare\n+```\n+\n+## 開発ワークフロー\n+\n+### ブランチ戦略\n+\n+- `main`ブランチ：安定版のコード\n+- 機能開発：`feature/機能名`\n+- バグ修正：`bugfix/バグ名`\n+- ホットフィックス：`hotfix/修正内容`\n+\n+### 開発手順\n+\n+1. 新しいブランチを作成します：\n+\n+```bash\n+git checkout -b feature/your-feature-name\n+```\n+\n+2. コードを変更します\n+\n+3. コード品質チェックを実行します：\n+\n+```bash\n+# 型チェック\n+pnpm typecheck\n+\n+# コードチェック\n+pnpm check\n+\n+# 自動修正\n+pnpm fix\n+\n+# 機密情報チェック\n+pnpm secretlint\n+```\n+\n+4. ビルドテストを実行します：\n+\n+```bash\n+pnpm build:run\n+```\n+\n+5. 変更をコミットします：\n+\n+```bash\n+git add .\n+git commit -m \"feat: 新機能の追加\"\n+```\n+\n+## コミットメッセージ規約\n+\n+[Conventional Commits](https://www.conventionalcommits.org/)形式を使用してください：\n+\n+- `feat:` 新機能\n+- `fix:` バグ修正\n+- `docs:` ドキュメント変更\n+- `style:` コードスタイル変更（機能に影響しない）\n+- `refactor:` リファクタリング\n+- `test:` テスト追加・修正\n+- `chore:` ビルドプロセスやツール変更\n+\n+例：\n+```\n+feat: add new install command for .sh files\n+fix: resolve path handling issue in install command\n+docs: update README with new command examples\n+```\n+\n+## コード品質基準\n+\n+### 自動チェック\n+\n+Pre-commitフックで以下が自動実行されます：\n+\n+- **secretlint**: 機密情報（APIキー、パスワードなど）の混入チェック\n+- **typecheck**: TypeScriptの型チェック\n+- **fix**: Biomeによるコードの自動修正\n+\n+### 手動チェック\n+\n+変更前に以下のコマンドを実行してください：\n+\n+```bash\n+# 全てのチェックを実行\n+pnpm typecheck && pnpm check && pnpm secretlint\n+\n+# コードの自動修正\n+pnpm fix\n+```\n+\n+## プロジェクト構造\n+\n+```\n+tsumiki/\n+├── src/\n+│   ├── cli.ts              # CLIエントリーポイント\n+│   └── commands/\n+│       └── install.tsx     # インストールコマンドのUI実装\n+├── commands/               # コマンドテンプレート（.md, .sh）\n+├── dist/                  # ビルド出力\n+├── package.json\n+├── CLAUDE.md              # プロジェクト指示書\n+└── README.md\n+```\n+\n+## プルリクエスト\n+\n+### プルリクエストの作成\n+\n+1. 変更をプッシュします：\n+\n+```bash\n+git push origin feature/your-feature-name\n+```\n+\n+2. GitHubでプルリクエストを作成します\n+\n+3. プルリクエストテンプレートに従って説明を記載します\n+\n+### プルリクエストの要件\n+\n+- [ ] 変更内容が明確に説明されている\n+- [ ] 関連するIssueがリンクされている（該当する場合）\n+- [ ] コード品質チェックが通っている\n+- [ ] ビルドが成功している\n+- [ ] 機密情報が含まれていない\n+\n+## Issue報告\n+\n+バグ報告や機能要望は[Issues](https://github.com/classmethod/tsumiki/issues)で受け付けています。\n+\n+### バグ報告\n+\n+以下の情報を含めてください：\n+\n+- 再現手順\n+- 期待される動作\n+- 実際の動作\n+- 環境情報（OS、Node.jsバージョンなど）\n+- エラーメッセージ（該当する場合）\n+\n+### 機能要望\n+\n+以下の情報を含めてください：\n+\n+- 提案する機能の説明\n+- ユースケース\n+- 期待される利益\n+- 実装案（あれば）\n+\n+## セキュリティ\n+\n+セキュリティに関する問題を発見した場合は、公開のIssueではなく、プライベートに報告してください。\n+\n+## ライセンス\n+\n+このプロジェクトはMITライセンスの下で公開されています。コントリビューションする際は、このライセンスに同意したものとみなされます。\n+\n+## 質問・サポート\n+\n+- [Issues](https://github.com/classmethod/tsumiki/issues) - バグ報告、機能要望\n+- [Discussions](https://github.com/classmethod/tsumiki/discussions) - 質問、議論\n+\n+コントリビューションをお待ちしています！\n\\ No newline at end of file\n",
+  "diffTruncated": false,
+  "tree": [
+    ".devcontainer/Dockerfile",
+    ".devcontainer/devcontainer.json",
+    ".gitignore",
+    ".npmrc",
+    ".secretlintrc.json",
+    "CLAUDE.md",
+    "CONTRIBUTING.md",
+    "LICENSE",
+    "MANUAL.md",
+    "README.md",
+    "biome.json",
+    "book/01-fundamentals/01-aitdd-definition.md",
+    "book/02-environment/01-tools-setup.md",
+    "book/02-environment/02-claude-usage.md",
+    "book/02-environment/03-workflow-setup.md",
+    "book/03-process/01-extended-tdd-flow.md",
+    "book/03-process/02-todo-and-specification.md",
+    "book/03-process/03-test-case-creation.md",
+    "book/03-process/04-rgr-validation-cycle.md",
+    "book/03-process/05-validation-details.md",
+    "book/04-hands-on/01-first-project.md",
+    "book/04-hands-on/02-crud-example.md",
+    "book/04-hands-on/03-api-development.md",
+    "book/04-hands-on/04-error-handling.md",
+    "book/05-optimization/01-prompt-design.md",
+    "book/05-optimization/02-ai-inference-visualization.md",
+    "book/05-optimization/03-continuous-improvement.md",
+    "book/06-collaboration/01-balance-strategy.md",
+    "book/06-collaboration/02-creativity-points.md",
+    "book/06-collaboration/03-review-quality.md",
+    "book/07-case-studies/01-experimental-results.md",
+    "book/07-case-studies/02-evolution-case.md",
+    "book/07-case-studies/03-failure-cases.md",
+    "book/08-best-practices/01-tech-selection.md",
+    "book/08-best-practices/02-documentation.md",
+    "book/08-best-practices/03-future-vision.md",
+    "book/aitdd-getting-started.md",
+    "book/toc.md",
+    "commands/direct-setup.md",
+    "commands/direct-verify.md",
+    "commands/kairo-design.md",
+    "commands/kairo-implement.md",
+    "commands/kairo-requirements.md",
+    "commands/kairo-task-verify.md",
+    "commands/kairo-tasks.md",
+    "commands/rev-design.md",
+    "commands/rev-requirements.md",
+    "commands/rev-specs.md",
+    "commands/rev-tasks.md",
+    "commands/start-server.md",
+    "commands/tdd-cycle-full.sh",
+    "commands/tdd-green.md",
+    "commands/tdd-load-context.md",
+    "commands/tdd-red.md",
+    "commands/tdd-refactor.md",
+    "commands/tdd-requirements.md",
+    "commands/tdd-testcases.md",
+    "commands/tdd-todo.md",
+    "commands/tdd-verify-complete.md",
+    "mise.toml",
+    "package.json",
+    "src/cli.ts",
+    "src/commands/gitignore.tsx",
+    "src/commands/install.tsx",
+    "src/commands/uninstall.tsx",
+    "tsconfig.json",
+    "tsup.config.ts"
+  ],
+  "explanation": {
+    "what": ".devcontainer/Dockerfile と .devcontainer/devcontainer.json を新規追加し、Claude Code を使った開発をコンテナ内で行える環境を整備した。あわせて CONTRIBUTING.md を追加し、開発環境セットアップ手順・ブランチ戦略・コミットメッセージ規約(Conventional Commits)・コード品質基準・PRの出し方をまとめた。",
+    "why": "PR #15 は npx 経由でインストールできる Tsumiki 用 CLI(install/uninstall/gitignore コマンド)を追加する一連の作業で、このコミットはその中でパッケージング作業と並行して開発環境自体を整えるステップ。devcontainer は Node 20 ベースに git-delta・mise・zsh などを仕込んでおり、PR body で触れられている「Claude CodeもNode.js製なので、ランタイムを統一することで一緒に導入しやすくなる」という方針とも整合する開発体験の底上げにあたる。CONTRIBUTING.md の追加は、外部からのコントリビューションを見据えて開発フローを明文化したものと読み取れる。",
+    "highlights": [
+      { "file": ".devcontainer/devcontainer.json", "note": "Claude Code Sandbox という名前で、bash履歴とClaude設定をvolumeマウントし永続化している" },
+      { "file": "CONTRIBUTING.md", "note": "pnpm前提の開発フロー・コミット規約・PR要件がこの1コミットでまとめて定義されている" }
+    ],
+    "langNotes": [
+      { "topic": "devcontainer", "note": "VS Code / Claude Code の開発コンテナ定義。devcontainer.json でイメージのビルド方法・拡張機能・マウント・環境変数を宣言し、開発者間で同一の実行環境を再現できるようにする仕組み。" }
+    ],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [{ "type": "pr", "number": 15, "url": "https://github.com/classmethod/tsumiki/pull/15" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-08-04T00:00:00Z"
+  }
+}

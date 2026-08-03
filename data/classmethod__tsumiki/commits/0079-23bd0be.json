@@ -1,0 +1,153 @@
+{
+  "seq": 79,
+  "sha": "23bd0be0c71e8ab5ddc9da3c5699394bfe8d7a72",
+  "parents": [
+    "056e07d1bfce7e7aaaafdf4c24e6cac094ed0e1b",
+    "9035d35b013c9f9d7a543da4845c37cc7df3ad96"
+  ],
+  "author": {
+    "name": "cm-kuroeda",
+    "email": "kuroeda.makoto@classmethod.jp",
+    "date": "2025-08-19T10:38:53+09:00"
+  },
+  "message": "Merge pull request #25 from rimanem18/bugfix/kairo-implements-out-dir\n\nkairo-implement の出力先に影響が出ないように、出力フォーマットを修正",
+  "pr": {
+    "number": 25,
+    "title": "kairo-implement の出力先に影響が出ないように、出力フォーマットを修正",
+    "body": "- 関連: #23 \r\n\r\n上記 issue で tdd-* コマンドの出力先のほうが正しいと確認したため、変更を加えました。\r\n\r\n### 変更内容\r\n- `kairo-implement` のフォーマット例のファイル出力パスが一致していなかったため、出力フォーマット例を変更\r\n- MANUAL.md のディレクトリ構成も上記に従う形に変更\r\n\r\n### 気になったものの変更していないこと\r\n- `{TASK-ID}`,`{{task_id}}`, `{feature_name}`,`{要件名}` などの表記ゆれ\r\n- 出力フォーマット例で、タスク番号が3桁のものがあるが、kairo-tasks では4桁を出力するように指示されている\r\n",
+    "url": "https://github.com/classmethod/tsumiki/pull/25"
+  },
+  "linkedIssues": [
+    {
+      "number": 23,
+      "title": "kairo-implement と tdd-* で生成ファイルの保存先ディレクトリが異なる件について仕様を確認したい",
+      "body": "挙動に疑問があったため、仕様かどうか確認したいです。\n\n\n## 概要\n`kairo-implement` と `tdd-*` の個別実行でファイルの保存先が異なり、動作に差があります。\n\nプロンプトのまま受け取れば問題のない場所に保存されるのですが、保存場所の差異や、ディレクトリ名にTASK 番号が先にきている点などが、しっくりこなかったため、確認させていただきたく思いました。\n\n私の認識や扱い方に間違いがあれば、遠慮なくご指摘ください。\n\n### 抜粋\n[kairo-implement](https://github.com/classmethod/tsumiki/blob/main/commands/kairo-implement.md#%E5%90%84%E3%82%B9%E3%83%86%E3%83%83%E3%83%97%E5%AE%8C%E4%BA%86%E6%99%82tdd) のスラッシュコマンド抜粋\n>✅ Task 1/6: @task tdd-requirements 完了\n>  ファイル: /implementation/{要件名}/TASK-101/requirements.md\n\n[tdd-requirements](https://github.com/classmethod/tsumiki/blob/main/commands/tdd-requirements.md#5-ears%E8%A6%81%E4%BB%B6%E8%A8%AD%E8%A8%88%E6%96%87%E6%9B%B8%E3%81%A8%E3%81%AE%E5%AF%BE%E5%BF%9C%E9%96%A2%E4%BF%82) のスラッシュコマンド抜粋\n>要件定義書をdocs/implements/{{task_id}}/{feature_name}-requirements.mdに保存（既存ファイルがある場合は追記）\n\n### 再現手順\n1. `/kairo-requirements helloworld するmvp を開発したい`\n2. `/kairo-design mvp-helloworld`\n3. `/kairo-implement mvp-helloworld TASK-100`\n4. → implementation/ ディレクトリ生成・格納\n5. `/tdd-requirements mvp-helloworld TASK-200`\n6. `/tdd-testcases mvp-helloworld TASK-200`\n7. → implementation/ に格納されるときも、docs/implements/ に格納されるときもある\n\n### 現在の動作\n- `kairo-implement` を実施すると、implementation/{要件名}/{TASK-ID}/ というようなディレクトリに格納されていく\n- `tdd-requirements`, `tdd-testcases`,`tdd-red`, `tdd-green` のような個別実行だと、 docs/implements/{TASK-ID}/{要件名}/ というようなディレクトリに格納されていく\n\n### 期待する動作\n- `kairo-implement` と `tdd-*` の md ファイルがどちらも `docs/implementation/{要件名}/{TASK-ID}/` に格納される\n",
+      "url": "https://github.com/classmethod/tsumiki/issues/23"
+    }
+  ],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 3,
+    "deletions": 4
+  },
+  "files": [
+    {
+      "path": "MANUAL.md",
+      "status": "M",
+      "additions": 2,
+      "deletions": 3,
+      "binary": false
+    },
+    {
+      "path": "commands/kairo-implement.md",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/MANUAL.md b/MANUAL.md\nindex 0ffd289..d009b8c 100644\n--- a/MANUAL.md\n+++ b/MANUAL.md\n@@ -262,13 +262,12 @@ Kairoは各タスクに対して内部的にTDDコマンドを使用して以下\n ├── .claude/\n │   └── commands/           # Kairoコマンド\n ├── docs/\n+│   ├── implements/        # 実装コード\n+│   │   └── {タスクID}/\n │   ├── spec/              # 要件定義書\n │   ├── design/            # 設計文書\n │   ├── tasks/             # タスク一覧\n │   └── reverse/           # リバース文書\n-├── implementation/        # 実装コード\n-│   └── {要件名}/\n-│       └── {タスクID}/\n ├── backend/              # バックエンドコード\n ├── frontend/             # フロントエンドコード\n └── database/             # データベース関連\ndiff --git a/commands/kairo-implement.md b/commands/kairo-implement.md\nindex 06c5fe1..80316b5 100644\n--- a/commands/kairo-implement.md\n+++ b/commands/kairo-implement.md\n@@ -287,7 +287,7 @@ $ claude code kairo-implement --status\n \n ```\n ✅ Task 1/6: @task tdd-requirements 完了\n-   ファイル: /implementation/{要件名}/TASK-101/requirements.md\n+   ファイル: docs/implements/TASK-101/{要件名}-requirements.md\n    Task実行結果: 要件定義書作成完了\n \n 🏃 Task 2/6: @task tdd-testcases 実行中...\n",
+  "diffTruncated": false,
+  "tree": [
+    ".claude/commands/release.yml",
+    ".devcontainer/Dockerfile",
+    ".devcontainer/devcontainer.json",
+    ".github/ISSUE_TEMPLATE/bug_report.md",
+    ".github/workflows/ci.yml",
+    ".github/workflows/release.yml",
+    ".gitignore",
+    ".npmrc",
+    ".secretlintrc.json",
+    "CLAUDE.md",
+    "CONTRIBUTING.md",
+    "LICENSE",
+    "MANUAL.md",
+    "README.md",
+    "agents/symbol-searcher.md",
+    "biome.json",
+    "book/01-fundamentals/01-aitdd-definition.md",
+    "book/02-environment/01-tools-setup.md",
+    "book/02-environment/02-claude-usage.md",
+    "book/02-environment/03-workflow-setup.md",
+    "book/03-process/01-extended-tdd-flow.md",
+    "book/03-process/02-todo-and-specification.md",
+    "book/03-process/03-test-case-creation.md",
+    "book/03-process/04-rgr-validation-cycle.md",
+    "book/03-process/05-validation-details.md",
+    "book/04-hands-on/01-first-project.md",
+    "book/04-hands-on/02-crud-example.md",
+    "book/04-hands-on/03-api-development.md",
+    "book/04-hands-on/04-error-handling.md",
+    "book/05-optimization/01-prompt-design.md",
+    "book/05-optimization/02-ai-inference-visualization.md",
+    "book/05-optimization/03-continuous-improvement.md",
+    "book/06-collaboration/01-balance-strategy.md",
+    "book/06-collaboration/02-creativity-points.md",
+    "book/06-collaboration/03-review-quality.md",
+    "book/07-case-studies/01-experimental-results.md",
+    "book/07-case-studies/02-evolution-case.md",
+    "book/07-case-studies/03-failure-cases.md",
+    "book/08-best-practices/01-tech-selection.md",
+    "book/08-best-practices/02-documentation.md",
+    "book/08-best-practices/03-future-vision.md",
+    "book/aitdd-getting-started.md",
+    "book/toc.md",
+    "commands/auto-debug.md",
+    "commands/direct-setup.md",
+    "commands/direct-verify.md",
+    "commands/kairo-design.md",
+    "commands/kairo-implement.md",
+    "commands/kairo-requirements.md",
+    "commands/kairo-task-verify.md",
+    "commands/kairo-tasks.md",
+    "commands/rev-design.md",
+    "commands/rev-requirements.md",
+    "commands/rev-specs.md",
+    "commands/rev-tasks.md",
+    "commands/start-server.md",
+    "commands/tdd-cycle-full.sh",
+    "commands/tdd-green.md",
+    "commands/tdd-load-context.md",
+    "commands/tdd-red.md",
+    "commands/tdd-refactor.md",
+    "commands/tdd-requirements.md",
+    "commands/tdd-testcases.md",
+    "commands/tdd-todo.md",
+    "commands/tdd-verify-complete.md",
+    "mise.toml",
+    "package.json",
+    "src/cli.ts",
+    "src/commands/gitignore.tsx",
+    "src/commands/install.tsx",
+    "src/commands/uninstall.tsx",
+    "tsconfig.json",
+    "tsup.config.ts"
+  ],
+  "explanation": {
+    "what": "MANUAL.md と commands/kairo-implement.md の出力先パスの記述を修正した。MANUAL.md のディレクトリ構成図から `implementation/{要件名}/{タスクID}/` の行を削除し、`docs/implements/` 配下に実装コードが入る旨の1行を追加。kairo-implement.md の完了報告の出力例も `/implementation/{要件名}/TASK-101/requirements.md` から `docs/implements/TASK-101/{要件名}-requirements.md` に変更した。",
+    "why": "リンクされた issue #23 で、kairo-implement と tdd-* コマンドの生成ファイル保存先ディレクトリが食い違っている(implementation/{要件名}/{TASK-ID}/ と docs/implements/{TASK-ID}/{要件名}/ が混在)という仕様確認の指摘があった。PR本文には、issue での確認の結果 tdd-* コマンド側の出力先が正しいと分かったため、kairo-implement 側のドキュメント記述をそちらに合わせて修正した、とある。",
+    "highlights": [
+      {
+        "file": "commands/kairo-implement.md",
+        "note": "完了報告の出力パス例を tdd-* コマンド系の docs/implements/ 形式に統一"
+      }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "issue",
+    "refs": [
+      {
+        "type": "pr",
+        "number": 25,
+        "url": "https://github.com/classmethod/tsumiki/pull/25"
+      },
+      {
+        "type": "issue",
+        "number": 23,
+        "url": "https://github.com/classmethod/tsumiki/issues/23"
+      }
+    ],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-08-04T12:00:00Z"
+  }
+}

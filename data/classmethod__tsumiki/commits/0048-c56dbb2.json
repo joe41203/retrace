@@ -1,0 +1,119 @@
+{
+  "seq": 48,
+  "sha": "c56dbb2e1881071b9930d0f95be421cfcf7ca37e",
+  "parents": [
+    "fa991ae749aaaa2d50e94d8d1aa0f67ecda0c465"
+  ],
+  "author": {
+    "name": "dyoshikawa",
+    "email": "dyoshikawa1993@gmail.com",
+    "date": "2025-07-30T17:41:12+09:00"
+  },
+  "message": "Add build:run script and update install command path handling",
+  "pr": {
+    "number": 15,
+    "title": "Node.js製のTsumikiインストールコマンドを追加",
+    "body": "提案&実装です。\r\n\r\n現状、導入やアップデートは手動のコピーしか手段がない（と思う）ため、インストール用のCLIを提案します。\r\n\r\nCLIの使い心地を確認してもらえるように、暫定的にnpmレジストリに `@dyoshikawa/tsumiki` として登録しています。\r\n\r\n```bash\r\n# 使い方\r\n\r\n# インストール\r\nnpx @dyoshikawa/tsumiki install\r\n\r\n# アンインストール\r\nnpx @dyoshikawa/tsumiki uninstall\r\n\r\n# .gitignoreにtsumikiコマンドを登録\r\nnpx @dyoshikawa/tsumiki gitignore\r\n```\r\n\r\nNode.jsを選定したのは以下の理由です。\r\n\r\n- Claude CodeもNode.js製なので、ランタイムを統一することで一緒に導入しやすくなる\r\n  - 例: `npm i -g @anthropic-ai/claude-code @classmethod/tsumiki`\r\n- 社内にNode.js開発者が多いので、コミットしやすそう",
+    "url": "https://github.com/classmethod/tsumiki/pull/15"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 3,
+    "deletions": 3
+  },
+  "files": [
+    {
+      "path": "package.json",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "src/commands/install.tsx",
+      "status": "M",
+      "additions": 2,
+      "deletions": 2,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/package.json b/package.json\nindex 5958b4c..d94bf08 100644\n--- a/package.json\n+++ b/package.json\n@@ -41,8 +41,8 @@\n   ],\n   \"scripts\": {\n     \"build\": \"rm -rf dist && mkdir -p dist/commands && cp ./commands/*.md ./commands/*.sh dist/commands/ 2>/dev/null || true && tsup\",\n+    \"build:run\": \"pnpm build && node dist/cli.js\",\n     \"check\": \"biome check src\",\n-    \"dev\": \"tsx src/cli.ts\",\n     \"fix\": \"biome check src --write\",\n     \"prepare\": \"simple-git-hooks\",\n     \"secretlint\": \"secretlint --secretlintignore .gitignore **/*\",\ndiff --git a/src/commands/install.tsx b/src/commands/install.tsx\nindex 50622e7..08c4d6f 100644\n--- a/src/commands/install.tsx\n+++ b/src/commands/install.tsx\n@@ -28,8 +28,8 @@ const InstallComponent: React.FC = () => {\n         // tsumikiのcommandsディレクトリを取得\n         const __filename = fileURLToPath(import.meta.url);\n         const __dirname = path.dirname(__filename);\n-        // 開発時はプロジェクトルートのcommandsディレクトリを、ビルド後はdist/commandsを参照\n-        const tsumikiDir = path.resolve(__dirname, \"../../commands\");\n+        // ビルド後はdist/commandsを参照（cli.jsがdist/にあるため）\n+        const tsumikiDir = path.join(__dirname, 'commands');\n \n         // .claude/commandsディレクトリが存在しない場合は作成\n         await fs.ensureDir(targetDir);\n",
+  "diffTruncated": false,
+  "tree": [
+    ".gitignore",
+    ".npmrc",
+    ".secretlintrc.json",
+    "LICENSE",
+    "MANUAL.md",
+    "README.md",
+    "biome.json",
+    "book/01-fundamentals/01-aitdd-definition.md",
+    "book/02-environment/01-tools-setup.md",
+    "book/02-environment/02-claude-usage.md",
+    "book/02-environment/03-workflow-setup.md",
+    "book/03-process/01-extended-tdd-flow.md",
+    "book/03-process/02-todo-and-specification.md",
+    "book/03-process/03-test-case-creation.md",
+    "book/03-process/04-rgr-validation-cycle.md",
+    "book/03-process/05-validation-details.md",
+    "book/04-hands-on/01-first-project.md",
+    "book/04-hands-on/02-crud-example.md",
+    "book/04-hands-on/03-api-development.md",
+    "book/04-hands-on/04-error-handling.md",
+    "book/05-optimization/01-prompt-design.md",
+    "book/05-optimization/02-ai-inference-visualization.md",
+    "book/05-optimization/03-continuous-improvement.md",
+    "book/06-collaboration/01-balance-strategy.md",
+    "book/06-collaboration/02-creativity-points.md",
+    "book/06-collaboration/03-review-quality.md",
+    "book/07-case-studies/01-experimental-results.md",
+    "book/07-case-studies/02-evolution-case.md",
+    "book/07-case-studies/03-failure-cases.md",
+    "book/08-best-practices/01-tech-selection.md",
+    "book/08-best-practices/02-documentation.md",
+    "book/08-best-practices/03-future-vision.md",
+    "book/aitdd-getting-started.md",
+    "book/toc.md",
+    "commands/direct-setup.md",
+    "commands/direct-verify.md",
+    "commands/kairo-design.md",
+    "commands/kairo-implement.md",
+    "commands/kairo-requirements.md",
+    "commands/kairo-task-verify.md",
+    "commands/kairo-tasks.md",
+    "commands/rev-design.md",
+    "commands/rev-requirements.md",
+    "commands/rev-specs.md",
+    "commands/rev-tasks.md",
+    "commands/start-server.md",
+    "commands/tdd-cycle-full.sh",
+    "commands/tdd-green.md",
+    "commands/tdd-load-context.md",
+    "commands/tdd-red.md",
+    "commands/tdd-refactor.md",
+    "commands/tdd-requirements.md",
+    "commands/tdd-testcases.md",
+    "commands/tdd-todo.md",
+    "commands/tdd-verify-complete.md",
+    "mise.toml",
+    "package.json",
+    "src/cli.ts",
+    "src/commands/install.tsx",
+    "tsconfig.json",
+    "tsup.config.ts"
+  ],
+  "explanation": {
+    "what": "package.json に `build:run`（`pnpm build && node dist/cli.js`、ビルド後に CLI を直接実行して手動テストするためのスクリプト）を追加し、代わりに `dev` スクリプトを削除した。install.tsx 側では tsumikiDir の解決を `path.resolve(__dirname, \"../../commands\")` から `path.join(__dirname, 'commands')` に変更し、コメントも「cli.jsがdist/にあるため」と実態に即した説明に更新した。",
+    "why": "PR body によれば、このコマンドは `npx @dyoshikawa/tsumiki install` として npm 経由で実行される想定。ビルド後の `dist/cli.js` から見て commands はプロジェクトルート相対ではなく `dist/commands`（build スクリプトでコピー済み）を指すべきであり、それに合わせてパス解決を1階層シンプルにしたとみられる。",
+    "highlights": [
+      { "file": "src/commands/install.tsx", "note": "tsumikiDir のパス解決が `../../commands` から `dist/` 直下の `commands` を指す形に変わった" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [{ "type": "pr", "number": 15, "url": "https://github.com/classmethod/tsumiki/pull/15" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-08-04T00:00:00Z"
+  }
+}

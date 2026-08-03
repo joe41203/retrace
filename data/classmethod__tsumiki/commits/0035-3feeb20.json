@@ -1,0 +1,114 @@
+{
+  "seq": 35,
+  "sha": "3feeb200818795ae130e270287b101c07bf62be3",
+  "parents": [
+    "3cc01143e992ab867ae7d7eb3aa8ce75c5e793a4"
+  ],
+  "author": {
+    "name": "dyoshikawa",
+    "email": "dyoshikawa1993@gmail.com",
+    "date": "2025-07-30T16:52:43+09:00"
+  },
+  "message": "Refactor package.json scripts for improved linting and type checking",
+  "pr": {
+    "number": 15,
+    "title": "Node.js製のTsumikiインストールコマンドを追加",
+    "body": "提案&実装です。\r\n\r\n現状、導入やアップデートは手動のコピーしか手段がない（と思う）ため、インストール用のCLIを提案します。\r\n\r\nCLIの使い心地を確認してもらえるように、暫定的にnpmレジストリに `@dyoshikawa/tsumiki` として登録しています。\r\n\r\n```bash\r\n# 使い方\r\n\r\n# インストール\r\nnpx @dyoshikawa/tsumiki install\r\n\r\n# アンインストール\r\nnpx @dyoshikawa/tsumiki uninstall\r\n\r\n# .gitignoreにtsumikiコマンドを登録\r\nnpx @dyoshikawa/tsumiki gitignore\r\n```\r\n\r\nNode.jsを選定したのは以下の理由です。\r\n\r\n- Claude CodeもNode.js製なので、ランタイムを統一することで一緒に導入しやすくなる\r\n  - 例: `npm i -g @anthropic-ai/claude-code @classmethod/tsumiki`\r\n- 社内にNode.js開発者が多いので、コミットしやすそう",
+    "url": "https://github.com/classmethod/tsumiki/pull/15"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 1,
+    "additions": 6,
+    "deletions": 4
+  },
+  "files": [
+    {
+      "path": "package.json",
+      "status": "M",
+      "additions": 6,
+      "deletions": 4,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/package.json b/package.json\nindex ea2f50c..e94a5eb 100644\n--- a/package.json\n+++ b/package.json\n@@ -17,9 +17,10 @@\n     \"dev\": \"tsx\",\n     \"build\": \"tsup --clean\",\n     \"prepare\": \"simple-git-hooks\",\n-    \"check\": \"biome check .\",\n-    \"fix\": \"biome check . --write\",\n-    \"secretlint\": \"secretlint --secretlintignore .gitignore **/*\"\n+    \"check\": \"biome check src\",\n+    \"fix\": \"biome check src --write\",\n+    \"secretlint\": \"secretlint --secretlintignore .gitignore **/*\",\n+    \"typecheck\": \"tsgo --noEmit\"\n   },\n   \"keywords\": [],\n   \"author\": \"\",\n@@ -38,6 +39,7 @@\n     \"@types/fs-extra\": \"11.0.4\",\n     \"@types/node\": \"24.1.0\",\n     \"@types/react\": \"19.1.9\",\n+    \"@typescript/native-preview\": \"7.0.0-dev.20250729.2\",\n     \"secretlint\": \"10.2.1\",\n     \"simple-git-hooks\": \"2.13.0\",\n     \"tsup\": \"8.5.0\",\n@@ -45,6 +47,6 @@\n     \"typescript\": \"5.8.3\"\n   },\n   \"simple-git-hooks\": {\n-    \"pre-commit\": \"pnpm exec secretlint --secretlintignore .gitignore **/*\"\n+    \"pre-commit\": \"pnpm secretlint && pnpm typecheck && pnpm fix\"\n   }\n }\n",
+  "diffTruncated": false,
+  "tree": [
+    ".gitignore",
+    ".npmrc",
+    ".secretlintrc.json",
+    "LICENSE",
+    "MANUAL.md",
+    "README.md",
+    "biome.json",
+    "book/01-fundamentals/01-aitdd-definition.md",
+    "book/02-environment/01-tools-setup.md",
+    "book/02-environment/02-claude-usage.md",
+    "book/02-environment/03-workflow-setup.md",
+    "book/03-process/01-extended-tdd-flow.md",
+    "book/03-process/02-todo-and-specification.md",
+    "book/03-process/03-test-case-creation.md",
+    "book/03-process/04-rgr-validation-cycle.md",
+    "book/03-process/05-validation-details.md",
+    "book/04-hands-on/01-first-project.md",
+    "book/04-hands-on/02-crud-example.md",
+    "book/04-hands-on/03-api-development.md",
+    "book/04-hands-on/04-error-handling.md",
+    "book/05-optimization/01-prompt-design.md",
+    "book/05-optimization/02-ai-inference-visualization.md",
+    "book/05-optimization/03-continuous-improvement.md",
+    "book/06-collaboration/01-balance-strategy.md",
+    "book/06-collaboration/02-creativity-points.md",
+    "book/06-collaboration/03-review-quality.md",
+    "book/07-case-studies/01-experimental-results.md",
+    "book/07-case-studies/02-evolution-case.md",
+    "book/07-case-studies/03-failure-cases.md",
+    "book/08-best-practices/01-tech-selection.md",
+    "book/08-best-practices/02-documentation.md",
+    "book/08-best-practices/03-future-vision.md",
+    "book/aitdd-getting-started.md",
+    "book/toc.md",
+    "commands/direct-setup.md",
+    "commands/direct-verify.md",
+    "commands/kairo-design.md",
+    "commands/kairo-implement.md",
+    "commands/kairo-requirements.md",
+    "commands/kairo-task-verify.md",
+    "commands/kairo-tasks.md",
+    "commands/rev-design.md",
+    "commands/rev-requirements.md",
+    "commands/rev-specs.md",
+    "commands/rev-tasks.md",
+    "commands/start-server.md",
+    "commands/tdd-cycle-full.sh",
+    "commands/tdd-green.md",
+    "commands/tdd-load-context.md",
+    "commands/tdd-red.md",
+    "commands/tdd-refactor.md",
+    "commands/tdd-requirements.md",
+    "commands/tdd-testcases.md",
+    "commands/tdd-todo.md",
+    "commands/tdd-verify-complete.md",
+    "mise.toml",
+    "package.json",
+    "src/cli.ts",
+    "src/commands/install.tsx",
+    "tsconfig.json",
+    "tsup.config.ts"
+  ],
+  "explanation": {
+    "what": "`check`/`fix` スクリプトの対象をリポジトリ全体(`.`)から `src` ディレクトリに絞り、`typecheck: tsgo --noEmit` スクリプトと開発依存 `@typescript/native-preview` を追加した。`pre-commit` フックを `secretlint` 単体から `pnpm secretlint && pnpm typecheck && pnpm fix` の3段構成に変更した。",
+    "why": "コミットメッセージ「Refactor package.json scripts for improved linting and type checking」の通り。lint 対象を `src` に絞ることで `book/` などの Markdown 資産を誤って biome でチェックしないようにしつつ、型チェックもコミット前フックに組み込んで品質チェックを強化したと考えられる。",
+    "highlights": [
+      { "file": "package.json", "note": "pre-commit を secretlint → typecheck → fix の3段に拡張" }
+    ],
+    "langNotes": [
+      { "topic": "tsgo(@typescript/native-preview)", "note": "TypeScript チームが開発しているネイティブ実装(Go 移植)のコンパイラのプレビュー版。`tsc` 互換の型チェックをより高速に行うことを目指しており、ここでは `typecheck` スクリプトとして採用されている。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [{ "type": "pr", "number": 15, "url": "https://github.com/classmethod/tsumiki/pull/15" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-08-04T12:00:00Z"
+  }
+}

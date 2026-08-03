@@ -1,0 +1,150 @@
+{
+  "seq": 113,
+  "sha": "5af28df773a7d64cd54f74992eedb23793ff7db3",
+  "parents": [
+    "e4f9612162a7ec933431a8cb1ecca409994bf03c"
+  ],
+  "author": {
+    "name": "kuroeda.makoto",
+    "email": "kuroeda.makoto@classmethod.jp",
+    "date": "2025-10-11T10:39:09+09:00"
+  },
+  "message": "fix: remove Biome dependency as project contains only markdown and shell files\n\nThis project consists solely of .md and .sh files (command templates and agent definitions), which are not supported by Biome. Simplified the toolchain to use only secretlint for security checks.\n\nChanges:\n- Remove check and fix scripts from package.json\n- Update pre-commit hook to run only secretlint\n- Remove Biome-related steps from CI/release workflows (check, typecheck, build)\n- Update documentation (CLAUDE.md, CONTRIBUTING.md) to reflect secretlint-only approach\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nCo-Authored-By: Claude <noreply@anthropic.com>",
+  "pr": {
+    "number": 35,
+    "title": "Feat/add claude plugin config",
+    "body": "claude code pluginに対応\r\ninstall方法を変更",
+    "url": "https://github.com/classmethod/tsumiki/pull/35"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 5,
+    "additions": 5,
+    "deletions": 33
+  },
+  "files": [
+    {
+      "path": ".github/workflows/ci.yml",
+      "status": "M",
+      "additions": 0,
+      "deletions": 9,
+      "binary": false
+    },
+    {
+      "path": ".github/workflows/release.yml",
+      "status": "M",
+      "additions": 1,
+      "deletions": 4,
+      "binary": false
+    },
+    {
+      "path": "CLAUDE.md",
+      "status": "M",
+      "additions": 1,
+      "deletions": 5,
+      "binary": false
+    },
+    {
+      "path": "CONTRIBUTING.md",
+      "status": "M",
+      "additions": 2,
+      "deletions": 12,
+      "binary": false
+    },
+    {
+      "path": "package.json",
+      "status": "M",
+      "additions": 1,
+      "deletions": 3,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/.github/workflows/ci.yml b/.github/workflows/ci.yml\nindex b5b8eed..f12070e 100644\n--- a/.github/workflows/ci.yml\n+++ b/.github/workflows/ci.yml\n@@ -36,14 +36,5 @@ jobs:\n             exit 1\n           fi\n \n-      - name: Run check\n-        run: pnpm check\n-\n       - name: Run secretlint\n         run: pnpm secretlint\n-\n-      - name: Run typecheck\n-        run: pnpm typecheck\n-\n-      - name: Build project\n-        run: pnpm build\ndiff --git a/.github/workflows/release.yml b/.github/workflows/release.yml\nindex 7929ba5..024e682 100644\n--- a/.github/workflows/release.yml\n+++ b/.github/workflows/release.yml\n@@ -30,10 +30,7 @@ jobs:\n         run: pnpm install\n \n       - name: Run quality checks\n-        run: |\n-          pnpm check\n-          pnpm secretlint\n-          pnpm typecheck\n+        run: pnpm secretlint\n \n       - name: Publish to npm\n         run: pnpm publish\ndiff --git a/CLAUDE.md b/CLAUDE.md\nindex 9a7a864..8bcc361 100644\n--- a/CLAUDE.md\n+++ b/CLAUDE.md\n@@ -18,8 +18,6 @@ TsumikiはAI駆動開発フレームワークです。Claude Code Plugin経由\n pnpm install                # 依存関係のインストール\n \n # コード品質\n-pnpm check                  # Biomeでコードチェック（commands/とagents/）\n-pnpm fix                    # Biomeで自動修正\n pnpm secretlint             # シークレット情報の検査\n \n # pre-commitフック\n@@ -35,7 +33,6 @@ pnpm prepare                # simple-git-hooksのセットアップ\n \n ## 技術スタック\n \n-- **Code Quality**: Biome（リンタ・フォーマッタ）\n - **Security**: secretlint（機密情報検査）\n - **Package Manager**: pnpm\n - **Distribution**: Claude Code Plugin Marketplace\n@@ -58,6 +55,5 @@ Claude Code Pluginが自動的に：\n \n Pre-commitフックで以下が自動実行されます：\n - `pnpm secretlint`: 機密情報のチェック\n-- `pnpm fix`: コードの自動修正\n \n-コマンドファイル（`.md`）やエージェント定義（`.md`）を修正する際は、必ず`pnpm check`を実行してからコミットしてください。\n+コマンドファイル（`.md`）やエージェント定義（`.md`）を修正する際は、機密情報が含まれていないことを確認してからコミットしてください。\ndiff --git a/CONTRIBUTING.md b/CONTRIBUTING.md\nindex 9acb15c..ee3d3f4 100644\n--- a/CONTRIBUTING.md\n+++ b/CONTRIBUTING.md\n@@ -52,12 +52,6 @@ git checkout -b feature/your-feature-name\n 3. コード品質チェックを実行します：\n \n ```bash\n-# コードチェック\n-pnpm check\n-\n-# 自動修正\n-pnpm fix\n-\n # 機密情報チェック\n pnpm secretlint\n ```\n@@ -95,18 +89,14 @@ docs: update README with new command examples\n Pre-commitフックで以下が自動実行されます：\n \n - **secretlint**: 機密情報（APIキー、パスワードなど）の混入チェック\n-- **fix**: Biomeによるコードの自動修正\n \n ### 手動チェック\n \n 変更前に以下のコマンドを実行してください：\n \n ```bash\n-# 全てのチェックを実行\n-pnpm check && pnpm secretlint\n-\n-# コードの自動修正\n-pnpm fix\n+# 機密情報チェック\n+pnpm secretlint\n ```\n \n ## プロジェクト構造\ndiff --git a/package.json b/package.json\nindex a08e064..ffcd3a1 100644\n--- a/package.json\n+++ b/package.json\n@@ -24,13 +24,11 @@\n     \"name\": \"classmethod\"\n   },\n   \"scripts\": {\n-    \"check\": \"biome check src\",\n-    \"fix\": \"biome check src --write\",\n     \"prepare\": \"simple-git-hooks\",\n     \"secretlint\": \"secretlint --secretlintignore .gitignore **/*\"\n   },\n   \"simple-git-hooks\": {\n-    \"pre-commit\": \"pnpm secretlint && pnpm fix\"\n+    \"pre-commit\": \"pnpm secretlint\"\n   },\n   \"devDependencies\": {\n     \"@biomejs/biome\": \"2.1.3\",\n",
+  "diffTruncated": false,
+  "tree": [
+    ".claude-plugin/marketplace.json",
+    ".claude-plugin/plugin.json",
+    ".claude/commands/release.yml",
+    ".devcontainer/Dockerfile",
+    ".devcontainer/devcontainer.json",
+    ".github/ISSUE_TEMPLATE/bug_report.md",
+    ".github/workflows/ci.yml",
+    ".github/workflows/release.yml",
+    ".gitignore",
+    ".npmrc",
+    ".secretlintrc.json",
+    "CLAUDE.md",
+    "CONTRIBUTING.md",
+    "LICENSE",
+    "MANUAL.md",
+    "README.md",
+    "agents/symbol-searcher.md",
+    "biome.json",
+    "book/01-fundamentals/01-aitdd-definition.md",
+    "book/02-environment/01-tools-setup.md",
+    "book/02-environment/02-claude-usage.md",
+    "book/02-environment/03-workflow-setup.md",
+    "book/03-process/01-extended-tdd-flow.md",
+    "book/03-process/02-todo-and-specification.md",
+    "book/03-process/03-test-case-creation.md",
+    "book/03-process/04-rgr-validation-cycle.md",
+    "book/03-process/05-validation-details.md",
+    "book/04-hands-on/01-first-project.md",
+    "book/04-hands-on/02-crud-example.md",
+    "book/04-hands-on/03-api-development.md",
+    "book/04-hands-on/04-error-handling.md",
+    "book/05-optimization/01-prompt-design.md",
+    "book/05-optimization/02-ai-inference-visualization.md",
+    "book/05-optimization/03-continuous-improvement.md",
+    "book/06-collaboration/01-balance-strategy.md",
+    "book/06-collaboration/02-creativity-points.md",
+    "book/06-collaboration/03-review-quality.md",
+    "book/07-case-studies/01-experimental-results.md",
+    "book/07-case-studies/02-evolution-case.md",
+    "book/07-case-studies/03-failure-cases.md",
+    "book/08-best-practices/01-tech-selection.md",
+    "book/08-best-practices/02-documentation.md",
+    "book/08-best-practices/03-future-vision.md",
+    "book/aitdd-getting-started.md",
+    "book/toc.md",
+    "commands/auto-debug.md",
+    "commands/direct-setup.md",
+    "commands/direct-verify.md",
+    "commands/init-tech-stack.md",
+    "commands/kairo-design.md",
+    "commands/kairo-implement.md",
+    "commands/kairo-requirements.md",
+    "commands/kairo-task-verify.md",
+    "commands/kairo-tasks.md",
+    "commands/rev-design.md",
+    "commands/rev-requirements.md",
+    "commands/rev-specs.md",
+    "commands/rev-tasks.md",
+    "commands/start-server.md",
+    "commands/tdd-cycle-full.sh",
+    "commands/tdd-green.md",
+    "commands/tdd-load-context.md",
+    "commands/tdd-red.md",
+    "commands/tdd-refactor.md",
+    "commands/tdd-requirements.md",
+    "commands/tdd-testcases.md",
+    "commands/tdd-todo.md",
+    "commands/tdd-verify-complete.md",
+    "commands/tech-stack.md",
+    "mise.toml",
+    "package.json"
+  ],
+  "explanation": {
+    "what": "Biome への依存を撤去した。package.json から `check`/`fix` スクリプトを削除し、pre-commit フックを `secretlint` のみに簡素化。CI(`ci.yml`)と release ワークフロー(`release.yml`)から `pnpm check`・`pnpm typecheck`・`pnpm build` のステップを削除し、CLAUDE.md・CONTRIBUTING.md の開発手順もそれに合わせて更新した。",
+    "why": "コミットメッセージが明記する通り、tsumiki は `.md` と `.sh` のみで構成されるプロジェクトになっており、TypeScript/JS 向けリンタである Biome は対象がなく意味を持たなくなっていた。0109 で src/ ディレクトリと CLI 実装を削除し、0112 で check スクリプトの対象を一時的に `src` に戻していたが、その `src` 自体がもう存在しないため、Biome 関連の仕組みごと取り除いてツールチェーンを secretlint のみに単純化した。",
+    "highlights": [
+      { "file": ".github/workflows/ci.yml", "note": "check/typecheck/build のCIステップが消え、secretlint のみが残る" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [{ "type": "pr", "number": 35, "url": "https://github.com/classmethod/tsumiki/pull/35" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-08-04T12:00:00Z"
+  }
+}

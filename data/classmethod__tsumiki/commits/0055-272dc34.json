@@ -1,0 +1,122 @@
+{
+  "seq": 55,
+  "sha": "272dc34eac06afb26234a4add2bcba10e8e5a97d",
+  "parents": [
+    "2987d8dcf1546c2964f7a3958bfe453c96251b97"
+  ],
+  "author": {
+    "name": "dyoshikawa",
+    "email": "dyoshikawa1993@gmail.com",
+    "date": "2025-07-30T17:53:15+09:00"
+  },
+  "message": "Add gitignore command to manage .gitignore rules for specific Tsumiki command files\n\n- Add new gitignore command to CLI with proper description\n- Implement React+Ink based UI for gitignore command\n- Read actual command files from commands/ directory and add specific file paths\n- Add .claude/commands/{filename} rules instead of generic patterns\n- Include error handling and user-friendly status messages\n- Follow existing code patterns from install/uninstall commands\n\nThis prevents conflicts with user's own commands/ directory while only ignoring\nTsumiki-installed files in .claude/commands/\n\n🤖 Generated with [Claude Code](https://claude.ai/code)\n\nCo-Authored-By: Claude <noreply@anthropic.com>",
+  "pr": {
+    "number": 15,
+    "title": "Node.js製のTsumikiインストールコマンドを追加",
+    "body": "提案&実装です。\r\n\r\n現状、導入やアップデートは手動のコピーしか手段がない（と思う）ため、インストール用のCLIを提案します。\r\n\r\nCLIの使い心地を確認してもらえるように、暫定的にnpmレジストリに `@dyoshikawa/tsumiki` として登録しています。\r\n\r\n```bash\r\n# 使い方\r\n\r\n# インストール\r\nnpx @dyoshikawa/tsumiki install\r\n\r\n# アンインストール\r\nnpx @dyoshikawa/tsumiki uninstall\r\n\r\n# .gitignoreにtsumikiコマンドを登録\r\nnpx @dyoshikawa/tsumiki gitignore\r\n```\r\n\r\nNode.jsを選定したのは以下の理由です。\r\n\r\n- Claude CodeもNode.js製なので、ランタイムを統一することで一緒に導入しやすくなる\r\n  - 例: `npm i -g @anthropic-ai/claude-code @classmethod/tsumiki`\r\n- 社内にNode.js開発者が多いので、コミットしやすそう",
+    "url": "https://github.com/classmethod/tsumiki/pull/15"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 218,
+    "deletions": 0
+  },
+  "files": [
+    {
+      "path": "src/cli.ts",
+      "status": "M",
+      "additions": 6,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "src/commands/gitignore.tsx",
+      "status": "A",
+      "additions": 212,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/src/cli.ts b/src/cli.ts\nindex 35bb13a..e3653fb 100644\n--- a/src/cli.ts\n+++ b/src/cli.ts\n@@ -1,6 +1,7 @@\n #!/usr/bin/env node\n \n import { Command } from \"commander\";\n+import { gitignoreCommand } from \"./commands/gitignore.js\";\n import { installCommand } from \"./commands/install.js\";\n import { uninstallCommand } from \"./commands/uninstall.js\";\n \n@@ -21,4 +22,9 @@ program\n   .description(\"Uninstall Claude Code command templates from .claude/commands/\")\n   .action(uninstallCommand);\n \n+program\n+  .command(\"gitignore\")\n+  .description(\"Add commands/*.{md,sh} to .gitignore file\")\n+  .action(gitignoreCommand);\n+\n program.parse();\ndiff --git a/src/commands/gitignore.tsx b/src/commands/gitignore.tsx\nnew file mode 100644\nindex 0000000..3ddf50b\n--- /dev/null\n+++ b/src/commands/gitignore.tsx\n@@ -0,0 +1,212 @@\n+import * as path from \"node:path\";\n+import { fileURLToPath } from \"node:url\";\n+import fs from \"fs-extra\";\n+import { Box, Newline, render, Text } from \"ink\";\n+import React, { useEffect, useState } from \"react\";\n+\n+type GitignoreStatus =\n+  | \"starting\"\n+  | \"checking\"\n+  | \"updating\"\n+  | \"completed\"\n+  | \"skipped\"\n+  | \"error\";\n+\n+const GitignoreComponent: React.FC = () => {\n+  const [status, setStatus] = useState<GitignoreStatus>(\"starting\");\n+  const [addedRules, setAddedRules] = useState<string[]>([]);\n+  const [skippedRules, setSkippedRules] = useState<string[]>([]);\n+  const [error, setError] = useState<string | null>(null);\n+\n+  useEffect(() => {\n+    const performGitignoreUpdate = async (): Promise<void> => {\n+      try {\n+        setStatus(\"checking\");\n+\n+        const currentDir = process.cwd();\n+        const gitignorePath = path.join(currentDir, \".gitignore\");\n+\n+        // tsumikiのcommandsディレクトリを取得\n+        const __filename = fileURLToPath(import.meta.url);\n+        const __dirname = path.dirname(__filename);\n+        // ビルド後はdist/commandsを参照（cli.jsがdist/にあるため）\n+        const tsumikiDir = path.join(__dirname, \"commands\");\n+\n+        // commandsディレクトリ内のすべての.mdファイルと.shファイルを取得\n+        const files = await fs.readdir(tsumikiDir);\n+        const targetFiles = files.filter(\n+          (file) => file.endsWith(\".md\") || file.endsWith(\".sh\"),\n+        );\n+\n+        // 具体的なファイルパスをルールとして作成\n+        const rulesToAdd = targetFiles.map(\n+          (file) => `.claude/commands/${file}`,\n+        );\n+\n+        let gitignoreContent = \"\";\n+        let gitignoreExists = false;\n+\n+        try {\n+          gitignoreContent = await fs.readFile(gitignorePath, \"utf-8\");\n+          gitignoreExists = true;\n+        } catch {\n+          gitignoreExists = false;\n+        }\n+\n+        const existingLines = gitignoreContent\n+          .split(\"\\n\")\n+          .map((line) => line.trim());\n+        const rulesToActuallyAdd: string[] = [];\n+        const rulesAlreadyExist: string[] = [];\n+\n+        for (const rule of rulesToAdd) {\n+          if (existingLines.includes(rule)) {\n+            rulesAlreadyExist.push(rule);\n+          } else {\n+            rulesToActuallyAdd.push(rule);\n+          }\n+        }\n+\n+        if (rulesToActuallyAdd.length === 0) {\n+          setSkippedRules(rulesAlreadyExist);\n+          setStatus(\"skipped\");\n+          setTimeout(() => {\n+            process.exit(0);\n+          }, 2000);\n+          return;\n+        }\n+\n+        setStatus(\"updating\");\n+\n+        let newContent = gitignoreContent;\n+        if (\n+          gitignoreExists &&\n+          gitignoreContent.length > 0 &&\n+          !gitignoreContent.endsWith(\"\\n\")\n+        ) {\n+          newContent += \"\\n\";\n+        }\n+\n+        if (gitignoreExists && gitignoreContent.length > 0) {\n+          newContent += \"\\n# Tsumiki command templates\\n\";\n+        } else {\n+          newContent = \"# Tsumiki command templates\\n\";\n+        }\n+\n+        for (const rule of rulesToActuallyAdd) {\n+          newContent += `${rule}\\n`;\n+        }\n+\n+        await fs.writeFile(gitignorePath, newContent);\n+\n+        setAddedRules(rulesToActuallyAdd);\n+        setSkippedRules(rulesAlreadyExist);\n+        setStatus(\"completed\");\n+\n+        setTimeout(() => {\n+          process.exit(0);\n+        }, 2000);\n+      } catch (err) {\n+        const errorMessage =\n+          err instanceof Error ? err.message : \"Unknown error occurred\";\n+        setError(errorMessage);\n+        setStatus(\"error\");\n+\n+        setTimeout(() => {\n+          process.exit(1);\n+        }, 3000);\n+      }\n+    };\n+\n+    performGitignoreUpdate();\n+  }, []);\n+\n+  if (status === \"starting\") {\n+    return (\n+      <Box>\n+        <Text color=\"cyan\">🚀 .gitignore の更新を開始します...</Text>\n+      </Box>\n+    );\n+  }\n+\n+  if (status === \"checking\") {\n+    return (\n+      <Box>\n+        <Text color=\"yellow\">📋 .gitignore ファイルをチェック中...</Text>\n+      </Box>\n+    );\n+  }\n+\n+  if (status === \"updating\") {\n+    return (\n+      <Box>\n+        <Text color=\"blue\">✏️ .gitignore を更新中...</Text>\n+      </Box>\n+    );\n+  }\n+\n+  if (status === \"error\") {\n+    return (\n+      <Box flexDirection=\"column\">\n+        <Text color=\"red\">❌ エラーが発生しました:</Text>\n+        <Text color=\"red\">{error}</Text>\n+      </Box>\n+    );\n+  }\n+\n+  if (status === \"skipped\") {\n+    return (\n+      <Box flexDirection=\"column\">\n+        <Text color=\"yellow\">⏭️ すべてのルールが既に存在します</Text>\n+        <Newline />\n+        <Text>既存のルール:</Text>\n+        {skippedRules.map((rule) => (\n+          <Text key={rule} color=\"gray\">\n+            • {rule}\n+          </Text>\n+        ))}\n+        <Newline />\n+        <Text color=\"cyan\">.gitignore の更新は不要でした</Text>\n+      </Box>\n+    );\n+  }\n+\n+  if (status === \"completed\") {\n+    return (\n+      <Box flexDirection=\"column\">\n+        <Text color=\"green\">✅ .gitignore の更新が完了しました!</Text>\n+        <Newline />\n+        {addedRules.length > 0 && (\n+          <>\n+            <Text>追加されたルール ({addedRules.length}個):</Text>\n+            {addedRules.map((rule) => (\n+              <Text key={rule} color=\"green\">\n+                • {rule}\n+              </Text>\n+            ))}\n+          </>\n+        )}\n+        {skippedRules.length > 0 && (\n+          <>\n+            <Text>既存のルール ({skippedRules.length}個):</Text>\n+            {skippedRules.map((rule) => (\n+              <Text key={rule} color=\"gray\">\n+                • {rule}\n+              </Text>\n+            ))}\n+          </>\n+        )}\n+        <Newline />\n+        <Text color=\"cyan\">\n+          Tsumiki のコマンドファイルが Git から無視されるようになりました\n+        </Text>\n+      </Box>\n+    );\n+  }\n+\n+  return null;\n+};\n+\n+export const gitignoreCommand = (): void => {\n+  render(React.createElement(GitignoreComponent));\n+};\n",
+  "diffTruncated": false,
+  "tree": [
+    ".gitignore",
+    ".npmrc",
+    ".secretlintrc.json",
+    "CLAUDE.md",
+    "LICENSE",
+    "MANUAL.md",
+    "README.md",
+    "biome.json",
+    "book/01-fundamentals/01-aitdd-definition.md",
+    "book/02-environment/01-tools-setup.md",
+    "book/02-environment/02-claude-usage.md",
+    "book/02-environment/03-workflow-setup.md",
+    "book/03-process/01-extended-tdd-flow.md",
+    "book/03-process/02-todo-and-specification.md",
+    "book/03-process/03-test-case-creation.md",
+    "book/03-process/04-rgr-validation-cycle.md",
+    "book/03-process/05-validation-details.md",
+    "book/04-hands-on/01-first-project.md",
+    "book/04-hands-on/02-crud-example.md",
+    "book/04-hands-on/03-api-development.md",
+    "book/04-hands-on/04-error-handling.md",
+    "book/05-optimization/01-prompt-design.md",
+    "book/05-optimization/02-ai-inference-visualization.md",
+    "book/05-optimization/03-continuous-improvement.md",
+    "book/06-collaboration/01-balance-strategy.md",
+    "book/06-collaboration/02-creativity-points.md",
+    "book/06-collaboration/03-review-quality.md",
+    "book/07-case-studies/01-experimental-results.md",
+    "book/07-case-studies/02-evolution-case.md",
+    "book/07-case-studies/03-failure-cases.md",
+    "book/08-best-practices/01-tech-selection.md",
+    "book/08-best-practices/02-documentation.md",
+    "book/08-best-practices/03-future-vision.md",
+    "book/aitdd-getting-started.md",
+    "book/toc.md",
+    "commands/direct-setup.md",
+    "commands/direct-verify.md",
+    "commands/kairo-design.md",
+    "commands/kairo-implement.md",
+    "commands/kairo-requirements.md",
+    "commands/kairo-task-verify.md",
+    "commands/kairo-tasks.md",
+    "commands/rev-design.md",
+    "commands/rev-requirements.md",
+    "commands/rev-specs.md",
+    "commands/rev-tasks.md",
+    "commands/start-server.md",
+    "commands/tdd-cycle-full.sh",
+    "commands/tdd-green.md",
+    "commands/tdd-load-context.md",
+    "commands/tdd-red.md",
+    "commands/tdd-refactor.md",
+    "commands/tdd-requirements.md",
+    "commands/tdd-testcases.md",
+    "commands/tdd-todo.md",
+    "commands/tdd-verify-complete.md",
+    "mise.toml",
+    "package.json",
+    "src/cli.ts",
+    "src/commands/gitignore.tsx",
+    "src/commands/install.tsx",
+    "src/commands/uninstall.tsx",
+    "tsconfig.json",
+    "tsup.config.ts"
+  ],
+  "explanation": {
+    "what": "新規ファイル src/commands/gitignore.tsx（212行）を追加し、`.gitignore` に Tsumiki のコマンドファイルを無視するルールを追記する `gitignore` コマンドを実装した。tsumikiDir から .md/.sh のファイル名一覧を取得し、`.claude/commands/{filename}` という具体的なパスのルールを1件ずつ生成する。既存の `.gitignore` を読み、まだ存在しないルールだけを `# Tsumiki command templates` の見出し付きで追記し、既存分はスキップとして区別する。React + Ink で starting/checking/updating/completed/skipped/error の状態を表示する。src/cli.ts に `gitignore` サブコマンドを登録した。コミットメッセージ本文には Claude Code による生成であることを示す `Co-Authored-By: Claude` の署名がある。",
+    "why": "PR body に「.gitignoreにtsumikiコマンドを登録: `npx @dyoshikawa/tsumiki gitignore`」と明記されており、この PR で提案された3コマンド目（install/uninstall/gitignore）を実装するコミット。コミットメッセージには、汎用的なパターンではなく具体的なファイルパス（`.claude/commands/{filename}`）でルールを追加することで、ユーザー自身が `commands/` ディレクトリに置いた別ファイルと衝突しないようにする、という設計意図が書かれている。",
+    "highlights": [
+      { "file": "src/commands/gitignore.tsx", "note": "ワイルドカードではなく実在するファイル名を1つずつ `.claude/commands/{filename}` として列挙し、ユーザー自身のファイルとの衝突を避けている" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [{ "type": "pr", "number": 15, "url": "https://github.com/classmethod/tsumiki/pull/15" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-08-04T00:00:00Z"
+  }
+}

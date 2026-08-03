@@ -1,0 +1,172 @@
+{
+  "seq": 108,
+  "sha": "136fe36560abb9fada4a064eba89e9e822bb6651",
+  "parents": [
+    "114e7d23fd53b4dcd6875fd80ec79f0d2dba0947"
+  ],
+  "author": {
+    "name": "kuroeda.makoto",
+    "email": "kuroeda.makoto@classmethod.jp",
+    "date": "2025-10-10T10:18:12+09:00"
+  },
+  "message": "docs: update command references to use /tsumiki: prefix\n\n- Update @task references in kairo-implement.md to use /tsumiki: prefix\n- Update command references in kairo-tasks.md\n- Update prerequisite references in rev-*.md and direct-*.md files\n- Keep /{taskID}/ path placeholders unchanged (not commands)\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nCo-Authored-By: Claude <noreply@anthropic.com>",
+  "pr": {
+    "number": 35,
+    "title": "Feat/add claude plugin config",
+    "body": "claude code pluginに対応\r\ninstall方法を変更",
+    "url": "https://github.com/classmethod/tsumiki/pull/35"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 7,
+    "additions": 39,
+    "deletions": 39
+  },
+  "files": [
+    {
+      "path": "commands/direct-setup.md",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "commands/direct-verify.md",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "commands/kairo-implement.md",
+      "status": "M",
+      "additions": 26,
+      "deletions": 26,
+      "binary": false
+    },
+    {
+      "path": "commands/kairo-tasks.md",
+      "status": "M",
+      "additions": 8,
+      "deletions": 8,
+      "binary": false
+    },
+    {
+      "path": "commands/rev-design.md",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "commands/rev-requirements.md",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "commands/rev-specs.md",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/commands/direct-setup.md b/commands/direct-setup.md\nindex 6b36a48..e9c9f88 100644\n--- a/commands/direct-setup.md\n+++ b/commands/direct-setup.md\n@@ -143,7 +143,7 @@ psql -d mydb -f database-schema.sql\n \n ## 次のステップ\n \n-- `direct-verify.md` を実行して設定を確認\n+- `/tsumiki:direct-verify` を実行して設定を確認\n - 必要に応じて設定の調整を実施\n \n ## 実行後の確認\ndiff --git a/commands/direct-verify.md b/commands/direct-verify.md\nindex b47f55f..edb9267 100644\n--- a/commands/direct-verify.md\n+++ b/commands/direct-verify.md\n@@ -10,7 +10,7 @@ DIRECTタスクで実行した設定作業の動作確認とテストを行い\n \n ## 前提条件\n \n-- `direct-setup.md` が実行済み\n+- `/tsumiki:direct-setup` が実行済み\n - タスクIDが提供されている\n - 設定作業の記録が存在する\n \ndiff --git a/commands/kairo-implement.md b/commands/kairo-implement.md\nindex a3b60df..4011d87 100644\n--- a/commands/kairo-implement.md\n+++ b/commands/kairo-implement.md\n@@ -61,57 +61,57 @@ description: 分割されたタスクを順番に、またはユーザが指定\n \n    ### A. **TDDプロセス**（コード実装タスク用）\n \n-   a. **要件定義** - `@task general-purpose tdd-requirements.md`\n+   a. **要件定義** - `@task general-purpose /tsumiki:tdd-requirements`\n    ```\n    Task実行: TDD要件定義フェーズ\n    目的: タスクの詳細要件を記述し、受け入れ基準を明確化する\n-   コマンド: tdd-requirements.md\n+   コマンド: /tsumiki:tdd-requirements\n    実行方式: 個別Task実行\n    ```\n \n-   b. **テストケース作成** - `@task general-purpose tdd-testcases.md`\n+   b. **テストケース作成** - `@task general-purpose /tsumiki:tdd-testcases`\n    ```\n    Task実行: TDDテストケース作成フェーズ\n    目的: 単体テストケースを作成し、エッジケースを考慮する\n-   コマンド: tdd-testcases.md\n+   コマンド: /tsumiki:tdd-testcases\n    実行方式: 個別Task実行\n    ```\n \n-   c. **テスト実装** - `@task general-purpose tdd-red.md`\n+   c. **テスト実装** - `@task general-purpose /tsumiki:tdd-red`\n    ```\n    Task実行: TDDレッドフェーズ\n    目的: 失敗するテストを実装し、テストが失敗することを確認する\n-   コマンド: tdd-red.md\n+   コマンド: /tsumiki:tdd-red\n    実行方式: 個別Task実行\n    ```\n \n-   d. **最小実装** - `@task general-purpose tdd-green.md`\n+   d. **最小実装** - `@task general-purpose /tsumiki:tdd-green`\n    ```\n    Task実行: TDDグリーンフェーズ\n    目的: テストが通る最小限の実装を行い、過度な実装を避ける\n-   コマンド: tdd-green.md\n+   コマンド: /tsumiki:tdd-green\n    実行方式: 個別Task実行\n    ```\n \n-   e. **リファクタリング** - `@task general-purpose tdd-refactor.md`\n+   e. **リファクタリング** - `@task general-purpose /tsumiki:tdd-refactor`\n    ```\n    Task実行: TDDリファクタリングフェーズ\n    目的: コードの品質向上と保守性の改善を行う\n-   コマンド: tdd-refactor.md\n+   コマンド: /tsumiki:tdd-refactor\n    実行方式: 個別Task実行\n    ```\n \n-   f. **品質確認** - `@task general-purpose tdd-verify-complete.md`\n+   f. **品質確認** - `@task general-purpose /tsumiki:tdd-verify-complete`\n    ```\n    Task実行: TDD品質確認フェーズ\n    目的: 実装の完成度を確認し、不足があればc-fを繰り返す\n-   コマンド: tdd-verify-complete.md\n+   コマンド: /tsumiki:tdd-verify-complete\n    実行方式: 個別Task実行\n    ```\n \n    ### B. **直接作業プロセス**（準備作業タスク用）\n \n-   a. **準備作業の実行** - `@task general-purpose direct-setup.md`\n+   a. **準備作業の実行** - `@task general-purpose /tsumiki:direct-setup`\n    ```\n    Task実行: 直接作業実行フェーズ\n    目的: ディレクトリ作成、設定ファイル作成、依存関係のインストール、環境設定を行う\n@@ -123,7 +123,7 @@ description: 分割されたタスクを順番に、またはユーザが指定\n    実行方式: 個別Task実行\n    ```\n \n-   b. **作業結果の確認** - `@task general-purpose direct-verify.md`\n+   b. **作業結果の確認** - `@task general-purpose /tsumiki:direct-verify`\n    ```\n    Task実行: 直接作業確認フェーズ\n    目的: 作業完了の検証と成果物確認を行う\n@@ -225,16 +225,16 @@ $ claude code kairo-implement --status\n \n ```bash\n # TDDプロセスの場合\n-@task general-purpose tdd-requirements.md\n-@task general-purpose tdd-testcases.md\n-@task general-purpose tdd-red.md\n-@task general-purpose tdd-green.md\n-@task general-purpose tdd-refactor.md\n-@task general-purpose tdd-verify-complete.md\n+@task general-purpose /tsumiki:tdd-requirements\n+@task general-purpose /tsumiki:tdd-testcases\n+@task general-purpose /tsumiki:tdd-red\n+@task general-purpose /tsumiki:tdd-green\n+@task general-purpose /tsumiki:tdd-refactor\n+@task general-purpose /tsumiki:tdd-verify-complete\n \n # 直接作業プロセスの場合\n-@task general-purpose direct-setup.md\n-@task general-purpose direct-verify.md\n+@task general-purpose /tsumiki:direct-setup\n+@task general-purpose /tsumiki:direct-verify\n ```\n \n ## 実装時の注意事項\n@@ -300,22 +300,22 @@ $ claude code kairo-implement --status\n ### 各ステップ完了時（TDD）\n \n ```\n-✅ Task 1/6: @task tdd-requirements 完了\n+✅ Task 1/6: @task /tsumiki:tdd-requirements 完了\n    ファイル: docs/implements/{要件名}/{{task_id}}/{要件名}-requirements.md\n    Task実行結果: 要件定義書作成完了\n \n-🏃 Task 2/6: @task tdd-testcases 実行中...\n+🏃 Task 2/6: @task /tsumiki:tdd-testcases 実行中...\n    Task実行: TDDテストケース作成フェーズを開始\n ```\n \n ### 各ステップ完了時（直接作業）\n \n ```\n-✅ Task 1/2: @task direct-work-execute 完了\n+✅ Task 1/2: @task /tsumiki:direct-setup 完了\n    作成ファイル: 8個、設定更新: 3個\n    Task実行結果: 準備作業実行完了\n \n-🏃 Task 2/2: @task direct-work-verify 実行中...\n+🏃 Task 2/2: @task /tsumiki:direct-verify 実行中...\n    Task実行: 直接作業確認フェーズを開始\n ```\n \ndiff --git a/commands/kairo-tasks.md b/commands/kairo-tasks.md\nindex 9fcd071..6ecc275 100644\n--- a/commands/kairo-tasks.md\n+++ b/commands/kairo-tasks.md\n@@ -139,16 +139,16 @@ description: 設計文書に基づいて実装タスクを1日単位の粒度で\n ## タスクプロセス定義\n \n ### TDDタスク\n-1. `tdd-requirements.md` - 詳細要件定義\n-2. `tdd-testcases.md` - テストケース作成  \n-3. `tdd-red.md` - テスト実装（失敗）\n-4. `tdd-green.md` - 最小実装\n-5. `tdd-refactor.md` - リファクタリング\n-6. `tdd-verify-complete.md` - 品質確認\n+1. `/tsumiki:tdd-requirements` - 詳細要件定義\n+2. `/tsumiki:tdd-testcases` - テストケース作成\n+3. `/tsumiki:tdd-red` - テスト実装（失敗）\n+4. `/tsumiki:tdd-green` - 最小実装\n+5. `/tsumiki:tdd-refactor` - リファクタリング\n+6. `/tsumiki:tdd-verify-complete` - 品質確認\n \n ### DIRECTタスク\n-1. `direct-setup.md` - 直接実装・設定\n-2. `direct-verify.md` - 動作確認・品質確認\n+1. `/tsumiki:direct-setup` - 直接実装・設定\n+2. `/tsumiki:direct-verify` - 動作確認・品質確認\n \n ## 実行フロー\n \ndiff --git a/commands/rev-design.md b/commands/rev-design.md\nindex ef5ae82..49b5c91 100644\n--- a/commands/rev-design.md\n+++ b/commands/rev-design.md\n@@ -12,7 +12,7 @@ description: 既存のコードベースから技術設計文書を逆生成し\n \n - 分析対象のコードベースが存在する\n - `docs/reverse/` ディレクトリが存在する（なければ作成）\n-- 可能であれば事前に `rev-tasks.md` を実行済み\n+- 可能であれば事前に `/tsumiki:rev-tasks` を実行済み\n \n ## 実行内容\n \ndiff --git a/commands/rev-requirements.md b/commands/rev-requirements.md\nindex 7d5415c..54e3ba8 100644\n--- a/commands/rev-requirements.md\n+++ b/commands/rev-requirements.md\n@@ -12,7 +12,7 @@ description: 既存のコードベースから要件定義書を逆生成しま\n \n - 分析対象のコードベースが存在する\n - `docs/reverse/` ディレクトリが存在する（なければ作成）\n-- 可能であれば事前に `rev-tasks.md` および `rev-design.md` を実行済み\n+- 可能であれば事前に `/tsumiki:rev-tasks` および `/tsumiki:rev-design` を実行済み\n \n ## 実行内容\n \ndiff --git a/commands/rev-specs.md b/commands/rev-specs.md\nindex 0c1800f..b4e1db6 100644\n--- a/commands/rev-specs.md\n+++ b/commands/rev-specs.md\n@@ -12,7 +12,7 @@ description: 既存のコードベースから包括的なテストケースと\n \n - 分析対象のコードベースが存在する\n - `docs/reverse/` ディレクトリが存在する（なければ作成）\n-- 可能であれば事前に `rev-requirements.md`, `rev-design.md` を実行済み\n+- 可能であれば事前に `/tsumiki:rev-requirements`, `/tsumiki:rev-design` を実行済み\n \n ## 実行内容\n \n",
+  "diffTruncated": false,
+  "tree": [
+    ".claude-plugin/marketplace.json",
+    ".claude-plugin/plugin.json",
+    ".claude/commands/release.yml",
+    ".devcontainer/Dockerfile",
+    ".devcontainer/devcontainer.json",
+    ".github/ISSUE_TEMPLATE/bug_report.md",
+    ".github/workflows/ci.yml",
+    ".github/workflows/release.yml",
+    ".gitignore",
+    ".npmrc",
+    ".secretlintrc.json",
+    "CLAUDE.md",
+    "CONTRIBUTING.md",
+    "LICENSE",
+    "MANUAL.md",
+    "README.md",
+    "agents/symbol-searcher.md",
+    "biome.json",
+    "book/01-fundamentals/01-aitdd-definition.md",
+    "book/02-environment/01-tools-setup.md",
+    "book/02-environment/02-claude-usage.md",
+    "book/02-environment/03-workflow-setup.md",
+    "book/03-process/01-extended-tdd-flow.md",
+    "book/03-process/02-todo-and-specification.md",
+    "book/03-process/03-test-case-creation.md",
+    "book/03-process/04-rgr-validation-cycle.md",
+    "book/03-process/05-validation-details.md",
+    "book/04-hands-on/01-first-project.md",
+    "book/04-hands-on/02-crud-example.md",
+    "book/04-hands-on/03-api-development.md",
+    "book/04-hands-on/04-error-handling.md",
+    "book/05-optimization/01-prompt-design.md",
+    "book/05-optimization/02-ai-inference-visualization.md",
+    "book/05-optimization/03-continuous-improvement.md",
+    "book/06-collaboration/01-balance-strategy.md",
+    "book/06-collaboration/02-creativity-points.md",
+    "book/06-collaboration/03-review-quality.md",
+    "book/07-case-studies/01-experimental-results.md",
+    "book/07-case-studies/02-evolution-case.md",
+    "book/07-case-studies/03-failure-cases.md",
+    "book/08-best-practices/01-tech-selection.md",
+    "book/08-best-practices/02-documentation.md",
+    "book/08-best-practices/03-future-vision.md",
+    "book/aitdd-getting-started.md",
+    "book/toc.md",
+    "commands/auto-debug.md",
+    "commands/direct-setup.md",
+    "commands/direct-verify.md",
+    "commands/init-tech-stack.md",
+    "commands/kairo-design.md",
+    "commands/kairo-implement.md",
+    "commands/kairo-requirements.md",
+    "commands/kairo-task-verify.md",
+    "commands/kairo-tasks.md",
+    "commands/rev-design.md",
+    "commands/rev-requirements.md",
+    "commands/rev-specs.md",
+    "commands/rev-tasks.md",
+    "commands/start-server.md",
+    "commands/tdd-cycle-full.sh",
+    "commands/tdd-green.md",
+    "commands/tdd-load-context.md",
+    "commands/tdd-red.md",
+    "commands/tdd-refactor.md",
+    "commands/tdd-requirements.md",
+    "commands/tdd-testcases.md",
+    "commands/tdd-todo.md",
+    "commands/tdd-verify-complete.md",
+    "commands/tech-stack.md",
+    "mise.toml",
+    "package.json",
+    "src/cli.ts",
+    "src/commands/gitignore.tsx",
+    "src/commands/install.tsx",
+    "src/commands/uninstall.tsx",
+    "tsconfig.json",
+    "tsup.config.ts"
+  ],
+  "explanation": {
+    "what": "kairo-implement.md・kairo-tasks.md・rev-*.md・direct-*.md 内で、まだ `tdd-red.md` のような裸のコマンド名や `direct-setup.md` のようなファイル名参照だったコマンド呼び出しを、すべて `/tsumiki:tdd-red` `/tsumiki:direct-setup` 形式の `/tsumiki:` 接頭辞付きスラッシュコマンドに書き換えている。ただし `{taskID}` のようなパスプレースホルダーはコマンド名ではないため変更していない。",
+    "why": "PR #35 は Claude Code Plugin 対応・install 方法変更が目的（PR body「claude code pluginに対応 install方法を変更」）。直前のコミット(0106, 0107)でも同種の接頭辞付与が進められており、このコミットはその総仕上げとして、コマンド間の相互参照ドキュメントに残っていた旧表記を洗い出して統一したもの。",
+    "highlights": [
+      { "file": "commands/kairo-implement.md", "note": "@task 呼び出し例・進捗表示例まで含め tdd-*/direct-* への言及を網羅的に /tsumiki: 接頭辞へ置換" }
+    ],
+    "langNotes": [
+      { "topic": "Claude Code Plugin のコマンド接頭辞", "note": "Plugin として配布されるスラッシュコマンドは `/<プラグイン名>:<コマンド名>` の形式で呼び出す。tsumiki は marketplace 経由の plugin になったため、ドキュメント中の相互参照もこの接頭辞付き表記に統一する必要が生じた。" }
+    ],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [{ "type": "pr", "number": 35, "url": "https://github.com/classmethod/tsumiki/pull/35" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-08-04T12:00:00Z"
+  }
+}

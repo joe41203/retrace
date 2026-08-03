@@ -1,0 +1,149 @@
+{
+  "seq": 31,
+  "sha": "078824e63ae093865cdbdb878bcff8800efe2595",
+  "parents": [
+    "01c8a9523331469653304dbc04f9332981747b93"
+  ],
+  "author": {
+    "name": "dyoshikawa",
+    "email": "dyoshikawa1993@gmail.com",
+    "date": "2025-07-30T16:41:22+09:00"
+  },
+  "message": "Refactor CLI and installation command structure; remove deprecated install command implementation",
+  "pr": {
+    "number": 15,
+    "title": "Node.js製のTsumikiインストールコマンドを追加",
+    "body": "提案&実装です。\r\n\r\n現状、導入やアップデートは手動のコピーしか手段がない（と思う）ため、インストール用のCLIを提案します。\r\n\r\nCLIの使い心地を確認してもらえるように、暫定的にnpmレジストリに `@dyoshikawa/tsumiki` として登録しています。\r\n\r\n```bash\r\n# 使い方\r\n\r\n# インストール\r\nnpx @dyoshikawa/tsumiki install\r\n\r\n# アンインストール\r\nnpx @dyoshikawa/tsumiki uninstall\r\n\r\n# .gitignoreにtsumikiコマンドを登録\r\nnpx @dyoshikawa/tsumiki gitignore\r\n```\r\n\r\nNode.jsを選定したのは以下の理由です。\r\n\r\n- Claude CodeもNode.js製なので、ランタイムを統一することで一緒に導入しやすくなる\r\n  - 例: `npm i -g @anthropic-ai/claude-code @classmethod/tsumiki`\r\n- 社内にNode.js開発者が多いので、コミットしやすそう",
+    "url": "https://github.com/classmethod/tsumiki/pull/15"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 6,
+    "additions": 103,
+    "deletions": 97
+  },
+  "files": [
+    {
+      "path": "biome.json",
+      "status": "M",
+      "additions": 33,
+      "deletions": 33,
+      "binary": false
+    },
+    {
+      "path": "package.json",
+      "status": "M",
+      "additions": 2,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "src/cli.ts",
+      "status": "M",
+      "additions": 8,
+      "deletions": 8,
+      "binary": false
+    },
+    {
+      "path": "src/commands/install.tsx",
+      "status": "R",
+      "additions": 49,
+      "deletions": 39,
+      "binary": false,
+      "oldPath": "src/commands/install.ts"
+    },
+    {
+      "path": "tsconfig.json",
+      "status": "M",
+      "additions": 3,
+      "deletions": 8,
+      "binary": false
+    },
+    {
+      "path": "tsup.config.ts",
+      "status": "M",
+      "additions": 8,
+      "deletions": 8,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/biome.json b/biome.json\nindex c947d12..4c4e966 100644\n--- a/biome.json\n+++ b/biome.json\n@@ -1,35 +1,35 @@\n {\n-\t\"$schema\": \"https://biomejs.dev/schemas/2.1.3/schema.json\",\n-\t\"vcs\": {\n-\t\t\"enabled\": false,\n-\t\t\"clientKind\": \"git\",\n-\t\t\"useIgnoreFile\": false\n-\t},\n-\t\"files\": {\n-\t\t\"ignoreUnknown\": false\n-\t},\n-\t\"formatter\": {\n-\t\t\"enabled\": true,\n-\t\t\"indentStyle\": \"space\",\n-\t\t\"indentWidth\": 2\n-\t},\n-\t\"linter\": {\n-\t\t\"enabled\": true,\n-\t\t\"rules\": {\n-\t\t\t\"recommended\": true\n-\t\t}\n-\t},\n-\t\"javascript\": {\n-\t\t\"formatter\": {\n-\t\t\t\"quoteStyle\": \"double\"\n-\t\t}\n-\t},\n-\t\"assist\": {\n-\t\t\"enabled\": true,\n-\t\t\"actions\": {\n-\t\t\t\"source\": {\n-\t\t\t\t\"organizeImports\": \"on\"\n-\t\t\t}\n-\t\t}\n-\t}\n+  \"$schema\": \"https://biomejs.dev/schemas/2.1.3/schema.json\",\n+  \"vcs\": {\n+    \"enabled\": false,\n+    \"clientKind\": \"git\",\n+    \"useIgnoreFile\": false\n+  },\n+  \"files\": {\n+    \"ignoreUnknown\": false\n+  },\n+  \"formatter\": {\n+    \"enabled\": true,\n+    \"indentStyle\": \"space\",\n+    \"indentWidth\": 2\n+  },\n+  \"linter\": {\n+    \"enabled\": true,\n+    \"rules\": {\n+      \"recommended\": true\n+    }\n+  },\n+  \"javascript\": {\n+    \"formatter\": {\n+      \"quoteStyle\": \"double\"\n+    }\n+  },\n+  \"assist\": {\n+    \"enabled\": true,\n+    \"actions\": {\n+      \"source\": {\n+        \"organizeImports\": \"on\"\n+      }\n+    }\n+  }\n }\ndiff --git a/package.json b/package.json\nindex 3212880..449b0d2 100644\n--- a/package.json\n+++ b/package.json\n@@ -5,7 +5,7 @@\n   \"main\": \"index.js\",\n   \"scripts\": {\n     \"check\": \"biome check .\",\n-    \"format\": \"biome check . --write\",\n+    \"fix\": \"biome check . --write\"\n   },\n   \"keywords\": [],\n   \"author\": \"\",\n@@ -19,6 +19,7 @@\n   },\n   \"devDependencies\": {\n     \"@biomejs/biome\": \"2.1.3\",\n+    \"@tsconfig/node24\": \"24.0.1\",\n     \"@types/fs-extra\": \"11.0.4\",\n     \"@types/node\": \"24.1.0\",\n     \"@types/react\": \"19.1.9\",\ndiff --git a/src/cli.ts b/src/cli.ts\nindex 1ef30bd..2a195b1 100644\n--- a/src/cli.ts\n+++ b/src/cli.ts\n@@ -1,18 +1,18 @@\n #!/usr/bin/env node\n \n-import { Command } from 'commander';\n-import { installCommand } from './commands/install.js';\n+import { Command } from \"commander\";\n+import { installCommand } from \"./commands/install.js\";\n \n const program = new Command();\n \n program\n-  .name('tsumiki')\n-  .description('CLI tool for installing Claude Code command templates')\n-  .version('1.0.0');\n+  .name(\"tsumiki\")\n+  .description(\"CLI tool for installing Claude Code command templates\")\n+  .version(\"1.0.0\");\n \n program\n-  .command('install')\n-  .description('Install Claude Code command templates to .claude/commands/')\n+  .command(\"install\")\n+  .description(\"Install Claude Code command templates to .claude/commands/\")\n   .action(installCommand);\n \n-program.parse();\n\\ No newline at end of file\n+program.parse();\ndiff --git a/src/commands/install.ts b/src/commands/install.tsx\nsimilarity index 62%\nrename from src/commands/install.ts\nrename to src/commands/install.tsx\nindex 930a3a1..bdbeb8b 100644\n--- a/src/commands/install.ts\n+++ b/src/commands/install.tsx\n@@ -1,69 +1,74 @@\n-import React, { useEffect, useState } from 'react';\n-import { render, Text, Box, Newline } from 'ink';\n-import * as fs from 'fs-extra';\n-import * as path from 'path';\n+import * as path from \"node:path\";\n+import * as fs from \"fs-extra\";\n+import { Box, Newline, render, Text } from \"ink\";\n+import React, { useEffect, useState } from \"react\";\n \n-type InstallStatus = 'starting' | 'checking' | 'copying' | 'completed' | 'error';\n+type InstallStatus =\n+  | \"starting\"\n+  | \"checking\"\n+  | \"copying\"\n+  | \"completed\"\n+  | \"error\";\n \n const InstallComponent: React.FC = () => {\n-  const [status, setStatus] = useState<InstallStatus>('starting');\n+  const [status, setStatus] = useState<InstallStatus>(\"starting\");\n   const [copiedFiles, setCopiedFiles] = useState<string[]>([]);\n   const [error, setError] = useState<string | null>(null);\n \n   useEffect(() => {\n     const performInstall = async (): Promise<void> => {\n       try {\n-        setStatus('checking');\n-        \n+        setStatus(\"checking\");\n+\n         // 現在のディレクトリを取得\n         const currentDir = process.cwd();\n-        const targetDir = path.join(currentDir, '.claude', 'commands');\n-        \n+        const targetDir = path.join(currentDir, \".claude\", \"commands\");\n+\n         // tsumikiのcommandsディレクトリを取得\n-        const tsumikiDir = path.resolve(__dirname, '..', '..', 'commands');\n-        \n+        const tsumikiDir = path.resolve(__dirname, \"..\", \"..\", \"commands\");\n+\n         // .claude/commandsディレクトリが存在しない場合は作成\n         await fs.ensureDir(targetDir);\n-        \n-        setStatus('copying');\n-        \n+\n+        setStatus(\"copying\");\n+\n         // commandsディレクトリ内のすべての.mdファイルを取得\n         const files = await fs.readdir(tsumikiDir);\n-        const mdFiles = files.filter(file => file.endsWith('.md'));\n-        \n+        const mdFiles = files.filter((file) => file.endsWith(\".md\"));\n+\n         const copiedFilesList: string[] = [];\n-        \n+\n         for (const file of mdFiles) {\n           const sourcePath = path.join(tsumikiDir, file);\n           const targetPath = path.join(targetDir, file);\n-          \n+\n           await fs.copy(sourcePath, targetPath);\n           copiedFilesList.push(file);\n         }\n-        \n+\n         setCopiedFiles(copiedFilesList);\n-        setStatus('completed');\n-        \n+        setStatus(\"completed\");\n+\n         // 2秒後に終了\n         setTimeout(() => {\n           process.exit(0);\n         }, 2000);\n-        \n       } catch (err) {\n-        const errorMessage = err instanceof Error ? err.message : 'Unknown error occurred';\n+        const errorMessage =\n+          err instanceof Error ? err.message : \"Unknown error occurred\";\n         setError(errorMessage);\n-        setStatus('error');\n-        \n+        setStatus(\"error\");\n+\n         setTimeout(() => {\n           process.exit(1);\n         }, 3000);\n       }\n     };\n-    \n+\n     performInstall();\n   }, []);\n \n-  if (status === 'starting') {\n+  if (status === \"starting\") {\n     return (\n       <Box>\n         <Text color=\"cyan\">🚀 Tsumiki インストールを開始します...</Text>\n@@ -71,7 +76,7 @@ const InstallComponent: React.FC = () => {\n     );\n   }\n \n-  if (status === 'checking') {\n+  if (status === \"checking\") {\n     return (\n       <Box>\n         <Text color=\"yellow\">📋 環境をチェック中...</Text>\n@@ -79,7 +84,7 @@ const InstallComponent: React.FC = () => {\n     );\n   }\n \n-  if (status === 'copying') {\n+  if (status === \"copying\") {\n     return (\n       <Box>\n         <Text color=\"blue\">📝 コマンドテンプレートをコピー中...</Text>\n@@ -87,7 +92,7 @@ const InstallComponent: React.FC = () => {\n     );\n   }\n \n-  if (status === 'error') {\n+  if (status === \"error\") {\n     return (\n       <Box flexDirection=\"column\">\n         <Text color=\"red\">❌ エラーが発生しました:</Text>\n@@ -96,20 +101,25 @@ const InstallComponent: React.FC = () => {\n     );\n   }\n \n-  if (status === 'completed') {\n+  if (status === \"completed\") {\n     return (\n       <Box flexDirection=\"column\">\n         <Text color=\"green\">✅ インストールが完了しました!</Text>\n         <Newline />\n         <Text>コピーされたファイル ({copiedFiles.length}個):</Text>\n-        {copiedFiles.map(file => (\n-          <Text key={file} color=\"gray\">  • {file}</Text>\n+        {copiedFiles.map((file) => (\n+          <Text key={file} color=\"gray\">\n+            {\" \"}\n+            • {file}\n+          </Text>\n         ))}\n         <Newline />\n-        <Text color=\"cyan\">Claude Codeで以下のようにコマンドを使用できます:</Text>\n-        <Text color=\"white\">  /tdd-requirements</Text>\n-        <Text color=\"white\">  /kairo-design</Text>\n-        <Text color=\"white\">  ...</Text>\n+        <Text color=\"cyan\">\n+          Claude Codeで以下のようにコマンドを使用できます:\n+        </Text>\n+        <Text color=\"white\"> /tdd-requirements</Text>\n+        <Text color=\"white\"> /kairo-design</Text>\n+        <Text color=\"white\"> ...</Text>\n       </Box>\n     );\n   }\n@@ -119,4 +129,4 @@ const InstallComponent: React.FC = () => {\n \n export const installCommand = (): void => {\n   render(React.createElement(InstallComponent));\n-};\n\\ No newline at end of file\n+};\ndiff --git a/tsconfig.json b/tsconfig.json\nindex a4d3c69..7510be6 100644\n--- a/tsconfig.json\n+++ b/tsconfig.json\n@@ -8,11 +8,6 @@\n     \"sourceMap\": true,\n     \"jsx\": \"react\"\n   },\n-  \"include\": [\n-    \"src/**/*\"\n-  ],\n-  \"exclude\": [\n-    \"node_modules\",\n-    \"dist\"\n-  ]\n-}\n\\ No newline at end of file\n+  \"include\": [\"src/**/*\"],\n+  \"exclude\": [\"node_modules\", \"dist\"]\n+}\ndiff --git a/tsup.config.ts b/tsup.config.ts\nindex 8d4b10c..25f7818 100644\n--- a/tsup.config.ts\n+++ b/tsup.config.ts\n@@ -1,14 +1,14 @@\n-import { defineConfig } from 'tsup';\n+import { defineConfig } from \"tsup\";\n \n export default defineConfig({\n-  entry: ['src/cli.ts'],\n-  format: ['cjs'],\n-  target: 'node18',\n-  outDir: 'dist',\n+  entry: [\"src/cli.ts\"],\n+  format: [\"cjs\"],\n+  target: \"node18\",\n+  outDir: \"dist\",\n   clean: true,\n   sourcemap: true,\n   splitting: false,\n   bundle: true,\n-  external: ['ink', 'react'],\n-  noExternal: ['commander', 'fs-extra'],\n-});\n\\ No newline at end of file\n+  external: [\"ink\", \"react\"],\n+  noExternal: [\"commander\", \"fs-extra\"],\n+});\n",
+  "diffTruncated": false,
+  "tree": [
+    ".gitignore",
+    ".npmrc",
+    "LICENSE",
+    "MANUAL.md",
+    "README.md",
+    "biome.json",
+    "book/01-fundamentals/01-aitdd-definition.md",
+    "book/02-environment/01-tools-setup.md",
+    "book/02-environment/02-claude-usage.md",
+    "book/02-environment/03-workflow-setup.md",
+    "book/03-process/01-extended-tdd-flow.md",
+    "book/03-process/02-todo-and-specification.md",
+    "book/03-process/03-test-case-creation.md",
+    "book/03-process/04-rgr-validation-cycle.md",
+    "book/03-process/05-validation-details.md",
+    "book/04-hands-on/01-first-project.md",
+    "book/04-hands-on/02-crud-example.md",
+    "book/04-hands-on/03-api-development.md",
+    "book/04-hands-on/04-error-handling.md",
+    "book/05-optimization/01-prompt-design.md",
+    "book/05-optimization/02-ai-inference-visualization.md",
+    "book/05-optimization/03-continuous-improvement.md",
+    "book/06-collaboration/01-balance-strategy.md",
+    "book/06-collaboration/02-creativity-points.md",
+    "book/06-collaboration/03-review-quality.md",
+    "book/07-case-studies/01-experimental-results.md",
+    "book/07-case-studies/02-evolution-case.md",
+    "book/07-case-studies/03-failure-cases.md",
+    "book/08-best-practices/01-tech-selection.md",
+    "book/08-best-practices/02-documentation.md",
+    "book/08-best-practices/03-future-vision.md",
+    "book/aitdd-getting-started.md",
+    "book/toc.md",
+    "commands/direct-setup.md",
+    "commands/direct-verify.md",
+    "commands/kairo-design.md",
+    "commands/kairo-implement.md",
+    "commands/kairo-requirements.md",
+    "commands/kairo-task-verify.md",
+    "commands/kairo-tasks.md",
+    "commands/rev-design.md",
+    "commands/rev-requirements.md",
+    "commands/rev-specs.md",
+    "commands/rev-tasks.md",
+    "commands/start-server.md",
+    "commands/tdd-cycle-full.sh",
+    "commands/tdd-green.md",
+    "commands/tdd-load-context.md",
+    "commands/tdd-red.md",
+    "commands/tdd-refactor.md",
+    "commands/tdd-requirements.md",
+    "commands/tdd-testcases.md",
+    "commands/tdd-todo.md",
+    "commands/tdd-verify-complete.md",
+    "mise.toml",
+    "package.json",
+    "src/cli.ts",
+    "src/commands/install.tsx",
+    "tsconfig.json",
+    "tsup.config.ts"
+  ],
+  "explanation": {
+    "what": "`src/commands/install.ts` を `src/commands/install.tsx` にリネームし、シングルクォートをダブルクォートに、node組み込みモジュールのimportを `node:path` 形式に統一した。`biome.json` はタブインデントをスペースインデントに整形し、`package.json` の `format` スクリプトを `fix` に改名、`tsconfig.json` の `include`/`exclude` を1行にまとめた。",
+    "why": "コミットメッセージに「Refactor CLI and installation command structure; remove deprecated install command implementation」とある。JSX を含むファイルの拡張子を実体に合わせて `.tsx` にし、biome の推奨スタイル(ダブルクォート・スペースインデント)にコード全体を揃えた整形コミットと考えられる。",
+    "highlights": [
+      { "file": "src/commands/install.tsx", "note": "拡張子を .ts→.tsx に変更(rename)し、クォートスタイルを biome.json の quoteStyle: double に合わせて統一" }
+    ],
+    "langNotes": [
+      { "topic": ".tsx 拡張子", "note": "JSX(ここでは ink の `<Box>`/`<Text>` 記法)を含む TypeScript ファイルは `.tsx` 拡張子にする必要がある。当初 `.ts` で作られていたものをこのコミットで実体に合わせて `.tsx` にリネームしている。" }
+    ],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [{ "type": "pr", "number": 15, "url": "https://github.com/classmethod/tsumiki/pull/15" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-08-04T12:00:00Z"
+  }
+}

@@ -1,0 +1,239 @@
+{
+  "seq": 69,
+  "sha": "1bce89dd8582b0fc2033d57090e8e8fd925d4a5b",
+  "parents": [
+    "2c5e16487a75b219a479e3a17e384b0a7dd4cd3f"
+  ],
+  "author": {
+    "name": "makotan",
+    "email": "makotan@gmail.com",
+    "date": "2025-08-05T05:49:02+09:00"
+  },
+  "message": "feat: improve agent integration and context preparation across TDD/Kairo commands\n\n- Add new symbol-searcher agent for code symbol discovery and analysis\n- Add auto-debug command for automated test error resolution\n- Update all TDD commands to use @agent-symbol-searcher for context preparation\n- Update all Kairo commands to integrate symbol search for better context\n- Replace tdd-load-context with direct @agent-symbol-searcher usage\n- Add Task-based execution patterns to kairo-implement\n- Improve context preparation with targeted file reading based on search results\n- Add comprehensive symbol search capabilities for better code navigation\n\n🤖 Generated with [Claude Code](https://claude.ai/code)\n\nCo-Authored-By: Claude <noreply@anthropic.com>",
+  "pr": {
+    "number": 18,
+    "title": "各コマンドの初期処理をagentに変更",
+    "body": "agentを追加して各コマンドの初期処理の検索のコスト改善\r\nkairo-implementのコマンド実行をタスクに修正\r\ninstallでagentも含まれるように変更",
+    "url": "https://github.com/classmethod/tsumiki/pull/18"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 17,
+    "additions": 277,
+    "deletions": 54
+  },
+  "files": [
+    {
+      "path": "agents/symbol-searcher.md",
+      "status": "A",
+      "additions": 61,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "commands/auto-debug.md",
+      "status": "A",
+      "additions": 10,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "commands/direct-setup.md",
+      "status": "M",
+      "additions": 5,
+      "deletions": 3,
+      "binary": false
+    },
+    {
+      "path": "commands/direct-verify.md",
+      "status": "M",
+      "additions": 3,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "commands/kairo-design.md",
+      "status": "M",
+      "additions": 3,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "commands/kairo-implement.md",
+      "status": "M",
+      "additions": 103,
+      "deletions": 32,
+      "binary": false
+    },
+    {
+      "path": "commands/kairo-requirements.md",
+      "status": "M",
+      "additions": 2,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "commands/kairo-task-verify.md",
+      "status": "M",
+      "additions": 4,
+      "deletions": 2,
+      "binary": false
+    },
+    {
+      "path": "commands/kairo-tasks.md",
+      "status": "M",
+      "additions": 9,
+      "deletions": 6,
+      "binary": false
+    },
+    {
+      "path": "commands/tdd-green.md",
+      "status": "M",
+      "additions": 11,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "commands/tdd-load-context.md",
+      "status": "M",
+      "additions": 11,
+      "deletions": 4,
+      "binary": false
+    },
+    {
+      "path": "commands/tdd-red.md",
+      "status": "M",
+      "additions": 10,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "commands/tdd-refactor.md",
+      "status": "M",
+      "additions": 11,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "commands/tdd-requirements.md",
+      "status": "M",
+      "additions": 10,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "commands/tdd-testcases.md",
+      "status": "M",
+      "additions": 10,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "commands/tdd-todo.md",
+      "status": "M",
+      "additions": 3,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "commands/tdd-verify-complete.md",
+      "status": "M",
+      "additions": 11,
+      "deletions": 1,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/agents/symbol-searcher.md b/agents/symbol-searcher.md\nnew file mode 100644\nindex 0000000..1608ce8\n--- /dev/null\n+++ b/agents/symbol-searcher.md\n@@ -0,0 +1,61 @@\n+---\n+name: symbol-searcher\n+description: Use this agent when you need to search for specific symbols (classes, methods, functions, variables, etc.) across the codebase and retrieve detailed information about their locations and types. This agent is particularly useful for code navigation, refactoring preparation, or understanding code structure. Examples:\\n\\n<example>\\nContext: The user wants to find all occurrences of a specific method across the codebase.\\nuser: \"Find all instances of the 'createTodo' method in the project\"\\nassistant: \"I'll use the symbol-searcher agent to locate all occurrences of the 'createTodo' method across the codebase.\"\\n<commentary>\\nSince the user wants to find specific symbols in the code, use the Task tool to launch the symbol-searcher agent.\\n</commentary>\\n</example>\\n\\n<example>\\nContext: The user needs to understand where a class is defined and used.\\nuser: \"Where is the TodoController class defined and what methods does it have?\"\\nassistant: \"Let me search for the TodoController class symbol to find its definition and methods.\"\\n<commentary>\\nThe user is asking about a specific class symbol, so use the symbol-searcher agent to find its location and details.\\n</commentary>\\n</example>\n+tools: Glob, Grep, LS, Read, NotebookRead, WebFetch, TodoWrite, WebSearch, mcp__ide__getDiagnostics\n+model: haiku\n+color: green\n+---\n+\n+You are an expert code symbol analyzer specializing in searching and identifying symbols across codebases. Your primary responsibility is to locate specific symbols (classes, methods, functions, variables, interfaces, types, etc.) and provide comprehensive information about their locations and characteristics.\n+\n+When searching for symbols, you will:\n+\n+1. **Search Strategy**:\n+   - Use appropriate tools to scan files for the requested symbol names\n+   - Consider partial matches and case variations when appropriate\n+   - Search across all relevant file types in the project\n+   - Prioritize definition locations over usage locations unless specified otherwise\n+\n+2. **Symbol Classification**:\n+   - Accurately identify the symbol type: class, method, function, variable, interface, type, enum, constant, etc.\n+   - For methods/functions, include whether they are static, async, private/public\n+   - For classes, note if they are abstract, extend other classes, or implement interfaces\n+   - Include descriptive context that helps understand the symbol's purpose\n+\n+3. **Information Extraction**:\n+   For each symbol found, you must provide:\n+   - **Symbol Name**: The exact name with descriptive context (e.g., 'createTodo - async method for creating new todo items')\n+   - **Type**: The specific symbol type (class, method, function, variable, etc.)\n+   - **File Path**: The relative path from the project root\n+   - **Location**: Line number and, if possible, column number\n+   - **Context**: Brief description of what the symbol does based on its name and surrounding code\n+\n+4. **Output Format**:\n+   Present your findings in a structured format:\n+   ```\n+   Symbol: [Name with description]\n+   Type: [Symbol type]\n+   File: [Relative path]\n+   Location: Line [X], Column [Y]\n+   Context: [Brief functional description]\n+   ```\n+\n+5. **Search Completeness**:\n+   - Always search the entire codebase unless instructed to limit scope\n+   - Group results by symbol type when multiple matches are found\n+   - If a symbol has multiple definitions (overloads, implementations), list all occurrences\n+   - Distinguish between declarations, definitions, and usages when relevant\n+\n+6. **Edge Cases**:\n+   - If no symbols are found, suggest similar symbol names that exist in the codebase\n+   - Handle minified or obfuscated code by noting when symbol names might be transformed\n+   - For ambiguous requests, search for all possible interpretations\n+   - Consider language-specific naming conventions (camelCase, snake_case, etc.)\n+\n+7. **Quality Assurance**:\n+   - Verify that the symbol at the reported location matches the search criteria\n+   - Ensure file paths are correct and relative to the project root\n+   - Double-check symbol type classification\n+   - Include enough context in descriptions to make the symbol's purpose clear\n+\n+Remember: Your goal is to provide developers with precise, actionable information about code symbols that helps them navigate and understand the codebase efficiently. Always prioritize accuracy and completeness in your symbol analysis.\ndiff --git a/commands/auto-debug.md b/commands/auto-debug.md\nnew file mode 100644\nindex 0000000..623a4f1\n--- /dev/null\n+++ b/commands/auto-debug.md\n@@ -0,0 +1,10 @@\n+テストエラーを解消して。\n+最初に全テストケースの確認をタスク実行してテストケースのエラーをtodoにセットして\n+各対象毎に以下の作業を実施して\n+　 - タスクで詳細にテストのエラー原因を調る\n+ 　- 新たなタスクで /tdd-green を使って修正する\n+最後に全体のテストの成功率を確認してレポートして\n+ゴールはテストケースの成功数を上げること\n+NEVER: テストのスキップ\n+NEVER: 既存でテストケースの削除\n+#ultrathink\ndiff --git a/commands/direct-setup.md b/commands/direct-setup.md\nindex 63aab10..9bc2667 100644\n--- a/commands/direct-setup.md\n+++ b/commands/direct-setup.md\n@@ -13,11 +13,13 @@ DIRECTタスクの設定作業を実行します。設計文書に基づいて\n ## 実行内容\n \n 1. **設計文書の確認**\n-   - `docs/design/{要件名}/architecture.md` を確認\n-   - `docs/design/{要件名}/database-schema.sql` を確認\n-   - その他関連する設計文書を確認\n+   - @agent-symbol-searcher で関連設計文書や設定パターンを検索し、見つかったファイルをReadツールで読み込み\n+   - `docs/design/{要件名}/architecture.md` をReadツールで読み込み\n+   - `docs/design/{要件名}/database-schema.sql` をReadツールで読み込み\n+   - その他関連する設計文書をReadツールで読み込み\n \n 2. **設定作業の実行**\n+   - @agent-symbol-searcher で既存の設定ファイルや環境変数を検索し、見つかったファイルをReadツールで読み込み\n    - 環境変数の設定\n    - 設定ファイルの作成・更新\n    - 依存関係のインストール\ndiff --git a/commands/direct-verify.md b/commands/direct-verify.md\nindex 0e1e81a..d5d17e3 100644\n--- a/commands/direct-verify.md\n+++ b/commands/direct-verify.md\n@@ -15,6 +15,8 @@ DIRECTタスクで実行した設定作業の動作確認とテストを行い\n **【重要】**: direct-setupで作成されたファイルについて、コンパイルエラーや構文エラーが見つかった場合は自動的に解決を試行します。\n \n 1. **設定の確認**\n+   - @agent-symbol-searcher で関連設定や検証パターンを検索し、見つかったファイルをReadツールで読み込み\n+   - `docs/implements/{TASK-ID}/setup-report.md` をReadツールで読み込み、設定作業の結果を確認\n    - 環境変数の確認\n    - 設定ファイルの内容確認\n    - 依存関係のインストール状況確認\n@@ -27,6 +29,7 @@ DIRECTタスクで実行した設定作業の動作確認とテストを行い\n    - 最低限のコンパイルエラー解消\n \n 3. **動作テストの実行**\n+   - @agent-symbol-searcher で既存のテストケースや検証スクリプトを検索し、見つかったファイルをReadツールで読み込み\n    - 基本的な動作確認\n    - 接続テスト\n    - 権限の確認\ndiff --git a/commands/kairo-design.md b/commands/kairo-design.md\nindex 01d6344..8b1d718 100644\n--- a/commands/kairo-design.md\n+++ b/commands/kairo-design.md\n@@ -19,7 +19,8 @@\n - 🔴 **赤信号**: EARS要件定義書・設計文書にない推測の場合\n \n 1. **要件の分析**\n-   - 要件定義書を読み込む\n+   - @agent-symbol-searcher で要件定義書を検索し、見つかったファイルをReadツールで読み込み\n+   - @agent-symbol-searcher で関連する既存設計文書を確認し、見つかったファイルをReadツールで読み込み\n    - 機能要件と非機能要件を整理する\n    - システムの境界を明確にする\n \n@@ -212,6 +213,7 @@ CREATE INDEX idx_users_email ON users(email);\n \n ## 実行後の確認\n \n+- @agent-symbol-searcher で作成した設計と既存システムとの整合性を確認\n - 作成したファイルの一覧を表示\n - 設計の主要なポイントをサマリーで表示\n - ユーザに確認を促すメッセージを表示\ndiff --git a/commands/kairo-implement.md b/commands/kairo-implement.md\nindex 20bc374..ac298a2 100644\n--- a/commands/kairo-implement.md\n+++ b/commands/kairo-implement.md\n@@ -21,11 +21,13 @@\n - 🔴 **赤信号**: EARS要件定義書・設計文書にない推測の場合\n \n 1. **タスクの選択**\n+   - @agent-symbol-searcher で指定されたタスクIDを検索し、見つかったタスクファイルをReadツールで読み込み\n    - ユーザが指定したタスクIDを確認\n    - 指定がない場合は、依存関係に基づいて次のタスクを自動選択\n    - 選択したタスクの詳細を表示\n \n 2. **依存関係の確認**\n+   - @agent-symbol-searcher で依存タスクの状態を検索し、見つかったタスクファイルをReadツールで読み込み\n    - 依存タスクが完了しているか確認\n    - 未完了の依存タスクがある場合は警告\n \n@@ -41,42 +43,78 @@\n \n    ### A. **TDDプロセス**（コード実装タスク用）\n \n-   a. **要件定義** (`tdd-requirements.md`)\n-   - タスクの詳細要件を記述\n-   - 受け入れ基準を明確化\n-\n-   b. **テストケース作成** (`tdd-testcases.md`)\n-   - 単体テストケースを作成\n-   - エッジケースを考慮\n-\n-   c. **テスト実装** (`tdd-red.md`)\n-   - 失敗するテストを実装\n-   - テストが失敗することを確認\n-\n-   d. **最小実装** (`tdd-green.md`)\n-   - テストが通る最小限の実装\n-   - 過度な実装を避ける\n-\n-   e. **リファクタリング** (`tdd-refactor.md`)\n-   - コードの品質向上\n-   - 保守性の改善\n-\n-   f. **品質確認** (`tdd-verify-complete.md`)\n-   - 実装の完成度を確認\n-   - 不足があれば c-f を繰り返す\n+   a. **要件定義** - `@task general-purpose tdd-requirements.md`\n+   ```\n+   Task実行: TDD要件定義フェーズ\n+   目的: タスクの詳細要件を記述し、受け入れ基準を明確化する\n+   コマンド: tdd-requirements.md\n+   実行方式: 個別Task実行\n+   ```\n+\n+   b. **テストケース作成** - `@task general-purpose tdd-testcases.md`\n+   ```\n+   Task実行: TDDテストケース作成フェーズ\n+   目的: 単体テストケースを作成し、エッジケースを考慮する\n+   コマンド: tdd-testcases.md\n+   実行方式: 個別Task実行\n+   ```\n+\n+   c. **テスト実装** - `@task general-purpose tdd-red.md`\n+   ```\n+   Task実行: TDDレッドフェーズ\n+   目的: 失敗するテストを実装し、テストが失敗することを確認する\n+   コマンド: tdd-red.md\n+   実行方式: 個別Task実行\n+   ```\n+\n+   d. **最小実装** - `@task general-purpose tdd-green.md`\n+   ```\n+   Task実行: TDDグリーンフェーズ\n+   目的: テストが通る最小限の実装を行い、過度な実装を避ける\n+   コマンド: tdd-green.md\n+   実行方式: 個別Task実行\n+   ```\n+\n+   e. **リファクタリング** - `@task general-purpose tdd-refactor.md`\n+   ```\n+   Task実行: TDDリファクタリングフェーズ\n+   目的: コードの品質向上と保守性の改善を行う\n+   コマンド: tdd-refactor.md\n+   実行方式: 個別Task実行\n+   ```\n+\n+   f. **品質確認** - `@task general-purpose tdd-verify-complete.md`\n+   ```\n+   Task実行: TDD品質確認フェーズ\n+   目的: 実装の完成度を確認し、不足があればc-fを繰り返す\n+   コマンド: tdd-verify-complete.md\n+   実行方式: 個別Task実行\n+   ```\n \n    ### B. **直接作業プロセス**（準備作業タスク用）\n \n-   a. **準備作業の実行**\n+   a. **準備作業の実行** - `@task general-purpose direct-work-execute`\n+   ```\n+   Task実行: 直接作業実行フェーズ\n+   目的: ディレクトリ作成、設定ファイル作成、依存関係のインストール、環境設定を行う\n+   作業内容:\n    - ディレクトリ作成\n    - 設定ファイル作成\n    - 依存関係のインストール\n    - 環境設定\n-\n-   b. **作業結果の確認**\n+   実行方式: 個別Task実行\n+   ```\n+\n+   b. **作業結果の確認** - `@task general-purpose direct-work-verify`\n+   ```\n+   Task実行: 直接作業確認フェーズ\n+   目的: 作業完了の検証と成果物確認を行う\n+   作業内容:\n    - 作業完了の検証\n    - 期待された成果物の確認\n    - 次のタスクへの準備状況確認\n+   実行方式: 個別Task実行\n+   ```\n \n 6. **タスクの完了処理**\n    - タスクのステータスを更新（タスクファイルのチェックボックスにチェックを入れる）\n@@ -154,6 +192,33 @@ $ claude code kairo-implement --status\n \n **例**: プロジェクト初期化、データベース設定、開発環境設定\n \n+## 個別Task実行アプローチ\n+\n+### Task実行の方針\n+\n+各実装ステップを個別のTaskとして実行することで、以下のメリットが得られます：\n+\n+1. **独立性**: 各ステップが独立して実行され、エラー発生時の切り分けが容易\n+2. **再実行性**: 特定のステップのみ再実行が可能\n+3. **並列性**: 依存関係のないステップは並列実行可能\n+4. **追跡性**: 各ステップの実行状況と結果が明確に記録される\n+\n+### Task実行パターン\n+\n+```bash\n+# TDDプロセスの場合\n+@task general-purpose tdd-requirements.md\n+@task general-purpose tdd-testcases.md\n+@task general-purpose tdd-red.md\n+@task general-purpose tdd-green.md\n+@task general-purpose tdd-refactor.md\n+@task general-purpose tdd-verify-complete.md\n+\n+# 直接作業プロセスの場合\n+@task general-purpose direct-work-execute\n+@task general-purpose direct-work-verify\n+```\n+\n ## 実装時の注意事項\n \n ### TDDプロセス用\n@@ -217,19 +282,23 @@ $ claude code kairo-implement --status\n ### 各ステップ完了時（TDD）\n \n ```\n-✅ Step 1/6: 要件定義 完了\n+✅ Task 1/6: @task tdd-requirements 完了\n    ファイル: /implementation/{要件名}/TASK-101/requirements.md\n+   Task実行結果: 要件定義書作成完了\n \n-🏃 Step 2/6: テストケース作成 実行中...\n+🏃 Task 2/6: @task tdd-testcases 実行中...\n+   Task実行: TDDテストケース作成フェーズを開始\n ```\n \n ### 各ステップ完了時（直接作業）\n \n ```\n-✅ Step 1/2: 準備作業実行 完了\n+✅ Task 1/2: @task direct-work-execute 完了\n    作成ファイル: 8個、設定更新: 3個\n+   Task実行結果: 準備作業実行完了\n \n-🏃 Step 2/2: 作業結果確認 実行中...\n+🏃 Task 2/2: @task direct-work-verify 実行中...\n+   Task実行: 直接作業確認フェーズを開始\n ```\n \n ### タスク完了時（TDD）\n@@ -241,7 +310,8 @@ $ claude code kairo-implement --status\n    - [ ] **タスク完了** → [x] **タスク完了**\n \n 📊 実装サマリー:\n-- 実装タイプ: TDDプロセス\n+- 実装タイプ: TDDプロセス (個別Task実行)\n+- 実行Taskステップ: 6個 (全て成功)\n - 作成ファイル: 12個\n - テストケース: 25個 (全て成功)\n - カバレッジ: 95%\n@@ -263,7 +333,8 @@ $ claude code kairo-implement --status\n    - [ ] **タスク完了** → [x] **タスク完了**\n \n 📊 実装サマリー:\n-- 実装タイプ: 直接作業プロセス\n+- 実装タイプ: 直接作業プロセス (個別Task実行)\n+- 実行Taskステップ: 2個 (全て成功)\n - 作成ファイル: 8個\n - 設定更新: 3個\n - 環境確認: 正常\ndiff --git a/commands/kairo-requirements.md b/commands/kairo-requirements.md\nindex 13dc293..aa531b8 100644\n--- a/commands/kairo-requirements.md\n+++ b/commands/kairo-requirements.md\n@@ -20,6 +20,7 @@\n \n 1. **要件の分析**\n    - ユーザから提供された要件の概要を理解する\n+   - @agent-symbol-searcher で関連する既存要件・設計文書を検索し、見つかったファイルをReadツールで読み込み\n    - 関連するドメイン知識を適用する\n    - 不明確な点がある場合は、一般的なベストプラクティスに基づいて補完する\n \n@@ -342,6 +343,7 @@ journey\n \n ## 実行後の確認\n \n+- @agent-symbol-searcher で作成した要件との関連性を確認\n - 作成した3つのファイルのパスを表示\n   - `docs/spec/{要件名}-requirements.md`\n   - `docs/spec/{要件名}-user-stories.md` \ndiff --git a/commands/kairo-task-verify.md b/commands/kairo-task-verify.md\nindex c0d613d..1b28075 100644\n--- a/commands/kairo-task-verify.md\n+++ b/commands/kairo-task-verify.md\n@@ -19,10 +19,12 @@\n - 🔴 **赤信号**: EARS要件定義書・設計文書にない推測の場合\n \n 1. **タスクファイルの確認**\n-   - `docs/tasks/{要件名}-tasks.md` を読み込み\n+   - @agent-symbol-searcher でタスクファイルを検索し、見つかったファイルをReadツールで読み込み\n+   - `docs/tasks/{要件名}-tasks.md` をReadツールで読み込み\n \n 2. **出力フォーマット例との比較**\n-   - kairo-tasksの出力フォーマット例を確認\n+   - @agent-symbol-searcher で関連するタスクフォーマットを検索し、見つかったファイルをReadツールで読み込み\n+   - kairo-tasksコマンドファイルをReadツールで読み込み、出力フォーマット例を確認\n    - 作成されたタスクファイルに不足している情報を特定\n \n 3. **不足情報の追加**\ndiff --git a/commands/kairo-tasks.md b/commands/kairo-tasks.md\nindex 4887439..5730b9e 100644\n--- a/commands/kairo-tasks.md\n+++ b/commands/kairo-tasks.md\n@@ -20,14 +20,16 @@\n - 🔴 **赤信号**: EARS要件定義書・設計文書にない推測の場合\n \n 1. **設計文書の分析**\n-   - `docs/design/{要件名}/architecture.md` を確認\n-   - `docs/design/{要件名}/database-schema.sql` を確認\n-   - `docs/design/{要件名}/api-endpoints.md` を確認\n-   - `docs/design/{要件名}/interfaces.ts` を確認\n-   - `docs/design/{要件名}/dataflow.md` を確認\n+   - @agent-symbol-searcher で設計文書を検索し、見つかったファイルをReadツールで読み込み\n+   - `docs/design/{要件名}/architecture.md` をReadツールで読み込み\n+   - `docs/design/{要件名}/database-schema.sql` をReadツールで読み込み\n+   - `docs/design/{要件名}/api-endpoints.md` をReadツールで読み込み\n+   - `docs/design/{要件名}/interfaces.ts` をReadツールで読み込み\n+   - `docs/design/{要件名}/dataflow.md` をReadツールで読み込み\n \n 2. **既存タスクファイルの確認**\n-   - 既存の`docs/tasks/{要件名}-*.md`ファイルを確認\n+   - @agent-symbol-searcher で既存タスクIDを検索し、見つかったタスクファイルをReadツールで読み込み\n+   - 既存の`docs/tasks/{要件名}-*.md`ファイルをReadツールで読み込み\n    - 使用済みタスク番号（TASK-0001形式）を抽出\n    - 新規タスクで重複しない番号を割り当て\n \n@@ -358,6 +360,7 @@ gantt\n \n ## 実行後の確認\n \n+- @agent-symbol-searcher で作成したタスクと既存システムとの整合性を確認\n - 作成したファイルの一覧を表示\n   - `docs/tasks/{要件名}-overview.md`: 全体概要とフェーズ一覧\n   - `docs/tasks/{要件名}-phase1.md`: フェーズ1詳細\ndiff --git a/commands/tdd-green.md b/commands/tdd-green.md\nindex ca6c43c..6361386 100644\n--- a/commands/tdd-green.md\n+++ b/commands/tdd-green.md\n@@ -6,7 +6,17 @@ TDDのGreenフェーズを実行します。\n \n 開発コンテキストの準備を行います：\n \n-**Taskツール実行**: `/tdd-load-context` でTDD関連ファイルの読み込みとコンテキスト準備を実行\n+1. **@agent-symbol-searcher で実装関連情報を検索し、見つかったファイルを読み込み**\n+   - 既存の類似機能やユーティリティ関数を検索し、該当ファイルをReadツールで読み込み\n+   - 実装パターンやアーキテクチャガイドラインを特定し、設計文書をReadツールで読み込み\n+   - 依存関係やインポートパスを確認し、関連ファイルをReadツールで読み込み\n+\n+2. **関連ファイルを直接読み込み**\n+   - `docs/implements/{{task_id}}/{feature_name}-memo.md` - 既存の開発履歴を確認\n+   - `docs/implements/{{task_id}}/{feature_name}-requirements.md` - 要件定義を確認\n+   - `docs/implements/{{task_id}}/{feature_name}-testcases.md` - テストケース定義を確認\n+   - `docs/implements/{{task_id}}/{feature_name}-red-phase.md` - Redフェーズのテストを確認\n+   - 関連する設計文書やタスクファイルも必要に応じて読み込み\n \n 読み込み完了後、準備されたコンテキスト情報を基にGreenフェーズ（実装）の作業を開始します。\n \ndiff --git a/commands/tdd-load-context.md b/commands/tdd-load-context.md\nindex ec3dd56..2c1ca1a 100644\n--- a/commands/tdd-load-context.md\n+++ b/commands/tdd-load-context.md\n@@ -1,10 +1,17 @@\n-# TDD関連ファイル読み込み・コンテキスト準備\n+# TDD関連ファイル読み込み・コンテキスト準備 (非推奨)\n \n-TDD開発に必要なファイルを効率的に読み込み、開発コンテキストを準備するタスクです。\n+**注意**: このコマンドは非推奨です。他のTDDコマンドでは@agent-symbol-searcherとReadツールを直接使用してコンテキストを準備します。\n+\n+以下は参考情報として保持しています。\n \n ## 実行タスク\n \n-以下のTaskツールによる並列読み込みを実行します：\n+以下の@agent-symbol-searcherとTaskツールによる並列読み込み・検索を実行します：\n+\n+### 0. **@agent-symbol-searcher で関連情報を検索**\n+   - 対象機能に関連する既存シンボル・関数・クラスを検索\n+   - 類似機能の実装パターンやアーキテクチャを特定\n+   - TDD関連のツール・フレームワークの使用方法を確認\n \n ```\n 1. 【読み込み】TDDメモファイルの確認\n@@ -106,4 +113,4 @@ TDD開発に必要なファイルを効率的に読み込み、開発コンテ\n - **保守性**: ファイル読み込み・探索ロジックの一元管理\n - **軽量化**: 関連ファイルは特定のみで、必要に応じて個別に読み込み可能\n \n-このタスクにより、TDD開発の各フェーズで必要な情報を効率的に準備できます。\n\\ No newline at end of file\n+このタスクにより、@agent-symbol-searcherでの検索結果と既存TDDファイルの情報を組み合わせ、TDD開発の各フェーズで必要な情報を効率的に準備できます。\n\\ No newline at end of file\ndiff --git a/commands/tdd-red.md b/commands/tdd-red.md\nindex 5775413..fb7d0ee 100644\n--- a/commands/tdd-red.md\n+++ b/commands/tdd-red.md\n@@ -6,7 +6,16 @@ TDDのRedフェーズを実行します。\n \n 開発コンテキストの準備を行います：\n \n-**Taskツール実行**: `/tdd-load-context` でTDD関連ファイルの読み込みとコンテキスト準備を実行\n+1. **@agent-symbol-searcher でテスト実装関連情報を検索し、見つかったファイルを読み込み**\n+   - 既存のテストファイルやテスト関数を検索し、該当ファイルをReadツールで読み込み\n+   - テストセットアップやモックの使用パターンを特定し、関連ファイルをReadツールで読み込み\n+   - Jest/Mochaなどのテストフレームワークの設定を確認し、設定ファイルをReadツールで読み込み\n+\n+2. **関連ファイルを直接読み込み**\n+   - `docs/implements/{{task_id}}/{feature_name}-memo.md` - 既存の開発履歴を確認\n+   - `docs/implements/{{task_id}}/{feature_name}-requirements.md` - 要件定義を確認\n+   - `docs/implements/{{task_id}}/{feature_name}-testcases.md` - テストケース定義を確認\n+   - 関連する設計文書やタスクファイルも必要に応じて読み込み\n \n 読み込み完了後、準備されたコンテキスト情報を基にRedフェーズ（失敗テスト作成）の作業を開始します。\n \ndiff --git a/commands/tdd-refactor.md b/commands/tdd-refactor.md\nindex 04f44c6..a274efb 100644\n--- a/commands/tdd-refactor.md\n+++ b/commands/tdd-refactor.md\n@@ -6,7 +6,17 @@ TDDのRefactorフェーズを実行します。\n \n 開発コンテキストの準備を行います：\n \n-**Taskツール実行**: `/tdd-load-context` でTDD関連ファイルの読み込みとコンテキスト準備を実行\n+1. **@agent-symbol-searcher でリファクタリング関連情報を検索し、見つかったファイルを読み込み**\n+   - 既存のコードスタイルやベストプラクティスを検索し、スタイルガイドをReadツールで読み込み\n+   - プロジェクト全体のアーキテクチャパターンを特定し、設計文書をReadツールで読み込み\n+   - 再利用可能なユーティリティ関数やコンポーネントを確認し、関連ファイルをReadツールで読み込み\n+\n+2. **関連ファイルを直接読み込み**\n+   - `docs/implements/{{task_id}}/{feature_name}-memo.md` - 既存の開発履歴を確認\n+   - `docs/implements/{{task_id}}/{feature_name}-requirements.md` - 要件定義を確認\n+   - `docs/implements/{{task_id}}/{feature_name}-testcases.md` - テストケース定義を確認\n+   - `docs/implements/{{task_id}}/{feature_name}-green-phase.md` - Greenフェーズの実装を確認\n+   - 関連する設計文書やタスクファイルも必要に応じて読み込み\n \n 読み込み完了後、準備されたコンテキスト情報を基にRefactorフェーズ（コード改善）の作業を開始します。\n \ndiff --git a/commands/tdd-requirements.md b/commands/tdd-requirements.md\nindex bd03082..3f74870 100644\n--- a/commands/tdd-requirements.md\n+++ b/commands/tdd-requirements.md\n@@ -8,7 +8,16 @@ TDD開発を始めます。以下の機能について要件を整理してく\n \n 開発コンテキストの準備を行います：\n \n-**Taskツール実行**: `/tdd-load-context` でTDD関連ファイルの読み込みとコンテキスト準備を実行\n+1. **@agent-symbol-searcher で機能関連情報を検索し、見つかったファイルを読み込み**\n+   - 関連する既存機能・コンポーネントを検索し、該当ファイルをReadツールで読み込み\n+   - 類似した実装パターンやアーキテクチャを特定し、設計文書をReadツールで読み込み\n+   - 既存のインターフェースやAPI仕様を確認し、関連ファイルをReadツールで読み込み\n+\n+2. **関連ファイルを直接読み込み**\n+   - `docs/implements/{{task_id}}/{feature_name}-memo.md` - 既存の開発履歴を確認\n+   - `docs/implements/{{task_id}}/{feature_name}-requirements.md` - 既存の要件定義を確認\n+   - `docs/implements/{{task_id}}/{feature_name}-testcases.md` - 既存のテストケースを確認\n+   - 関連する設計文書やタスクファイルも必要に応じて読み込み\n \n 読み込み完了後、準備されたコンテキスト情報を基にTDD要件定義の作業を開始します。\n \ndiff --git a/commands/tdd-testcases.md b/commands/tdd-testcases.md\nindex 25d5500..d4cfe6d 100644\n--- a/commands/tdd-testcases.md\n+++ b/commands/tdd-testcases.md\n@@ -6,7 +6,16 @@\n \n 開発コンテキストの準備を行います：\n \n-**Taskツール実行**: `/tdd-load-context` でTDD関連ファイルの読み込みとコンテキスト準備を実行\n+1. **@agent-symbol-searcher でテスト関連情報を検索し、見つかったファイルを読み込み**\n+   - 既存のテストパターンやテストケースを検索し、該当テストファイルをReadツールで読み込み\n+   - 類似機能のテスト方法やモック戦略を特定し、関連ファイルをReadツールで読み込み\n+   - テストフレームワークの使用方法を確認し、設定ファイルをReadツールで読み込み\n+\n+2. **関連ファイルを直接読み込み**\n+   - `docs/implements/{{task_id}}/{feature_name}-memo.md` - 既存の開発履歴を確認\n+   - `docs/implements/{{task_id}}/{feature_name}-requirements.md` - 要件定義を確認\n+   - `docs/implements/{{task_id}}/{feature_name}-testcases.md` - 既存のテストケースを確認\n+   - 関連する設計文書やタスクファイルも必要に応じて読み込み\n \n 読み込み完了後、準備されたコンテキスト情報を基にテストケースの洗い出しを行います。\n \ndiff --git a/commands/tdd-todo.md b/commands/tdd-todo.md\nindex 892182b..48308e9 100644\n--- a/commands/tdd-todo.md\n+++ b/commands/tdd-todo.md\n@@ -16,12 +16,14 @@\n ## 作成手順\n \n 1. **要件定義文書の分析**\n+   - @agent-symbol-searcher で関連要件・設計文書を検索\n    - EARS記法による要件の理解\n    - ユーザストーリーと価値の把握\n    - 機能要件と非機能要件の確認\n    - Edgeケースと受け入れ基準の理解\n \n 2. **設計文書の分析**\n+   - @agent-symbol-searcher で既存アーキテクチャパターンを検索\n    - アーキテクチャ設計の全体像を把握\n    - データベーススキーマの構造を理解\n    - APIエンドポイントの仕様を確認\n@@ -29,6 +31,7 @@\n    - データフローの設計を理解\n \n 3. **タスクファイルの分析**\n+   - @agent-symbol-searcher で関連タスクIDや完了状態を検索\n    - 全体のフェーズ構造を把握\n    - タスクID別の実装内容を確認\n    - 依存関係と実行順序を理解\ndiff --git a/commands/tdd-verify-complete.md b/commands/tdd-verify-complete.md\nindex 3ec8275..233d051 100644\n--- a/commands/tdd-verify-complete.md\n+++ b/commands/tdd-verify-complete.md\n@@ -28,7 +28,17 @@ TDD開発でテストケースの実装が完全に完了しているかを検\n \n 検証コンテキストの準備を行います：\n \n-**Taskツール実行**: `/tdd-load-context` でTDD関連ファイルの読み込みとコンテキスト準備を実行\n+1. **@agent-symbol-searcher で検証関連情報を検索し、見つかったファイルを読み込み**\n+   - 完了予定のテストケースや機能を検索し、該当ファイルをReadツールで読み込み\n+   - 既存のテストカバレッジや品質基準を確認し、関連ファイルをReadツールで読み込み\n+   - 実装完了タスクのマーキングパターンを特定し、タスクファイルをReadツールで読み込み\n+\n+2. **関連ファイルを直接読み込み**\n+   - `docs/implements/{{task_id}}/{feature_name}-memo.md` - 既存の開発履歴を確認\n+   - `docs/implements/{{task_id}}/{feature_name}-requirements.md` - 要件定義を確認\n+   - `docs/implements/{{task_id}}/{feature_name}-testcases.md` - テストケース定義を確認\n+   - `docs/implements/{{task_id}}/{feature_name}-refactor-phase.md` - Refactorフェーズの結果を確認\n+   - 元タスクファイル (`docs/tasks/{taskfile}.md`) - タスクの完了状態を確認\n \n 読み込み完了後、準備されたコンテキスト情報を基にテストケース完全性検証を開始します。\n \n",
+  "diffTruncated": false,
+  "tree": [
+    ".claude/commands/release.yml",
+    ".devcontainer/Dockerfile",
+    ".devcontainer/devcontainer.json",
+    ".github/workflows/ci.yml",
+    ".github/workflows/release.yml",
+    ".gitignore",
+    ".npmrc",
+    ".secretlintrc.json",
+    "CLAUDE.md",
+    "CONTRIBUTING.md",
+    "LICENSE",
+    "MANUAL.md",
+    "README.md",
+    "agents/symbol-searcher.md",
+    "biome.json",
+    "book/01-fundamentals/01-aitdd-definition.md",
+    "book/02-environment/01-tools-setup.md",
+    "book/02-environment/02-claude-usage.md",
+    "book/02-environment/03-workflow-setup.md",
+    "book/03-process/01-extended-tdd-flow.md",
+    "book/03-process/02-todo-and-specification.md",
+    "book/03-process/03-test-case-creation.md",
+    "book/03-process/04-rgr-validation-cycle.md",
+    "book/03-process/05-validation-details.md",
+    "book/04-hands-on/01-first-project.md",
+    "book/04-hands-on/02-crud-example.md",
+    "book/04-hands-on/03-api-development.md",
+    "book/04-hands-on/04-error-handling.md",
+    "book/05-optimization/01-prompt-design.md",
+    "book/05-optimization/02-ai-inference-visualization.md",
+    "book/05-optimization/03-continuous-improvement.md",
+    "book/06-collaboration/01-balance-strategy.md",
+    "book/06-collaboration/02-creativity-points.md",
+    "book/06-collaboration/03-review-quality.md",
+    "book/07-case-studies/01-experimental-results.md",
+    "book/07-case-studies/02-evolution-case.md",
+    "book/07-case-studies/03-failure-cases.md",
+    "book/08-best-practices/01-tech-selection.md",
+    "book/08-best-practices/02-documentation.md",
+    "book/08-best-practices/03-future-vision.md",
+    "book/aitdd-getting-started.md",
+    "book/toc.md",
+    "commands/auto-debug.md",
+    "commands/direct-setup.md",
+    "commands/direct-verify.md",
+    "commands/kairo-design.md",
+    "commands/kairo-implement.md",
+    "commands/kairo-requirements.md",
+    "commands/kairo-task-verify.md",
+    "commands/kairo-tasks.md",
+    "commands/rev-design.md",
+    "commands/rev-requirements.md",
+    "commands/rev-specs.md",
+    "commands/rev-tasks.md",
+    "commands/start-server.md",
+    "commands/tdd-cycle-full.sh",
+    "commands/tdd-green.md",
+    "commands/tdd-load-context.md",
+    "commands/tdd-red.md",
+    "commands/tdd-refactor.md",
+    "commands/tdd-requirements.md",
+    "commands/tdd-testcases.md",
+    "commands/tdd-todo.md",
+    "commands/tdd-verify-complete.md",
+    "mise.toml",
+    "package.json",
+    "src/cli.ts",
+    "src/commands/gitignore.tsx",
+    "src/commands/install.tsx",
+    "src/commands/uninstall.tsx",
+    "tsconfig.json",
+    "tsup.config.ts"
+  ],
+  "explanation": {
+    "what": "新設した `agents/symbol-searcher.md`(サブエージェント定義)を、TDD系(tdd-requirements/testcases/red/green/refactor/verify-complete)と Kairo系(kairo-design/requirements/task-verify/tasks)の全コマンド定義から `@agent-symbol-searcher` として呼び出すよう書き換えた。旧来の共通コンテキスト準備コマンド `tdd-load-context.md` は非推奨マークを付けて残しつつ、各コマンドは直接 symbol-searcher と Read ツールでファイルを探す方式に置き換えている。さらに `kairo-implement.md` には `@task general-purpose` によるタスク単位の個別実行パターンを追加し、TDD各フェーズ・DIRECT作業を個別Taskとして並列/再実行可能にした。auto-debug.md というテストエラー自動解消コマンドも新規追加している。",
+    "why": "PR #18 の body に「agentを追加して各コマンドの初期処理の検索のコスト改善」「kairo-implementのコマンド実行をタスクに修正」とある。各コマンドが個別にファイル探索ロジックを書いていたのを専用エージェントに委譲することで検索コストを下げ、kairo-implement の実行単位をタスク化することで独立性・再実行性・並列性を高める狙いだったと分かる。",
+    "highlights": [
+      { "file": "agents/symbol-searcher.md", "note": "新設のサブエージェント定義。frontmatterの description に発火条件の具体例、tools にこのエージェントが使えるツール一覧(Glob/Grep/Read等)を列挙し、model: haiku を明示している" },
+      { "file": "commands/kairo-implement.md", "note": "TDDの6フェーズとDIRECT作業の2フェーズを `@task general-purpose` で個別Task実行する新パターンを追加" }
+    ],
+    "langNotes": [
+      { "topic": "サブエージェント(agents/*.md)", "note": "Claude Code はスラッシュコマンドとは別に、特定タスクに特化したサブエージェントを Markdown + frontmatter で定義できる。frontmatter の description に発火条件の具体例を書いておくと、メインの会話から Task ツール経由で自動的に呼び出される。tools フィールドでそのエージェントに許可するツールを絞り込め、model でどのモデル(ここでは haiku)を使うかも指定できる。" },
+      { "topic": "@agent-<name> / @task 記法", "note": "コマンド定義 Markdown 内で `@agent-symbol-searcher` のように書くと該当サブエージェントの呼び出しを、`@task general-purpose <対象>` のように書くと Task ツールによる汎用サブタスク実行を、それぞれ実行時に解決する記法。tsumiki のコマンド群はこの記法で「処理の一部を別コンテキストに切り出す」設計を多用している。" }
+    ],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [{ "type": "pr", "number": 18, "url": "https://github.com/classmethod/tsumiki/pull/18" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-08-04T00:00:00Z"
+  }
+}

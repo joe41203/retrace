@@ -1,0 +1,123 @@
+{
+  "seq": 54,
+  "sha": "2987d8dcf1546c2964f7a3958bfe453c96251b97",
+  "parents": [
+    "ce4a9a796db636662aa8cde9efcd92d18ea5f99a"
+  ],
+  "author": {
+    "name": "dyoshikawa",
+    "email": "dyoshikawa1993@gmail.com",
+    "date": "2025-07-30T17:47:52+09:00"
+  },
+  "message": "Implement uninstall command for removing Claude Code command templates",
+  "pr": {
+    "number": 15,
+    "title": "Node.js製のTsumikiインストールコマンドを追加",
+    "body": "提案&実装です。\r\n\r\n現状、導入やアップデートは手動のコピーしか手段がない（と思う）ため、インストール用のCLIを提案します。\r\n\r\nCLIの使い心地を確認してもらえるように、暫定的にnpmレジストリに `@dyoshikawa/tsumiki` として登録しています。\r\n\r\n```bash\r\n# 使い方\r\n\r\n# インストール\r\nnpx @dyoshikawa/tsumiki install\r\n\r\n# アンインストール\r\nnpx @dyoshikawa/tsumiki uninstall\r\n\r\n# .gitignoreにtsumikiコマンドを登録\r\nnpx @dyoshikawa/tsumiki gitignore\r\n```\r\n\r\nNode.jsを選定したのは以下の理由です。\r\n\r\n- Claude CodeもNode.js製なので、ランタイムを統一することで一緒に導入しやすくなる\r\n  - 例: `npm i -g @anthropic-ai/claude-code @classmethod/tsumiki`\r\n- 社内にNode.js開発者が多いので、コミットしやすそう",
+    "url": "https://github.com/classmethod/tsumiki/pull/15"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 2,
+    "additions": 186,
+    "deletions": 0
+  },
+  "files": [
+    {
+      "path": "src/cli.ts",
+      "status": "M",
+      "additions": 6,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "src/commands/uninstall.tsx",
+      "status": "A",
+      "additions": 180,
+      "deletions": 0,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/src/cli.ts b/src/cli.ts\nindex 2a195b1..35bb13a 100644\n--- a/src/cli.ts\n+++ b/src/cli.ts\n@@ -2,6 +2,7 @@\n \n import { Command } from \"commander\";\n import { installCommand } from \"./commands/install.js\";\n+import { uninstallCommand } from \"./commands/uninstall.js\";\n \n const program = new Command();\n \n@@ -15,4 +16,9 @@ program\n   .description(\"Install Claude Code command templates to .claude/commands/\")\n   .action(installCommand);\n \n+program\n+  .command(\"uninstall\")\n+  .description(\"Uninstall Claude Code command templates from .claude/commands/\")\n+  .action(uninstallCommand);\n+\n program.parse();\ndiff --git a/src/commands/uninstall.tsx b/src/commands/uninstall.tsx\nnew file mode 100644\nindex 0000000..d287c4d\n--- /dev/null\n+++ b/src/commands/uninstall.tsx\n@@ -0,0 +1,180 @@\n+import * as path from \"node:path\";\n+import { fileURLToPath } from \"node:url\";\n+import fs from \"fs-extra\";\n+import { Box, Newline, render, Text } from \"ink\";\n+import React, { useEffect, useState } from \"react\";\n+\n+type UninstallStatus =\n+  | \"starting\"\n+  | \"checking\"\n+  | \"removing\"\n+  | \"completed\"\n+  | \"error\"\n+  | \"not_found\";\n+\n+const UninstallComponent: React.FC = () => {\n+  const [status, setStatus] = useState<UninstallStatus>(\"starting\");\n+  const [removedFiles, setRemovedFiles] = useState<string[]>([]);\n+  const [error, setError] = useState<string | null>(null);\n+\n+  useEffect(() => {\n+    const performUninstall = async (): Promise<void> => {\n+      try {\n+        setStatus(\"checking\");\n+\n+        // 現在のディレクトリを取得\n+        const currentDir = process.cwd();\n+        const targetDir = path.join(currentDir, \".claude\", \"commands\");\n+\n+        // .claude/commandsディレクトリが存在するかチェック\n+        const dirExists = await fs.pathExists(targetDir);\n+        if (!dirExists) {\n+          setStatus(\"not_found\");\n+          setTimeout(() => {\n+            process.exit(0);\n+          }, 2000);\n+          return;\n+        }\n+\n+        // tsumikiのcommandsディレクトリを取得\n+        const __filename = fileURLToPath(import.meta.url);\n+        const __dirname = path.dirname(__filename);\n+        // ビルド後はdist/commandsを参照（cli.jsがdist/にあるため）\n+        const tsumikiDir = path.join(__dirname, \"commands\");\n+\n+        // tsumikiのファイル一覧を取得\n+        const tsumikiFiles = await fs.readdir(tsumikiDir);\n+        const tsumikiTargetFiles = tsumikiFiles.filter(\n+          (file) => file.endsWith(\".md\") || file.endsWith(\".sh\"),\n+        );\n+\n+        setStatus(\"removing\");\n+\n+        // .claude/commands内のファイルをチェックして、tsumiki由来のファイルのみ削除\n+        const installedFiles = await fs.readdir(targetDir);\n+        const removedFilesList: string[] = [];\n+\n+        for (const file of installedFiles) {\n+          if (tsumikiTargetFiles.includes(file)) {\n+            const filePath = path.join(targetDir, file);\n+            await fs.remove(filePath);\n+            removedFilesList.push(file);\n+          }\n+        }\n+\n+        // 削除後に.claude/commandsディレクトリが空になったかチェック\n+        const remainingFiles = await fs.readdir(targetDir);\n+        if (remainingFiles.length === 0) {\n+          // 空のディレクトリを削除\n+          await fs.rmdir(targetDir);\n+          // .claudeディレクトリも空の場合は削除\n+          const claudeDir = path.dirname(targetDir);\n+          const claudeFiles = await fs.readdir(claudeDir);\n+          if (claudeFiles.length === 0) {\n+            await fs.rmdir(claudeDir);\n+          }\n+        }\n+\n+        setRemovedFiles(removedFilesList);\n+        setStatus(\"completed\");\n+\n+        // 2秒後に終了\n+        setTimeout(() => {\n+          process.exit(0);\n+        }, 2000);\n+      } catch (err) {\n+        const errorMessage =\n+          err instanceof Error ? err.message : \"Unknown error occurred\";\n+        setError(errorMessage);\n+        setStatus(\"error\");\n+\n+        setTimeout(() => {\n+          process.exit(1);\n+        }, 3000);\n+      }\n+    };\n+\n+    performUninstall();\n+  }, []);\n+\n+  if (status === \"starting\") {\n+    return (\n+      <Box>\n+        <Text color=\"cyan\">🗑️ Tsumiki アンインストールを開始します...</Text>\n+      </Box>\n+    );\n+  }\n+\n+  if (status === \"checking\") {\n+    return (\n+      <Box>\n+        <Text color=\"yellow\">📋 インストール状況をチェック中...</Text>\n+      </Box>\n+    );\n+  }\n+\n+  if (status === \"removing\") {\n+    return (\n+      <Box>\n+        <Text color=\"blue\">🗑️ コマンドテンプレートを削除中...</Text>\n+      </Box>\n+    );\n+  }\n+\n+  if (status === \"not_found\") {\n+    return (\n+      <Box flexDirection=\"column\">\n+        <Text color=\"yellow\">\n+          ⚠️ .claude/commands ディレクトリが見つかりません\n+        </Text>\n+        <Text color=\"gray\">Tsumikiはインストールされていないようです。</Text>\n+      </Box>\n+    );\n+  }\n+\n+  if (status === \"error\") {\n+    return (\n+      <Box flexDirection=\"column\">\n+        <Text color=\"red\">❌ エラーが発生しました:</Text>\n+        <Text color=\"red\">{error}</Text>\n+      </Box>\n+    );\n+  }\n+\n+  if (status === \"completed\") {\n+    if (removedFiles.length === 0) {\n+      return (\n+        <Box flexDirection=\"column\">\n+          <Text color=\"yellow\">⚠️ 削除対象のファイルが見つかりませんでした</Text>\n+          <Text color=\"gray\">\n+            Tsumikiのコマンドはインストールされていないようです。\n+          </Text>\n+        </Box>\n+      );\n+    }\n+\n+    return (\n+      <Box flexDirection=\"column\">\n+        <Text color=\"green\">✅ アンインストールが完了しました!</Text>\n+        <Newline />\n+        <Text>削除されたファイル ({removedFiles.length}個):</Text>\n+        {removedFiles.map((file) => (\n+          <Text key={file} color=\"gray\">\n+            {\" \"}\n+            • {file}\n+          </Text>\n+        ))}\n+        <Newline />\n+        <Text color=\"cyan\">\n+          TsumikiのClaude Codeコマンドテンプレートが削除されました。\n+        </Text>\n+      </Box>\n+    );\n+  }\n+\n+  return null;\n+};\n+\n+export const uninstallCommand = (): void => {\n+  render(React.createElement(UninstallComponent));\n+};\n",
+  "diffTruncated": false,
+  "tree": [
+    ".gitignore",
+    ".npmrc",
+    ".secretlintrc.json",
+    "CLAUDE.md",
+    "LICENSE",
+    "MANUAL.md",
+    "README.md",
+    "biome.json",
+    "book/01-fundamentals/01-aitdd-definition.md",
+    "book/02-environment/01-tools-setup.md",
+    "book/02-environment/02-claude-usage.md",
+    "book/02-environment/03-workflow-setup.md",
+    "book/03-process/01-extended-tdd-flow.md",
+    "book/03-process/02-todo-and-specification.md",
+    "book/03-process/03-test-case-creation.md",
+    "book/03-process/04-rgr-validation-cycle.md",
+    "book/03-process/05-validation-details.md",
+    "book/04-hands-on/01-first-project.md",
+    "book/04-hands-on/02-crud-example.md",
+    "book/04-hands-on/03-api-development.md",
+    "book/04-hands-on/04-error-handling.md",
+    "book/05-optimization/01-prompt-design.md",
+    "book/05-optimization/02-ai-inference-visualization.md",
+    "book/05-optimization/03-continuous-improvement.md",
+    "book/06-collaboration/01-balance-strategy.md",
+    "book/06-collaboration/02-creativity-points.md",
+    "book/06-collaboration/03-review-quality.md",
+    "book/07-case-studies/01-experimental-results.md",
+    "book/07-case-studies/02-evolution-case.md",
+    "book/07-case-studies/03-failure-cases.md",
+    "book/08-best-practices/01-tech-selection.md",
+    "book/08-best-practices/02-documentation.md",
+    "book/08-best-practices/03-future-vision.md",
+    "book/aitdd-getting-started.md",
+    "book/toc.md",
+    "commands/direct-setup.md",
+    "commands/direct-verify.md",
+    "commands/kairo-design.md",
+    "commands/kairo-implement.md",
+    "commands/kairo-requirements.md",
+    "commands/kairo-task-verify.md",
+    "commands/kairo-tasks.md",
+    "commands/rev-design.md",
+    "commands/rev-requirements.md",
+    "commands/rev-specs.md",
+    "commands/rev-tasks.md",
+    "commands/start-server.md",
+    "commands/tdd-cycle-full.sh",
+    "commands/tdd-green.md",
+    "commands/tdd-load-context.md",
+    "commands/tdd-red.md",
+    "commands/tdd-refactor.md",
+    "commands/tdd-requirements.md",
+    "commands/tdd-testcases.md",
+    "commands/tdd-todo.md",
+    "commands/tdd-verify-complete.md",
+    "mise.toml",
+    "package.json",
+    "src/cli.ts",
+    "src/commands/install.tsx",
+    "src/commands/uninstall.tsx",
+    "tsconfig.json",
+    "tsup.config.ts"
+  ],
+  "explanation": {
+    "what": "新規ファイル src/commands/uninstall.tsx（180行）を追加し、`.claude/commands/` からインストール済みの Tsumiki コマンドテンプレートを削除する `uninstall` コマンドを実装した。install.tsx と同様に fileURLToPath で tsumikiDir を解決し、そこにある .md/.sh のファイル名一覧と `.claude/commands/` 内のファイルを突き合わせて、Tsumiki 由来のファイルだけを削除する。削除後にディレクトリが空になれば `.claude/commands` と `.claude` 自体も削除する。React + Ink で starting/checking/removing/completed/not_found/error の各状態を表示する。src/cli.ts に `uninstall` サブコマンドを登録した。",
+    "why": "PR body に「アンインストール: `npx @dyoshikawa/tsumiki uninstall`」という使い方が明記されており、この PR で提案されている3つのコマンド（install/uninstall/gitignore）のうち uninstall を実装するコミット。ユーザー自身が `.claude/commands/` に置いた無関係なファイルまで消してしまわないよう、Tsumiki のファイル名一覧との突き合わせで削除対象を絞っている。",
+    "highlights": [
+      { "file": "src/commands/uninstall.tsx", "note": "install.tsx にある tsumikiDir 解決と同じ .md/.sh フィルタで「自分がインストールしたファイルだけ」を判定し、それ以外は消さない設計になっている" }
+    ],
+    "langNotes": [
+      { "topic": "Ink (React for CLI)", "note": "Ink は React のコンポーネント/フックの書き方をそのまま使ってターミナル UI を宣言的に描画できるライブラリ。このコミットでも useState/useEffect で非同期処理の進行状況（starting → checking → removing → completed）を状態遷移として表現し、状態ごとに異なる `<Text>` を返している。" }
+    ],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [{ "type": "pr", "number": 15, "url": "https://github.com/classmethod/tsumiki/pull/15" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-08-04T00:00:00Z"
+  }
+}

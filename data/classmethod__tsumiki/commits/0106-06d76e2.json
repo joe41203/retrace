@@ -1,0 +1,155 @@
+{
+  "seq": 106,
+  "sha": "06d76e2d240047b578993d158253197944bd9a83",
+  "parents": [
+    "f310e1ccdb42cc877a26fe64b1b3513982ab1894"
+  ],
+  "author": {
+    "name": "kuroeda.makoto",
+    "email": "kuroeda.makoto@classmethod.jp",
+    "date": "2025-10-10T06:36:12+09:00"
+  },
+  "message": "docs: update installation method to Claude Code Plugin\n\n- Update README.md and MANUAL.md to recommend Plugin installation\n- Add /tsumiki: prefix to all command examples\n- Mark npx installation method as deprecated\n- Add marketplace.json for Plugin marketplace\n- Update all command samples throughout documentation\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nCo-Authored-By: Claude <noreply@anthropic.com>",
+  "pr": {
+    "number": 35,
+    "title": "Feat/add claude plugin config",
+    "body": "claude code pluginに対応\r\ninstall方法を変更",
+    "url": "https://github.com/classmethod/tsumiki/pull/35"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 4,
+    "additions": 99,
+    "deletions": 57
+  },
+  "files": [
+    {
+      "path": ".claude-plugin/marketplace.json",
+      "status": "A",
+      "additions": 28,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": ".claude-plugin/plugin.json",
+      "status": "M",
+      "additions": 2,
+      "deletions": 2,
+      "binary": false
+    },
+    {
+      "path": "MANUAL.md",
+      "status": "M",
+      "additions": 39,
+      "deletions": 32,
+      "binary": false
+    },
+    {
+      "path": "README.md",
+      "status": "M",
+      "additions": 30,
+      "deletions": 23,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/.claude-plugin/marketplace.json b/.claude-plugin/marketplace.json\nnew file mode 100644\nindex 0000000..79f8828\n--- /dev/null\n+++ b/.claude-plugin/marketplace.json\n@@ -0,0 +1,28 @@\n+{\n+  \"name\": \"tsumiki\",\n+  \"owner\": {\n+    \"name\": \"makoto kuroeda\",\n+    \"email\": \"kuroeda.makoto@classmethod.jp\",\n+    \"url\": \"https://github.com/classmethod\"\n+  },\n+  \"metadata\": {\n+    \"description\": \"AI-driven development toolkit for TDD and SDD workflows, providing comprehensive command templates and agents to enhance developer productivity with Claude Code\",\n+    \"version\": \"0.0.6\"\n+  },\n+  \"plugins\": [\n+    {\n+      \"name\": \"tsumiki\",\n+      \"source\": \"./\",\n+      \"description\": \"AI-driven development toolkit for TDD and SDD workflows, providing comprehensive command templates and agents to enhance developer productivity with Claude Code\",\n+      \"version\": \"0.0.6\",\n+      \"author\": {\n+        \"name\": \"makoto kuroeda\",\n+        \"email\": \"kuroeda.makoto@classmethod.jp\"\n+      },\n+      \"homepage\": \"https://github.com/classmethod/tsumiki\",\n+      \"repository\": \"https://github.com/classmethod/tsumiki\",\n+      \"license\": \"MIT\",\n+      \"keywords\": [\"ai-development\", \"sdd\", \"tdd\"]\n+    }\n+  ]\n+}\ndiff --git a/.claude-plugin/plugin.json b/.claude-plugin/plugin.json\nindex c4d281c..8c18ef1 100644\n--- a/.claude-plugin/plugin.json\n+++ b/.claude-plugin/plugin.json\n@@ -10,6 +10,6 @@\n   \"repository\": \"https://github.com/classmethod/tsumiki\",\n   \"license\": \"MIT\",\n   \"keywords\": [\"ai-development\", \"sdd\", \"tdd\"],\n-  \"commands\": \"./commands\",\n-  \"agents\": \"./agents\"\n+  \"commands\": \"./commands/\",\n+  \"agents\": [\"./agents/symbol-searcher.md\"]\n }\ndiff --git a/MANUAL.md b/MANUAL.md\nindex 666cbd7..47a74fa 100644\n--- a/MANUAL.md\n+++ b/MANUAL.md\n@@ -4,7 +4,17 @@\n \n ### セットアップ\n \n-プロジェクトを使用する前に、まず `commands` ディレクトリの内容をClaudeのコマンドディレクトリにコピーします：\n+Claude Code Pluginを使用してTsumikiをインストールします：\n+\n+```bash\n+/plugin marketplace add https://github.com/classmethod/tsumiki.git\n+```\n+\n+**注意**: Claude Code Pluginでインストールした場合、コマンドは `/tsumiki:` プレフィックス付きで実行します（例：`/tsumiki:kairo-requirements`）。\n+\n+#### 非推奨：手動セットアップ\n+\n+以下の方法でも利用可能ですが、Plugin方式を推奨します：\n \n ```bash\n # プロジェクトのcommandsディレクトリを.claude/commandsにコピー\n@@ -40,25 +50,22 @@ TASK作成時に `TDD` と判定している場合で個別にTDDプロセスを\n \n ```\n # TDD要件定義\n-/tdd-requirements タスクファイル名　TASK番号\n+/tsumiki:tdd-requirements タスクファイル名　TASK番号\n \n # テストケース作成\n-/tdd-testcases タスクファイル名　TASK番号\n-\n-# テスト実装〜TDD完了確認まで自動化する場合\n-/tdd-cycle-full.sh  \"タスクファイル名　TASK番号\"\n+/tsumiki:tdd-testcases タスクファイル名　TASK番号\n \n # テスト実装（Red）\n-/tdd-red タスクファイル名　TASK番号\n+/tsumiki:tdd-red タスクファイル名　TASK番号\n \n # 最小実装（Green）\n-/tdd-green タスクファイル名　TASK番号\n+/tsumiki:tdd-green タスクファイル名　TASK番号\n \n # リファクタリング\n-/tdd-refactor タスクファイル名　TASK番号\n+/tsumiki:tdd-refactor タスクファイル名　TASK番号\n \n # TDD完了確認\n-/tdd-verify-complete タスクファイル名　TASK番号\n+/tsumiki:tdd-verify-complete タスクファイル名　TASK番号\n ```\n \n ### DIRECTコマンド\n@@ -67,10 +74,10 @@ TASK作成時に `DIRECT` と判定している場合は、以下のコマンド\n \n ```\n # DIRECT準備\n-/direct-setup タスクファイル名　TASK番号\n+/tsumiki:direct-setup タスクファイル名　TASK番号\n \n # DIRECT検証\n-/direct-verify タスクファイル名　TASK番号\n+/tsumiki:direct-verify タスクファイル名　TASK番号\n ```\n \n ### Kairoコマンド（包括的フロー）\n@@ -80,9 +87,9 @@ TASK作成時に `DIRECT` と判定している場合は、以下のコマンド\n プロジェクトの技術スタック（フレームワーク、ライブラリ）を初期化します：\n \n ```\n-/init-tech-stack\n-\n+/tsumiki:init-tech-stack\n ```\n+\n init-tech-stack は以下を生成します：\n \n 生成されたファイル: `/docs/tech-stack.md` 配下\n@@ -92,7 +99,7 @@ init-tech-stack は以下を生成します：\n 最初に、プロジェクトの要件概要をKairoに伝えます：\n \n ```\n-/kairo-requirements 要件概要\n+/tsumiki:kairo-requirements 要件概要\n \n # プロンプト例：\n # \"ECサイトの商品レビュー機能を実装したい。\n@@ -113,7 +120,7 @@ Kairoは以下を生成します：\n 要件を確認・修正した後、設計を依頼します：\n \n ```\n-/kairo-design（または省略可能）\n+/tsumiki:kairo-design（または省略可能）\n \n # 要件を承認済みであることを伝えてください\n ```\n@@ -132,12 +139,12 @@ Kairoは以下を生成します：\n 設計を確認した後（承認は省略可）、タスク分割を実行します：\n \n ```\n-/kairo-tasks\n+/tsumiki:kairo-tasks\n \n # 設計を承認したことを伝えてください（または省略可能）\n ```\n \n-タスク内容の確認用に `/kairo-task-verify` を実行することをお勧めします。\n+タスク内容の確認用に `/tsumiki:kairo-task-verify` を実行することをお勧めします。\n \n Kairoは以下を生成します：\n - 依存関係を考慮したタスク一覧\n@@ -153,10 +160,10 @@ Kairoは以下を生成します：\n \n ```\n # 全タスクを順番に実装\n-/kairo-implement\n+/tsumiki:kairo-implement\n \n # 特定のタスクのみ実装\n-/kairo-implement  タスクファイル名　TASK番号\n+/tsumiki:kairo-implement  タスクファイル名　TASK番号\n # \"TASK-101を実装してください\"\n ```\n \n@@ -174,16 +181,16 @@ Kairoは各タスクに対して内部的にTDDコマンドを使用して以下\n \n ```\n # 既存コードからタスク構造を分析\n-/rev-tasks\n+/tsumiki:rev-tasks\n \n # 設計文書の逆生成（タスク分析後推奨）\n-/rev-design\n+/tsumiki:rev-design\n \n # テスト仕様書の逆生成（設計文書後推奨）\n-/rev-specs\n+/tsumiki:rev-specs\n \n # 要件定義書の逆生成（全分析完了後推奨）\n-/rev-requirements\n+/tsumiki:rev-requirements\n ```\n \n #### リバースエンジニアリングの詳細\n@@ -267,16 +274,16 @@ Kairoは各タスクに対して内部的にTDDコマンドを使用して以下\n \n ```bash\n # プロジェクト全体の逆解析\n-/rev-tasks\n+/tsumiki:rev-tasks\n # → タスク構造を把握\n \n-/rev-design\n+/tsumiki:rev-design\n # → アーキテクチャと設計を文書化\n \n-/rev-specs\n+/tsumiki:rev-specs\n # → テスト状況を分析して不足テストを特定\n \n-/rev-requirements\n+/tsumiki:rev-requirements\n # → 最終的に要件定義書を生成\n ```\n \n@@ -308,15 +315,15 @@ Kairoは各タスクに対して内部的にTDDコマンドを使用して以下\n \n ```mermaid\n flowchart TD\n-    A[要件概要を伝える] --> B[kairo-requirements]\n+    A[要件概要を伝える] --> B[tsumiki:kairo-requirements]\n     B --> C{要件を確認}\n     C -->|修正必要| B\n-    C -->|OK| D[kairo-design]\n+    C -->|OK| D[tsumiki:kairo-design]\n     D --> E{設計を確認}\n     E -->|修正必要| D\n-    E -->|OK| F[kairo-tasks]\n+    E -->|OK| F[tsumiki:kairo-tasks]\n     F --> G{タスクを確認}\n-    G -->|OK| H[kairo-implement]\n+    G -->|OK| H[tsumiki:kairo-implement]\n     H --> I{全タスク完了?}\n     I -->|No| H\n     I -->|Yes| J[プロジェクト完了]\ndiff --git a/README.md b/README.md\nindex 85fbc05..2aef74f 100644\n--- a/README.md\n+++ b/README.md\n@@ -6,7 +6,19 @@ TsumikiはAI駆動開発のためのフレームワークです。要件定義\n \n ## インストール\n \n-Tsumikiを使用するには、次のnpxコマンドでインストールしてください：\n+Tsumikiを使用するには、次のClaude Code Pluginコマンドでインストールしてください：\n+\n+```bash\n+/plugin marketplace add https://github.com/classmethod/tsumiki.git\n+```\n+\n+このコマンドを実行すると、TsumikiのClaude Codeスラッシュコマンドとエージェントが自動的にインストールされます。\n+\n+**注意**: Claude Code Pluginでインストールした場合、コマンドは `/tsumiki:` プレフィックス付きで実行します（例：`/tsumiki:kairo-requirements`）。\n+\n+### 非推奨：npxによるインストール\n+\n+以下の方法でもインストール可能ですが、今後はClaude Code Plugin方式を推奨します：\n \n ```bash\n npx tsumiki install\n@@ -56,57 +68,52 @@ Kairoは要件定義から実装までの開発プロセスを自動化・支援\n \n ## クイックスタート\n \n+**注意**: Claude Code Pluginでインストールした場合は、各コマンドの先頭に `tsumiki:` を付けてください（例：`/tsumiki:kairo-requirements`）。\n+\n ### 包括的な開発フロー\n \n ```bash\n # 1. 技術スタック初期化\n-/init-tech-stack\n+/tsumiki:init-tech-stack\n \n # 2. 要件定義\n-/kairo-requirements\n+/tsumiki:kairo-requirements\n \n # 3. 設計\n-/kairo-design\n+/tsumiki:kairo-design\n \n # 4. タスク分割\n-/kairo-tasks\n+/tsumiki:kairo-tasks\n \n # 5. 実装\n-/kairo-implement\n+/tsumiki:kairo-implement\n ```\n \n ### 個別TDDプロセス\n \n ```bash\n-/tdd-requirements\n-/tdd-testcases\n-/tdd-red\n-/tdd-green\n-/tdd-refactor\n-/tdd-verify-complete\n+/tsumiki:tdd-requirements\n+/tsumiki:tdd-testcases\n+/tsumiki:tdd-red\n+/tsumiki:tdd-green\n+/tsumiki:tdd-refactor\n+/tsumiki:tdd-verify-complete\n ```\n \n ### リバースエンジニアリング\n \n ```bash\n # 1. 既存コードからタスク構造を分析\n-/rev-tasks\n+/tsumiki:rev-tasks\n \n # 2. 設計文書の逆生成（タスク分析後推奨）\n-/rev-design\n+/tsumiki:rev-design\n \n # 3. テスト仕様書の逆生成（設計文書後推奨）\n-/rev-specs\n+/tsumiki:rev-specs\n \n # 4. 要件定義書の逆生成（全分析完了後推奨）\n-/rev-requirements\n-```\n-\n-### 開発環境のクリーンアップ\n-\n-```bash\n-# 開発環境をクリーンアップ\n-/clear\n+/tsumiki:rev-requirements\n ```\n \n ## Claude Code以外のツールでtsumikiを使用する\n",
+  "diffTruncated": false,
+  "tree": [
+    ".claude-plugin/marketplace.json",
+    ".claude-plugin/plugin.json",
+    ".claude/commands/release.yml",
+    ".devcontainer/Dockerfile",
+    ".devcontainer/devcontainer.json",
+    ".github/ISSUE_TEMPLATE/bug_report.md",
+    ".github/workflows/ci.yml",
+    ".github/workflows/release.yml",
+    ".gitignore",
+    ".npmrc",
+    ".secretlintrc.json",
+    "CLAUDE.md",
+    "CONTRIBUTING.md",
+    "LICENSE",
+    "MANUAL.md",
+    "README.md",
+    "agents/symbol-searcher.md",
+    "biome.json",
+    "book/01-fundamentals/01-aitdd-definition.md",
+    "book/02-environment/01-tools-setup.md",
+    "book/02-environment/02-claude-usage.md",
+    "book/02-environment/03-workflow-setup.md",
+    "book/03-process/01-extended-tdd-flow.md",
+    "book/03-process/02-todo-and-specification.md",
+    "book/03-process/03-test-case-creation.md",
+    "book/03-process/04-rgr-validation-cycle.md",
+    "book/03-process/05-validation-details.md",
+    "book/04-hands-on/01-first-project.md",
+    "book/04-hands-on/02-crud-example.md",
+    "book/04-hands-on/03-api-development.md",
+    "book/04-hands-on/04-error-handling.md",
+    "book/05-optimization/01-prompt-design.md",
+    "book/05-optimization/02-ai-inference-visualization.md",
+    "book/05-optimization/03-continuous-improvement.md",
+    "book/06-collaboration/01-balance-strategy.md",
+    "book/06-collaboration/02-creativity-points.md",
+    "book/06-collaboration/03-review-quality.md",
+    "book/07-case-studies/01-experimental-results.md",
+    "book/07-case-studies/02-evolution-case.md",
+    "book/07-case-studies/03-failure-cases.md",
+    "book/08-best-practices/01-tech-selection.md",
+    "book/08-best-practices/02-documentation.md",
+    "book/08-best-practices/03-future-vision.md",
+    "book/aitdd-getting-started.md",
+    "book/toc.md",
+    "commands/auto-debug.md",
+    "commands/direct-setup.md",
+    "commands/direct-verify.md",
+    "commands/init-tech-stack.md",
+    "commands/kairo-design.md",
+    "commands/kairo-implement.md",
+    "commands/kairo-requirements.md",
+    "commands/kairo-task-verify.md",
+    "commands/kairo-tasks.md",
+    "commands/rev-design.md",
+    "commands/rev-requirements.md",
+    "commands/rev-specs.md",
+    "commands/rev-tasks.md",
+    "commands/start-server.md",
+    "commands/tdd-cycle-full.sh",
+    "commands/tdd-green.md",
+    "commands/tdd-load-context.md",
+    "commands/tdd-red.md",
+    "commands/tdd-refactor.md",
+    "commands/tdd-requirements.md",
+    "commands/tdd-testcases.md",
+    "commands/tdd-todo.md",
+    "commands/tdd-verify-complete.md",
+    "commands/tech-stack.md",
+    "mise.toml",
+    "package.json",
+    "src/cli.ts",
+    "src/commands/gitignore.tsx",
+    "src/commands/install.tsx",
+    "src/commands/uninstall.tsx",
+    "tsconfig.json",
+    "tsup.config.ts"
+  ],
+  "explanation": {
+    "what": "`.claude-plugin/marketplace.json` を新規追加し、tsumiki を Claude Code のプラグインマーケットプレイスとして公開できるようにした。`.claude-plugin/plugin.json` は `commands` を `\"./commands/\"` に、`agents` を配列 `[\"./agents/symbol-searcher.md\"]` に変更。README.md / MANUAL.md はインストール方法を `/plugin marketplace add https://github.com/classmethod/tsumiki.git` によるPlugin方式に切り替え、npxによる従来のインストールは非推奨と明記した上で、全コマンド例に `/tsumiki:` 接頭辞(例: `/tsumiki:kairo-requirements`)を付け直した。MANUAL.md 内のMermaidフローチャートのノードラベルにも同接頭辞を反映している。",
+    "why": "PR body に「claude code pluginに対応」「install方法を変更」とある。前のコミットで追加した plugin.json だけではマーケットプレイスとして配布できないため marketplace.json を補い、ユーザーが実際にインストール・利用する導線(README/MANUAL)をPlugin方式に一本化した。Pluginとして導入したコマンドは `/tsumiki:` というプレフィックス付きで呼び出す仕様のため、ドキュメント中の全コマンド例を合わせて書き換えている。",
+    "highlights": [
+      { "file": ".claude-plugin/marketplace.json", "note": "新規ファイル。plugins 配列に source: \"./\" で自リポジトリを1プラグインとして登録" },
+      { "file": ".claude-plugin/plugin.json", "note": "agents が文字列から配列に変更され、symbol-searcher.md を明示的に指定" }
+    ],
+    "langNotes": [
+      { "topic": "marketplace.json", "note": "Claude Code のプラグインマーケットプレイス定義ファイル。`plugins` 配列に登録した各プラグインの `source`(配布元パス)やメタデータを持ち、ユーザーは `/plugin marketplace add <repo-url>` でこのマーケットプレイスを追加してからプラグインをインストールする。" },
+      { "topic": "/tsumiki: プレフィックス", "note": "Claude Code プラグインとしてインストールしたコマンドは、名前空間衝突を避けるため `/<plugin-name>:<command-name>` の形式で呼び出す。npx直接インストール時の `/kairo-requirements` は、Plugin経由では `/tsumiki:kairo-requirements` になる。" }
+    ],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [
+      { "type": "pr", "number": 35, "url": "https://github.com/classmethod/tsumiki/pull/35" }
+    ],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-08-04T12:00:00Z"
+  }
+}

@@ -1,0 +1,193 @@
+{
+  "seq": 109,
+  "sha": "af716af107cbf08981360b1fff407f5585c7345c",
+  "parents": [
+    "136fe36560abb9fada4a064eba89e9e822bb6651"
+  ],
+  "author": {
+    "name": "kuroeda.makoto",
+    "email": "kuroeda.makoto@classmethod.jp",
+    "date": "2025-10-10T14:35:35+09:00"
+  },
+  "message": "refactor: remove npx CLI functionality and migrate to plugin-only distribution\n\nRemove all npx-related code and build infrastructure as Tsumiki is now distributed exclusively via Claude Code Plugin marketplace.\n\nChanges:\n- Delete src/ directory (CLI implementation)\n- Delete build configuration (tsup.config.ts, tsconfig.json)\n- Remove build-related dependencies from package.json\n- Update documentation to remove npx installation instructions\n- Simplify project structure to plugin-only distribution\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nCo-Authored-By: Claude <noreply@anthropic.com>",
+  "pr": {
+    "number": 35,
+    "title": "Feat/add claude plugin config",
+    "body": "claude code pluginに対応\r\ninstall方法を変更",
+    "url": "https://github.com/classmethod/tsumiki/pull/35"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 11,
+    "additions": 43,
+    "deletions": 728
+  },
+  "files": [
+    {
+      "path": "CLAUDE.md",
+      "status": "M",
+      "additions": 22,
+      "deletions": 27,
+      "binary": false
+    },
+    {
+      "path": "CONTRIBUTING.md",
+      "status": "M",
+      "additions": 5,
+      "deletions": 18,
+      "binary": false
+    },
+    {
+      "path": "MANUAL.md",
+      "status": "M",
+      "additions": 3,
+      "deletions": 15,
+      "binary": false
+    },
+    {
+      "path": "README.md",
+      "status": "M",
+      "additions": 3,
+      "deletions": 12,
+      "binary": false
+    },
+    {
+      "path": "package.json",
+      "status": "M",
+      "additions": 10,
+      "deletions": 46,
+      "binary": false
+    },
+    {
+      "path": "src/cli.ts",
+      "status": "D",
+      "additions": 0,
+      "deletions": 30,
+      "binary": false
+    },
+    {
+      "path": "src/commands/gitignore.tsx",
+      "status": "D",
+      "additions": 0,
+      "deletions": 212,
+      "binary": false
+    },
+    {
+      "path": "src/commands/install.tsx",
+      "status": "D",
+      "additions": 0,
+      "deletions": 161,
+      "binary": false
+    },
+    {
+      "path": "src/commands/uninstall.tsx",
+      "status": "D",
+      "additions": 0,
+      "deletions": 180,
+      "binary": false
+    },
+    {
+      "path": "tsconfig.json",
+      "status": "D",
+      "additions": 0,
+      "deletions": 13,
+      "binary": false
+    },
+    {
+      "path": "tsup.config.ts",
+      "status": "D",
+      "additions": 0,
+      "deletions": 14,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/CLAUDE.md b/CLAUDE.md\nindex 3d823a8..46a099d 100644\n--- a/CLAUDE.md\n+++ b/CLAUDE.md\n@@ -4,7 +4,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co\n \n ## 概要\n \n-TsumikiはAI駆動開発フレームワークのコマンドテンプレートを提供するCLIツールです。このプロジェクトはTypeScript + ReactをInkで構成されたCLIアプリケーションで、Claude Code用のコマンドテンプレートをユーザーの`.claude/commands/`ディレクトリにインストールします。\n+TsumikiはAI駆動開発フレームワークです。Claude Code Plugin経由でインストールされ、要件定義から実装までのAI支援開発プロセスを提供します。\n+\n+このリポジトリには以下が含まれています：\n+- **`commands/`**: Claude Codeスラッシュコマンド用のテンプレートファイル（`.md`と`.sh`）\n+- **`agents/`**: Claude Codeエージェント用の定義ファイル（`.md`）\n+- **`.claude-plugin/`**: Claude Code Plugin設定ファイル\n \n ## 開発コマンド\n \n@@ -12,14 +17,9 @@ TsumikiはAI駆動開発フレームワークのコマンドテンプレート\n # 開発環境\n pnpm install                # 依存関係のインストール\n \n-# ビルド\n-pnpm build                  # プロジェクトをビルドし、commandsディレクトリをdist/にコピー\n-pnpm build:run              # ビルド後、CLI実行（テスト用）\n-\n # コード品質\n-pnpm check                  # Biomeでコードチェック\n+pnpm check                  # Biomeでコードチェック（commands/とagents/）\n pnpm fix                    # Biomeで自動修正\n-pnpm typecheck              # TypeScriptの型チェック（tsgoを使用）\n pnpm secretlint             # シークレット情報の検査\n \n # pre-commitフック\n@@ -28,40 +28,35 @@ pnpm prepare                # simple-git-hooksのセットアップ\n \n ## プロジェクト構造\n \n-- **`src/cli.ts`**: CLIエントリーポイント、commanderを使用してコマンド定義\n-- **`src/commands/install.tsx`**: React + Inkを使用したインストールコマンドのUI実装\n - **`commands/`**: TsumikiのAI開発フレームワーク用Claude Codeコマンドテンプレート（`.md`と`.sh`ファイル）\n-- **`dist/`**: ビルド出力、`dist/commands/`にテンプレートがコピーされる\n+- **`agents/`**: Claude Codeエージェント定義（`.md`ファイル）\n+- **`.claude-plugin/`**: Claude Code Plugin設定（marketplace.json, plugin.json）\n+- **`book/`**: 開発ガイドとドキュメント\n \n ## 技術スタック\n \n-- **CLI Framework**: Commander.js\n-- **UI Framework**: React + Ink（CLIでのReactレンダリング）\n-- **Build Tool**: tsup（TypeScript + ESBuildベース）\n - **Code Quality**: Biome（リンタ・フォーマッタ）\n-- **TypeScript**: tsgo（高速型チェック）\n+- **Security**: secretlint（機密情報検査）\n - **Package Manager**: pnpm\n+- **Distribution**: Claude Code Plugin Marketplace\n \n-## ビルドプロセス\n+## インストール方法\n \n-ビルド時（`pnpm build`）は以下の処理が実行されます：\n-1. `dist`ディレクトリをクリーンアップ\n-2. `dist/commands`ディレクトリを作成\n-3. `commands/`内の`.md`と`.sh`ファイルを`dist/commands/`にコピー\n-4. tsupでTypeScriptコードをESMとCJSの両形式でビルド\n+ユーザーは以下のコマンドでTsumikiをインストールします：\n \n-## インストール動作\n+```bash\n+/plugin marketplace add https://github.com/classmethod/tsumiki.git\n+```\n \n-`tsumiki install`コマンドは以下を実行します：\n-1. 現在のディレクトリに`.claude/commands/`ディレクトリを作成\n-2. ビルド済みの`dist/commands/`から全ての`.md`と`.sh`ファイルをコピー\n-3. React + Inkでプログレス表示とファイル一覧を表示\n+Claude Code Pluginが自動的に：\n+1. リポジトリから`commands/`と`agents/`のファイルを読み込み\n+2. `.claude-plugin/plugin.json`の設定に従ってコマンドとエージェントを登録\n+3. `/tsumiki:` プレフィックス付きでコマンドを使用可能にする\n \n ## 品質管理\n \n Pre-commitフックで以下が自動実行されます：\n - `pnpm secretlint`: 機密情報のチェック\n-- `pnpm typecheck`: 型チェック\n - `pnpm fix`: コードの自動修正\n \n-コード修正時は必ず`pnpm check`と`pnpm typecheck`を実行してからコミットしてください。\n\\ No newline at end of file\n+コマンドファイル（`.md`）やエージェント定義（`.md`）を修正する際は、必ず`pnpm check`を実行してからコミットしてください。\ndiff --git a/CONTRIBUTING.md b/CONTRIBUTING.md\nindex 1a925f1..9acb15c 100644\n--- a/CONTRIBUTING.md\n+++ b/CONTRIBUTING.md\n@@ -52,9 +52,6 @@ git checkout -b feature/your-feature-name\n 3. コード品質チェックを実行します：\n \n ```bash\n-# 型チェック\n-pnpm typecheck\n-\n # コードチェック\n pnpm check\n \n@@ -65,13 +62,7 @@ pnpm fix\n pnpm secretlint\n ```\n \n-4. ビルドテストを実行します：\n-\n-```bash\n-pnpm build:run\n-```\n-\n-5. 変更をコミットします：\n+4. 変更をコミットします：\n \n ```bash\n git add .\n@@ -104,7 +95,6 @@ docs: update README with new command examples\n Pre-commitフックで以下が自動実行されます：\n \n - **secretlint**: 機密情報（APIキー、パスワードなど）の混入チェック\n-- **typecheck**: TypeScriptの型チェック\n - **fix**: Biomeによるコードの自動修正\n \n ### 手動チェック\n@@ -113,7 +103,7 @@ Pre-commitフックで以下が自動実行されます：\n \n ```bash\n # 全てのチェックを実行\n-pnpm typecheck && pnpm check && pnpm secretlint\n+pnpm check && pnpm secretlint\n \n # コードの自動修正\n pnpm fix\n@@ -123,12 +113,10 @@ pnpm fix\n \n ```\n tsumiki/\n-├── src/\n-│   ├── cli.ts              # CLIエントリーポイント\n-│   └── commands/\n-│       └── install.tsx     # インストールコマンドのUI実装\n+├── .claude-plugin/         # Claude Code Plugin設定\n ├── commands/               # コマンドテンプレート（.md, .sh）\n-├── dist/                  # ビルド出力\n+├── agents/                 # エージェント定義（.md）\n+├── book/                   # ドキュメント\n ├── package.json\n ├── CLAUDE.md              # プロジェクト指示書\n └── README.md\n@@ -153,7 +141,6 @@ git push origin feature/your-feature-name\n - [ ] 変更内容が明確に説明されている\n - [ ] 関連するIssueがリンクされている（該当する場合）\n - [ ] コード品質チェックが通っている\n-- [ ] ビルドが成功している\n - [ ] 機密情報が含まれていない\n \n ## Issue報告\ndiff --git a/MANUAL.md b/MANUAL.md\nindex 47a74fa..ddc3277 100644\n--- a/MANUAL.md\n+++ b/MANUAL.md\n@@ -8,24 +8,12 @@ Claude Code Pluginを使用してTsumikiをインストールします：\n \n ```bash\n /plugin marketplace add https://github.com/classmethod/tsumiki.git\n+/plugin install tsumiki@tsumiki \n ```\n \n-**注意**: Claude Code Pluginでインストールした場合、コマンドは `/tsumiki:` プレフィックス付きで実行します（例：`/tsumiki:kairo-requirements`）。\n+**注意**: コマンドは `/tsumiki:` プレフィックス付きで実行します（例：`/tsumiki:kairo-requirements`）。\n \n-#### 非推奨：手動セットアップ\n-\n-以下の方法でも利用可能ですが、Plugin方式を推奨します：\n-\n-```bash\n-# プロジェクトのcommandsディレクトリを.claude/commandsにコピー\n-cp -r commands ~/.claude/commands/\n-\n-# または、プロジェクトディレクトリ内で\n-mkdir -p .claude\n-cp -r commands .claude/\n-```\n-\n-#### オプション：プロジェクト固有のルール設定\n+#### プロジェクト固有のルール設定\n \n セットアップ後、プロジェクト固有のルールや設定を追加できます。\n `docs/rule/{種類1}/{種類2}` ディレクトリ構造でファイルを配置すると、対応するコマンド実行時に自動で読み込まれます。\ndiff --git a/README.md b/README.md\nindex 2aef74f..8664c84 100644\n--- a/README.md\n+++ b/README.md\n@@ -10,21 +10,12 @@ Tsumikiを使用するには、次のClaude Code Pluginコマンドでインス\n \n ```bash\n /plugin marketplace add https://github.com/classmethod/tsumiki.git\n+/plugin install tsumiki@tsumiki \n ```\n \n このコマンドを実行すると、TsumikiのClaude Codeスラッシュコマンドとエージェントが自動的にインストールされます。\n \n-**注意**: Claude Code Pluginでインストールした場合、コマンドは `/tsumiki:` プレフィックス付きで実行します（例：`/tsumiki:kairo-requirements`）。\n-\n-### 非推奨：npxによるインストール\n-\n-以下の方法でもインストール可能ですが、今後はClaude Code Plugin方式を推奨します：\n-\n-```bash\n-npx tsumiki install\n-```\n-\n-このコマンドを実行すると、`.claude/commands/` にTsumikiのClaude Codeスラッシュコマンドがインストールされます。\n+**注意**: コマンドは `/tsumiki:` プレフィックス付きで実行します（例：`/tsumiki:kairo-requirements`）。\n \n ## 概要\n \n@@ -120,7 +111,7 @@ Kairoは要件定義から実装までの開発プロセスを自動化・支援\n \n [rulesync](https://github.com/dyoshikawa/rulesync)を組み合わせて使用することで、Claude Code以外のツールでもtsumikiのコマンドを使用できます。\n \n-`tsumiki install` 後、プロジェクトルートで以下のコマンドを実行します。\n+プロジェクトルートで以下のコマンドを実行します。\n \n ```\n npx -y rulesync init\ndiff --git a/package.json b/package.json\nindex b5d399a..fac5c6e 100644\n--- a/package.json\n+++ b/package.json\n@@ -2,13 +2,14 @@\n   \"name\": \"tsumiki\",\n   \"private\": false,\n   \"version\": \"0.0.6\",\n-  \"description\": \"A CLI tool for install tsumiki commands\",\n+  \"description\": \"AI-driven development framework for Claude Code\",\n   \"keywords\": [\n-    \"cli\",\n     \"tsumiki\",\n     \"claude\",\n     \"claudecode\",\n-    \"ai\"\n+    \"ai\",\n+    \"tdd\",\n+    \"plugin\"\n   ],\n   \"homepage\": \"https://github.com/classmethod/tsumiki#readme\",\n   \"bugs\": {\n@@ -22,57 +23,20 @@\n   \"author\": {\n     \"name\": \"classmethod\"\n   },\n-  \"type\": \"module\",\n-  \"exports\": {\n-    \".\": {\n-      \"types\": \"./dist/cli.d.ts\",\n-      \"import\": \"./dist/cli.js\",\n-      \"require\": \"./dist/cli.cjs\"\n-    }\n-  },\n-  \"main\": \"./dist/cli.cjs\",\n-  \"module\": \"./dist/cli.js\",\n-  \"types\": \"./dist/cli.d.ts\",\n-  \"bin\": {\n-    \"tsumiki\": \"./dist/cli.js\"\n-  },\n-  \"files\": [\n-    \"dist\"\n-  ],\n   \"scripts\": {\n-    \"build\": \"rm -rf dist && mkdir -p dist/commands dist/agents && cp ./commands/*.md ./commands/*.sh dist/commands/ 2>/dev/null || true && cp ./agents/*.md dist/agents/ 2>/dev/null || true && tsup\",\n-    \"build:run\": \"pnpm build && node dist/cli.js\",\n-    \"check\": \"biome check src\",\n-    \"fix\": \"biome check src --write\",\n+    \"check\": \"biome check commands agents\",\n+    \"fix\": \"biome check commands agents --write\",\n     \"prepare\": \"simple-git-hooks\",\n-    \"secretlint\": \"secretlint --secretlintignore .gitignore **/*\",\n-    \"typecheck\": \"tsgo --noEmit\"\n+    \"secretlint\": \"secretlint --secretlintignore .gitignore **/*\"\n   },\n   \"simple-git-hooks\": {\n-    \"pre-commit\": \"pnpm secretlint && pnpm typecheck && pnpm fix\"\n-  },\n-  \"dependencies\": {\n-    \"commander\": \"14.0.0\",\n-    \"fs-extra\": \"11.3.0\",\n-    \"ink\": \"6.1.0\",\n-    \"react\": \"19.1.1\"\n+    \"pre-commit\": \"pnpm secretlint && pnpm fix\"\n   },\n   \"devDependencies\": {\n     \"@biomejs/biome\": \"2.1.3\",\n     \"@secretlint/secretlint-rule-preset-recommend\": \"10.2.1\",\n-    \"@tsconfig/node24\": \"24.0.1\",\n-    \"@types/fs-extra\": \"11.0.4\",\n-    \"@types/node\": \"24.1.0\",\n-    \"@types/react\": \"19.1.9\",\n-    \"@typescript/native-preview\": \"7.0.0-dev.20250729.2\",\n     \"secretlint\": \"10.2.1\",\n-    \"simple-git-hooks\": \"2.13.0\",\n-    \"tsup\": \"8.5.0\",\n-    \"tsx\": \"4.20.3\",\n-    \"typescript\": \"5.8.3\"\n+    \"simple-git-hooks\": \"2.13.0\"\n   },\n-  \"packageManager\": \"pnpm@10.13.1\",\n-  \"engines\": {\n-    \"node\": \">=18.0.0\"\n-  }\n+  \"packageManager\": \"pnpm@10.13.1\"\n }\ndiff --git a/src/cli.ts b/src/cli.ts\ndeleted file mode 100644\nindex e3653fb..0000000\n--- a/src/cli.ts\n+++ /dev/null\n@@ -1,30 +0,0 @@\n-#!/usr/bin/env node\n-\n-import { Command } from \"commander\";\n-import { gitignoreCommand } from \"./commands/gitignore.js\";\n-import { installCommand } from \"./commands/install.js\";\n-import { uninstallCommand } from \"./commands/uninstall.js\";\n-\n-const program = new Command();\n-\n-program\n-  .name(\"tsumiki\")\n-  .description(\"CLI tool for installing Claude Code command templates\")\n-  .version(\"1.0.0\");\n-\n-program\n-  .command(\"install\")\n-  .description(\"Install Claude Code command templates to .claude/commands/\")\n-  .action(installCommand);\n-\n-program\n-  .command(\"uninstall\")\n-  .description(\"Uninstall Claude Code command templates from .claude/commands/\")\n-  .action(uninstallCommand);\n-\n-program\n-  .command(\"gitignore\")\n-  .description(\"Add commands/*.{md,sh} to .gitignore file\")\n-  .action(gitignoreCommand);\n-\n-program.parse();\ndiff --git a/src/commands/gitignore.tsx b/src/commands/gitignore.tsx\ndeleted file mode 100644\nindex 3ddf50b..0000000\n--- a/src/commands/gitignore.tsx\n+++ /dev/null\n@@ -1,212 +0,0 @@\n-import * as path from \"node:path\";\n-import { fileURLToPath } from \"node:url\";\n-import fs from \"fs-extra\";\n-import { Box, Newline, render, Text } from \"ink\";\n-import React, { useEffect, useState } from \"react\";\n-\n-type GitignoreStatus =\n-  | \"starting\"\n-  | \"checking\"\n-  | \"updating\"\n-  | \"completed\"\n-  | \"skipped\"\n-  | \"error\";\n-\n-const GitignoreComponent: React.FC = () => {\n-  const [status, setStatus] = useState<GitignoreStatus>(\"starting\");\n-  const [addedRules, setAddedRules] = useState<string[]>([]);\n-  const [skippedRules, setSkippedRules] = useState<string[]>([]);\n-  const [error, setError] = useState<string | null>(null);\n-\n-  useEffect(() => {\n-    const performGitignoreUpdate = async (): Promise<void> => {\n-      try {\n-        setStatus(\"checking\");\n-\n-        const currentDir = process.cwd();\n-        const gitignorePath = path.join(currentDir, \".gitignore\");\n-\n-        // tsumikiのcommandsディレクトリを取得\n-        const __filename = fileURLToPath(import.meta.url);\n-        const __dirname = path.dirname(__filename);\n-        // ビルド後はdist/commandsを参照（cli.jsがdist/にあるため）\n-        const tsumikiDir = path.join(__dirname, \"commands\");\n-\n-        // commandsディレクトリ内のすべての.mdファイルと.shファイルを取得\n-        const files = await fs.readdir(tsumikiDir);\n-        const targetFiles = files.filter(\n-          (file) => file.endsWith(\".md\") || file.endsWith(\".sh\"),\n-        );\n-\n-        // 具体的なファイルパスをルールとして作成\n-        const rulesToAdd = targetFiles.map(\n-          (file) => `.claude/commands/${file}`,\n-        );\n-\n-        let gitignoreContent = \"\";\n-        let gitignoreExists = false;\n-\n-        try {\n-          gitignoreContent = await fs.readFile(gitignorePath, \"utf-8\");\n-          gitignoreExists = true;\n-        } catch {\n-          gitignoreExists = false;\n-        }\n-\n-        const existingLines = gitignoreContent\n-          .split(\"\\n\")\n-          .map((line) => line.trim());\n-        const rulesToActuallyAdd: string[] = [];\n-        const rulesAlreadyExist: string[] = [];\n-\n-        for (const rule of rulesToAdd) {\n-          if (existingLines.includes(rule)) {\n-            rulesAlreadyExist.push(rule);\n-          } else {\n-            rulesToActuallyAdd.push(rule);\n-          }\n-        }\n-\n-        if (rulesToActuallyAdd.length === 0) {\n-          setSkippedRules(rulesAlreadyExist);\n-          setStatus(\"skipped\");\n-          setTimeout(() => {\n-            process.exit(0);\n-          }, 2000);\n-          return;\n-        }\n-\n-        setStatus(\"updating\");\n-\n-        let newContent = gitignoreContent;\n-        if (\n-          gitignoreExists &&\n-          gitignoreContent.length > 0 &&\n-          !gitignoreContent.endsWith(\"\\n\")\n-        ) {\n-          newContent += \"\\n\";\n-        }\n-\n-        if (gitignoreExists && gitignoreContent.length > 0) {\n-          newContent += \"\\n# Tsumiki command templates\\n\";\n-        } else {\n-          newContent = \"# Tsumiki command templates\\n\";\n-        }\n-\n-        for (const rule of rulesToActuallyAdd) {\n-          newContent += `${rule}\\n`;\n-        }\n-\n-        await fs.writeFile(gitignorePath, newContent);\n-\n-        setAddedRules(rulesToActuallyAdd);\n-        setSkippedRules(rulesAlreadyExist);\n-        setStatus(\"completed\");\n-\n-        setTimeout(() => {\n-          process.exit(0);\n-        }, 2000);\n-      } catch (err) {\n-        const errorMessage =\n-          err instanceof Error ? err.message : \"Unknown error occurred\";\n-        setError(errorMessage);\n-        setStatus(\"error\");\n-\n-        setTimeout(() => {\n-          process.exit(1);\n-        }, 3000);\n-      }\n-    };\n-\n-    performGitignoreUpdate();\n-  }, []);\n-\n-  if (status === \"starting\") {\n-    return (\n-      <Box>\n-        <Text color=\"cyan\">🚀 .gitignore の更新を開始します...</Text>\n-      </Box>\n-    );\n-  }\n-\n-  if (status === \"checking\") {\n-    return (\n-      <Box>\n-        <Text color=\"yellow\">📋 .gitignore ファイルをチェック中...</Text>\n-      </Box>\n-    );\n-  }\n-\n-  if (status === \"updating\") {\n-    return (\n-      <Box>\n-        <Text color=\"blue\">✏️ .gitignore を更新中...</Text>\n-      </Box>\n-    );\n-  }\n-\n-  if (status === \"error\") {\n-    return (\n-      <Box flexDirection=\"column\">\n-        <Text color=\"red\">❌ エラーが発生しました:</Text>\n-        <Text color=\"red\">{error}</Text>\n-      </Box>\n-    );\n-  }\n-\n-  if (status === \"skipped\") {\n-    return (\n-      <Box flexDirection=\"column\">\n-        <Text color=\"yellow\">⏭️ すべてのルールが既に存在します</Text>\n-        <Newline />\n-        <Text>既存のルール:</Text>\n-        {skippedRules.map((rule) => (\n-          <Text key={rule} color=\"gray\">\n-            • {rule}\n-          </Text>\n-        ))}\n-        <Newline />\n-        <Text color=\"cyan\">.gitignore の更新は不要でした</Text>\n-      </Box>\n-    );\n-  }\n-\n-  if (status === \"completed\") {\n-    return (\n-      <Box flexDirection=\"column\">\n-        <Text color=\"green\">✅ .gitignore の更新が完了しました!</Text>\n-        <Newline />\n-        {addedRules.length > 0 && (\n-          <>\n-            <Text>追加されたルール ({addedRules.length}個):</Text>\n-            {addedRules.map((rule) => (\n-              <Text key={rule} color=\"green\">\n-                • {rule}\n-              </Text>\n-            ))}\n-          </>\n-        )}\n-        {skippedRules.length > 0 && (\n-          <>\n-            <Text>既存のルール ({skippedRules.length}個):</Text>\n-            {skippedRules.map((rule) => (\n-              <Text key={rule} color=\"gray\">\n-                • {rule}\n-              </Text>\n-            ))}\n-          </>\n-        )}\n-        <Newline />\n-        <Text color=\"cyan\">\n-          Tsumiki のコマンドファイルが Git から無視されるようになりました\n-        </Text>\n-      </Box>\n-    );\n-  }\n-\n-  return null;\n-};\n-\n-export const gitignoreCommand = (): void => {\n-  render(React.createElement(GitignoreComponent));\n-};\ndiff --git a/src/commands/install.tsx b/src/commands/install.tsx\ndeleted file mode 100644\nindex c75dca9..0000000\n--- a/src/commands/install.tsx\n+++ /dev/null\n@@ -1,161 +0,0 @@\n-import * as path from \"node:path\";\n-import { fileURLToPath } from \"node:url\";\n-import fs from \"fs-extra\";\n-import { Box, Newline, render, Text } from \"ink\";\n-import React, { useEffect, useState } from \"react\";\n-\n-type InstallStatus =\n-  | \"starting\"\n-  | \"checking\"\n-  | \"copying\"\n-  | \"completed\"\n-  | \"error\";\n-\n-const InstallComponent: React.FC = () => {\n-  const [status, setStatus] = useState<InstallStatus>(\"starting\");\n-  const [copiedFiles, setCopiedFiles] = useState<string[]>([]);\n-  const [error, setError] = useState<string | null>(null);\n-\n-  useEffect(() => {\n-    const performInstall = async (): Promise<void> => {\n-      try {\n-        setStatus(\"checking\");\n-\n-        // 現在のディレクトリを取得\n-        const currentDir = process.cwd();\n-        const commandsTargetDir = path.join(currentDir, \".claude\", \"commands\");\n-        const agentsTargetDir = path.join(currentDir, \".claude\", \"agents\");\n-\n-        // tsumikiのcommandsディレクトリとagentsディレクトリを取得\n-        const __filename = fileURLToPath(import.meta.url);\n-        const __dirname = path.dirname(__filename);\n-        // ビルド後はdist/commands, dist/agentsを参照（cli.jsがdist/にあるため）\n-        const tsumikiCommandsDir = path.join(__dirname, \"commands\");\n-        const tsumikiAgentsDir = path.join(__dirname, \"agents\");\n-\n-        // .claude/commandsと.claude/agentsディレクトリが存在しない場合は作成\n-        await fs.ensureDir(commandsTargetDir);\n-        await fs.ensureDir(agentsTargetDir);\n-\n-        setStatus(\"copying\");\n-\n-        // commandsディレクトリ内のすべての.mdファイルと.shファイルを取得\n-        const commandFiles = await fs.readdir(tsumikiCommandsDir);\n-        const targetCommandFiles = commandFiles.filter(\n-          (file) => file.endsWith(\".md\") || file.endsWith(\".sh\"),\n-        );\n-\n-        // agentsディレクトリ内のすべての.mdファイルを取得\n-        let targetAgentFiles: string[] = [];\n-        try {\n-          const agentFiles = await fs.readdir(tsumikiAgentsDir);\n-          targetAgentFiles = agentFiles.filter((file) => file.endsWith(\".md\"));\n-        } catch {\n-          // agentsディレクトリが存在しない場合はスキップ\n-        }\n-\n-        const copiedFilesList: string[] = [];\n-\n-        // commandsファイルをコピー\n-        for (const file of targetCommandFiles) {\n-          const sourcePath = path.join(tsumikiCommandsDir, file);\n-          const targetPath = path.join(commandsTargetDir, file);\n-\n-          await fs.copy(sourcePath, targetPath);\n-          copiedFilesList.push(`commands/${file}`);\n-        }\n-\n-        // agentsファイルをコピー\n-        for (const file of targetAgentFiles) {\n-          const sourcePath = path.join(tsumikiAgentsDir, file);\n-          const targetPath = path.join(agentsTargetDir, file);\n-\n-          await fs.copy(sourcePath, targetPath);\n-          copiedFilesList.push(`agents/${file}`);\n-        }\n-\n-        setCopiedFiles(copiedFilesList);\n-        setStatus(\"completed\");\n-\n-        // 2秒後に終了\n-        setTimeout(() => {\n-          process.exit(0);\n-        }, 2000);\n-      } catch (err) {\n-        const errorMessage =\n-          err instanceof Error ? err.message : \"Unknown error occurred\";\n-        setError(errorMessage);\n-        setStatus(\"error\");\n-\n-        setTimeout(() => {\n-          process.exit(1);\n-        }, 3000);\n-      }\n-    };\n-\n-    performInstall();\n-  }, []);\n-\n-  if (status === \"starting\") {\n-    return (\n-      <Box>\n-        <Text color=\"cyan\">🚀 Tsumiki インストールを開始します...</Text>\n-      </Box>\n-    );\n-  }\n-\n-  if (status === \"checking\") {\n-    return (\n-      <Box>\n-        <Text color=\"yellow\">📋 環境をチェック中...</Text>\n-      </Box>\n-    );\n-  }\n-\n-  if (status === \"copying\") {\n-    return (\n-      <Box>\n-        <Text color=\"blue\">📝 コマンドテンプレートをコピー中...</Text>\n-      </Box>\n-    );\n-  }\n-\n-  if (status === \"error\") {\n-    return (\n-      <Box flexDirection=\"column\">\n-        <Text color=\"red\">❌ エラーが発生しました:</Text>\n-        <Text color=\"red\">{error}</Text>\n-      </Box>\n-    );\n-  }\n-\n-  if (status === \"completed\") {\n-    return (\n-      <Box flexDirection=\"column\">\n-        <Text color=\"green\">✅ インストールが完了しました!</Text>\n-        <Newline />\n-        <Text>コピーされたファイル ({copiedFiles.length}個):</Text>\n-        {copiedFiles.map((file) => (\n-          <Text key={file} color=\"gray\">\n-            {\" \"}\n-            • {file}\n-          </Text>\n-        ))}\n-        <Newline />\n-        <Text color=\"cyan\">\n-          Claude Codeで以下のようにコマンドを使用できます:\n-        </Text>\n-        <Text color=\"white\"> /tdd-requirements</Text>\n-        <Text color=\"white\"> /kairo-design</Text>\n-        <Text color=\"white\"> @agent-symbol-searcher</Text>\n-        <Text color=\"white\"> ...</Text>\n-      </Box>\n-    );\n-  }\n-\n-  return null;\n-};\n-\n-export const installCommand = (): void => {\n-  render(React.createElement(InstallComponent));\n-};\ndiff --git a/src/commands/uninstall.tsx b/src/commands/uninstall.tsx\ndeleted file mode 100644\nindex d287c4d..0000000\n--- a/src/commands/uninstall.tsx\n+++ /dev/null\n@@ -1,180 +0,0 @@\n-import * as path from \"node:path\";\n-import { fileURLToPath } from \"node:url\";\n-import fs from \"fs-extra\";\n-import { Box, Newline, render, Text } from \"ink\";\n-import React, { useEffect, useState } from \"react\";\n-\n-type UninstallStatus =\n-  | \"starting\"\n-  | \"checking\"\n-  | \"removing\"\n-  | \"completed\"\n-  | \"error\"\n-  | \"not_found\";\n-\n-const UninstallComponent: React.FC = () => {\n-  const [status, setStatus] = useState<UninstallStatus>(\"starting\");\n-  const [removedFiles, setRemovedFiles] = useState<string[]>([]);\n-  const [error, setError] = useState<string | null>(null);\n-\n-  useEffect(() => {\n-    const performUninstall = async (): Promise<void> => {\n-      try {\n-        setStatus(\"checking\");\n-\n-        // 現在のディレクトリを取得\n-        const currentDir = process.cwd();\n-        const targetDir = path.join(currentDir, \".claude\", \"commands\");\n-\n-        // .claude/commandsディレクトリが存在するかチェック\n-        const dirExists = await fs.pathExists(targetDir);\n-        if (!dirExists) {\n-          setStatus(\"not_found\");\n-          setTimeout(() => {\n-            process.exit(0);\n-          }, 2000);\n-          return;\n-        }\n-\n-        // tsumikiのcommandsディレクトリを取得\n-        const __filename = fileURLToPath(import.meta.url);\n-        const __dirname = path.dirname(__filename);\n-        // ビルド後はdist/commandsを参照（cli.jsがdist/にあるため）\n-        const tsumikiDir = path.join(__dirname, \"commands\");\n-\n-        // tsumikiのファイル一覧を取得\n-        const tsumikiFiles = await fs.readdir(tsumikiDir);\n-        const tsumikiTargetFiles = tsumikiFiles.filter(\n-          (file) => file.endsWith(\".md\") || file.endsWith(\".sh\"),\n-        );\n-\n-        setStatus(\"removing\");\n-\n-        // .claude/commands内のファイルをチェックして、tsumiki由来のファイルのみ削除\n-        const installedFiles = await fs.readdir(targetDir);\n-        const removedFilesList: string[] = [];\n-\n-        for (const file of installedFiles) {\n-          if (tsumikiTargetFiles.includes(file)) {\n-            const filePath = path.join(targetDir, file);\n-            await fs.remove(filePath);\n-            removedFilesList.push(file);\n-          }\n-        }\n-\n-        // 削除後に.claude/commandsディレクトリが空になったかチェック\n-        const remainingFiles = await fs.readdir(targetDir);\n-        if (remainingFiles.length === 0) {\n-          // 空のディレクトリを削除\n-          await fs.rmdir(targetDir);\n-          // .claudeディレクトリも空の場合は削除\n-          const claudeDir = path.dirname(targetDir);\n-          const claudeFiles = await fs.readdir(claudeDir);\n-          if (claudeFiles.length === 0) {\n-            await fs.rmdir(claudeDir);\n-          }\n-        }\n-\n-        setRemovedFiles(removedFilesList);\n-        setStatus(\"completed\");\n-\n-        // 2秒後に終了\n-        setTimeout(() => {\n-          process.exit(0);\n-        }, 2000);\n-      } catch (err) {\n-        const errorMessage =\n-          err instanceof Error ? err.message : \"Unknown error occurred\";\n-        setError(errorMessage);\n-        setStatus(\"error\");\n-\n-        setTimeout(() => {\n-          process.exit(1);\n-        }, 3000);\n-      }\n-    };\n-\n-    performUninstall();\n-  }, []);\n-\n-  if (status === \"starting\") {\n-    return (\n-      <Box>\n-        <Text color=\"cyan\">🗑️ Tsumiki アンインストールを開始します...</Text>\n-      </Box>\n-    );\n-  }\n-\n-  if (status === \"checking\") {\n-    return (\n-      <Box>\n-        <Text color=\"yellow\">📋 インストール状況をチェック中...</Text>\n-      </Box>\n-    );\n-  }\n-\n-  if (status === \"removing\") {\n-    return (\n-      <Box>\n-        <Text color=\"blue\">🗑️ コマンドテンプレートを削除中...</Text>\n-      </Box>\n-    );\n-  }\n-\n-  if (status === \"not_found\") {\n-    return (\n-      <Box flexDirection=\"column\">\n-        <Text color=\"yellow\">\n-          ⚠️ .claude/commands ディレクトリが見つかりません\n-        </Text>\n-        <Text color=\"gray\">Tsumikiはインストールされていないようです。</Text>\n-      </Box>\n-    );\n-  }\n-\n-  if (status === \"error\") {\n-    return (\n-      <Box flexDirection=\"column\">\n-        <Text color=\"red\">❌ エラーが発生しました:</Text>\n-        <Text color=\"red\">{error}</Text>\n-      </Box>\n-    );\n-  }\n-\n-  if (status === \"completed\") {\n-    if (removedFiles.length === 0) {\n-      return (\n-        <Box flexDirection=\"column\">\n-          <Text color=\"yellow\">⚠️ 削除対象のファイルが見つかりませんでした</Text>\n-          <Text color=\"gray\">\n-            Tsumikiのコマンドはインストールされていないようです。\n-          </Text>\n-        </Box>\n-      );\n-    }\n-\n-    return (\n-      <Box flexDirection=\"column\">\n-        <Text color=\"green\">✅ アンインストールが完了しました!</Text>\n-        <Newline />\n-        <Text>削除されたファイル ({removedFiles.length}個):</Text>\n-        {removedFiles.map((file) => (\n-          <Text key={file} color=\"gray\">\n-            {\" \"}\n-            • {file}\n-          </Text>\n-        ))}\n-        <Newline />\n-        <Text color=\"cyan\">\n-          TsumikiのClaude Codeコマンドテンプレートが削除されました。\n-        </Text>\n-      </Box>\n-    );\n-  }\n-\n-  return null;\n-};\n-\n-export const uninstallCommand = (): void => {\n-  render(React.createElement(UninstallComponent));\n-};\ndiff --git a/tsconfig.json b/tsconfig.json\ndeleted file mode 100644\nindex 7510be6..0000000\n--- a/tsconfig.json\n+++ /dev/null\n@@ -1,13 +0,0 @@\n-{\n-  \"extends\": \"@tsconfig/node24/tsconfig.json\",\n-  \"compilerOptions\": {\n-    \"outDir\": \"./dist\",\n-    \"rootDir\": \"./src\",\n-    \"declaration\": true,\n-    \"declarationMap\": true,\n-    \"sourceMap\": true,\n-    \"jsx\": \"react\"\n-  },\n-  \"include\": [\"src/**/*\"],\n-  \"exclude\": [\"node_modules\", \"dist\"]\n-}\ndiff --git a/tsup.config.ts b/tsup.config.ts\ndeleted file mode 100644\nindex abbfc66..0000000\n--- a/tsup.config.ts\n+++ /dev/null\n@@ -1,14 +0,0 @@\n-import { defineConfig } from 'tsup';\n-\n-export default defineConfig({\n-  entry: ['src/cli.ts'],\n-  format: ['esm', 'cjs'],\n-  dts: true,\n-  outDir: 'dist',\n-  clean: false,\n-  target: 'es2022',\n-  tsconfig: 'tsconfig.json',\n-  esbuildOptions: (options) => {\n-    options.jsx = 'automatic';\n-  },\n-});\n",
+  "diffTruncated": false,
+  "tree": [
+    ".claude-plugin/marketplace.json",
+    ".claude-plugin/plugin.json",
+    ".claude/commands/release.yml",
+    ".devcontainer/Dockerfile",
+    ".devcontainer/devcontainer.json",
+    ".github/ISSUE_TEMPLATE/bug_report.md",
+    ".github/workflows/ci.yml",
+    ".github/workflows/release.yml",
+    ".gitignore",
+    ".npmrc",
+    ".secretlintrc.json",
+    "CLAUDE.md",
+    "CONTRIBUTING.md",
+    "LICENSE",
+    "MANUAL.md",
+    "README.md",
+    "agents/symbol-searcher.md",
+    "biome.json",
+    "book/01-fundamentals/01-aitdd-definition.md",
+    "book/02-environment/01-tools-setup.md",
+    "book/02-environment/02-claude-usage.md",
+    "book/02-environment/03-workflow-setup.md",
+    "book/03-process/01-extended-tdd-flow.md",
+    "book/03-process/02-todo-and-specification.md",
+    "book/03-process/03-test-case-creation.md",
+    "book/03-process/04-rgr-validation-cycle.md",
+    "book/03-process/05-validation-details.md",
+    "book/04-hands-on/01-first-project.md",
+    "book/04-hands-on/02-crud-example.md",
+    "book/04-hands-on/03-api-development.md",
+    "book/04-hands-on/04-error-handling.md",
+    "book/05-optimization/01-prompt-design.md",
+    "book/05-optimization/02-ai-inference-visualization.md",
+    "book/05-optimization/03-continuous-improvement.md",
+    "book/06-collaboration/01-balance-strategy.md",
+    "book/06-collaboration/02-creativity-points.md",
+    "book/06-collaboration/03-review-quality.md",
+    "book/07-case-studies/01-experimental-results.md",
+    "book/07-case-studies/02-evolution-case.md",
+    "book/07-case-studies/03-failure-cases.md",
+    "book/08-best-practices/01-tech-selection.md",
+    "book/08-best-practices/02-documentation.md",
+    "book/08-best-practices/03-future-vision.md",
+    "book/aitdd-getting-started.md",
+    "book/toc.md",
+    "commands/auto-debug.md",
+    "commands/direct-setup.md",
+    "commands/direct-verify.md",
+    "commands/init-tech-stack.md",
+    "commands/kairo-design.md",
+    "commands/kairo-implement.md",
+    "commands/kairo-requirements.md",
+    "commands/kairo-task-verify.md",
+    "commands/kairo-tasks.md",
+    "commands/rev-design.md",
+    "commands/rev-requirements.md",
+    "commands/rev-specs.md",
+    "commands/rev-tasks.md",
+    "commands/start-server.md",
+    "commands/tdd-cycle-full.sh",
+    "commands/tdd-green.md",
+    "commands/tdd-load-context.md",
+    "commands/tdd-red.md",
+    "commands/tdd-refactor.md",
+    "commands/tdd-requirements.md",
+    "commands/tdd-testcases.md",
+    "commands/tdd-todo.md",
+    "commands/tdd-verify-complete.md",
+    "commands/tech-stack.md",
+    "mise.toml",
+    "package.json"
+  ],
+  "explanation": {
+    "what": "npx 経由の CLI 配布に関わるコードを一括削除した。`src/cli.ts`（Commander.js エントリポイント）、`src/commands/install.tsx`・`uninstall.tsx`・`gitignore.tsx`（React + Ink 製の対話UI実装）、`tsconfig.json`、`tsup.config.ts` を削除し、`package.json` から `bin` / `exports` / ビルド用 devDependencies（commander・ink・react・tsup・typescript 等）を除去。CLAUDE.md・CONTRIBUTING.md・MANUAL.md・README.md からも npx install の説明とビルド関連の開発手順を削除し、Claude Code Plugin のみが正式なインストール経路であることを明記した。",
+    "why": "コミットメッセージに明記の通り、tsumiki は Claude Code Plugin marketplace 経由の配布に一本化されたため、それまで並行して存在していた npx CLI（`tsumiki install` コマンド）は不要になった。PR #35 のタイトル・本文が示す「claude code pluginに対応、install方法を変更」という方針に沿った後始末で、配布経路を1つに絞ることでプロジェクト構成と開発フローを単純化する狙いが読み取れる。",
+    "highlights": [
+      { "file": "src/commands/install.tsx", "note": "React + Ink で書かれていたインストール処理そのものが丸ごと削除される（この構成の最後の姿）" },
+      { "file": "package.json", "note": "bin/exports/ビルド系 devDependencies が消え、plugin配布専用のシンプルな scripts だけが残る" }
+    ],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "message",
+    "refs": [{ "type": "pr", "number": 35, "url": "https://github.com/classmethod/tsumiki/pull/35" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-08-04T12:00:00Z"
+  }
+}
