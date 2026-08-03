@@ -16,6 +16,8 @@ export interface Repo {
 	defaultBranch: string;
 	headSha: string;
 	mainlineCount: number;
+	/** 取り込み範囲。欠落時は "first-parent" とみなす */
+	commitMode?: "first-parent" | "all";
 	extractedAt: string;
 }
 

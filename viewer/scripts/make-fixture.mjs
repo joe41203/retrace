@@ -379,6 +379,7 @@ const repo = {
   defaultBranch: 'main',
   headSha: commits[commits.length - 1].sha,
   mainlineCount: commits.length,
+  commitMode: 'first-parent',
   extractedAt: iso(30),
 };
 writeJson(join(OUT_DIR, 'repo.json'), repo);

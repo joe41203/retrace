@@ -49,6 +49,10 @@ function validateRepoJson(repo) {
     if (!isString(repo[k])) err(`${ctx}: ${k} が文字列でない`);
   }
   if (!isNumber(repo.mainlineCount)) err(`${ctx}: mainlineCount が数値でない`);
+  // commitMode は任意(欠落時は first-parent 扱い)。あるなら enum を守ること。
+  if (repo.commitMode !== undefined && !["first-parent", "all"].includes(repo.commitMode)) {
+    err(`${ctx}: commitMode が "first-parent" | "all" でない(${repo.commitMode})`);
+  }
 }
 
 function validateIndexJson(index) {

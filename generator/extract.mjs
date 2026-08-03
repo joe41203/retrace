@@ -1,9 +1,13 @@
 #!/usr/bin/env node
 // retrace 機械抽出スクリプト
-// 使い方: node generator/extract.mjs --repo <owner>/<repo> [--force]
+// 使い方: node generator/extract.mjs --repo <owner>/<repo> [--force] [--all-commits]
 //
 // git / gh CLI を呼んで DESIGN.md のスキーマ通りに data/<owner>__<repo>/ を生成する。
 // LLM は一切使わない。再開可能(既存 commits/*.json はスキップ、--force で上書き)。
+//
+// 取り込み範囲は 2 モード(repo.json の commitMode に記録される):
+//   first-parent(既定) — mainline のみ。PR は 1 マージコミットに畳まれる
+//   all(--all-commits) — PR ブランチ側のコミットも含む全コミット(topo 順)
 
 import fs from "node:fs";
 import fsp from "node:fs/promises";
@@ -26,11 +30,12 @@ import {
 // ---- 引数パース ------------------------------------------------------------
 
 function parseArgs(argv) {
-  const args = { force: false, repo: null };
+  const args = { force: false, repo: null, allCommits: false };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === "--repo") args.repo = argv[++i];
     else if (a === "--force") args.force = true;
+    else if (a === "--all-commits") args.allCommits = true;
     else if (a === "-h" || a === "--help") args.help = true;
     else throw new Error(`未知の引数: ${a}`);
   }
@@ -244,7 +249,9 @@ async function readCommitMeta(repoDir, sha) {
 async function main() {
   const args = parseArgs(process.argv.slice(2));
   if (args.help || !args.repo) {
-    console.log("使い方: node generator/extract.mjs --repo <owner>/<repo> [--force]");
+    console.log(
+      "使い方: node generator/extract.mjs --repo <owner>/<repo> [--force] [--all-commits]",
+    );
     process.exit(args.repo ? 0 : 1);
   }
   const startedAt = Date.now();
@@ -255,19 +262,22 @@ async function main() {
   const { defaultBranch, language } = await getRepoInfo(owner, repo, repoDir);
   console.log(`[repo] defaultBranch = ${defaultBranch} / language = ${language ?? "(不明)"}`);
 
-  // mainline: first-parent を逆順(古い順)
+  // 取り込み対象を逆順(古い順)で列挙する。
+  // first-parent: mainline のみ / all: PR ブランチ側も含む全コミット(topo 順で親子が前後する)
+  const commitMode = args.allCommits ? "all" : "first-parent";
+  const rangeOpts = args.allCommits ? ["--topo-order"] : ["--first-parent"];
   const revList = await git(repoDir, [
     "rev-list",
     "--reverse",
-    "--first-parent",
+    ...rangeOpts,
     `origin/${defaultBranch}`,
   ]).catch(async () => {
     // origin/<branch> が無い場合はローカル参照でリトライ
-    return git(repoDir, ["rev-list", "--reverse", "--first-parent", defaultBranch]);
+    return git(repoDir, ["rev-list", "--reverse", ...rangeOpts, defaultBranch]);
   });
   const shas = revList.split("\n").map((s) => s.trim()).filter(Boolean);
   const mainlineCount = shas.length;
-  console.log(`[mainline] ${mainlineCount} コミット`);
+  console.log(`[${commitMode}] ${mainlineCount} コミット`);
 
   const outDir = path.join(DATA_DIR, id);
   const commitsDir = path.join(outDir, "commits");
@@ -371,6 +381,7 @@ async function main() {
     defaultBranch,
     headSha,
     mainlineCount,
+    commitMode,
     extractedAt,
   });
 
@@ -379,7 +390,9 @@ async function main() {
   const secs = ((Date.now() - startedAt) / 1000).toFixed(1);
   console.log("");
   console.log(`[完了] ${owner}/${repo} — ${secs}s`);
-  console.log(`  mainline: ${mainlineCount} / 新規: ${processed} / スキップ: ${skipped}`);
+  console.log(
+    `  ${commitMode}: ${mainlineCount} / 新規: ${processed} / スキップ: ${skipped}`,
+  );
   console.log(
     `  PR 紐付け: ${prLinked} (${((prLinked / mainlineCount) * 100).toFixed(1)}%) / linkedIssues: ${issueCount} / diffTruncated: ${truncatedCount}`,
   );

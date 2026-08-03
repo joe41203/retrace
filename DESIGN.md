@@ -56,9 +56,12 @@ flowchart LR
   "url": "https://github.com/nakabonne/ali",
   "defaultBranch": "master",
   "headSha": "…", "mainlineCount": 200,
+  "commitMode": "first-parent",
   "extractedAt": "2026-07-22T00:00:00Z"
 }
 ```
+
+`commitMode` は取り込み範囲。`"first-parent"`(既定)は mainline のみで、PR は 1 マージコミットに畳まれる。`"all"`(`extract.mjs --all-commits`)は PR ブランチ側のコミットも含む全コミットを topo 順で取り込む。マージ中心のリポジトリでは first-parent 件数が GitHub の総コミット数を大きく下回る(classmethod/tsumiki: 137 → 37)ため、PR 内の試行錯誤まで読みたい場合に `all` を使う。`all` ではマージコミットの diff がその PR のブランチ側コミットと内容的に重複する点に注意。`mainlineCount` はモードに関わらず「取り込んだコミット数」。`commitMode` は省略可(欠落時は `"first-parent"` とみなす)。
 
 ### index.json(ビューアが最初に読む一覧)
 
