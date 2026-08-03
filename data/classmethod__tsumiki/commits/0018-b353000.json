@@ -1,0 +1,204 @@
+{
+  "seq": 18,
+  "sha": "b3530001370da1dfc27bf4a7facc97b1d44616ee",
+  "parents": [
+    "df295007fde364b645175e3b604ad43992ede0f0",
+    "2c5e16487a75b219a479e3a17e384b0a7dd4cd3f"
+  ],
+  "author": {
+    "name": "cm-kuroeda",
+    "email": "kuroeda.makoto@classmethod.jp",
+    "date": "2025-07-31T16:57:20+09:00"
+  },
+  "message": "Merge pull request #17 from makotan/feature/filepath-and-tdd-improvements\n\nファイルパスの設定が一部ズレてたのを修正",
+  "pr": {
+    "number": 17,
+    "title": "ファイルパスの設定が一部ズレてたのを修正",
+    "body": "tdd-greenで積極的にモックを使うのを修正\r\nその他細かい改善",
+    "url": "https://github.com/classmethod/tsumiki/pull/17"
+  },
+  "linkedIssues": [],
+  "stats": {
+    "filesChanged": 13,
+    "additions": 792,
+    "deletions": 200
+  },
+  "files": [
+    {
+      "path": "commands/direct-verify.md",
+      "status": "M",
+      "additions": 89,
+      "deletions": 5,
+      "binary": false
+    },
+    {
+      "path": "commands/kairo-design.md",
+      "status": "M",
+      "additions": 46,
+      "deletions": 16,
+      "binary": false
+    },
+    {
+      "path": "commands/kairo-implement.md",
+      "status": "M",
+      "additions": 9,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "commands/kairo-requirements.md",
+      "status": "M",
+      "additions": 245,
+      "deletions": 14,
+      "binary": false
+    },
+    {
+      "path": "commands/kairo-task-verify.md",
+      "status": "M",
+      "additions": 7,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "commands/kairo-tasks.md",
+      "status": "M",
+      "additions": 272,
+      "deletions": 92,
+      "binary": false
+    },
+    {
+      "path": "commands/tdd-green.md",
+      "status": "M",
+      "additions": 25,
+      "deletions": 7,
+      "binary": false
+    },
+    {
+      "path": "commands/tdd-load-context.md",
+      "status": "M",
+      "additions": 28,
+      "deletions": 40,
+      "binary": false
+    },
+    {
+      "path": "commands/tdd-red.md",
+      "status": "M",
+      "additions": 8,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "commands/tdd-refactor.md",
+      "status": "M",
+      "additions": 3,
+      "deletions": 0,
+      "binary": false
+    },
+    {
+      "path": "commands/tdd-requirements.md",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "commands/tdd-testcases.md",
+      "status": "M",
+      "additions": 1,
+      "deletions": 1,
+      "binary": false
+    },
+    {
+      "path": "commands/tdd-verify-complete.md",
+      "status": "M",
+      "additions": 58,
+      "deletions": 24,
+      "binary": false
+    }
+  ],
+  "diff": "diff --git a/commands/direct-verify.md b/commands/direct-verify.md\nindex 8db6eff..0e1e81a 100644\n--- a/commands/direct-verify.md\n+++ b/commands/direct-verify.md\n@@ -12,19 +12,27 @@ DIRECTタスクで実行した設定作業の動作確認とテストを行い\n \n ## 実行内容\n \n+**【重要】**: direct-setupで作成されたファイルについて、コンパイルエラーや構文エラーが見つかった場合は自動的に解決を試行します。\n+\n 1. **設定の確認**\n    - 環境変数の確認\n    - 設定ファイルの内容確認\n    - 依存関係のインストール状況確認\n    - サービスの起動状況確認\n \n-2. **動作テストの実行**\n+2. **コンパイル・構文確認**\n+   - TypeScript/JavaScript構文エラーチェック（該当する場合）\n+   - 設定ファイルの構文確認（JSON, YAML等）\n+   - SQL構文確認（該当する場合）\n+   - 最低限のコンパイルエラー解消\n+\n+3. **動作テストの実行**\n    - 基本的な動作確認\n    - 接続テスト\n    - 権限の確認\n    - エラーケースの確認\n \n-3. **品質チェック**\n+4. **品質チェック**\n    - セキュリティ設定の確認\n    - パフォーマンス基準の確認\n    - ログの確認\n@@ -77,6 +85,53 @@ cat config/database.json | jq .\n - [x] JSON形式が正しい\n - [x] 必要な設定項目が含まれている\n \n+## コンパイル・構文チェック結果\n+\n+### 1. TypeScript/JavaScript構文チェック\n+\n+```bash\n+# TypeScriptファイルがある場合\n+npx tsc --noEmit --skipLibCheck\n+\n+# JavaScript構文チェック\n+node --check *.js\n+```\n+\n+**チェック結果**:\n+\n+- [x] TypeScript構文エラー: なし\n+- [x] JavaScript構文エラー: なし\n+- [x] import/require文: 正常\n+\n+### 2. 設定ファイル構文チェック\n+\n+```bash\n+# JSON設定ファイルの構文チェック\n+cat config/*.json | jq empty\n+\n+# YAML設定ファイルの構文チェック（該当する場合）\n+yamllint config/*.yml\n+```\n+\n+**チェック結果**:\n+\n+- [x] JSON構文: 正常\n+- [x] YAML構文: 正常（該当する場合）\n+- [x] 設定項目の妥当性: 確認済み\n+\n+### 3. SQL構文チェック（該当する場合）\n+\n+```bash\n+# SQL構文の基本チェック\n+psql -d mydb --single-transaction --set ON_ERROR_STOP=on -f schema.sql --dry-run\n+```\n+\n+**チェック結果**:\n+\n+- [x] SQL構文: 正常\n+- [x] テーブル定義: 正常\n+- [x] 制約定義: 正常\n+\n ### 3. 依存関係の確認\n \n ```bash\n@@ -175,14 +230,42 @@ ps aux | grep node\n - [x] 品質基準を満たしている\n - [x] 次のタスクに進む準備が整っている\n \n-## 発見された問題\n+## 発見された問題と解決\n+\n+### 構文エラー・コンパイルエラーの解決\n+\n+**自動解決を試行する問題**:\n+- TypeScript/JavaScript構文エラー\n+- JSON/YAML構文エラー\n+- 基本的なSQL構文エラー\n+- import/require文の問題\n \n ### 問題1: {問題があれば記載}\n \n - **問題内容**: {問題の詳細}\n+- **発見方法**: {構文チェック/コンパイル/動作テスト}\n - **重要度**: {高/中/低}\n-- **対処法**: {対処方法}\n-- **ステータス**: {解決済み/対応中/未対応}\n+- **自動解決**: {実行した解決コマンド・修正内容}\n+- **解決結果**: {解決済み/手動対応が必要}\n+\n+### 解決実行ログ\n+\n+```bash\n+# 実行した解決コマンド例\n+# 構文エラー修正\n+sed -i 's/typo/correct/g' config.js\n+\n+# 依存関係の修正\n+npm install missing-package\n+\n+# 設定ファイル修正\n+jq '.port = 3000' config.json > temp.json && mv temp.json config.json\n+```\n+\n+**解決結果**:\n+- [x] 問題1: 解決済み\n+- [x] 問題2: 解決済み\n+- [ ] 問題3: 手動対応が必要（詳細は推奨事項に記載）\n \n ## 推奨事項\n \n@@ -214,6 +297,7 @@ ps aux | grep node\n ### 完了条件\n 以下の条件を全て満たす場合にタスクを完了とマークします：\n - [ ] 全ての設定確認項目がクリア\n+- [ ] コンパイル・構文チェックが成功（エラーがすべて解決済み）\n - [ ] 全ての動作テストが成功\n - [ ] 品質チェック項目が基準を満たしている\n - [ ] 発見された問題が適切に対処されている\ndiff --git a/commands/kairo-design.md b/commands/kairo-design.md\nindex 01ea8f0..01d6344 100644\n--- a/commands/kairo-design.md\n+++ b/commands/kairo-design.md\n@@ -1,14 +1,23 @@\n # kairo-design\n \n ## 目的\n+\n 承認された要件定義書に基づいて、技術設計文書を生成する。データフロー図、TypeScriptインターフェース、データベーススキーマ、APIエンドポイントを含む包括的な設計を行う。\n \n ## 前提条件\n+\n - `docs/spec/` に要件定義書が存在する\n - 要件がユーザによって承認されている\n \n ## 実行内容\n \n+**【信頼性レベル指示】**:\n+各項目について、元の資料（EARS要件定義書・設計文書含む）との照合状況を以下の信号でコメントしてください：\n+\n+- 🟢 **青信号**: EARS要件定義書・設計文書を参考にしてほぼ推測していない場合\n+- 🟡 **黄信号**: EARS要件定義書・設計文書から妥当な推測の場合\n+- 🔴 **赤信号**: EARS要件定義書・設計文書にない推測の場合\n+\n 1. **要件の分析**\n    - 要件定義書を読み込む\n    - 機能要件と非機能要件を整理する\n@@ -52,61 +61,73 @@\n ## 出力フォーマット例\n \n ### architecture.md\n+\n ```markdown\n # {要件名} アーキテクチャ設計\n \n ## システム概要\n+\n {システムの概要説明}\n \n ## アーキテクチャパターン\n+\n - パターン: {選択したパターン}\n - 理由: {選択理由}\n \n ## コンポーネント構成\n+\n ### フロントエンド\n+\n - フレームワーク: {使用フレームワーク}\n - 状態管理: {状態管理方法}\n \n ### バックエンド\n+\n - フレームワーク: {使用フレームワーク}\n - 認証方式: {認証方法}\n \n ### データベース\n+\n - DBMS: {使用するDBMS}\n - キャッシュ: {キャッシュ戦略}\n ```\n \n ### dataflow.md\n+\n ```markdown\n # データフロー図\n \n ## ユーザーインタラクションフロー\n+\n \\`\\`\\`mermaid\n flowchart TD\n-    A[ユーザー] --> B[フロントエンド]\n-    B --> C[API Gateway]\n-    C --> D[バックエンド]\n-    D --> E[データベース]\n+A[ユーザー] --> B[フロントエンド]\n+B --> C[API Gateway]\n+C --> D[バックエンド]\n+D --> E[データベース]\n \\`\\`\\`\n \n ## データ処理フロー\n+\n \\`\\`\\`mermaid\n sequenceDiagram\n-    participant U as ユーザー\n-    participant F as フロントエンド\n-    participant B as バックエンド\n-    participant D as データベース\n-    \n+participant U as ユーザー\n+participant F as フロントエンド\n+participant B as バックエンド\n+participant D as データベース\n+\n     U->>F: アクション\n     F->>B: APIリクエスト\n     B->>D: クエリ実行\n     D-->>B: 結果返却\n     B-->>F: レスポンス\n     F-->>U: 画面更新\n+\n \\`\\`\\`\n ```\n \n ### interfaces.ts\n+\n ```typescript\n // エンティティ定義\n export interface User {\n@@ -135,6 +156,7 @@ export interface ApiResponse<T> {\n ```\n \n ### database-schema.sql\n+\n ```sql\n -- ユーザーテーブル\n CREATE TABLE users (\n@@ -150,38 +172,46 @@ CREATE INDEX idx_users_email ON users(email);\n ```\n \n ### api-endpoints.md\n+\n ```markdown\n # API エンドポイント仕様\n \n ## 認証\n+\n ### POST /auth/login\n+\n リクエスト:\n \\`\\`\\`json\n {\n-  \"email\": \"user@example.com\",\n-  \"password\": \"password\"\n+\"email\": \"user@example.com\",\n+\"password\": \"password\"\n }\n \\`\\`\\`\n \n レスポンス:\n \\`\\`\\`json\n {\n-  \"success\": true,\n-  \"data\": {\n-    \"token\": \"jwt-token\",\n-    \"user\": { ... }\n-  }\n+\"success\": true,\n+\"data\": {\n+\"token\": \"jwt-token\",\n+\"user\": { ... }\n+}\n }\n \\`\\`\\`\n \n ## ユーザー管理\n+\n ### GET /users/:id\n+\n ### POST /users\n+\n ### PUT /users/:id\n+\n ### DELETE /users/:id\n ```\n \n ## 実行後の確認\n+\n - 作成したファイルの一覧を表示\n - 設計の主要なポイントをサマリーで表示\n - ユーザに確認を促すメッセージを表示\ndiff --git a/commands/kairo-implement.md b/commands/kairo-implement.md\nindex 21744fa..20bc374 100644\n--- a/commands/kairo-implement.md\n+++ b/commands/kairo-implement.md\n@@ -1,9 +1,11 @@\n # kairo-implement\n \n ## 目的\n+\n 分割されたタスクを順番に、またはユーザが指定したタスクを実装する。既存のTDDコマンドを活用して品質の高い実装を行う。\n \n ## 前提条件\n+\n - `docs/tasks/{要件名}-tasks.md` にタスク一覧が存在する\n - ユーザがタスクの実装を承認している\n - 既存のTDDコマンドが利用可能である\n@@ -11,6 +13,13 @@\n \n ## 実行内容\n \n+**【信頼性レベル指示】**:\n+各項目について、元の資料（EARS要件定義書・設計文書含む）との照合状況を以下の信号でコメントしてください：\n+\n+- 🟢 **青信号**: EARS要件定義書・設計文書を参考にしてほぼ推測していない場合\n+- 🟡 **黄信号**: EARS要件定義書・設計文書から妥当な推測の場合\n+- 🔴 **赤信号**: EARS要件定義書・設計文書にない推測の場合\n+\n 1. **タスクの選択**\n    - ユーザが指定したタスクIDを確認\n    - 指定がない場合は、依存関係に基づいて次のタスクを自動選択\ndiff --git a/commands/kairo-requirements.md b/commands/kairo-requirements.md\nindex bb11c34..13dc293 100644\n--- a/commands/kairo-requirements.md\n+++ b/commands/kairo-requirements.md\n@@ -11,6 +11,13 @@\n \n ## 実行内容\n \n+**【信頼性レベル指示】**:\n+各項目について、元の資料（EARS要件定義書・設計文書含む）との照合状況を以下の信号でコメントしてください：\n+\n+- 🟢 **青信号**: EARS要件定義書・設計文書を参考にしてほぼ推測していない場合\n+- 🟡 **黄信号**: EARS要件定義書・設計文書から妥当な推測の場合\n+- 🔴 **赤信号**: EARS要件定義書・設計文書にない推測の場合\n+\n 1. **要件の分析**\n    - ユーザから提供された要件の概要を理解する\n    - 関連するドメイン知識を適用する\n@@ -34,11 +41,15 @@\n    - パフォーマンス要件\n \n 5. **ファイルの作成**\n-   - `docs/spec/{要件名}-requirements.md` として保存\n+   - `docs/spec/{要件名}-requirements.md`: 機能要件と関連文書へのリンク\n+   - `docs/spec/{要件名}-user-stories.md`: 詳細なユーザストーリー\n+   - `docs/spec/{要件名}-acceptance-criteria.md`: 受け入れ基準とテスト項目\n    - マークダウン形式で構造化された文書を作成\n \n ## 出力フォーマット例\n \n+### 1. requirements.md（メインファイル）\n+\n ```markdown\n # {要件名} 要件定義書\n \n@@ -46,13 +57,10 @@\n \n {要件の概要}\n \n-## ユーザストーリー\n-\n-### ストーリー1: {タイトル}\n+## 関連文書\n \n-- **である** {ユーザー種別} **として**\n-- **私は** {実現したいこと} **をしたい**\n-- **そうすることで** {得られる価値}\n+- **ユーザストーリー**: [📖 {要件名}-user-stories.md]({要件名}-user-stories.md)\n+- **受け入れ基準**: [✅ {要件名}-acceptance-criteria.md]({要件名}-acceptance-criteria.md)\n \n ## 機能要件（EARS記法）\n \n@@ -101,20 +109,243 @@\n ### 境界値\n \n - EDGE-101: {境界値ケース}\n+```\n+\n+### 2. user-stories.md（詳細なユーザストーリー）\n+\n+```markdown\n+# {要件名} ユーザストーリー\n+\n+## 概要\n+\n+このドキュメントは{要件名}機能の詳細なユーザストーリーを記載します。\n+\n+## ユーザー種別の定義\n+\n+### プライマリユーザー\n+\n+- **エンドユーザー**: {エンドユーザーの詳細説明}\n+- **管理者**: {管理者の詳細説明}\n+- **開発者**: {開発者の詳細説明}\n+\n+### セカンダリユーザー\n+\n+- **システム管理者**: {システム管理者の詳細説明}\n+- **外部システム**: {外部システムの詳細説明}\n+\n+## ユーザストーリー\n+\n+### 📚 エピック1: {大きな機能グループ}\n+\n+#### ストーリー1.1: {具体的なストーリー名}\n+\n+**ユーザストーリー**:\n+- **私は** {ユーザー種別} **として**\n+- **{具体的な状況・コンテキスト} において**\n+- **{実現したい行動・操作} をしたい**\n+- **そうすることで** {得られる価値・解決される問題}\n+\n+**詳細説明**:\n+- **背景**: {なぜこの機能が必要なのか}\n+- **前提条件**: {このストーリーの前提となる状況}\n+- **利用シーン**: {具体的な利用場面の例}\n+- **期待する体験**: {ユーザーが期待する体験の詳細}\n+\n+**関連要件**: REQ-001, REQ-002\n+\n+**優先度**: 高/中/低\n+\n+**見積もり**: {ストーリーポイントまたは工数}\n+\n+#### ストーリー1.2: {具体的なストーリー名}\n+\n+{同様の形式で記載}\n+\n+### 📚 エピック2: {大きな機能グループ}\n+\n+{同様の形式で記載}\n+\n+## ユーザージャーニー\n+\n+### ジャーニー1: {代表的な利用フロー}\n+\n+```mermaid\n+journey\n+    title {ユーザージャーニーのタイトル}\n+    section {フェーズ1}\n+      {アクション1}: 5: {ユーザー種別}\n+      {アクション2}: 3: {ユーザー種別}\n+    section {フェーズ2}\n+      {アクション3}: 4: {ユーザー種別}\n+      {アクション4}: 5: {ユーザー種別}\n+```\n+\n+**詳細**:\n+1. **{アクション1}**: {詳細な説明}\n+2. **{アクション2}**: {詳細な説明}\n+\n+## ペルソナ定義\n+\n+### ペルソナ1: {代表的ユーザー名}\n+\n+- **基本情報**: {年齢、職業、技術レベル等}\n+- **ゴール**: {このユーザーが達成したいこと}\n+- **課題**: {現在抱えている問題}\n+- **行動パターン**: {典型的な行動の特徴}\n+- **利用環境**: {使用するデバイス、環境等}\n+\n+## 非機能的ユーザー要求\n+\n+### ユーザビリティ要求\n+\n+- **学習容易性**: {初回利用時の学習コスト}\n+- **効率性**: {熟練後の作業効率}\n+- **記憶しやすさ**: {再利用時の記憶のしやすさ}\n+- **エラー対応**: {エラー時の対応しやすさ}\n+- **満足度**: {主観的な満足度}\n+\n+### アクセシビリティ要求\n+\n+- **視覚**: {視覚障害者への配慮}\n+- **聴覚**: {聴覚障害者への配慮}\n+- **運動**: {運動機能障害者への配慮}\n+- **認知**: {認知障害者への配慮}\n+```\n+\n+### 3. acceptance-criteria.md（受け入れ基準）\n+\n+```markdown\n+# {要件名} 受け入れ基準\n+\n+## 概要\n+\n+このドキュメントは{要件名}機能の受け入れ基準とテスト項目を記載します。\n+\n+## 機能テスト基準\n+\n+### REQ-001: {要件名} の受け入れ基準\n+\n+**Given（前提条件）**:\n+- {テスト実行前の状態}\n+- {必要な初期データ}\n+\n+**When（実行条件）**:\n+- {実行するアクション}\n+- {入力するデータ}\n+\n+**Then（期待結果）**:\n+- {期待される出力・状態}\n+- {確認すべき副作用}\n+\n+**テストケース**:\n+- [ ] 正常系: {正常なケースの詳細}\n+- [ ] 異常系: {異常なケースの詳細}\n+- [ ] 境界値: {境界値テストの詳細}\n+\n+### REQ-002: {要件名} の受け入れ基準\n+\n+{同様の形式で記載}\n+\n+## 非機能テスト基準\n+\n+### パフォーマンステスト\n+\n+**NFR-001: {パフォーマンス要件}**\n+\n+- [ ] 応答時間: {具体的な時間基準}\n+- [ ] スループット: {処理量の基準}\n+- [ ] 同時接続数: {同時利用者数の基準}\n+- [ ] リソース使用量: {CPU・メモリ使用量の基準}\n+\n+**テスト方法**:\n+- 負荷テストツール: {使用するツール}\n+- テストシナリオ: {具体的なテスト手順}\n+- 合格基準: {定量的な合格ライン}\n+\n+### セキュリティテスト\n+\n+**NFR-101: {セキュリティ要件}**\n+\n+- [ ] 認証: {認証機能のテスト項目}\n+- [ ] 認可: {権限制御のテスト項目}\n+- [ ] データ保護: {データ暗号化のテスト項目}\n+- [ ] 脆弱性: {セキュリティ脆弱性のテスト項目}\n+\n+## ユーザビリティテスト基準\n+\n+### UX/UIテスト\n+\n+- [ ] 直感的操作性: {操作の分かりやすさ}\n+- [ ] レスポンシブデザイン: {各デバイスでの表示}\n+- [ ] アクセシビリティ: {WCAG 2.1準拠}\n+- [ ] エラーメッセージ: {分かりやすいエラー表示}\n+\n+**テスト方法**:\n+- ユーザビリティテスト: {実施方法}\n+- A/Bテスト: {比較テストの方法}\n+- アクセシビリティチェック: {使用するツール}\n+\n+## Edgeケーステスト基準\n+\n+### EDGE-001: {エラーケース} の受け入れ基準\n+\n+**テストシナリオ**:\n+- {異常な状況の設定}\n+- {期待されるエラーハンドリング}\n+- {ユーザーへの適切な通知}\n+\n+**合格基準**:\n+- [ ] システムがクラッシュしない\n+- [ ] 適切なエラーメッセージが表示される\n+- [ ] データの整合性が保たれる\n+- [ ] 復旧可能な状態を維持する\n+\n+## 統合テスト基準\n+\n+### システム間連携テスト\n+\n+- [ ] 外部API連携: {外部システムとの連携テスト}\n+- [ ] データベース連携: {DB操作の整合性テスト}\n+- [ ] ファイルシステム: {ファイル操作のテスト}\n+\n+## リグレッションテスト基準\n+\n+### 既存機能影響確認\n+\n+- [ ] 既存機能の動作確認: {影響範囲の特定と確認}\n+- [ ] パフォーマンス劣化確認: {既存機能の性能確認}\n+- [ ] セキュリティ設定確認: {セキュリティ機能の継続確認}\n+\n+## 受け入れテスト実行チェックリスト\n+\n+### テスト実行前\n \n-## 受け入れ基準\n+- [ ] テスト環境の準備完了\n+- [ ] テストデータの準備完了\n+- [ ] テストツールの準備完了\n+- [ ] 実行担当者の確認完了\n \n-### 機能テスト\n+### テスト実行中\n \n-- [ ] {テスト項目}\n+- [ ] 全機能テストの実行\n+- [ ] 全非機能テストの実行\n+- [ ] 問題発見時の記録\n+- [ ] 修正後の再テスト\n \n-### 非機能テスト\n+### テスト完了後\n \n-- [ ] {テスト項目}\n+- [ ] テスト結果の記録\n+- [ ] 残存問題の整理\n+- [ ] 受け入れ可否の判定\n+- [ ] ステークホルダーへの報告\n ```\n \n ## 実行後の確認\n \n-- 作成したファイルのパスを表示\n-- 主要な要件の数を報告\n+- 作成した3つのファイルのパスを表示\n+  - `docs/spec/{要件名}-requirements.md`\n+  - `docs/spec/{要件名}-user-stories.md` \n+  - `docs/spec/{要件名}-acceptance-criteria.md`\n+- 主要な要件の数とユーザストーリー数を報告\n+- 各ファイル内のリンクが正しく設定されていることを確認\n - ユーザに確認を促すメッセージを表示\ndiff --git a/commands/kairo-task-verify.md b/commands/kairo-task-verify.md\nindex 08e7aff..c0d613d 100644\n--- a/commands/kairo-task-verify.md\n+++ b/commands/kairo-task-verify.md\n@@ -11,6 +11,13 @@\n \n ## 実行内容\n \n+**【信頼性レベル指示】**:\n+各項目について、元の資料（EARS要件定義書・設計文書含む）との照合状況を以下の信号でコメントしてください：\n+\n+- 🟢 **青信号**: EARS要件定義書・設計文書を参考にしてほぼ推測していない場合\n+- 🟡 **黄信号**: EARS要件定義書・設計文書から妥当な推測の場合\n+- 🔴 **赤信号**: EARS要件定義書・設計文書にない推測の場合\n+\n 1. **タスクファイルの確認**\n    - `docs/tasks/{要件名}-tasks.md` を読み込み\n \ndiff --git a/commands/kairo-tasks.md b/commands/kairo-tasks.md\nindex 4d07e15..4887439 100644\n--- a/commands/kairo-tasks.md\n+++ b/commands/kairo-tasks.md\n@@ -1,15 +1,24 @@\n # kairo-tasks\n \n ## 目的\n-設計文書に基づいて実装タスクを分割し、依存関係を考慮した適切な順序で整理する。各タスクには実装詳細、テスト要件、UI/UX要件を含める。\n+\n+設計文書に基づいて実装タスクを1日単位の粒度で分割し、1ヶ月単位のフェーズに整理する。各フェーズ毎に個別のタスクファイルを作成し、依存関係を考慮した適切な順序で管理する。\n \n ## 前提条件\n+\n - `docs/design/{要件名}/` に設計文書が存在する\n - 設計がユーザによって承認されている（または承認が省略されている）\n - `docs/tasks/` ディレクトリが存在する（なければ作成）\n \n ## 実行内容\n \n+**【信頼性レベル指示】**:\n+各項目について、元の資料（EARS要件定義書・設計文書含む）との照合状況を以下の信号でコメントしてください：\n+\n+- 🟢 **青信号**: EARS要件定義書・設計文書を参考にしてほぼ推測していない場合\n+- 🟡 **黄信号**: EARS要件定義書・設計文書から妥当な推測の場合\n+- 🔴 **赤信号**: EARS要件定義書・設計文書にない推測の場合\n+\n 1. **設計文書の分析**\n    - `docs/design/{要件名}/architecture.md` を確認\n    - `docs/design/{要件名}/database-schema.sql` を確認\n@@ -17,20 +26,25 @@\n    - `docs/design/{要件名}/interfaces.ts` を確認\n    - `docs/design/{要件名}/dataflow.md` を確認\n \n-2. **タスクの洗い出し**\n+2. **既存タスクファイルの確認**\n+   - 既存の`docs/tasks/{要件名}-*.md`ファイルを確認\n+   - 使用済みタスク番号（TASK-0001形式）を抽出\n+   - 新規タスクで重複しない番号を割り当て\n+\n+3. **タスクの洗い出し**\n    - 基盤タスク（DB設定、環境構築など）\n    - バックエンドタスク（API実装）\n    - フロントエンドタスク（UI実装）\n    - 統合タスク（E2Eテストなど）\n \n-3. **依存関係の分析**\n+4. **依存関係の分析**\n    - タスク間の依存関係を明確化\n    - 並行実行可能なタスクを識別\n    - クリティカルパスを特定\n \n-4. **タスクの詳細化**\n+5. **タスクの詳細化**\n    各タスクに以下を含める：\n-   - タスクID（一意の識別子）\n+   - タスクID（TASK-0001形式の4桁番号）\n    - タスク名\n    - タスクタイプ（TDD/DIRECT）\n      - **TDD**: コーディング、ビジネスロジック実装、UI実装、テスト実装など開発作業\n@@ -46,135 +60,278 @@\n      - モバイル対応\n      - アクセシビリティ要件\n \n-5. **タスクの順序付け**\n+6. **タスクの順序付け**\n    - 依存関係に基づいて実行順序を決定\n    - マイルストーンを設定\n    - 並行実行可能なタスクをグループ化\n \n-6. **ファイルの作成**\n-   - `docs/tasks/{要件名}-tasks.md` として保存\n-   - 出力フォーマット例を確認して、出力フォーマット例に沿った情報を記載する\n+7. **フェーズ分割とファイル作成**\n+   - タスクを1ヶ月程度の期間でフェーズに分割\n+   - 各フェーズ毎に個別のタスクファイルを作成\n+   - `docs/tasks/{要件名}-overview.md`: 全体概要とフェーズ一覧\n+   - `docs/tasks/{要件名}-phase1.md`: フェーズ1の詳細タスク\n+   - `docs/tasks/{要件名}-phase2.md`: フェーズ2の詳細タスク\n+   - （以下、フェーズ数に応じて継続）\n+   - 各タスクを1日単位の粒度で設計\n    - 各タスクにチェックボックスを追加してタスクの完了状況を追跡可能にする\n-   - 出力フォーマット例を確認して、出力フォーマット例に沿った情報が抜けていたら追加する\n \n ## 出力フォーマット例\n \n+### 1. overview.md（全体概要）\n+\n ````markdown\n-# {要件名} 実装タスク\n+# {要件名} 実装タスク全体概要\n+\n+## プロジェクト概要\n+\n+- **要件名**: {要件名}\n+- **総期間**: {開始日} 〜 {終了予定日}\n+- **総工数**: {工数}\n+- **総タスク数**: {数}\n+\n+## フェーズ構成\n+\n+| フェーズ | 期間 | 主要成果物 | タスク数 | 工数 | ファイル |\n+|---------|------|-----------|---------|------|---------|\n+| Phase 1: 基盤構築 | 1ヶ月 | 開発環境・DB設定 | 20タスク | 160h | [phase1.md](phase1.md) |\n+| Phase 2: コア機能 | 1ヶ月 | 基本API・認証 | 22タスク | 176h | [phase2.md](phase2.md) |\n+| Phase 3: UI実装 | 1ヶ月 | 画面・コンポーネント | 25タスク | 200h | [phase3.md](phase3.md) |\n+| Phase 4: 統合・最適化 | 2週間 | テスト・性能調整 | 10タスク | 80h | [phase4.md](phase4.md) |\n+\n+## 既存タスク番号の管理\n+\n+**既存ファイル確認結果**:\n+- 確認したファイル: `docs/tasks/{要件名}-*.md`\n+- 使用済みタスク番号: TASK-0001 〜 TASK-0077 (例)\n+- 次回開始番号: TASK-0078\n+\n+## 依存関係\n+\n+```mermaid\n+gantt\n+    title プロジェクト全体スケジュール\n+    dateFormat  YYYY-MM-DD\n+    section Phase 1\n+    基盤構築           :phase1, 2024-01-01, 30d\n+    section Phase 2\n+    コア機能           :phase2, after phase1, 30d\n+    section Phase 3\n+    UI実装            :phase3, after phase2, 30d\n+    section Phase 4\n+    統合・最適化       :phase4, after phase3, 14d\n+```\n+\n+## 進捗管理\n+\n+### 全体進捗\n+- [ ] Phase 1: 基盤構築 (0/20)\n+- [ ] Phase 2: コア機能 (0/22)\n+- [ ] Phase 3: UI実装 (0/25)\n+- [ ] Phase 4: 統合・最適化 (0/10)\n+\n+### マイルストーン\n+- [ ] M1: 開発環境完成 (Phase 1完了時)\n+- [ ] M2: MVP機能完成 (Phase 2完了時)\n+- [ ] M3: UI完成 (Phase 3完了時)\n+- [ ] M4: リリース準備完了 (Phase 4完了時)\n+\n+## リスク管理\n+\n+| リスク | 影響度 | 発生確率 | 対策 |\n+|--------|--------|----------|------|\n+| {リスク項目} | 高/中/低 | 高/中/低 | {対策内容} |\n+\n+## 品質基準\n+\n+- テストカバレッジ: 90%以上\n+- パフォーマンス: 応答時間3秒以内\n+- セキュリティ: OWASP Top 10対応\n+- アクセシビリティ: WCAG 2.1 AA準拠\n+````\n+\n+### 2. phase*.md（各フェーズ詳細）\n+\n+````markdown\n+# {要件名} Phase 1: 基盤構築\n+\n+## フェーズ概要\n+\n+- **期間**: 1ヶ月 (20営業日)\n+- **目標**: 開発環境とデータベース基盤の構築\n+- **成果物**: 動作する開発環境、データベーススキーマ、CI/CD基盤\n+- **担当**: {担当者名}\n+\n+## 週次計画\n+\n+### Week 1: 環境構築\n+- **目標**: 基本的な開発環境の構築\n+- **成果物**: Docker環境、基本設定\n \n-## 概要\n+### Week 2: データベース設計\n+- **目標**: データベーススキーマの実装\n+- **成果物**: DB設計、マイグレーション\n \n-全タスク数: {数}\n-推定作業時間: {時間}\n-クリティカルパス: {タスクID列}\n+### Week 3: CI/CD構築\n+- **目標**: 自動化パイプラインの構築\n+- **成果物**: テスト・デプロイ自動化\n \n-## タスク一覧\n+### Week 4: 基盤テスト・調整\n+- **目標**: 基盤の安定化\n+- **成果物**: 動作確認済み基盤\n \n-### フェーズ1: 基盤構築\n+## 日次タスク\n \n-#### TASK-001: データベース初期設定\n+### Week 1: 環境構築\n+\n+#### Day 1 (TASK-0001): プロジェクト初期化\n \n - [ ] **タスク完了**\n+- **推定工数**: 8時間\n - **タスクタイプ**: DIRECT\n-- **要件リンク**: REQ-401\n+- **要件リンク**: REQ-001\n - **依存タスク**: なし\n - **実装詳細**:\n-  - PostgreSQLのDockerコンテナ設定\n-  - 初期スキーマの作成\n-  - マイグレーション設定\n-- **テスト要件**:\n-  - [ ] データベース接続テスト\n-  - [ ] スキーマ検証テスト\n+  - Node.js/TypeScript環境設定\n+  - package.json設定\n+  - ESLint/Prettier設定\n+  - Git初期化・.gitignore設定\n - **完了条件**:\n-  - [ ] データベースが起動している\n-  - [ ] 全テーブルが作成されている\n+  - [ ] npm run dev で開発サーバーが起動する\n+  - [ ] npm run lint でエラーが出ない\n+  - [ ] TypeScript設定が正しく動作する\n+- **注意事項**: Node.js LTS版を使用すること\n \n-#### TASK-002: バックエンド基本設定\n+#### Day 2 (TASK-0002): Docker環境構築\n \n - [ ] **タスク完了**\n+- **推定工数**: 8時間\n - **タスクタイプ**: DIRECT\n-- **要件リンク**: REQ-001, REQ-002\n-- **依存タスク**: TASK-001\n+- **要件リンク**: REQ-002\n+- **依存タスク**: TASK-0001\n - **実装詳細**:\n-  - Express/NestJSの初期設定\n-  - TypeScript設定\n-  - 環境変数設定\n-- **テスト要件**:\n-  - [ ] サーバー起動テスト\n-  - [ ] ヘルスチェックエンドポイントテスト\n+  - Dockerfile作成\n+  - docker-compose.yml設定\n+  - PostgreSQL・Redis設定\n+  - 環境変数管理設定\n+- **完了条件**:\n+  - [ ] docker-compose up で全サービスが起動する\n+  - [ ] アプリケーションからDB接続できる\n+  - [ ] ホットリロードが動作する\n+- **注意事項**: ポート競合に注意すること\n \n-### フェーズ2: API実装\n+#### Day 3 (TASK-0003): 基本ディレクトリ構造\n \n-#### TASK-101: ユーザー認証API\n+- [ ] **タスク完了**\n+- **推定工数**: 6時間\n+- **タスクタイプ**: DIRECT\n+- **要件リンク**: REQ-003\n+- **依存タスク**: TASK-0002\n+- **実装詳細**:\n+  - src/ディレクトリ構造作成\n+  - テストディレクトリ構造\n+  - 設定ファイル配置\n+  - README.md作成\n+- **完了条件**:\n+  - [ ] Clean Architectureに沿った構造\n+  - [ ] テストファイルの配置が正しい\n+  - [ ] README.mdが充実している\n+- **注意事項**: 後から変更しにくい構造のため慎重に設計\n+\n+#### Day 4 (TASK-0004): ログ・エラーハンドリング基盤\n \n - [ ] **タスク完了**\n+- **推定工数**: 8時間\n - **タスクタイプ**: TDD\n-- **要件リンク**: REQ-101, REQ-102\n-- **依存タスク**: TASK-002\n+- **要件リンク**: REQ-004\n+- **依存タスク**: TASK-0003\n - **実装詳細**:\n-  - JWT認証の実装\n-  - ログイン/ログアウトエンドポイント\n-  - トークンリフレッシュ機能\n+  - Winston/Pinoログライブラリ設定\n+  - エラーハンドリングミドルウェア\n+  - 構造化ログ設定\n+  - ログローテーション設定\n - **テスト要件**:\n-  - [ ] 単体テスト: 認証ロジック\n-  - [ ] 統合テスト: ログインフロー\n-  - [ ] セキュリティテスト: トークン検証\n-- **エラーハンドリング**:\n-  - [ ] 無効な認証情報\n-  - [ ] トークン期限切れ\n-  - [ ] レート制限\n-\n-### フェーズ3: フロントエンド実装\n+  - [ ] ログ出力テスト\n+  - [ ] エラーハンドリングテスト\n+  - [ ] ログレベル制御テスト\n+- **完了条件**:\n+  - [ ] 各レベルのログが正しく出力される\n+  - [ ] エラーが適切にキャッチされる\n+  - [ ] 本番環境でセンシティブ情報が出力されない\n \n-#### TASK-201: ログイン画面\n+#### Day 5 (TASK-0005): 設定管理システム\n \n - [ ] **タスク完了**\n+- **推定工数**: 6時間\n - **タスクタイプ**: TDD\n-- **要件リンク**: REQ-101\n-- **依存タスク**: TASK-101\n+- **要件リンク**: REQ-005\n+- **依存タスク**: TASK-0004\n - **実装詳細**:\n-  - React/Vue/Angularコンポーネント\n-  - フォームバリデーション\n-  - エラー表示\n-- **UI/UX要件**:\n-  - [ ] ローディング状態: ボタン無効化 + スピナー\n-  - [ ] エラー表示: トースト通知\n-  - [ ] モバイル対応: レスポンシブデザイン\n-  - [ ] アクセシビリティ: ARIA属性、キーボード操作\n+  - 環境別設定ファイル\n+  - 設定バリデーション\n+  - 機密情報管理\n+  - 設定読み込みモジュール\n - **テスト要件**:\n-  - [ ] コンポーネントテスト\n-  - [ ] E2Eテスト: ログインフロー\n-  - [ ] レスポンシブテスト\n+  - [ ] 設定読み込みテスト\n+  - [ ] 環境別設定テスト\n+  - [ ] 設定バリデーションテスト\n+- **完了条件**:\n+  - [ ] 環境変数が正しく読み込まれる\n+  - [ ] 不正な設定でエラーになる\n+  - [ ] 機密情報が適切に管理される\n \n-### フェーズ4: 統合・最適化\n+### Week 2: データベース設計\n \n-#### TASK-301: E2Eテストスイート\n+#### Day 6 (TASK-0006): データベース接続基盤\n \n - [ ] **タスク完了**\n+- **推定工数**: 8時間\n - **タスクタイプ**: TDD\n-- **要件リンク**: 全要件\n-- **依存タスク**: TASK-201\n+- **要件リンク**: REQ-401\n+- **依存タスク**: TASK-0005\n - **実装詳細**:\n-  - Cypress/Playwrightセットアップ\n-  - 主要ユーザーフローのテスト\n-  - CI/CD統合\n+  - TypeORM/Prisma設定\n+  - 接続プール設定\n+  - マイグレーション基盤\n+  - データベースモニタリング\n+- **テスト要件**:\n+  - [ ] 接続プールテスト\n+  - [ ] 接続障害処理テスト\n+  - [ ] トランザクション管理テスト\n+- **完了条件**:\n+  - [ ] データベース接続が安定している\n+  - [ ] 接続プールが適切に動作する\n+  - [ ] マイグレーションコマンドが動作する\n \n-## 実行順序\n+{...続き、Day 7-20まで同様の形式で記載...}\n \n-```mermaid\n-gantt\n-    title タスク実行スケジュール\n-    dateFormat  YYYY-MM-DD\n-    section 基盤\n-    TASK-001           :a1, 2024-01-01, 1d\n-    TASK-002           :a2, after a1, 1d\n-    section API\n-    TASK-101           :b1, after a2, 2d\n-    section フロントエンド\n-    TASK-201           :c1, after b1, 2d\n-    section 統合\n-    TASK-301           :d1, after c1, 1d\n-```\n+## フェーズ完了基準\n+\n+- [ ] 全タスクが完了している (20/20)\n+- [ ] 開発環境が安定して動作する\n+- [ ] データベーススキーマが完成している\n+- [ ] CI/CDパイプラインが動作する\n+- [ ] 基盤コードのテストカバレッジが90%以上\n+- [ ] セキュリティチェックが完了している\n+- [ ] ドキュメントが整備されている\n+\n+## 次フェーズへの引き継ぎ事項\n+\n+- 開発環境の利用方法\n+- データベーススキーマの詳細\n+- CI/CDの運用方法\n+- 設定項目の一覧\n+- トラブルシューティング情報\n+\n+## 振り返り\n+\n+### 計画との差異\n+- {計画と実際の差異を記録}\n+\n+### 学習事項\n+- {技術的な学習事項を記録}\n+\n+### 改善点\n+- {次フェーズで改善すべき点を記録}\n ````\n \n ## サブタスクテンプレート\n@@ -200,8 +357,31 @@ gantt\n ```\n \n ## 実行後の確認\n-- 作成したファイルのパスを表示\n-- タスクの総数と推定時間を表示\n-- クリティカルパスを強調表示\n+\n+- 作成したファイルの一覧を表示\n+  - `docs/tasks/{要件名}-overview.md`: 全体概要とフェーズ一覧\n+  - `docs/tasks/{要件名}-phase1.md`: フェーズ1詳細\n+  - `docs/tasks/{要件名}-phase2.md`: フェーズ2詳細\n+  - （以下、フェーズ数に応じて継続）\n+- 各フェーズの概要とタスク数を表示\n+- 全体スケジュールと依存関係を表示\n+- プロジェクト期間と総工数を報告\n+- **既存タスク番号の確認結果を表示**\n+  - 既存ファイルから抽出した使用済み番号\n+  - 新規タスクで使用開始する番号\n+  - 重複なく連続した番号の割り当て確認\n - ユーザに実装開始の確認を促すメッセージを表示\n-```\n+\n+## ファイル間リンクの確認\n+\n+- overview.mdから各phase*.mdへのリンクが正しく設定されていることを確認\n+- 各フェーズファイル内のタスク依存関係が正しく記載されていることを確認\n+- **全タスクIDがTASK-0001形式の4桁で統一されていることを確認**\n+- マイルストーンとフェーズ完了基準が明確に定義されていることを確認\n+\n+## タスク番号管理の注意事項\n+\n+- 既存ファイルがある場合は必ずGrepツールで使用済み番号を確認\n+- TASK-0001からTASK-9999まで最大9999タスクをサポート\n+- 番号の重複や欠番が発生しないよう注意深く管理\n+- 複数のフェーズファイルにまたがってもタスク番号は連続で割り当て\ndiff --git a/commands/tdd-green.md b/commands/tdd-green.md\nindex 4815156..ca6c43c 100644\n--- a/commands/tdd-green.md\n+++ b/commands/tdd-green.md\n@@ -1,4 +1,4 @@\n-# TDD Greenフェーズ（最小限の実装）\n+# TDD Greenフェーズ（実装）\n \n TDDのGreenフェーズを実行します。\n \n@@ -8,7 +8,7 @@ TDDのGreenフェーズを実行します。\n \n **Taskツール実行**: `/tdd-load-context` でTDD関連ファイルの読み込みとコンテキスト準備を実行\n \n-読み込み完了後、準備されたコンテキスト情報を基にGreenフェーズ（最小実装）の作業を開始します。\n+読み込み完了後、準備されたコンテキスト情報を基にGreenフェーズ（実装）の作業を開始します。\n \n **テスト実行時はTaskツールを利用する**\n \n@@ -22,19 +22,23 @@ TDDのGreenフェーズを実行します。\n \n ## 目標\n \n-Redフェーズで作成したテストを通すための**最小限の実装**を行ってください。\n+Redフェーズで作成したテストを通すための**実装**を行ってください。\n \n ## 実装の原則\n \n - **テストが確実に通ること最優先**\n - コードの美しさは二の次（次のRefactorフェーズで改善）\n - 「とりあえず動く」レベルでOK\n-- ハードコーディングでも構わない\n - 複雑なロジックは後回し、シンプルな実装を心がける\n - テストがなかなか通らないときは、Taskツールを使用して失敗原因を調べてから修正の計画を立てて実装する\n - 既存のテストがエラーになった場合は仕様を元に適切に修正する\n-- NEVER: 必要なテストのスキップ\n-- NEVER: 必要なテストの削除\n+- **モック使用の制限**: テストコード以外でモックを記述しない（実装コードは実際のロジックを書く）\n+- **ファイルサイズ管理**: 実装ファイルが800行を超えた時点でファイル分割を検討する\n+- NEVER: 必要なテストのスキップ禁止\n+- NEVER: 必要なテストの削除禁止\n+- NEVER: 実装コード内でのモック・スタブの記述禁止\n+- NEVER: 実装コード内でDBに代わるインメモリーストレージの利用禁止\n+- NEVER: 実装コード内でDB操作の省略禁止\n \n ## 実装時の日本語コメント要件\n \n@@ -106,6 +110,7 @@ try {\n ```\n \n ## 実装例\n+\n ```javascript\n /**\n  * 【機能概要】: JSONファイルパスを検証し、有効/無効なパスを分類する\n@@ -134,9 +139,11 @@ function {{function_name}}(input) {\n    - 【シンプル実装】: 複雑なアルゴリズムは後のリファクタで追加\n    - 【可読性重視】: 現段階では理解しやすさを最優先\n 3. **ファイルサイズを意識した実装**\n-   - 【モジュール設計】: 将来的に500行未満になるよう機能を適切に分離\n+   - 【800行制限】: 実装ファイルが800行を超えた時点で分割を検討\n+   - 【モジュール設計】: 機能単位でファイルを適切に分離\n    - 【関数分割】: 長大な関数は小さな単位に分割して実装\n    - 【責任境界】: 各ファイルの責任範囲を明確にして実装\n+   - 【分割戦略】: 機能・レイヤー・ドメインでファイルを分離\n 4. **コード品質基準の考慮**\n    - 【静的解析対応】: lintやtypecheckでエラーが出ない実装を心がける\n    - 【フォーマット統一】: プロジェクトの既存フォーマットに合わせた実装\n@@ -147,6 +154,11 @@ function {{function_name}}(input) {\n 6. **エラーハンドリングも最小限**\n    - 【必要最小限】: テストで要求される部分のみ実装\n    - 【将来拡張可能】: リファクタ段階で詳細なエラー処理を追加予定\n+7. **モック使用の制限**\n+   - 【実装コード制限】: 実装コード内でモック・スタブを使用しない\n+   - 【テストコード限定】: モックはテストコード内でのみ使用\n+   - 【実際のロジック実装】: 実装コードは実際の処理を記述する\n+   - 【依存関係注入】: 必要に応じて依存性注入パターンで実装\n \n ## 提供してください\n \n@@ -154,6 +166,8 @@ function {{function_name}}(input) {\n 2. **テスト実行結果**: Taskツールを使用して実際にテストが通ることの確認\n 3. **実装の説明**: どのような考えで実装したか（日本語コメントとの対応関係）\n 4. **課題の特定**: 現在の実装の問題点（リファクタ対象の明確化）\n+5. **ファイルサイズチェック**: 実装ファイルの行数確認（800行超過時の分割計画）\n+6. **モック使用確認**: 実装コードにモック・スタブが含まれていないことの確認\n \n 実装完了後、以下を実行してください：\n \n@@ -183,6 +197,8 @@ function {{function_name}}(input) {\n - リファクタ箇所: 明確に特定可能\n - 機能的問題: なし\n - コンパイルエラー: なし\n+- ファイルサイズ: 800行以下または分割計画が明確\n+- モック使用: 実装コードにモック・スタブが含まれていない\n \n ⚠️ 要改善:\n - テストの一部が失敗（Taskツールで検出）\n@@ -190,6 +206,8 @@ function {{function_name}}(input) {\n - リファクタ方針が不明\n - 機能に懸念がある\n - コンパイルエラーが存在\n+- ファイルサイズが800行を超過し分割計画が不明\n+- 実装コードにモック・スタブが含まれている\n ```\n \n ## TODO更新パターン\ndiff --git a/commands/tdd-load-context.md b/commands/tdd-load-context.md\nindex 457573d..ec3dd56 100644\n--- a/commands/tdd-load-context.md\n+++ b/commands/tdd-load-context.md\n@@ -7,41 +7,37 @@ TDD開発に必要なファイルを効率的に読み込み、開発コンテ\n 以下のTaskツールによる並列読み込みを実行します：\n \n ```\n-Taskツールで以下のファイルを並列読み込み:\n-\n-1. TDDメモファイルの確認\n-   - `docs/implements/{{task_id}}/{feature_name}-memo.md`\n+1. 【読み込み】TDDメモファイルの確認\n+   - Readツール: `docs/implements/{{task_id}}/{feature_name}-memo.md`\n    - 既存の開発履歴、フェーズ情報、検証結果を把握\n \n-2. 要件定義文書の確認  \n-   - `docs/implements/{{task_id}}/{feature_name}-requirements.md`\n+2. 【読み込み】要件定義文書の確認  \n+   - Readツール: `docs/implements/{{task_id}}/{feature_name}-requirements.md`\n    - 機能仕様、入出力、制約条件を把握\n \n-3. テストケース定義の確認\n-   - `docs/implements/{{task_id}}/{feature_name}-testcases.md` \n+3. 【読み込み】テストケース定義の確認\n+   - Readツール: `docs/implements/{{task_id}}/{feature_name}-testcases.md` \n    - 予定テストケース、分類、期待値を把握\n \n-4. プロジェクト設計文書の確認（存在する場合）\n-   - `docs/spec/{feature_name}-requirements.md` (EARS要件定義書)\n-   - `docs/design/{feature_name}/architecture.md`\n-   - `docs/design/{feature_name}/interfaces.ts`\n-   - `docs/design/{feature_name}/api-endpoints.md`\n-   - `docs/design/{feature_name}/database-schema.sql`\n-   - `docs/design/{feature_name}/dataflow.md`\n-\n-5. プロジェクト構造・ライブラリの確認\n-   - `package.json` - 利用可能ライブラリの把握\n-   - 既存テストファイル構造の確認\n-   - 類似機能の実装パターン調査\n-\n-6. タスク管理文書の確認\n-   - `docs/tasks/{要件名}-tasks.md` - 全体タスクの進捗状況\n-   - 現在のタスクステータスと依存関係の把握\n+4. 【探索のみ】プロジェクト設計文書の特定\n+   - Globツール: `docs/spec/{feature_name}-requirements.md` の存在確認\n+   - Globツール: `docs/design/{feature_name}/` ディレクトリ内ファイルの特定\n+   - 見つかったファイルパスを記録（読み込みは実行せず）\n+\n+5. 【探索のみ】プロジェクト構造・ライブラリファイルの特定\n+   - Globツール: `package.json` の存在確認\n+   - Globツール: 既存テストファイル構造の把握（`**/*test*.js`, `**/*spec*.js`等）\n+   - Grepツール: 類似機能の実装パターン調査（関連キーワード検索）\n+   - 見つかったファイルパスを記録（読み込みは実行せず）\n+\n+6. 【探索のみ】タスク管理文書の特定\n+   - Globツール: `docs/tasks/{要件名}-tasks.md` の存在確認\n+   - 見つかったファイルパスを記録（読み込みは実行せず）\n ```\n \n ## 読み込み結果の整理\n \n-Taskツールによる並列読み込み完了後、以下の形式で情報を整理します：\n+読み込み・探索完了後、以下の形式で情報を整理します：\n \n ### 📋 開発コンテキスト情報\n \n@@ -61,21 +57,12 @@ Taskツールによる並列読み込み完了後、以下の形式で情報を\n - **制約条件**: [パフォーマンス・セキュリティ・技術制約]\n - **参照EARS要件**: [REQ-XXX, NFR-XXX等の要件ID]\n \n-### 🧪 テスト情報\n-- **予定テストケース総数**: [数]個\n-- **テスト分類**:\n-  - 正常系: [数]個\n-  - 異常系: [数]個  \n-  - エッジケース: [数]個\n-- **実装済みテスト**: [数]個 (実装率: [%])\n-- **テスト成功率**: [通過数]/[実装数] ([%])\n-\n ### 🔧 技術・実装情報\n - **使用言語**: [JavaScript/TypeScript等]\n - **テストフレームワーク**: [Jest/Mocha等]\n-- **利用可能ライブラリ**: [主要ライブラリ一覧]\n-- **既存実装パターン**: [参考にする既存実装]\n-- **命名規則**: [プロジェクトの命名規則]\n+- **関連ファイル**: [探索で見つかった関連ファイルパス一覧]\n+- **設計文書パス**: [見つかった設計文書のパス一覧]\n+- **類似実装パス**: [参考にできる既存実装のファイルパス]\n \n ### 📈 進捗・品質情報\n - **全体タスク進捗**: [完了数]/[総数] ([%])\n@@ -106,16 +93,17 @@ Taskツールによる並列読み込み完了後、以下の形式で情報を\n \n 開発コンテキストの準備を行います：\n \n-**Taskツール実行**: `/tdd-load-context` でTDD関連ファイルの読み込みとコンテキスト準備を実行\n+**Taskツール実行**: `/tdd-load-context` でTDD関連ファイルの読み込み・探索とコンテキスト準備を実行\n \n 読み込み完了後、準備されたコンテキスト情報を基に{現在のフェーズ}の作業を開始します。\n ```\n \n ## 効果\n \n-- **効率化**: 複数ファイルの並列読み込みによる時間短縮\n+- **効率化**: メモ・要件・テストケースは読み込み、その他は探索のみで時間短縮\n - **一貫性**: 全TDDフェーズで統一されたコンテキスト準備\n - **品質向上**: 必要情報の読み込み漏れ防止\n-- **保守性**: ファイル読み込みロジックの一元管理\n+- **保守性**: ファイル読み込み・探索ロジックの一元管理\n+- **軽量化**: 関連ファイルは特定のみで、必要に応じて個別に読み込み可能\n \n このタスクにより、TDD開発の各フェーズで必要な情報を効率的に準備できます。\n\\ No newline at end of file\ndiff --git a/commands/tdd-red.md b/commands/tdd-red.md\nindex e1fed85..5775413 100644\n--- a/commands/tdd-red.md\n+++ b/commands/tdd-red.md\n@@ -14,6 +14,13 @@ TDDのRedフェーズを実行します。\n \n **【対象テストケース】**: {{test_case_name}}\n \n+## テストケース追加目標数\n+\n+**テストケース追加目標数**: 10以上（利用可能なテストケースが10未満の場合は全て追加）\n+\n+未実装のテストケースから10個以上のテストケースを選択して実装してください。利用可能なテストケースが10個未満の場合は、利用可能な全てのテストケースを実装対象とします。\n+既にテストケースが実装済みの場合はテストケース定義に書かれているテストケースからテストを追加します。\n+\n ## 信頼性レベル指示\n \n テストコード作成時には、各テストケースの内容について元の資料との照合状況を以下の信号でコメントしてください：\n@@ -163,6 +170,7 @@ docs/implements/{{task_id}}/{feature_name}-memo.mdファイルの形式：\n \n ## 関連ファイル\n \n+- 元タスクファイル: `docs/tasks/{taskファイルのパス}.md`\n - 要件定義: `docs/implements/{{task_id}}/{feature_name}-requirements.md`\n - テストケース定義: `docs/implements/{{task_id}}/{feature_name}-testcases.md`\n - 実装ファイル: `[実装ファイルのパス]`\ndiff --git a/commands/tdd-refactor.md b/commands/tdd-refactor.md\nindex b1cb1ef..04f44c6 100644\n--- a/commands/tdd-refactor.md\n+++ b/commands/tdd-refactor.md\n@@ -42,6 +42,9 @@ Greenフェーズで実装されたコードを以下の観点で改善してく\n - 依存関係の整理\n - モジュール化の検討\n \n+- NEVER: 実装コード内でのモック・スタブの記述\n+- NEVER: 実装コード内でDBに代わるインメモリーストレージの利用\n+\n ### 4. ファイルサイズの最適化\n \n - ファイルサイズが500行未満になるよう分割・最適化\ndiff --git a/commands/tdd-requirements.md b/commands/tdd-requirements.md\nindex 464e073..bd03082 100644\n--- a/commands/tdd-requirements.md\n+++ b/commands/tdd-requirements.md\n@@ -81,7 +81,7 @@ TDD開発を始めます。以下の機能について要件を整理してく\n \n 整理後、以下を実行してください：\n \n-1. 要件定義書をdoc/implementation/{feature_name}-requirements.mdに保存（既存ファイルがある場合は追記）\n+1. 要件定義書をdocs/implements/{{task_id}}/{feature_name}-requirements.mdに保存（既存ファイルがある場合は追記）\n 2. TODOステータスを更新（要件定義完了をマーク）\n 3. **品質判定**: 要件の品質を以下の基準で判定\n    - 要件が明確で曖昧さがない\ndiff --git a/commands/tdd-testcases.md b/commands/tdd-testcases.md\nindex 8e0f6b8..25d5500 100644\n--- a/commands/tdd-testcases.md\n+++ b/commands/tdd-testcases.md\n@@ -139,7 +139,7 @@ afterEach(() => {\n \n すべて洗い出したら以下を実行してください：\n \n-1. テストケース一覧をdoc/implementation/{feature_name}-testcases.mdに保存（既存ファイルがある場合は追記）\n+1. テストケース一覧をdocs/implements/{{task_id}}/{feature_name}-testcases.mdに保存（既存ファイルがある場合は追記）\n 2. TODOステータスを更新（テストケース洗い出し完了をマーク）\n 3. **品質判定**: テストケースの品質を以下の基準で判定\n    - テストケース分類: 正常系・異常系・境界値が網羅されている\ndiff --git a/commands/tdd-verify-complete.md b/commands/tdd-verify-complete.md\nindex df2d6e5..3ec8275 100644\n--- a/commands/tdd-verify-complete.md\n+++ b/commands/tdd-verify-complete.md\n@@ -6,21 +6,31 @@ TDD開発でテストケースの実装が完全に完了しているかを検\n \n リファクタリング後に、予定していたテストケースがすべて実装されているかを確認し、実装漏れを防ぎます。\n \n+## 重要な原則\n+\n+**⚠️ この工程では修正を行わない**\n+- この検証フェーズではコードやテストの修正は一切行わない\n+- 問題を発見した場合は内容をmemoファイルに記載する\n+- 修正作業は後の工程（次のTDDサイクルや別のタスク）に委ねる\n+- 検証・記録・報告に専念する\n+\n ## 検証手順\n \n ### 1. 既存テストのグリーン状態確認\n \n - **必須**: 全ての既存テストが成功していることを確認\n - `npm test` または `jest` を実行してテスト結果を確認\n-- テスト失敗がある場合は先に修正が必要\n-- すべてのテストがグリーンであることを確認してから次のステップに進む\n+- **テスト失敗がある場合**: memoファイルに記載し、後の工程で修正対応\n+- **この工程では修正禁止**: テスト失敗を発見してもここでは修正しない\n+- テスト状態を記録し、次のステップに進む\n+\n+### 2. 事前準備\n+\n+検証コンテキストの準備を行います：\n \n-### 2. TDDメモファイルと要件定義文書の確認\n-- `doc/implementation/{test_case_name}-memo.md` を確認（メモファイルが存在する場合）\n-- `doc/implementation/{feature_name}-requirements.md` を確認\n-- `doc/implementation/{feature_name}-testcases.md` を確認\n-- `doc/todo.md` を確認して対象タスクの現在のステータスを把握\n-- 予定していたテストケース数と内容を把握\n+**Taskツール実行**: `/tdd-load-context` でTDD関連ファイルの読み込みとコンテキスト準備を実行\n+\n+読み込み完了後、準備されたコンテキスト情報を基にテストケース完全性検証を開始します。\n \n ### 2. 実装済みテストケースの確認\n \n@@ -107,14 +117,16 @@ TDD開発でテストケースの実装が完全に完了しているかを検\n \n ### 5. 検証結果のメモファイル記録とTODO.md更新\n \n-#### メモファイルへの追記\n-検証完了後、以下の情報を `doc/implementation/{test_case_name}-memo.md` に追記：\n+#### メモファイルの統合更新\n+\n+検証完了後、`docs/implements/{{task_id}}/{feature_name}-memo.md` の既存内容を整理・統合し、以下の情報に更新：\n \n ```markdown\n # [機能名] TDD開発完了記録\n \n ## 確認すべきドキュメント\n \n+- `docs/tasks/{taskファイルのパス}.md`\n - `docs/implements/{{task_id}}/{feature_name}-requirements.md`\n - `docs/implements/{{task_id}}/{feature_name}-testcases.md`\n \n@@ -133,9 +145,25 @@ TDD開発でテストケースの実装が完全に完了しているかを検\n ### 品質保証\n [品質確保で重要だった観点]\n \n-## ⚠️ 注意点（該当時のみ）\n+## ⚠️ 注意点・修正が必要な項目（該当時のみ）\n [実装時の重要な注意事項や未完了項目]\n \n+### 🔧 後工程での修正対象\n+#### テスト失敗\n+- [失敗しているテストケース名]\n+- **失敗内容**: [具体的な失敗内容]\n+- **修正方針**: [推奨される修正方法]\n+\n+#### 実装不足\n+- [未実装の機能や要件]\n+- **不足内容**: [具体的な不足内容]\n+- **対応方針**: [推奨される対応方法]\n+\n+#### 品質改善\n+- [品質向上が必要な箇所]\n+- **改善内容**: [具体的な改善内容]\n+- **改善方針**: [推奨される改善方法]\n+\n ---\n *既存のメモ内容から重要な情報を統合し、重複・詳細な経過記録は削除*\n ```\n@@ -147,11 +175,11 @@ TDD開発でテストケースの実装が完全に完了しているかを検\n 4. **再利用重視**: 今後の開発で参考になる情報を優先して残す\n 5. **関連情報重視**: 仕様情報などの情報は優先して残す\n \n-#### TODO.md完了マーク自動更新\n+#### 元タスクファイル完了マーク自動更新\n \n-検証が完了した場合、以下の手順でTODO.mdを自動更新：\n+検証が完了した場合、以下の手順で元タスクファイルを自動更新：\n \n-1. **完了タスクの特定**: 現在のTDD開発対象タスクを特定\n+1. **完了タスクの特定**: 現在のTDD開発対象タスクを元タスクファイルから特定\n 2. **完了マーク追加**: 該当タスクに `✅ **完了**` マークを追加\n 3. **完了理由記載**: `(TDD開発完了 - [テスト数]テストケース全通過)` を追記\n 4. **サブタスク更新**: 関連するサブタスクにも `[x]` チェックマークを追加\n@@ -182,32 +210,37 @@ TDD開発でテストケースの実装が完全に完了しているかを検\n ```\n \n **メモファイル記録**: 検証結果をメモファイルに自動追記する。\n-**TODO.md更新**: 完了したタスクに✅完了マークを自動追加する。\n+**元タスクファイル更新**: 完了したタスクに✅完了マークを自動追加する。\n \n #### 実装不足がある場合\n \n-以下のメッセージを提供し、追加実装を促す：\n+以下のメッセージを提供し、状況を記録する：\n \n ```\n ⚠️ テストケース実装不足を検出\n \n 未実装テストケース（[数]個）があります。\n-完全な品質保証のため、以下の追加実装をお勧めします：\n+以下の内容をmemoファイルに記録しました：\n \n [未実装テストケースのリスト]\n \n-追加実装を行いますか？それとも現状で次のステップに進みますか？\n+【重要】この工程では修正を行いません。\n+修正が必要な内容はmemoファイルに記載され、後の工程で対応されます。\n+\n+現状の記録を完了し、次のステップに進みます。\n ```\n \n-**メモファイル記録**: 実装不足の検証結果もメモファイルに追記する。\n-**TODO.md更新**: 実装不足の場合でも、部分完了したタスクがあれば適切にマークする。\n+**メモファイル記録**: 実装不足の検証結果と修正方針をメモファイルに詳細記録する。\n+**元タスクファイル更新**: 実装不足の場合でも、部分完了したタスクがあれば適切にマークする。\n+**修正作業禁止**: この工程では一切の修正作業を行わない。\n \n ## 検証対象ファイル\n \n ### 確認すべきドキュメント\n-- `doc/todo.md` - プロジェクト全体のタスク完了状況（完了マーク更新対象）\n-- `doc/implementation/{feature_name}-requirements.md`\n-- `doc/implementation/{feature_name}-testcases.md`\n+\n+- **元タスクファイル**: `docs/tasks/{taskファイルのパス}.md` - プロジェクト全体のタスク完了状況（完了マーク更新対象）\n+- `docs/implements/{{task_id}}/{feature_name}-requirements.md`\n+- `docs/implements/{{task_id}}/{feature_name}-testcases.md`\n \n ### 確認すべきテストファイル\n \n@@ -349,7 +382,8 @@ TDD開発でテストケースの実装が完全に完了しているかを検\n ❌ 未実装テストケース:\n [未実装テストケースの詳細リスト]\n \n-🤔 要件充実度向上のため追加実装を行いますか？\n+📝 **修正内容をmemoファイルに記録済み**\n+後の工程で対応予定です。この工程では修正を行いません。\n ```\n \n この検証により、TDD開発の品質と完全性を確保します。\n",
+  "diffTruncated": false,
+  "tree": [
+    ".claude/commands/release.yml",
+    ".devcontainer/Dockerfile",
+    ".devcontainer/devcontainer.json",
+    ".github/workflows/ci.yml",
+    ".github/workflows/release.yml",
+    ".gitignore",
+    ".npmrc",
+    ".secretlintrc.json",
+    "CLAUDE.md",
+    "CONTRIBUTING.md",
+    "LICENSE",
+    "MANUAL.md",
+    "README.md",
+    "biome.json",
+    "book/01-fundamentals/01-aitdd-definition.md",
+    "book/02-environment/01-tools-setup.md",
+    "book/02-environment/02-claude-usage.md",
+    "book/02-environment/03-workflow-setup.md",
+    "book/03-process/01-extended-tdd-flow.md",
+    "book/03-process/02-todo-and-specification.md",
+    "book/03-process/03-test-case-creation.md",
+    "book/03-process/04-rgr-validation-cycle.md",
+    "book/03-process/05-validation-details.md",
+    "book/04-hands-on/01-first-project.md",
+    "book/04-hands-on/02-crud-example.md",
+    "book/04-hands-on/03-api-development.md",
+    "book/04-hands-on/04-error-handling.md",
+    "book/05-optimization/01-prompt-design.md",
+    "book/05-optimization/02-ai-inference-visualization.md",
+    "book/05-optimization/03-continuous-improvement.md",
+    "book/06-collaboration/01-balance-strategy.md",
+    "book/06-collaboration/02-creativity-points.md",
+    "book/06-collaboration/03-review-quality.md",
+    "book/07-case-studies/01-experimental-results.md",
+    "book/07-case-studies/02-evolution-case.md",
+    "book/07-case-studies/03-failure-cases.md",
+    "book/08-best-practices/01-tech-selection.md",
+    "book/08-best-practices/02-documentation.md",
+    "book/08-best-practices/03-future-vision.md",
+    "book/aitdd-getting-started.md",
+    "book/toc.md",
+    "commands/direct-setup.md",
+    "commands/direct-verify.md",
+    "commands/kairo-design.md",
+    "commands/kairo-implement.md",
+    "commands/kairo-requirements.md",
+    "commands/kairo-task-verify.md",
+    "commands/kairo-tasks.md",
+    "commands/rev-design.md",
+    "commands/rev-requirements.md",
+    "commands/rev-specs.md",
+    "commands/rev-tasks.md",
+    "commands/start-server.md",
+    "commands/tdd-cycle-full.sh",
+    "commands/tdd-green.md",
+    "commands/tdd-load-context.md",
+    "commands/tdd-red.md",
+    "commands/tdd-refactor.md",
+    "commands/tdd-requirements.md",
+    "commands/tdd-testcases.md",
+    "commands/tdd-todo.md",
+    "commands/tdd-verify-complete.md",
+    "mise.toml",
+    "package.json",
+    "src/cli.ts",
+    "src/commands/gitignore.tsx",
+    "src/commands/install.tsx",
+    "src/commands/uninstall.tsx",
+    "tsconfig.json",
+    "tsup.config.ts"
+  ],
+  "explanation": {
+    "what": "direct-verify.md、kairo-design.md、kairo-implement.md、kairo-requirements.md、kairo-task-verify.md、kairo-tasks.md、tdd-green.md、tdd-load-context.md、tdd-red.md、tdd-refactor.md、tdd-requirements.md、tdd-testcases.md、tdd-verify-complete.md の13コマンドファイルを修正した(計+792/-200行)。特にkairo-requirements.md(+245/-14)とkairo-tasks.md(+272/-92)の変更が大きく、他は数行〜数十行規模の修正。",
+    "why": "PR titleの「ファイルパスの設定が一部ズレてたのを修正」の通り、各コマンドファイル中でファイルパスの指定がずれていた箇所を修正したことが主目的。PR bodyには「tdd-greenで積極的にモックを使うのを修正」ともあり、tdd-green.mdについてはモックの使い方に関する記述も見直された。bodyの「その他細かい改善」からは、上記以外にも各コマンドで細部の改善が加えられたことが分かるが、個々の具体的な改善内容はPR記述からは特定できない。",
+    "highlights": [],
+    "langNotes": [],
+    "diagram": null,
+    "evidence": "pr",
+    "refs": [{ "type": "pr", "number": 17, "url": "https://github.com/classmethod/tsumiki/pull/17" }],
+    "model": "claude-sonnet-5",
+    "generatedAt": "2026-08-04T12:00:00Z"
+  }
+}
